@@ -1,9 +1,12 @@
 import uuid
 import time
+import inspect
 from unittest import TestCase
 from ovsdal.dataobject import DataObject
 from ovsdal.tests.store import DummyStores
 from ovsdal.exceptions import *
+# Below import is required for dynamic object testing
+from ovsdal.hybrids.disk import *
 
 
 class TestDataObject(TestCase):
@@ -48,11 +51,6 @@ class TestDataObject(TestCase):
     def test_readonlyproperty(self):
         test = TestObject(store=DummyStores)
         self.assertIsNotNone(test.used_size, 'RO property should return data')
-
-    def test_readonlyisreadonly(self):
-        test = TestObject(store=DummyStores)
-        with self.assertRaises(Exception):
-            test.used_size = 10
 
     def test_datastorewins(self):
         test = TestObject(store=DummyStores)
@@ -99,6 +97,21 @@ class TestDataObject(TestCase):
         self.assertEqual(test.used_size, value, 'Value should still be from cache')
         time.sleep(2)
         self.assertNotEqual(test.used_size, value, 'Value should be different')
+
+    def test_objectproperties(self):
+        for member in inspect.getmembers(__import__('ovsdal').hybrids):
+            if inspect.ismodule(member[1]):
+                for submember in inspect.getmembers(member[1]):
+                    if submember[1] is not DataObject and inspect.isclass(submember[1]):
+                        instance = submember[1](store=DummyStores)
+                        self.assertIsNotNone(instance.guid)
+                        properties = []
+                        for item in dir(instance):
+                            if hasattr(submember[1], item) and isinstance(getattr(submember[1], item), property):
+                                properties.append(item)
+                        for attribute in instance._expiry.keys():
+                            self.assertIn(attribute, properties, '%s should be a property' % attribute)
+                            data = getattr(instance, attribute)
 
 
 class TestObject(DataObject):

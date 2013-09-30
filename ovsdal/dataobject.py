@@ -163,7 +163,7 @@ class DataObject(object):
                       datastore_wins = self._datastoreWins,
                       store          = self._store)
 
-    # Guid RO property
+    # Guid readonly property
     @property
     def guid(self):
         """
