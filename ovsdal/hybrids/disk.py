@@ -2,7 +2,6 @@ from ovsdal.dataobject import DataObject
 
 
 class Disk(DataObject):
-    _name = 'disk'  # Name of this object
     _blueprint = {'name'             : None,  # All persistent stored fields, with default value
                   'description'      : 'Test disk',
                   'size'             : 0,
@@ -40,7 +39,7 @@ class Disk(DataObject):
             # Simulate fetching real data
             from random import randint
             snapshots = []
-            for i in xrange(0, randint(0, 10)):
+            for i in xrange(0, randint(1, 10)):
                 snapshots.append({'consistent': randint(0, 1) == 1, 'id': i})
             return snapshots
         return self._backend_property(get_data)

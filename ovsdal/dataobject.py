@@ -14,13 +14,16 @@ class DataObject(object):
     * Volatile caching: Memcached
     """
 
+    # Properties that needs to be overwritten by implementation
+    _blueprint = None            # Blueprint data of the objec type
+    _objectexpiry = None         # Timeout of main object cache
+    _expiry = None               # Timeout of readonly object properties cache
+
+    # Internal properties
     _name = None                 # Name of the object
     _guid = None                 # Guid identifier of the object
     _namespace = 'openvstorage'  # Namespace of the object
     _original = {}               # Original data copy
-    _blueprint = {}              # Blueprint data of the objec type
-    _objectexpiry = 0            # Timeout of main object cache
-    _expiry = {}                 # Timeout of readonly object properties cache
     _store = None                # Used storage backend
 
     def __init__(self, guid=None, datastore_wins=False, store=None):
@@ -36,6 +39,7 @@ class DataObject(object):
 
         self._datastoreWins = datastore_wins
         self._store = store
+        self._name = self.__class__.__name__.lower()
 
         # Init guid
         new = False

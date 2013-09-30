@@ -1,12 +1,12 @@
 import uuid
 import time
 import inspect
+import imp
+import os
 from unittest import TestCase
 from ovsdal.dataobject import DataObject
 from ovsdal.tests.store import DummyStores
 from ovsdal.exceptions import *
-# Below import is required for dynamic object testing
-from ovsdal.hybrids.disk import *
 
 
 class TestDataObject(TestCase):
@@ -99,15 +99,21 @@ class TestDataObject(TestCase):
         self.assertNotEqual(test.used_size, value, 'Value should be different')
 
     def test_objectproperties(self):
-        for member in inspect.getmembers(__import__('ovsdal').hybrids):
-            if inspect.ismodule(member[1]):
-                for submember in inspect.getmembers(member[1]):
-                    if submember[1] is not DataObject and inspect.isclass(submember[1]):
-                        instance = submember[1](store=DummyStores)
+        path = os.path.join(os.path.dirname(__file__), '..', 'hybrids')
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                module = imp.load_source(filename.replace('.py', ''), os.path.join(path, filename))
+                for member in inspect.getmembers(module):
+                    member_type = member[1]
+                    if member_type is not DataObject and inspect.isclass(member_type):
+                        self.assertIsInstance(member_type._blueprint, dict, '_blueprint is a required property on %s' % member_type.__name__)
+                        self.assertIsInstance(member_type._objectexpiry, int, '_objectexpiry is a required property on %s' % member_type.__name__)
+                        self.assertIsInstance(member_type._expiry, dict, '_expiry is a required property on %s' % member_type.__name__)
+                        instance = member_type(store=DummyStores)
                         self.assertIsNotNone(instance.guid)
                         properties = []
                         for item in dir(instance):
-                            if hasattr(submember[1], item) and isinstance(getattr(submember[1], item), property):
+                            if hasattr(member[1], item) and isinstance(getattr(member[1], item), property):
                                 properties.append(item)
                         for attribute in instance._expiry.keys():
                             self.assertIn(attribute, properties, '%s should be a property' % attribute)
@@ -115,7 +121,6 @@ class TestDataObject(TestCase):
 
 
 class TestObject(DataObject):
-    _name = 'testobject'
     _blueprint = {'name'       : 'Object',
                   'description': 'Test object',
                   'size'       : 0}
