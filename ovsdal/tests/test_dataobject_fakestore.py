@@ -3,6 +3,7 @@ import time
 from unittest import TestCase
 from ovsdal.dataobject import DataObject
 from ovsdal.tests.store import DummyStores
+from ovsdal.exceptions import *
 
 
 class TestDataObject(TestCase):
@@ -85,7 +86,7 @@ class TestDataObject(TestCase):
         test.name = 'one'
         test.save()
         test2.name = 'two'
-        self.assertRaises(Exception, test2.save)
+        self.assertRaises(ConcurrencyException, test2.save)
         test.delete()
 
     def test_volatileproperty(self):

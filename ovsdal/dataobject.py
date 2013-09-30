@@ -2,6 +2,7 @@ import json
 import inspect
 import uuid
 import copy
+from exceptions import *
 
 
 class DataObject(object):
@@ -126,7 +127,7 @@ class DataObject(object):
             else:
                 data[attribute] = self._data[attribute]
         if data_conflicts:
-            raise Exception('Got field conflicts while saving %s. Conflicts: %s' % (self._name, ', '.join(data_conflicts)))
+            raise ConcurrencyException('Got field conflicts while saving %s. Conflicts: %s' % (self._name, ', '.join(data_conflicts)))
 
         # Save the data
         self._data = copy.deepcopy(data)
