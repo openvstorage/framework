@@ -10,7 +10,12 @@ from ovsdal.exceptions import *
 
 
 class TestDataObject(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
+        DummyStores.clean()
+
+    @classmethod
+    def tearDownClass(cls):
         DummyStores.clean()
 
     def test_invalidobject(self):
@@ -50,7 +55,7 @@ class TestDataObject(TestCase):
 
     def test_readonlyproperty(self):
         test = TestObject(store=DummyStores)
-        self.assertIsNotNone(test.used_size, 'RO property should return data')
+        self.assertIsNotNone(test.time, 'RO property should return data')
 
     def test_datastorewins(self):
         test = TestObject(store=DummyStores)
@@ -90,13 +95,28 @@ class TestDataObject(TestCase):
     def test_volatileproperty(self):
         test = TestObject(store=DummyStores)
         test.size = 1000000
-        value = test.used_size
+        value = test.time
         time.sleep(2)
-        self.assertEqual(test.used_size, value, 'Value should still be from cache')
+        self.assertEqual(test.time, value, 'Value should still be from cache')
         time.sleep(2)
-        self.assertEqual(test.used_size, value, 'Value should still be from cache')
+        self.assertEqual(test.time, value, 'Value should still be from cache')
         time.sleep(2)
-        self.assertNotEqual(test.used_size, value, 'Value should be different')
+        self.assertNotEqual(test.time, value, 'Value should be different')
+
+    def test_persistency(self):
+        test = TestObject(store=DummyStores)
+        test.name = 'test'
+        test.save()
+        # Right after a save, the cache is invalidated
+        test2 = TestObject(test.guid, store=DummyStores)
+        self.assertFalse(test2._metadata['cache'], 'Object should be retreived from persistent backend')
+        # Subsequent calls will retreive the object from cache
+        test3 = TestObject(test.guid, store=DummyStores)
+        self.assertTrue(test3._metadata['cache'], 'Object should be retreived from cache')
+        # After the object expiry passed, it will be retreived from backend again
+        time.sleep(12)
+        test4 = TestObject(test.guid, store=DummyStores)
+        self.assertFalse(test4._metadata['cache'], 'Object should be retreived from persistent backend')
 
     def test_objectproperties(self):
         path = os.path.join(os.path.dirname(__file__), '..', 'hybrids')
@@ -123,14 +143,13 @@ class TestDataObject(TestCase):
 class TestObject(DataObject):
     _blueprint = {'name'       : 'Object',
                   'description': 'Test object',
-                  'size'       : 0}
-    _objectexpiry = 300
-    _expiry = {'used_size': 5}
+                  'number'     : 0}
+    _objectexpiry = 10
+    _expiry = {'time': 5}
 
     @property
-    def used_size(self):
+    def time(self):
         def get_data():
-            # Simulate fetching real data
-            from random import randint
-            return randint(0, self._data['size'])
+            import time
+            return time.time()
         return self._backend_property(get_data)

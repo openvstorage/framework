@@ -25,6 +25,7 @@ class DataObject(object):
     _namespace = 'openvstorage'  # Namespace of the object
     _original = {}               # Original data copy
     _store = None                # Used storage backend
+    _metadata = {}               # Some metadata, mainly used for unit testing
 
     def __init__(self, guid=None, datastore_wins=False, store=None):
         """
@@ -60,12 +61,16 @@ class DataObject(object):
         self._volatile = self._store.volatile()
 
         # Load data from cache or persistent backend where appropriate
+        self._metadata['cache'] = None
         if new:
             self._data = {}
         else:
             self._data = self._volatile.get(self._key)
             if self._data is None:
+                self._metadata['cache'] = False
                 self._data = json.loads(self._persistent.get(self._key))
+            else:
+                self._metadata['cache'] = True
 
         # Set default values on new fields
         for key, default in self._blueprint.iteritems():
@@ -83,8 +88,7 @@ class DataObject(object):
         self._original = copy.deepcopy(self._data)
 
         # Re-cache the object
-        if new is False:
-            self._volatile.set(self._key, self._data, self._objectexpiry)
+        self._volatile.set(self._key, self._data, self._objectexpiry)
 
     # Helper method to support dynamic adding of properties
     def _add_property(self, attribute, value):
@@ -179,7 +183,7 @@ class DataObject(object):
     # Helper method supporting cache wrapping the readonly properties
     def _backend_property(self, function):
         caller_name = inspect.stack()[1][3]
-        cache_key = '%s_%s' % (self._key, caller_name)
+        cache_key   = '%s_%s' % (self._key, caller_name)
         cached_data = self._volatile.get(cache_key)
         if cached_data is None:
             cached_data = function()  # Load data from backend
