@@ -5,32 +5,36 @@ import imp
 import os
 from unittest import TestCase
 from ovsdal.dataobject import DataObject
-from ovsdal.tests.store import DummyStores
+from ovsdal.tests.store import DummyStoreFactory, InvalidStoreFactory
 from ovsdal.exceptions import *
 
 
 class TestDataObject(TestCase):
     @classmethod
     def setUpClass(cls):
-        DummyStores.clean()
+        DummyStoreFactory.clean()
+
+    @classmethod
+    def setUp(cls):
+        DataObject.set_storefactory(DummyStoreFactory)
 
     @classmethod
     def tearDownClass(cls):
-        DummyStores.clean()
+        DummyStoreFactory.clean()
 
     def test_invalidobject(self):
-        self.assertRaises(Exception, TestObject, uuid.uuid4(), None, DummyStores)
+        self.assertRaises(Exception, TestObject, uuid.uuid4(), None)
 
     def test_newobjet_delete(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.save()
         guid = test.guid
         self.assertIsNotNone(guid, 'Guid should not be None')
         test.delete()
-        self.assertRaises(Exception, TestObject, guid, None, DummyStores)
+        self.assertRaises(Exception, TestObject,  guid, None)
 
     def test_discard(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.name = 'one'
         test.save()
         test.name = 'two'
@@ -39,29 +43,29 @@ class TestDataObject(TestCase):
         test.delete()
 
     def test_updateproperty(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.name = 'test'
         self.assertIs(test.name, 'test', 'Name should be updated')
         test.delete()
 
     def test_datapersistent(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         guid = test.guid
         test.name = 'test'
         test.save()
-        test2 = TestObject(guid, store=DummyStores)
+        test2 = TestObject(guid)
         self.assertEqual(test.name, test2.name, 'Data should be persistent')
         test.delete()
 
     def test_readonlyproperty(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         self.assertIsNotNone(test.time, 'RO property should return data')
 
     def test_datastorewins(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.name = 'initial'
         test.save()
-        test2 = TestObject(test.guid, datastore_wins=True, store=DummyStores)
+        test2 = TestObject(test.guid, datastore_wins=True)
         test.name = 'one'
         test.save()
         test2.name = 'two'
@@ -70,10 +74,10 @@ class TestDataObject(TestCase):
         test.delete()
 
     def test_datastoreloses(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.name = 'initial'
         test.save()
-        test2 = TestObject(test.guid, datastore_wins=False, store=DummyStores)
+        test2 = TestObject(test.guid, datastore_wins=False)
         test.name = 'one'
         test.save()
         test2.name = 'two'
@@ -82,10 +86,10 @@ class TestDataObject(TestCase):
         test.delete()
 
     def test_datastoreraises(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.name = 'initial'
         test.save()
-        test2 = TestObject(test.guid, datastore_wins=None, store=DummyStores)
+        test2 = TestObject(test.guid, datastore_wins=None)
         test.name = 'one'
         test.save()
         test2.name = 'two'
@@ -93,7 +97,7 @@ class TestDataObject(TestCase):
         test.delete()
 
     def test_volatileproperty(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.size = 1000000
         value = test.time
         time.sleep(2)
@@ -104,18 +108,18 @@ class TestDataObject(TestCase):
         self.assertNotEqual(test.time, value, 'Value should be different')
 
     def test_persistency(self):
-        test = TestObject(store=DummyStores)
+        test = TestObject()
         test.name = 'test'
         test.save()
         # Right after a save, the cache is invalidated
-        test2 = TestObject(test.guid, store=DummyStores)
+        test2 = TestObject(test.guid)
         self.assertFalse(test2._metadata['cache'], 'Object should be retreived from persistent backend')
         # Subsequent calls will retreive the object from cache
-        test3 = TestObject(test.guid, store=DummyStores)
+        test3 = TestObject(test.guid)
         self.assertTrue(test3._metadata['cache'], 'Object should be retreived from cache')
         # After the object expiry passed, it will be retreived from backend again
         time.sleep(12)
-        test4 = TestObject(test.guid, store=DummyStores)
+        test4 = TestObject(test.guid)
         self.assertFalse(test4._metadata['cache'], 'Object should be retreived from persistent backend')
 
     def test_objectproperties(self):
@@ -129,7 +133,7 @@ class TestDataObject(TestCase):
                         self.assertIsInstance(member_type._blueprint, dict, '_blueprint is a required property on %s' % member_type.__name__)
                         self.assertIsInstance(member_type._objectexpiry, int, '_objectexpiry is a required property on %s' % member_type.__name__)
                         self.assertIsInstance(member_type._expiry, dict, '_expiry is a required property on %s' % member_type.__name__)
-                        instance = member_type(store=DummyStores)
+                        instance = member_type()
                         self.assertIsNotNone(instance.guid)
                         properties = []
                         for item in dir(instance):
@@ -138,6 +142,16 @@ class TestDataObject(TestCase):
                         for attribute in instance._expiry.keys():
                             self.assertIn(attribute, properties, '%s should be a property' % attribute)
                             data = getattr(instance, attribute)
+
+    def test_nostore(self):
+        TestObject.set_storefactory(None)
+        with self.assertRaises(InvalidStoreFactoryException):
+            test = TestObject()
+
+    def test_invalidstore(self):
+        TestObject.set_storefactory(InvalidStoreFactory)
+        with self.assertRaises(InvalidStoreFactoryException):
+            test = TestObject()
 
 
 class TestObject(DataObject):

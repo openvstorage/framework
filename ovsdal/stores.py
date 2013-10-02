@@ -2,10 +2,10 @@ import memcache
 from arakoon import Arakoon
 
 
-class KeyValueStores(object):
+class DefaultStoreFactory(object):
     @staticmethod
-    def persistent(cluster):
-        arakoon_config = Arakoon.ArakoonClientConfig(cluster,
+    def persistent():
+        arakoon_config = Arakoon.ArakoonClientConfig('openvstorage',
                                                      {'cfvsa002': (['172.22.1.4'], 8872)})
         return Arakoon.ArakoonClient(config=arakoon_config)
 

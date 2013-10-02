@@ -20,14 +20,14 @@ class DataObject(object):
     _expiry = None               # Timeout of readonly object properties cache
 
     # Internal properties
-    _name = None                 # Name of the object
-    _guid = None                 # Guid identifier of the object
-    _namespace = 'openvstorage'  # Namespace of the object
-    _original = {}               # Original data copy
-    _store = None                # Used storage backend
-    _metadata = {}               # Some metadata, mainly used for unit testing
+    _store_factory = None    # Store factory
+    _name = None             # Name of the object
+    _guid = None             # Guid identifier of the object
+    _namespace = 'ovs_data'  # Namespace of the object
+    _original = {}           # Original data copy
+    _metadata = {}           # Some metadata, mainly used for unit testing
 
-    def __init__(self, guid=None, datastore_wins=False, store=None):
+    def __init__(self, guid=None, datastore_wins=False):
         """
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
@@ -39,7 +39,6 @@ class DataObject(object):
         """
 
         self._datastoreWins = datastore_wins
-        self._store = store
         self._name = self.__class__.__name__.lower()
 
         # Init guid
@@ -51,14 +50,16 @@ class DataObject(object):
             self._guid = str(guid)
 
         # Build base keys
-        self._key = '%s_%s' % (self._name, self._guid)
+        self._key = '%s_%s_%s' % (self._namespace, self._name, self._guid)
 
         # Load backends
-        if self._store is None:
-            from store import KeyValueStores
-            self._store = KeyValueStores
-        self._persistent = self._store.persistent(self._namespace)
-        self._volatile = self._store.volatile()
+        if DataObject._store_factory is None:
+            raise InvalidStoreFactoryException
+        try:
+            self._persistent = DataObject._store_factory.persistent()
+            self._volatile = DataObject._store_factory.volatile()
+        except:
+            raise InvalidStoreFactoryException
 
         # Load data from cache or persistent backend where appropriate
         self._metadata['cache'] = None
@@ -104,6 +105,10 @@ class DataObject(object):
     # Helper method supporting property setting
     def _fset(self, attribute, value):
         self._data[attribute] = value
+
+    @classmethod
+    def set_storefactory(cls, factory):
+        DataObject._store_factory = factory
 
     # Save method, saving to persistent backend and invalidating cache
     def save(self):
@@ -168,8 +173,7 @@ class DataObject(object):
         """
 
         self.__init__(guid           = self._guid,
-                      datastore_wins = self._datastoreWins,
-                      store          = self._store)
+                      datastore_wins = self._datastoreWins)
 
     # Guid readonly property
     @property

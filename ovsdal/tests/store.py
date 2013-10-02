@@ -2,15 +2,18 @@ import time
 import json
 
 
-class DummyStores(object):
+class InvalidStoreFactory(object):
+    pass
+
+
+class DummyStoreFactory(object):
     @staticmethod
     def clean():
         DummyPersistentStore.clean()
         DummyVolatileStore.clean()
 
     @staticmethod
-    def persistent(namespace):
-        # namespace is not used in dummy
+    def persistent():
         return DummyPersistentStore()
 
     @staticmethod
