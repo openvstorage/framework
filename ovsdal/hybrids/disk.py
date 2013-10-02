@@ -1,4 +1,5 @@
 from ovsdal.dataobject import DataObject
+from machine import Machine
 
 
 class Disk(DataObject):

@@ -1,7 +1,9 @@
 import json
 import inspect
+import imp
 import uuid
 import copy
+import os
 from exceptions import *
 
 
@@ -27,6 +29,10 @@ class DataObject(object):
     _original = {}           # Original data copy
     _metadata = {}           # Some metadata, mainly used for unit testing
 
+    # Public properties
+    new = False
+    dirty = False
+
     def __init__(self, guid=None, datastore_wins=False):
         """
         Loads an object with a given guid. If no guid is given, a new object
@@ -40,12 +46,13 @@ class DataObject(object):
 
         self._datastoreWins = datastore_wins
         self._name = self.__class__.__name__.lower()
+        self.new = False
+        self.dirty = False
 
         # Init guid
-        new = False
         if guid is None:
             self._guid = str(uuid.uuid4())
-            new = True
+            self.new = True
         else:
             self._guid = str(guid)
 
@@ -63,7 +70,7 @@ class DataObject(object):
 
         # Load data from cache or persistent backend where appropriate
         self._metadata['cache'] = None
-        if new:
+        if self.new:
             self._data = {}
         else:
             self._data = self._volatile.get(self._key)
@@ -76,14 +83,21 @@ class DataObject(object):
         # Set default values on new fields
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
-                self._data[key] = default
+                if inspect.isclass(default) and issubclass(default, DataObject):
+                    instance = default()
+                    self._data[key] = {'id'    : None,
+                                       'source': inspect.getfile(instance.__class__),
+                                       'type'  : instance.__class__.__name__}
+                else:
+                    self._data[key] = default
 
         # Add properties where appropriate, hooking in the correct dictionary
-        for attribute in self._blueprint.keys():
+        for attribute, default in self._blueprint.iteritems():
             if attribute not in dir(self):
-                self._add_property(attribute,
-                                   self._data.get(attribute,
-                                                  self._blueprint[attribute]))
+                if inspect.isclass(default) and issubclass(default, DataObject):
+                    self._add_cproperty(attribute, self._data.get(attribute, default))
+                else:
+                    self._add_sproperty(attribute, self._data.get(attribute, default))
 
         # Store original data
         self._original = copy.deepcopy(self._data)
@@ -92,19 +106,39 @@ class DataObject(object):
         self._volatile.set(self._key, self._data, self._objectexpiry)
 
     # Helper method to support dynamic adding of properties
-    def _add_property(self, attribute, value):
-        fget = lambda self: self._fget(attribute)
-        fset = lambda self, value: self._fset(attribute, value)
+    def _add_sproperty(self, attribute, value):
+        fget = lambda self: self._get_sproperty(attribute)
+        fset = lambda self, value: self._set_sproperty(attribute, value)
+        setattr(self.__class__, attribute, property(fget, fset))
+        self._data[attribute] = value
+
+    def _add_cproperty(self, attribute, value):
+        fget = lambda self: self._get_cproperty(attribute)
+        fset = lambda self, value: self._set_cproperty(attribute, value)
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
     # Helper method spporting property fetching
-    def _fget(self, attribute):
+    def _get_sproperty(self, attribute):
         return self._data[attribute]
 
+    def _get_cproperty(self, attribute):
+        filename = self._data[attribute]['source'].replace('.pyc', '.py')
+        name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
+        module = imp.load_source(name, filename)
+        cls = getattr(module, self._data[attribute]['type'])
+        return cls(self._data[attribute]['id'])
+
     # Helper method supporting property setting
-    def _fset(self, attribute, value):
+    def _set_sproperty(self, attribute, value):
+        self.dirty = True
         self._data[attribute] = value
+
+    def _set_cproperty(self, attribute, value):
+        self.dirty = True
+        self._data[attribute] = {'id'    : value.guid,
+                                 'source': inspect.getfile(value.__class__),
+                                 'type'  : value.__class__.__name__}
 
     @classmethod
     def set_storefactory(cls, factory):
@@ -151,6 +185,8 @@ class DataObject(object):
         for key in self._expiry.keys():
             self._volatile.delete('%s_%s' % (self._key, key))
         self._volatile.delete(self._key)
+        self.dirty = False
+        self.new = False
 
     # Delete the object
     def delete(self):

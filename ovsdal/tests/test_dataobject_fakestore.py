@@ -153,10 +153,31 @@ class TestDataObject(TestCase):
         with self.assertRaises(InvalidStoreFactoryException):
             test = TestObject()
 
+    def test_parentobjects(self):
+        test = TestObject()
+        self.assertTrue(test.parent.new, 'parent should be None')
+        parent = OtherObject()
+        parent.save()
+        test.parent = parent
+        self.assertFalse(test.parent.new, 'parent should be available')
+        self.assertIsNotNone(test.parent.name, 'parent should be browsable')
+        test.save()
+        test2 = TestObject(test.guid)
+        self.assertIsNotNone(test2.parent.name, 'parent link should be persistent')
+        parent.delete()
+        test.delete()
+
+
+class OtherObject(DataObject):
+    _blueprint = {'name': 'Other'}
+    _objectexpiry = 10
+    _expiry = {}
+
 
 class TestObject(DataObject):
     _blueprint = {'name'       : 'Object',
                   'description': 'Test object',
+                  'parent'     : OtherObject,
                   'number'     : 0}
     _objectexpiry = 10
     _expiry = {'time': 5}
