@@ -1,4 +1,4 @@
-import pylibmc
+import memcache
 from arakoon import Arakoon
 
 
@@ -11,4 +11,4 @@ class KeyValueStores(object):
 
     @staticmethod
     def volatile():
-        return pylibmc.Client(['127.0.0.1'], binary=True)
+        return memcache.Client(['10.100.138.253:11211'])
