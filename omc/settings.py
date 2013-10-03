@@ -11,9 +11,9 @@ BASE_NAME = parser.get('main', 'base_name')
 BASE_WWW_DIR = os.path.dirname(__file__)
 BASE_LOG_DIR = parser.get('main', 'log_folder') + '/' + BASE_NAME
 
-FRONTEND_ROOT = '/' + BASE_NAME
-PORTAL_ROOT   = '/' + BASE_NAME + '/portal'
-STATIC_URL    = '/' + BASE_NAME + '/static/'  # STATIC_URL must end with a slash
+FRONTEND_ROOT = ''
+PORTAL_ROOT   = '/portal'
+STATIC_URL    = '/static/'  # STATIC_URL must end with a slash
 
 ADMINS = (
     ('Kenneth Henderick', 'kenneth.henderick@cloudfounders.com'),
@@ -84,6 +84,7 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
     BASE_NAME + '.frontend',
 )
 
