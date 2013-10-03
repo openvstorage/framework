@@ -6,11 +6,10 @@ class Disk(DataObject):
     _blueprint = {'name'             : None,  # All persistent stored fields, with default value
                   'description'      : 'Test disk',
                   'size'             : 0,
-                  'parentdiskid'     : None,
                   'storagepoolid'    : None,
                   'volumedriverid'   : 1,
                   'machine'          : Machine,
-                  'pmachineid'       : 3,
+                  'pmachine'         : Machine,
                   'status'           : 'ATTACHED',
                   'type'             : 'DSSVOL',
                   'serialnr'         : 'ADEF194FDE',

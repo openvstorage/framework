@@ -5,7 +5,7 @@ import imp
 import os
 from unittest import TestCase
 from ovsdal.dataobject import DataObject
-from ovsdal.datalist import DataList
+from ovsdal.dataobjectlist import DataObjectList
 from ovsdal.tests.store import DummyStoreFactory, InvalidStoreFactory
 from ovsdal.helpers import Reflector
 from ovsdal.exceptions import *
@@ -203,7 +203,7 @@ class TestDataObject(TestCase):
         test = TestObject()
         # Children should be instantiated as empty list
         self.assertEqual(len(test.children), 0, 'Children should be empty')
-        # DataList object should behave as a default python list
+        # DataObjectList object should behave as a default python list
         test.children.append(OtherObject())
         test.children.append(OtherObject())
         test.children[0].name = 'first'
@@ -229,7 +229,7 @@ class TestDataObject(TestCase):
         self.assertNotIn(item.guid, test.children.descriptor['guids'], 'Popped child should be removed from list')
         test.children.insert(1, item)
         self.assertEqual(test.children[1].guid, item.guid, 'Insert should work')
-        new_list = DataList(OtherObject)
+        new_list = DataObjectList(OtherObject)
         new_object = OtherObject()
         new_object.name = 'third'
         new_object.save()
@@ -245,13 +245,13 @@ class TestDataObject(TestCase):
             item.delete()
         # We can only set a list property to one of the defined type
         with self.assertRaises(TypeError):
-            test.children = DataList(TestObject)
-        test.children = DataList(OtherObject)
+            test.children = DataObjectList(TestObject)
+        test.children = DataObjectList(OtherObject)
         test.delete()
 
     def test_datalistvalidation(self):
         # A list created with an empty constructor should raise errors on every call
-        test = DataList()
+        test = DataObjectList()
         self.assertRaises(RuntimeError, test.append, None)
         self.assertRaises(RuntimeError, test.extend, None)
         self.assertRaises(RuntimeError, test.insert, 0, None)
@@ -268,7 +268,7 @@ class TestDataObject(TestCase):
         test.initialze(Reflector.get_object_descriptor(OtherObject()))
         self.assertRaises(TypeError, test.append, TestObject())
         self.assertRaises(TypeError, test.insert, 0, TestObject())
-        self.assertRaises(TypeError, test.extend, DataList(TestObject))
+        self.assertRaises(TypeError, test.extend, DataObjectList(TestObject))
 
     def test_datalistrecursivesave(self):
         test = TestObject()

@@ -4,7 +4,7 @@ import uuid
 import copy
 from exceptions import *
 from helpers import Reflector
-from datalist import DataList
+from dataobjectlist import DataObjectList
 
 
 class DataObject(object):
@@ -90,21 +90,19 @@ class DataObject(object):
         # Set default values on new fields
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
-                if inspect.isclass(default) and issubclass(default, DataObject):
+                if DataObject.is_dataobject(default):
                     self._data[key] = Reflector.get_object_descriptor(default())
-                elif isinstance(default, list) and len(default) == 1 and \
-                        inspect.isclass(default[0]) and issubclass(default[0], DataObject):
-                    self._data[key] = DataList(default[0]).descriptor
+                elif isinstance(default, list) and len(default) == 1 and DataObject.is_dataobject(default[0]):
+                    self._data[key] = DataObjectList(default[0]).descriptor
                 else:
                     self._data[key] = default
 
         # Add properties where appropriate, hooking in the correct dictionary
         for attribute, default in self._blueprint.iteritems():
             if attribute not in dir(self):
-                if inspect.isclass(default) and issubclass(default, DataObject):
+                if DataObject.is_dataobject(default):
                     self._add_cproperty(attribute, self._data[attribute])
-                elif isinstance(default, list) and len(default) == 1 and \
-                        inspect.isclass(default[0]) and issubclass(default[0], DataObject):
+                elif isinstance(default, list) and len(default) == 1 and DataObject.is_dataobject(default[0]):
                     self._add_lproperty(attribute, self._data[attribute])
                 else:
                     self._add_sproperty(attribute, self._data[attribute])
@@ -149,7 +147,7 @@ class DataObject(object):
 
     def _get_lproperty(self, attribute):
         if attribute not in self._objects:
-            value = DataList()
+            value = DataObjectList()
             value.initialze(self._data[attribute])
             self._objects[attribute] = value
         return self._objects[attribute]
@@ -182,6 +180,15 @@ class DataObject(object):
     @classmethod
     def set_storefactory(cls, factory):
         DataObject._store_factory = factory
+
+    #######################
+    ## Static helper method
+    #######################
+
+    @staticmethod
+    def is_dataobject(value):
+        return inspect.isclass(value) and issubclass(value, DataObject)
+
 
     #######################
     ## Saving data to persistent store and invalidating volatile store

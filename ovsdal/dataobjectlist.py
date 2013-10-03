@@ -1,7 +1,7 @@
 from helpers import Reflector
 
 
-class DataList(object):
+class DataObjectList(object):
     def __init__(self, objecttype=None):
         self._initialized = False
         if objecttype is not None:
@@ -26,7 +26,7 @@ class DataList(object):
 
     def append(self, value):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
         if not isinstance(value, self.type):
             raise TypeError('Only an object of type %s can be appended' % self.type.__name__)
 
@@ -36,9 +36,9 @@ class DataList(object):
 
     def extend(self, new_list):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
-        if not isinstance(new_list, DataList) or new_list.type.__name__ != self.type.__name__:
-            raise TypeError('Only a list of type DataList<%s> can be added' % self.type.__name__)
+            raise RuntimeError('DataObjectList not yet initialized')
+        if not isinstance(new_list, DataObjectList) or new_list.type.__name__ != self.type.__name__:
+            raise TypeError('Only a list of type DataObjectList<%s> can be added' % self.type.__name__)
 
         for guid in new_list.descriptor['guids']:
             if guid not in self.descriptor['guids']:
@@ -47,7 +47,7 @@ class DataList(object):
 
     def insert(self, index, value):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
         if not isinstance(value, self.type):
             raise TypeError('Only an object of type %s can be inserted' % self.type.__name__)
 
@@ -57,7 +57,7 @@ class DataList(object):
 
     def remove(self, value):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         if value.guid in self.descriptor['guids']:
             self.descriptor['guids'].remove(value.guid)
@@ -65,7 +65,7 @@ class DataList(object):
 
     def pop(self, **kwargs):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         guid = self.descriptor['guids'].pop(**kwargs)
         value = self._get_object(guid)
@@ -74,31 +74,31 @@ class DataList(object):
 
     def index(self, value, start=None, stop=None):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         return self.descriptor['guids'].index(value.guid)
 
     def count(self, value):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         return self.descriptor['guids'].count(value.guid)
 
     def sort(self, **kwargs):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         self.descriptor['guids'].sort(**kwargs)
 
     def reverse(self):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         self.descriptor['guids'].reverse()
 
     def __iter__(self):
         if not self._initialized:
-            raise RuntimeError('DataList not yet initialized')
+            raise RuntimeError('DataObjectList not yet initialized')
 
         for guid in self.descriptor['guids']:
             yield self._get_object(guid)
