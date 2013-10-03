@@ -25,6 +25,9 @@ class DataObject(object):
     _objectexpiry = None         # Timeout of main object cache
     _expiry = None               # Timeout of readonly object properties cache
 
+    # Class property
+    _store_factory = None        # Store factory
+
     #######################
     ## Constructor
     #######################
@@ -40,9 +43,8 @@ class DataObject(object):
         ** None: in case changed field were also changed externally, an error will be raised
         """
 
-        self._datastoreWins = datastore_wins
+        self._datastore_wins = datastore_wins
         self._name = self.__class__.__name__.lower()
-        self._store_factory = None    # Store factory
         self._name = None             # Name of the object
         self._guid = None             # Guid identifier of the object
         self._namespace = 'ovs_data'  # Namespace of the object
@@ -118,20 +120,20 @@ class DataObject(object):
     #######################
 
     def _add_sproperty(self, attribute, value):
-        fget = lambda self: self._get_sproperty(attribute)
-        fset = lambda self, value: self._set_sproperty(attribute, value)
+        fget = lambda s: s._get_sproperty(attribute)
+        fset = lambda s, v: s._set_sproperty(attribute, v)
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
     def _add_cproperty(self, attribute, value):
-        fget = lambda self: self._get_cproperty(attribute)
-        fset = lambda self, value: self._set_cproperty(attribute, value)
+        fget = lambda s: s._get_cproperty(attribute)
+        fset = lambda s, v: s._set_cproperty(attribute, v)
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
     def _add_lproperty(self, attribute, value):
-        fget = lambda self: self._get_lproperty(attribute)
-        fset = lambda self, value: self._set_lproperty(attribute, value)
+        fget = lambda s: s._get_lproperty(attribute)
+        fset = lambda s, v: s._set_lproperty(attribute, v)
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
@@ -210,10 +212,10 @@ class DataObject(object):
                 # We changed this value
                 if attribute in data and self._original[attribute] != data[attribute]:
                     # Some other process also wrote to the database
-                    if self._datastoreWins is None:
+                    if self._datastore_wins is None:
                         # In case we didn't set a policy, we raise the conflicts
                         data_conflicts.append(attribute)
-                    elif self._datastoreWins is False:
+                    elif self._datastore_wins is False:
                         # If the datastore should not win, we just overwrite the data
                         data[attribute] = self._data[attribute]
                     # If the datastore should win, we discard/ignore our change
@@ -260,7 +262,7 @@ class DataObject(object):
         """
 
         self.__init__(guid           = self._guid,
-                      datastore_wins = self._datastoreWins)
+                      datastore_wins = self._datastore_wins)
 
     #######################
     ## The primary key

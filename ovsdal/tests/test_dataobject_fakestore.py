@@ -54,8 +54,10 @@ class TestDataObject(TestCase):
     def test_updateproperty(self):
         test = TestObject()
         test.name = 'test'
+        test.description = 'desc'
         # A property should be writable
-        self.assertIs(test.name, 'test', 'Name should be updated')
+        self.assertIs(test.name, 'test', 'Property should be updated')
+        self.assertIs(test.description, 'desc', 'Property should be updated')
         test.delete()
 
     def test_datapersistent(self):
@@ -179,7 +181,7 @@ class TestDataObject(TestCase):
     def test_parentobjects(self):
         test = TestObject()
         # A child should be lazy instantiated
-        self.assertIsNotNone(test.child.name, 'child should be browsable')
+        self.assertIsNotNone(test.child.name, 'Child should be browsable')
         with self.assertRaises(TypeError):
             # A child can only be set to the configured type
             test.child = TestObject()
@@ -187,20 +189,20 @@ class TestDataObject(TestCase):
         test.child.name = 'something'
         test.child.description = 'else'
         # The data set to a child's properties should be available
-        self.assertEqual(test.child.name, 'something', 'child should be persistent')
+        self.assertEqual(test.child.name, 'something', 'Child should be persistent')
         test.child.save()
         test.save()
         test2 = TestObject(test.guid)
         # Child properties should also be saved correctly
-        self.assertEqual(test2.child.name, test.child.name, 'child link should be persistent')
-        self.assertEqual(test2.child.description, 'else', 'child link should be persistent')
+        self.assertEqual(test2.child.name, test.child.name, 'Child link should be persistent')
+        self.assertEqual(test2.child.description, 'else', 'Child link should be persistent')
         test.child.delete()
         test.delete()
 
     def test_parentlists(self):
         test = TestObject()
         # Children should be instantiated as empty list
-        self.assertEqual(len(test.children), 0, 'children should be empty')
+        self.assertEqual(len(test.children), 0, 'Children should be empty')
         # DataList object should behave as a default python list
         test.children.append(OtherObject())
         test.children.append(OtherObject())
@@ -209,35 +211,35 @@ class TestDataObject(TestCase):
         test.children[0].description = 'first other'
         test.children[1].description = 'second other'
         # Modifying children should be persistent
-        self.assertEqual(test.children[0].name, 'first', 'children should be persistent')
+        self.assertEqual(test.children[0].name, 'first', 'Children should be persistent')
         for item in test.children:
-            self.assertIn(item.name, ['first', 'second'], 'children should be iterable')
+            self.assertIn(item.name, ['first', 'second'], 'Children should be iterable')
             item.save()
         test.save()
         # Children structure should be persistent
         test2 = TestObject(test.guid)
-        self.assertEqual(test2.children[1].description, 'second other', 'children should be persistent')
+        self.assertEqual(test2.children[1].description, 'second other', 'Children should be persistent')
         test.children.sort()
         guid = test.children[0].guid
-        self.assertEqual(test.children.count(test.children[0]), 1, 'children should be countable')
-        self.assertEqual(test.children.index(test.children[0]), 0, 'indexer should work')
+        self.assertEqual(test.children.count(test.children[0]), 1, 'Children should be countable')
+        self.assertEqual(test.children.index(test.children[0]), 0, 'Indexer should work')
         test.children.reverse()
-        self.assertEqual(test.children[-1].guid, guid, 'sort and reverse should work')
+        self.assertEqual(test.children[-1].guid, guid, 'Sort and reverse should work')
         item = test.children.pop()
-        self.assertNotIn(item.guid, test.children.descriptor['guids'], 'popped child should be removed from list')
+        self.assertNotIn(item.guid, test.children.descriptor['guids'], 'Popped child should be removed from list')
         test.children.insert(1, item)
-        self.assertEqual(test.children[1].guid, item.guid, 'insert should work')
+        self.assertEqual(test.children[1].guid, item.guid, 'Insert should work')
         new_list = DataList(OtherObject)
         new_object = OtherObject()
         new_object.name = 'third'
         new_object.save()
         new_list.append(new_object)
         test.children.extend(new_list)
-        self.assertEqual(len(test.children), 3, 'list should be extended')
+        self.assertEqual(len(test.children), 3, 'List should be extended')
         # Test the lazy loading
         test.children._objects = {}
         for item in test.children:
-            self.assertIn(item.name, ['first', 'second', 'third'], 'dynamic loading should work')
+            self.assertIn(item.name, ['first', 'second', 'third'], 'Dynamic loading should work')
             # Children should be removable
             test.children.remove(item)
             item.delete()
@@ -282,8 +284,8 @@ class TestDataObject(TestCase):
             item = test2.child.name
         test.save(recursive=True)
         test3 = TestObject(test.guid)
-        self.assertEqual(test3.children[0].name, 'one', 'save should work recursively')
-        self.assertEqual(test3.child.name, 'one', 'save should work recursively')
+        self.assertEqual(test3.children[0].name, 'one', 'Save should work recursively')
+        self.assertEqual(test3.child.name, 'one', 'Save should work recursively')
         test.children[0].delete()
         test.child.delete()
         test.delete()
