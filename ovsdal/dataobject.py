@@ -25,19 +25,6 @@ class DataObject(object):
     _objectexpiry = None         # Timeout of main object cache
     _expiry = None               # Timeout of readonly object properties cache
 
-    # Internal properties
-    _store_factory = None    # Store factory
-    _name = None             # Name of the object
-    _guid = None             # Guid identifier of the object
-    _namespace = 'ovs_data'  # Namespace of the object
-    _original = {}           # Original data copy
-    _metadata = {}           # Some metadata, mainly used for unit testing
-    _data = {}               # Internal data storage
-    _objects = {}            # Internal objects storage
-
-    # Public properties
-    dirty = False
-
     #######################
     ## Constructor
     #######################
@@ -55,6 +42,15 @@ class DataObject(object):
 
         self._datastoreWins = datastore_wins
         self._name = self.__class__.__name__.lower()
+        self._store_factory = None    # Store factory
+        self._name = None             # Name of the object
+        self._guid = None             # Guid identifier of the object
+        self._namespace = 'ovs_data'  # Namespace of the object
+        self._original = {}           # Original data copy
+        self._metadata = {}           # Some metadata, mainly used for unit testing
+        self._data = {}               # Internal data storage
+        self._objects = {}            # Internal objects storage
+
         self.dirty = False
 
         # Init guid
@@ -189,11 +185,20 @@ class DataObject(object):
     ## Saving data to persistent store and invalidating volatile store
     #######################
 
-    def save(self):
+    def save(self, recursive=False):
         """
         Save the object to the persistent backend and clear cache, making use
         of the specified conflict resolve settings
         """
+
+        if recursive:
+            for key, value in self._blueprint.iteritems():
+                if inspect.isclass(value) and issubclass(value, DataObject):
+                    self._objects[key].save(recursive=True)
+                elif isinstance(value, list) and len(value) == 1 and \
+                        inspect.isclass(value[0]) and issubclass(value[0], DataObject):
+                    for item in self._objects[key]:
+                        item.save(recursive=True)
 
         try:
             data = json.loads(self._persistent.get(self._key))

@@ -37,7 +37,7 @@ class DataList(object):
     def extend(self, new_list):
         if not self._initialized:
             raise RuntimeError('DataList not yet initialized')
-        if not isinstance(new_list, DataList) or new_list.type != self.type:
+        if not isinstance(new_list, DataList) or new_list.type.__name__ != self.type.__name__:
             raise TypeError('Only a list of type DataList<%s> can be added' % self.type.__name__)
 
         for guid in new_list.descriptor['guids']:
@@ -108,4 +108,4 @@ class DataList(object):
 
     def __getitem__(self, item):
         guid = self.descriptor['guids'][item]
-        return self._objects[guid]
+        return self._get_object(guid)

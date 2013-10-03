@@ -268,6 +268,26 @@ class TestDataObject(TestCase):
         self.assertRaises(TypeError, test.insert, 0, TestObject())
         self.assertRaises(TypeError, test.extend, DataList(TestObject))
 
+    def test_datalistrecursivesave(self):
+        test = TestObject()
+        test.child.name = 'one'
+        test.children.append(OtherObject())
+        test.children[0].name = 'one'
+        test.save()
+        time.sleep(11)
+        test2 = TestObject(test.guid)
+        with self.assertRaises(Exception):
+            item = test2.children[0]
+        with self.assertRaises(Exception):
+            item = test2.child.name
+        test.save(recursive=True)
+        test3 = TestObject(test.guid)
+        self.assertEqual(test3.children[0].name, 'one', 'save should work recursively')
+        self.assertEqual(test3.child.name, 'one', 'save should work recursively')
+        test.children[0].delete()
+        test.child.delete()
+        test.delete()
+
 
 class OtherObject(DataObject):
     _blueprint = {'name'       : 'Other',
