@@ -1,10 +1,10 @@
 import json
 import inspect
-import imp
 import uuid
 import copy
-import os
 from exceptions import *
+from helpers import Reflector
+from datalist import DataList
 
 
 class DataObject(object):
@@ -28,9 +28,10 @@ class DataObject(object):
     _namespace = 'ovs_data'  # Namespace of the object
     _original = {}           # Original data copy
     _metadata = {}           # Some metadata, mainly used for unit testing
+    _data = {}               # Internal data storage
+    _objects = {}            # Internal objects storage
 
     # Public properties
-    new = False
     dirty = False
 
     def __init__(self, guid=None, datastore_wins=False):
@@ -46,13 +47,13 @@ class DataObject(object):
 
         self._datastoreWins = datastore_wins
         self._name = self.__class__.__name__.lower()
-        self.new = False
         self.dirty = False
 
         # Init guid
+        new = False
         if guid is None:
             self._guid = str(uuid.uuid4())
-            self.new = True
+            new = True
         else:
             self._guid = str(guid)
 
@@ -70,7 +71,7 @@ class DataObject(object):
 
         # Load data from cache or persistent backend where appropriate
         self._metadata['cache'] = None
-        if self.new:
+        if new:
             self._data = {}
         else:
             self._data = self._volatile.get(self._key)
@@ -84,10 +85,12 @@ class DataObject(object):
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
                 if inspect.isclass(default) and issubclass(default, DataObject):
-                    instance = default()
-                    self._data[key] = {'id'    : None,
-                                       'source': inspect.getfile(instance.__class__),
-                                       'type'  : instance.__class__.__name__}
+                    self._objects[key] = default()
+                    self._data[key] = Reflector.get_object_descriptor(self._objects[key])
+                elif isinstance(default, list) and len(default) == 1 and \
+                        inspect.isclass(default[0]) and issubclass(default[0], DataObject):
+                    self._objects[key] = DataList(default[0])
+                    self._data[key] = self._objects[key].descriptor
                 else:
                     self._data[key] = default
 
@@ -95,9 +98,12 @@ class DataObject(object):
         for attribute, default in self._blueprint.iteritems():
             if attribute not in dir(self):
                 if inspect.isclass(default) and issubclass(default, DataObject):
-                    self._add_cproperty(attribute, self._data.get(attribute, default))
+                    self._add_cproperty(attribute, self._data[attribute])
+                elif isinstance(default, list) and len(default) == 1 and \
+                        inspect.isclass(default[0]) and issubclass(default[0], DataObject):
+                    self._add_lproperty(attribute, self._data[attribute])
                 else:
-                    self._add_sproperty(attribute, self._data.get(attribute, default))
+                    self._add_sproperty(attribute, self._data[attribute])
 
         # Store original data
         self._original = copy.deepcopy(self._data)
@@ -118,16 +124,28 @@ class DataObject(object):
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
+    def _add_lproperty(self, attribute, value):
+        fget = lambda self: self._get_lproperty(attribute)
+        fset = lambda self, value: self._set_lproperty(attribute, value)
+        setattr(self.__class__, attribute, property(fget, fset))
+        self._data[attribute] = value
+
     # Helper method spporting property fetching
     def _get_sproperty(self, attribute):
         return self._data[attribute]
 
     def _get_cproperty(self, attribute):
-        filename = self._data[attribute]['source'].replace('.pyc', '.py')
-        name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
-        module = imp.load_source(name, filename)
-        cls = getattr(module, self._data[attribute]['type'])
-        return cls(self._data[attribute]['id'])
+        if attribute not in self._objects:
+            self._objects[attribute] = Reflector.load_object_from_descriptor(self._data[attribute],
+                                                                             instantiate=True)
+        return self._objects[attribute]
+
+    def _get_lproperty(self, attribute):
+        if attribute not in self._objects:
+            value = DataList()
+            value.initialze(self._data[attribute])
+            self._objects[attribute] = value
+        return self._objects[attribute]
 
     # Helper method supporting property setting
     def _set_sproperty(self, attribute, value):
@@ -136,9 +154,19 @@ class DataObject(object):
 
     def _set_cproperty(self, attribute, value):
         self.dirty = True
-        self._data[attribute] = {'id'    : value.guid,
-                                 'source': inspect.getfile(value.__class__),
-                                 'type'  : value.__class__.__name__}
+        descriptor = Reflector.get_object_descriptor(value)
+        if descriptor['name'] != self._data[attribute]['name']:
+            raise TypeError('An invalid type was given')
+        self._objects[attribute] = value
+        self._data[attribute] = Reflector.get_object_descriptor(value)
+
+    def _set_lproperty(self, attribute, value):
+        self.dirty = True
+        descriptor = value.descriptor
+        if descriptor['name'] != self._data[attribute]['name']:
+            raise TypeError('An invalid type was given')
+        self._objects[attribute] = value
+        self._data[attribute] = value.descriptor
 
     @classmethod
     def set_storefactory(cls, factory):
@@ -186,7 +214,6 @@ class DataObject(object):
             self._volatile.delete('%s_%s' % (self._key, key))
         self._volatile.delete(self._key)
         self.dirty = False
-        self.new = False
 
     # Delete the object
     def delete(self):

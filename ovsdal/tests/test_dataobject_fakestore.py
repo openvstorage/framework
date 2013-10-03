@@ -155,21 +155,44 @@ class TestDataObject(TestCase):
 
     def test_parentobjects(self):
         test = TestObject()
-        self.assertTrue(test.parent.new, 'parent should be None')
-        parent = OtherObject()
-        parent.save()
-        test.parent = parent
-        self.assertFalse(test.parent.new, 'parent should be available')
         self.assertIsNotNone(test.parent.name, 'parent should be browsable')
+        test.parent = OtherObject()
+        test.parent.name = 'something'
+        test.parent.description = 'else'
+        self.assertEqual(test.parent.name, 'something', 'parent should be persistent')
+        test.parent.save()
         test.save()
         test2 = TestObject(test.guid)
-        self.assertIsNotNone(test2.parent.name, 'parent link should be persistent')
-        parent.delete()
+        self.assertEqual(test2.parent.name, test.parent.name, 'parent link should be persistent')
+        self.assertEqual(test2.parent.description, 'else', 'parent link should be persistent')
+        test.parent.delete()
+        test.delete()
+
+    def test_parentlists(self):
+        test = TestObject()
+        self.assertEqual(len(test.parentlist), 0, 'list should be empty')
+        test.parentlist.append(OtherObject())
+        test.parentlist.append(OtherObject())
+        test.parentlist[0].name = 'first'
+        test.parentlist[1].name = 'second'
+        test.parentlist[0].description = 'first other'
+        test.parentlist[1].description = 'second other'
+        self.assertEqual(test.parentlist[0].name, 'first', 'list children should be persistent')
+        for item in test.parentlist:
+            self.assertIn(item.name, ['first', 'second'], 'children should be iterable')
+            item.save()
+        test.save()
+        test2 = TestObject(test.guid)
+        self.assertEqual(test2.parentlist[1].description, 'second other', 'child items should be persistent')
+        for item in test.parentlist:
+            test.parentlist.remove(item)
+            item.delete()
         test.delete()
 
 
 class OtherObject(DataObject):
-    _blueprint = {'name': 'Other'}
+    _blueprint = {'name'       : 'Other',
+                  'description': 'Test other'}
     _objectexpiry = 10
     _expiry = {}
 
@@ -178,6 +201,7 @@ class TestObject(DataObject):
     _blueprint = {'name'       : 'Object',
                   'description': 'Test object',
                   'parent'     : OtherObject,
+                  'parentlist' : [OtherObject],
                   'number'     : 0}
     _objectexpiry = 10
     _expiry = {'time': 5}

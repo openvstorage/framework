@@ -1,5 +1,5 @@
 from ovsdal.dataobject import DataObject
-from machine import Machine
+from ovsdal.hybrids.machine import Machine
 
 
 class Disk(DataObject):
@@ -9,7 +9,7 @@ class Disk(DataObject):
                   'parentdiskid'     : None,
                   'storagepoolid'    : None,
                   'volumedriverid'   : 1,
-                  'machineid'        : 1,
+                  'machine'          : Machine,
                   'pmachineid'       : 3,
                   'status'           : 'ATTACHED',
                   'type'             : 'DSSVOL',
