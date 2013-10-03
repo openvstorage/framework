@@ -5,9 +5,10 @@ import copy
 from exceptions import *
 from helpers import Reflector
 from dataobjectlist import DataObjectList
+from storedobject import StoredObject
 
 
-class DataObject(object):
+class DataObject(StoredObject):
     """
     This base class contains all logic to support our multiple backends and the caching
     * Persistent data
@@ -25,9 +26,6 @@ class DataObject(object):
     _objectexpiry = None         # Timeout of main object cache
     _expiry = None               # Timeout of readonly object properties cache
 
-    # Class property
-    _store_factory = None        # Store factory
-
     #######################
     ## Constructor
     #######################
@@ -43,6 +41,10 @@ class DataObject(object):
         ** None: in case changed field were also changed externally, an error will be raised
         """
 
+        # Initialize super class
+        super(DataObject, self).__init__()
+
+        # Initialize internal fields
         self._datastore_wins = datastore_wins
         self._name = self.__class__.__name__.lower()
         self._name = None             # Name of the object
@@ -53,6 +55,7 @@ class DataObject(object):
         self._data = {}               # Internal data storage
         self._objects = {}            # Internal objects storage
 
+        # Initialize public fields
         self.dirty = False
 
         # Init guid
@@ -65,15 +68,6 @@ class DataObject(object):
 
         # Build base keys
         self._key = '%s_%s_%s' % (self._namespace, self._name, self._guid)
-
-        # Load backends
-        if DataObject._store_factory is None:
-            raise InvalidStoreFactoryException
-        try:
-            self._persistent = DataObject._store_factory.persistent()
-            self._volatile = DataObject._store_factory.volatile()
-        except:
-            raise InvalidStoreFactoryException
 
         # Load data from cache or persistent backend where appropriate
         self._metadata['cache'] = None
@@ -174,21 +168,12 @@ class DataObject(object):
         self._data[attribute] = value.descriptor
 
     #######################
-    ## Class method for setting the store
-    #######################
-
-    @classmethod
-    def set_storefactory(cls, factory):
-        DataObject._store_factory = factory
-
-    #######################
     ## Static helper method
     #######################
 
     @staticmethod
     def is_dataobject(value):
         return inspect.isclass(value) and issubclass(value, DataObject)
-
 
     #######################
     ## Saving data to persistent store and invalidating volatile store

@@ -4,6 +4,7 @@ import inspect
 import imp
 import os
 from unittest import TestCase
+from ovsdal.storedobject import StoredObject
 from ovsdal.dataobject import DataObject
 from ovsdal.dataobjectlist import DataObjectList
 from ovsdal.tests.store import DummyStoreFactory, InvalidStoreFactory
@@ -19,7 +20,7 @@ class TestDataObject(TestCase):
 
     @classmethod
     def setUp(cls):
-        DataObject.set_storefactory(DummyStoreFactory)
+        StoredObject.set_storefactory(DummyStoreFactory)
 
     @classmethod
     def tearDownClass(cls):
