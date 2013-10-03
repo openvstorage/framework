@@ -1,0 +1,25 @@
+from ovsdal.dataobject import DataObject
+from ovsdal.<otherobject> import OtherObject
+
+class MyObject(DataObject):
+    _blueprint = {'<persistent property 1>': <default value 1>,
+                  '<persistent property 2>': <default value 2>,
+                  '<child object>'         : OtherObject,         # Or any other type
+                  '<children object list>' : [OtherObject]}       # List with single type item
+    _objectexpiry = <time in seconds>  # Timeout for main object cache
+    _expiry = {'<readonly 3rd-party property 1>': <timeout in seconds>,  # Timeout in seconds of these properties
+               '<readonly 3rd-party property 2>': <timeout in seconds>}
+
+    @property
+    def <readonly 3rd-party property 1>(self):
+        def get_data():
+            # Actual code to load the property of the backend.
+            return <that retreived value>
+        return self._backend_property(get_data)
+
+    @property
+    def <readonly 3rd-party property 2>(self):
+        def get_data():
+            # Actual code to load the property of the backend.
+            return <that retreived value>
+        return self._backend_property(get_data)

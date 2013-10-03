@@ -34,16 +34,16 @@ class DataList(object):
             self.descriptor['guids'].append(value.guid)
         self._objects[value.guid] = value
 
-    def extend(self, list):
+    def extend(self, new_list):
         if not self._initialized:
             raise RuntimeError('DataList not yet initialized')
-        if not isinstance(list, DataList) or list.type != self.type:
+        if not isinstance(new_list, DataList) or new_list.type != self.type:
             raise TypeError('Only a list of type DataList<%s> can be added' % self.type.__name__)
 
-        for guid in list.descriptor['guids']:
+        for guid in new_list.descriptor['guids']:
             if guid not in self.descriptor['guids']:
                 self.descriptor['guids'].append(guid)
-                self._objects[guid] = list._objects[guid]
+                self._objects[guid] = new_list._objects[guid]
 
     def insert(self, index, value):
         if not self._initialized:
@@ -76,7 +76,7 @@ class DataList(object):
         if not self._initialized:
             raise RuntimeError('DataList not yet initialized')
 
-        self.descriptor['guids'].index(value.guid)
+        return self.descriptor['guids'].index(value.guid)
 
     def count(self, value):
         if not self._initialized:

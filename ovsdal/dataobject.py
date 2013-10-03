@@ -16,6 +16,10 @@ class DataObject(object):
     * Volatile caching: Memcached
     """
 
+    #######################
+    ## Attributes
+    #######################
+
     # Properties that needs to be overwritten by implementation
     _blueprint = None            # Blueprint data of the objec type
     _objectexpiry = None         # Timeout of main object cache
@@ -33,6 +37,10 @@ class DataObject(object):
 
     # Public properties
     dirty = False
+
+    #######################
+    ## Constructor
+    #######################
 
     def __init__(self, guid=None, datastore_wins=False):
         """
@@ -85,12 +93,10 @@ class DataObject(object):
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
                 if inspect.isclass(default) and issubclass(default, DataObject):
-                    self._objects[key] = default()
-                    self._data[key] = Reflector.get_object_descriptor(self._objects[key])
+                    self._data[key] = Reflector.get_object_descriptor(default())
                 elif isinstance(default, list) and len(default) == 1 and \
                         inspect.isclass(default[0]) and issubclass(default[0], DataObject):
-                    self._objects[key] = DataList(default[0])
-                    self._data[key] = self._objects[key].descriptor
+                    self._data[key] = DataList(default[0]).descriptor
                 else:
                     self._data[key] = default
 
@@ -111,7 +117,10 @@ class DataObject(object):
         # Re-cache the object
         self._volatile.set(self._key, self._data, self._objectexpiry)
 
-    # Helper method to support dynamic adding of properties
+    #######################
+    ## Helper methods for dynamic getting and setting
+    #######################
+
     def _add_sproperty(self, attribute, value):
         fget = lambda self: self._get_sproperty(attribute)
         fset = lambda self, value: self._set_sproperty(attribute, value)
@@ -155,7 +164,7 @@ class DataObject(object):
     def _set_cproperty(self, attribute, value):
         self.dirty = True
         descriptor = Reflector.get_object_descriptor(value)
-        if descriptor['name'] != self._data[attribute]['name']:
+        if descriptor['type'] != self._data[attribute]['type']:
             raise TypeError('An invalid type was given')
         self._objects[attribute] = value
         self._data[attribute] = Reflector.get_object_descriptor(value)
@@ -163,16 +172,23 @@ class DataObject(object):
     def _set_lproperty(self, attribute, value):
         self.dirty = True
         descriptor = value.descriptor
-        if descriptor['name'] != self._data[attribute]['name']:
+        if descriptor['type'] != self._data[attribute]['type']:
             raise TypeError('An invalid type was given')
         self._objects[attribute] = value
         self._data[attribute] = value.descriptor
+
+    #######################
+    ## Class method for setting the store
+    #######################
 
     @classmethod
     def set_storefactory(cls, factory):
         DataObject._store_factory = factory
 
-    # Save method, saving to persistent backend and invalidating cache
+    #######################
+    ## Saving data to persistent store and invalidating volatile store
+    #######################
+
     def save(self):
         """
         Save the object to the persistent backend and clear cache, making use
@@ -215,7 +231,10 @@ class DataObject(object):
         self._volatile.delete(self._key)
         self.dirty = False
 
-    # Delete the object
+    #######################
+    ## Other CRUDs
+    #######################
+
     def delete(self):
         """
         Delete the given object
@@ -238,7 +257,10 @@ class DataObject(object):
         self.__init__(guid           = self._guid,
                       datastore_wins = self._datastoreWins)
 
-    # Guid readonly property
+    #######################
+    ## The primary key
+    #######################
+
     @property
     def guid(self):
         """
@@ -247,7 +269,10 @@ class DataObject(object):
 
         return self._guid
 
-    # Helper method supporting cache wrapping the readonly properties
+    #######################
+    ## Helper method to support 3rd party backend caching
+    #######################
+
     def _backend_property(self, function):
         caller_name = inspect.stack()[1][3]
         cache_key   = '%s_%s' % (self._key, caller_name)
