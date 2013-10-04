@@ -21,7 +21,7 @@ class DataList(StoredObject):
     operator = Operator()
 
     def __init__(self, key, query, load=True):
-        self._key = 'ovs_list_%s' % key
+        self._key = None if key is None else ('ovs_list_%s' % key)
         self._query = query
         self.data = None
         if load:
@@ -74,7 +74,7 @@ class DataList(StoredObject):
             return value < item[2]
 
     def load(self):
-        self.data = StoredObject.volatile.get(self._key)
+        self.data = StoredObject.volatile.get(self._key) if self._key is not None else None
         if self.data is None:
             # The query should be a dictionary:
             #     {'object': Disk,                           # Object on which the query should be executed
@@ -109,5 +109,6 @@ class DataList(StoredObject):
                     else:
                         self.data.append(Descriptor(self._query['object'], guid).descriptor)
 
-            StoredObject.volatile.set(self._key, self.data)
+            if self._key is not None:
+                StoredObject.volatile.set(self._key, self.data)
         return self

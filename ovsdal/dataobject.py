@@ -258,6 +258,18 @@ class DataObject(StoredObject):
         return self._guid
 
     #######################
+    ## Static helper method
+    #######################
+
+    @staticmethod
+    def is_dataobject(value):
+        return isinstance(value, DataObject)
+
+    @staticmethod
+    def fetch_object(object_type, value):
+        return object_type(value) if not DataObject.is_dataobject(value) else value
+
+    #######################
     ## Helper method to support 3rd party backend caching
     #######################
 

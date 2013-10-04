@@ -8,6 +8,7 @@ from ovsdal.datalist import DataList
 from ovsdal.storage.dummies import DummyPersistentStore, DummyVolatileStore
 from ovsdal.exceptions import *
 from ovsdal.helpers import HybridRunner, Descriptor
+from ovsdal.lists.disklist import DiskList
 
 
 #noinspection PyUnresolvedReferences,PyProtectedMember
