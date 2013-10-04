@@ -2,25 +2,6 @@ import time
 import json
 
 
-class InvalidStoreFactory(object):
-    pass
-
-
-class DummyStoreFactory(object):
-    @staticmethod
-    def clean():
-        DummyPersistentStore.clean()
-        DummyVolatileStore.clean()
-
-    @staticmethod
-    def persistent():
-        return DummyPersistentStore()
-
-    @staticmethod
-    def volatile():
-        return DummyVolatileStore()
-
-
 class DummyPersistentStore(object):
     _path = '/tmp/dummypersistent.json'
 
@@ -43,6 +24,10 @@ class DummyPersistentStore(object):
 
     def get(self, key):
         return self._read()[key]
+
+    def prefix(self, key):
+        data = self._read()
+        return [k for k in data.keys() if k.startswith(key)]
 
     def set(self, key, value):
         data = self._read()
@@ -88,7 +73,7 @@ class DummyVolatileStore(object):
             return data['s'].get(key)
         return None
 
-    def set(self, key, value, timeout):
+    def set(self, key, value, timeout=99999999):
         data = self._read()
         data['s'][key] = value
         data['t'][key] = time.time() + timeout

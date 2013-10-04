@@ -3,9 +3,11 @@ import inspect
 import uuid
 import copy
 from exceptions import *
-from helpers import Reflector
-from dataobjectlist import DataObjectList
+from helpers import Descriptor
 from storedobject import StoredObject
+from relations.relations import Relation, RelationMapper
+from dataobjectlist import DataObjectList
+from datalist import DataList
 
 
 class DataObject(StoredObject):
@@ -46,10 +48,7 @@ class DataObject(StoredObject):
 
         # Initialize internal fields
         self._datastore_wins = datastore_wins
-        self._name = self.__class__.__name__.lower()
-        self._name = None             # Name of the object
         self._guid = None             # Guid identifier of the object
-        self._namespace = 'ovs_data'  # Namespace of the object
         self._original = {}           # Original data copy
         self._metadata = {}           # Some metadata, mainly used for unit testing
         self._data = {}               # Internal data storage
@@ -57,6 +56,8 @@ class DataObject(StoredObject):
 
         # Initialize public fields
         self.dirty = False
+        self._name = self.__class__.__name__.lower()
+        self.namespace = 'ovs_data'   # Namespace of the object
 
         # Init guid
         new = False
@@ -67,45 +68,48 @@ class DataObject(StoredObject):
             self._guid = str(guid)
 
         # Build base keys
-        self._key = '%s_%s_%s' % (self._namespace, self._name, self._guid)
+        self._key = '%s_%s_%s' % (self.namespace, self._name, self._guid)
 
         # Load data from cache or persistent backend where appropriate
         self._metadata['cache'] = None
         if new:
             self._data = {}
         else:
-            self._data = self._volatile.get(self._key)
+            self._data = StoredObject.volatile.get(self._key)
             if self._data is None:
                 self._metadata['cache'] = False
-                self._data = json.loads(self._persistent.get(self._key))
+                self._data = json.loads(StoredObject.persistent.get(self._key))
             else:
                 self._metadata['cache'] = True
 
         # Set default values on new fields
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
-                if DataObject.is_dataobject(default):
-                    self._data[key] = Reflector.get_object_descriptor(default())
-                elif isinstance(default, list) and len(default) == 1 and DataObject.is_dataobject(default[0]):
-                    self._data[key] = DataObjectList(default[0]).descriptor
+                if isinstance(default, Relation):
+                    self._data[key] = Descriptor(default.object_type).descriptor
                 else:
                     self._data[key] = default
 
         # Add properties where appropriate, hooking in the correct dictionary
         for attribute, default in self._blueprint.iteritems():
             if attribute not in dir(self):
-                if DataObject.is_dataobject(default):
+                if isinstance(default, Relation):
                     self._add_cproperty(attribute, self._data[attribute])
-                elif isinstance(default, list) and len(default) == 1 and DataObject.is_dataobject(default[0]):
-                    self._add_lproperty(attribute, self._data[attribute])
                 else:
                     self._add_sproperty(attribute, self._data[attribute])
+
+        # Load foreign keys
+        relations = RelationMapper.load_foreign_relations(self.__class__)
+        if relations is not None:
+            for key, info in relations.iteritems():
+                self._objects[key] = info
+                self._add_lproperty(key)
 
         # Store original data
         self._original = copy.deepcopy(self._data)
 
         # Re-cache the object
-        self._volatile.set(self._key, self._data, self._objectexpiry)
+        StoredObject.volatile.set(self._key, self._data, self._objectexpiry)
 
     #######################
     ## Helper methods for dynamic getting and setting
@@ -123,11 +127,9 @@ class DataObject(StoredObject):
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
-    def _add_lproperty(self, attribute, value):
+    def _add_lproperty(self, attribute):
         fget = lambda s: s._get_lproperty(attribute)
-        fset = lambda s, v: s._set_lproperty(attribute, v)
-        setattr(self.__class__, attribute, property(fget, fset))
-        self._data[attribute] = value
+        setattr(self.__class__, attribute, property(fget))
 
     # Helper method spporting property fetching
     def _get_sproperty(self, attribute):
@@ -135,15 +137,19 @@ class DataObject(StoredObject):
 
     def _get_cproperty(self, attribute):
         if attribute not in self._objects:
-            self._objects[attribute] = Reflector.load_object_from_descriptor(self._data[attribute],
-                                                                             instantiate=True)
+            self._objects[attribute] = Descriptor().load(self._data[attribute]).get_object()
         return self._objects[attribute]
 
     def _get_lproperty(self, attribute):
-        if attribute not in self._objects:
-            value = DataObjectList()
-            value.initialze(self._data[attribute])
-            self._objects[attribute] = value
+        if not isinstance(self._objects[attribute], DataObjectList):
+            remote_class = Descriptor().load(self._objects[attribute]['class']).get_object()
+            remote_key   = self._objects[attribute]['key']
+            datalist = DataList(key   = '%s_%s' % (self._key, attribute),
+                                query = {'object': remote_class,
+                                         'data'  : DataList.select.OBJECT,
+                                         'query' : {'type': DataList.where_operator.AND,
+                                                    'items': [(remote_key, DataList.operator.EQUALS, self.guid)]}})
+            self._objects[attribute] = DataObjectList(datalist.data, remote_class, readonly=True)
         return self._objects[attribute]
 
     # Helper method supporting property setting
@@ -153,27 +159,15 @@ class DataObject(StoredObject):
 
     def _set_cproperty(self, attribute, value):
         self.dirty = True
-        descriptor = Reflector.get_object_descriptor(value)
-        if descriptor['type'] != self._data[attribute]['type']:
-            raise TypeError('An invalid type was given')
-        self._objects[attribute] = value
-        self._data[attribute] = Reflector.get_object_descriptor(value)
-
-    def _set_lproperty(self, attribute, value):
-        self.dirty = True
-        descriptor = value.descriptor
-        if descriptor['type'] != self._data[attribute]['type']:
-            raise TypeError('An invalid type was given')
-        self._objects[attribute] = value
-        self._data[attribute] = value.descriptor
-
-    #######################
-    ## Static helper method
-    #######################
-
-    @staticmethod
-    def is_dataobject(value):
-        return inspect.isclass(value) and issubclass(value, DataObject)
+        if value is None:
+            self._objects[attribute] = None
+            self._data[attribute]['guid'] = None
+        else:
+            descriptor = Descriptor(value.__class__).descriptor
+            if descriptor['type'] != self._data[attribute]['type']:
+                raise TypeError('An invalid type was given')
+            self._objects[attribute] = value
+            self._data[attribute]['guid'] = value.guid
 
     #######################
     ## Saving data to persistent store and invalidating volatile store
@@ -186,16 +180,16 @@ class DataObject(StoredObject):
         """
 
         if recursive:
-            for key, value in self._blueprint.iteritems():
-                if inspect.isclass(value) and issubclass(value, DataObject):
-                    self._objects[key].save(recursive=True)
-                elif isinstance(value, list) and len(value) == 1 and \
-                        inspect.isclass(value[0]) and issubclass(value[0], DataObject):
-                    for item in self._objects[key]:
-                        item.save(recursive=True)
+            for item in self._objects.values():
+                # Only traverse trough loaded sublists
+                if isinstance(item, DataObject):
+                    item.save(recursive=True)
+                elif isinstance(item, DataObjectList):
+                    for subitem in item.iterloaded():
+                        subitem.save(recursive=True)
 
         try:
-            data = json.loads(self._persistent.get(self._key))
+            data = json.loads(StoredObject.persistent.get(self._key))
         except:
             data = {}
         data_conflicts = []
@@ -221,13 +215,13 @@ class DataObject(StoredObject):
 
         # Save the data
         self._data = copy.deepcopy(data)
-        self._persistent.set(self._key, json.dumps(self._data))
+        StoredObject.persistent.set(self._key, json.dumps(self._data))
         self._original = copy.deepcopy(self._data)
 
         # Invalidate the cache
         for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
-        self._volatile.delete(self._key)
+            StoredObject.volatile.delete('%s_%s' % (self._key, key))
+        StoredObject.volatile.delete(self._key)
         self.dirty = False
 
     #######################
@@ -240,12 +234,12 @@ class DataObject(StoredObject):
         """
 
         try:
-            self._persistent.delete(self._key)
+            StoredObject.persistent.delete(self._key)
         except:
             pass
         for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
-        self._volatile.delete(self._key)
+            StoredObject.volatile.delete('%s_%s' % (self._key, key))
+        StoredObject.volatile.delete(self._key)
 
     # Discard all pending changes
     def discard(self):
@@ -262,11 +256,15 @@ class DataObject(StoredObject):
 
     @property
     def guid(self):
-        """
-        The unique identifier of the object
-        """
-
         return self._guid
+
+    #######################
+    ## Static helper method
+    #######################
+
+    @staticmethod
+    def is_dataobject(value):
+        return inspect.isclass(value) and issubclass(value, DataObject)
 
     #######################
     ## Helper method to support 3rd party backend caching
@@ -275,8 +273,8 @@ class DataObject(StoredObject):
     def _backend_property(self, function):
         caller_name = inspect.stack()[1][3]
         cache_key   = '%s_%s' % (self._key, caller_name)
-        cached_data = self._volatile.get(cache_key)
+        cached_data = StoredObject.volatile.get(cache_key)
         if cached_data is None:
             cached_data = function()  # Load data from backend
-            self._volatile.set(cache_key, cached_data, self._expiry[caller_name])
+            StoredObject.volatile.set(cache_key, cached_data, self._expiry[caller_name])
         return cached_data

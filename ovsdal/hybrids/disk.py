@@ -1,15 +1,16 @@
 from ovsdal.dataobject import DataObject
 from ovsdal.hybrids.machine import Machine
+from ovsdal.relations.relations import Relation
 
 
 class Disk(DataObject):
     _blueprint = {'name'             : None,  # All persistent stored fields, with default value
                   'description'      : 'Test disk',
-                  'size'             : 0,
+                  'size'             : 100,
                   'storagepoolid'    : None,
                   'volumedriverid'   : 1,
-                  'machine'          : Machine,
-                  'pmachine'         : Machine,
+                  'machine'          : Relation(Machine, 'disks'),
+                  'storage'          : Relation(Machine, 'stored_disks'),
                   'status'           : 'ATTACHED',
                   'type'             : 'DSSVOL',
                   'serialnr'         : 'ADEF194FDE',
