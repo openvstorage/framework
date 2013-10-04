@@ -1,8 +1,5 @@
 import uuid
 import time
-import inspect
-import imp
-import os
 from unittest import TestCase
 from ovsdal.storedobject import StoredObject
 from ovsdal.hybrids.disk import Disk
@@ -19,7 +16,6 @@ class TestDataObject(TestCase):
     def setUpClass(cls):
         DummyVolatileStore.clean()
         DummyPersistentStore.clean()
-        Disk._objectexpiry = 10  # Artificially change expiry times for faster tests
 
     @classmethod
     def setUp(cls):
@@ -144,7 +140,7 @@ class TestDataObject(TestCase):
         disk3 = Disk(disk.guid)
         self.assertTrue(disk3._metadata['cache'], 'Object should be retreived from cache')
         # After the object expiry passed, it will be retreived from backend again
-        time.sleep(12)
+        DummyVolatileStore().delete(disk._key)  # We clear the entry
         disk4 = Disk(disk.guid)
         self.assertFalse(disk4._metadata['cache'], 'Object should be retreived from persistent backend')
         disk.delete()
@@ -154,7 +150,6 @@ class TestDataObject(TestCase):
         for cls in HybridRunner.get_hybrids():
             # Make sure certain attributes are correctly set
             self.assertIsInstance(cls._blueprint, dict, '_blueprint is a required property on %s' % cls.__name__)
-            self.assertIsInstance(cls._objectexpiry, int, '_objectexpiry is a required property on %s' % cls.__name__)
             self.assertIsInstance(cls._expiry, dict, '_expiry is a required property on %s' % cls.__name__)
             instance = cls()
             # Make sure the type can be instantiated
@@ -169,7 +164,7 @@ class TestDataObject(TestCase):
                 # ... and should work
                 data = getattr(instance, attribute)
 
-    def test_relations(self):
+    def test_queries(self):
         machine = Machine()
         machine.name = 'machine'
         machine.save()
@@ -179,11 +174,6 @@ class TestDataObject(TestCase):
             disk.size = i
             if i < 10:
                 disk.machine = machine
-            else:
-                disk.machine = machine
-                self.assertEqual(disk.machine.name, 'machine', 'child should be set')
-                disk.machine = None
-                self.assertIsNone(disk.machine, 'child should be cleared')
             disk.save()
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
         list_1 = DataList(key   = 'list_1',
@@ -217,7 +207,7 @@ class TestDataObject(TestCase):
                           query = {'object': Disk,
                                    'data'  : DataList.select.COUNT,
                                    'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('machine', DataList.operator.EQUALS, machine.guid),
+                                              'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
                                                         {'type' : DataList.where_operator.OR,
                                                          'items': [('size', DataList.operator.LT, 3),
                                                                    ('size', DataList.operator.GT, 6)]}]}}).data
@@ -229,20 +219,86 @@ class TestDataObject(TestCase):
                                               'items': [('size', DataList.operator.LT, 3),
                                                         ('size', DataList.operator.GT, 6)]}}).data
         self.assertEqual(list_6, 0, 'list should contain int 0')  # no disks
+        list_7 = DataList(key   = 'list_7',
+                          query = {'object': Disk,
+                                   'data'  : DataList.select.COUNT,
+                                   'query' : {'type': DataList.where_operator.OR,
+                                              'items': [('machine.guid', DataList.operator.EQUALS, '123'),
+                                                        ('used_size', DataList.operator.EQUALS, -1),
+                                                        {'type' : DataList.where_operator.AND,
+                                                         'items': [('size', DataList.operator.GT, 3),
+                                                                   ('size', DataList.operator.LT, 6)]}]}}).data
+        self.assertEqual(list_7, 2, 'list should contain int 2')  # disk 4 and 5
+        list_8 = DataList(key   = 'list_8',
+                          query = {'object': Disk,
+                                   'data'  : DataList.select.COUNT,
+                                   'query' : {'type': DataList.where_operator.AND,
+                                              'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
+                                                        ('name', DataList.operator.EQUALS, 'test_3')]}}).data
+        self.assertEqual(list_8, 1, 'list should contain int 1')  # disk 3
+        list_9 = DataList(key   = 'list_9',
+                          query = {'object': Disk,
+                                   'data'  : DataList.select.COUNT,
+                                   'query' : {'type': DataList.where_operator.AND,
+                                              'items': [('size', DataList.operator.GT, 3),
+                                                        {'type' : DataList.where_operator.AND,
+                                                         'items': [('size', DataList.operator.LT, 6)]}]}}).data
+        self.assertEqual(list_9, 2, 'list should contain int 2')  # disk 4 and 5
+        list_10 = DataList(key   = 'list_10',
+                           query = {'object': Disk,
+                                    'data'  : DataList.select.COUNT,
+                                    'query' : {'type': DataList.where_operator.OR,
+                                               'items': [('size', DataList.operator.LT, 3),
+                                                         {'type': DataList.where_operator.OR,
+                                                          'items': [('size', DataList.operator.GT, 6)]}]}}).data
+        self.assertEqual(list_10, 16, 'list should contain int 16')  # disk 0, 1, 2, 7, 8, 9, 10-19
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
 
+    def test_invalidpropertyassignment(self):
+        disk = Disk()
+        disk.size = 100
+        with self.assertRaises(TypeError):
+            disk.machine = Disk()
 
-    #def test_nostore(self):
-    #    # Instantiating an object should check if there is a store set
-    #    TestObject.set_storefactory(None)
-    #    with self.assertRaises(InvalidStoreFactoryException):
-    #        test = TestObject()
-#
-    #def test_invalidstore(self):
-    #    # Instantiating an object should check whether the store factory can provide the required stores
-    #    TestObject.set_storefactory(InvalidStoreFactory)
-    #    with self.assertRaises(InvalidStoreFactoryException):
-    #        test = TestObject()
-#
+    def test_recursive(self):
+        machine = Machine()
+        machine.name = 'original'
+        machine.save()
+        for i in xrange(0, 10):
+            disk = Disk()
+            disk.name = 'test_%d' % i
+            if i % 2:
+                disk.machine = machine
+            else:
+                disk.machine = machine
+                self.assertEqual(disk.machine.name, 'original', 'child should be set')
+                disk.machine = None
+                self.assertIsNone(disk.machine, 'child should be cleared')
+            disk.save()
+        counter = 1
+        for disk in machine.disks:
+            disk.size = counter
+            counter += 1
+        machine.save(recursive=True)
+        disk = Disk(machine.disks[0].guid)
+        disk.machine.name = 'mtest'
+        disk.save(recursive=True)
+        machine2 = Machine(machine.guid)
+        self.assertEqual(machine2.disks[0].size, 1, 'lists should be saved recursively')
+        self.assertEqual(machine2.disks[1].size, 2, 'lists should be saved recursively')
+        self.assertEqual(machine2.name, 'mtest', 'properties should be saved recursively')
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
+
+    def test_descriptors(self):
+        with self.assertRaises(RuntimeError):
+            descriptor = Descriptor().descriptor
+        with self.assertRaises(RuntimeError):
+            value = Descriptor().get_object()
+
     #def test_parentobjects(self):
     #    test = TestObject()
     #    self.assertIsNone(test.child, 'Child should not be instantiated by default')

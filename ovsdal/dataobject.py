@@ -25,7 +25,6 @@ class DataObject(StoredObject):
 
     # Properties that needs to be overwritten by implementation
     _blueprint = None            # Blueprint data of the objec type
-    _objectexpiry = None         # Timeout of main object cache
     _expiry = None               # Timeout of readonly object properties cache
 
     #######################
@@ -109,7 +108,7 @@ class DataObject(StoredObject):
         self._original = copy.deepcopy(self._data)
 
         # Re-cache the object
-        StoredObject.volatile.set(self._key, self._data, self._objectexpiry)
+        StoredObject.volatile.set(self._key, self._data)
 
     #######################
     ## Helper methods for dynamic getting and setting
@@ -137,7 +136,7 @@ class DataObject(StoredObject):
 
     def _get_cproperty(self, attribute):
         if attribute not in self._objects:
-            self._objects[attribute] = Descriptor().load(self._data[attribute]).get_object()
+            self._objects[attribute] = Descriptor().load(self._data[attribute]).get_object(instantiate=True)
         return self._objects[attribute]
 
     def _get_lproperty(self, attribute):
@@ -148,7 +147,7 @@ class DataObject(StoredObject):
                                 query = {'object': remote_class,
                                          'data'  : DataList.select.OBJECT,
                                          'query' : {'type': DataList.where_operator.AND,
-                                                    'items': [(remote_key, DataList.operator.EQUALS, self.guid)]}})
+                                                    'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
             self._objects[attribute] = DataObjectList(datalist.data, remote_class, readonly=True)
         return self._objects[attribute]
 
@@ -257,14 +256,6 @@ class DataObject(StoredObject):
     @property
     def guid(self):
         return self._guid
-
-    #######################
-    ## Static helper method
-    #######################
-
-    @staticmethod
-    def is_dataobject(value):
-        return inspect.isclass(value) and issubclass(value, DataObject)
 
     #######################
     ## Helper method to support 3rd party backend caching

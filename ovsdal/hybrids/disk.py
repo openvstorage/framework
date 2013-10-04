@@ -22,7 +22,6 @@ class Disk(DataObject):
                   'environmentguid'  : None,
                   'cloudspaceguid'   : None,
                   'autobackup'       : False}
-    _objectexpiry = 300  # Timeout in seconds of the main object cache
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 10}
 

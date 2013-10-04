@@ -1,36 +1,36 @@
 import inspect
 import os
 import imp
+import copy
+from storedobject import StoredObject
 
 
-class Descriptor(object):
+class Descriptor(StoredObject):
     def __init__(self, object_type=None, guid=None):
         if object_type is None:
             self.initialized = False
         else:
             self.initialized = True
 
-            filename = inspect.getfile(object_type).replace('.pyc', '.py')
-            self._name   = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
-            self._source = os.path.relpath(filename, os.path.dirname(__file__))
-            self._type   = object_type.__name__
-            self._guid   = guid
+            key = 'ovs_descriptor_%s' % str(object_type)
+            self._descriptor = StoredObject.volatile.get(key)
+            if self._descriptor is None:
+                filename = inspect.getfile(object_type).replace('.pyc', '.py')
+                self._descriptor = {'name'  : filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', ''),
+                                    'source': os.path.relpath(filename, os.path.dirname(__file__)),
+                                    'type'  : object_type.__name__}
+                StoredObject.volatile.set(key, self._descriptor)
+            self._descriptor['guid'] = guid
 
     def load(self, descriptor):
-        self._guid = descriptor.get('guid')
-        self._name = descriptor['name']
-        self._source = descriptor['source']
-        self._type = descriptor['type']
+        self._descriptor = copy.deepcopy(descriptor)
         self.initialized = True
         return self
 
     @property
     def descriptor(self):
         if self.initialized:
-            return {'name'  : self._name,
-                    'source': self._source,
-                    'type'  : self._type,
-                    'guid'  : self._guid}
+            return copy.deepcopy(self._descriptor)
         else:
             raise RuntimeError('Descriptor not yet initialized')
 
@@ -38,13 +38,13 @@ class Descriptor(object):
         if not self.initialized:
             raise RuntimeError('Descriptor not yet initialized')
 
-        filename = os.path.join(os.path.dirname(__file__), self._source)
-        module = imp.load_source(self._name, filename)
-        cls = getattr(module, self._type)
+        filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
+        module = imp.load_source(self._descriptor['name'], filename)
+        cls = getattr(module, self._descriptor['type'])
         if instantiate:
-            if self._guid is None:
+            if self._descriptor['guid'] is None:
                 return None
-            return cls(self._guid)
+            return cls(self._descriptor['guid'])
         else:
             return cls
 

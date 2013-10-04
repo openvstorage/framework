@@ -1,6 +1,5 @@
 from storedobject import StoredObject
 from helpers import Descriptor
-from relations.relations import Relation
 
 
 class DataList(StoredObject):
@@ -22,7 +21,7 @@ class DataList(StoredObject):
     operator = Operator()
 
     def __init__(self, key, query, load=True):
-        self._key = key
+        self._key = 'ovs_list_%s' % key
         self._query = query
         self.data = None
         if load:
@@ -60,12 +59,13 @@ class DataList(StoredObject):
 
     @staticmethod
     def _evaluate(instance, item):
-        if isinstance(instance._blueprint[item[0]], Relation):
-            # @TODO: We should support advanced recursive queries.
-            # For now, we assume we want to query the guid
-            value = instance._data[item[0]]['guid']
-        else:
-            value = getattr(instance, item[0])
+        path = item[0].split('.')
+        value = instance
+        for pitem in path:
+            if value is not None:
+                value = getattr(value, pitem)
+            else:
+                return False
         if item[1] == DataList.operator.EQUALS:
             return value == item[2]
         if item[1] == DataList.operator.GT:
@@ -76,25 +76,18 @@ class DataList(StoredObject):
     def load(self):
         self.data = StoredObject.volatile.get(self._key)
         if self.data is None:
-            # The query should be a dictionary of the following format / example:
-            #
-            # {'object': Disk,
-            #  'data'  : DataList.select.OBJECT,
-            #  'query'  : {'type' : DataList.where_operator.AND,
-            #              'items': [(machine, DataList.operator.EQUALS, self.guid),
-            #                        (size,    DataList.operator.GT,     10000),
-            #                        {'type' : DataList.where_operator.OR,
-            #                         'items': [(used_size, DataList.operator.LT, 100),
-            #                                   (used_size, DataList.operator.GT, 500)]]]}})
-            #
-            # Which should result in a SQL-alike query behavior:
-            #
-            # SELECT *
-            # FROM Disk
-            # WHERE Disk.machine == <self.guid>
-            # AND Disk.size > 10000
-            # AND (Disk.used_size < 100
-            #      OR Disk.used_size > 500)
+            # The query should be a dictionary:
+            #     {'object': Disk,                           # Object on which the query should be executed
+            #      'data'  : DataList.select.XYZ,            # The requested result; a list of object descriptors, or a count
+            #      'query' : <query>}                        # The actual query
+            # Where <query> is a query(group) dictionary:
+            #     {'type' : DataList.where_operator.ABC,     # Defines whether the given items should be considered in an AND or OR group
+            #      'items': <items>}                         # The items in the group
+            # Where the <items> is any combination of one or more <filter> or <query>
+            # A <filter> tuple example:
+            #     (<field>, DataList.operator.GHI, <value>)  # The operator can be for example EQUALS
+            # The field is any property you would also find on the given object. In case of properties, you can dot as far as you like
+            # This means you can combine AND and OR in any possible combination
 
             base_key = '%s_%s_' % (self._query['object']().namespace, self._query['object'].__name__.lower())
             keys = StoredObject.persistent.prefix(base_key)

@@ -6,7 +6,6 @@ class MyObject(DataObject):
                   '<persistent property 2>': <default value 2>,
                   '<child object>'         : OtherObject,         # Or any other type
                   '<children object list>' : [OtherObject]}       # List with single type item
-    _objectexpiry = <time in seconds>  # Timeout for main object cache
     _expiry = {'<readonly 3rd-party property 1>': <timeout in seconds>,  # Timeout in seconds of these properties
                '<readonly 3rd-party property 2>': <timeout in seconds>}
 
