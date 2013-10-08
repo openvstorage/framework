@@ -70,10 +70,15 @@ class DummyVolatileStore(object):
     def get(self, key):
         data = self._read()
         if key in data['t'] and data['t'][key] > time.time():
-            return data['s'].get(key)
+            value = data['s'].get(key)
+            if 'ovs_primarykeys_' in key:
+                value = set(value)
+            return value
         return None
 
     def set(self, key, value, timeout=99999999):
+        if 'ovs_primarykeys_' in key:
+            value = list(value)
         data = self._read()
         data['s'][key] = value
         data['t'][key] = time.time() + timeout

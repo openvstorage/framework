@@ -23,4 +23,4 @@ class ArakoonWrapper(object):
         return self._client.set(key, json.dumps(value))
 
     def prefix(self, prefix):
-        return self.prefix(prefix)
+        return self._client.prefix(prefix)

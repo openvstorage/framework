@@ -3,6 +3,7 @@ import os
 import imp
 import copy
 import fcntl
+import re
 from storedobject import StoredObject
 
 
@@ -13,7 +14,7 @@ class Descriptor(StoredObject):
         else:
             self.initialized = True
 
-            key = 'ovs_descriptor_%s' % str(object_type)
+            key = 'ovs_descriptor_%s' % re.sub('[\W_]+', '', str(object_type))
             self._descriptor = StoredObject.volatile.get(key)
             if self._descriptor is None:
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')

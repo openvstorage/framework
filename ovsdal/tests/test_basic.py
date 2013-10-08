@@ -1,6 +1,5 @@
 import uuid
 import time
-import unittest
 from unittest import TestCase
 from ovsdal.storedobject import StoredObject
 from ovsdal.hybrids.disk import Disk
@@ -12,7 +11,7 @@ from ovsdal.helpers import HybridRunner, Descriptor
 
 
 #noinspection PyUnresolvedReferences
-class TestDataObject(TestCase):
+class Basic(TestCase):
     @classmethod
     def setUpClass(cls):
         DummyVolatileStore.clean()
@@ -373,6 +372,7 @@ class TestDataObject(TestCase):
         disk3.machine = machine
         disk3.save()
         self.assertEqual(machine.disks.count(disk1), 1, 'Disk should be available only once')
+        self.assertGreaterEqual(machine.disks.index(disk1), 0, 'We should retreive an index')
         machine.disks.sort()
         guid = machine.disks[0].guid
         machine.disks.reverse()

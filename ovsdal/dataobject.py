@@ -23,11 +23,10 @@ class DataObject(StoredObject):
       * Individual cache settings for "live" properties
       * 1-n relations with automatic property propagation
       * Recursive save
-    * Limits:
-      * @TODO: When deleting an object that has children, those children will still refer to a
-        non-existing fetch_object, possibly raising ObjectNotFoundExceptions
-      * @TODO: Primary key caching is consistent on single-node only
     """
+    # @TODO: When deleting an object that has children, those children will still refer to a non-existing fetch_object, possibly raising ObjectNotFoundExceptions
+    # @TODO: Primary key caching is consistent on single-node only (using unix file locking)
+    # @TODO: Currently, there is a limit to the amount of objects per type that is situated around 10k objects
 
     #######################
     ## Attributes
@@ -335,9 +334,9 @@ class DataObject(StoredObject):
             lock.acquire()
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
-                keys = StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name))
-            elif key not in keys:
-                keys.append(key)
+                keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
+            else:
+                keys.add(key)
             StoredObject.volatile.set(internal_key, keys)
         finally:
             lock.release()
@@ -349,9 +348,12 @@ class DataObject(StoredObject):
             lock.acquire()
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
-                keys = StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name))
-            elif key in keys:
-                keys.remove(key)
+                keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
+            else:
+                try:
+                    keys.remove(key)
+                except KeyError:
+                    pass
             StoredObject.volatile.set(internal_key, keys)
         finally:
             lock.release()
