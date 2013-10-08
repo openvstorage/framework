@@ -13,10 +13,20 @@ from datalist import DataList
 class DataObject(StoredObject):
     """
     This base class contains all logic to support our multiple backends and the caching
-    * Persistent data
-    ** OVS backing data: Arakoon
-    ** Read-only reality data: backend (backend libraries contacting e.g. voldrv)
-    * Volatile caching: Memcached
+    * Storage backends:
+      * Persistent backend for persistent storage (key-value store)
+      * Volatile backend for volatile but fast storage (key-value store)
+      * Storage backends are abstracted and injected into this class, making it possible to use fake backends
+    * Features:
+      * Hybrid property access:
+        * Persistent backend
+        * 3rd party component for "live" properties
+      * Individual cache settings for "live" properties
+      * 1-n relations with automatic property propagation
+      * Recursive save
+    * Limits:
+      * When deleting an object that has children, those children will still refer to a
+        non-existing fetch_object, possibly raising ObjectNotFoundExceptions
     """
 
     #######################
@@ -56,7 +66,7 @@ class DataObject(StoredObject):
         # Initialize public fields
         self.dirty = False
         self._name = self.__class__.__name__.lower()
-        self.namespace = 'ovs_data'   # Namespace of the object
+        self._namespace = 'ovs_data'   # Namespace of the object
 
         # Init guid
         new = False
@@ -67,17 +77,23 @@ class DataObject(StoredObject):
             self._guid = str(guid)
 
         # Build base keys
-        self._key = '%s_%s_%s' % (self.namespace, self._name, self._guid)
+        self._key = '%s_%s_%s' % (self._namespace, self._name, self._guid)
 
         # Load data from cache or persistent backend where appropriate
         self._metadata['cache'] = None
         if new:
             self._data = {}
         else:
-            self._data = StoredObject.volatile.get(self._key)
+            try:
+                self._data = StoredObject.volatile.get(self._key)
+            except:
+                self._data = None
             if self._data is None:
                 self._metadata['cache'] = False
-                self._data = json.loads(StoredObject.persistent.get(self._key))
+                try:
+                    self._data = StoredObject.persistent.get(self._key)
+                except:
+                    raise ObjectNotFoundException()
             else:
                 self._metadata['cache'] = True
 
@@ -101,7 +117,8 @@ class DataObject(StoredObject):
         relations = RelationMapper.load_foreign_relations(self.__class__)
         if relations is not None:
             for key, info in relations.iteritems():
-                self._objects[key] = info
+                self._objects[key] = {'info': info,
+                                      'data': None}
                 self._add_lproperty(key)
 
         # Store original data
@@ -140,16 +157,20 @@ class DataObject(StoredObject):
         return self._objects[attribute]
 
     def _get_lproperty(self, attribute):
-        if not isinstance(self._objects[attribute], DataObjectList):
-            remote_class = Descriptor().load(self._objects[attribute]['class']).get_object()
-            remote_key   = self._objects[attribute]['key']
-            datalist = DataList(key   = '%s_%s' % (self._key, attribute),
-                                query = {'object': remote_class,
-                                         'data'  : DataList.select.OBJECT,
-                                         'query' : {'type': DataList.where_operator.AND,
-                                                    'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
-            self._objects[attribute] = DataObjectList(datalist.data, remote_class, readonly=True)
-        return self._objects[attribute]
+        info = self._objects[attribute]['info']
+        remote_class = Descriptor().load(info['class']).get_object()
+        remote_key   = info['key']
+        datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
+                            query = {'object': remote_class,
+                                     'data': DataList.select.OBJECT,
+                                     'query': {'type': DataList.where_operator.AND,
+                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
+
+        if self._objects[attribute]['data'] is None:
+            self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
+        else:
+            self._objects[attribute]['data'].merge(datalist.data)
+        return self._objects[attribute]['data']
 
     # Helper method supporting property setting
     def _set_sproperty(self, attribute, value):
@@ -172,23 +193,31 @@ class DataObject(StoredObject):
     ## Saving data to persistent store and invalidating volatile store
     #######################
 
-    def save(self, recursive=False):
+    def save(self, recursive=False, skip=None):
         """
         Save the object to the persistent backend and clear cache, making use
         of the specified conflict resolve settings
         """
 
         if recursive:
-            for item in self._objects.values():
-                # Only traverse trough loaded sublists
-                if isinstance(item, DataObject):
-                    item.save(recursive=True)
-                elif isinstance(item, DataObjectList):
-                    for subitem in item.iterloaded():
-                        subitem.save(recursive=True)
+            # Save objects that point to us (e.g. disk.machine - if this is disk)
+            for attribute, default in self._blueprint.iteritems():
+                if isinstance(default, Relation):
+                    if attribute != skip:  # disks will be skipped
+                        item = getattr(self, attribute)
+                        if item is not None:
+                            item.save(recursive=True, skip=default.remote_key)
+
+            # Save object we point at (e.g. machine.disks - if this is machine)
+            relations = RelationMapper.load_foreign_relations(self.__class__)
+            if relations is not None:
+                for key, info in relations.iteritems():
+                    if key != skip:  # machine will be skipped
+                        for item in getattr(self, key).iterloaded():
+                            item.save(recursive=True, skip=info['key'])
 
         try:
-            data = json.loads(StoredObject.persistent.get(self._key))
+            data = StoredObject.persistent.get(self._key)
         except:
             data = {}
         data_conflicts = []
@@ -214,13 +243,28 @@ class DataObject(StoredObject):
 
         # Save the data
         self._data = copy.deepcopy(data)
-        StoredObject.persistent.set(self._key, json.dumps(self._data))
-        self._original = copy.deepcopy(self._data)
+        StoredObject.persistent.set(self._key, self._data)
+
+        # Invalidate relation lists
+        for key, default in self._blueprint.iteritems():
+            if isinstance(default, Relation):
+                if self._original[key]['guid'] != self._data[key]['guid']:
+                    # The field points to another object
+                    StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
+                                                                  default.object_type.__name__.lower(),
+                                                                  self._original[key]['guid'],
+                                                                  default.remote_key))
+                    StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
+                                                                  default.object_type.__name__.lower(),
+                                                                  self._data[key]['guid'],
+                                                                  default.remote_key))
 
         # Invalidate the cache
         for key in self._expiry.keys():
             StoredObject.volatile.delete('%s_%s' % (self._key, key))
         StoredObject.volatile.delete(self._key)
+
+        self._original = copy.deepcopy(self._data)
         self.dirty = False
 
     #######################

@@ -1,5 +1,6 @@
 import uuid
 import time
+import unittest
 from unittest import TestCase
 from ovsdal.storedobject import StoredObject
 from ovsdal.hybrids.disk import Disk
@@ -8,13 +9,15 @@ from ovsdal.datalist import DataList
 from ovsdal.storage.dummies import DummyPersistentStore, DummyVolatileStore
 from ovsdal.exceptions import *
 from ovsdal.helpers import HybridRunner, Descriptor
-from ovsdal.lists.disklist import DiskList
 
 
-#noinspection PyUnresolvedReferences,PyProtectedMember
+#noinspection PyUnresolvedReferences
 class TestDataObject(TestCase):
     @classmethod
     def setUpClass(cls):
+        DummyVolatileStore.clean()
+        DummyPersistentStore.clean()
+        # Test to make sure the clean doesn't raise if there is nothing to clean
         DummyVolatileStore.clean()
         DummyPersistentStore.clean()
 
@@ -24,15 +27,11 @@ class TestDataObject(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        DummyVolatileStore.clean()
-        DummyPersistentStore.clean()
-        # Test to make sure the clean doesn't raise if there is nothing to clean
-        DummyVolatileStore.clean()
-        DummyPersistentStore.clean()
+        pass
 
     def test_invalidobject(self):
         # Loading an non-existing object should raise
-        self.assertRaises(Exception, Disk, uuid.uuid4(), None)
+        self.assertRaises(ObjectNotFoundException, Disk, uuid.uuid4(), None)
 
     def test_newobjet_delete(self):
         disk = Disk()
@@ -175,6 +174,8 @@ class TestDataObject(TestCase):
             disk.size = i
             if i < 10:
                 disk.machine = machine
+            else:
+                disk.storage = machine
             disk.save()
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
         list_1 = DataList(key   = 'list_1',
@@ -196,6 +197,7 @@ class TestDataObject(TestCase):
                                    'query' : {'type': DataList.where_operator.AND,
                                               'items': [('size', DataList.operator.GT, 3),
                                                         ('size', DataList.operator.LT, 6)]}}).data
+
         self.assertEqual(list_3, 2, 'list should contain int 2')  # disk 4 and 5
         list_4 = DataList(key   = 'list_4',
                           query = {'object': Disk,
@@ -253,6 +255,14 @@ class TestDataObject(TestCase):
                                                          {'type': DataList.where_operator.OR,
                                                           'items': [('size', DataList.operator.GT, 6)]}]}}).data
         self.assertEqual(list_10, 16, 'list should contain int 16')  # disk 0, 1, 2, 7, 8, 9, 10-19
+        list_11 = DataList(key   = 'list_11',
+                           query = {'object': Disk,
+                                    'data'  : DataList.select.COUNT,
+                                    'query' : {'type': DataList.where_operator.AND,
+                                               'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data
+        self.assertEqual(list_11, 10, 'list should contain int 10')  # disk 10-19
+        for disk in machine.stored_disks:
+            disk.delete()
         for disk in machine.disks:
             disk.delete()
         machine.delete()
@@ -267,6 +277,13 @@ class TestDataObject(TestCase):
         machine = Machine()
         machine.name = 'original'
         machine.save()
+        machine2 = Machine()
+        machine2.save()
+        diskx = Disk()
+        diskx.name = 'storage_test'
+        diskx.storage = machine2
+        diskx.save()
+        machine2.delete()  # Creating an orphaned object
         for i in xrange(0, 10):
             disk = Disk()
             disk.name = 'test_%d' % i
@@ -284,15 +301,16 @@ class TestDataObject(TestCase):
             counter += 1
         machine.save(recursive=True)
         disk = Disk(machine.disks[0].guid)
+        self.assertEqual(disk.size, 1, 'lists should be saved recursively')
         disk.machine.name = 'mtest'
         disk.save(recursive=True)
         machine2 = Machine(machine.guid)
-        self.assertEqual(machine2.disks[0].size, 1, 'lists should be saved recursively')
         self.assertEqual(machine2.disks[1].size, 2, 'lists should be saved recursively')
         self.assertEqual(machine2.name, 'mtest', 'properties should be saved recursively')
         for disk in machine.disks:
             disk.delete()
         machine.delete()
+        diskx.delete()
 
     def test_descriptors(self):
         with self.assertRaises(RuntimeError):
@@ -300,117 +318,64 @@ class TestDataObject(TestCase):
         with self.assertRaises(RuntimeError):
             value = Descriptor().get_object()
 
-    #def test_parentobjects(self):
-    #    test = TestObject()
-    #    self.assertIsNone(test.child, 'Child should not be instantiated by default')
-    #    with self.assertRaises(TypeError):
-    #        # A child can only be set to the configured type
-    #        test.child = TestObject()
-    #    test.child = OtherObject()
-    #    test.child.name = 'something'
-    #    self.assertIsNotNone(test.child.name, 'Child should be browsable')
-    #    test.child.description = 'else'
-    #    # The data set to a child's properties should be available
-    #    self.assertEqual(test.child.name, 'something', 'Child should be persistent')
-    #    test.child.save()
-    #    test.save()
-    #    test2 = TestObject(test.guid)
-    #    # Child properties should also be saved correctly
-    #    self.assertEqual(test2.child.name, test.child.name, 'Child link should be persistent')
-    #    self.assertEqual(test2.child.description, 'else', 'Child link should be persistent')
-    #    test.child.delete()
-    #    test.delete()
-#
-    #def test_parentlists(self):
-    #    test = TestObject()
-    #    # Children should be instantiated as empty list
-    #    self.assertEqual(len(test.children), 0, 'Children should be empty')
-    #    # DataObjectList object should behave as a default python list
-    #    test.children.append(OtherObject())
-    #    test.children.append(OtherObject())
-    #    test.children[0].name = 'first'
-    #    test.children[1].name = 'second'
-    #    test.children[0].description = 'first other'
-    #    test.children[1].description = 'second other'
-    #    # Modifying children should be persistent
-    #    self.assertEqual(test.children[0].name, 'first', 'Children should be persistent')
-    #    for item in test.children:
-    #        self.assertIn(item.name, ['first', 'second'], 'Children should be iterable')
-    #        item.save()
-    #    test.save()
-    #    # Children structure should be persistent
-    #    test2 = TestObject(test.guid)
-    #    self.assertEqual(test2.children[1].description, 'second other', 'Children should be persistent')
-    #    test.children.sort()
-    #    guid = test.children[0].guid
-    #    self.assertEqual(test.children.count(test.children[0]), 1, 'Children should be countable')
-    #    self.assertEqual(test.children.index(test.children[0]), 0, 'Indexer should work')
-    #    test.children.reverse()
-    #    self.assertEqual(test.children[-1].guid, guid, 'Sort and reverse should work')
-    #    item = test.children.pop()
-    #    self.assertNotIn(item.guid, test.children.descriptor['guids'], 'Popped child should be removed from list')
-    #    test.children.insert(1, item)
-    #    self.assertEqual(test.children[1].guid, item.guid, 'Insert should work')
-    #    new_list = DataObjectList(OtherObject)
-    #    new_object = OtherObject()
-    #    new_object.name = 'third'
-    #    new_object.save()
-    #    new_list.append(new_object)
-    #    test.children.extend(new_list)
-    #    self.assertEqual(len(test.children), 3, 'List should be extended')
-    #    with self.assertRaises(TypeError):
-    #        test.children = None
-    #    # Test the lazy loading
-    #    test.children._objects = {}
-    #    for item in test.children:
-    #        self.assertIn(item.name, ['first', 'second', 'third'], 'Dynamic loading should work')
-    #        # Children should be removable
-    #        test.children.remove(item)
-    #        item.delete()
-    #    # We can only set a list property to one of the defined type
-    #    with self.assertRaises(TypeError):
-    #        test.children = DataObjectList(TestObject)
-    #    test.children = DataObjectList(OtherObject)
-    #    test.delete()
-#
-    #def test_datalistvalidation(self):
-    #    # A list created with an empty constructor should raise errors on every call
-    #    test = DataObjectList()
-    #    self.assertRaises(RuntimeError, test.append, None)
-    #    self.assertRaises(RuntimeError, test.extend, None)
-    #    self.assertRaises(RuntimeError, test.insert, 0, None)
-    #    self.assertRaises(RuntimeError, test.remove, None)
-    #    self.assertRaises(RuntimeError, test.pop)
-    #    self.assertRaises(RuntimeError, test.index, None)
-    #    self.assertRaises(RuntimeError, test.count, None)
-    #    self.assertRaises(RuntimeError, test.sort)
-    #    self.assertRaises(RuntimeError, test.reverse)
-    #    with self.assertRaises(RuntimeError):
-    #        # Also itteration should be impossible
-    #        x = [i for i in test]
-    #    # After initialisation, it should check for the correct types
-    #    test.initialze(Reflector.get_object_descriptor(OtherObject()))
-    #    self.assertRaises(TypeError, test.append, TestObject())
-    #    self.assertRaises(TypeError, test.insert, 0, TestObject())
-    #    self.assertRaises(TypeError, test.extend, DataObjectList(TestObject))
-#
-    #def test_datalistrecursivesave(self):
-    #    test = TestObject()
-    #    test.child = OtherObject()
-    #    test.child.name = 'one'
-    #    test.children.append(OtherObject())
-    #    test.children[0].name = 'one'
-    #    test.save()
-    #    time.sleep(11)
-    #    test2 = TestObject(test.guid)
-    #    with self.assertRaises(Exception):
-    #        item = test2.children[0]
-    #    with self.assertRaises(Exception):
-    #        item = test2.child.name
-    #    test.save(recursive=True)
-    #    test3 = TestObject(test.guid)
-    #    self.assertEqual(test3.children[0].name, 'one', 'Save should work recursively')
-    #    self.assertEqual(test3.child.name, 'one', 'Save should work recursively')
-    #    test.children[0].delete()
-    #    test.child.delete()
-    #    test.delete()
+    def test_relationcache(self):
+        machine = Machine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = Disk()
+        disk1.name = 'disk1'
+        disk1.save()
+        disk2 = Disk()
+        disk2.name = 'disk2'
+        disk2.save()
+        disk3 = Disk()
+        disk3.name = 'disk3'
+        disk3.save()
+        self.assertEqual(len(machine.disks), 0, 'There should be no disks on the machine')
+        disk1.machine = machine
+        disk1.save()
+        self.assertEqual(len(machine.disks), 1, 'There should be 1 disks on the machine')
+        disk2.machine = machine
+        disk2.save()
+        self.assertEqual(len(machine.disks), 2, 'There should be 2 disks on the machine')
+        disk3.machine = machine
+        disk3.save()
+        self.assertEqual(len(machine.disks), 3, 'There should be 3 disks on the machine')
+        machine.disks[0].name = 'disk1_'
+        machine.disks[1].name = 'disk2_'
+        machine.disks[2].name = 'disk3_'
+        disk1.machine = None
+        disk1.save()
+        disk2.machine = None
+        disk2.save()
+        self.assertEqual(len(machine.disks), 1, 'There should be 1 disks on the machine')
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
+
+    def test_datalistactions(self):
+        machine = Machine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = Disk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = Disk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        disk3 = Disk()
+        disk3.name = 'disk3'
+        disk3.machine = machine
+        disk3.save()
+        self.assertEqual(machine.disks.count(disk1), 1, 'Disk should be available only once')
+        machine.disks.sort()
+        guid = machine.disks[0].guid
+        machine.disks.reverse()
+        self.assertEqual(machine.disks[-1].guid, guid, 'Reverse and sort should work')
+        machine.disks.sort()
+        self.assertEqual(machine.disks.index(disk1), 0, 'And the guid should be first again')
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()

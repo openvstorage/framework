@@ -1,5 +1,6 @@
 from storedobject import StoredObject
 from helpers import Descriptor
+from exceptions import ObjectNotFoundException
 
 
 class DataList(StoredObject):
@@ -19,9 +20,10 @@ class DataList(StoredObject):
     select = Select()
     where_operator = WhereOperator()
     operator = Operator()
+    namespace = 'ovs_list'
 
     def __init__(self, key, query, load=True):
-        self._key = None if key is None else ('ovs_list_%s' % key)
+        self._key = None if key is None else ('%s_%s' % (DataList.namespace, key))
         self._query = query
         self.data = None
         if load:
@@ -89,7 +91,7 @@ class DataList(StoredObject):
             # The field is any property you would also find on the given object. In case of properties, you can dot as far as you like
             # This means you can combine AND and OR in any possible combination
 
-            base_key = '%s_%s_' % (self._query['object']().namespace, self._query['object'].__name__.lower())
+            base_key = '%s_%s_' % (self._query['object']()._namespace, self._query['object'].__name__.lower())
             keys = StoredObject.persistent.prefix(base_key)
             if self._query['data'] == DataList.select.COUNT:
                 self.data = 0
@@ -99,10 +101,13 @@ class DataList(StoredObject):
             for key in keys:
                 guid = key.replace(base_key, '')
                 instance = self._query['object'](guid)
-                if self._query['query']['type'] == DataList.where_operator.AND:
-                    include = self._exec_and(instance, self._query['query']['items'])
-                else:
-                    include = self._exec_or(instance, self._query['query']['items'])
+                try:
+                    if self._query['query']['type'] == DataList.where_operator.AND:
+                        include = self._exec_and(instance, self._query['query']['items'])
+                    else:
+                        include = self._exec_or(instance, self._query['query']['items'])
+                except ObjectNotFoundException:
+                    include = False
                 if include:
                     if self._query['data'] == DataList.select.COUNT:
                         self.data += 1

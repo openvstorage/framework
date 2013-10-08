@@ -41,12 +41,12 @@ class DummyPersistentStore(object):
 
     def _save(self, data):
         f = open(self._path, 'w+')
-        f.write(json.dumps(data))
+        f.write(json.dumps(data, sort_keys=True, indent=2))
         f.close()
 
 
 class DummyVolatileStore(object):
-    _path = '/tmp/volatilepersistent.json'
+    _path = '/tmp/dummyvolatile.json'
     _storage = {}
     _timeout = {}
 
@@ -88,5 +88,5 @@ class DummyVolatileStore(object):
 
     def _save(self, data):
         f = open(self._path, 'w+')
-        f.write(json.dumps(data))
+        f.write(json.dumps(data, sort_keys=True, indent=2))
         f.close()

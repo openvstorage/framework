@@ -4,3 +4,7 @@ class ConcurrencyException(Exception):
 
 class InvalidStoreFactoryException(Exception):
     pass
+
+
+class ObjectNotFoundException(Exception):
+    pass
