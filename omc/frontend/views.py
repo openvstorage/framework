@@ -14,14 +14,14 @@ def dashboard(request, **arguments):
 
 
 def statistics(request, **arguments):
-    import memcache
+    import memcached
 
     # Get first memcached URI
     match = re.match("([.\w]+:\d+)", settings.CACHES['default']['LOCATION'])
     if not match:
         raise RuntimeError("Could not find memcache configuration")
 
-    client = memcache.Client([match.group(1)])
+    client = memcached.Client([match.group(1)])
     stats = client.get_stats()[0][1]
     for key in stats.keys():
         try:
