@@ -29,6 +29,14 @@ class DataList(StoredObject):
         if load:
             self.load()
 
+    @staticmethod
+    def get_pks(namespace, name):
+        key = 'ovs_primarykeys_%s' % name
+        keys = StoredObject.volatile.get(key)
+        if keys is None:
+            keys = StoredObject.persistent.prefix('%s_%s_' % (namespace, name))
+        return keys
+
     def _exec_and(self, instance, items):
         for item in items:
             if isinstance(item, dict):
@@ -91,8 +99,10 @@ class DataList(StoredObject):
             # The field is any property you would also find on the given object. In case of properties, you can dot as far as you like
             # This means you can combine AND and OR in any possible combination
 
-            base_key = '%s_%s_' % (self._query['object']()._namespace, self._query['object'].__name__.lower())
-            keys = StoredObject.persistent.prefix(base_key)
+            namespace = self._query['object']()._namespace
+            name = self._query['object'].__name__.lower()
+            base_key = '%s_%s_' % (namespace, name)
+            keys = DataList.get_pks(namespace, name)
             if self._query['data'] == DataList.select.COUNT:
                 self.data = 0
             else:
@@ -100,8 +110,8 @@ class DataList(StoredObject):
 
             for key in keys:
                 guid = key.replace(base_key, '')
-                instance = self._query['object'](guid)
                 try:
+                    instance = self._query['object'](guid)
                     if self._query['query']['type'] == DataList.where_operator.AND:
                         include = self._exec_and(instance, self._query['query']['items'])
                     else:

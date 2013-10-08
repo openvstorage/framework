@@ -2,6 +2,7 @@ import inspect
 import os
 import imp
 import copy
+import fcntl
 from storedobject import StoredObject
 
 
@@ -60,3 +61,18 @@ class HybridRunner(object):
                 for member in inspect.getmembers(module):
                     if inspect.isclass(member[1]) and member[1].__module__ == name:
                         yield member[1]
+
+
+class Lock(object):
+    def __init__(self, filename):
+        self.filename = filename
+        self.handle = open(filename, 'w')
+
+    def acquire(self):
+        fcntl.flock(self.handle, fcntl.LOCK_EX)
+
+    def release(self):
+        fcntl.flock(self.handle, fcntl.LOCK_UN)
+
+    def __del__(self):
+        self.handle.close()

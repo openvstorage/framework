@@ -1,9 +1,8 @@
-import json
 import inspect
 import uuid
 import copy
 from exceptions import *
-from helpers import Descriptor
+from helpers import Descriptor, Lock
 from storedobject import StoredObject
 from relations.relations import Relation, RelationMapper
 from dataobjectlist import DataObjectList
@@ -25,8 +24,9 @@ class DataObject(StoredObject):
       * 1-n relations with automatic property propagation
       * Recursive save
     * Limits:
-      * When deleting an object that has children, those children will still refer to a
+      * @TODO: When deleting an object that has children, those children will still refer to a
         non-existing fetch_object, possibly raising ObjectNotFoundExceptions
+      * @TODO: Primary key caching is consistent on single-node only
     """
 
     #######################
@@ -244,6 +244,7 @@ class DataObject(StoredObject):
         # Save the data
         self._data = copy.deepcopy(data)
         StoredObject.persistent.set(self._key, self._data)
+        self.add_pk(self._key)
 
         # Invalidate relation lists
         for key, default in self._blueprint.iteritems():
@@ -283,6 +284,7 @@ class DataObject(StoredObject):
         for key in self._expiry.keys():
             StoredObject.volatile.delete('%s_%s' % (self._key, key))
         StoredObject.volatile.delete(self._key)
+        self.delete_pk(self._key)
 
     # Discard all pending changes
     def discard(self):
@@ -314,7 +316,7 @@ class DataObject(StoredObject):
         return object_type(value) if not DataObject.is_dataobject(value) else value
 
     #######################
-    ## Helper method to support 3rd party backend caching
+    ## Helper methods
     #######################
 
     def _backend_property(self, function):
@@ -325,3 +327,31 @@ class DataObject(StoredObject):
             cached_data = function()  # Load data from backend
             StoredObject.volatile.set(cache_key, cached_data, self._expiry[caller_name])
         return cached_data
+
+    def add_pk(self, key):
+        internal_key = 'ovs_primarykeys_%s' % self._name
+        lock = Lock('/tmp/%s' % internal_key)
+        try:
+            lock.acquire()
+            keys = StoredObject.volatile.get(internal_key)
+            if keys is None:
+                keys = StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name))
+            elif key not in keys:
+                keys.append(key)
+            StoredObject.volatile.set(internal_key, keys)
+        finally:
+            lock.release()
+
+    def delete_pk(self, key):
+        internal_key = 'ovs_primarykeys_%s' % self._name
+        lock = Lock('/tmp/%s' % internal_key)
+        try:
+            lock.acquire()
+            keys = StoredObject.volatile.get(internal_key)
+            if keys is None:
+                keys = StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name))
+            elif key in keys:
+                keys.remove(key)
+            StoredObject.volatile.set(internal_key, keys)
+        finally:
+            lock.release()

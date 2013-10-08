@@ -76,6 +76,7 @@ class TestDataObject(TestCase):
         disk = Disk()
         # Readonly properties should return data
         self.assertIsNotNone(disk.used_size, 'RO property should return data')
+        disk.delete()
 
     def test_datastorewins(self):
         disk = Disk()
@@ -163,6 +164,7 @@ class TestDataObject(TestCase):
                 self.assertIn(attribute, properties, '%s should be a property' % attribute)
                 # ... and should work
                 data = getattr(instance, attribute)
+            instance.delete()
 
     def test_queries(self):
         machine = Machine()
@@ -197,7 +199,6 @@ class TestDataObject(TestCase):
                                    'query' : {'type': DataList.where_operator.AND,
                                               'items': [('size', DataList.operator.GT, 3),
                                                         ('size', DataList.operator.LT, 6)]}}).data
-
         self.assertEqual(list_3, 2, 'list should contain int 2')  # disk 4 and 5
         list_4 = DataList(key   = 'list_4',
                           query = {'object': Disk,
@@ -205,7 +206,7 @@ class TestDataObject(TestCase):
                                    'query' : {'type': DataList.where_operator.OR,
                                               'items': [('size', DataList.operator.LT, 3),
                                                         ('size', DataList.operator.GT, 6)]}}).data
-        self.assertEqual(list_4, 16, 'list should contain int 16')  # disk 0, 1, 2, 7, 8, 9, 10-19
+        self.assertGreaterEqual(list_4, 16, 'list should contain >= 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
         list_5 = DataList(key   = 'list_5',
                           query = {'object': Disk,
                                    'data'  : DataList.select.COUNT,
@@ -254,7 +255,7 @@ class TestDataObject(TestCase):
                                                'items': [('size', DataList.operator.LT, 3),
                                                          {'type': DataList.where_operator.OR,
                                                           'items': [('size', DataList.operator.GT, 6)]}]}}).data
-        self.assertEqual(list_10, 16, 'list should contain int 16')  # disk 0, 1, 2, 7, 8, 9, 10-19
+        self.assertGreaterEqual(list_10, 16, 'list should contain >= 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
         list_11 = DataList(key   = 'list_11',
                            query = {'object': Disk,
                                     'data'  : DataList.select.COUNT,
@@ -272,6 +273,7 @@ class TestDataObject(TestCase):
         disk.size = 100
         with self.assertRaises(TypeError):
             disk.machine = Disk()
+        disk.delete()
 
     def test_recursive(self):
         machine = Machine()
@@ -349,8 +351,9 @@ class TestDataObject(TestCase):
         disk2.machine = None
         disk2.save()
         self.assertEqual(len(machine.disks), 1, 'There should be 1 disks on the machine')
-        for disk in machine.disks:
-            disk.delete()
+        disk1.delete()
+        disk2.delete()
+        disk3.delete()
         machine.delete()
 
     def test_datalistactions(self):
@@ -375,7 +378,7 @@ class TestDataObject(TestCase):
         machine.disks.reverse()
         self.assertEqual(machine.disks[-1].guid, guid, 'Reverse and sort should work')
         machine.disks.sort()
-        self.assertEqual(machine.disks.index(disk1), 0, 'And the guid should be first again')
+        self.assertEqual(machine.disks[0].guid, guid, 'And the guid should be first again')
         for disk in machine.disks:
             disk.delete()
         machine.delete()
