@@ -3,6 +3,11 @@ from toolbox import Toolbox
 from ovsapi.user import User as OVSUser
 from ovsdal.hybrids.user import User as HybridUser
 from ovsdal.exceptions import ObjectNotFoundException
+from ovsdal.storedobject import StoredObject
+from ovsdal.storage.arakoonstore import ArakoonStore
+from ovsdal.storage.memcached import MemcacheStore
+
+StoredObject.set_stores(ArakoonStore.load(), MemcacheStore.load())
 
 
 class UPAuthenticationBackend(object):
@@ -10,7 +15,7 @@ class UPAuthenticationBackend(object):
         if username is None or password is None:
             return None
 
-        cuser = OVSUser.get_user_by_username(username)
+        cuser = OVSUser.get_user_by_username(str(username))
         if password != cuser.password:
             return None
 

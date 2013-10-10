@@ -60,8 +60,15 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    BASE_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware'
+)
+
+AUTHENTICATION_BACKENDS = (
+    BASE_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
+    BASE_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
 )
 
 from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
