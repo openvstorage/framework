@@ -1,0 +1,14 @@
+﻿<section>
+    <h2 data-bind="html: displayname"></h2>
+    <blockquote data-bind="html: description"></blockquote>
+    <h3>Features</h3>
+    <ul data-bind="foreach: features">
+        <li data-bind="html: $data"></li>
+    </ul>
+    <div class="alert alert-danger">
+      <h4>Warning</h4>
+      <p>
+          This website is still in heavy development.
+      </p>
+    </div>
+</section>
