@@ -3,7 +3,7 @@ define(['jquery', 'knockout', 'ovs/generic'], function ($, ko, generic) {
 
     return function () {
         var self = this;
-        // Normal variables
+        // Variables
         self.refresh_handle = undefined;
         self.refresh_timeout = undefined;
 
@@ -28,35 +28,25 @@ define(['jquery', 'knockout', 'ovs/generic'], function ($, ko, generic) {
                 type: 'get',
                 contentType: 'application/json'
             })
-                .done(function (data) {
-                    self.bytes(generic.get_bytes_human(data.bytes));
-                    self.curr_items(data.curr_items);
-                    self.total_items(data.total_items);
-                    self.get_hits(data.get_hits);
-                    self.cmd_get(data.cmd_get);
-                    self.hit_rate(data.cmd_get === 0 ? 0 : Math.round(data.get_hits / data.cmd_get * 1000) / 10);
-                    self.bytes_read(generic.get_bytes_human(data.bytes_read));
-                    self.bytes_written(generic.get_bytes_human(data.bytes_written));
-                    self.uptime(data.uptime);
+            .done(function (data) {
+                self.bytes(generic.get_bytes_human(data.bytes));
+                self.curr_items(data.curr_items);
+                self.total_items(data.total_items);
+                self.get_hits(data.get_hits);
+                self.cmd_get(data.cmd_get);
+                self.hit_rate(data.cmd_get === 0 ? 0 : Math.round(data.get_hits / data.cmd_get * 1000) / 10);
+                self.bytes_read(generic.get_bytes_human(data.bytes_read));
+                self.bytes_written(generic.get_bytes_human(data.bytes_written));
+                self.uptime(data.uptime);
 
-                    var raw_string = '';
-                    for (var attribute in data) {
-                        if (data.hasOwnProperty(attribute)) {
-                            raw_string += generic.padright(attribute, ' ', 20) + data[attribute].toString() + '\n';
-                        }
+                var raw_string = '';
+                for (var attribute in data) {
+                    if (data.hasOwnProperty(attribute)) {
+                        raw_string += generic.padright(attribute, ' ', 20) + data[attribute].toString() + '\n';
                     }
-                    self.raw(raw_string);
-                });
+                }
+                self.raw(raw_string);
+            });
         };
-        self.start_refresh = function () {
-            self.refresh_timeout = window.setInterval(function () {
-                self.refresh();
-            }, 1000);
-        };
-        self.stop_refresh = function() {
-            if (self.refresh_timeout !== undefined) {
-                clearInterval(self.refresh_timeout);
-            }
-        }
     };
 });

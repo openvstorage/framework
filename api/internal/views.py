@@ -1,18 +1,25 @@
 import re
 import datetime
 from backend.serializers.memcached import MemcacheSerializer
-from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.views import APIView
+from rest_framework import status, permissions
 from rest_framework.response import Response
+from rest_framework.reverse import reverse
 from django.conf import settings
 
 
-@api_view(['GET'])
-def memcached(request, format=None):
+class APIRoot(APIView):
+    def get(self, request, format=None):
+        return Response({'memcached': reverse('memcached', request=request, format=format)})
+
+
+class Memcached(APIView):
     """
-    List all snippets, or create a new snippet.
+    Provides a snapshot of the memcached instance configured in the Django backend.
     """
-    if request.method == 'GET':
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def get(self, request, format=None):
         import memcache
 
         # Get first memcached URI
