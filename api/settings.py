@@ -11,9 +11,10 @@ BASE_NAME = parser.get('main', 'base_name')
 BASE_WWW_DIR = os.path.dirname(__file__)
 BASE_LOG_DIR = parser.get('main', 'log_folder') + '/' + BASE_NAME
 
-FRONTEND_ROOT = ''
-PORTAL_ROOT   = '/portal'
-STATIC_URL    = '/static/'  # STATIC_URL must end with a slash
+FRONTEND_ROOT = '/' + BASE_NAME
+STATIC_URL    = '/' + BASE_NAME + '/static/'  # STATIC_URL must end with a slash
+
+FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
     ('Kenneth Henderick', 'kenneth.henderick@cloudfounders.com'),
@@ -71,7 +72,7 @@ TEMPLATE_CONTEXT_PROCESSORS += (
 ROOT_URLCONF = BASE_NAME + '.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'omc.wsgi.application'
+WSGI_APPLICATION = 'api.wsgi.application'
 
 TEMPLATE_DIRS = (
     BASE_WWW_DIR + '/templates',
@@ -85,7 +86,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    BASE_NAME + '.frontend',
 )
 
 CACHES = {
