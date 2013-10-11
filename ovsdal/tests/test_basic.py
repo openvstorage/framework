@@ -22,7 +22,8 @@ class Basic(TestCase):
 
     @classmethod
     def setUp(cls):
-        StoredObject.set_stores(DummyPersistentStore(), DummyVolatileStore())
+        StoredObject.persistent = DummyPersistentStore()
+        StoredObject.volatile = DummyVolatileStore()
 
     @classmethod
     def tearDownClass(cls):

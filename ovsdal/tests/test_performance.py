@@ -1,18 +1,11 @@
 import time
 from unittest import TestCase
-from ovsdal.storage.arakoonstore import ArakoonStore
-from ovsdal.storage.memcached import MemcacheStore
 from ovsdal.hybrids.disk import Disk
 from ovsdal.hybrids.machine import Machine
-from ovsdal.storedobject import StoredObject
 from ovsdal.datalist import DataList
 
 
 class LotsOfObjects(TestCase):
-    @classmethod
-    def setUp(cls):
-        StoredObject.set_stores(ArakoonStore.load(), MemcacheStore.load())
-
     def test_lotsofobjects(self):
         print 'start test'
         print 'start loading data'

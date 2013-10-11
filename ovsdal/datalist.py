@@ -23,6 +23,9 @@ class DataList(StoredObject):
     namespace = 'ovs_list'
 
     def __init__(self, key, query, load=True):
+        # Initialize super class
+        super(DataList, self).__init__()
+
         self._key = None if key is None else ('%s_%s' % (DataList.namespace, key))
         self._query = query
         self.data = None

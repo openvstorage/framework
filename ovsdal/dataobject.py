@@ -26,7 +26,9 @@ class DataObject(StoredObject):
     """
     # @TODO: When deleting an object that has children, those children will still refer to a non-existing fetch_object, possibly raising ObjectNotFoundExceptions
     # @TODO: Primary key caching is consistent on single-node only (using unix file locking)
-    # @TODO: Currently, there is a limit to the amount of objects per type that is situated around 10k objects
+    # @TODO: Currently, there is a limit to the amount of objects per type that is situated around 10k objects. Mostly related to memcache object size
+    # @TODO: Plain lists still have to be memory cleared if one of their related fields change
+    # @TODO: Currently, self-pointing relations are not yet possible
 
     #######################
     ## Attributes
@@ -40,7 +42,7 @@ class DataObject(StoredObject):
     ## Constructor
     #######################
 
-    def __init__(self, guid=None, datastore_wins=False):
+    def __init__(self, guid=None, data=None, datastore_wins=False):
         """
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
@@ -125,6 +127,11 @@ class DataObject(StoredObject):
 
         # Re-cache the object
         StoredObject.volatile.set(self._key, self._data)
+
+        # Optionally, initialize some fields
+        if data is not None:
+            for field, value in data.iteritems():
+                setattr(self, field, value)
 
     #######################
     ## Helper methods for dynamic getting and setting
@@ -294,8 +301,26 @@ class DataObject(StoredObject):
         self.__init__(guid           = self._guid,
                       datastore_wins = self._datastore_wins)
 
+    def serialize(self, depth=0):
+        data = {'guid': self.guid}
+        for key, default in self._blueprint.iteritems():
+            if isinstance(default, Relation):
+                if depth == 0:
+                    data['%s_guid' % key] = self._data[key]['guid']
+                else:
+                    instance = getattr(self, key)
+                    if instance is not None:
+                        data[key] = getattr(self, key).serialize(dept=(depth - 1))
+                    else:
+                        data[key] = None
+            else:
+                data[key] = self._data[key]
+        for key in self._expiry.keys():
+            data[key] = getattr(self, key)
+        return data
+
     #######################
-    ## The primary key
+    ## Properties
     #######################
 
     @property

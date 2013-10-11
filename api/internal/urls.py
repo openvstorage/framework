@@ -1,11 +1,7 @@
-from django.conf.urls import patterns, include, url
-from rest_framework.urlpatterns import format_suffix_patterns
-from views import Memcached, APIRoot
+from views import UserViewSet, MemcacheViewSet
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = patterns('',
-    url(r'^$', APIRoot.as_view(), name='root'),
-    url(r'^memcached/$', Memcached.as_view(), name='memcached'),
-    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-)
-
-urlpatterns = format_suffix_patterns(urlpatterns)
+router = DefaultRouter()
+router.register(r'users', UserViewSet, base_name='users')
+router.register(r'memcache', MemcacheViewSet, base_name='memcache')
+urlpatterns = router.urls

@@ -1,39 +1,74 @@
 import re
 import datetime
+import settings
+from backend.serializers.user import UserSerializer, PasswordSerializer
 from backend.serializers.memcached import MemcacheSerializer
-from rest_framework.views import APIView
-from rest_framework import status, permissions
+from rest_framework import status, viewsets
 from rest_framework.response import Response
-from rest_framework.reverse import reverse
-from django.conf import settings
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from ovsdal.exceptions import ObjectNotFoundException
+from ovsdal.hybrids.user import User
+from ovsapi.user import User as APIUser
+from django.http import Http404
 
 
-class APIRoot(APIView):
-    def get(self, request, format=None):
-        return Response({'memcached': reverse('memcached', request=request, format=format)})
-
-
-class Memcached(APIView):
+class UserViewSet(viewsets.ViewSet):
     """
-    Provides a snapshot of the memcached instance configured in the Django backend.
+    Manage users
     """
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
-    def get(self, request, format=None):
-        import memcache
+    def _get_object(self, guid):
+        try:
+            return User(guid)
+        except ObjectNotFoundException:
+            raise Http404
 
-        # Get first memcached URI
-        match = re.match("([.\w]+:\d+)", settings.CACHES['default']['LOCATION'])
-        if not match:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+    def list(self, request, format=None):
+        users = APIUser.get_users()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
 
-        host = memcache._Host(match.group(1))
-        host.connect()
-        host.send_cmd("stats")
+    def retrieve(self, request, pk=None, format=None):
+        user = self._get_object(pk)
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
 
+    def create(self, request, format=None):
+        serializer = UserSerializer(User(), request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action()
+    def set_password(self, request, pk=None, format=None):
+        user = self._get_object(pk)
+        serializer = PasswordSerializer(data=request.DATA)
+        if serializer.is_valid():
+            user.password = serializer.data['password']
+            user.save()
+            return Response(UserSerializer(user).data, status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MemcacheViewSet(viewsets.ViewSet):
+    """
+    Information about memcache instances
+    """
+    permission_classes = (IsAuthenticated,)
+
+    def _get_instance(self, host):
         class Stats:
             pass
 
+        import memcache
+        host = memcache._Host(host)
+        host.connect()
+        host.send_cmd("stats")
         stats = Stats()
         while 1:
             line = host.readline().split(None, 2)
@@ -50,8 +85,22 @@ class Memcached(APIView):
             except ValueError:
                 pass
             setattr(stats, key, value)
-
         host.close_socket()
+        return stats
 
+    def list(self, request, format=None):
+        match = re.match("([.\w]+:\d+)", settings.CACHES['default']['LOCATION'])
+        if not match:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        stats = self._get_instance(match.group(1))
         serializer = MemcacheSerializer(stats)
         return Response(serializer.data)
+
+    def retrieve(self, request, pk=None, format=None):
+        match = re.match("([.\w]+:\d+)", settings.CACHES['default']['LOCATION'])
+        if not match:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        stats = self._get_instance(match.group(1))
+        serializer = MemcacheSerializer(stats)
+        return Response(serializer.data)
+

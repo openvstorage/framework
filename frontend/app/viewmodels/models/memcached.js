@@ -24,7 +24,7 @@ define(['jquery', 'knockout', 'ovs/generic'], function ($, ko, generic) {
             if (self.refresh_handle !== undefined) {
                 self.refresh_handle.abort();
             }
-            self.refresh_handle = $.ajax('/api/internal/memcached/?timestamp=' + generic.gettimestamp(), {
+            self.refresh_handle = $.ajax('/api/internal/memcache/?timestamp=' + generic.gettimestamp(), {
                 type: 'get',
                 contentType: 'application/json'
             })
@@ -42,7 +42,7 @@ define(['jquery', 'knockout', 'ovs/generic'], function ($, ko, generic) {
                 var raw_string = '';
                 for (var attribute in data) {
                     if (data.hasOwnProperty(attribute)) {
-                        raw_string += generic.padright(attribute, ' ', 20) + data[attribute].toString() + '\n';
+                        raw_string += generic.padright(attribute, ' ', 25) + data[attribute].toString() + '\n';
                     }
                 }
                 self.raw(raw_string);
