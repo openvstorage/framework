@@ -7,12 +7,13 @@ parser.read(os.path.dirname(__file__) + '/config/settings.cfg')
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
-BASE_NAME = parser.get('main', 'base_name')
+UI_NAME = parser.get('main', 'ui_name')
+SYSTEM_NAME = parser.get('main', 'system_name')
 BASE_WWW_DIR = os.path.dirname(__file__)
-BASE_LOG_DIR = parser.get('main', 'log_folder') + '/' + BASE_NAME
+BASE_LOG_DIR = parser.get('main', 'log_folder') + '/' + SYSTEM_NAME
 
-FRONTEND_ROOT = '/' + BASE_NAME
-STATIC_URL    = '/' + BASE_NAME + '/static/'  # STATIC_URL must end with a slash
+FRONTEND_ROOT = '/' + UI_NAME
+STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
@@ -25,14 +26,14 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_WWW_DIR + '/' + BASE_NAME + '.db.sqlite3'
+        'NAME': BASE_WWW_DIR + '/' + SYSTEM_NAME + '.db.sqlite3'
     }
 }
 
 ALLOWED_HOSTS = []
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
-LOGIN_URL = BASE_NAME + '.frontend.login_view'
+LOGIN_URL = SYSTEM_NAME + '.frontend.login_view'
 
 SITE_ID = 1
 USE_I18N = True
@@ -60,14 +61,14 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    BASE_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
+    SYSTEM_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware'
 )
 
 AUTHENTICATION_BACKENDS = (
-    BASE_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
-    BASE_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
+    SYSTEM_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
+    SYSTEM_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 )
 
@@ -76,10 +77,10 @@ TEMPLATE_CONTEXT_PROCESSORS += (
     'django.core.context_processors.request',
 )
 
-ROOT_URLCONF = BASE_NAME + '.urls'
+ROOT_URLCONF = SYSTEM_NAME + '.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'api.wsgi.application'
+WSGI_APPLICATION = 'django.wsgi.application'
 
 TEMPLATE_DIRS = (
     BASE_WWW_DIR + '/templates',
@@ -129,7 +130,7 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
-        BASE_NAME: {
+        SYSTEM_NAME: {
             'handlers': ['logfile'],
             'level': 'INFO',
             'propogate': False
