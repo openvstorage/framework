@@ -173,18 +173,24 @@ class Basic(TestCase):
                 if hasattr(cls, item) and isinstance(getattr(cls, item), property):
                     properties.append(item)
             # All expiries should be implemented
+            missing_props = []
             for attribute in instance._expiry.keys():
-                self.assertIn(attribute, properties, '%s should be a property' % attribute)
-                # ... and should work
-                data = getattr(instance, attribute)
+                if attribute not in properties:
+                    missing_props.append(attribute)
+                else:  # ... and should work
+                    data = getattr(instance, attribute)
+            self.assertEqual(len(missing_props), 0, 'Missing dynamic properties in %s: %s' % (cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry
+            missing_metadata = []
             for prop in properties:
                 found = prop in cls._blueprint \
                     or prop in cls._relations \
                     or prop in cls._expiry \
                     or prop in remote_properties \
                     or prop == 'guid'
-                self.assertTrue(found, 'All properties should have metadata')
+                if not found:
+                    missing_metadata.append(prop)
+            self.assertEqual(len(missing_metadata), 0, 'Missing metadata for properties in %s: %s' % (cls.__name__, missing_metadata))
             instance.delete()
 
     def test_queries(self):
