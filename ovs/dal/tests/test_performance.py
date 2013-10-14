@@ -1,8 +1,8 @@
 import time
 from unittest import TestCase
-from ovsdal.hybrids.disk import Disk
-from ovsdal.hybrids.machine import Machine
-from ovsdal.datalist import DataList
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.machine import Machine
+from ovs.dal.datalist import DataList
 
 
 class LotsOfObjects(TestCase):

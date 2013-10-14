@@ -1,13 +1,13 @@
 import uuid
 import time
 from unittest import TestCase
-from ovsdal.storedobject import StoredObject
-from ovsdal.hybrids.disk import Disk
-from ovsdal.hybrids.machine import Machine
-from ovsdal.datalist import DataList
-from ovsdal.storage.dummies import DummyPersistentStore, DummyVolatileStore
-from ovsdal.exceptions import *
-from ovsdal.helpers import HybridRunner, Descriptor
+from ovs.dal.storedobject import StoredObject
+from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.machine import Machine
+from ovs.dal.datalist import DataList
+from ovs.dal.storage.dummies import DummyPersistentStore, DummyVolatileStore
+from ovs.dal.exceptions import *
+from ovs.dal.helpers import HybridRunner, Descriptor
 
 
 #noinspection PyUnresolvedReferences

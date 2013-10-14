@@ -1,4 +1,4 @@
-from hypervisor.hypervisor import Hypervisor
+from ovs.hypervisor.hypervisor import Hypervisor
 import time
 
 

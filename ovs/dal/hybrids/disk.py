@@ -1,5 +1,5 @@
-from ovsdal.dataobject import DataObject
-from ovsdal.hybrids.machine import Machine
+from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.machine import Machine
 
 
 class Disk(DataObject):

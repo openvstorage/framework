@@ -1,5 +1,5 @@
-from ovsdal.dataobject import DataObject
-from ovsdal.hybrids.group import Group
+from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.group import Group
 
 
 class User(DataObject):

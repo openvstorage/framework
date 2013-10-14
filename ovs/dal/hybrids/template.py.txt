@@ -1,6 +1,6 @@
-from ovsdal.dataobject import DataObject
-from ovsdal.pmachine import PMachine
-from hypervisors.factory import hypervisors
+from ovs.dal.dataobject import DataObject
+from ovs.dal.pmachine import PMachine
+from ovs.hypervisor.factory import Factory as HVFactory
 from volumedriver import voldrv
 
 # Example
@@ -17,7 +17,7 @@ class VMachine(DataObject):
     def status(self):
         def get_data():
             # Actual code to load the property of the backend.
-            return hypervisors.get(self.computenode.type).getstatus(self.hypervisor_id)
+            return HVFactory.get(self.computenode.type).getstatus(self.hypervisor_id)
         return self._backend_property(get_data)
 
     @property

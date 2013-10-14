@@ -1,5 +1,5 @@
-from ovsdal.storedobject import StoredObject
-from ovsdal.helpers import HybridRunner, Descriptor
+from ovs.dal.storedobject import StoredObject
+from ovs.dal.helpers import HybridRunner, Descriptor
 
 
 class RelationMapper(StoredObject):

@@ -3,7 +3,7 @@ from hypervisors.hyperv import HyperV
 from hypervisors.xen import Xen
 
 
-class HVFactory(object):
+class Factory(object):
     @staticmethod
     def get(computenode):
         hvtype   = computenode.hvtype

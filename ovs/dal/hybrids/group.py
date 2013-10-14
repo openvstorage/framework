@@ -1,4 +1,4 @@
-from ovsdal.dataobject import DataObject
+from ovs.dal.dataobject import DataObject
 
 
 class Group(DataObject):
