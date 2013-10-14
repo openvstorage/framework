@@ -441,6 +441,7 @@ class Basic(TestCase):
         for disk in machine.disks:
             disk.delete()
         machine.delete()
+        disk0.delete()
 
     def test_emptyquery(self):
         amount = DataList(key   = 'some_list',
@@ -499,10 +500,23 @@ class Basic(TestCase):
         disk.name = 'disk'
         disk.machine = machine
         disk.save()
-        dictionary = disk.serialize(depth=1)
+        dictionary = disk.serialize()
         self.assertIn('name', dictionary, 'Serialized object should have correct properties')
         self.assertEqual(dictionary['name'], 'disk', 'Serialized object should have correct name')
+        self.assertIn('machine_guid', dictionary, 'Serialized object should have correct depth')
+        self.assertEqual(dictionary['machine_guid'], machine.guid, 'Serialized object should have correct properties')
+        dictionary = disk.serialize(depth=1)
         self.assertIn('machine', dictionary, 'Serialized object should have correct depth')
         self.assertEqual(dictionary['machine']['name'], 'machine', 'Serialized object should have correct properties at all depths')
         disk.delete()
         machine.delete()
+
+    def test_primarykeys(self):
+        disk = Disk()
+        StoredObject.volatile.delete('ovs_primarykeys_%s' % disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._name)
+        self.assertEqual(len(keys), 0, 'There should be no primary keys')
+        disk.save()
+        keys = DataList.get_pks(disk._namespace, disk._name)
+        self.assertEqual(len(keys), 1, 'There should be one primary key')
+        disk.delete()
