@@ -8,7 +8,7 @@ class User(object):
     def get_user_by_username(username):
         users = DataList(key   = 'user_%s' % username,
                          query = {'object': HybridUser,
-                                  'data'  : DataList.select.OBJECT,
+                                  'data'  : DataList.select.DESCRIPTOR,
                                   'query' : {'type' : DataList.where_operator.AND,
                                              'items': [('username', DataList.operator.EQUALS, username)]}}).data
         if len(users) == 1:
@@ -19,7 +19,7 @@ class User(object):
     def get_users():
         users = DataList(key   = 'users',
                          query = {'object': HybridUser,
-                                  'data': DataList.select.OBJECT,
+                                  'data': DataList.select.DESCRIPTOR,
                                   'query': {'type': DataList.where_operator.AND,
                                             'items': []}}).data
         return [Descriptor().load(user).get_object(True) for user in users]

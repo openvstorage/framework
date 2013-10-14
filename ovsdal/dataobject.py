@@ -2,9 +2,9 @@ import inspect
 import uuid
 import copy
 from exceptions import *
-from helpers import Descriptor, Lock
+from helpers import Descriptor, Lock, Toolbox
 from storedobject import StoredObject
-from relations.relations import Relation, RelationMapper
+from relations.relations import RelationMapper
 from dataobjectlist import DataObjectList
 from datalist import DataList
 
@@ -27,7 +27,6 @@ class DataObject(StoredObject):
     # @TODO: When deleting an object that has children, those children will still refer to a non-existing fetch_object, possibly raising ObjectNotFoundExceptions
     # @TODO: Primary key caching is consistent on single-node only (using unix file locking)
     # @TODO: Currently, there is a limit to the amount of objects per type that is situated around 10k objects. Mostly related to memcache object size
-    # @TODO: Plain lists still have to be memory cleared if one of their related fields change
     # @TODO: Currently, self-pointing relations are not yet possible
 
     #######################
@@ -37,6 +36,7 @@ class DataObject(StoredObject):
     # Properties that needs to be overwritten by implementation
     _blueprint = None            # Blueprint data of the objec type
     _expiry = None               # Timeout of readonly object properties cache
+    _relations = None            # Blueprint for relations
 
     #######################
     ## Constructor
@@ -101,18 +101,19 @@ class DataObject(StoredObject):
         # Set default values on new fields
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
-                if isinstance(default, Relation):
-                    self._data[key] = Descriptor(default.object_type).descriptor
-                else:
-                    self._data[key] = default
+                self._data[key] = default
 
         # Add properties where appropriate, hooking in the correct dictionary
         for attribute, default in self._blueprint.iteritems():
             if attribute not in dir(self):
-                if isinstance(default, Relation):
-                    self._add_cproperty(attribute, self._data[attribute])
-                else:
-                    self._add_sproperty(attribute, self._data[attribute])
+                self._add_sproperty(attribute, self._data[attribute])
+
+        # Load relations
+        for attribute, relation in self._relations.iteritems():
+            if attribute not in self._data:
+                self._data[attribute] = Descriptor(relation[0]).descriptor
+            if attribute not in dir(self):
+                self._add_cproperty(attribute, self._data[attribute])
 
         # Load foreign keys
         relations = RelationMapper.load_foreign_relations(self.__class__)
@@ -168,7 +169,7 @@ class DataObject(StoredObject):
         remote_key   = info['key']
         datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
                             query = {'object': remote_class,
-                                     'data': DataList.select.OBJECT,
+                                     'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
                                                'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
 
@@ -207,12 +208,11 @@ class DataObject(StoredObject):
 
         if recursive:
             # Save objects that point to us (e.g. disk.machine - if this is disk)
-            for attribute, default in self._blueprint.iteritems():
-                if isinstance(default, Relation):
-                    if attribute != skip:  # disks will be skipped
-                        item = getattr(self, attribute)
-                        if item is not None:
-                            item.save(recursive=True, skip=default.remote_key)
+            for attribute, default in self._relations.iteritems():
+                if attribute != skip:  # disks will be skipped
+                    item = getattr(self, attribute)
+                    if item is not None:
+                        item.save(recursive=True, skip=default[1])
 
             # Save object we point at (e.g. machine.disks - if this is machine)
             relations = RelationMapper.load_foreign_relations(self.__class__)
@@ -252,19 +252,34 @@ class DataObject(StoredObject):
         StoredObject.persistent.set(self._key, self._data)
         self.add_pk(self._key)
 
-        # Invalidate relation lists
-        for key, default in self._blueprint.iteritems():
-            if isinstance(default, Relation):
-                if self._original[key]['guid'] != self._data[key]['guid']:
-                    # The field points to another object
-                    StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                                  default.object_type.__name__.lower(),
-                                                                  self._original[key]['guid'],
-                                                                  default.remote_key))
-                    StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                                  default.object_type.__name__.lower(),
-                                                                  self._data[key]['guid'],
-                                                                  default.remote_key))
+        # Invalidate lists/queries
+        # First, invalidate reverse lists (where we point to a remote object, invalidating that remote list)
+        for key, default in self._relations.iteritems():
+            if self._original[key]['guid'] != self._data[key]['guid']:
+                # The field points to another object
+                StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
+                                                              default[0].__name__.lower(),
+                                                              self._original[key]['guid'],
+                                                              default[1]))
+                StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
+                                                              default[0].__name__.lower(),
+                                                              self._data[key]['guid'],
+                                                              default[1]))
+        # Second, invalidate property lists
+        cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
+        for field in cache_list.keys():
+            clear = False
+            if field in self._blueprint:
+                if self._original[field] != self._data[field]:
+                    clear = True
+            if field in self._relations:
+                if self._original[field]['guid'] != self._data[field]['guid']:
+                    clear = True
+            if field in self._expiry:
+                clear = True
+            if clear:
+                for list_key in cache_list[field]:
+                    StoredObject.volatile.delete(list_key)
 
         # Invalidate the cache
         for key in self._expiry.keys():
@@ -303,18 +318,17 @@ class DataObject(StoredObject):
 
     def serialize(self, depth=0):
         data = {'guid': self.guid}
-        for key, default in self._blueprint.iteritems():
-            if isinstance(default, Relation):
-                if depth == 0:
-                    data['%s_guid' % key] = self._data[key]['guid']
-                else:
-                    instance = getattr(self, key)
-                    if instance is not None:
-                        data[key] = getattr(self, key).serialize(dept=(depth - 1))
-                    else:
-                        data[key] = None
+        for key, relation in self._relations.iteritems():
+            if depth == 0:
+                data['%s_guid' % key] = self._data[key]['guid']
             else:
-                data[key] = self._data[key]
+                instance = getattr(self, key)
+                if instance is not None:
+                    data[key] = getattr(self, key).serialize(depth=(depth - 1))
+                else:
+                    data[key] = None
+        for key, default in self._blueprint.iteritems():
+            data[key] = self._data[key]
         for key in self._expiry.keys():
             data[key] = getattr(self, key)
         return data
@@ -326,18 +340,6 @@ class DataObject(StoredObject):
     @property
     def guid(self):
         return self._guid
-
-    #######################
-    ## Static helper method
-    #######################
-
-    @staticmethod
-    def is_dataobject(value):
-        return isinstance(value, DataObject)
-
-    @staticmethod
-    def fetch_object(object_type, value):
-        return object_type(value) if not DataObject.is_dataobject(value) else value
 
     #######################
     ## Helper methods

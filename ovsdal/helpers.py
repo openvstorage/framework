@@ -77,3 +77,16 @@ class Lock(object):
 
     def __del__(self):
         self.handle.close()
+
+
+class Toolbox(StoredObject):
+    @staticmethod
+    def try_get(key, fallback):
+        data = StoredObject.volatile.get(key)
+        if data is None:
+            try:
+                data = StoredObject.persistent.get(key)
+            except:
+                data = fallback
+            StoredObject.volatile.set(key, data)
+        return data

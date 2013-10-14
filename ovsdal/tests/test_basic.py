@@ -62,6 +62,12 @@ class Basic(TestCase):
         self.assertIs(disk.description, 'desc', 'Property should be updated')
         disk.delete()
 
+    def test_preinit(self):
+        disk = Disk(data={'name': 'diskx'})
+        disk.save()
+        self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
+        disk.delete()
+
     def test_datapersistent(self):
         disk = Disk()
         guid = disk.guid
@@ -188,7 +194,7 @@ class Basic(TestCase):
         self.assertEqual(list_1, 1, 'list should contain int 1')
         list_2 = DataList(key   = 'list_2',
                           query = {'object': Disk,
-                                   'data'  : DataList.select.OBJECT,
+                                   'data'  : DataList.select.DESCRIPTOR,
                                    'query' : {'type': DataList.where_operator.AND,
                                               'items': [('size', DataList.operator.EQUALS, 1)]}}).data
         found_object = Descriptor().load(list_2[0]).get_object(True)
@@ -382,4 +388,121 @@ class Basic(TestCase):
         self.assertEqual(machine.disks[0].guid, guid, 'And the guid should be first again')
         for disk in machine.disks:
             disk.delete()
+        machine.delete()
+
+    def test_listcache(self):
+        disk0 = Disk()
+        disk0.save()
+        list_cache = DataList(key   = 'list_cache',
+                              query = {'object': Disk,
+                                       'data'  : DataList.select.COUNT,
+                                       'query' : {'type': DataList.where_operator.AND,
+                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
+        self.assertEqual(list_cache.data, 0, 'List should find no entries')
+        machine = Machine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = Disk()
+        disk1.machine = machine
+        disk1.save()
+        list_cache = DataList(key   = 'list_cache',
+                              query = {'object': Disk,
+                                       'data'  : DataList.select.COUNT,
+                                       'query' : {'type': DataList.where_operator.AND,
+                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
+        self.assertEqual(list_cache.data, 1, 'List should find one entry')
+        list_cache = DataList(key   = 'list_cache',
+                              query = {'object': Disk,
+                                       'data'  : DataList.select.COUNT,
+                                       'query' : {'type': DataList.where_operator.AND,
+                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        self.assertTrue(list_cache.from_cache, 'List should be loaded from cache')
+        disk2 = Disk()
+        disk2.machine = machine
+        disk2.save()
+        list_cache = DataList(key   = 'list_cache',
+                              query = {'object': Disk,
+                                       'data'  : DataList.select.COUNT,
+                                       'query' : {'type': DataList.where_operator.AND,
+                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
+        self.assertEqual(list_cache.data, 2, 'List should find two entries')
+        machine.name = 'x'
+        machine.save()
+        list_cache = DataList(key   = 'list_cache',
+                              query = {'object': Disk,
+                                       'data'  : DataList.select.COUNT,
+                                       'query' : {'type': DataList.where_operator.AND,
+                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
+        self.assertEqual(list_cache.data, 0, 'List should have no matches')
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
+
+    def test_emptyquery(self):
+        amount = DataList(key   = 'some_list',
+                          query = {'object': Disk,
+                                   'data'  : DataList.select.COUNT,
+                                   'query' : {'type': DataList.where_operator.AND,
+                                              'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}}).data
+        self.assertEqual(amount, 0, 'There should be no data')
+
+    def test_invalidqueries(self):
+        machine = Machine()
+        machine.name = 'machine'
+        machine.save()
+        disk = Disk()
+        disk.name = 'disk'
+        disk.machine = machine
+        disk.save()
+        setattr(DataList.select, 'SOMETHING', 'SOMETHING')
+        with self.assertRaises(NotImplementedError):
+            DataList(key   = 'some_list',
+                     query = {'object': Disk,
+                              'data'  : DataList.select.SOMETHING,
+                              'query' : {'type': DataList.where_operator.AND,
+                                         'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        setattr(DataList.where_operator, 'SOMETHING', 'SOMETHING')
+        with self.assertRaises(NotImplementedError):
+            DataList(key   = 'some_list',
+                     query = {'object': Disk,
+                              'data'  : DataList.select.COUNT,
+                              'query' : {'type': DataList.where_operator.SOMETHING,
+                                         'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+        setattr(DataList.operator, 'SOMETHING', 'SOMETHING')
+        with self.assertRaises(NotImplementedError):
+            DataList(key   = 'some_list',
+                     query = {'object': Disk,
+                              'data'  : DataList.select.COUNT,
+                              'query' : {'type': DataList.where_operator.AND,
+                                         'items': [('machine.name', DataList.operator.SOMETHING, 'machine')]}})
+        disk.delete()
+        machine.delete()
+
+    def test_clearedcache(self):
+        disk = Disk()
+        disk.name = 'somedisk'
+        disk.save()
+        StoredObject.volatile.delete(disk._key)
+        disk2 = Disk(disk.guid)
+        self.assertEqual(disk2.name, 'somedisk', 'Disk should be fetched from persistent store')
+        disk.delete()
+
+    def test_serialization(self):
+        machine = Machine()
+        machine.name = 'machine'
+        machine.save()
+        disk = Disk()
+        disk.name = 'disk'
+        disk.machine = machine
+        disk.save()
+        dictionary = disk.serialize(depth=1)
+        self.assertIn('name', dictionary, 'Serialized object should have correct properties')
+        self.assertEqual(dictionary['name'], 'disk', 'Serialized object should have correct name')
+        self.assertIn('machine', dictionary, 'Serialized object should have correct depth')
+        self.assertEqual(dictionary['machine']['name'], 'machine', 'Serialized object should have correct properties at all depths')
+        disk.delete()
         machine.delete()

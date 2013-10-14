@@ -1,16 +1,15 @@
 from ovsdal.dataobject import DataObject
 from ovsdal.pmachine import PMachine
-from ovsdal.relations.relations import Relation
 from hypervisors.factory import hypervisors
 from volumedriver import voldrv
 
 # Example
 class VMachine(DataObject):
     _blueprint = {'name'         : None,
-                  'description'  : '',                                     # examples: myVM.computenode.name
-                  'hypervisor_id : 0,
-                  'computenode'  : Relation(PMachine, 'guest_machines'),   #           myComputeNode.guest_machines[0].name
-                  'storagenode'  : Relation(PMachine, 'stored_machines')}  #           myComputeNode.guest_machines[0].computenode.name
+                  'description'  : '',
+                  'hypervisor_id : 0}                              # examples: myVM.computenode.name
+    _relations = {'computenode'  : (PMachine, 'guest_machines'),   #           myComputeNode.guest_machines[0].name
+                  'storagenode'  : (PMachine, 'stored_machines')}  #           myComputeNode.guest_machines[0].computenode.name
     _expiry = {'status' : 30,  # Timeout in seconds of these properties
                'iops'   : 5}
 

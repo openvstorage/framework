@@ -8,4 +8,5 @@ class Machine(DataObject):
                   'username'   : None,
                   'password'   : None,
                   'ip'         : None}
+    _relations = {}
     _expiry = {}

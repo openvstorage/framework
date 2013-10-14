@@ -1,6 +1,5 @@
 from ovsdal.dataobject import DataObject
 from ovsdal.hybrids.machine import Machine
-from ovsdal.relations.relations import Relation
 
 
 class Disk(DataObject):
@@ -9,8 +8,6 @@ class Disk(DataObject):
                   'size'             : 100,
                   'storagepoolid'    : None,
                   'volumedriverid'   : 1,
-                  'machine'          : Relation(Machine, 'disks'),
-                  'storage'          : Relation(Machine, 'stored_disks'),
                   'status'           : 'ATTACHED',
                   'type'             : 'DSSVOL',
                   'serialnr'         : 'ADEF194FDE',
@@ -22,6 +19,8 @@ class Disk(DataObject):
                   'environmentguid'  : None,
                   'cloudspaceguid'   : None,
                   'autobackup'       : False}
+    _relations = {'machine': (Machine, 'disks'),
+                  'storage': (Machine, 'stored_disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 10}
 

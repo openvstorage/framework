@@ -1,18 +1,20 @@
 from storedobject import StoredObject
-from helpers import Descriptor
+from helpers import Descriptor, Toolbox
 from exceptions import ObjectNotFoundException
 
 
 class DataList(StoredObject):
     class Select(object):
-        OBJECT = 'OBJECT'
-        COUNT  = 'COUNT'
+        DESCRIPTOR = 'DESCRIPTOR'
+        COUNT      = 'COUNT'
 
     class WhereOperator(object):
         AND = 'AND'
         OR  = 'OR'
 
     class Operator(object):
+        # In case more operators are required, add them here, and implement them in
+        # the _evaluate method below
         EQUALS    = 'EQUALS'
         LT        = 'LT'
         GT        = 'GT'
@@ -21,16 +23,18 @@ class DataList(StoredObject):
     where_operator = WhereOperator()
     operator = Operator()
     namespace = 'ovs_list'
+    cachelink = 'ovs_listcache'
 
-    def __init__(self, key, query, load=True):
+    def __init__(self, key, query):
         # Initialize super class
         super(DataList, self).__init__()
 
         self._key = None if key is None else ('%s_%s' % (DataList.namespace, key))
         self._query = query
+        self._invalidation = {}
         self.data = None
-        if load:
-            self.load()
+        self.from_cache = False
+        self._load()
 
     @staticmethod
     def get_pks(namespace, name):
@@ -51,7 +55,7 @@ class DataList(StoredObject):
                 if result is False:
                     return False
             else:
-                if DataList._evaluate(instance, item) is False:
+                if self._evaluate(instance, item) is False:
                     return False
         return True
 
@@ -66,27 +70,37 @@ class DataList(StoredObject):
                 if result is True:
                     return True
             else:
-                if DataList._evaluate(instance, item) is True:
+                if self._evaluate(instance, item) is True:
                     return True
         return False
 
-    @staticmethod
-    def _evaluate(instance, item):
+    def _evaluate(self, instance, item):
         path = item[0].split('.')
         value = instance
+        if value is None:
+            return False
+        itemcounter = 0
         for pitem in path:
-            if value is not None:
-                value = getattr(value, pitem)
-            else:
-                return False
+            itemcounter += 1
+            self._add_invalidation(value.__class__.__name__.lower(), pitem)
+            target_class = value._relations.get(pitem, None)
+            value = getattr(value, pitem)
+            if value is None and itemcounter != len(path):
+                # We loaded a None in the middle of our path
+                if target_class is not None:
+                    self._add_invalidation(target_class[0].__name__.lower(), path[itemcounter])
+                return False  # Fail the filter
+
+        # Apply operators
         if item[1] == DataList.operator.EQUALS:
             return value == item[2]
         if item[1] == DataList.operator.GT:
             return value > item[2]
         if item[1] == DataList.operator.LT:
             return value < item[2]
+        raise NotImplementedError('The given where_operator is not yet implemented.')
 
-    def load(self):
+    def _load(self):
         self.data = StoredObject.volatile.get(self._key) if self._key is not None else None
         if self.data is None:
             # The query should be a dictionary:
@@ -102,6 +116,7 @@ class DataList(StoredObject):
             # The field is any property you would also find on the given object. In case of properties, you can dot as far as you like
             # This means you can combine AND and OR in any possible combination
 
+            self.from_cache = False
             namespace = self._query['object']()._namespace
             name = self._query['object'].__name__.lower()
             base_key = '%s_%s_' % (namespace, name)
@@ -117,16 +132,40 @@ class DataList(StoredObject):
                     instance = self._query['object'](guid)
                     if self._query['query']['type'] == DataList.where_operator.AND:
                         include = self._exec_and(instance, self._query['query']['items'])
-                    else:
+                    elif self._query['query']['type'] == DataList.where_operator.OR:
                         include = self._exec_or(instance, self._query['query']['items'])
-                except ObjectNotFoundException:
-                    include = False
-                if include:
-                    if self._query['data'] == DataList.select.COUNT:
-                        self.data += 1
                     else:
-                        self.data.append(Descriptor(self._query['object'], guid).descriptor)
+                        raise NotImplementedError('The given operator is not yet implemented.')
+                    if include:
+                        if self._query['data'] == DataList.select.COUNT:
+                            self.data += 1
+                        elif self._query['data'] == DataList.select.DESCRIPTOR:
+                            self.data.append(Descriptor(self._query['object'], guid).descriptor)
+                        else:
+                            raise NotImplementedError('The given selector type is not yet implemented.')
+                except ObjectNotFoundException:
+                    pass
 
-            if self._key is not None:
+            if self._key is not None and len(keys) > 0:
                 StoredObject.volatile.set(self._key, self.data)
+            self._update_listinvalidation()
+        else:
+            self.from_cache = True
         return self
+
+    def _add_invalidation(self, object_name, field):
+        field_list = self._invalidation.get(object_name, [])
+        field_list.append(field)
+        self._invalidation[object_name] = field_list
+        pass
+
+    def _update_listinvalidation(self):
+        for object_name, field_list in self._invalidation.iteritems():
+            key = '%s_%s' % (DataList.cachelink, object_name)
+            cache_list = Toolbox.try_get(key, {})
+            for field in field_list:
+                list_list = cache_list.get(field, [])
+                list_list.append(self._key)
+                cache_list[field] = list_list
+            StoredObject.volatile.set(key, cache_list)
+            StoredObject.persistent.set(key, cache_list)
