@@ -157,6 +157,7 @@ class Basic(TestCase):
         for cls in HybridRunner.get_hybrids():
             # Make sure certain attributes are correctly set
             self.assertIsInstance(cls._blueprint, dict, '_blueprint is a required property on %s' % cls.__name__)
+            self.assertIsInstance(cls._relations, dict, '_relations is a required property on %s' % cls.__name__)
             self.assertIsInstance(cls._expiry, dict, '_expiry is a required property on %s' % cls.__name__)
             instance = cls()
             # Make sure the type can be instantiated
