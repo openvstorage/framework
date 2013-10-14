@@ -1,8 +1,8 @@
 from django.contrib.auth.models import User
 from toolbox import Toolbox
-from ovsapi.user import User as OVSUser
-from ovsdal.hybrids.user import User as HybridUser
-from ovsdal.exceptions import ObjectNotFoundException
+from ovs.lib.user import User as OVSUser
+from ovs.dal.hybrids.user import User as HybridUser
+from ovs.dal.exceptions import ObjectNotFoundException
 
 
 class UPAuthenticationBackend(object):

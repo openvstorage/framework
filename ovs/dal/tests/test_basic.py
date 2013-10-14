@@ -472,6 +472,29 @@ class Basic(TestCase):
                                               'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}}).data
         self.assertEqual(amount, 0, 'There should be no data')
 
+    def test_nofilterquery(self):
+        disk1 = Disk()
+        disk1.save()
+        disk2 = Disk()
+        disk2.save()
+        amount = DataList(key   = 'some_list',
+                          query = {'object': Disk,
+                                   'data'  : DataList.select.COUNT,
+                                   'query' : {'type': DataList.where_operator.AND,
+                                              'items': []}}).data
+        self.assertEqual(amount, 2, 'There should be two disks')
+        disk3 = Disk()
+        disk3.save()
+        amount = DataList(key   = 'some_list',
+                          query = {'object': Disk,
+                                   'data'  : DataList.select.COUNT,
+                                   'query' : {'type': DataList.where_operator.AND,
+                                              'items': []}}).data
+        self.assertEqual(amount, 3, 'There should be three disks')
+        disk1.delete()
+        disk2.delete()
+        disk3.delete()
+
     def test_invalidqueries(self):
         machine = Machine()
         machine.name = 'machine'

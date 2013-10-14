@@ -7,9 +7,9 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from ovsdal.exceptions import ObjectNotFoundException
-from ovsdal.hybrids.user import User
-from ovsapi.user import User as APIUser
+from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.hybrids.user import User
+from ovs.lib.user import User as APIUser
 from django.http import Http404
 
 

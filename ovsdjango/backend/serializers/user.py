@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django import forms
-from ovsdal.hybrids.user import User
+from ovs.dal.hybrids.user import User
 
 
 class UserSerializer(serializers.Serializer):

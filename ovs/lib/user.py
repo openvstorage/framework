@@ -1,6 +1,6 @@
-from ovsdal.datalist import DataList
-from ovsdal.helpers import Descriptor
-from ovsdal.hybrids.user import User as HybridUser
+from ovs.dal.datalist import DataList
+from ovs.dal.helpers import Descriptor
+from ovs.dal.hybrids.user import User as HybridUser
 
 
 class User(object):

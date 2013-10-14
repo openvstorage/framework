@@ -222,9 +222,11 @@ class DataObject(StoredObject):
                         for item in getattr(self, key).iterloaded():
                             item.save(recursive=True, skip=info['key'])
 
+        new = False
         try:
             data = StoredObject.persistent.get(self._key)
         except:
+            new = True
             data = {}
         data_conflicts = []
         for attribute in self._data.keys():
@@ -269,6 +271,8 @@ class DataObject(StoredObject):
         cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
         for field in cache_list.keys():
             clear = False
+            if field == '__all' and new:  # This is a no-filter query hook, which can be ignored here
+                clear = True
             if field in self._blueprint:
                 if self._original[field] != self._data[field]:
                     clear = True
@@ -298,10 +302,19 @@ class DataObject(StoredObject):
         Delete the given object
         """
 
+        # Invalidate no-filter queries/lists pointing to this object
+        cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
+        if '__all' in cache_list.keys():
+            for list_key in cache_list['__all']:
+                StoredObject.volatile.delete(list_key)
+
+        # Delete the object out of the persistent store
         try:
             StoredObject.persistent.delete(self._key)
         except:
             pass
+
+        # Delete the object and its properties out of the volatile store
         for key in self._expiry.keys():
             StoredObject.volatile.delete('%s_%s' % (self._key, key))
         StoredObject.volatile.delete(self._key)

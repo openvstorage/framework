@@ -24,3 +24,6 @@ class ArakoonWrapper(object):
 
     def prefix(self, prefix):
         return self._client.prefix(prefix)
+
+    def delete(self, key):
+        return self._client.delete(key)

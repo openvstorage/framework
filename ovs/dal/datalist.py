@@ -116,31 +116,39 @@ class DataList(StoredObject):
             # The field is any property you would also find on the given object. In case of properties, you can dot as far as you like
             # This means you can combine AND and OR in any possible combination
 
+            items        = self._query['query']['items']
+            query_type   = self._query['query']['type']
+            query_data   = self._query['data']
+            query_object = self._query['object']
+
             self.from_cache = False
-            namespace = self._query['object']()._namespace
-            name = self._query['object'].__name__.lower()
+            namespace = query_object()._namespace
+            name = query_object.__name__.lower()
             base_key = '%s_%s_' % (namespace, name)
             keys = DataList.get_pks(namespace, name)
-            if self._query['data'] == DataList.select.COUNT:
+
+            if query_data == DataList.select.COUNT:
                 self.data = 0
             else:
                 self.data = []
 
+            if len(items) == 0:
+                self._add_invalidation(name, '__all')
             for key in keys:
                 guid = key.replace(base_key, '')
                 try:
-                    instance = self._query['object'](guid)
-                    if self._query['query']['type'] == DataList.where_operator.AND:
-                        include = self._exec_and(instance, self._query['query']['items'])
-                    elif self._query['query']['type'] == DataList.where_operator.OR:
-                        include = self._exec_or(instance, self._query['query']['items'])
+                    instance = query_object(guid)
+                    if query_type == DataList.where_operator.AND:
+                        include = self._exec_and(instance, items)
+                    elif query_type == DataList.where_operator.OR:
+                        include = self._exec_or(instance, items)
                     else:
                         raise NotImplementedError('The given operator is not yet implemented.')
                     if include:
-                        if self._query['data'] == DataList.select.COUNT:
+                        if query_data == DataList.select.COUNT:
                             self.data += 1
-                        elif self._query['data'] == DataList.select.DESCRIPTOR:
-                            self.data.append(Descriptor(self._query['object'], guid).descriptor)
+                        elif query_data == DataList.select.DESCRIPTOR:
+                            self.data.append(Descriptor(query_object, guid).descriptor)
                         else:
                             raise NotImplementedError('The given selector type is not yet implemented.')
                 except ObjectNotFoundException:
@@ -165,7 +173,8 @@ class DataList(StoredObject):
             cache_list = Toolbox.try_get(key, {})
             for field in field_list:
                 list_list = cache_list.get(field, [])
-                list_list.append(self._key)
+                if self._key not in list_list:
+                    list_list.append(self._key)
                 cache_list[field] = list_list
             StoredObject.volatile.set(key, cache_list)
             StoredObject.persistent.set(key, cache_list)
