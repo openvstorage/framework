@@ -8,6 +8,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.storage.dummies import DummyPersistentStore, DummyVolatileStore
 from ovs.dal.exceptions import *
 from ovs.dal.helpers import HybridRunner, Descriptor
+from ovs.dal.relations.relations import RelationMapper
 
 
 #noinspection PyUnresolvedReferences
@@ -155,6 +156,11 @@ class Basic(TestCase):
     def test_objectproperties(self):
         # Some stuff here to dynamically test all hybrid properties
         for cls in HybridRunner.get_hybrids():
+            relation_info = RelationMapper.load_foreign_relations(cls)
+            remote_properties = []
+            if relation_info is not None:
+                for key in relation_info.keys():
+                    remote_properties.append(key)
             # Make sure certain attributes are correctly set
             self.assertIsInstance(cls._blueprint, dict, '_blueprint is a required property on %s' % cls.__name__)
             self.assertIsInstance(cls._relations, dict, '_relations is a required property on %s' % cls.__name__)
@@ -171,6 +177,14 @@ class Basic(TestCase):
                 self.assertIn(attribute, properties, '%s should be a property' % attribute)
                 # ... and should work
                 data = getattr(instance, attribute)
+            # An all properties should be either in the blueprint, relations or expiry
+            for prop in properties:
+                found = prop in cls._blueprint \
+                    or prop in cls._relations \
+                    or prop in cls._expiry \
+                    or prop in remote_properties \
+                    or prop == 'guid'
+                self.assertTrue(found, 'All properties should have metadata')
             instance.delete()
 
     def test_queries(self):
