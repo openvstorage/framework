@@ -6,9 +6,8 @@ class Disk(DataObject):
     _blueprint = {'name'             : None,  # All persistent stored fields, with default value
                   'description'      : 'Test disk',
                   'size'             : 100,
-                  'storagepoolid'    : None,
+                  'storagepoolid'    : None, #BACKEND
                   'volumedriverid'   : 1,
-                  'status'           : 'ATTACHED',
                   'type'             : 'DSSVOL',
                   'serialnr'         : 'ADEF194FDE',
                   'retentionpolicyid': None,
@@ -22,7 +21,8 @@ class Disk(DataObject):
     _relations = {'machine': (Machine, 'disks'),
                   'storage': (Machine, 'stored_disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
-               'snapshots': 10}
+               'snapshots': 10,
+               'status': 30}
 
     @property
     def used_size(self):
@@ -41,4 +41,10 @@ class Disk(DataObject):
             for i in xrange(0, randint(1, 10)):
                 snapshots.append({'consistent': randint(0, 1) == 1, 'id': i})
             return snapshots
+        return self._backend_property(get_data)
+
+    @property
+    def status(self):
+        def get_data():
+            return 'ATTACHED'
         return self._backend_property(get_data)
