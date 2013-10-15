@@ -1,16 +1,34 @@
 import re
 import datetime
+import time
 import settings
 from backend.serializers.user import UserSerializer, PasswordSerializer
 from backend.serializers.memcached import MemcacheSerializer
 from rest_framework import status, viewsets
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, link
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.user import User
 from ovs.lib.user import User as APIUser
+from ovs.lib.vdisk import vdisk
 from django.http import Http404
+
+
+class TestViewSet(viewsets.ViewSet):
+    """
+    A test viewset that we can use for POC stuff
+    """
+    permission_classes = (IsAuthenticated,)
+
+    def list(self, request, format=None):
+        start = time.time()
+        reference = vdisk().listVolumes.apply_async()
+        data = reference.wait()
+        elapsed = (time.time() - start)
+        return Response({'elapsed': elapsed,
+                         'data': data,
+                         'id': reference.id}, status=status.HTTP_200_OK)
 
 
 class UserViewSet(viewsets.ViewSet):
@@ -42,6 +60,14 @@ class UserViewSet(viewsets.ViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk=None, format=None):
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        else:
+            user = self._get_object(pk)
+            user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action()
     def set_password(self, request, pk=None, format=None):
