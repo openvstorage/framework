@@ -9,11 +9,10 @@ from celery import Celery
 from ovs import celeryconfig
 
 celery = Celery('ovs',
-                broker=celeryconfig.BROKER_URL,
-                backend=celeryconfig.CELERY_RESULT_BACKEND,
                 include=['ovs.lib.dummy',
                          'ovs.lib.vdisk',
                          'ovs.lib.user'])
+celery.config_from_object(celeryconfig)
 
 if __name__ == '__main__':
     celery.start()
