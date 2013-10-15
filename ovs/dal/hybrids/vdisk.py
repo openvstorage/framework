@@ -1,28 +1,27 @@
 from ovs.dal.dataobject import DataObject
-from ovs.dal.hybrids.machine import Machine
+from ovs.dal.hybrids.vmachine import vMachine
 
 
-class Disk(DataObject):
+class vDisk(DataObject):
     _blueprint = {'name'             : None,  # All persistent stored fields, with default value
                   'description'      : 'Test disk',
                   'size'             : 100,
-                  'storagepoolid'    : None, #BACKEND
-                  'volumedriverid'   : 1,
+                  'vpoolguid'        : None, #BACKEND
                   'type'             : 'DSSVOL',
-                  'serialnr'         : 'ADEF194FDE',
+                  'devicename'       : '123456789.vmdk',
                   'retentionpolicyid': None,
                   'snapshotpolicyid' : None,
-                  'devicename'       : '123456789.vmdk',
                   'tags'             : None,
                   'replicationguid'  : None,
                   'environmentguid'  : None,
                   'cloudspaceguid'   : None,
                   'autobackup'       : False}
-    _relations = {'machine': (Machine, 'disks'),
-                  'storage': (Machine, 'stored_disks')}
+    _relations = {'machine': (vMachine, 'disks'),
+                  'storage': (vMachine, 'stored_disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 10,
-               'status': 30}
+               'status': 30,
+               'volumedriverid': 30}
 
     @property
     def used_size(self):
@@ -47,4 +46,10 @@ class Disk(DataObject):
     def status(self):
         def get_data():
             return 'ATTACHED'
+        return self._backend_property(get_data)
+
+    @property
+    def volumedriverid(self):
+        def get_data():
+            return 1
         return self._backend_property(get_data)

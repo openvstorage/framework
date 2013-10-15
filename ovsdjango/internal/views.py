@@ -22,11 +22,14 @@ class TestViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
 
     def list(self, request, format=None):
-        start = time.time()
+        syncStart = time.time()
+        data = vdisk().listVolumes()
+        syncElapsed = (time.time() - syncStart)
+        asyncStart = time.time()
         reference = vdisk().listVolumes.apply_async()
         data = reference.wait()
-        elapsed = (time.time() - start)
-        return Response({'elapsed': elapsed,
+        asyncElapsed = (time.time() - asyncStart)
+        return Response({'Elapsed Sync/Async': [syncElapsed, asyncElapsed],
                          'data': data,
                          'id': reference.id}, status=status.HTTP_200_OK)
 

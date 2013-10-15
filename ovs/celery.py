@@ -11,9 +11,9 @@ from ovs import celeryconfig
 celery = Celery('ovs',
                 broker=celeryconfig.BROKER_URL,
                 backend=celeryconfig.CELERY_RESULT_BACKEND,
-                include=['ovs.app.dummy',
-                         'ovs.app.disk', 'ovs.app.user',
-                         'ovs.app.user'])
+                include=['ovs.lib.dummy',
+                         'ovs.lib.vdisk',
+                         'ovs.lib.user'])
 
 if __name__ == '__main__':
     celery.start()

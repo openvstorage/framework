@@ -1,7 +1,7 @@
 import time
 from unittest import TestCase
-from ovs.dal.hybrids.disk import Disk
-from ovs.dal.hybrids.machine import Machine
+from ovs.dal.hybrids.vdisk import vDisk
+from ovs.dal.hybrids.vmachine import vMachine
 from ovs.dal.datalist import DataList
 
 
@@ -12,12 +12,12 @@ class LotsOfObjects(TestCase):
         start = time.time()
         mguids = []
         for i in xrange(0, 100):
-            machine = Machine()
+            machine = vMachine()
             machine.name = 'machine_%d' % i
             machine.save()
             mguids.append(machine.guid)
             for ii in xrange(0, 100):
-                disk = Disk()
+                disk = vDisk()
                 disk.name = 'disk_%d_%d' % (i, ii)
                 disk.size = ii * 100
                 disk.machine = machine
