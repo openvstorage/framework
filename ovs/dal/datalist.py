@@ -168,13 +168,14 @@ class DataList(StoredObject):
         pass
 
     def _update_listinvalidation(self):
-        for object_name, field_list in self._invalidation.iteritems():
-            key = '%s_%s' % (DataList.cachelink, object_name)
-            cache_list = Toolbox.try_get(key, {})
-            for field in field_list:
-                list_list = cache_list.get(field, [])
-                if self._key not in list_list:
-                    list_list.append(self._key)
-                cache_list[field] = list_list
-            StoredObject.volatile.set(key, cache_list)
-            StoredObject.persistent.set(key, cache_list)
+        if self._key is not None:
+            for object_name, field_list in self._invalidation.iteritems():
+                key = '%s_%s' % (DataList.cachelink, object_name)
+                cache_list = Toolbox.try_get(key, {})
+                for field in field_list:
+                    list_list = cache_list.get(field, [])
+                    if self._key not in list_list:
+                        list_list.append(self._key)
+                    cache_list[field] = list_list
+                StoredObject.volatile.set(key, cache_list)
+                StoredObject.persistent.set(key, cache_list)
