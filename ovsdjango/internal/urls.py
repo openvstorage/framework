@@ -1,8 +1,12 @@
-from views import UserViewSet, MemcacheViewSet, TestViewSet
+from views.poc_tests import TestViewSet
+from views.statistics import MemcacheViewSet
+from views.users import UserViewSet
+from views.tasks import TaskViewSet
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, base_name='users')
-router.register(r'memcache', MemcacheViewSet, base_name='memcache')
+router.register(r'tasks', TaskViewSet, base_name='tasks')
+router.register(r'statistics/memcache', MemcacheViewSet, base_name='memcache')
 router.register(r'test', TestViewSet, base_name='test')
 urlpatterns = router.urls
