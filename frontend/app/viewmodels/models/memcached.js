@@ -24,7 +24,7 @@ define(['jquery', 'knockout', 'ovs/generic'], function ($, ko, generic) {
             if (self.refresh_handle !== undefined) {
                 self.refresh_handle.abort();
             }
-            self.refresh_handle = $.ajax('/api/internal/memcache/?timestamp=' + generic.gettimestamp(), {
+            self.refresh_handle = $.ajax('/api/internal/statistics/memcache/?timestamp=' + generic.gettimestamp(), {
                 type: 'get',
                 contentType: 'application/json'
             })

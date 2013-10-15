@@ -32,18 +32,11 @@ class TaskViewSet(viewsets.ViewSet):
         result = celery.AsyncResult(pk)
         data = {'id'        : result.id,
                 'status'    : result.status,
-                'successful': result.successful()}
+                'successful': result.successful(),
+                'failed'    : result.failed(),
+                'ready'     : result.ready(),
+                'result'    : result.result}
         return Response(data, status=status.HTTP_200_OK)
-
-    @link()
-    def wait(self, request, pk=None, format=None):
-        """
-        Wait for a given task to finish, returning the task's result
-        """
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        result = celery.AsyncResult(pk)
-        return Response(result.wait(), status=status.HTTP_200_OK)
 
     @link()
     def get(self, request, pk=None, format=None):

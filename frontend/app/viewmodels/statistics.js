@@ -1,9 +1,5 @@
 define(['plugins/router', 'durandal/app', 'models/memcached'], function (router, app, Memcached) {
     "use strict";
-    var Internal = function () {
-        var self = this;
-        // Variables
-    };
     var viewModel = {
         // Data
         displayname: 'Statistics',
