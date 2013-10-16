@@ -1,0 +1,29 @@
+<section>
+    <h2><span data-bind="html: displayname"></span></h2>
+    <blockquote data-bind="html: description"></blockquote>
+    <form class="form-horizontal" data-bind="submit: login, visible: !loggedin()">
+        <div class="control-group">
+            <label class="control-label" for="inputUsername">Username</label>
+            <div class="controls">
+                <input type="text" id="inputUsername" placeholder="Username"
+                       data-bind="value: username, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="control-group">
+            <label class="control-label" for="inputPassword">Password</label>
+            <div class="controls">
+                <input type="password" id="inputPassword" placeholder="Password"
+                       data-bind="value: password, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Sign in</button>
+        </div>
+    </form>
+    <div class="alert alert-success" data-bind="visible: loggedin()">
+      <h4>Welcome, <span data-bind="text: username"></span></h4>
+      <p>
+          Use the navigation to browse trough the interface.
+      </p>
+    </div>
+</section>
