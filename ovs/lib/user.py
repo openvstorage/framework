@@ -1,26 +1,12 @@
-from ovs.dal.datalist import DataList
-from ovs.dal.helpers import Descriptor
-from ovs.dal.hybrids.user import User as HybridUser
+from ovs.dal.lists.userlist import UserList
 
 
 class User(object):
     @staticmethod
     def get_user_by_username(username):
-        users = DataList(key   = 'user_%s' % username,
-                         query = {'object': HybridUser,
-                                  'data'  : DataList.select.DESCRIPTOR,
-                                  'query' : {'type' : DataList.where_operator.AND,
-                                             'items': [('username', DataList.operator.EQUALS, username)]}}).data
-        if len(users) == 1:
-            return Descriptor().load(users[0]).get_object(True)
-        return None
+        return UserList.get_user_by_username(username)
 
     @staticmethod
     def get_users():
-        users = DataList(key   = 'users',
-                         query = {'object': HybridUser,
-                                  'data': DataList.select.DESCRIPTOR,
-                                  'query': {'type': DataList.where_operator.AND,
-                                            'items': []}}).data
-        return [Descriptor().load(user).get_object(True) for user in users]
+        return UserList.get_users()
 
