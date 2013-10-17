@@ -3,21 +3,22 @@ from ovs.dal.hybrids.vmachine import vMachine
 
 
 class vDisk(DataObject):
-    _blueprint = {'name'             : None,  # All persistent stored fields, with default value
-                  'description'      : 'Test disk',
-                  'size'             : 100,
-                  'vpoolguid'        : None, #BACKEND
-                  'type'             : 'DSSVOL',
-                  'devicename'       : '123456789.vmdk',
-                  'retentionpolicyid': None,
-                  'snapshotpolicyid' : None,
-                  'tags'             : None,
-                  'replicationguid'  : None,
-                  'environmentguid'  : None,
-                  'cloudspaceguid'   : None,
-                  'autobackup'       : False}
-    _relations = {'machine': (vMachine, 'disks'),
-                  'storage': (vMachine, 'stored_disks')}
+    _blueprint = {'name' : None,  # All persistent stored fields, with default value
+                  'description' : 'Test disk',
+                  'size' : 100,
+                  'vpoolguid' : None, #BACKEND
+                  'type' : 'DSSVOL',
+                  'devicepath' : '123456789.vmdk',
+                  'parentsnapshot' : None,
+                  'children' : [],
+                  'retentionpolicyguid' : None,
+                  'snapshotpolicyguid' : None,
+                  'tags' : [],
+                  'replicationguid' : None,
+                  'environmentguid' : None,
+                  'cloudspaceguid' : None,
+                  'autobackup' : False}
+    _relations = {'machine': (vMachine, 'disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 10,
                'status': 30,

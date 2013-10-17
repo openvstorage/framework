@@ -397,3 +397,6 @@ class DataObject(StoredObject):
             StoredObject.volatile.set(internal_key, keys)
         finally:
             lock.release()
+
+    def __str__(self):
+        return str(self._data)
