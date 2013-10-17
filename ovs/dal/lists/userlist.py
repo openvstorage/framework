@@ -24,3 +24,14 @@ class UserList(object):
                                             'items': []}}).data
         return [Descriptor().load(user).get_object(True) for user in users]
 
+    @staticmethod
+    def get_user_by_token(token):
+        users = DataList(key   = 'user_%s' % token,
+                         query = {'object': User,
+                                  'data'  : DataList.select.DESCRIPTOR,
+                                  'query' : {'type' : DataList.where_operator.AND,
+                                             'items': [('token', DataList.operator.EQUALS, token)]}}).data
+        if len(users) == 1:
+            return Descriptor().load(users[0]).get_object(True)
+        return None
+

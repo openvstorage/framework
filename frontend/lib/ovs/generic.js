@@ -19,10 +19,24 @@ define(function() {
         }
         return value;
     }
+    function get_cookie(name) {
+        var i, cookie, cookies;
+        if (document.cookie && document.cookie !== '') {
+            cookies = document.cookie.split(';');
+            for (i = 0; i < cookies.length; i++) {
+                cookie = $.trim(cookies[i]);
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    return decodeURIComponent(cookie.substring(name.length + 1));
+                }
+            }
+        }
+        return '';
+    }
 
     return {
         gettimestamp   : gettimestamp,
         get_bytes_human: get_bytes_human,
-        padright       : padright
+        padright       : padright,
+        get_cookie     : get_cookie
     };
 });

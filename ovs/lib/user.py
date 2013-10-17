@@ -10,3 +10,6 @@ class User(object):
     def get_users():
         return UserList.get_users()
 
+    @staticmethod
+    def get_user_by_token(token):
+        return UserList.get_user_by_token(token)

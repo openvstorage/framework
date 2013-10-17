@@ -17,7 +17,10 @@
             </div>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Sign in</button>
+            <button type="submit" class="btn btn-primary" style="margin-top: -3px;">Sign in</button>
+            <span class="alert alert-danger" data-bind="visible: failed()" style="margin-left: 15px;">
+                The username/password combination were invalid or could not be validated.
+            </span>
         </div>
     </form>
     <div class="alert alert-success" data-bind="visible: loggedin()">

@@ -1,4 +1,4 @@
-define(['knockout'], function (ko){
+define(['knockout', 'ovs/generic'], function (ko, generic){
     "use strict";
     var singleton = function () {
         return {
@@ -19,7 +19,8 @@ define(['knockout'], function (ko){
                             'username': username,
                             'password': password
                         }),
-                        contentType: 'application/json'
+                        contentType: 'application/json',
+                        headers: { 'X-CSRFToken': self.getCSRFToken() }
                     })
                     .done(function(result) {
                         self.token = result.token;
@@ -49,6 +50,9 @@ define(['knockout'], function (ko){
             header: function () {
                 var self = this;
                 return 'Token ' + self.token;
+            },
+            getCSRFToken: function () {
+                return generic.get_cookie('csrftoken');
             }
         };
     };

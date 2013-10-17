@@ -24,6 +24,9 @@ class vDisk(DataObject):
                'status': 30,
                'volumedriverid': 30}
 
+    def __str__(self):
+        return str(self._data)
+
     @property
     def used_size(self):
         def get_data():
