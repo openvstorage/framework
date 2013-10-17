@@ -13,7 +13,6 @@ logger = logging.getLogger(settings.SYSTEM_NAME)
 
 class UPAuthenticationBackend(object):
     def authenticate(self, username=None, password=None):
-        logger.info('Entered username/password authentication')
         if username is None or password is None:
             return None
 
@@ -34,15 +33,13 @@ class UPAuthenticationBackend(object):
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
             user = User.objects.get(username=cuser.username)
-            logger.info('Loaded user %s' % username)
         except User.DoesNotExist:
             user = User.objects.create_user(cuser.username, 'nobody@example.com')
             logger.info('Created user %s' % username)
-
-        user.is_active = cuser.is_active
-        user.is_staff = False
-        user.is_superuser = False
-        user.save()
+            user.is_active = cuser.is_active
+            user.is_staff = False
+            user.is_superuser = False
+            user.save()
 
         return user
 
@@ -63,7 +60,6 @@ class TokenAuthenticationBackend(BaseAuthentication):
         Authorization: Token 401f7ac837da42b97f613d789819ff93537bee6a
     """
     def authenticate(self, request):
-        logger.info('Entered token authentication')
         auth = TokenAuthenticationBackend._get_authorization_header(request).split()
 
         if not auth or auth[0].lower() != b'token':
@@ -102,15 +98,13 @@ class TokenAuthenticationBackend(BaseAuthentication):
 
         try:
             user = User.objects.get(username=cuser.username)
-            logger.info('Loaded user %s' % cuser.username)
         except User.DoesNotExist:
             user = User.objects.create_user(cuser.username, 'nobody@example.com')
             logger.info('Created user %s' % cuser.username)
-
-        user.is_active = cuser.is_active
-        user.is_staff = False
-        user.is_superuser = False
-        user.save()
+            user.is_active = cuser.is_active
+            user.is_staff = False
+            user.is_superuser = False
+            user.save()
 
         return user, None
 
@@ -155,15 +149,13 @@ class HashAuthenticationBackend(object):
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
             user = User.objects.get(username=cuser.username)
-            logger.info('Loaded user %s' % cuser.username)
         except User.DoesNotExist:
             user = User.objects.create_user(cuser.username, 'nobody@example.com')
             logger.info('Created user %s' % cuser.username)
-
-        user.is_active = cuser.is_active
-        user.is_staff = True
-        user.is_superuser = True
-        user.save()
+            user.is_active = cuser.is_active
+            user.is_staff = True
+            user.is_superuser = True
+            user.save()
 
         return user
 
