@@ -5,7 +5,7 @@ from rest_framework import renderers
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.serializers import AuthTokenSerializer
-from ovs.lib.user import User
+from ovs.dal.lists.userlist import UserList
 
 
 class ObtainAuthToken(APIView):
@@ -23,6 +23,6 @@ class ObtainAuthToken(APIView):
     def post(self, request):
         serializer = self.serializer_class(data=request.DATA)
         if serializer.is_valid():
-            user = User.get_user_by_username(serializer.object['user'].username)
+            user = UserList.get_user_by_username(serializer.object['user'].username)
             return Response({'token': user.guid})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

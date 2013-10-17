@@ -1,5 +1,5 @@
 from ovs.dal.dataobject import DataObject
-
+from ovs.dal.hybrids.pmachine import pMachine
 
 
 class vMachine(DataObject):
@@ -10,6 +10,5 @@ class vMachine(DataObject):
                   'memory'      : 1024,
                   'vmid'        : None,
                   'template'    : True}
-    _relations = {}#'node': (pMachine, 'guests')}
+    _relations = {'node': (pMachine, 'guests')}
     _expiry = {}
-

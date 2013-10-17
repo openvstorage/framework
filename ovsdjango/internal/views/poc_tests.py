@@ -3,7 +3,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.permissions import IsAuthenticated
-from ovs.lib.vdisk import vdisk
+from ovs.lib.vdisk import VDiskController
 
 
 class TestViewSet(viewsets.ViewSet):
@@ -14,10 +14,10 @@ class TestViewSet(viewsets.ViewSet):
 
     def list(self, request, format=None):
         syncStart = time.time()
-        data = vdisk().listVolumes()
+        data = VDiskController().listVolumes()
         syncElapsed = (time.time() - syncStart)
         asyncStart = time.time()
-        reference = vdisk().listVolumes.apply_async()
+        reference = VDiskController().listVolumes.apply_async()
         data = reference.wait()
         asyncElapsed = (time.time() - asyncStart)
         return Response({'Elapsed Sync/Async': [syncElapsed, asyncElapsed],

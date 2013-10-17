@@ -4,16 +4,12 @@ import logging
 
 from celery import group
 from ovs.celery import celery
-from ovs.lib.vdisk import vdisk
+from ovs.lib.vdisk import VDiskController
 from ovs.dal.hybrids.vmachine import vMachine
-from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.hypervisor.factory import Factory
 
-class vMachine(object):
-    @staticmethod
-    def get_vmachines():
-        return VMachineList.get_vmachines()
 
+class VMachineController(object):
     @celery.task(name='ovs.machine.provision')
     def provision(self, *args, **kwargs):
         """
@@ -37,8 +33,8 @@ class vMachine(object):
         machine = vMachine(machineguid)
         tasks = []
         for disk in machine.disks:
-            t = vdisk().createSnapshot.s({'diskguid': disk.guid})
-            t.link_error(vdisk().deleteSnapshot.s())
+            t = VDiskController().createSnapshot.s({'diskguid': disk.guid})
+            t.link_error(VDiskController().deleteSnapshot.s())
             tasks.append(t)
         snapshot_vmachine_wf = group(t for t in tasks)
         return snapshot_vmachine_wf
@@ -66,7 +62,7 @@ class vMachine(object):
         diskTasks = []
 
         for disk in disks:
-            t = vdisk().clone.s({'parentdiskguid': disk['diskguid'], 'snapshotguid': disk['snapshotguid'], 'devicepath': devicepath, 'machineguid': newMachine.guid})
+            t = VDiskController().clone.s({'parentdiskguid': disk['diskguid'], 'snapshotguid': disk['snapshotguid'], 'devicepath': devicepath, 'machineguid': newMachine.guid})
             diskTasks.append(t)
         clone_disk_tasks = group(t for t in diskTaks)
         provision_machine_task = self.provision.s({'machineguid': newMachine.guid})
@@ -86,7 +82,7 @@ class vMachine(object):
 
         diskTasks = []
         for disk in machine.disks:
-            t = vdisk().delete.s({'diskguid': disk.guid})
+            t = VDiskController().delete.s({'diskguid': disk.guid})
             diskTasks.append(t)
         delete_disk_tasks = group(t for t in diskTasks)
 

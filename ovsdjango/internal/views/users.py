@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.user import User
-from ovs.lib.user import User as APIUser
+from ovs.dal.lists.userlist import UserList
 from django.http import Http404
 
 
@@ -22,7 +22,7 @@ class UserViewSet(viewsets.ViewSet):
             raise Http404
 
     def list(self, request, format=None):
-        users = APIUser.get_users()
+        users = UserList.get_users()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 

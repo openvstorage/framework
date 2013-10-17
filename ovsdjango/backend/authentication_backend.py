@@ -1,7 +1,6 @@
 from django.contrib.auth.models import User
 from toolbox import Toolbox
-from ovs.lib.user import User as LibUser
-from ovs.dal.hybrids.user import User as HybridUser
+from ovs.dal.lists.userlist import UserList
 from ovs.dal.exceptions import ObjectNotFoundException
 from rest_framework.authentication import BaseAuthentication
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
@@ -16,7 +15,7 @@ class UPAuthenticationBackend(object):
         if username is None or password is None:
             return None
 
-        cuser = LibUser.get_user_by_username(str(username))
+        cuser = UserList.get_user_by_username(str(username))
         if cuser is None:
             logger.error('User with username %s could not be found' % username)
             return None
@@ -85,7 +84,7 @@ class TokenAuthenticationBackend(BaseAuthentication):
     @staticmethod
     def _authenticate_credentials(key):
         try:
-            cuser = HybridUser(key)
+            cuser = User(key)
         except ObjectNotFoundException:
             msg = 'Invalid token'
             logger.error(msg)
@@ -136,7 +135,7 @@ class HashAuthenticationBackend(object):
             return None
 
         try:
-            cuser = HybridUser(user_guid)
+            cuser = User(user_guid)
         except ObjectNotFoundException:
             logger.error('User with guid %s could not be found' % user_guid)
             return None

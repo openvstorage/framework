@@ -6,7 +6,8 @@ from ovs.dal.hybrids.vdisk import vDisk
 from ovs.dal.lists.vdisklist import vDiskList
 from volumedriver.daemon import VolumeDriver, Volume
 
-class vdisk(object):
+
+class VDiskController(object):
     #celery = Celery('tasks')
     #celery.config_from_object('celeryconfig')
 
@@ -17,23 +18,23 @@ class vdisk(object):
         """
         response = VolumeDriver.listVolumes()
         return response
-    
+
     @celery.task(name='ovs.disk.getInfo')
     def getInfo(*args, **kwargs):
         """
         Get info from a specific disk
-        
+
         @param diskguid: Guid of the disk
         """
         diskguid = kwargs['diskguid']
         response = Volume.info(diskguid)
         return response
-    
+
     @celery.task(name='ovs.disk.create')
     def create(*args, **kwargs):
         """
         Create a new disk
-        
+
         @param diskguid: Guid of the new disk to create
         @param size: Size of the disk in MiB
         @param maxSize: Maximum size of allowed non disposable SCO's
@@ -51,12 +52,12 @@ class vdisk(object):
         kwargs['result'] = Volume.getDevice(name)
         vDisk(guid).save()
         return kwargs
-    
+
     @celery.task(name='ovs.disk.delete')
     def delete(*args, **kwargs):
         """
         Delete a disk
-        
+
         @param diskguid: guid of the disk
         """
         diskguid = kwargs['diskguid']
@@ -69,12 +70,12 @@ class vdisk(object):
                            migrateCacheToParent = False)
         vDisk(guid).delete()
         return kwargs
-    
+
     @celery.task(name='ovs.disk.clone')
     def clone(*args, **kwargs):
         """
         Clone a disk
-        
+
         @param parentdiskguid: guid of the disk
         @param snapshotguid: guid of the snapshot
         @param devicepath: path to the disk
@@ -84,7 +85,7 @@ class vdisk(object):
         devicepath = kwargs['devicepath']
         machineguid = kwargs.get('machineguid', None)
         propertiesToClone = ['description', 'size', 'vpoolguid', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
-        
+
         logging.info('Clone snapshot %s of disk %s'%(snapshot, name))
         newDisk = vDisk()
         disk = vDisk(diskguid)
@@ -97,12 +98,12 @@ class vdisk(object):
         newDisk.save()
         kwargs['result'] = newDisk.guid
         return kwargs
-    
+
     @celery.task(name='ovs.disk.createSnapshot')
     def createSnapshot(*args, **kwargs):
         """
         Create a disk snapshot
-        
+
         @param diskguid: guid of the disk
         """
         diskguid = kwargs['diskguid']
@@ -113,15 +114,15 @@ class vdisk(object):
         Volume.snapShotCreate(diskguid, snapshotguid)
         kwargs['result'] = snapshotguid
         return kwargs
-    
+
     @celery.task(name='ovs.disk.deleteSnapshot')
     def deleteSnapshot(*args, **kwargs):
         """
         Delete a disk snapshot
-        
+
         @param diskguid: guid of the disk
         @param snapshotguid: guid of the snapshot
-         
+
         @todo: Check if new volumedriver storagerouter upon deletion of a snapshot has built-in protection
         to block it from being deleted if a clone was created from it.
         """
@@ -130,7 +131,7 @@ class vdisk(object):
         logging.info('Delete snapshot %s from disk %s'%(snapshotguid, diskguid))
         Volume.snapShotDestroy(diskguid, snapshotguid)
         return kwargs
-    
+
     @celery.task(name='ovs.disk.listSnapshots')
     def listSnapshot(*args, **kwargs):
         """
@@ -140,7 +141,7 @@ class vdisk(object):
         logging.info('List snapshots from disk %s'%diskguid)
         Volume.listSnapshots(diskguid)
         return kwargs
-    
+
     @celery.task(name='ovs.disk.createDiskChain')
     def exampleCreateChain(*args, **kwargs):
         a = addNameSpace.s(*args, **kwargs)
@@ -149,7 +150,7 @@ class vdisk(object):
         b.link_error(removeVolumeChain(**kwargs))
         c = echo.s('Succesful created %s'%kwargs)
         return chain(a,b)
-    
+
     @celery.task(name='ovs.disk.deleteDiskChain')
     def exampleDeleteChain(*args, **kwargs):
         a = deleteVolume.s(*args, **kwargs)
