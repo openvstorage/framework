@@ -21,6 +21,8 @@
 
 define(['durandal/system', 'durandal/app', 'durandal/viewLocator'],  function (system, app, viewLocator) {
     "use strict";
+    system.debug(true);
+
     app.title = 'Open vStorage';
     app.configurePlugins({
         router: true,

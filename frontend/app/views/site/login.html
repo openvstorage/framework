@@ -1,26 +1,28 @@
 <section>
     <h2><span data-bind="html: displayname"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
-    <form class="form-horizontal" data-bind="submit: login, visible: !loggedin()">
-        <div class="control-group">
-            <label class="control-label" for="inputUsername">Username</label>
-            <div class="controls">
-                <input type="text" id="inputUsername" placeholder="Username"
+    <form class="form-horizontal" role="form" data-bind="submit: login, visible: !loggedin()">
+        <div class="form-group">
+            <label class="col-lg-1 control-label" for="inputUsername">Username</label>
+            <div class="col-lg-2">
+                <input type="text" class="form-control" id="inputUsername" placeholder="Username"
                        data-bind="value: username, valueUpdate: 'afterkeydown'">
             </div>
         </div>
-        <div class="control-group">
-            <label class="control-label" for="inputPassword">Password</label>
-            <div class="controls">
-                <input type="password" id="inputPassword" placeholder="Password"
+        <div class="form-group">
+            <label class="col-lg-1 control-label" for="inputPassword">Password</label>
+            <div class="col-lg-2">
+                <input type="password" class="form-control" id="inputPassword" placeholder="Password"
                        data-bind="value: password, valueUpdate: 'afterkeydown'">
             </div>
         </div>
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary" style="margin-top: -3px;">Sign in</button>
-            <span class="alert alert-danger" data-bind="visible: failed()" style="margin-left: 15px;">
-                The username/password combination were invalid or could not be validated.
-            </span>
+        <div class="form-group">
+            <div class="col-lg-offset-1 col-lg-10" style="padding-top: 5px;">
+                <button type="submit" class="btn btn-primary" style="margin-top: -3px;">Sign in</button>
+                <span class="alert alert-danger" data-bind="visible: failed()" style="padding: 8px; margin-left: 15px;">
+                    The username/password combination were invalid or could not be validated.
+                </span>
+            </div>
         </div>
     </form>
     <div class="alert alert-success" data-bind="visible: loggedin()">

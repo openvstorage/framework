@@ -15,6 +15,7 @@
     childRouter.mapUnknownRoutes('404');
 
     return {
+        authentication: authentication,
         shared: shared,
         router: childRouter,
         activate: function(mode) {

@@ -7,8 +7,9 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
                 self.mode = mode;
             },
             mode: undefined,
-            username: undefined,
-            password: undefined,
+            username: ko.observable(),
+            password: ko.observable(),
+            loggedin: ko.observable(false),
             token: undefined,
             login: function (username, password) {
                 var self = this;
@@ -24,11 +25,18 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
                     })
                     .done(function(result) {
                         self.token = result.token;
+                        self.username(username);
+                        self.password(password);
+                        self.loggedin(true);
                         deferred.resolve();
                     })
                     .fail(function (xmlHttpRequest, textStatus, errorThrown) {
                         // We check whether we actually received an error, and it's not the browser navigating away
                         if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                            self.token = undefined;
+                            self.username(undefined);
+                            self.password(undefined);
+                            self.loggedin(false);
                             deferred.reject();
                         }
                     });
@@ -36,9 +44,10 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
             },
             logout: function () {
                 var self = this;
-                self.username = undefined;
-                self.password = undefined;
                 self.token = undefined;
+                self.username(undefined);
+                self.password(undefined);
+                self.loggedin(false);
             },
             validate: function () {
                 var self = this;

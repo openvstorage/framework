@@ -1,18 +1,30 @@
 ﻿<div>
-    <div class="navbar navbar-fixed-top" data-bind="visible: shared.mode() == 'full'">
-        <div class="navbar-inner">
-            <a class="brand" data-bind="attr: { href: router.navigationModel()[0].hash }">
-                <span>Open vStorage</span>
-            </a>
-            <ul class="nav" data-bind="foreach: router.navigationModel">
+    <div class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() == 'full'">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-ex1-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" data-bind="attr: { href: router.navigationModel()[0].hash }">Open vStorage</a>
+        </div>
+        <div class="collapse navbar-collapse navbar-ex1-collapse">
+            <ul class="nav navbar-nav" data-bind="foreach: router.navigationModel">
                 <li data-bind="css: { active: isActive }">
                     <a data-bind="attr: { href: hash }, html: title"></a>
                 </li>
             </ul>
-            <div class="loader pull-right" data-bind="css: { active: router.isNavigating }">
-                <i style="margin-top: 6px;" class="icon-spinner icon-spin"></i>
-            </div>
+            <!-- below: navbar-right has float: right behavior -->
+            <ul class="nav navbar-nav navbar-right">
+                <li data-bind="visible: router.isNavigating ">
+                    <a><i style="margin-top: 4px;" class="icon-spinner icon-spin"></i></a>
+                </li>
+            </ul>
+            <p class="navbar-text navbar-right" data-bind="visible: authentication.loggedin">
+                Signed in as <i><span data-bind="text: authentication.username"></span></i>
+            </p>
         </div>
     </div>
-    <div class="container-fluid page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
+    <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
 </div>
