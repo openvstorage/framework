@@ -30,7 +30,7 @@ class LotsOfObjects(TestCase):
         print 'start queries'
         start = time.time()
         for i in xrange(0, 100):
-            machine = Machine(mguids[i])
+            machine = vMachine(mguids[i])
             self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
             seconds_passed = (time.time() - start)
             itemspersec = ((i + 1) * 10000.0) / seconds_passed
@@ -40,7 +40,7 @@ class LotsOfObjects(TestCase):
         print 'start cached queries'
         start = time.time()
         for i in xrange(0, 100):
-            machine = Machine(mguids[i])
+            machine = vMachine(mguids[i])
             self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
         seconds_passed = (time.time() - start)
         print 'completed in %d seconds' % seconds_passed
@@ -48,7 +48,7 @@ class LotsOfObjects(TestCase):
         print 'start full query on disk property'
         start = time.time()
         amount = DataList(key   = 'size_between_4k_7k',
-                          query = {'object': Disk,
+                          query = {'object': vDisk,
                                    'data': DataList.select.COUNT,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('size', DataList.operator.GT, 4000),
@@ -60,7 +60,7 @@ class LotsOfObjects(TestCase):
         print 'cleaning up'
         start = time.time()
         for i in xrange(0, 100):
-            machine = Machine(mguids[i])
+            machine = vMachine(mguids[i])
             for disk in machine.disks:
                 disk.delete()
             machine.delete()
