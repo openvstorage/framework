@@ -7,9 +7,12 @@
                                 fromParent: true
                             })
                             .map([
-                                { route: '',           moduleId: 'dashboard',  hash: '#full',            title: 'Dashboard',  nav: true  },
-                                { route: 'statistics', moduleId: 'statistics', hash: '#full/statistics', title: 'Statistics', nav: true  },
-                                { route: 'login',      moduleId: 'login',      hash: '#full/login',      title: 'Login',      nav: false }
+                                // Navigation routes
+                                { route: '',            moduleId: 'dashboard',   hash: '#full',             title: 'Dashboard',   nav: true  },
+                                { route: 'statistics',  moduleId: 'statistics',  hash: '#full/statistics',  title: 'Statistics',  nav: true  },
+                                { route: 'vmachines',   moduleId: 'vmachines',   hash: '#full/vmachines',   title: 'vMachines',   nav: true  },
+                                // Non-navigation routes
+                                { route: 'login',       moduleId: 'login',       hash: '#full/login',       title: 'Login',       nav: false }
                             ])
                             .buildNavigationModel();
     childRouter.mapUnknownRoutes('404');

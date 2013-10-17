@@ -1,4 +1,5 @@
 from ovs.dal.datalist import DataList
+from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.user import User
 from ovs.dal.helpers import Descriptor
 
@@ -22,7 +23,7 @@ class UserList(object):
                                   'data': DataList.select.DESCRIPTOR,
                                   'query': {'type': DataList.where_operator.AND,
                                             'items': []}}).data
-        return [Descriptor().load(user).get_object(True) for user in users]
+        return DataObjectList(users, User)
 
     @staticmethod
     def get_user_by_token(token):

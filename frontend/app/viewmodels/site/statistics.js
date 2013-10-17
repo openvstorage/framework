@@ -1,4 +1,4 @@
-define(['plugins/router', 'durandal/app', '../models/memcached', 'ovs/shared', 'ovs/authentication'], function (router, app, Memcached, shared, authentication) {
+define(['plugins/router', 'durandal/app', '../containers/memcached', 'ovs/shared', 'ovs/authentication'], function (router, app, Memcached, shared, authentication) {
     "use strict";
     var viewModel = {
         // Shared data

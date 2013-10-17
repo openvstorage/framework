@@ -10,6 +10,6 @@ class vMachine(DataObject):
                   'memory'      : 1024,
                   'vmid'        : None,
                   'template'    : True}
-    _relations = {'node': (pMachine, 'guests')}
+    _relations = {}#'node': (pMachine, 'guests')}
     _expiry = {}
 
