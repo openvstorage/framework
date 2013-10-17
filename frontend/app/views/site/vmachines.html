@@ -7,6 +7,7 @@
                 <tr>
                     <td style="width: 300px;">Guid</td>
                     <td>Name</td>
+                    <td># Disks</td>
                     <td style="width: 50px;">&nbsp;</td>
                 </tr>
             </thead>
@@ -14,6 +15,7 @@
                 <tr>
                     <td data-bind="text: guid"></td>
                     <td data-bind="text: name"></td>
+                    <td data-bind="text: vdisks().length"></td>
                     <td><a href="#" data-bind="click: load">load</a></td>
                 </tr>
             </tbody>

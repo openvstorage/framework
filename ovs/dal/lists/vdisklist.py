@@ -1,6 +1,6 @@
 from ovs.dal.datalist import DataList
 from ovs.dal.hybrids.vdisk import vDisk
-from ovs.dal.helpers import Descriptor
+from ovs.dal.dataobjectlist import DataObjectList
 
 
 class vDiskList(object):
@@ -11,4 +11,4 @@ class vDiskList(object):
                                    'data': DataList.select.DESCRIPTOR,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': []}}).data
-        return [Descriptor().load(vdisk).get_object(True) for vdisk in vdisks]
+        return DataObjectList(vdisks, vDisk)

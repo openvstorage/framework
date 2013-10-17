@@ -1,8 +1,11 @@
 class DataObjectList(object):
-    def __init__(self, query_result, cls):
+    def __init__(self, query_result, cls, reduced=False):
         self._guids = [x['guid'] for x in query_result]
         self.type = cls
         self._objects = {}
+        self._reduced = reduced
+        if not reduced:
+            self.reduced = DataObjectList(query_result, cls, reduced=True)
 
     def merge(self, query_result):
         # Maintaining order is very important here
@@ -19,10 +22,16 @@ class DataObjectList(object):
         for guid in self._objects.keys():
             if guid not in self._guids:
                 del self._objects[guid]
+        if not self._reduced:
+            self.reduced.merge(query_result)
 
     def _get_object(self, guid):
         if guid not in self._objects:
-            self._objects[guid] = self.type(guid)
+            if self._reduced:
+                self._objects[guid] = DataObjectList._create_class(self.type.__name__)()
+                setattr(self._objects[guid], 'guid', guid)
+            else:
+                self._objects[guid] = self.type(guid)
         return self._objects[guid]
 
     def index(self, value):
@@ -52,3 +61,10 @@ class DataObjectList(object):
     def __getitem__(self, item):
         guid = self._guids[item]
         return self._get_object(guid)
+
+    @staticmethod
+    def _create_class(name):
+        class Dummy():
+            pass
+        Dummy.__name__ = name
+        return Dummy
