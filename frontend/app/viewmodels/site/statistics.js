@@ -2,16 +2,21 @@ define(['plugins/router', 'durandal/app', '../containers/memcached', 'ovs/shared
     "use strict";
     var viewModel = {
         // Shared data
+
         shared: shared,
+
         // Data
+
         displayname: 'Statistics',
         description: 'The page contains various system statistics',
         memcached: new Memcached(),
 
         // Internal management
+
         refresh_timeout: undefined,
 
         // Functions
+
         refresh: function () {
             viewModel.memcached.refresh();
         },
@@ -27,6 +32,7 @@ define(['plugins/router', 'durandal/app', '../containers/memcached', 'ovs/shared
         },
 
         // Durandal
+
         canActivate: function() { return authentication.validate(); },
         activate: function () {
             app.trigger('statistics:refresh');

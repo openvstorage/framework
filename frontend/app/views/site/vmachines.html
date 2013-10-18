@@ -1,24 +1,13 @@
 ﻿<section>
     <h2><span data-bind="html: displayname"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
-    <div class="table-responsive">
-        <table class="table table-striped table-condensed">
-            <thead>
-                <tr>
-                    <td style="width: 300px;">Guid</td>
-                    <td>Name</td>
-                    <td># Disks</td>
-                    <td style="width: 50px;">&nbsp;</td>
-                </tr>
-            </thead>
-            <tbody data-bind="foreach: vmachines">
-                <tr>
-                    <td data-bind="text: guid"></td>
-                    <td data-bind="text: name"></td>
-                    <td data-bind="text: vdisks().length"></td>
-                    <td><a href="#" data-bind="click: load">load</a></td>
-                </tr>
-            </tbody>
+    <div data-bind="pager: { items: vmachines, headers: vmachine_headers }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td data-bind="text: guid"></td>
+                <td data-bind="text: name"></td>
+                <td><a data-bind="click: load">Load</a></td>
+            </tr>
         </table>
     </div>
 </section>

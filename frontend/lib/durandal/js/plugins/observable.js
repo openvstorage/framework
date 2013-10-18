@@ -1,9 +1,4 @@
 /**
- * Durandal 2.0.0 Copyright (c) 2012 Blue Spire Consulting, Inc. All Rights Reserved.
- * Available via the MIT license.
- * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
- */
-/**
  * Enables automatic observability of plain javascript object for ES5 compatible browsers. Also, converts promise properties into observables that are updated when the promise resolves.
  * @module observable
  * @requires system
@@ -31,8 +26,12 @@ define(['durandal/system', 'durandal/binder', 'knockout'], function(system, bind
         return first === '_' || first === '$';
     }
 
+    function isNode(obj) {
+        return !!(obj && obj.nodeType !== undefined && system.isNumber(obj.nodeType));
+    }
+
     function canConvertType(value) {
-        if (!value || system.isElement(value) || value.ko === ko || value.jquery) {
+        if (!value || isNode(value) || value.ko === ko || value.jquery) {
             return false;
         }
 
@@ -254,22 +253,21 @@ define(['durandal/system', 'durandal/binder', 'knockout'], function(system, bind
      * @param {object} obj The target object on which to create the property.
      * @param {string} propertyName The name of the property to define.
      * @param {function|object} evaluatorOrOptions The Knockout computed function or computed options object.
-     * @return {KnockoutComputed} The underlying computed observable.
+     * @return {KnockoutObservable} The underlying computed observable.
      */
     function defineProperty(obj, propertyName, evaluatorOrOptions) {
-        var ko = this,
-            computedOptions = { owner: obj, deferEvaluation: true },
+        var computedOptions = { owner: obj, deferEvaluation: true },
             computed;
 
         if (typeof evaluatorOrOptions === 'function') {
             computedOptions.read = evaluatorOrOptions;
         } else {
             if ('value' in evaluatorOrOptions) {
-                system.error('For ko.defineProperty, you must not specify a "value" for the property. You must provide a "get" function.');
+                system.error('For defineProperty, you must not specify a "value" for the property. You must provide a "get" function.');
             }
 
             if (typeof evaluatorOrOptions.get !== 'function') {
-                system.error('For ko.defineProperty, the third parameter must be either an evaluator function, or an options object containing a function called "get".');
+                system.error('For defineProperty, the third parameter must be either an evaluator function, or an options object containing a function called "get".');
             }
 
             computedOptions.read = evaluatorOrOptions.get;

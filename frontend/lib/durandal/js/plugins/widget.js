@@ -1,9 +1,4 @@
-/**
- * Durandal 2.0.0 Copyright (c) 2012 Blue Spire Consulting, Inc. All Rights Reserved.
- * Available via the MIT license.
- * see: http://durandaljs.com or https://github.com/BlueSpire/Durandal for details.
- */
-/**
+﻿/**
  * Layers the widget sugar on top of the composition system.
  * @module widget
  * @requires system
@@ -73,6 +68,7 @@ define(['durandal/system', 'durandal/composition', 'jquery', 'knockout'], functi
             };
 
             ko.virtualElements.allowedBindings[kind] = true;
+            composition.composeBindings.push(kind + ':');
         },
         /**
          * Maps views and module to the kind identifier if a non-standard pattern is desired.
@@ -185,6 +181,7 @@ define(['durandal/system', 'durandal/composition', 'jquery', 'knockout'], functi
                 }
             };
 
+            composition.composeBindings.push(config.bindingName + ':');
             ko.virtualElements.allowedBindings[config.bindingName] = true;
         }
     };

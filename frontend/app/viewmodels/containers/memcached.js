@@ -1,13 +1,15 @@
 define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication'], function ($, ko, generic, authentication) {
     "use strict";
-
     return function () {
         var self = this;
+
         // Variables
+
         self.refresh_handle = undefined;
         self.refresh_timeout = undefined;
 
         // Obserables
+
         self.bytes         = ko.observable('');
         self.curr_items    = ko.observable(0);
         self.total_items   = ko.observable(0);
@@ -20,6 +22,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication'], function ($,
         self.raw           = ko.observable('');
 
         // Functions
+
         self.refresh = function () {
             if (self.refresh_handle !== undefined) {
                 self.refresh_handle.abort();

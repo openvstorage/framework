@@ -1,19 +1,22 @@
 define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'viewmodels/containers/vdisk'], function ($, ko, generic, authentication, VDisk) {
     "use strict";
-
     return function (data) {
         var self = this;
+
         // Variables
+
         self.load_vdisks_handle = undefined;
         self.load_handle = undefined;
 
         // Obserables
+
         self.guid = ko.observable(data.guid);
         self.name = ko.observable();
         self.vdisks = ko.observableArray([]);
         self.vdisk_guids = [];
 
         // Functions
+
         self.load_disks = function () {
             return $.Deferred(function (deferred) {
                 if (self.load_vdisks_handle !== undefined) {

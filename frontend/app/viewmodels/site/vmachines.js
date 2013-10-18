@@ -1,17 +1,29 @@
-﻿define(['ovs/shared', 'knockout', 'ovs/generic', 'ovs/authentication', '../containers/vmachine'], function (shared, ko, generic, authentication, VMachine) {
+﻿﻿define(['ovs/shared', 'knockout', 'ovs/generic', 'ovs/authentication', '../containers/vmachine'], function (shared, ko, generic, authentication, VMachine) {
     "use strict";
     return {
         // Shared data
+
         shared: shared,
+
         // Data
+
         displayname: 'vMachines',
         description: 'This page contains a first overview of the vmachines and their vdisks in our model',
+
+        vmachine_headers: [
+            { key: 'guid',    value: 'Guid',   width: 300 },
+            { key: 'name',    value: 'Name',   width: undefined },
+            { key: undefined, value: '&nbsp;', width: 100 }
+        ],
         vmachines: ko.observableArray([]),
         vmachine_guids: [],
 
         // Variables
+
         load_vmachines_handle: undefined,
+
         // Functions
+
         load: function() {
             var self = this;
             return $.Deferred(function (deferred) {
@@ -34,6 +46,7 @@
                             self.vmachines.push(new VMachine(item));
                         }
                     }
+
                     deferred.resolve();
                 })
                 .fail(deferred.reject);
@@ -41,6 +54,7 @@
         },
 
         // Durandal
+
         canActivate: function() { return authentication.validate(); },
         activate: function() {
             var self = this;

@@ -29,6 +29,11 @@ define(['durandal/system', 'durandal/app', 'durandal/viewLocator'],  function (s
         dialog: true,
         widget: true
     });
+    app.configurePlugins({
+        widget: {
+            kinds: ['pager']
+        }
+    });
     app.start().then(function () {
         viewLocator.useConvention();
         app.setRoot('viewmodels/shell');
