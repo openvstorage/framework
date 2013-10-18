@@ -132,8 +132,7 @@ class DataList(StoredObject):
             else:
                 self.data = []
 
-            if len(items) == 0:
-                self._add_invalidation(name, '__all')
+            self._add_invalidation(name, '__all')
             for key in keys:
                 guid = key.replace(base_key, '')
                 try:
