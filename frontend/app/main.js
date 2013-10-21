@@ -1,17 +1,22 @@
 ﻿requirejs.config({
     paths: {
-        'text'        : '../lib/require/text',
-        'durandal'    : '../lib/durandal/js',
-        'plugins'     : '../lib/durandal/js/plugins',
-        'transitions' : '../lib/durandal/js/transitions',
-        'knockout'    : '../lib/knockout/knockout-2.3.0',
-        'bootstrap'   : '../lib/bootstrap/js/bootstrap',
-        'jquery'      : '../lib/jquery/jquery-1.9.1',
-        'ovs'         : '../lib/ovs',
-        'models'      : 'viewmodels/models'
+        'text'       : '../lib/require/text',
+        'durandal'   : '../lib/durandal/js',
+        'plugins'    : '../lib/durandal/js/plugins',
+        'transitions': '../lib/durandal/js/transitions',
+        'knockout'   : '../lib/knockout/knockout-2.3.0',
+        'bootstrap'  : '../lib/bootstrap/js/bootstrap',
+        'jquery'     : '../lib/jquery/jquery-1.9.1',
+        'jqp'        : '../lib/jquery-plugins/js',
+        'ovs'        : '../lib/ovs',
+        'models'     : 'viewmodels/models'
     },
     shim: {
         'bootstrap': {
+            deps   : ['jquery'],
+            exports: 'jQuery'
+        },
+        'jqp/jquery.pnotify': {
             deps   : ['jquery'],
             exports: 'jQuery'
         }

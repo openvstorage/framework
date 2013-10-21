@@ -1,13 +1,11 @@
 define(['ovs/shared', 'knockout', 'ovs/authentication'], function (shared, ko, authentication) {
     "use strict";
     return {
-        // Shared data
-
+        // System
         shared: shared,
         authentication: authentication,
 
         // Data
-
         displayname: 'Login',
         description: 'Please login into the Open vStorage management interface',
         username: ko.observable(),
@@ -16,7 +14,6 @@ define(['ovs/shared', 'knockout', 'ovs/authentication'], function (shared, ko, a
         failed:   ko.observable(false),
 
         // Functions
-
         login: function() {
             var self = this;
             self.failed(false);
@@ -31,7 +28,10 @@ define(['ovs/shared', 'knockout', 'ovs/authentication'], function (shared, ko, a
         },
 
         // Durandal
-
-        activate: function() { }
+        activate: function() {
+            setTimeout(function() {
+                $('#inputUsername').focus();
+            }, 250);
+        }
     };
 });

@@ -1,12 +1,14 @@
 ﻿<section>
     <h2><span data-bind="html: displayname"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
-    <div data-bind="pager: { items: vmachines, headers: vmachine_headers }">
+    <div data-bind="pager: { items: vmachines, headers: vmachine_headers, pagesize: 10, enter_viewport: 'load', controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
-                <td data-bind="text: guid"></td>
                 <td data-bind="text: name"></td>
-                <td><a data-bind="click: load">Load</a></td>
+                <td data-bind="text: vdisks().length"></td>
+                <td>
+                    <i data-bind="click: function(data, event) { $root.clone($data.guid()); }"  class="hand icon icon-copy"></i>
+                </td>
             </tr>
         </table>
     </div>

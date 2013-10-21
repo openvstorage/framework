@@ -1,14 +1,45 @@
 <div class="table-responsive">
     <table class="table table-striped table-condensed">
         <thead>
-            <tr data-bind="foreach: settings.headers">
+            <tr data-bind="foreach: headers">
                 <th data-bind="style: { width: width !== undefined ? width + 'px' : 'auto' }, html: value"></th>
             </tr>
         </thead>
-        <tbody data-bind="foreach: settings.items">
-            <tr data-part="vitem" data-bind="foreach: $parent.settings.headers">
+        <tbody data-bind="foreach: viewport_items">
+            <tr data-part="vitem" data-bind="foreach: $parent.headers">
                 <td data-bind="html: $parent[key]"></td>
             </tr>
         </tbody>
     </table>
+    <div data-bind="if: show_controls()">
+        <p style="margin-bottom: -15px;">
+            Showing <span data-bind="text: page_first"></span>-<span data-bind="text: page_last"></span>
+            from <span data-bind="text: total_items()"></span> results.</p>
+        <ul class="pagination">
+            <!-- ko if: has_previous() -->
+                <li><a data-bind="click: function(data, event) { current(1); }" class="hand">&laquo;&laquo;</a></li>
+                <li><a data-bind="click: function(data, event) { step(false); }" class="hand">&laquo;</a></li>
+            <!-- /ko -->
+            <!-- ko if: !has_previous() -->
+                <li class="disabled"><span>&laquo;&laquo;</span></li>
+                <li class="disabled"><span>&laquo;</span></li>
+            <!-- /ko -->
+            <!-- ko foreach: pages -->
+                <!-- ko if: $data == $parent.current() -->
+                    <li class="active"><span data-bind="text: $data"></span></li>
+                <!-- /ko -->
+                <!-- ko if: $data != $parent.current() -->
+                    <li><a data-bind="text: $data, click: function(data, event) { $parent.current($data); }" class="hand"></a></li>
+                <!-- /ko -->
+            <!-- /ko -->
+            <!-- ko if: has_next() -->
+                <li><a data-bind="click: function(data, event) { step(true); }" class="hand">&raquo;</a></li>
+                <li><a data-bind="click: function(data, event) { current(last_page()); }" class="hand">&raquo;&raquo;</a></li>
+            <!-- /ko -->
+            <!-- ko if: !has_next() -->
+                <li class="disabled"><span>&raquo;</span></li>
+                <li class="disabled"><span>&raquo;&raquo;</span></li>
+            <!-- /ko -->
+        </ul>
+    </div>
 </div>

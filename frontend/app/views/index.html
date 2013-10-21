@@ -17,14 +17,15 @@
             </ul>
             <!-- below: navbar-right has float: right behavior -->
             <p class="navbar-text navbar-right" data-bind="visible: authentication.loggedin">
-                Signed in as <i><span data-bind="text: authentication.username"></span></i>
+                Signed in as <i><span data-bind="text: authentication.username"></span></i>.
+                <a data-bind="click: authentication.logout" class="hand navbar-link">Log out</a>
             </p>
             <ul class="nav navbar-nav navbar-right">
-                <li data-bind="visible: router.isNavigating ">
+                <li data-bind="visible: router.isNavigating">
                     <a><i style="margin-top: 4px;" class="icon-spinner icon-spin"></i></a>
                 </li>
             </ul>
         </div>
     </div>
-    <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: false }"></div>
+    <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
 </div>

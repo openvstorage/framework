@@ -32,11 +32,18 @@ define(function() {
         }
         return '';
     }
+    function tryget(object, key, fallback) {
+        if (object.hasOwnProperty(key)) {
+            return object[key];
+        }
+        return fallback;
+    }
 
     return {
         gettimestamp   : gettimestamp,
         get_bytes_human: get_bytes_human,
         padright       : padright,
-        get_cookie     : get_cookie
+        get_cookie     : get_cookie,
+        tryget         : tryget
     };
 });
