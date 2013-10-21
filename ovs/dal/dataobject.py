@@ -57,6 +57,7 @@ class DataObject(StoredObject):
         super(DataObject, self).__init__()
 
         # Initialize internal fields
+        self._frozen = False
         self._datastore_wins = datastore_wins
         self._guid = None             # Guid identifier of the object
         self._original = {}           # Original data copy
@@ -129,6 +130,9 @@ class DataObject(StoredObject):
         # Re-cache the object
         StoredObject.volatile.set(self._key, self._data)
 
+        # Freeze property creation
+        self._frozen = True
+
         # Optionally, initialize some fields
         if data is not None:
             for field, value in data.iteritems():
@@ -196,6 +200,21 @@ class DataObject(StoredObject):
             self._objects[attribute] = value
             self._data[attribute]['guid'] = value.guid
 
+    def __setattr__(self, key, value):
+        if not hasattr(self, '_frozen') or not self._frozen:
+            allowed = True
+        else:
+            # If our object structure is frozen (which is after __init__), we only allow known
+            # property updates: items that are in __dict__ and our own blueprinting dicts
+            allowed = key in self.__dict__ \
+                or key in self._blueprint \
+                or key in self._relations \
+                or key in self._expiry
+        if allowed:
+            super(DataObject, self).__setattr__(key, value)
+        else:
+            raise RuntimeError('Property %s does not exist on this object.' % key)
+
     #######################
     ## Saving data to persistent store and invalidating volatile store
     #######################
@@ -252,7 +271,7 @@ class DataObject(StoredObject):
         # Save the data
         self._data = copy.deepcopy(data)
         StoredObject.persistent.set(self._key, self._data)
-        self.add_pk(self._key)
+        self._add_pk(self._key)
 
         # Invalidate lists/queries
         # First, invalidate reverse lists (where we point to a remote object, invalidating that remote list)
@@ -318,7 +337,7 @@ class DataObject(StoredObject):
         for key in self._expiry.keys():
             StoredObject.volatile.delete('%s_%s' % (self._key, key))
         StoredObject.volatile.delete(self._key)
-        self.delete_pk(self._key)
+        self._delete_pk(self._key)
 
     # Discard all pending changes
     def discard(self):
@@ -367,7 +386,7 @@ class DataObject(StoredObject):
             StoredObject.volatile.set(cache_key, cached_data, self._expiry[caller_name])
         return cached_data
 
-    def add_pk(self, key):
+    def _add_pk(self, key):
         internal_key = 'ovs_primarykeys_%s' % self._name
         lock = Lock('/tmp/%s' % internal_key)
         try:
@@ -381,7 +400,7 @@ class DataObject(StoredObject):
         finally:
             lock.release()
 
-    def delete_pk(self, key):
+    def _delete_pk(self, key):
         internal_key = 'ovs_primarykeys_%s' % self._name
         lock = Lock('/tmp/%s' % internal_key)
         try:
