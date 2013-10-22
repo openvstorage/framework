@@ -100,9 +100,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             if (!settings.hasOwnProperty('headers')) {
                 throw 'Headers should be specified';
             }
-            if (settings.hasOwnProperty('enter_viewport')) {
-                self.enter_viewport = settings.enter_viewport;
-            }
+
+            self.enter_viewport = generic.tryget(settings, 'enter_viewport');
             self.settings(settings);
             self.headers(settings.headers);
             self.pagesize(settings.pagesize);
