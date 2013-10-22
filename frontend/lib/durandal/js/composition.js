@@ -420,8 +420,6 @@ define(['durandal/system', 'durandal/viewLocator', 'durandal/binder', 'durandal/
                 if (context.child != context.activeView) {
                     if (context.cacheViews && context.activeView) {
                         var instruction = binder.getBindingInstruction(context.activeView);
-                        // @TODO: The below part fixes redirects to current view, working around #351
-                        // https://github.com/BlueSpire/Durandal/issues/351
                         if(!instruction || (instruction.cacheViews != undefined && !instruction.cacheViews)){
                             ko.removeNode(context.activeView);
                         }else{
