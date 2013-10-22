@@ -1,4 +1,4 @@
-﻿define(['plugins/router', 'durandal/app', 'ovs/shared', 'ovs/authentication', 'jqp/jquery.pnotify'], function (router, app, shared, authentication, $) {
+﻿define(['plugins/router', 'durandal/app', 'ovs/shared', 'ovs/authentication', 'jqp/pnotify'], function (router, app, shared, authentication, $) {
     "use strict";
     var childRouter = router.createChildRouter()
                             .makeRelative({
@@ -29,14 +29,6 @@
             // Notifications
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";
-            window.alert = function(message) {
-                $.pnotify({
-                    title: 'Alert',
-                    text: message,
-                    nonblock: true,
-                    delay: 5000
-                });
-            };
         }
     };
 });

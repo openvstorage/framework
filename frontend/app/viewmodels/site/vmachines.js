@@ -65,7 +65,7 @@
             var i, vms = self.vmachines();
             for (i = 0; i < vms.length; i += 1) {
                 if (vms[i].guid() === guid) {
-                    alert('Cloning is not yet supported for: ' + vms[i].name());
+                    generic.alert_error('Unsupported', 'Cloning is not yet supported for: ' + vms[i].name());
                 }
             }
         };

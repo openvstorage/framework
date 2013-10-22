@@ -16,7 +16,7 @@
             deps   : ['jquery'],
             exports: 'jQuery'
         },
-        'jqp/jquery.pnotify': {
+        'jqp/pnotify': {
             deps   : ['jquery'],
             exports: 'jQuery'
         }
