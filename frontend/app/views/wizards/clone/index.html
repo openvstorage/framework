@@ -1,0 +1,17 @@
+<div data-bind="css: { 'modal-content': modal() }" style="min-width: 500px;">
+    <div class="modal-header" data-bind="visible: modal()">
+        <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
+        <h4 class="modal-title" data-bind="text: title"></h4>
+    </div>
+    <h2 data-bind="visible: !modal(), text: title"></h2>
+    <div data-bind="if: modal()">
+        <div class="modal-body" data-bind="compose: activeStep"></div>
+    </div>
+    <div data-bind="if: !modal()">
+        <blockquote data-bind="compose: activeStep"></blockquote>
+    </div>
+    <div data-bind="css: { 'modal-footer': modal() }">
+        <button type="button" class="btn btn-default" data-bind="css: { disabled: !hasPrevious()}, click: previous">&laquo; previous</button>
+        <button type="button"  class="btn btn-default" data-bind="css: { disabled: !hasNext()}, click: next">next &raquo; </button>
+    </div>
+</div>

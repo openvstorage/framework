@@ -1,0 +1,45 @@
+﻿<div>
+    <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() == 'full'">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-ex1-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" data-bind="attr: { href: router.navigationModel()[0].hash }">Open vStorage</a>
+            </div>
+            <div class="collapse navbar-collapse navbar-ex1-collapse">
+                <ul class="nav navbar-nav">
+                    <li class="dropdown">
+                        <a class="dropdown-toggle hand" data-toggle="dropdown">vPools <b class="caret"></b></a>
+                        <ul class="dropdown-menu">
+                            <li><a href="#">ESXi 1 local disks</a></li>
+                            <li><a href="#">ESXi 2 local disks</a></li>
+                            <li><a href="#">S3 main</a></li>
+                            <li><a href="#">S3 sandbox</a></li>
+                            <li><a href="#"><i class="glyphicon glyphicon-plus"></i> &nbsp; Add vPool</a></li>
+                        </ul>
+                    </li>
+                    <!-- ko foreach: router.navigationModel -->
+                        <li data-bind="css: { active: isActive }">
+                            <a data-bind="attr: { href: hash }, html: title"></a>
+                        </li>
+                    <!-- /ko -->
+                </ul>
+                <!-- below: navbar-right has float: right behavior -->
+                <p class="navbar-text navbar-right" data-bind="visible: authentication.loggedin">
+                    Signed in as <i><span data-bind="text: authentication.username"></span></i>.
+                    <a data-bind="click: authentication.logout" class="hand navbar-link">Log out</a>
+                </p>
+                <ul class="nav navbar-nav navbar-right">
+                    <li data-bind="visible: router.isNavigating">
+                        <a><i style="margin-top: 4px;" class="icon-spinner icon-spin"></i></a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
+</div>
