@@ -127,8 +127,9 @@ class DataObject(StoredObject):
         # Store original data
         self._original = copy.deepcopy(self._data)
 
-        # Re-cache the object
-        StoredObject.volatile.set(self._key, self._data)
+        if not new:
+            # Re-cache the object
+            StoredObject.volatile.set(self._key, self._data)
 
         # Freeze property creation
         self._frozen = True
