@@ -245,30 +245,89 @@ class Sdk(object):
             self.waitForTask(task)
         return task
 
+    def _createDisk(self, factory, key, disk, unit, datastore):
+        """
+        disk = {'name': diskname, 'backingdevice': 'disk-flat.vmdk'}
+        """
+        deviceInfo = factory.create('ns0:Description')
+        deviceInfo.label   = disk['name']
+        deviceInfo.summary = 'Disk %s' % disk['name']
+        backing = factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
+        backing.diskMode = 'persistent'
+        #backing.datastore = datastore
+        backing.fileName = '[%(datastore)s] %(devicepath)s' % {'datastore': datastore.name, 'devicepath': disk['backingdevice']}
+        #backing.fileName = disk['backingdevice']
+        device = factory.create('ns0:VirtualDisk')
+        device.controllerKey = key
+        device.key           = -200 - unit
+        device.unitNumber    = unit
+        device.deviceInfo    = deviceInfo
+        device.backing       = backing
+        diskSpec = factory.create('ns0:VirtualDeviceConfigSpec')
+        diskSpec.operation     = 'add'
+        diskSpec.fileOperation = None
+        diskSpec.device        = device
+        return diskSpec
+
+    def _createFileInfo(self, factory, datastore):
+        fileInfo = factory.create('ns0:VirtualMachineFileInfo')
+        fileInfo.vmPathName = '[%s]' % datastore
+        return fileInfo
+
+    def _createNic(self, factory, deviceType, deviceLabel, deviceSummary, network, unit):
+        deviceInfo = factory.create('ns0:Description')
+        deviceInfo.label   = deviceLabel
+        deviceInfo.summary = deviceSummary
+        backing = factory.create('ns0:VirtualEthernetCardNetworkBackingInfo')
+        backing.deviceName = network
+        device = factory.create('ns0:%s'%deviceType)
+        device.addressType      = 'Generated'
+        device.wakeOnLanEnabled = True
+        device.controllerKey    = 100  # PCI Controller
+        device.key              = -300 - unit
+        device.unitNumber       = unit
+        device.backing          = backing
+        device.deviceInfo       = deviceInfo
+        nicSpec = factory.create('ns0:VirtualDeviceConfigSpec')
+        nicSpec.operation     = 'add'
+        nicSpec.fileOperation = None
+        nicSpec.device        = device
+        return nicSpec
+
+    def _createDiskController(self, factory, key):
+        deviceInfo = self._client.factory.create('ns0:Description')
+        deviceInfo.label   = 'SCSI controller 0'
+        deviceInfo.summary = 'LSI Logic SAS'
+        controller = factory.create('ns0:VirtualLsiLogicSASController')
+        controller.busNumber  = 0
+        controller.key        = key
+        controller.sharedBus  = 'noSharing'
+        controller.deviceInfo = deviceInfo
+        controllerSpec = factory.create('ns0:VirtualDeviceConfigSpec')
+        controllerSpec.operation     = 'add'
+        controllerSpec.fileOperation = None
+        controllerSpec.device        = controller
+        return controllerSpec
+
+    def _createOptionValue(self, factory, key, value):
+        option = factory.create('ns0:OptionValue')
+        option.key   = key
+        option.value = value
+        return option
+
+    @validate_session
+    def copyFile(self, source, destination, wait=True):
+        task = self._client.service.CopyDatastoreFile_Task(_this = self._serviceContent.fileManager, sourceName = source, destinationName = destination)
+
+        if wait:
+            self.waitForTask(task)
+        return task
+        
+
     @validate_session
     def updateVM(self, vm, name, os, disks, kvmport, esxHost=None, wait=True):
         # The info we get passed in will overwrite whatever is currently on the machine
-        def createDisk(factory, key, disk, unit):
-            deviceInfo = factory.create('ns0:Description')
-            deviceInfo.label   = disk.get('disk_role', disk['iqn'])
-            deviceInfo.summary = 'Disk %s' % disk.get('disk_role', disk['iqn'])
-            backing = factory.create('ns0:VirtualDiskRawDiskMappingVer1BackingInfo')
-            backing.deviceName        = '/vmfs/devices/disks/%s' % disk['eui']
-            backing.compatibilityMode = 'virtualMode'
-            backing.diskMode          = 'persistent'
-            backing.fileName          = ''
-            backing.lunUuid           = disk['lun']
-            device = factory.create('ns0:VirtualDisk')
-            device.controllerKey = key
-            device.key           = -200 - unit
-            device.unitNumber    = unit
-            device.deviceInfo    = deviceInfo
-            device.backing       = backing
-            diskSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-            diskSpec.operation     = 'add'
-            diskSpec.fileOperation = 'create'
-            diskSpec.device        = device
-            return diskSpec
+        self._createDisk(factory, key,disk, unit)
 
         def createOptionValue(factory, key, value):
             option = factory.create('ns0:OptionValue')
@@ -329,7 +388,7 @@ class Sdk(object):
                 preferredController = controllers[0]
             for disk in disksToAdd:
                 # The remaining disks were not found, so we should add them
-                config.deviceChange.append(createDisk(self._client.factory, preferredController, disk, disk['index']))
+                config.deviceChange.append(self._createDisk(self._client.factory, preferredController, disk, disk['index']))
 
         # Change additional properties
         extraConfigs = [
@@ -337,7 +396,7 @@ class Sdk(object):
             ('RemoteDisplay.vnc.port', str(kvmport))
         ]
         for item in extraConfigs:
-            config.extraConfig.append(createOptionValue(self._client.factory, item[0], item[1]))
+            config.extraConfig.append(self._createOptionValue(self._client.factory, item[0], item[1]))
 
         task = self._client.service.ReconfigVM_Task(vm, config)
 
@@ -346,77 +405,7 @@ class Sdk(object):
         return task
 
     @validate_session
-    def createVM(self, name, cpus, memory, os, disks, nics, kvmport, esxHost=None, wait=False):
-        def createFileInfo(factory):
-            fileInfo = factory.create('ns0:VirtualMachineFileInfo')
-            fileInfo.vmPathName = '[%s]' % hostData['datastore'].name
-            return fileInfo
-
-        def createDiskController(factory, key):
-            deviceInfo = self._client.factory.create('ns0:Description')
-            deviceInfo.label   = 'SCSI controller 0'
-            deviceInfo.summary = 'LSI Logic SAS'
-            controller = factory.create('ns0:VirtualLsiLogicSASController')
-            controller.busNumber  = 0
-            controller.key        = key
-            controller.sharedBus  = 'noSharing'
-            controller.deviceInfo = deviceInfo
-            controllerSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-            controllerSpec.operation     = 'add'
-            controllerSpec.fileOperation = None
-            controllerSpec.device        = controller
-            return controllerSpec
-
-        def createDisk(factory, key, disk, unit):
-            deviceInfo = factory.create('ns0:Description')
-            deviceInfo.label   = disk.get('disk_role', disk['iqn'])
-            deviceInfo.summary = 'Disk %s' % disk.get('disk_role', disk['iqn'])
-            backing = factory.create('ns0:VirtualDiskRawDiskMappingVer1BackingInfo')
-            backing.deviceName        = '/vmfs/devices/disks/%s' % disk['eui']
-            backing.compatibilityMode = 'virtualMode'
-            backing.diskMode          = 'persistent'
-            backing.fileName          = ''
-            backing.lunUuid           = disk['lun']
-            device = factory.create('ns0:VirtualDisk')
-            device.controllerKey = key
-            device.key           = -200 - unit
-            device.unitNumber    = unit
-            device.deviceInfo    = deviceInfo
-            device.backing       = backing
-            diskSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-            diskSpec.operation     = 'add'
-            diskSpec.fileOperation = 'create'
-            diskSpec.device        = device
-            return diskSpec
-
-        def createNic(factory, nic, unit):
-            deviceInfo = factory.create('ns0:Description')
-            deviceInfo.label   = 'Nic [%s]' % nic['mac']
-            deviceInfo.summary = 'Nic [%s]' % nic['mac']
-            backing = factory.create('ns0:VirtualEthernetCardNetworkBackingInfo')
-            backing.network    = nic['network']
-            backing.deviceName = nic['bridge']
-            device = factory.create('ns0:VirtualE1000')
-            device.addressType      = 'Manual'
-            device.macAddress       = nic['mac']
-            device.wakeOnLanEnabled = True
-            device.controllerKey    = 100  # PCI Controller
-            device.key              = -300 - unit
-            device.unitNumber       = unit
-            device.backing          = backing
-            device.deviceInfo       = deviceInfo
-            nicSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-            nicSpec.operation     = 'add'
-            nicSpec.fileOperation = None
-            nicSpec.device        = device
-            return nicSpec
-
-        def createOptionValue(factory, key, value):
-            option = factory.create('ns0:OptionValue')
-            option.key   = key
-            option.value = value
-            return option
-
+    def createVM(self, name, cpus, memory, os, disks, nics, kvmport, datastore, esxHost=None, wait=False):
         esxHost = self._validateHost(esxHost)
         hostData = self._getHostData(esxHost)
 
@@ -428,10 +417,10 @@ class Sdk(object):
         config.guestId      = os
         config.deviceChange = []
         config.extraConfig  = []
-        config.files        = createFileInfo(self._client.factory)
+        config.files        = self._createFileInfo(self._client.factory, datastore)
 
         disk_controller_key = -101
-        config.deviceChange.append(createDiskController(self._client.factory, disk_controller_key))
+        config.deviceChange.append(self._createDiskController(self._client.factory, disk_controller_key))
 
         # Add disk devices
         iqnMapping = self._getHostIQNMapping(esxHost, rescan=True)
@@ -439,13 +428,14 @@ class Sdk(object):
             if disk['iqn'] in iqnMapping:
                 disk['eui'] = iqnMapping[disk['iqn']]['eui']
                 disk['lun'] = iqnMapping[disk['iqn']]['lun']
-                config.deviceChange.append(createDisk(self._client.factory, disk_controller_key, disk, disks.index(disk)))
+                config.deviceChange.append(self._createDisk(self._client.factory, disk_controller_key, disk, disks.index(disk)))
 
         # Add network
-        networks = [self._getObject(network) for network in hostData['network']]
+        #networks = [self._getObject(network) for network in hostData['network']]
         for nic in nics:
-            nic['network'] = [network.summary.network for network in networks if network.name == nic['bridge']][0]
-            config.deviceChange.append(createNic(self._client.factory, nic, nics.index(nic)))
+            #network = [network.summary.network for network in networks if network.name == nic['bridge']][0]
+            unit = nics.index(nic)
+            config.deviceChange.append(self._createNic(self._client.factory, 'VirtualE1000', 'Interface %s'%unit, '%s interface'%nic['bridge'], nic['bridge'], unit))
 
         # Change additional properties
         extraConfigs = [
@@ -467,7 +457,7 @@ class Sdk(object):
             ('pciBridge7.functions',       '8')
         ]
         for item in extraConfigs:
-            config.extraConfig.append(createOptionValue(self._client.factory, item[0], item[1]))
+            config.extraConfig.append(self._createOptionValue(self._client.factory, item[0], item[1]))
 
         task = self._client.service.CreateVM_Task(hostData['folder'],
                                                   config = config,
@@ -476,6 +466,66 @@ class Sdk(object):
         if wait:
             self.waitForTask(task)
         return task
+
+    @validate_session
+    def cloneVM(self, vmid, name, disks, esxHost=None, wait=True):
+        """
+        Clone a existing VM configuration
+        
+        @param vmid: unique id of the vm
+        @param name: name of the clone vm
+        @param disks: list of disks to use in vm configuration
+        @param kvmport: kvm port for the clone vm
+        @param esxHost: esx host identifier on which to clone the vm
+        @param wait: wait for task to complete or not (True/False) 
+        """
+        
+        esxHost = self._validateHost(esxHost)
+        hostData = self._getHostData(esxHost)
+        
+        sourceVMObject = self.exists(key=vmid)
+        if not sourceVMObject:
+            raise Exception("VM with key reference %s not found" % vmid)
+        sourceVM = self._getObject(sourceVMObject)
+        datastore = self._getObject(sourceVM.datastore[0][0])
+
+        # Build basic config information
+        config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
+        config.name         = name
+        config.numCPUs      = sourceVM.config.hardware.numCPU
+        config.memoryMB     = sourceVM.config.hardware.memoryMB
+        config.guestId      = sourceVM.config.guestId
+        config.deviceChange = []
+        config.extraConfig  = []
+        config.files        = self._createFileInfo(self._client.factory, datastore.name)
+
+        disk_controller_key = -101
+        config.deviceChange.append(self._createDiskController(self._client.factory, disk_controller_key))
+
+        # Add disk devices
+        for disk in disks:
+            config.deviceChange.append(self._createDisk(self._client.factory, disk_controller_key, disk, disks.index(disk), datastore))
+            self.copyFile('[{0}] {1}'.format(datastore.name, '%s.vmdk'%disk['name'].split('_')[-1]), '[{0}] {1}'.format(datastore.name, disk['backingdevice']))
+
+        # Add network
+        for device in sourceVM.config.hardware.device:
+            if hasattr(device, 'backing') and device.backing.__class__.__name__ == 'VirtualEthernetCardNetworkBackingInfo':
+                config.deviceChange.append(self._createNic(self._client.factory, device.__class__.__name__, device.deviceInfo.label, device.deviceInfo.summary, device.backing.deviceName, device.unitNumber))
+
+        # Copy additional properties
+        extraConfigsToSkip = ['nvram']
+        for item in sourceVM.config.extraConfig:
+            if not item.key in extraConfigsToSkip:
+                config.extraConfig.append(self._createOptionValue(self._client.factory, item.key, item.value))
+
+        task = self._client.service.CreateVM_Task(hostData['folder'],
+                                                  config = config,
+                                                  pool   = hostData['resourcePool'],
+                                                  host   = hostData['host'])
+        if wait:
+            self.waitForTask(task)
+        return task
+
 
     @validate_session
     def registerVM(self, vmxpath, esxHost=None, wait=False):

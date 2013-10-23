@@ -3,9 +3,10 @@ import logging
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import vDisk
+from ovs.dal.hybrids.vmachine import vMachine
 from ovs.dal.lists.vdisklist import vDiskList
-from volumedriver.daemon import VolumeDriver, Volume
-
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+vsrClient = VolumeStorageRouterClient().load()
 
 class VDiskController(object):
     #celery = Celery('tasks')
@@ -16,7 +17,7 @@ class VDiskController(object):
         """
         List all known volumes
         """
-        response = VolumeDriver.listVolumes()
+        response = vsrClient.listVolumes()
         return response
 
     @celery.task(name='ovs.disk.getInfo')
@@ -27,7 +28,7 @@ class VDiskController(object):
         @param diskguid: Guid of the disk
         """
         diskguid = kwargs['diskguid']
-        response = Volume.info(diskguid)
+        response = vsrClient.info(diskguid)
         return response
 
     @celery.task(name='ovs.disk.create')
@@ -35,22 +36,37 @@ class VDiskController(object):
         """
         Create a new disk
 
-        @param diskguid: Guid of the new disk to create
+        @param vpool: name of the vpool
+                      vpool is served by one or more storagerouter APPLICATION,
+                      this application contains the information where the storagerouterclient should connect to
+        @param name: name of the disk
+        @param location: location where virtual device should be created (eg: myVM)
+        @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
         @param size: Size of the disk in MiB
         @param maxSize: Maximum size of allowed non disposable SCO's
+        @param machineguid: guid of the machine to assign the disk to
         """
-        diskguid = kwargs['diskguid']
+        location = kwargs['location']
+        devicename = kwargs['devicename']
         size = kwargs['size']
-        maxSize = kwargs.get('maxSize', '338')
-        Volume.create(uniqueVolumeIdentifier = diskguid,
-                      volumeSize             = '%sMiB'%size,
-                      scoMultiplier          = 1024)
-        Volume.attach(name)
-        Volume.setSCOCacheLimits(uniqueVolumeIdentifier = name,
-                                 minSize                = '0B',
-                                 maxNonDisposableSize   = '%sMiB'%maxSize)
-        kwargs['result'] = Volume.getDevice(name)
-        vDisk(guid).save()
+        name = kwargs.get('name', devicename)
+        description = '{0} {1}'.format(location, name)
+        machineguid = kwargs.get('machineguid', None)
+        volumeid = vsrClient.create(targetPath = '{0}/{1}'.format(location, devicename),
+                                    volumeSize = '%sMiB'%size,
+                                    scoMultiplier = 1024)
+#        Volume.attach(name)
+#         Volume.setSCOCacheLimits(uniqueVolumeIdentifier = name,
+#                                  minSize                = '0B',
+#                                  maxNonDisposableSize   = '%sMiB'%maxSize)
+#        kwargs['result'] = Volume.getDevice(name)
+        disk = vDisk()
+        disk.name = name
+        disk.description = description
+        disk.devicename = devicename
+        disk.volumeid = volumeid
+        disk.machine = vMachine(machineguid) if machineguid else None
+        disk.save()
         return kwargs
 
     @celery.task(name='ovs.disk.delete')
@@ -61,39 +77,47 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         diskguid = kwargs['diskguid']
-        logging.info('Delete disk %s'%guid )
-        if name in VolumeDriver.listVolumes():
-            if Volume.info()['attached']:
-                Volume.detach(uniqueVolumeIdentifier = guid)
-            Volume.destroy(uniqueVolumeIdentifier = guid,
-                           force = True,
-                           migrateCacheToParent = False)
-        vDisk(guid).delete()
+        disk = vDisk(diskguid)
+        logging.info('Delete disk %s'%disk.name)
+        #if disk.volumeid in vsrClient.listVolumes():
+            #if Volume.info()['attached']:
+            #    Volume.detach(uniqueVolumeIdentifier = guid)
+            #vsrClient.destroy(uniqueVolumeIdentifier = disk.volumeid)
+        disk.delete()
         return kwargs
 
     @celery.task(name='ovs.disk.clone')
     def clone(*args, **kwargs):
         """
         Clone a disk
-
+        
+        @param location: location where virtual device should be created (eg: myVM)
+        @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
         @param parentdiskguid: guid of the disk
-        @param snapshotguid: guid of the snapshot
-        @param devicepath: path to the disk
+        @param snapshotid: guid of the snapshot
+        @param machineguid: guid of the machine to assign disk to
         """
         diskguid = kwargs['parentdiskguid']
-        snapshotguid = kwargs['snapshotguid']
-        devicepath = kwargs['devicepath']
+        snapshotid = kwargs['snapshotid']
+        location = kwargs['location']
+        devicename = kwargs['devicename']
         machineguid = kwargs.get('machineguid', None)
+        description = '{0} {1}'.format(location, devicename.replace('-flat', ''))
         propertiesToClone = ['description', 'size', 'vpoolguid', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
-
-        logging.info('Clone snapshot %s of disk %s'%(snapshot, name))
+        
         newDisk = vDisk()
         disk = vDisk(diskguid)
-        Volume.clone(diskguid, snapshotguid, newDisk.guid, devicepath)
+        logging.info('Clone snapshot %s of disk %s'%(snapshotid, disk.name))
+        volumeid = vsrClient.clone('{0}/{1}'.format(location, devicename), disk.volumeid, snapshotid)
         for property in propertiesToClone:
             setattr(newDisk, property, getattr(disk, property))
         disk.children.append(newDisk.guid)
         disk.save()
+        newDisk.name = '%s-clone'%disk.name
+        newDisk.description = description
+        newDisk.volumeid = volumeid
+        newDisk.devicename = devicename
+        newDisk.parentsnapshot = snapshotid
         newDisk.machine = vMachine(machineguid) if machineguid else disk.machine
         newDisk.save()
         kwargs['result'] = newDisk.guid
@@ -107,11 +131,11 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         diskguid = kwargs['diskguid']
-        snapshotguid = uuid.uuid4()
-        logging.info('Create snapshot %s on disk %s'%(snapshotguid, diskguid))
-        if not Volume.canTakeSnapshot(diskguid):
-            raise ValueError('Volume %s not found'%diskguid)
-        Volume.snapShotCreate(diskguid, snapshotguid)
+        disk = vDisk(diskguid)
+        logging.info('Create snapshot for disk %s'%(disk.name))
+        #if not srClient.canTakeSnapshot(diskguid):
+        #    raise ValueError('Volume %s not found'%diskguid)
+        snapshotguid = vsrClient.snapShotCreate(disk.volumeid)
         kwargs['result'] = snapshotguid
         return kwargs
 
@@ -127,33 +151,7 @@ class VDiskController(object):
         to block it from being deleted if a clone was created from it.
         """
         diskguid = kwargs['diskguid']
-        snapshotguid = kwargs['snapshotguid']
+        snapshotid = kwargs['snapshotid']
         logging.info('Delete snapshot %s from disk %s'%(snapshotguid, diskguid))
-        Volume.snapShotDestroy(diskguid, snapshotguid)
+        vsrClient.snapShotDestroy(disk.volumeid, snapshotid)
         return kwargs
-
-    @celery.task(name='ovs.disk.listSnapshots')
-    def listSnapshot(*args, **kwargs):
-        """
-        List snapshots of a disk
-        """
-        diskguid = kwargs['diskguid']
-        logging.info('List snapshots from disk %s'%diskguid)
-        Volume.listSnapshots(diskguid)
-        return kwargs
-
-    @celery.task(name='ovs.disk.createDiskChain')
-    def exampleCreateChain(*args, **kwargs):
-        a = addNameSpace.s(*args, **kwargs)
-        a.link_error(deleteNameSpace.s(**kwargs))
-        b = createVolume.s(**kwargs)
-        b.link_error(removeVolumeChain(**kwargs))
-        c = echo.s('Succesful created %s'%kwargs)
-        return chain(a,b)
-
-    @celery.task(name='ovs.disk.deleteDiskChain')
-    def exampleDeleteChain(*args, **kwargs):
-        a = deleteVolume.s(*args, **kwargs)
-        b = deleteNameSpace.s(**kwargs)
-        c = echo.s('Succesful deleted %s'%kwargs)
-        return chain(a,b)

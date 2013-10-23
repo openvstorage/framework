@@ -11,7 +11,9 @@ from ovs import celeryconfig
 celery = Celery('ovs',
                 include=['ovs.lib.dummy',
                          'ovs.lib.vdisk',
-                         'ovs.lib.user'])
+                         'ovs.lib.machine'
+                         'ovs.lib.user',
+                         'ovs.hypervisor.hypervisors.vmware'])
 celery.config_from_object(celeryconfig)
 
 if __name__ == '__main__':
