@@ -8,7 +8,10 @@ class vDisk(DataObject):
                   'size' : 100,
                   'vpoolguid' : None, #BACKEND
                   'type' : 'DSSVOL',
-                  'devicepath' : '123456789.vmdk',
+                  'role' : 'BOOT', # BOOT, DATA, TEMP
+                  'devicename' : '123456789-flat.vmdk',
+                  'order' : None,
+                  'volumeid' : None,
                   'parentsnapshot' : None,
                   'children' : [],
                   'retentionpolicyguid' : None,
@@ -52,8 +55,3 @@ class vDisk(DataObject):
             return 'ATTACHED'
         return self._backend_property(get_data)
 
-    @property
-    def volumedriverid(self):
-        def get_data():
-            return 1
-        return self._backend_property(get_data)
