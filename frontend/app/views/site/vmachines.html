@@ -7,7 +7,10 @@
                 <td data-bind="text: name"></td>
                 <td data-bind="text: vdisks().length"></td>
                 <td>
-                    <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand icon icon-copy"></i>
+                    <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
+                </td>
+                <td>
+                    <i data-bind="click: function() { $root.deletevm($data.guid()); }"  class="hand glyphicon glyphicon-trash"></i>
                 </td>
             </tr>
         </table>

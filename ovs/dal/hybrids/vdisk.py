@@ -1,14 +1,15 @@
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vmachine import vMachine
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
 class vDisk(DataObject):
     _blueprint = {'name' : None,  # All persistent stored fields, with default value
                   'description' : 'Test disk',
                   'size' : 100,
-                  'vpoolguid' : None, #BACKEND
+                  'vpoolguid' : None,  #BACKEND
                   'type' : 'DSSVOL',
-                  'role' : 'BOOT', # BOOT, DATA, TEMP
+                  'role' : 'BOOT',  # BOOT, DATA, TEMP
                   'devicename' : '123456789-flat.vmdk',
                   'order' : None,
                   'volumeid' : None,
@@ -23,12 +24,13 @@ class vDisk(DataObject):
                   'autobackup' : False}
     _relations = {'machine': (vMachine, 'disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
-               'snapshots': 10,
+               'snapshots': 60,
                'status': 30,
                'volumedriverid': 30}
 
-    def __str__(self):
-        return str(self._data)
+    def __init__(self, guid=None, data=None, datastore_wins=False):
+        self._vsrClient = VolumeStorageRouterClient().load()
+        super(vDisk, self).__init__(guid=guid, data=data, datastore_wins=datastore_wins)
 
     @property
     def used_size(self):
@@ -41,12 +43,7 @@ class vDisk(DataObject):
     @property
     def snapshots(self):
         def get_data():
-            # Simulate fetching real data
-            from random import randint
-            snapshots = []
-            for i in xrange(0, randint(1, 10)):
-                snapshots.append({'consistent': randint(0, 1) == 1, 'id': i})
-            return snapshots
+            return self._vsrClient.listSnapShots(self.volumeid)
         return self._backend_property(get_data)
 
     @property

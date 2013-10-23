@@ -1,8 +1,8 @@
 ﻿define([
-    'durandal/app',
+    'durandal/app', 'plugins/dialog',
     'ovs/shared', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/refresher',
-    '../containers/vmachine'
-], function (app, shared, ko, generic, authentication, Refresher, VMachine) {
+    '../containers/vmachine', '../wizards/clone/index'
+], function (app, dialog, shared, ko, generic, authentication, Refresher, VMachine, CloneWizard) {
     "use strict";
     return function () {
         var self = this;
@@ -18,6 +18,7 @@
         self.vmachine_headers = [
             { key: 'name',    value: 'Name',   width: 300 },
             { key: undefined, value: 'Disks',  width: undefined },
+            { key: undefined, value: '&nbsp;', width: 35 },
             { key: undefined, value: '&nbsp;', width: 35 }
         ];
         self.vmachines = ko.observableArray([]);
@@ -65,8 +66,43 @@
             var i, vms = self.vmachines();
             for (i = 0; i < vms.length; i += 1) {
                 if (vms[i].guid() === guid) {
-                    generic.alert_error('Unsupported', 'Cloning is not yet supported for: ' + vms[i].name());
+                    dialog.show(new CloneWizard({
+                        modal: true,
+                        machineguid: guid
+                    }));
                 }
+            }
+        };
+        self.deletevm = function(guid) {
+            var i, vms = self.vmachines();
+            for (i = 0; i < vms.length; i += 1) {
+                (function(i) {
+                    if (vms[i].guid() === guid) {
+                        app.showMessage('Are you sure you want to delete "' + vms[i].name() + '"?', 'Are you sure?', ['Yes', 'No'])
+                            .done(function (answer) {
+                                if (answer === 'Yes') {
+                                    $.ajax('/api/internal/vmachines/' + vms[i].guid() + '/?timestamp=' + generic.gettimestamp(), {
+                                        type: 'DELETE',
+                                        contentType: 'application/json',
+                                        data: JSON.stringify({}),
+                                        headers: {
+                                            'Authorization': authentication.header(),
+                                            'X-CSRFToken': generic.get_cookie('csrftoken')
+                                        }
+                                    })
+                                        .done(function (data) {
+                                            generic.alert_success('Machine ' + vms[i].name() + ' deleted.');
+                                        })
+                                        .fail(function (xmlHttpRequest) {
+                                            // We check whether we actually received an error, and it's not the browser navigating away
+                                            if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                                                generic.alert_error('Machine ' + vms[i].name() + ' deletion failed.');
+                                            }
+                                        });
+                                }
+                            });
+                    }
+                }(i));
             }
         };
 

@@ -10,6 +10,3 @@ class pMachine(DataObject):
                   'ip'         : None}
     _relations = {}
     _expiry = {}
-
-    def __str__(self):
-        return str(self._data)

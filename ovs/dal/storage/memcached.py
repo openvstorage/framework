@@ -15,8 +15,8 @@ class MemcacheWrapper(object):
     def get(self, key):
         return self._client.get(str(key))
 
-    def set(self, key, value):
-        return self._client.set(str(key), value)
+    def set(self, key, value, time=0):
+        return self._client.set(str(key), value, time)
 
     def delete(self, key):
         return self._client.delete(str(key))

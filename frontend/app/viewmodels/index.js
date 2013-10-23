@@ -11,7 +11,6 @@
                                 { route: '',            moduleId: 'dashboard',   hash: '#full',             title: 'Dashboard',   nav: true  },
                                 { route: 'statistics',  moduleId: 'statistics',  hash: '#full/statistics',  title: 'Statistics',  nav: true  },
                                 { route: 'vmachines',   moduleId: 'vmachines',   hash: '#full/vmachines',   title: 'vMachines',   nav: true  },
-                                { route: 'clone', moduleId: '../wizards/clone/index', hash: '#full/clone', title: 'Clone', nav: true },
                                 // Non-navigation routes
                                 { route: 'login',       moduleId: 'login',       hash: '#full/login',       title: 'Login',       nav: false }
                             ])

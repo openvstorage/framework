@@ -419,4 +419,4 @@ class DataObject(StoredObject):
             lock.release()
 
     def __str__(self):
-        return str(self._data)
+        return str(self.serialize())
