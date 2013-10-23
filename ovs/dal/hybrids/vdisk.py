@@ -2,6 +2,8 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vmachine import vMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
+_vsrClient = VolumeStorageRouterClient().load()
+
 
 class vDisk(DataObject):
     _blueprint = {'name' : None,  # All persistent stored fields, with default value
@@ -28,10 +30,6 @@ class vDisk(DataObject):
                'status': 30,
                'volumedriverid': 30}
 
-    def __init__(self, guid=None, data=None, datastore_wins=False):
-        self._vsrClient = VolumeStorageRouterClient().load()
-        super(vDisk, self).__init__(guid=guid, data=data, datastore_wins=datastore_wins)
-
     @property
     def used_size(self):
         def get_data():
@@ -43,7 +41,7 @@ class vDisk(DataObject):
     @property
     def snapshots(self):
         def get_data():
-            return self._vsrClient.listSnapShots(self.volumeid)
+            return _vsrClient.listSnapShots(self.volumeid)
         return self._backend_property(get_data)
 
     @property
