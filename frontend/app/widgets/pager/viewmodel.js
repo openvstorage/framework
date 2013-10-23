@@ -1,10 +1,11 @@
-define(['knockout', 'ovs/generic'], function(ko, generic) {
+define(['knockout', 'ovs/generic', 'ovs/refresher'], function(ko, generic, Refresher) {
     "use strict";
     return function () {
         var self = this;
 
         self.viewport_indexes = [];
         self.viewport_shower = undefined;
+        self.refresher = new Refresher();
         self.internal_current = ko.observable(1);
 
         self.headers = ko.observableArray([]);
@@ -92,6 +93,14 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 }
             }
         };
+        self.viewport_refresh = function() {
+            var i, items = self.viewport_items();
+            for (i = 0; i < items.length; i += 1) {
+                if (self.enter_viewport !== undefined) {
+                    items[i][self.enter_viewport]();
+                }
+            }
+        };
 
         self.activate = function (settings) {
             if (!settings.hasOwnProperty('items')) {
@@ -102,10 +111,22 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
 
             self.enter_viewport = generic.tryget(settings, 'enter_viewport');
+            self.refresh = generic.tryget(settings, 'viewport_refresh');
             self.settings(settings);
             self.headers(settings.headers);
             self.pagesize(settings.pagesize);
             self.controls(generic.tryget(settings, 'controls', true));
+
+            if (self.refresh !== undefined) {
+                self.refresher.init(self.viewport_refresh, self.refresh);
+                self.refresher.start();
+                settings.bindingContext.$root.widgets.push(self);
+            }
+        };
+        self.deactivate = function() {
+            if (self.refresh !== undefined) {
+                self.refresher.stop();
+            }
         };
     };
 });

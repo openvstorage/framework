@@ -24,13 +24,12 @@ define([
         // Durandal
         self.canActivate = function() { return authentication.validate(); };
         self.activate = function () {
-            self.refresher.init('statistics', self.refresh, 1000);
-            app.trigger('statistics.refresher:run');
-            app.trigger('statistics.refresher:start');
+            self.refresher.init(self.refresh, 1000);
+            self.refresher.run();
+            self.refresher.start();
         };
         self.deactivate = function () {
-            app.trigger('statistics.refresher:stop');
-            self.refresher.destroy();
+            self.refresher.stop();
         };
     };
 });

@@ -10,6 +10,7 @@
         // System
         self.shared = shared;
         self.refresher = new Refresher();
+        self.widgets = [];
 
         // Data
         self.displayname = 'vMachines';
@@ -109,13 +110,16 @@
         // Durandal
         self.canActivate = function() { return authentication.validate(); };
         self.activate = function () {
-            self.refresher.init('vmachine', self.load, 5000);
-            app.trigger('vmachine.refresher:run');
-            app.trigger('vmachine.refresher:start');
+            self.refresher.init(self.load, 5000);
+            self.refresher.run();
+            self.refresher.start();
         };
         self.deactivate = function () {
-            app.trigger('vmachine.refresher:stop');
-            self.refresher.destroy();
+            var i;
+            for (i = 0; i < self.widgets.length; i += 2) {
+                self.widgets[i].deactivate();
+            }
+            self.refresher.stop();
         };
     };
 });

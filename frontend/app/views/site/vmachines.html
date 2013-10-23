@@ -1,7 +1,8 @@
 ﻿<section>
     <h2><span data-bind="html: displayname"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
-    <div data-bind="pager: { items: vmachines, headers: vmachine_headers, pagesize: 10, enter_viewport: 'load', controls: true }">
+    <div data-bind="pager: { items: vmachines, headers: vmachine_headers, pagesize: 10,
+                             enter_viewport: 'load', viewport_refresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td data-bind="text: name"></td>
