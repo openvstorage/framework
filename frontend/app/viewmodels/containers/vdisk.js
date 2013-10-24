@@ -1,4 +1,4 @@
-define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication'], function ($, ko, generic, authentication) {
+define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api'], function ($, ko, generic, authentication, api) {
     "use strict";
     return function (data) {
         var self = this;
@@ -21,13 +21,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication'], function ($,
                 if (self.load_handle !== undefined) {
                     self.load_handle.abort();
                 }
-                self.load_handle = $.ajax('/api/internal/vdisks/' + self.guid() + '/?timestamp=' + generic.gettimestamp(), {
-                    type: 'get',
-                    contentType: 'application/json',
-                    headers: {
-                        'Authorization': authentication.header()
-                    }
-                })
+                self.load_handle = api.get('vdisks/' + self.guid())
                 .done(function (data) {
                     self.name(data.name);
                     self.order(data.order);

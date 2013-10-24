@@ -21,7 +21,7 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
                             'password': password
                         }),
                         contentType: 'application/json',
-                        headers: { 'X-CSRFToken': self.getCSRFToken() }
+                        headers: { 'X-CSRFToken': generic.get_cookie('csrftoken') }
                     })
                     .done(function(result) {
                         self.token = result.token;
@@ -59,9 +59,6 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
             header: function () {
                 var self = this;
                 return 'Token ' + self.token;
-            },
-            getCSRFToken: function () {
-                return generic.get_cookie('csrftoken');
             }
         };
     };

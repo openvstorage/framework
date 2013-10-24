@@ -1,4 +1,4 @@
-define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'viewmodels/containers/vdisk'], function ($, ko, generic, authentication, VDisk) {
+define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api', 'viewmodels/containers/vdisk'], function ($, ko, generic, authentication, api, VDisk) {
     "use strict";
     return function (guid) {
         var self = this;
@@ -19,13 +19,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'viewmodels/c
                 if (self.load_vdisks_handle !== undefined) {
                     self.load_vdisks_handle.abort();
                 }
-                self.load_vdisks_handle = $.ajax('/api/internal/vdisks/?vmachineguid=' + self.guid() + '&timestamp=' + generic.gettimestamp(), {
-                    type: 'get',
-                    contentType: 'application/json',
-                    headers: {
-                        'Authorization': authentication.header()
-                    }
-                })
+                self.load_vdisks_handle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
                 .done(function (data) {
                     var i, item;
                     for (i = 0; i < data.length; i += 1) {
@@ -47,13 +41,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'viewmodels/c
                     if (self.load_handle !== undefined) {
                         self.load_handle.abort();
                     }
-                    self.load_handle = $.ajax('/api/internal/vmachines/' + self.guid() + '/?timestamp=' + generic.gettimestamp(), {
-                        type: 'get',
-                        contentType: 'application/json',
-                        headers: {
-                            'Authorization': authentication.header()
-                        }
-                    })
+                    self.load_handle = api.get('vmachines/' + self.guid())
                     .done(function (data) {
                         self.name(data.name);
                         deferred.resolve();

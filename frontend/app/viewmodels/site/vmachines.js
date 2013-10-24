@@ -1,8 +1,8 @@
 ﻿define([
     'durandal/app', 'plugins/dialog',
-    'ovs/shared', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/refresher',
+    'ovs/shared', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/refresher', 'ovs/api',
     '../containers/vmachine', '../wizards/clone/index'
-], function (app, dialog, shared, ko, generic, authentication, Refresher, VMachine, CloneWizard) {
+], function (app, dialog, shared, ko, generic, authentication, Refresher, api, VMachine, CloneWizard) {
     "use strict";
     return function () {
         var self = this;
@@ -34,13 +34,7 @@
                 if (self.load_vmachines_handle !== undefined) {
                     self.load_vmachines_handle.abort();
                 }
-                self.load_vmachines_handle = $.ajax('/api/internal/vmachines/?timestamp=' + generic.gettimestamp(), {
-                    type: 'get',
-                    contentType: 'application/json',
-                    headers: {
-                        'Authorization': authentication.header()
-                    }
-                })
+                self.load_vmachines_handle = api.get('vmachines')
                 .done(function (data) {
                     var i, item, guids = [];
                     for (i = 0; i < data.length; i += 1) {
@@ -82,24 +76,16 @@
                         app.showMessage('Are you sure you want to delete "' + vms[i].name() + '"?', 'Are you sure?', ['Yes', 'No'])
                             .done(function (answer) {
                                 if (answer === 'Yes') {
-                                    $.ajax('/api/internal/vmachines/' + vms[i].guid() + '/?timestamp=' + generic.gettimestamp(), {
-                                        type: 'DELETE',
-                                        contentType: 'application/json',
-                                        data: JSON.stringify({}),
-                                        headers: {
-                                            'Authorization': authentication.header(),
-                                            'X-CSRFToken': generic.get_cookie('csrftoken')
-                                        }
+                                    api.del('vmachines/' + vms[i].guid())
+                                    .done(function (data) {
+                                        generic.alert_success('Machine ' + vms[i].name() + ' deleted.');
                                     })
-                                        .done(function (data) {
-                                            generic.alert_success('Machine ' + vms[i].name() + ' deleted.');
-                                        })
-                                        .fail(function (xmlHttpRequest) {
-                                            // We check whether we actually received an error, and it's not the browser navigating away
-                                            if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                                                generic.alert_error('Machine ' + vms[i].name() + ' deletion failed.');
-                                            }
-                                        });
+                                    .fail(function (xmlHttpRequest) {
+                                        // We check whether we actually received an error, and it's not the browser navigating away
+                                        if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                                            generic.alert_error('Machine ' + vms[i].name() + ' deletion failed.');
+                                        }
+                                    });
                                 }
                             });
                     }

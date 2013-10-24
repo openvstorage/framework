@@ -1,7 +1,7 @@
 define([
     'knockout',
-    './data', 'ovs/authentication', 'ovs/generic'
-], function(ko, data, authentication, generic) {
+    './data', 'ovs/authentication', 'ovs/generic', 'ovs/api'
+], function(ko, data, authentication, generic, api) {
     "use strict";
     return function () {
         var self = this;
@@ -18,15 +18,7 @@ define([
                 for (i = 0; i < disks.length; i += 1) {
                     data.disks[disks[i].guid()] = disks[i].selected_snapshot();
                 }
-                $.ajax('/api/internal/vmachines/' + vm.guid() + '/clone/?timestamp=' + generic.gettimestamp(), {
-                    type: 'post',
-                    contentType: 'application/json',
-                    data: JSON.stringify(data),
-                    headers: {
-                        'Authorization': authentication.header(),
-                        'X-CSRFToken': generic.get_cookie('csrftoken')
-                    }
-                })
+                api.post('vmachines/' + vm.guid() + '/clone', data)
                 .done(function (data) {
                     deferred.resolve(data);
                 })
