@@ -21,9 +21,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api'], f
 
         // Functions
         self.refresh = function () {
-            if (self.refresh_handle !== undefined) {
-                self.refresh_handle.abort();
-            }
+            generic.xhr_abort(self.refresh_handle);
             self.refresh_handle = api.get('statistics/memcache')
             .done(function (data) {
                 self.bytes(generic.get_bytes_human(data.bytes));

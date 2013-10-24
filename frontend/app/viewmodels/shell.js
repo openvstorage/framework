@@ -1,4 +1,7 @@
-﻿define(['plugins/router', 'durandal/app', 'ovs/shared', 'bootstrap'], function (router, app, shared) {
+﻿define([
+    'plugins/router', 'durandal/app', 'bootstrap',
+    'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks'
+], function (router, app, bootstrap, shared, Messaging, generic, Tasks) {
     "use strict";
     router.map([
                { route: '',              moduleId: 'viewmodels/redirect',   nav: false },
@@ -7,9 +10,15 @@
           .mapUnknownRoutes('viewmodels/404')
           .activate();
 
-    return {
-        shared: shared,
-        router: router,
-        activate: function () { }
+    return function() {
+        var self = this;
+
+        self.shared = shared;
+        self.router = router;
+        self.activate = function () {
+            self.shared.messaging = new Messaging();
+            self.shared.messaging.start();
+            self.shared.tasks = new Tasks();
+        };
     };
 });

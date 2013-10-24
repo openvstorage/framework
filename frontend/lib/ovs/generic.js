@@ -56,6 +56,24 @@ define(function() {
     function alert_error(title, message) {
         alert(title, message, 'error');
     }
+    function keys(object) {
+        var all_keys = [], key;
+        for (key in object) {
+            if (object.hasOwnProperty(key)) {
+                all_keys.push(key);
+            }
+        }
+        return all_keys;
+    }
+    function xhr_abort(token) {
+        if (token !== undefined && token.state() === 'pending') {
+            try {
+                token.abort();
+            } catch (error) {
+                // Ignore these errors
+            }
+        }
+    }
 
     return {
         gettimestamp   : gettimestamp,
@@ -66,6 +84,8 @@ define(function() {
         alert          : alert,
         alert_info     : alert_info,
         alert_success  : alert_success,
-        alert_error    : alert_error
+        alert_error    : alert_error,
+        keys           : keys,
+        xhr_abort      : xhr_abort
     };
 });

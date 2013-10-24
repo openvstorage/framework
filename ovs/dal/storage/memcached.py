@@ -12,8 +12,9 @@ class MemcacheWrapper(object):
         self._nodes = nodes
         self._client = memcache.Client(self._nodes)
 
-    def get(self, key):
-        return self._client.get(str(key))
+    def get(self, key, default=None):
+        value = self._client.get(str(key))
+        return value if value is not None else default
 
     def set(self, key, value, time=0):
         return self._client.set(str(key), value, time)

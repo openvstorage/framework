@@ -35,7 +35,7 @@ class TaskViewSet(viewsets.ViewSet):
                 'successful': result.successful(),
                 'failed'    : result.failed(),
                 'ready'     : result.ready(),
-                'result'    : result.result}
+                'result'    : result.result if result.successful() else result.result.message}
         return Response(data, status=status.HTTP_200_OK)
 
     @link()

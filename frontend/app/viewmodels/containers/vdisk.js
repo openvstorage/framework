@@ -18,9 +18,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api'], f
         // Functions
         self.load = function () {
             return $.Deferred(function (deferred) {
-                if (self.load_handle !== undefined) {
-                    self.load_handle.abort();
-                }
+                generic.xhr_abort(self.load_handle);
                 self.load_handle = api.get('vdisks/' + self.guid())
                 .done(function (data) {
                     self.name(data.name);

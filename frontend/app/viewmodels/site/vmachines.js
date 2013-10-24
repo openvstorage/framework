@@ -31,9 +31,7 @@
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
-                if (self.load_vmachines_handle !== undefined) {
-                    self.load_vmachines_handle.abort();
-                }
+                generic.xhr_abort(self.load_vmachines_handle);
                 self.load_vmachines_handle = api.get('vmachines')
                 .done(function (data) {
                     var i, item, guids = [];
@@ -71,25 +69,23 @@
         self.deletevm = function(guid) {
             var i, vms = self.vmachines();
             for (i = 0; i < vms.length; i += 1) {
-                (function(i) {
-                    if (vms[i].guid() === guid) {
-                        app.showMessage('Are you sure you want to delete "' + vms[i].name() + '"?', 'Are you sure?', ['Yes', 'No'])
+                (function(vm) {
+                    if (vm.guid() === guid) {
+                        app.showMessage('Are you sure you want to delete "' + vm.name() + '"?', 'Are you sure?', ['Yes', 'No'])
                             .done(function (answer) {
                                 if (answer === 'Yes') {
-                                    api.del('vmachines/' + vms[i].guid())
-                                    .done(function (data) {
-                                        generic.alert_success('Machine ' + vms[i].name() + ' deleted.');
+                                    api.del('vmachines/' + vm.guid())
+                                    .then(self.shared.tasks.wait)
+                                    .done(function () {
+                                        generic.alert_success('Machine ' + vm.name() + ' deleted.');
                                     })
-                                    .fail(function (xmlHttpRequest) {
-                                        // We check whether we actually received an error, and it's not the browser navigating away
-                                        if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                                            generic.alert_error('Machine ' + vms[i].name() + ' deletion failed.');
-                                        }
+                                    .fail(function (error) {
+                                        generic.alert_success('Machine ' + vm.name() + ' could not be deleted: ' + error);
                                     });
                                 }
                             });
                     }
-                }(i));
+                }(vms[i]));
             }
         };
 

@@ -16,9 +16,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api', 'v
         // Functions
         self.load_disks = function () {
             return $.Deferred(function (deferred) {
-                if (self.load_vdisks_handle !== undefined) {
-                    self.load_vdisks_handle.abort();
-                }
+                generic.xhr_abort(self.load_vdisks_handle);
                 self.load_vdisks_handle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
                 .done(function (data) {
                     var i, item;
@@ -38,9 +36,7 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api', 'v
             return $.when.apply($, [
                 self.load_disks(),
                 $.Deferred(function (deferred) {
-                    if (self.load_handle !== undefined) {
-                        self.load_handle.abort();
-                    }
+                    generic.xhr_abort(self.load_handle);
                     self.load_handle = api.get('vmachines/' + self.guid())
                     .done(function (data) {
                         self.name(data.name);

@@ -11,15 +11,25 @@ define(['ovs/authentication', 'ovs/generic'], function(authentication, generic) 
             }
         }
 
-        return $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), {
-            type: type,
-            contentType: 'application/json',
-            data: JSON.stringify(data),
-            headers: {
-                'Authorization': authentication.header(),
-                'X-CSRFToken': generic.get_cookie('csrftoken')
-            }
-        });
+        return $.Deferred(function (deferred) {
+            $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), {
+                type: type,
+                timeout: 1000 * 60 * 60,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                headers: {
+                    'Authorization': authentication.header(),
+                    'X-CSRFToken': generic.get_cookie('csrftoken')
+                }
+            })
+            .done(deferred.resolve)
+            .fail(function (xmlHttpRequest, textStatus, errorThrown) {
+                // We check whether we actually received an error, and it's not the browser navigating away
+                if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                    deferred.reject(xmlHttpRequest, textStatus, errorThrown);
+                }
+            });
+        }).promise();
     }
     function get(api, data, filter) {
         return call(api, data, filter, 'GET');

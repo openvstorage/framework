@@ -1,11 +1,12 @@
 define([
     'knockout',
-    './data', 'ovs/authentication', 'ovs/generic', 'ovs/api'
-], function(ko, data, authentication, generic, api) {
+    './data', 'ovs/shared', 'ovs/authentication', 'ovs/generic', 'ovs/api'
+], function(ko, data, shared, authentication, generic, api) {
     "use strict";
     return function () {
         var self = this;
 
+        self.shared = shared;
         self.data = data;
         self.can_continue = ko.observable({value: true, reason: undefined});
 
@@ -19,14 +20,17 @@ define([
                     data.disks[disks[i].guid()] = disks[i].selected_snapshot();
                 }
                 api.post('vmachines/' + vm.guid() + '/clone', data)
-                .done(function (data) {
+                .then(function (data) {
                     deferred.resolve(data);
+                    generic.alert_info('Machine ' + vm.name() + ' cloning in progress...');
+                    return data;
                 })
-                .fail(function (xmlHttpRequest) {
-                    // We check whether we actually received an error, and it's not the browser navigating away
-                    if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                        deferred.reject();
-                    }
+                .then(self.shared.tasks.wait)
+                .done(function () {
+                    generic.alert_success('Machine ' + vm.name() + ' cloned successfully to ' + self.data.name());
+                })
+                .fail(function (error) {
+                    generic.alert_error('Error while cloning ' + vm.name() + ': ' + error);
                 });
             }).promise();
         };
