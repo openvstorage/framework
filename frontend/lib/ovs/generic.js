@@ -30,7 +30,7 @@ define(function() {
                 }
             }
         }
-        return '';
+        return undefined;
     }
     function tryGet(object, key, fallback) {
         if (object !== undefined && object.hasOwnProperty(key)) {

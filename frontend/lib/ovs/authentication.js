@@ -17,15 +17,20 @@ define([
             login: function (username, password) {
                 var self = this;
                 return $.Deferred(function (deferred) {
-                    $.ajax('/api/auth/', {
-                        type: 'post',
-                        data: ko.toJSON({
-                            'username': username,
-                            'password': password
-                        }),
-                        contentType: 'application/json',
-                        headers: { 'X-CSRFToken': generic.getCookie('csrftoken') }
-                    })
+                    var callData = {
+                            type: 'post',
+                            data: ko.toJSON({
+                                'username': username,
+                                'password': password
+                            }),
+                            contentType: 'application/json',
+                            headers: {}
+                        },
+                        cookie = generic.getCookie('csrftoken');
+                    if (cookie !== undefined) {
+                        callData.headers['X-CSRFToken'] = cookie;
+                    }
+                    $.ajax('/api/auth/', callData)
                         .done(function(result) {
                             self.token = result.token;
                             self.username(username);
@@ -44,13 +49,6 @@ define([
                             }
                         });
                 }).promise();
-            },
-            logout: function () {
-                var self = this;
-                self.token = undefined;
-                self.username(undefined);
-                self.password(undefined);
-                self.loggedIn(false);
             },
             validate: function () {
                 var self = this;

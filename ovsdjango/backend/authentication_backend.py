@@ -1,5 +1,6 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User as DUser
 from toolbox import Toolbox
+from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.exceptions import ObjectNotFoundException
 from rest_framework.authentication import BaseAuthentication
@@ -31,9 +32,9 @@ class UPAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = User.objects.get(username=cuser.username)
-        except User.DoesNotExist:
-            user = User.objects.create_user(cuser.username, 'nobody@example.com')
+            user = DUser.objects.get(username=cuser.username)
+        except DUser.DoesNotExist:
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
             logger.info('Created user %s' % username)
             user.is_active = cuser.is_active
             user.is_staff = False
@@ -44,8 +45,8 @@ class UPAuthenticationBackend(object):
 
     def get_user(self, user_id):
         try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
+            return DUser.objects.get(pk=user_id)
+        except DUser.DoesNotExist:
             return None
 
 
@@ -77,8 +78,8 @@ class TokenAuthenticationBackend(BaseAuthentication):
 
     def get_user(self, user_id):
         try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
+            return DUser.objects.get(pk=user_id)
+        except DUser.DoesNotExist:
             return None
 
     @staticmethod
@@ -96,9 +97,9 @@ class TokenAuthenticationBackend(BaseAuthentication):
             raise exceptions.AuthenticationFailed()
 
         try:
-            user = User.objects.get(username=cuser.username)
-        except User.DoesNotExist:
-            user = User.objects.create_user(cuser.username, 'nobody@example.com')
+            user = DUser.objects.get(username=cuser.username)
+        except DUser.DoesNotExist:
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
             logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = False
@@ -147,9 +148,9 @@ class HashAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = User.objects.get(username=cuser.username)
-        except User.DoesNotExist:
-            user = User.objects.create_user(cuser.username, 'nobody@example.com')
+            user = DUser.objects.get(username=cuser.username)
+        except DUser.DoesNotExist:
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
             logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = True
@@ -160,6 +161,6 @@ class HashAuthenticationBackend(object):
 
     def get_user(self, user_id):
         try:
-            return User.objects.get(pk=user_id)
-        except User.DoesNotExist:
+            return DUser.objects.get(pk=user_id)
+        except DUser.DoesNotExist:
             return None

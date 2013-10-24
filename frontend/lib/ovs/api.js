@@ -15,16 +15,20 @@ define([
         }
 
         return $.Deferred(function (deferred) {
-            $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), {
-                type: type,
-                timeout: 1000 * 60 * 60,
-                contentType: 'application/json',
-                data: JSON.stringify(data),
-                headers: {
-                    'Authorization': authentication.header(),
-                    'X-CSRFToken': generic.getCookie('csrftoken')
-                }
-            })
+            var callData = {
+                    type: type,
+                    timeout: 1000 * 60 * 60,
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                    headers: {
+                        'Authorization': authentication.header()
+                    }
+                },
+                cookie = generic.getCookie('csrftoken');
+            if (cookie !== undefined) {
+                callData.headers['X-CSRFToken'] = cookie;
+            }
+            $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
                 .done(deferred.resolve)
                 .fail(function (xmlHttpRequest, textStatus, errorThrown) {
                     // We check whether we actually received an error, and it's not the browser navigating away
