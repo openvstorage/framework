@@ -1,4 +1,7 @@
-define(['knockout', 'ovs/generic', 'ovs/refresher'], function(ko, generic, Refresher) {
+define([
+    'jquery', 'knockout',
+    'ovs/generic', 'ovs/refresher'
+], function($, ko, generic, Refresher) {
     "use strict";
     return function () {
         var self = this;

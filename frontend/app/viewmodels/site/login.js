@@ -1,4 +1,7 @@
-define(['ovs/shared', 'knockout', 'ovs/authentication'], function (shared, ko, authentication) {
+define([
+    'jquery', 'knockout',
+    'ovs/shared', 'ovs/authentication'
+], function ($, ko, shared, authentication) {
     "use strict";
     return function () {
         var self = this;

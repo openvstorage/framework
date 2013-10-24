@@ -1,4 +1,7 @@
-﻿define(['ovs/shared', 'knockout'], function (shared, ko) {
+﻿define([
+    'knockout',
+    'ovs/shared'
+], function (ko, shared) {
     "use strict";
     return function () {
         var self = this;

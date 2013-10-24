@@ -1,8 +1,8 @@
 ﻿define([
-    'durandal/app', 'plugins/dialog',
-    'ovs/shared', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/refresher', 'ovs/api',
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'ovs/shared', 'ovs/generic', 'ovs/authentication', 'ovs/refresher', 'ovs/api',
     '../containers/vmachine', '../wizards/clone/index'
-], function (app, dialog, shared, ko, generic, authentication, Refresher, api, VMachine, CloneWizard) {
+], function ($, app, dialog, ko, shared, generic, authentication, Refresher, api, VMachine, CloneWizard) {
     "use strict";
     return function () {
         var self = this;
@@ -74,18 +74,19 @@
                 }
             }
             if (vm !== undefined) {
-                self.vMachines.remove(vm);
                 (function(vm) {
                     app.showMessage('Are you sure you want to delete "' + vm.name() + '"?', 'Are you sure?', ['Yes', 'No'])
                         .done(function (answer) {
                             if (answer === 'Yes') {
+                                self.vMachines.remove(vm);
+                                generic.alertInfo('Queued for deletion', 'Machine ' + vm.name() + ' will be deleted...');
                                 api.del('vmachines/' + vm.guid())
                                     .then(self.shared.tasks.wait)
                                     .done(function () {
-                                        generic.alertSuccess('Machine ' + vm.name() + ' deleted.');
+                                        generic.alertSuccess('Machine deleted', 'Machine ' + vm.name() + ' deleted.');
                                     })
                                     .fail(function (error) {
-                                        generic.alertSuccess('Machine ' + vm.name() + ' could not be deleted: ' + error);
+                                        generic.alertSuccess('Error', 'Machine ' + vm.name() + ' could not be deleted: ' + error);
                                     });
                             }
                         });

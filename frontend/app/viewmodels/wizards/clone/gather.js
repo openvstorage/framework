@@ -1,7 +1,7 @@
 define([
-    'knockout',
+    'jquery', 'knockout',
     '../../containers/vmachine', './data'
-], function(ko, VMachine, data) {
+], function($, ko, VMachine, data) {
     "use strict";
     return function () {
         var self = this;

@@ -1,4 +1,7 @@
-define(['ovs/authentication', 'ovs/generic'], function(authentication, generic) {
+define([
+    'jquery',
+    'ovs/authentication', 'ovs/generic'
+], function($, authentication, generic) {
    "use strict";
     function call(api, data, filter, type) {
         var querystring = [], key;

@@ -24,7 +24,9 @@
     urlArgs: "bust=0.1b"
 });
 
-define(['durandal/system', 'durandal/app', 'durandal/viewLocator'],  function (system, app, viewLocator) {
+define([
+    'durandal/system', 'durandal/app', 'durandal/viewLocator'
+],  function (system, app, viewLocator) {
     "use strict";
     system.debug(true);
 

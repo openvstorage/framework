@@ -1,7 +1,7 @@
 ﻿define([
-    'plugins/router', 'durandal/app', 'bootstrap',
+    'plugins/router', 'bootstrap',
     'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks'
-], function (router, app, bootstrap, shared, Messaging, generic, Tasks) {
+], function (router, bootstrap, shared, Messaging, generic, Tasks) {
     "use strict";
     router.map([
                { route: '',              moduleId: 'viewmodels/redirect',   nav: false },

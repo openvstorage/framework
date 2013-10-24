@@ -1,4 +1,8 @@
-define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api', 'viewmodels/containers/vdisk'], function ($, ko, generic, authentication, api, VDisk) {
+define([
+    'jquery', 'knockout',
+    'ovs/generic', 'ovs/api',
+    'viewmodels/containers/vdisk'
+], function ($, ko, generic, api, VDisk) {
     "use strict";
     return function (guid) {
         var self = this;

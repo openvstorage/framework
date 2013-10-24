@@ -1,8 +1,7 @@
 define([
-    'durandal/activator', 'plugins/dialog', 'knockout',
     'ovs/generic',
     '../build', './gather', './confirm', './data'
-], function (activator, dialog, ko, generic, build, Gather, Confirm, data) {
+], function (generic, build, Gather, Confirm, data) {
     "use strict";
     return function (options) {
         var self = this;

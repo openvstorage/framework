@@ -1,4 +1,7 @@
-define(['knockout', 'ovs/generic'], function (ko, generic){
+define([
+    'jquery', 'knockout',
+    'ovs/generic'
+], function ($, ko, generic){
     "use strict";
     var singleton = function () {
         return {

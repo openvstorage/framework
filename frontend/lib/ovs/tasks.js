@@ -1,4 +1,7 @@
-define(['ovs/shared', 'ovs/generic', 'ovs/api'], function(shared, generic, api) {
+define([
+    'jquery',
+    'ovs/shared', 'ovs/generic', 'ovs/api'
+], function($, shared, generic, api) {
     "use strict";
     return function() {
         var self = this;

@@ -1,4 +1,7 @@
-define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api'], function ($, ko, generic, authentication, api) {
+define([
+    'knockout',
+    'ovs/generic', 'ovs/api'
+], function (ko, generic, api) {
     "use strict";
     return function () {
         var self = this;

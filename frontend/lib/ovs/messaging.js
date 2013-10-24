@@ -1,4 +1,7 @@
-define(['ovs/authentication', 'ovs/api', 'ovs/generic'], function(authentication, api, generic) {
+define([
+    'jquery',
+    'ovs/authentication', 'ovs/api', 'ovs/generic'
+], function($, authentication, api, generic) {
     "use strict";
     return function() {
         var self = this;

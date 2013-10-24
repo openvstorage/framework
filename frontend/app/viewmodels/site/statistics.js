@@ -1,8 +1,7 @@
 define([
-    'plugins/router', 'durandal/app',
     'ovs/shared', 'ovs/authentication', 'ovs/refresher',
     '../containers/memcached'
-], function (router, app, shared, authentication, Refresher, Memcached) {
+], function (shared, authentication, Refresher, Memcached) {
     "use strict";
     return function () {
         var self = this;

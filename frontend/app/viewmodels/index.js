@@ -1,4 +1,7 @@
-﻿define(['plugins/router', 'durandal/app', 'ovs/shared', 'ovs/authentication', 'jqp/pnotify'], function (router, app, shared, authentication, $) {
+﻿define([
+    'plugins/router', 'jqp/pnotify',
+    'ovs/shared', 'ovs/authentication'
+], function (router, $, shared, authentication) {
     "use strict";
     var childRouter = router.createChildRouter()
                             .makeRelative({
