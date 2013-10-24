@@ -9,7 +9,7 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
             mode: undefined,
             username: ko.observable(),
             password: ko.observable(),
-            loggedin: ko.observable(false),
+            loggedIn: ko.observable(false),
             token: undefined,
             login: function (username, password) {
                 var self = this;
@@ -21,25 +21,25 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
                             'password': password
                         }),
                         contentType: 'application/json',
-                        headers: { 'X-CSRFToken': generic.get_cookie('csrftoken') }
+                        headers: { 'X-CSRFToken': generic.getCookie('csrftoken') }
                     })
-                    .done(function(result) {
-                        self.token = result.token;
-                        self.username(username);
-                        self.password(password);
-                        self.loggedin(true);
-                        deferred.resolve();
-                    })
-                    .fail(function (xmlHttpRequest, textStatus, errorThrown) {
-                        // We check whether we actually received an error, and it's not the browser navigating away
-                        if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                            self.token = undefined;
-                            self.username(undefined);
-                            self.password(undefined);
-                            self.loggedin(false);
-                            deferred.reject();
-                        }
-                    });
+                        .done(function(result) {
+                            self.token = result.token;
+                            self.username(username);
+                            self.password(password);
+                            self.loggedIn(true);
+                            deferred.resolve();
+                        })
+                        .fail(function (xmlHttpRequest) {
+                            // We check whether we actually received an error, and it's not the browser navigating away
+                            if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                                self.token = undefined;
+                                self.username(undefined);
+                                self.password(undefined);
+                                self.loggedIn(false);
+                                deferred.reject();
+                            }
+                        });
                 }).promise();
             },
             logout: function () {
@@ -47,7 +47,7 @@ define(['knockout', 'ovs/generic'], function (ko, generic){
                 self.token = undefined;
                 self.username(undefined);
                 self.password(undefined);
-                self.loggedin(false);
+                self.loggedIn(false);
             },
             validate: function () {
                 var self = this;

@@ -1,6 +1,6 @@
 <div style="min-width: 700px;">
     <h4 style="margin-top: 5px;">Please provide the required information</h4>
-    <div data-bind="visible: can_continue().value">
+    <div data-bind="visible: canContinue().value">
         <form role="form" class="form-horizontal">
             <p>
                 Enter a new name for the cloned machine:
@@ -15,15 +15,15 @@
             <p>
                 Select the snapshots from which you want to clone:
             </p>
-            <ul data-bind="foreach: data.vm().vdisks()">
+            <ul data-bind="foreach: data.vm().vDisks()">
                 <li style="margin-bottom: 5px;">
                     Disk <b><span data-bind="text: name"></span></b>:
-                    <select data-bind="options: snapshots, value: selected_snapshot"></select>
+                    <select data-bind="options: snapshots, value: selectedSnapshot"></select>
                 </li>
             </ul>
         </form>
     </div>
-    <div class="alert alert-warning" data-bind="visible: !can_continue().value">
-        <p data-bind="text: can_continue().reason"></p>
+    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
+        <p data-bind="text: canContinue().reason"></p>
     </div>
 </div>

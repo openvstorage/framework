@@ -8,30 +8,32 @@ define([
 
         self.shared = shared;
         self.data = data;
-        self.can_continue = ko.observable({value: true, reason: undefined});
+        self.canContinue = ko.observable({value: true, reason: undefined});
 
         self.finish = function() {
             return $.Deferred(function (deferred) {
-                var i, data = {}, vm = self.data.vm(),
-                    disks = vm.vdisks();
+                var i,
+                    data = {},
+                    vm = self.data.vm(),
+                    disks = vm.vDisks();
                 data.disks = {};
                 data.name = self.data.name();
                 for (i = 0; i < disks.length; i += 1) {
-                    data.disks[disks[i].guid()] = disks[i].selected_snapshot();
+                    data.disks[disks[i].guid()] = disks[i].selectedSnapshot();
                 }
                 api.post('vmachines/' + vm.guid() + '/clone', data)
-                .then(function (data) {
-                    deferred.resolve(data);
-                    generic.alert_info('Machine ' + vm.name() + ' cloning in progress...');
-                    return data;
-                })
-                .then(self.shared.tasks.wait)
-                .done(function () {
-                    generic.alert_success('Machine ' + vm.name() + ' cloned successfully to ' + self.data.name());
-                })
-                .fail(function (error) {
-                    generic.alert_error('Error while cloning ' + vm.name() + ': ' + error);
-                });
+                    .then(function (data) {
+                        deferred.resolve(data);
+                        generic.alertInfo('Machine ' + vm.name() + ' cloning in progress...');
+                        return data;
+                    })
+                    .then(self.shared.tasks.wait)
+                    .done(function () {
+                        generic.alertSuccess('Machine ' + vm.name() + ' cloned successfully to ' + self.data.name());
+                    })
+                    .fail(function (error) {
+                        generic.alertError('Error while cloning ' + vm.name() + ': ' + error);
+                    });
             }).promise();
         };
     };

@@ -13,50 +13,50 @@
         self.widgets = [];
 
         // Data
-        self.displayname = 'vMachines';
+        self.displayName = 'vMachines';
         self.description = 'This page contains a first overview of the vmachines and their vdisks in our model';
 
-        self.vmachine_headers = [
+        self.vMachineHeaders = [
             { key: 'name',    value: 'Name',   width: 300 },
             { key: undefined, value: 'Disks',  width: undefined },
             { key: undefined, value: '&nbsp;', width: 35 },
             { key: undefined, value: '&nbsp;', width: 35 }
         ];
-        self.vmachines = ko.observableArray([]);
-        self.vmachine_guids =  [];
+        self.vMachines = ko.observableArray([]);
+        self.vMachineGuids =  [];
 
         // Variables
-        self.load_vmachines_handle = undefined;
+        self.loadVMachinesHandle = undefined;
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
-                generic.xhr_abort(self.load_vmachines_handle);
-                self.load_vmachines_handle = api.get('vmachines')
-                .done(function (data) {
-                    var i, item, guids = [];
-                    for (i = 0; i < data.length; i += 1) {
-                        guids.push(data[i].guid);
-                    }
-                    for (i = 0; i < guids.length; i += 1) {
-                        if ($.inArray(guids[i], self.vmachine_guids) === -1) {
-                            self.vmachine_guids.push(guids[i]);
-                            self.vmachines.push(new VMachine(guids[i]));
+                generic.xhrAbort(self.loadVMachinesHandle);
+                self.loadVMachinesHandle = api.get('vmachines')
+                    .done(function (data) {
+                        var i, guids = [];
+                        for (i = 0; i < data.length; i += 1) {
+                            guids.push(data[i].guid);
                         }
-                    }
-                    for (i = 0; i < self.vmachine_guids.length; i += 1) {
-                        if ($.inArray(self.vmachine_guids[i], guids) === -1) {
-                            self.vmachine_guids.splice(i, 1);
-                            self.vmachines.splice(i, 1);
+                        for (i = 0; i < guids.length; i += 1) {
+                            if ($.inArray(guids[i], self.vMachineGuids) === -1) {
+                                self.vMachineGuids.push(guids[i]);
+                                self.vMachines.push(new VMachine(guids[i]));
+                            }
                         }
-                    }
-                    deferred.resolve();
-                })
-                .fail(deferred.reject);
+                        for (i = 0; i < self.vMachineGuids.length; i += 1) {
+                            if ($.inArray(self.vMachineGuids[i], guids) === -1) {
+                                self.vMachineGuids.splice(i, 1);
+                                self.vMachines.splice(i, 1);
+                            }
+                        }
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
             }).promise();
         };
         self.clone = function(guid) {
-            var i, vms = self.vmachines();
+            var i, vms = self.vMachines();
             for (i = 0; i < vms.length; i += 1) {
                 if (vms[i].guid() === guid) {
                     dialog.show(new CloneWizard({
@@ -66,26 +66,30 @@
                 }
             }
         };
-        self.deletevm = function(guid) {
-            var i, vms = self.vmachines();
+        self.deleteVM = function(guid) {
+            var i, vms = self.vMachines(), vm;
             for (i = 0; i < vms.length; i += 1) {
+                if (vms[i].guid() === guid) {
+                    vm = vms[i];
+                }
+            }
+            if (vm !== undefined) {
+                self.vMachines.remove(vm);
                 (function(vm) {
-                    if (vm.guid() === guid) {
-                        app.showMessage('Are you sure you want to delete "' + vm.name() + '"?', 'Are you sure?', ['Yes', 'No'])
-                            .done(function (answer) {
-                                if (answer === 'Yes') {
-                                    api.del('vmachines/' + vm.guid())
+                    app.showMessage('Are you sure you want to delete "' + vm.name() + '"?', 'Are you sure?', ['Yes', 'No'])
+                        .done(function (answer) {
+                            if (answer === 'Yes') {
+                                api.del('vmachines/' + vm.guid())
                                     .then(self.shared.tasks.wait)
                                     .done(function () {
-                                        generic.alert_success('Machine ' + vm.name() + ' deleted.');
+                                        generic.alertSuccess('Machine ' + vm.name() + ' deleted.');
                                     })
                                     .fail(function (error) {
-                                        generic.alert_success('Machine ' + vm.name() + ' could not be deleted: ' + error);
+                                        generic.alertSuccess('Machine ' + vm.name() + ' could not be deleted: ' + error);
                                     });
-                                }
-                            });
-                    }
-                }(vms[i]));
+                            }
+                        });
+                }(vm));
             }
         };
 

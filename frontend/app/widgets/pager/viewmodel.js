@@ -3,17 +3,17 @@ define(['knockout', 'ovs/generic', 'ovs/refresher'], function(ko, generic, Refre
     return function () {
         var self = this;
 
-        self.viewport_indexes = [];
-        self.viewport_shower = undefined;
-        self.refresher = new Refresher();
-        self.internal_current = ko.observable(1);
+        // System
+        self.refresher       = new Refresher();
 
-        self.headers = ko.observableArray([]);
-        self.settings = ko.observable({});
-
-        self.pagesize = ko.observable(0);
-        self.padding = ko.observable(2);
-        self.controls = ko.observable(true);
+        // Fields
+        self.viewportIndexes = [];
+        self.internalCurrent = ko.observable(1);
+        self.headers         = ko.observableArray([]);
+        self.settings        = ko.observable({});
+        self.pagesize        = ko.observable(0);
+        self.padding         = ko.observable(2);
+        self.controls        = ko.observable(true);
 
         self.items = ko.computed(function () {
             var settings = self.settings();
@@ -22,49 +22,49 @@ define(['knockout', 'ovs/generic', 'ovs/refresher'], function(ko, generic, Refre
             }
             return [];
         });
-        self.show_controls = ko.computed(function () {
-            return self.controls() || (self.total_items() > self.pagesize());
+        self.showControls = ko.computed(function () {
+            return self.controls() || (self.totalItems() > self.pagesize());
         });
-        self.total_items = ko.computed(function () {
+        self.totalItems = ko.computed(function () {
             return self.items().length;
         });
-        self.last_page = ko.computed(function () {
-            return Math.floor((self.total_items() - 1) / self.pagesize()) + 1;
+        self.lastPage = ko.computed(function () {
+            return Math.floor((self.totalItems() - 1) / self.pagesize()) + 1;
         });
         self.current = ko.computed({
             // One-based
             read: function() {
-                return Math.min(self.internal_current(), Math.floor(self.total_items() / Math.max(1, self.pagesize())) + 1);
+                return Math.min(self.internalCurrent(), Math.floor(self.totalItems() / Math.max(1, self.pagesize())) + 1);
             },
             write: function(value) {
-                self.internal_current(value);
+                self.internalCurrent(value);
             }
         });
-        self.has_next = ko.computed(function () {
-            return self.current() < self.last_page();
+        self.hasNext = ko.computed(function () {
+            return self.current() < self.lastPage();
         });
-        self.has_previous = ko.computed(function () {
+        self.hasPrevious = ko.computed(function () {
             return self.current() > 1;
         });
-        self.page_first = ko.computed(function () {
+        self.pageFirst = ko.computed(function () {
             return (self.current() - 1) * self.pagesize() + 1;
         });
-        self.page_last = ko.computed(function () {
-            return Math.min(self.page_first() + self.pagesize() - 1, self.items().length);
+        self.pageLast = ko.computed(function () {
+            return Math.min(self.pageFirst() + self.pagesize() - 1, self.items().length);
         });
         self.pages = ko.computed(function () {
             var i,
                 pages = [],
                 from = Math.max(1, self.current() - self.padding()),
-                to = Math.min(self.last_page(), self.current() + self.padding());
+                to = Math.min(self.lastPage(), self.current() + self.padding());
             from = Math.max(1, Math.min(to - 2 * self.padding(), from));
-            to = Math.min(self.last_page(), Math.max(from + 2 * self.padding(), to));
+            to = Math.min(self.lastPage(), Math.max(from + 2 * self.padding(), to));
             for (i = from; i <= to; i += 1) {
                 pages.push(i);
             }
             return pages;
         });
-        self.viewport_items = ko.computed(function () {
+        self.viewportItems = ko.computed(function () {
             var i,
                 items = self.items(),
                 v_items = [],
@@ -72,32 +72,32 @@ define(['knockout', 'ovs/generic', 'ovs/refresher'], function(ko, generic, Refre
                 start = (self.current() - 1) * self.pagesize(),
                 max = Math.min(start + self.pagesize(), items.length);
             for (i = start; i < max; i += 1) {
-                if (self.enter_viewport !== undefined && $.inArray(i, self.viewport_indexes) === -1) {
-                    items[i][self.enter_viewport]();
+                if (self.enterViewport !== undefined && $.inArray(i, self.viewportIndexes) === -1) {
+                    items[i][self.enterViewport]();
                 }
                 v_indexes.push(i);
                 v_items.push(items[i]);
             }
-            self.viewport_indexes = v_indexes.slice();
+            self.viewportIndexes = v_indexes.slice();
             return v_items;
         });
 
         self.step = function(next) {
             if (next) {
-                if (self.has_next()) {
+                if (self.hasNext()) {
                     self.current(self.current() + 1);
                 }
             } else {
-                if (self.has_previous()) {
+                if (self.hasPrevious()) {
                     self.current(self.current() - 1);
                 }
             }
         };
         self.viewport_refresh = function() {
-            var i, items = self.viewport_items();
+            var i, items = self.viewportItems();
             for (i = 0; i < items.length; i += 1) {
-                if (self.enter_viewport !== undefined) {
-                    items[i][self.enter_viewport]();
+                if (self.enterViewport !== undefined) {
+                    items[i][self.enterViewport]();
                 }
             }
         };
@@ -110,12 +110,12 @@ define(['knockout', 'ovs/generic', 'ovs/refresher'], function(ko, generic, Refre
                 throw 'Headers should be specified';
             }
 
-            self.enter_viewport = generic.tryget(settings, 'enter_viewport');
-            self.refresh = generic.tryget(settings, 'viewport_refresh');
+            self.enterViewport = generic.tryGet(settings, 'enterViewport');
+            self.refresh = generic.tryGet(settings, 'viewportRefresh');
             self.settings(settings);
             self.headers(settings.headers);
             self.pagesize(settings.pagesize);
-            self.controls(generic.tryget(settings, 'controls', true));
+            self.controls(generic.tryGet(settings, 'controls', true));
 
             if (self.refresh !== undefined) {
                 self.refresher.init(self.viewport_refresh, self.refresh);

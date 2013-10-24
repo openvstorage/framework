@@ -3,8 +3,8 @@ define(['knockout'], function (ko){
     var singleton = function() {
         return {
             messaging: undefined,
-            tasks: undefined,
-            mode: ko.observable('full')
+            tasks    : undefined,
+            mode     : ko.observable('full')
         };
     };
     return singleton();

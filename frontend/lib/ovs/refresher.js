@@ -8,13 +8,13 @@ define(['durandal/app'], function (app){
             self.interval = interval;
         };
         self.start = function () {
-            self.refresh_timeout = window.setInterval(function () {
+            self.refreshTimeout = window.setInterval(function () {
                 self.load();
             }, self.interval);
         };
         self.stop = function () {
-            if (self.refresh_timeout !== undefined) {
-                window.clearInterval(self.refresh_timeout);
+            if (self.refreshTimeout !== undefined) {
+                window.clearInterval(self.refreshTimeout);
             }
         };
         self.run = function () {

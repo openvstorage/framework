@@ -30,12 +30,16 @@ class TaskViewSet(viewsets.ViewSet):
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         result = celery.AsyncResult(pk)
+        if result.successful():
+            result_data = result.result
+        else:
+            result_data = result.result.message if result.result is not None else None
         data = {'id'        : result.id,
                 'status'    : result.status,
                 'successful': result.successful(),
                 'failed'    : result.failed(),
                 'ready'     : result.ready(),
-                'result'    : result.result if result.successful() else result.result.message}
+                'result'    : result_data}
         return Response(data, status=status.HTTP_200_OK)
 
     @link()

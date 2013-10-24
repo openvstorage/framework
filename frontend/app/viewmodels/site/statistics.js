@@ -8,11 +8,11 @@ define([
         var self = this;
 
         // System
-        self.shared = shared;
+        self.shared    = shared;
         self.refresher = new Refresher();
 
         // Data
-        self.displayname = 'Statistics';
+        self.displayName = 'Statistics';
         self.description = 'The page contains various system statistics';
         self.memcached = new Memcached();
 

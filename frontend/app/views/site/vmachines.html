@@ -1,17 +1,17 @@
 ﻿<section>
-    <h2><span data-bind="html: displayname"></span></h2>
+    <h2><span data-bind="html: displayName"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
-    <div data-bind="pager: { items: vmachines, headers: vmachine_headers, pagesize: 10,
-                             enter_viewport: 'load', viewport_refresh: 5000, controls: true }">
+    <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
+                             enterViewport: 'load', viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td data-bind="text: name"></td>
-                <td data-bind="text: vdisks().length"></td>
+                <td data-bind="text: vDisks().length"></td>
                 <td>
                     <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
                 </td>
                 <td>
-                    <i data-bind="click: function() { $root.deletevm($data.guid()); }"  class="hand glyphicon glyphicon-trash"></i>
+                    <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand glyphicon glyphicon-trash"></i>
                 </td>
             </tr>
         </table>

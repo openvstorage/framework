@@ -4,7 +4,7 @@ define(['ovs/authentication', 'ovs/generic'], function(authentication, generic) 
         var querystring = [], key;
 
         filter = filter || {};
-        filter.timestamp = generic.gettimestamp();
+        filter.timestamp = generic.getTimestamp();
         for (key in filter) {
             if (filter.hasOwnProperty(key)) {
                 querystring.push(key + '=' + filter[key]);
@@ -19,16 +19,16 @@ define(['ovs/authentication', 'ovs/generic'], function(authentication, generic) 
                 data: JSON.stringify(data),
                 headers: {
                     'Authorization': authentication.header(),
-                    'X-CSRFToken': generic.get_cookie('csrftoken')
+                    'X-CSRFToken': generic.getCookie('csrftoken')
                 }
             })
-            .done(deferred.resolve)
-            .fail(function (xmlHttpRequest, textStatus, errorThrown) {
-                // We check whether we actually received an error, and it's not the browser navigating away
-                if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                    deferred.reject(xmlHttpRequest, textStatus, errorThrown);
-                }
-            });
+                .done(deferred.resolve)
+                .fail(function (xmlHttpRequest, textStatus, errorThrown) {
+                    // We check whether we actually received an error, and it's not the browser navigating away
+                    if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                        deferred.reject(xmlHttpRequest, textStatus, errorThrown);
+                    }
+                });
         }).promise();
     }
     function get(api, data, filter) {

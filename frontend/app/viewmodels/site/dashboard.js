@@ -7,7 +7,7 @@
         self.shared = shared;
 
         // Data
-        self.displayname = ko.observable('Welcome to Open vStorage');
+        self.displayName = ko.observable('Welcome to Open vStorage');
         self.description = ko.observable('Open vStorage is the next generation storage');
     };
 });

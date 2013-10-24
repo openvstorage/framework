@@ -1,7 +1,7 @@
 <section>
-    <h2><span data-bind="html: displayname"></span></h2>
+    <h2><span data-bind="html: displayName"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
-    <form class="form-horizontal" role="form" data-bind="submit: login, visible: !loggedin()">
+    <form class="form-horizontal" data-bind="submit: login, visible: !loggedIn()">
         <div class="form-group">
             <label class="col-lg-1 control-label" for="inputUsername">Username</label>
             <div class="col-lg-2">
@@ -25,7 +25,7 @@
             </div>
         </div>
     </form>
-    <div class="alert alert-success" data-bind="visible: loggedin()">
+    <div class="alert alert-success" data-bind="visible: loggedIn()">
       <h4>Welcome, <span data-bind="text: username"></span></h4>
       <p>
           Use the navigation to browse trough the interface.

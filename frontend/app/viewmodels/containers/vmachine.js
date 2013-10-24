@@ -4,45 +4,45 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api', 'v
         var self = this;
 
         // Variables
-        self.load_vdisks_handle = undefined;
-        self.load_handle = undefined;
+        self.loadVDisksHandle = undefined;
+        self.loadHandle       = undefined;
 
         // Obserables
-        self.guid = ko.observable(guid);
-        self.name = ko.observable();
-        self.vdisks = ko.observableArray([]);
-        self.vdisk_guids = [];
+        self.guid       = ko.observable(guid);
+        self.name       = ko.observable();
+        self.vDisks     = ko.observableArray([]);
+        self.vDiskGuids = [];
 
         // Functions
-        self.load_disks = function () {
+        self.loadDisks = function () {
             return $.Deferred(function (deferred) {
-                generic.xhr_abort(self.load_vdisks_handle);
-                self.load_vdisks_handle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
-                .done(function (data) {
-                    var i, item;
-                    for (i = 0; i < data.length; i += 1) {
-                        item = data[i];
-                        if ($.inArray(item.guid, self.vdisk_guids) === -1) {
-                            self.vdisk_guids.push(item.guid);
-                            self.vdisks.push(new VDisk(item));
+                generic.xhrAbort(self.loadVDisksHandle);
+                self.loadVDisksHandle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
+                    .done(function (data) {
+                        var i, item;
+                        for (i = 0; i < data.length; i += 1) {
+                            item = data[i];
+                            if ($.inArray(item.guid, self.vDiskGuids) === -1) {
+                                self.vDiskGuids.push(item.guid);
+                                self.vDisks.push(new VDisk(item));
+                            }
                         }
-                    }
-                    deferred.resolve();
-                })
-                .fail(deferred.reject);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
             }).promise();
         };
         self.load = function () {
             return $.when.apply($, [
-                self.load_disks(),
+                self.loadDisks(),
                 $.Deferred(function (deferred) {
-                    generic.xhr_abort(self.load_handle);
-                    self.load_handle = api.get('vmachines/' + self.guid())
-                    .done(function (data) {
-                        self.name(data.name);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                    generic.xhrAbort(self.loadHandle);
+                    self.loadHandle = api.get('vmachines/' + self.guid())
+                        .done(function (data) {
+                            self.name(data.name);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
                 }).promise()
             ]);
         };

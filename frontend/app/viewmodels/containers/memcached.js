@@ -4,40 +4,40 @@ define(['jquery', 'knockout', 'ovs/generic', 'ovs/authentication', 'ovs/api'], f
         var self = this;
 
         // Variables
-        self.refresh_handle = undefined;
-        self.refresh_timeout = undefined;
+        self.refreshHandle = undefined;
+        self.refreshTimeout = undefined;
 
         // Obserables
-        self.bytes         = ko.observable('');
-        self.curr_items    = ko.observable(0);
-        self.total_items   = ko.observable(0);
-        self.get_hits      = ko.observable(0);
-        self.cmd_get       = ko.observable(0);
-        self.hit_rate      = ko.observable(0);
-        self.bytes_read    = ko.observable('');
-        self.bytes_written = ko.observable('');
-        self.uptime        = ko.observable(0);
-        self.raw           = ko.observable('');
+        self.bytes        = ko.observable('');
+        self.currItems    = ko.observable(0);
+        self.totalItems   = ko.observable(0);
+        self.getHits      = ko.observable(0);
+        self.cmdGet       = ko.observable(0);
+        self.hitRate      = ko.observable(0);
+        self.bytesRead    = ko.observable('');
+        self.bytesWritten = ko.observable('');
+        self.uptime       = ko.observable(0);
+        self.raw          = ko.observable('');
 
         // Functions
         self.refresh = function () {
-            generic.xhr_abort(self.refresh_handle);
-            self.refresh_handle = api.get('statistics/memcache')
+            generic.xhrAbort(self.refreshHandle);
+            self.refreshHandle = api.get('statistics/memcache')
             .done(function (data) {
-                self.bytes(generic.get_bytes_human(data.bytes));
-                self.curr_items(data.curr_items);
-                self.total_items(data.total_items);
-                self.get_hits(data.get_hits);
-                self.cmd_get(data.cmd_get);
-                self.hit_rate(data.cmd_get === 0 ? 0 : Math.round(data.get_hits / data.cmd_get * 1000) / 10);
-                self.bytes_read(generic.get_bytes_human(data.bytes_read));
-                self.bytes_written(generic.get_bytes_human(data.bytes_written));
+                self.bytes(generic.getBytesHuman(data.bytes));
+                self.currItems(data.curr_items);
+                self.totalItems(data.total_items);
+                self.getHits(data.get_hits);
+                self.cmdGet(data.cmd_get);
+                self.hitRate(data.cmd_get === 0 ? 0 : Math.round(data.get_hits / data.cmd_get * 1000) / 10);
+                self.bytesRead(generic.getBytesHuman(data.bytes_read));
+                self.bytesWritten(generic.getBytesHuman(data.bytes_written));
                 self.uptime(data.uptime);
 
-                var raw_string = '';
-                for (var attribute in data) {
+                var raw_string = '', attribute;
+                for (attribute in data) {
                     if (data.hasOwnProperty(attribute)) {
-                        raw_string += generic.padright(attribute, ' ', 25) + data[attribute].toString() + '\n';
+                        raw_string += generic.padRight(attribute, ' ', 25) + data[attribute].toString() + '\n';
                     }
                 }
                 self.raw(raw_string);

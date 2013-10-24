@@ -1,9 +1,9 @@
 define(function() {
     "use strict";
-    function gettimestamp() {
+    function getTimestamp() {
         return new Date().getTime();
     }
-    function get_bytes_human(value) {
+    function getBytesHuman(value) {
         var units, counter;
         units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
         counter = 0;
@@ -13,13 +13,13 @@ define(function() {
         }
         return (Math.round(value * 100) / 100).toString() + ' ' + units[counter];
     }
-    function padright(value, character, length) {
+    function padRight(value, character, length) {
         while (value.length < length) {
             value += character;
         }
         return value;
     }
-    function get_cookie(name) {
+    function getCookie(name) {
         var i, cookie, cookies;
         if (document.cookie && document.cookie !== '') {
             cookies = document.cookie.split(';');
@@ -32,7 +32,7 @@ define(function() {
         }
         return '';
     }
-    function tryget(object, key, fallback) {
+    function tryGet(object, key, fallback) {
         if (object !== undefined && object.hasOwnProperty(key)) {
             return object[key];
         }
@@ -47,13 +47,13 @@ define(function() {
             type: (type !== undefined ? type : 'notice')
         });
     }
-    function alert_info(title, message) {
+    function alertInfo(title, message) {
         alert(title, message, 'info');
     }
-    function alert_success(title, message) {
+    function alertSuccess(title, message) {
         alert(title, message, 'success');
     }
-    function alert_error(title, message) {
+    function alertError(title, message) {
         alert(title, message, 'error');
     }
     function keys(object) {
@@ -65,7 +65,7 @@ define(function() {
         }
         return all_keys;
     }
-    function xhr_abort(token) {
+    function xhrAbort(token) {
         if (token !== undefined && token.state() === 'pending') {
             try {
                 token.abort();
@@ -76,16 +76,16 @@ define(function() {
     }
 
     return {
-        gettimestamp   : gettimestamp,
-        get_bytes_human: get_bytes_human,
-        padright       : padright,
-        get_cookie     : get_cookie,
-        tryget         : tryget,
-        alert          : alert,
-        alert_info     : alert_info,
-        alert_success  : alert_success,
-        alert_error    : alert_error,
-        keys           : keys,
-        xhr_abort      : xhr_abort
+        getTimestamp : getTimestamp,
+        getBytesHuman: getBytesHuman,
+        padRight     : padRight,
+        getCookie    : getCookie,
+        tryGet       : tryGet,
+        alert        : alert,
+        alertInfo    : alertInfo,
+        alertSuccess : alertSuccess,
+        alertError   : alertError,
+        keys         : keys,
+        xhrAbort     : xhrAbort
     };
 });

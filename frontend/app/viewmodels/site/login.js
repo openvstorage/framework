@@ -8,24 +8,24 @@ define(['ovs/shared', 'knockout', 'ovs/authentication'], function (shared, ko, a
         self.authentication = authentication;
 
         // Data
-        self.displayname = ko.observable('Login');
+        self.displayName = ko.observable('Login');
         self.description = ko.observable('Please login into the Open vStorage management interface');
-        self.username = ko.observable();
-        self.password = ko.observable();
-        self.loggedin = ko.observable(false);
-        self.failed = ko.observable(false);
+        self.username    = ko.observable();
+        self.password    = ko.observable();
+        self.loggedIn    = ko.observable(false);
+        self.failed      = ko.observable(false);
 
         // Functions
         self.login = function() {
             self.failed(false);
             self.authentication.login(self.username(), self.password())
-                               .done(function () {
-                                   self.loggedin(true);
-                               })
-                               .fail(function () {
-                                   self.password('');
-                                   self.failed(true);
-                               });
+                .done(function () {
+                    self.loggedIn(true);
+                })
+                .fail(function () {
+                    self.password('');
+                    self.failed(true);
+                });
         };
 
         // Durandal

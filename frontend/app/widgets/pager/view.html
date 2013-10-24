@@ -5,22 +5,22 @@
                 <th data-bind="style: { width: width !== undefined ? width + 'px' : 'auto' }, html: value"></th>
             </tr>
         </thead>
-        <tbody data-bind="foreach: viewport_items">
+        <tbody data-bind="foreach: viewportItems">
             <tr data-part="vitem" data-bind="foreach: $parent.headers">
                 <td data-bind="html: $parent[key]"></td>
             </tr>
         </tbody>
     </table>
-    <div data-bind="if: show_controls()">
+    <div data-bind="if: showControls()">
         <p style="margin-bottom: -15px;">
-            Showing <span data-bind="text: page_first"></span>-<span data-bind="text: page_last"></span>
-            from <span data-bind="text: total_items()"></span> results.</p>
+            Showing <span data-bind="text: pageFirst"></span>-<span data-bind="text: pageLast"></span>
+            from <span data-bind="text: totalItems()"></span> results.</p>
         <ul class="pagination">
-            <!-- ko if: has_previous() -->
+            <!-- ko if: hasPrevious() -->
                 <li><a data-bind="click: function() { current(1); }" class="hand">&laquo;&laquo;</a></li>
                 <li><a data-bind="click: function() { step(false); }" class="hand">&laquo;</a></li>
             <!-- /ko -->
-            <!-- ko if: !has_previous() -->
+            <!-- ko if: !hasPrevious() -->
                 <li class="disabled"><span>&laquo;&laquo;</span></li>
                 <li class="disabled"><span>&laquo;</span></li>
             <!-- /ko -->
@@ -32,11 +32,11 @@
                     <li><a data-bind="text: $data, click: function() { $parent.current($data); }" class="hand"></a></li>
                 <!-- /ko -->
             <!-- /ko -->
-            <!-- ko if: has_next() -->
+            <!-- ko if: hasNext() -->
                 <li><a data-bind="click: function() { step(true); }" class="hand">&raquo;</a></li>
                 <li><a data-bind="click: function() { current(last_page()); }" class="hand">&raquo;&raquo;</a></li>
             <!-- /ko -->
-            <!-- ko if: !has_next() -->
+            <!-- ko if: !hasNext() -->
                 <li class="disabled"><span>&raquo;</span></li>
                 <li class="disabled"><span>&raquo;&raquo;</span></li>
             <!-- /ko -->

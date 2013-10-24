@@ -1,12 +1,12 @@
 <section>
-    <h2><span data-bind="html: displayname"></span></h2>
+    <h2><span data-bind="html: displayName"></span></h2>
     <blockquote data-bind="html: description"></blockquote>
     <h3>Memcached</h3>
     <ul>
         <li>memory usage: <span data-bind="text: memcached.bytes"></span></li>
-        <li>keys in cache: <span data-bind="text: memcached.curr_items"></span> of <span data-bind="text: memcached.total_items"></span></li>
-        <li>cache hits: <span data-bind="text: memcached.get_hits"></span> of <span data-bind="text: memcached.cmd_get"></span>: <b><span data-bind="text: memcached.hit_rate"></span>%</b></li>
-        <li>cache traffic: <span data-bind="text: memcached.bytes_read"></span> in, <span data-bind="text: memcached.bytes_written"></span> out</li>
+        <li>keys in cache: <span data-bind="text: memcached.currItems"></span> of <span data-bind="text: memcached.totalItems"></span></li>
+        <li>cache hits: <span data-bind="text: memcached.getHits"></span> of <span data-bind="text: memcached.cmdGet"></span>: <b><span data-bind="text: memcached.hitRate"></span>%</b></li>
+        <li>cache traffic: <span data-bind="text: memcached.bytesRead"></span> in, <span data-bind="text: memcached.bytesWritten"></span> out</li>
         <li>uptime: <span data-bind="text: memcached.uptime"></span></li>
     </ul>
     <p>Raw memcached information:</p>

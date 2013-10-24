@@ -6,10 +6,10 @@
     <p>
         Please validate the selected snapshots below. These will be used for the clone:
     </p>
-    <ul data-bind="foreach: data.vm().vdisks()">
+    <ul data-bind="foreach: data.vm().vDisks()">
         <li>
             Disk <b><span data-bind="text: name"></span></b>:
-            <span data-bind="text: selected_snapshot"></span>
+            <span data-bind="text: selectedSnapshot"></span>
         </li>
     </ul>
 </div>
