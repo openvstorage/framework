@@ -3,7 +3,7 @@ define([
     './data', 'ovs/shared', 'ovs/generic', 'ovs/api'
 ], function(ko, data, shared, generic, api) {
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
         self.shared = shared;
@@ -12,7 +12,7 @@ define([
         self.canContinue = ko.observable({value: true, reason: undefined});
 
         self.finish = function() {
-            return $.Deferred(function (deferred) {
+            return $.Deferred(function(deferred) {
                 var i,
                     data = {},
                     vm = self.data.vm(),
@@ -23,16 +23,16 @@ define([
                     data.disks[disks[i].guid()] = disks[i].selectedSnapshot();
                 }
                 api.post('vmachines/' + vm.guid() + '/clone', data)
-                    .then(function (data) {
+                    .then(function(data) {
                         deferred.resolve(data);
                         generic.alertInfo('Clone started', 'Machine ' + vm.name() + ' cloning in progress...');
                         return data;
                     })
                     .then(self.shared.tasks.wait)
-                    .done(function () {
+                    .done(function() {
                         generic.alertSuccess('Clone completed', 'Machine ' + vm.name() + ' cloned successfully to ' + self.data.name());
                     })
-                    .fail(function (error) {
+                    .fail(function(error) {
                         generic.alertError('Error', 'Error while cloning ' + vm.name() + ': ' + error);
                     });
             }).promise();

@@ -1,67 +1,76 @@
 define([
-    'jquery', 'knockout',
+    'plugins/router', 'jquery', 'knockout',
     'ovs/generic'
-], function ($, ko, generic){
+], function(router, $, ko, generic){
     "use strict";
-    var singleton = function () {
-        return {
-            init: function (mode) {
-                var self = this;
-                self.mode = mode;
-            },
-            mode: undefined,
-            username: ko.observable(),
-            password: ko.observable(),
-            loggedIn: ko.observable(false),
-            token: undefined,
-            login: function (username, password) {
-                var self = this;
-                return $.Deferred(function (deferred) {
-                    var callData = {
-                            type: 'post',
-                            data: ko.toJSON({
-                                'username': username,
-                                'password': password
-                            }),
-                            contentType: 'application/json',
-                            headers: {}
-                        },
-                        cookie = generic.getCookie('csrftoken');
-                    if (cookie !== undefined) {
-                        callData.headers['X-CSRFToken'] = cookie;
-                    }
-                    $.ajax('/api/auth/', callData)
-                        .done(function(result) {
-                            self.token = result.token;
-                            self.username(username);
-                            self.password(password);
-                            self.loggedIn(true);
-                            deferred.resolve();
-                        })
-                        .fail(function (xmlHttpRequest) {
-                            // We check whether we actually received an error, and it's not the browser navigating away
-                            if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                                self.token = undefined;
-                                self.username(undefined);
-                                self.password(undefined);
-                                self.loggedIn(false);
-                                deferred.reject();
-                            }
-                        });
-                }).promise();
-            },
-            validate: function () {
-                var self = this;
-                if (self.token !== undefined) {
-                    return true;
+    return function() {
+        var self = this;
+
+        self.mode       = undefined;
+        self.onLoggedIn = [];
+        self.token      = undefined;
+
+        self.username = ko.observable();
+        self.password = ko.observable();
+        self.loggedIn = ko.observable(false);
+
+        self.init = function(mode) {
+            self.mode = mode;
+        };
+        self.login = function(username, password) {
+            return $.Deferred(function(deferred) {
+                var callData = {
+                        type: 'post',
+                        data: ko.toJSON({
+                            'username': username,
+                            'password': password
+                        }),
+                        contentType: 'application/json',
+                        headers: {}
+                    },
+                    cookie = generic.getCookie('csrftoken');
+                if (cookie !== undefined) {
+                    callData.headers['X-CSRFToken'] = cookie;
                 }
-                return { redirect: '#' + self.mode + '/login' };
-            },
-            header: function () {
-                var self = this;
-                return 'Token ' + self.token;
+                $.ajax('/api/auth/', callData)
+                    .done(function(result) {
+                        var i;
+                        self.token = result.token;
+                        self.username(username);
+                        self.password(password);
+                        self.loggedIn(true);
+                        for (i = 0; i < self.onLoggedIn.length; i += 1) {
+                            self.onLoggedIn[i]();
+                        }
+                        deferred.resolve();
+                    })
+                    .fail(function(xmlHttpRequest) {
+                        // We check whether we actually received an error, and it's not the browser navigating away
+                        if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                            self.token = undefined;
+                            self.username(undefined);
+                            self.password(undefined);
+                            self.loggedIn(false);
+                            deferred.reject();
+                        }
+                    });
+            }).promise();
+        };
+        self.logout = function() {
+            self.token = undefined;
+            self.username(undefined);
+            self.password(undefined);
+            self.loggedIn(false);
+            router.navigate('');
+        };
+        self.validate = function() {
+            if (self.token !== undefined) {
+                return true;
             }
+            return { redirect: '#' + self.mode + '/login' };
+        };
+        self.header = function() {
+            return 'Token ' + self.token;
         };
     };
-    return singleton();
 });

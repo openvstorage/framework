@@ -1,7 +1,7 @@
 ﻿define([
     'plugins/router', 'jqp/pnotify',
-    'ovs/shared', 'ovs/authentication'
-], function (router, $, shared, authentication) {
+    'ovs/shared'
+], function(router, $, shared) {
     "use strict";
     var childRouter = router.createChildRouter()
                             .makeRelative({
@@ -21,14 +21,13 @@
     childRouter.mapUnknownRoutes('404');
 
     return {
-        authentication: authentication,
         shared: shared,
         router: childRouter,
         activate: function(mode) {
-            // Shared config
-            this.shared.mode(mode);
-            // Authentication
-            authentication.init(mode);
+            var self = this;
+            // Config
+            self.shared.mode(mode);
+            self.shared.authentication.init(mode);
             // Notifications
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";

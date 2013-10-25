@@ -1,7 +1,7 @@
-define(function () {
+define(function() {
     "use strict";
     return {
-        canActivate: function () {
+        canActivate: function() {
             return { redirect: '#full' };
         }
     };

@@ -1,7 +1,7 @@
 define([
     'jquery',
-    'ovs/authentication', 'ovs/generic'
-], function($, authentication, generic) {
+    'ovs/shared', 'ovs/generic'
+], function($, shared, generic) {
    "use strict";
     function call(api, data, filter, type) {
         var querystring = [], key;
@@ -14,14 +14,14 @@ define([
             }
         }
 
-        return $.Deferred(function (deferred) {
+        return $.Deferred(function(deferred) {
             var callData = {
                     type: type,
                     timeout: 1000 * 60 * 60,
                     contentType: 'application/json',
                     data: JSON.stringify(data),
                     headers: {
-                        'Authorization': authentication.header()
+                        'Authorization': shared.authentication.header()
                     }
                 },
                 cookie = generic.getCookie('csrftoken');
@@ -30,7 +30,7 @@ define([
             }
             $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
                 .done(deferred.resolve)
-                .fail(function (xmlHttpRequest, textStatus, errorThrown) {
+                .fail(function(xmlHttpRequest, textStatus, errorThrown) {
                     // We check whether we actually received an error, and it's not the browser navigating away
                     if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                         deferred.reject(xmlHttpRequest, textStatus, errorThrown);

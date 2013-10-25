@@ -1,9 +1,9 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api'
-], function ($, ko, generic, api) {
+], function($, ko, generic, api) {
     "use strict";
-    return function (data) {
+    return function(data) {
         var self = this;
 
         // Variables
@@ -19,11 +19,11 @@ define([
         self.selectedSnapshot = ko.observable();
 
         // Functions
-        self.load = function () {
-            return $.Deferred(function (deferred) {
+        self.load = function() {
+            return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadHandle);
                 self.loadHandle = api.get('vdisks/' + self.guid())
-                    .done(function (data) {
+                    .done(function(data) {
                         self.name(data.name);
                         self.order(data.order);
                         self.snapshots(data.snapshots);

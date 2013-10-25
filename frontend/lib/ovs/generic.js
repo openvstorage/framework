@@ -74,6 +74,12 @@ define(function() {
             }
         }
     }
+    function removeElement(array, element) {
+        var index = array.indexOf(element);
+        if (index !== -1) {
+            array.splice(index, 1);
+        }
+    }
 
     return {
         getTimestamp : getTimestamp,
@@ -86,6 +92,7 @@ define(function() {
         alertSuccess : alertSuccess,
         alertError   : alertError,
         keys         : keys,
-        xhrAbort     : xhrAbort
+        xhrAbort     : xhrAbort,
+        removeElement: removeElement
     };
 });

@@ -1,7 +1,7 @@
 define([
     'jquery',
-    'ovs/authentication', 'ovs/api', 'ovs/generic'
-], function($, authentication, api, generic) {
+    'ovs/api', 'ovs/generic'
+], function($, api, generic) {
     "use strict";
     return function() {
         var self = this;
@@ -11,6 +11,7 @@ define([
         self.requestHandle = undefined;
         self.abort         = false;
         self.subscriptions = {};
+        self.running       = false;
 
         self.getSubscriptions = function(type) {
             var callbacks,
@@ -30,7 +31,9 @@ define([
         };
         self.subscribe = function(type, callback) {
             self.getSubscriptions(type).subscribe(callback);
-            self.sendSubscriptions();
+            if (self.running) {
+                self.sendSubscriptions();
+            }
         };
         self.unsubscribe = function(type, callback) {
             self.getSubscriptions(type).unsubscribe(callback);
@@ -45,24 +48,29 @@ define([
         self.start = function() {
             self.abort = false;
             self.getLastMessageID()
-            .done(function (message_id) {
-                self.lastMessageID = message_id;
-                self.wait();
-            })
-            .fail(function () {
-                throw "Last message id could not be loaded.";
-            });
+                .then(function(message_id) {
+                    self.lastMessageID = message_id;
+                })
+                .then(self.sendSubscriptions)
+                .done(function() {
+                    self.running = true;
+                    self.wait();
+                })
+                .fail(function() {
+                    throw "Last message id could not be loaded.";
+                });
         };
         self.stop = function() {
             self.abort = true;
             generic.xhrAbort(self.requestHandle);
+            self.running = false;
         };
         self.sendSubscriptions = function() {
             return api.post('messages/' + self.subscriberID + '/subscribe', generic.keys(self.subscriptions));
         };
         self.wait = function() {
             self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', undefined, {'message_id': self.lastMessageID})
-                .done(function (data) {
+                .done(function(data) {
                     var i, subscriptions = generic.keys(self.subscriptions), resubscribe = false;
                     self.lastMessageID = data.last_message_id;
                     for (i = 0; i < data.messages.length; i += 1) {
@@ -75,7 +83,7 @@ define([
                     }
                     if (resubscribe) {
                         self.sendSubscriptions()
-                        .always(function () {
+                        .always(function() {
                             if (!self.abort) {
                                 self.wait();
                             }
@@ -84,7 +92,7 @@ define([
                         self.wait();
                     }
                 })
-                .fail(function () {
+                .fail(function() {
                     if (!self.abort) {
                         window.setTimeout(self.wait, 5000);
                     }

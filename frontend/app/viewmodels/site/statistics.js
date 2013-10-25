@@ -1,9 +1,9 @@
 define([
-    'ovs/shared', 'ovs/authentication', 'ovs/refresher',
+    'ovs/shared', 'ovs/refresher',
     '../containers/memcached'
-], function (shared, authentication, Refresher, Memcached) {
+], function(shared, Refresher, Memcached) {
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
         // System
@@ -16,18 +16,18 @@ define([
         self.memcached = new Memcached();
 
         // Functions
-        self.refresh = function () {
+        self.refresh = function() {
             self.memcached.refresh();
         };
 
         // Durandal
-        self.canActivate = function() { return authentication.validate(); };
-        self.activate = function () {
+        self.canActivate = function() { return self.shared.authentication.validate(); };
+        self.activate = function() {
             self.refresher.init(self.refresh, 1000);
             self.refresher.run();
             self.refresher.start();
         };
-        self.deactivate = function () {
+        self.deactivate = function() {
             self.refresher.stop();
         };
     };

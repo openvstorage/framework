@@ -5,8 +5,13 @@
                              enterViewport: 'load', viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
-                <td data-bind="text: name"></td>
-                <td data-bind="text: vDisks().length"></td>
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;" class="icon-spinner icon-spin"></i>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td><span data-bind="text: vDisks().length"></span></td>
+                <td><span data-bind="text: iops"></span></td>
+                <td><span data-bind="text: backendSize"></span> MiB</td>
                 <td>
                     <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
                 </td>

@@ -1,9 +1,9 @@
 define([
     'knockout',
     'ovs/generic', 'ovs/api'
-], function (ko, generic, api) {
+], function(ko, generic, api) {
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
         // Variables
@@ -23,10 +23,10 @@ define([
         self.raw          = ko.observable('');
 
         // Functions
-        self.refresh = function () {
+        self.refresh = function() {
             generic.xhrAbort(self.refreshHandle);
             self.refreshHandle = api.get('statistics/memcache')
-            .done(function (data) {
+            .done(function(data) {
                 self.bytes(generic.getBytesHuman(data.bytes));
                 self.currItems(data.curr_items);
                 self.totalItems(data.total_items);

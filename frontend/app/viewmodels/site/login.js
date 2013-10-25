@@ -1,14 +1,13 @@
 define([
     'jquery', 'knockout',
-    'ovs/shared', 'ovs/authentication'
-], function ($, ko, shared, authentication) {
+    'ovs/shared'
+], function($, ko, shared) {
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
         // System
         self.shared = shared;
-        self.authentication = authentication;
 
         // Data
         self.displayName = ko.observable('Login');
@@ -21,19 +20,19 @@ define([
         // Functions
         self.login = function() {
             self.failed(false);
-            self.authentication.login(self.username(), self.password())
-                .done(function () {
+            self.shared.authentication.login(self.username(), self.password())
+                .done(function() {
                     self.loggedIn(true);
                 })
-                .fail(function () {
+                .fail(function() {
                     self.password('');
                     self.failed(true);
                 });
         };
 
         // Durandal
-        self.activate = function () {
-            setTimeout(function () {
+        self.activate = function() {
+            setTimeout(function() {
                 $('#inputUsername').focus();
             }, 250);
         };

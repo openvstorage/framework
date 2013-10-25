@@ -1,8 +1,8 @@
 define([
     'durandal/activator', 'plugins/dialog', 'knockout'
-], function (activator, dialog, ko) {
+], function(activator, dialog, ko) {
     "use strict";
-    return function (parent) {
+    return function(parent) {
         parent.title   = ko.observable();
         parent.steps   = ko.observableArray([]);
         parent.step    = ko.observable(0);
@@ -38,7 +38,7 @@ define([
             }
             return false;
         });
-        parent.canContinue = ko.computed(function () {
+        parent.canContinue = ko.computed(function() {
             var step = parent.steps()[parent.step()];
             if (step !== undefined) {
                 return step.canContinue();
@@ -46,22 +46,22 @@ define([
             return {value: true, reason: undefined};
         });
 
-        parent.next = function () {
+        parent.next = function() {
             if (parent.step() < parent.stepsLength() ) {
                 parent.step(parent.step() + 1);
                 parent.activateStep();
             }
         };
-        parent.activateStep = function () {
+        parent.activateStep = function() {
             parent.activeStep(parent.steps()[parent.step()]);
         };
-        parent.previous = function () {
+        parent.previous = function() {
             if (parent.step() > 0) {
                 parent.step(parent.step() - 1);
                 parent.activateStep();
             }
         };
-        parent.close = function (success) {
+        parent.close = function(success) {
             dialog.close(parent, {
                 success: success,
                 data: success ? {} : undefined
@@ -71,19 +71,19 @@ define([
             parent.running(true);
             var step = parent.steps()[parent.step()];
             step.finish()
-                .done(function (data) {
+                .done(function(data) {
                     dialog.close(parent, {
                         success: true,
                         data: data
                     });
                 })
-                .fail(function (data) {
+                .fail(function(data) {
                     dialog.close(parent, {
                         success: false,
                         data: data
                     });
                 })
-                .always(function () {
+                .always(function() {
                     parent.running(false);
                 });
         };

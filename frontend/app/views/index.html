@@ -29,12 +29,13 @@
                     <!-- /ko -->
                 </ul>
                 <!-- below: navbar-right has float: right behavior -->
-                <p class="navbar-text navbar-right" data-bind="visible: authentication.loggedIn">
-                    Signed in as <i><span data-bind="text: authentication.username"></span></i>
+                <p class="navbar-text navbar-right" data-bind="visible: shared.authentication.loggedIn">
+                    Signed in as <i><span data-bind="text: shared.authentication.username"></span></i>.
+                    <a data-bind="click: shared.authentication.logout" class="hand navbar-link">Log out</a>
                 </p>
                 <ul class="nav navbar-nav navbar-right">
                     <li data-bind="visible: router.isNavigating">
-                        <a><i style="margin-top: 4px;" class="icon-spinner icon-spin"></i></a>
+                        <i style="margin-top: 4px;" class="icon-spinner icon-spin"></i>
                     </li>
                 </ul>
             </div>

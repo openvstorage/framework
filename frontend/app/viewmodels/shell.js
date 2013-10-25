@@ -1,7 +1,7 @@
 ﻿define([
     'plugins/router', 'bootstrap',
-    'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks'
-], function (router, bootstrap, shared, Messaging, generic, Tasks) {
+    'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication'
+], function(router, bootstrap, shared, Messaging, generic, Tasks, Authentication) {
     "use strict";
     router.map([
                { route: '',              moduleId: 'viewmodels/redirect',   nav: false },
@@ -15,10 +15,12 @@
 
         self.shared = shared;
         self.router = router;
-        self.activate = function () {
-            self.shared.messaging = new Messaging();
-            self.shared.messaging.start();
-            self.shared.tasks = new Tasks();
+        self.activate = function() {
+            self.shared.messaging      = new Messaging();
+            self.shared.authentication = new Authentication();
+            self.shared.tasks          = new Tasks();
+
+            self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
         };
     };
 });

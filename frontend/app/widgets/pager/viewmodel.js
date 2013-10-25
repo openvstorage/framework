@@ -3,7 +3,7 @@ define([
     'ovs/generic', 'ovs/refresher'
 ], function($, ko, generic, Refresher) {
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
         // System
@@ -18,20 +18,20 @@ define([
         self.padding         = ko.observable(2);
         self.controls        = ko.observable(true);
 
-        self.items = ko.computed(function () {
+        self.items = ko.computed(function() {
             var settings = self.settings();
             if (settings.hasOwnProperty('items')) {
                 return self.settings().items();
             }
             return [];
         });
-        self.showControls = ko.computed(function () {
+        self.showControls = ko.computed(function() {
             return self.controls() || (self.totalItems() > self.pagesize());
         });
-        self.totalItems = ko.computed(function () {
+        self.totalItems = ko.computed(function() {
             return self.items().length;
         });
-        self.lastPage = ko.computed(function () {
+        self.lastPage = ko.computed(function() {
             return Math.floor((self.totalItems() - 1) / self.pagesize()) + 1;
         });
         self.current = ko.computed({
@@ -43,19 +43,19 @@ define([
                 self.internalCurrent(value);
             }
         });
-        self.hasNext = ko.computed(function () {
+        self.hasNext = ko.computed(function() {
             return self.current() < self.lastPage();
         });
-        self.hasPrevious = ko.computed(function () {
+        self.hasPrevious = ko.computed(function() {
             return self.current() > 1;
         });
-        self.pageFirst = ko.computed(function () {
+        self.pageFirst = ko.computed(function() {
             return (self.current() - 1) * self.pagesize() + 1;
         });
-        self.pageLast = ko.computed(function () {
+        self.pageLast = ko.computed(function() {
             return Math.min(self.pageFirst() + self.pagesize() - 1, self.items().length);
         });
-        self.pages = ko.computed(function () {
+        self.pages = ko.computed(function() {
             var i,
                 pages = [],
                 from = Math.max(1, self.current() - self.padding()),
@@ -67,7 +67,7 @@ define([
             }
             return pages;
         });
-        self.viewportItems = ko.computed(function () {
+        self.viewportItems = ko.computed(function() {
             var i,
                 items = self.items(),
                 v_items = [],
@@ -105,7 +105,7 @@ define([
             }
         };
 
-        self.activate = function (settings) {
+        self.activate = function(settings) {
             if (!settings.hasOwnProperty('items')) {
                 throw 'Items should be specified';
             }

@@ -1,4 +1,4 @@
-define(['knockout'], function (ko){
+define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {
         return {

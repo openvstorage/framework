@@ -1,10 +1,10 @@
 ﻿define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/authentication', 'ovs/refresher', 'ovs/api',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vmachine', '../wizards/clone/index'
-], function ($, app, dialog, ko, shared, generic, authentication, Refresher, api, VMachine, CloneWizard) {
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, CloneWizard) {
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
         // System
@@ -17,10 +17,12 @@
         self.description = 'This page contains a first overview of the vmachines and their vdisks in our model';
 
         self.vMachineHeaders = [
-            { key: 'name',    value: 'Name',   width: 300 },
-            { key: undefined, value: 'Disks',  width: undefined },
-            { key: undefined, value: '&nbsp;', width: 35 },
-            { key: undefined, value: '&nbsp;', width: 35 }
+            { key: 'name',        value: 'Name',         width: 150 },
+            { key: undefined,     value: 'Disks',        width: 75 },
+            { key: 'iops',        value: 'Iops',         width: 75 },
+            { key: 'backendSize', value: 'Backend size', width: undefined },
+            { key: undefined,     value: '&nbsp;',       width: 35 },
+            { key: undefined,     value: '&nbsp;',       width: 35 }
         ];
         self.vMachines = ko.observableArray([]);
         self.vMachineGuids =  [];
@@ -30,10 +32,10 @@
 
         // Functions
         self.load = function() {
-            return $.Deferred(function (deferred) {
+            return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVMachinesHandle);
                 self.loadVMachinesHandle = api.get('vmachines')
-                    .done(function (data) {
+                    .done(function(data) {
                         var i, guids = [];
                         for (i = 0; i < data.length; i += 1) {
                             guids.push(data[i].guid);
@@ -76,16 +78,16 @@
             if (vm !== undefined) {
                 (function(vm) {
                     app.showMessage('Are you sure you want to delete "' + vm.name() + '"?', 'Are you sure?', ['Yes', 'No'])
-                        .done(function (answer) {
+                        .done(function(answer) {
                             if (answer === 'Yes') {
-                                self.vMachines.remove(vm);
-                                generic.alertInfo('Queued for deletion', 'Machine ' + vm.name() + ' will be deleted...');
+                                self.vMachines.destroy(vm);
+                                generic.alertInfo('Marked for deletion', 'Machine ' + vm.name() + ' is marked for deletion...');
                                 api.del('vmachines/' + vm.guid())
                                     .then(self.shared.tasks.wait)
-                                    .done(function () {
+                                    .done(function() {
                                         generic.alertSuccess('Machine deleted', 'Machine ' + vm.name() + ' deleted.');
                                     })
-                                    .fail(function (error) {
+                                    .fail(function(error) {
                                         generic.alertSuccess('Error', 'Machine ' + vm.name() + ' could not be deleted: ' + error);
                                     });
                             }
@@ -95,13 +97,13 @@
         };
 
         // Durandal
-        self.canActivate = function() { return authentication.validate(); };
-        self.activate = function () {
+        self.canActivate = function() { return self.shared.authentication.validate(); };
+        self.activate = function() {
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
         };
-        self.deactivate = function () {
+        self.deactivate = function() {
             var i;
             for (i = 0; i < self.widgets.length; i += 2) {
                 self.widgets[i].deactivate();

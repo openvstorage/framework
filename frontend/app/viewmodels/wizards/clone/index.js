@@ -1,9 +1,9 @@
 define([
     'ovs/generic',
     '../build', './gather', './confirm', './data'
-], function (generic, build, Gather, Confirm, data) {
+], function(generic, build, Gather, Confirm, data) {
     "use strict";
-    return function (options) {
+    return function(options) {
         var self = this;
 
         self.data = data;

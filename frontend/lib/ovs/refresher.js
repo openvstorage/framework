@@ -1,23 +1,23 @@
-define(['durandal/app'], function (app){
+define(function(){
     "use strict";
-    return function () {
+    return function() {
         var self = this;
 
-        self.init = function (load, interval) {
+        self.init = function(load, interval) {
             self.load = load;
             self.interval = interval;
         };
-        self.start = function () {
-            self.refreshTimeout = window.setInterval(function () {
+        self.start = function() {
+            self.refreshTimeout = window.setInterval(function() {
                 self.load();
             }, self.interval);
         };
-        self.stop = function () {
+        self.stop = function() {
             if (self.refreshTimeout !== undefined) {
                 window.clearInterval(self.refreshTimeout);
             }
         };
-        self.run = function () {
+        self.run = function() {
             self.load();
         };
     };

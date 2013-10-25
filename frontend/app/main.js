@@ -26,7 +26,7 @@
 
 define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator'
-],  function (system, app, viewLocator) {
+],  function(system, app, viewLocator) {
     "use strict";
     system.debug(true);
 
@@ -41,7 +41,7 @@ define([
             kinds: ['pager']
         }
     });
-    app.start().then(function () {
+    app.start().then(function() {
         viewLocator.useConvention();
         app.setRoot('viewmodels/shell');
     });
