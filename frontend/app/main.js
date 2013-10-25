@@ -21,7 +21,7 @@
             exports: 'jQuery'
         }
     },
-    urlArgs: "bust=0.1b"
+    urlArgs: "bust=0.1.0.0b"
 });
 
 define([

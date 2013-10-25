@@ -27,7 +27,7 @@ define([
                 self.data.vm()
                     .load()
                     .done(function() {
-                        self.data.name(self.data.vm().name() + '_clone');
+                        self.data.name(self.data.vm().name() + '-clone');
                         var i, disks = self.data.vm().vDisks(),
                             loads = [];
                         for(i = 0; i < disks.length; i += 1) {

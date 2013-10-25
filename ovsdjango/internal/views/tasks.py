@@ -33,7 +33,7 @@ class TaskViewSet(viewsets.ViewSet):
         if result.successful():
             result_data = result.result
         else:
-            result_data = result.result.message if result.result is not None else None
+            result_data = str(result.result) if result.result is not None else None
         data = {'id'        : result.id,
                 'status'    : result.status,
                 'successful': result.successful(),

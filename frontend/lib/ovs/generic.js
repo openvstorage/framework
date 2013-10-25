@@ -39,13 +39,16 @@ define(function() {
         return fallback;
     }
     function alert(title, message, type) {
-        $.pnotify({
+        var data = {
             title: title,
             text: message,
             nonblock: true,
-            delay: 3000,
-            type: (type !== undefined ? type : 'notice')
-        });
+            delay: 3000
+        };
+        if (type !== undefined) {
+            data.type = type;
+        }
+        $.pnotify(data);
     }
     function alertInfo(title, message) {
         alert(title, message, 'info');

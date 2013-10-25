@@ -4,7 +4,8 @@ define(['knockout'], function(ko){
         return {
             name:        ko.observable(),
             machineGuid: ko.observable(),
-            vm:          ko.observable()
+            vm:          ko.observable(),
+            amount:      ko.observable(1)
         };
     };
     return singleton();
