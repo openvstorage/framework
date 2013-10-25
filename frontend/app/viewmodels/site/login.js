@@ -10,8 +10,6 @@ define([
         self.shared = shared;
 
         // Data
-        self.displayName = ko.observable('Login');
-        self.description = ko.observable('Please login into the Open vStorage management interface');
         self.username    = ko.observable();
         self.password    = ko.observable();
         self.loggedIn    = ko.observable(false);

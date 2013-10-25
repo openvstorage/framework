@@ -1,6 +1,16 @@
 ﻿<section>
-    <h2><span data-bind="html: displayName"></span></h2>
-    <blockquote data-bind="html: description"></blockquote>
+    <h2>vMachines</h2>
+    <p>
+        This page contains a first overview of the vmachines and their vdisks in our model.<br />
+        Featuring:
+    </p>
+    <ul>
+        <li>Adds/removes machines every 5 seconds</li>
+        <li>Refreshes viewport data every 5 seconds</li>
+        <li>Display of hybrid properties</li>
+        <li>Smoothed value updates</li>
+        <li>Value dependent markup</li>
+    </ul>
     <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
                              enterViewport: 'load', viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">

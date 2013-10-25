@@ -11,8 +11,6 @@ define([
         self.refresher = new Refresher();
 
         // Data
-        self.displayName = 'Statistics';
-        self.description = 'The page contains various system statistics';
         self.memcached = new Memcached();
 
         // Functions

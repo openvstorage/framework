@@ -13,9 +13,6 @@
         self.widgets = [];
 
         // Data
-        self.displayName = 'vMachines';
-        self.description = 'This page contains a first overview of the vmachines and their vdisks in our model';
-
         self.vMachineHeaders = [
             { key: 'name',       value: 'Name',        width: 150 },
             { key: undefined,    value: 'Disks',       width: 60 },
