@@ -4,7 +4,7 @@ import time
 
 class Xen(Hypervisor):
     def _connect(self):
-        print '[XEN] connecting to {0} with {1}/{2}'.format(self._ip, self._username, self._password)
+        print '[XEN] connecting to {0}'.format(self._ip)
 
     @Hypervisor.connected
     def start(self, vmid):

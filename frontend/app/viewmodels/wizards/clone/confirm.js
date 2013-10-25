@@ -51,7 +51,7 @@ define([
                             generic.alertSuccess('Clones completed', 'Machine ' + vm.name() + ' cloned successfully.');
                         } else if (success > 0) {
                             generic.alert('Clones complete', 'Machine ' + vm.name() + ' cloned. However, some of the clones could not be created.');
-                        } else if (clones.length > 0) {
+                        } else if (clones.length > 2) {
                             generic.alertError('Error', 'All clones for machine ' + vm.name() + ' failed.');
                         }
                     });

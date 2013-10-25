@@ -4,7 +4,7 @@ import time
 
 class HyperV(Hypervisor):
     def _connect(self):
-        print '[HV] connecting to {0} with {1}/{2}'.format(self._ip, self._username, self._password)
+        print '[HV] connecting to {0}'.format(self._ip)
 
     @Hypervisor.connected
     def start(self, vmid):
