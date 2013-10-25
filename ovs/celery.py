@@ -7,6 +7,7 @@ sys.path.append('/opt/openvStorage')
 
 from celery import Celery
 from ovs import celeryconfig
+from ovs.logging.logHandler import LogHandler
 
 celery = Celery('ovs',
                 include=['ovs.lib.dummy',
@@ -16,6 +17,8 @@ celery = Celery('ovs',
                          'ovs.lib.messaging',
                          'ovs.hypervisor.hypervisors.vmware'])
 celery.config_from_object(celeryconfig)
+
+loghandler = LogHandler('celery.log')
 
 if __name__ == '__main__':
     celery.start()

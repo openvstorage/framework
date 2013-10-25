@@ -1,5 +1,6 @@
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vmachine import vMachine
+from ovs.dal.hybrids.vpool import vPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 _vsrClient = VolumeStorageRouterClient().load()
@@ -9,7 +10,6 @@ class vDisk(DataObject):
     _blueprint = {'name' : None,  # All persistent stored fields, with default value
                   'description' : 'Test disk',
                   'size' : 100,
-                  'vpoolguid' : None,  #BACKEND
                   'type' : 'DSSVOL',
                   'role' : 'BOOT',  # BOOT, DATA, TEMP
                   'devicename' : '123456789-flat.vmdk',
@@ -23,8 +23,10 @@ class vDisk(DataObject):
                   'replicationguid' : None,
                   'environmentguid' : None,
                   'cloudspaceguid' : None,
-                  'autobackup' : False}
-    _relations = {'machine': (vMachine, 'disks')}
+                  'autobackup' : False,
+                  'templatesnapshot': None}
+    _relations = {'machine': (vMachine, 'disks'),
+                  'vpool': (vPool, 'disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 60,
                'status': 30,

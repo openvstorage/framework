@@ -103,7 +103,7 @@ class VDiskController(object):
         devicename = kwargs['devicename']
         machineguid = kwargs.get('machineguid', None)
         description = '{0} {1}'.format(location, devicename.replace('-flat', ''))
-        propertiesToClone = ['description', 'size', 'vpoolguid', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
+        propertiesToClone = ['description', 'size', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
         
         newDisk = vDisk()
         disk = vDisk(diskguid)

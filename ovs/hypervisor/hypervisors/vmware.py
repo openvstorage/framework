@@ -28,19 +28,20 @@ class VMware(Hypervisor):
     def createVM(self, *args, **kwargs):
         """
         Configure the vmachine on the hypervisor
-        
-        @param vmid
         """
 
     @celery.task(name='ovs.hypervisor.vmware.deleteVM')
     @Hypervisor.connected
-    def delete(self, *args, **kwargs):
+    def deleteVM(self, vmid, esxHost=None, wait=False):
         """
         Remove the vmachine from the hypervisor
         
-        @param vmid
+        @param vmid: hypervisor id of the virtual machine
+        @param esxHost: esx host identifier
+        @param wait: wait for action to complete
         """
-        self.connection.deleteVM(vmid, wait=False)
+        if vmid and self.connection.exists(key=vmid):
+            self.connection.deleteVM(vmid, wait)
 
     @celery.task(name='ovs.hypervisor.vmware.cloneVM')
     @Hypervisor.connected
@@ -48,7 +49,28 @@ class VMware(Hypervisor):
         """
         Clone a vmachine
         
+        @param vmid: hypvervisor id of the virtual machine
+        @param name: name of the virtual machine
+        @param disks: list of disk information
+        @param esxHost: esx host identifier
+        @param wait: wait for action to complete 
         """
         print '[VMW] Cloning machine {0} to {1} ...'.format(str(vmid), name)
-        self.connection.cloneVM(vmid, name, disks, esxHost, wait)
+        task = self.connection.cloneVM(vmid, name, disks, esxHost, wait)
         print '[VMW] Cloned machine {0} to {1} ...'.format(str(vmid), name)
+        if wait == True:
+            if self.connection.validateResult(task):
+                taskInfo = self.connection.getTaskInfo(task)
+                return taskInfo.info.result.value
+        return None
+
+    @celery.task(name='ovs.hypervisor.vmware.setAsTemplate')
+    @Hypervisor.connected
+    def setAsTemplate(self, vmid, disks, esxHost=None, wait=False):
+        """
+        Configure a vm as template
+        This lets the machine exist on the hypervisor but configures all disks as "Independent Non-persistent"
+        
+        @param vmid: hypervisor id of the virtual machine
+        """
+        task = self.connection.setDiskMode(vmid, disks, 'independent_nonpersistent', esxHost, wait)

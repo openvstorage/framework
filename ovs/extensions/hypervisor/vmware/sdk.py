@@ -212,6 +212,34 @@ class Sdk(object):
         raise Exception("Could not find a virtual machine with name %s" % vmname)
 
     @validate_session
+    def setDiskMode(self, vmid, disks, mode, esxHost=None, wait=True):
+        config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
+        config.deviceChange = []
+
+        esxHost = self._validateHost(esxHost)
+        vmid = self.exists(key=vmid)
+        # Set disk mode for disks
+        esxHost    = self._validateHost(esxHost)
+        vm = self._getObject(vmid)
+        for device in vm.config.hardware.devices:
+            if hasattr(device, 'backing') and device.__class__.__name__ == 'VirtualDisk' and device.backing.fileName in disks:
+                backing = factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
+                backing.diskMode = mode
+                device = factory.create('ns0:VirtualDisk')
+                device.backing       = backing
+                diskSpec = factory.create('ns0:VirtualDeviceConfigSpec')
+                diskSpec.operation     = 'edit'
+                diskSpec.fileOperation = None
+                diskSpec.device        = device
+                config.deviceChange.append(diskSpec)
+
+        task = self._client.service.ReconfigVM_Task(vm.obj_identifier, config)
+
+        if wait:
+            self.waitForTask(task)
+        return task
+
+    @validate_session
     def removeDisk(self, vm, disk, esxHost=None, wait=True):
         config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
         config.deviceChange = []
