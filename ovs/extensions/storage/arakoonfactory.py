@@ -2,14 +2,14 @@ from arakoon import Arakoon
 import json
 
 
-class ArakoonStore(object):
+class ArakoonFactory(object):
     @staticmethod
     def load():
-        return ArakoonWrapper('openvstorage',
-                              {'cfvsa002': (['172.22.1.4'], 8872)})
+        return ArakoonStore('openvstorage',
+                            {'cfvsa002': (['172.22.1.4'], 8872)})
 
 
-class ArakoonWrapper(object):
+class ArakoonStore(object):
     def __init__(self, cluster, node_config):
         self._cluster = cluster
         self._node_config = node_config

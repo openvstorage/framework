@@ -1,27 +1,28 @@
 from threading import Lock
 from celery.signals import task_postrun
-from ovs.dal.storage.memcached import MemcacheStore
+from ovs.extensions.storage.memcachefactory import MemcacheFactory
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-_cache = MemcacheStore.load()
+_cache = MemcacheFactory.load()
 
 
-def synchronized(lock):
+def synchronized():
     """
     Synchronization decorator.
     """
     def wrap(f):
         def new_function(*args, **kw):
-            lock.acquire()
+            mutex = VolatileMutex('messaging')
+            mutex.acquire()
             try:
                 return f(*args, **kw)
             finally:
-                lock.release()
+                mutex.release()
         return new_function
     return wrap
 
 
 class MessageController(object):
-    locker = Lock()
     TIMEOUT = 300
 
     class Type:
@@ -29,17 +30,17 @@ class MessageController(object):
         ALL = [TASK_COMPLETE]
 
     @staticmethod
-    @synchronized(locker)
+    @synchronized()
     def all_subscriptions():
         return _cache.get('msg_subscriptions', [])
 
     @staticmethod
-    @synchronized(locker)
+    @synchronized()
     def subscriptions(subscriber_id):
         return _cache.get('msg_subscriptions_%d' % subscriber_id, [])
 
     @staticmethod
-    @synchronized(locker)
+    @synchronized()
     def subscribe(subscriber_id, subscriptions):
         _cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
         all_subscriptions = _cache.get('msg_subscriptions', [])
@@ -49,7 +50,7 @@ class MessageController(object):
         _cache.set('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
 
     @staticmethod
-    @synchronized(locker)
+    @synchronized()
     def get_messages(subscriber_id, message_id):
         subscriptions = _cache.get('msg_subscriptions_%d' % subscriber_id, [])
         all_messages = _cache.get('msg_messages', [])
@@ -67,7 +68,7 @@ class MessageController(object):
         return messages, last_message_id
 
     @staticmethod
-    @synchronized(locker)
+    @synchronized()
     def fire(message_type, body):
         last_message_id = max([m['id'] for m in _cache.get('msg_messages', [])] + [0])
         message = {'id'  : last_message_id + 1,
@@ -78,7 +79,7 @@ class MessageController(object):
         _cache.set('msg_messages', messages, MessageController.TIMEOUT)
 
     @staticmethod
-    @synchronized(locker)
+    @synchronized()
     def last_message_id():
         return max([m['id'] for m in _cache.get('msg_messages', [])] + [0])
 

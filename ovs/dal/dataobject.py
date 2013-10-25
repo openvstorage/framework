@@ -2,11 +2,12 @@ import inspect
 import uuid
 import copy
 from exceptions import *
-from helpers import Descriptor, Lock, Toolbox
+from helpers import Descriptor, Toolbox
 from storedobject import StoredObject
 from relations.relations import RelationMapper
 from dataobjectlist import DataObjectList
 from datalist import DataList
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 
 class DataObject(StoredObject):
@@ -25,7 +26,6 @@ class DataObject(StoredObject):
       * Recursive save
     """
     # @TODO: When deleting an object that has children, those children will still refer to a non-existing fetch_object, possibly raising ObjectNotFoundExceptions
-    # @TODO: Primary key caching is consistent on single-node only (using unix file locking)
     # @TODO: Currently, there is a limit to the amount of objects per type that is situated around 10k objects. Mostly related to memcache object size
     # @TODO: Currently, self-pointing relations are not yet possible
 
@@ -67,8 +67,11 @@ class DataObject(StoredObject):
 
         # Initialize public fields
         self.dirty = False
+
+        # Worker fields/objects
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
+        self._mutex = VolatileMutex('primarykeys_%s' % self._name)
 
         # Init guid
         new = False
@@ -389,9 +392,8 @@ class DataObject(StoredObject):
 
     def _add_pk(self, key):
         internal_key = 'ovs_primarykeys_%s' % self._name
-        lock = Lock('/tmp/%s' % internal_key)
         try:
-            lock.acquire()
+            self._mutex.acquire()
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
                 keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
@@ -399,13 +401,12 @@ class DataObject(StoredObject):
                 keys.add(key)
             StoredObject.volatile.set(internal_key, keys)
         finally:
-            lock.release()
+            self._mutex.release()
 
     def _delete_pk(self, key):
         internal_key = 'ovs_primarykeys_%s' % self._name
-        lock = Lock('/tmp/%s' % internal_key)
         try:
-            lock.acquire()
+            self._mutex.acquire()
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
                 keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
@@ -416,7 +417,7 @@ class DataObject(StoredObject):
                     pass
             StoredObject.volatile.set(internal_key, keys)
         finally:
-            lock.release()
+            self._mutex.release()
 
     def __str__(self):
         return str(self.serialize())

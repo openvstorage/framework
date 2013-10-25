@@ -5,7 +5,7 @@ from ovs.dal.storedobject import StoredObject
 from ovs.dal.hybrids.vdisk import vDisk
 from ovs.dal.hybrids.vmachine import vMachine
 from ovs.dal.datalist import DataList
-from ovs.dal.storage.dummies import DummyPersistentStore, DummyVolatileStore
+from ovs.extensions.storage.dummies import DummyPersistentStore, DummyVolatileStore
 from ovs.dal.exceptions import *
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations.relations import RelationMapper
