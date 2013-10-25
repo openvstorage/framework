@@ -33,11 +33,9 @@
                     Signed in as <i><span data-bind="text: shared.authentication.username"></span></i>.
                     <a data-bind="click: shared.authentication.logout" class="hand navbar-link">Log out</a>
                 </p>
-                <ul class="nav navbar-nav navbar-right">
-                    <li data-bind="visible: router.isNavigating">
-                        <i style="margin-top: 4px;" class="icon-spinner icon-spin"></i>
-                    </li>
-                </ul>
+                <p class="navbar-text navbar-right" data-bind="visible: router.isNavigating">
+                    <i class="icon-spinner icon-spin"></i>
+                </p>
             </div>
         </div>
     </nav>

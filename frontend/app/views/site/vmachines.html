@@ -10,8 +10,12 @@
                     <span data-bind="text: name"></span>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
+                <td><span data-bind="text: storedData"></span> MiB</td>
+                <td><span data-bind="text: cache"></span> MiB</td>
                 <td><span data-bind="text: iops"></span></td>
-                <td><span data-bind="text: backendSize"></span> MiB</td>
+                <td data-bind="css: { danger: latency() >= 100 }"><span data-bind="text: latency"></span> ms</td>
+                <td><span data-bind="text: readSpeed"></span> MiB/s</td>
+                <td><span data-bind="text: writeSpeed"></span> MiB/s</td>
                 <td>
                     <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
                 </td>

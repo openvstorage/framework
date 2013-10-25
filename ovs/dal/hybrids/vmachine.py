@@ -12,7 +12,11 @@ class vMachine(DataObject):
                   'template'    : True}
     _relations = {'node': (pMachine, 'guests')}
     _expiry = {'iops': 30,
-               'backend_size': 120}
+               'stored_data': 120,
+               'cache': 60,
+               'latency': 15,
+               'read_speed': 30,
+               'write_speed': 30}
 
     @property
     def iops(self):
@@ -22,8 +26,36 @@ class vMachine(DataObject):
         return self._backend_property(get_data)
 
     @property
-    def backend_size(self):
+    def stored_data(self):
         def get_data():
             from random import randint
             return randint(0, 500)
+        return self._backend_property(get_data)
+
+    @property
+    def cache(self):
+        def get_data():
+            from random import randint
+            return randint(100, 200)
+        return self._backend_property(get_data)
+
+    @property
+    def latency(self):
+        def get_data():
+            from random import randint
+            return randint(10, 125)
+        return self._backend_property(get_data)
+
+    @property
+    def read_speed(self):
+        def get_data():
+            from random import randint
+            return randint(0, 250)
+        return self._backend_property(get_data)
+
+    @property
+    def write_speed(self):
+        def get_data():
+            from random import randint
+            return randint(0, 250)
         return self._backend_property(get_data)

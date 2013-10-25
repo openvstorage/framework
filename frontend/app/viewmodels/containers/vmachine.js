@@ -12,13 +12,19 @@ define([
         self.loadHandle       = undefined;
 
         // Obserables
-        self.loading     = ko.observable(false);
-        self.guid        = ko.observable(guid);
-        self.name        = ko.observable();
-        self.iops        = ko.observable();
-        self.backendSize = ko.observable();
-        self.vDisks      = ko.observableArray([]);
-        self.vDiskGuids  = [];
+        self.loading    = ko.observable(false);
+
+        self.guid       = ko.observable(guid);
+        self.name       = ko.observable();
+        self.iops       = ko.observable();
+        self.storedData = ko.observable();
+        self.cache      = ko.observable();
+        self.latency    = ko.observable();
+        self.readSpeed  = ko.observable();
+        self.writeSpeed = ko.observable();
+
+        self.vDisks     = ko.observableArray([]);
+        self.vDiskGuids = [];
 
         // Functions
         self.loadDisks = function() {
@@ -49,8 +55,12 @@ define([
                             self.loadHandle = api.get('vmachines/' + self.guid())
                                 .done(function(data) {
                                     self.name(data.name);
-                                    self.iops(data.iops);
-                                    self.backendSize(data.backend_size);
+                                    generic.smooth(self.iops, data.iops);
+                                    generic.smooth(self.storedData, data.stored_data);
+                                    generic.smooth(self.cache, data.cache);
+                                    generic.smooth(self.latency, data.latency);
+                                    generic.smooth(self.readSpeed, data.read_speed);
+                                    generic.smooth(self.writeSpeed, data.write_speed);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

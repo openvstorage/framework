@@ -80,6 +80,30 @@ define(function() {
             array.splice(index, 1);
         }
     }
+    function smooth(observable, target_value, steps) {
+        var start_value, diff, step_size, decimals, execute;
+        if (steps === undefined) {
+            steps = 3;
+        }
+        start_value = observable() || 0;
+        diff = target_value - start_value;
+        if (diff !== 0) {
+            decimals = Math.max((start_value.toString().split('.')[1] || []).length, (target_value.toString().split('.')[1] || []).length);
+            step_size = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
+            execute = function() {
+                var current = observable();
+                if (current !== target_value) {
+                    if (Math.abs(target_value - current) > Math.abs(step_size)) {
+                        observable(observable() + step_size);
+                        window.setTimeout(execute, 75);
+                    } else {
+                        observable(target_value);
+                    }
+                }
+            };
+            window.setTimeout(execute, 75);
+        }
+    }
 
     return {
         getTimestamp : getTimestamp,
@@ -93,6 +117,7 @@ define(function() {
         alertError   : alertError,
         keys         : keys,
         xhrAbort     : xhrAbort,
-        removeElement: removeElement
+        removeElement: removeElement,
+        smooth       : smooth
     };
 });

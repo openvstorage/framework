@@ -17,12 +17,16 @@
         self.description = 'This page contains a first overview of the vmachines and their vdisks in our model';
 
         self.vMachineHeaders = [
-            { key: 'name',        value: 'Name',         width: 150 },
-            { key: undefined,     value: 'Disks',        width: 75 },
-            { key: 'iops',        value: 'Iops',         width: 75 },
-            { key: 'backendSize', value: 'Backend size', width: undefined },
-            { key: undefined,     value: '&nbsp;',       width: 35 },
-            { key: undefined,     value: '&nbsp;',       width: 35 }
+            { key: 'name',       value: 'Name',        width: 150 },
+            { key: undefined,    value: 'Disks',       width: 60 },
+            { key: 'storedData', value: 'Stored data', width: 100 },
+            { key: 'cache',      value: 'Cache',       width: 70 },
+            { key: 'iops',       value: 'IOPS',        width: 55 },
+            { key: 'latency',    value: 'Latency',     width: 70 },
+            { key: 'readSpeed',  value: 'Read speed',  width: 100 },
+            { key: 'writeSpeed', value: 'Write speed', width: undefined },
+            { key: undefined,    value: '&nbsp;',      width: 35 },
+            { key: undefined,    value: '&nbsp;',      width: 35 }
         ];
         self.vMachines = ko.observableArray([]);
         self.vMachineGuids =  [];
