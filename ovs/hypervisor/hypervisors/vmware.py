@@ -45,7 +45,7 @@ class VMware(Hypervisor):
 
     @celery.task(name='ovs.hypervisor.vmware.cloneVM')
     @Hypervisor.connected
-    def cloneVM(self, vmid, name, disks, esxHost=None, wait=False):
+    def cloneVM(self, vmid, name, disks, esxHost=None, wait=False, *args, **kwargs):
         """
         Clone a vmachine
 

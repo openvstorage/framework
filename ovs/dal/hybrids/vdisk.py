@@ -29,8 +29,7 @@ class vDisk(DataObject):
                   'vpool': (vPool, 'disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 60,
-               'status': 30,
-               'volumedriverid': 30}
+               'status': 30}
 
     @property
     def used_size(self):

@@ -100,15 +100,15 @@ class VDiskController(object):
         diskguid = kwargs['parentdiskguid']
         snapshotid = kwargs['snapshotid']
         location = kwargs['location']
-        devicename = kwargs['devicename']
+        deviceNamePrefix = kwargs['devicename']
         machineguid = kwargs.get('machineguid', None)
-        description = '{0} {1}'.format(location, devicename.replace('-flat', ''))
+        description = '{0} {1}'.format(location, deviceNamePrefix)
         propertiesToClone = ['description', 'size', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
         
         newDisk = vDisk()
         disk = vDisk(diskguid)
         logging.info('Clone snapshot %s of disk %s'%(snapshotid, disk.name))
-        volumeid = vsrClient.clone('{0}/{1}'.format(location, devicename), disk.volumeid, snapshotid)
+        volumeid = vsrClient.clone('{0}/{1}'.format(location, '%s-flat.vmdk'%deviceNamePrefix), disk.volumeid, snapshotid)
         for property in propertiesToClone:
             setattr(newDisk, property, getattr(disk, property))
         disk.children.append(newDisk.guid)
@@ -116,12 +116,11 @@ class VDiskController(object):
         newDisk.name = '%s-clone'%disk.name
         newDisk.description = description
         newDisk.volumeid = volumeid
-        newDisk.devicename = devicename
+        newDisk.devicename = '%s.vmdk'%deviceNamePrefix
         newDisk.parentsnapshot = snapshotid
         newDisk.machine = vMachine(machineguid) if machineguid else disk.machine
         newDisk.save()
-        kwargs['result'] = newDisk.guid
-        return kwargs
+        return {'diskguid': newDisk.guid,'name': newDisk.name, 'backingdevice': '{0}/{1}.vmdk'.format(location, deviceNamePrefix)}
 
     @celery.task(name='ovs.disk.createSnapshot')
     def createSnapshot(*args, **kwargs):

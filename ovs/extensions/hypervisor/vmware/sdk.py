@@ -533,7 +533,7 @@ class Sdk(object):
         # Add disk devices
         for disk in disks:
             config.deviceChange.append(self._createDisk(self._client.factory, disk_controller_key, disk, disks.index(disk), datastore))
-            self.copyFile('[{0}] {1}'.format(datastore.name, '%s.vmdk'%disk['name'].split('_')[-1]), '[{0}] {1}'.format(datastore.name, disk['backingdevice']))
+            self.copyFile('[{0}] {1}'.format(datastore.name, '%s.vmdk'%disk['name'].split('_')[-1].replace('-clone','')), '[{0}] {1}'.format(datastore.name, disk['backingdevice']))
 
         # Add network
         for device in sourceVM.config.hardware.device:
