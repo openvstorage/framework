@@ -7,8 +7,8 @@ class VPoolList(object):
     @staticmethod
     def get_vpools():
         vpools = DataList(key   = 'vpools',
-                             query = {'object': vPool,
-                                      'data': DataList.select.DESCRIPTOR,
-                                      'query': {'type': DataList.where_operator.AND,
-                                                'items': []}}).data
+                          query = {'object': vPool,
+                                   'data': DataList.select.DESCRIPTOR,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': []}}).data
         return DataObjectList(vpools, vPool)

@@ -5,8 +5,7 @@ from ovs.dal.lists.vdisklist import vDiskList
 from ovs.dal.hybrids.vdisk import vDisk
 from ovs.dal.hybrids.vmachine import vMachine
 from ovs.dal.exceptions import ObjectNotFoundException
-from backend.serializers.vdisk import VDiskSerializer
-from backend.serializers.vdisk import SimpleVDiskSerializer
+from backend.serializers.serializers import SimpleSerializer, FullSerializer
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -24,7 +23,7 @@ class VDiskViewSet(viewsets.ViewSet):
             vdisks = vDiskList.get_vdisks().reduced
         else:
             vdisks = vMachine(vmachineguid).disks.reduced
-        serializer = SimpleVDiskSerializer(vdisks, many=True)
+        serializer = SimpleSerializer(vdisks, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None, format=None):
@@ -37,4 +36,4 @@ class VDiskViewSet(viewsets.ViewSet):
             vdisk = vDisk(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(VDiskSerializer(vdisk).data, status=status.HTTP_200_OK)
+        return Response(FullSerializer(vDisk, instance=vdisk).data, status=status.HTTP_200_OK)

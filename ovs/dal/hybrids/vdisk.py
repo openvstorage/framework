@@ -7,29 +7,29 @@ _vsrClient = VolumeStorageRouterClient().load()
 
 
 class vDisk(DataObject):
-    _blueprint = {'name' : None,  # All persistent stored fields, with default value
-                  'description' : 'Test disk',
-                  'size' : 100,
-                  'type' : 'DSSVOL',
-                  'role' : 'BOOT',  # BOOT, DATA, TEMP
-                  'devicename' : '123456789-flat.vmdk',
-                  'order' : None,
-                  'volumeid' : None,
-                  'parentsnapshot' : None,
-                  'children' : [],
-                  'retentionpolicyguid' : None,
-                  'snapshotpolicyguid' : None,
-                  'tags' : [],
-                  'replicationguid' : None,
-                  'environmentguid' : None,
-                  'cloudspaceguid' : None,
-                  'autobackup' : False,
-                  'templatesnapshot': None}
+    _blueprint = {'name'               : (None,                  str),
+                  'description'        : ('Test disk',           str),
+                  'size'               : (100,                   int),
+                  'type'               : ('DSSVOL',              str),
+                  'role'               : ('BOOT',                str),  # BOOT, DATA, TEMP
+                  'devicename'         : ('123456789-flat.vmdk', str),
+                  'order'              : (None,                  int),
+                  'volumeid'           : (None,                  str),
+                  'parentsnapshot'     : (None,                  str),
+                  'children'           : ([],                    list),
+                  'retentionpolicyguid': (None,                  str),
+                  'snapshotpolicyguid' : (None,                  str),
+                  'tags'               : ([],                    list),
+                  'replicationguid'    : (None,                  str),
+                  'environmentguid'    : (None,                  str),
+                  'cloudspaceguid'     : (None,                  str),
+                  'autobackup'         : (False,                 bool),
+                  'templatesnapshot'   : (None,                  str)}
     _relations = {'machine': (vMachine, 'disks'),
-                  'vpool': (vPool, 'disks')}
+                  'vpool'  : (vPool,    'disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 60,
-               'status': 30}
+               'status'   : 30}
 
     @property
     def used_size(self):

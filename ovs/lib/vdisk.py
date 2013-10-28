@@ -90,7 +90,7 @@ class VDiskController(object):
     def clone(*args, **kwargs):
         """
         Clone a disk
-        
+
         @param location: location where virtual device should be created (eg: myVM)
         @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
         @param parentdiskguid: guid of the disk
@@ -104,7 +104,7 @@ class VDiskController(object):
         machineguid = kwargs.get('machineguid', None)
         description = '{0} {1}'.format(location, deviceNamePrefix)
         propertiesToClone = ['description', 'size', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
-        
+
         newDisk = vDisk()
         disk = vDisk(diskguid)
         logging.info('Clone snapshot %s of disk %s'%(snapshotid, disk.name))

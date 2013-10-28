@@ -3,13 +3,13 @@ from ovs.dal.hybrids.pmachine import pMachine
 
 
 class vMachine(DataObject):
-    _blueprint = {'name'        : None,
-                  'description' : None,
-                  'hvtype'      : None,
-                  'cpu'         : 1,
-                  'memory'      : 1024,
-                  'vmid'        : None,
-                  'template'    : True}
+    _blueprint = {'name'       : (None, str),
+                  'description': (None, str),
+                  'hvtype'     : (None, str),
+                  'cpu'        : (1,    int),
+                  'memory'     : (1024, int),
+                  'vmid'       : (None, str),
+                  'template'   : (True, bool)}
     _relations = {'node': (pMachine, 'guests')}
     _expiry = {'iops': 30,
                'stored_data': 120,

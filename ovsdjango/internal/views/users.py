@@ -1,4 +1,5 @@
-from backend.serializers.user import UserSerializer, PasswordSerializer
+from backend.serializers.user import PasswordSerializer
+from backend.serializers.serializers import FullSerializer
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -23,16 +24,16 @@ class UserViewSet(viewsets.ViewSet):
 
     def list(self, request, format=None):
         users = UserList.get_users()
-        serializer = UserSerializer(users, many=True)
+        serializer = FullSerializer(User, instance=users, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None, format=None):
         user = self._get_object(pk)
-        serializer = UserSerializer(user)
+        serializer = FullSerializer(User, instance=user)
         return Response(serializer.data)
 
     def create(self, request, format=None):
-        serializer = UserSerializer(User(), request.DATA)
+        serializer = FullSerializer(User, User(), request.DATA)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -54,6 +55,6 @@ class UserViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             user.password = serializer.data['password']
             user.save()
-            return Response(UserSerializer(user).data, status=status.HTTP_202_ACCEPTED)
+            return Response(FullSerializer(User, user).data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

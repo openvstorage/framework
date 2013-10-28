@@ -2,8 +2,8 @@ from ovs.dal.dataobject import DataObject
 
 
 class vPool(DataObject):
-    _blueprint = {'name'       : None,
-                  'description': None,
-                  'size'       : None,}
+    _blueprint = {'name'       : (None, str),
+                  'description': (None, str),
+                  'size'       : (None, int)}
     _relations = {}
     _expiry = {}

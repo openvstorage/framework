@@ -3,9 +3,9 @@ from ovs.dal.hybrids.group import Group
 
 
 class User(DataObject):
-    _blueprint = {'username' : None,
-                  'password' : None,
-                  'email'    : None,
-                  'is_active': False}
+    _blueprint = {'username' : (None,  str),
+                  'password' : (None,  str),
+                  'email'    : (None,  str),
+                  'is_active': (False, bool)}
     _relations = {'group': (Group, 'users')}
     _expiry = {}

@@ -13,7 +13,6 @@ class VMachineList(object):
                                                 'items': []}}).data
         return DataObjectList(vmachines, vMachine)
 
-    #@todo: object.delete() gaat niet alle lijsten gaan invalidaten/updaten
     @staticmethod
     def get_vmachine_by_name(vmname):
         vmachines = DataList(key   = 'vmachine_%s' % vmname,

@@ -6,8 +6,8 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.vmachine import vMachine
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
-from backend.serializers.vmachine import VMachineSerializer
-from backend.serializers.vmachine import SimpleVMachineSerializer
+from backend.serializers.serializers import SimpleSerializer, FullSerializer
+
 
 
 class VMachineViewSet(viewsets.ViewSet):
@@ -21,7 +21,7 @@ class VMachineViewSet(viewsets.ViewSet):
         Overview of all machines
         """
         vmachines = VMachineList.get_vmachines().reduced
-        serializer = SimpleVMachineSerializer(vmachines, many=True)
+        serializer = SimpleSerializer(vmachines, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def retrieve(self, request, pk=None, format=None):
@@ -34,7 +34,7 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = vMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(VMachineSerializer(vmachine).data, status=status.HTTP_200_OK)
+        return Response(FullSerializer(vMachine, instance=vmachine).data, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         """

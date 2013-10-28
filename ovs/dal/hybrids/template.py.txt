@@ -5,9 +5,9 @@ from volumedriver import voldrv
 
 # Example
 class VMachine(DataObject):
-    _blueprint = {'name'         : None,
-                  'description'  : '',
-                  'hypervisor_id : 0}                              # examples: myVM.computenode.name
+    _blueprint = {'name'         : (None, str),
+                  'description'  : ('',   str),
+                  'hypervisor_id : (0,    int)}                    # examples: myVM.computenode.name
     _relations = {'computenode'  : (PMachine, 'guest_machines'),   #           myComputeNode.guest_machines[0].name
                   'storagenode'  : (PMachine, 'stored_machines')}  #           myComputeNode.guest_machines[0].computenode.name
     _expiry = {'status' : 30,  # Timeout in seconds of these properties

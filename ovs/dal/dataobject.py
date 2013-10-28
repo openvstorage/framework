@@ -105,7 +105,7 @@ class DataObject(StoredObject):
         # Set default values on new fields
         for key, default in self._blueprint.iteritems():
             if key not in self._data:
-                self._data[key] = default
+                self._data[key] = default[0]
 
         # Add properties where appropriate, hooking in the correct dictionary
         for attribute, default in self._blueprint.iteritems():
@@ -190,7 +190,10 @@ class DataObject(StoredObject):
     # Helper method supporting property setting
     def _set_sproperty(self, attribute, value):
         self.dirty = True
-        self._data[attribute] = value
+        if isinstance(value, self._blueprint[attribute][1]):
+            self._data[attribute] = value
+        else:
+            raise TypeError('Property %s should be of type %s' % (attribute, self._blueprint[attribute][1].__name__))
 
     def _set_cproperty(self, attribute, value):
         self.dirty = True
