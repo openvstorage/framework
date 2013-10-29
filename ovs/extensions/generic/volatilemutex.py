@@ -15,12 +15,14 @@ class VolatileMutex(object):
         self._has_lock = False
         self._start = 0
 
-    def acquire(self):
+    def acquire(self, wait=None):
         if self._has_lock:
             return True
         self._start = time.time()
-        while not self._volatile.add(self.key(), 1):
-            pass
+        while not self._volatile.add(self.key(), 1, 60):
+            passed = time.time() - self._start
+            if wait is not None and passed > wait:
+                raise RuntimeError('Could not aquire lock %s' % self.key())
         passed = time.time() - self._start
         if passed > 0.025:  # More than 25 ms is a long time to wait!
             print 'Waited %s seconds for lock %s' % (passed, self.key())

@@ -84,6 +84,14 @@ class DummyVolatileStore(object):
         data['t'][key] = time.time() + timeout
         self._save(data)
 
+    def add(self, key, value, timeout=99999999):
+        data = self._read()
+        if key not in data['s']:
+            self.set(key, value, timeout)
+            return True
+        else:
+            return False
+
     def delete(self, key):
         data = self._read()
         if key in data['s']:

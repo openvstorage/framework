@@ -396,7 +396,7 @@ class DataObject(StoredObject):
     def _add_pk(self, key):
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
-            self._mutex.acquire()
+            self._mutex.acquire(10)
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
                 keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
@@ -409,7 +409,7 @@ class DataObject(StoredObject):
     def _delete_pk(self, key):
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
-            self._mutex.acquire()
+            self._mutex.acquire(10)
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
                 keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
