@@ -1,16 +1,5 @@
 ﻿<section>
-    <h2>vMachines</h2>
-    <p>
-        This page contains a first overview of the vmachines and their vdisks in our model.<br />
-        Featuring:
-    </p>
-    <ul>
-        <li>Adds/removes machines every 5 seconds</li>
-        <li>Refreshes viewport data every 5 seconds</li>
-        <li>Display of hybrid properties</li>
-        <li>Smoothed value updates</li>
-        <li>Value dependent markup</li>
-    </ul>
+    <h2>Virtual Machines</h2>
     <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
                              enterViewport: 'load', viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
@@ -26,10 +15,10 @@
                 <td data-bind="css: { danger: latency() >= 100 }"><span data-bind="text: latency"></span> ms</td>
                 <td><span data-bind="text: readSpeed"></span> MiB/s</td>
                 <td><span data-bind="text: writeSpeed"></span> MiB/s</td>
-                <td>
+                <td style="width: 35px;">
                     <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
                 </td>
-                <td>
+                <td style="width: 35px;">
                     <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand glyphicon glyphicon-trash"></i>
                 </td>
             </tr>

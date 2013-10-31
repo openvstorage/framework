@@ -15,16 +15,15 @@
 
         // Data
         self.vMachineHeaders = [
-            { key: 'name',       value: 'Name',        width: 150 },
-            { key: undefined,    value: 'Disks',       width: 60 },
-            { key: 'storedData', value: 'Stored data', width: 100 },
-            { key: 'cache',      value: 'Cache',       width: 70 },
-            { key: 'iops',       value: 'IOPS',        width: 55 },
-            { key: 'latency',    value: 'Latency',     width: 70 },
-            { key: 'readSpeed',  value: 'Read speed',  width: 100 },
-            { key: 'writeSpeed', value: 'Write speed', width: undefined },
-            { key: undefined,    value: '&nbsp;',      width: 35 },
-            { key: undefined,    value: '&nbsp;',      width: 35 }
+            { key: 'name',       value: 'Name',        width: 150,       colspan: undefined },
+            { key: undefined,    value: 'vDisks',      width: 60,        colspan: undefined },
+            { key: 'storedData', value: 'Stored data', width: 100,       colspan: undefined },
+            { key: 'cache',      value: 'Cache',       width: 70,        colspan: undefined },
+            { key: 'iops',       value: 'IOPS',        width: 55,        colspan: undefined },
+            { key: 'latency',    value: 'Latency',     width: 70,        colspan: undefined },
+            { key: 'readSpeed',  value: 'Read speed',  width: 100,       colspan: undefined },
+            { key: 'writeSpeed', value: 'Write speed', width: undefined, colspan: undefined },
+            { key: undefined,    value: 'Actions',     width: undefined, colspan: 2 }
         ];
         self.vMachines = ko.observableArray([]);
         self.vMachineGuids =  [];
