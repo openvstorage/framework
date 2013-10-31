@@ -11,14 +11,26 @@
                             })
                             .map([
                                 // Navigation routes
-                                { route: '',            moduleId: 'dashboard',   hash: '#full',             title: 'Dashboard',   nav: true  },
-                                { route: 'statistics',  moduleId: 'statistics',  hash: '#full/statistics',  title: 'Statistics',  nav: true  },
-                                { route: 'vmachines',   moduleId: 'vmachines',   hash: '#full/vmachines',   title: 'vMachines',   nav: true  },
+                                { route: '',                moduleId: 'dashboard',   hash: '#full',             title: 'Dashboard',   nav: true  },
+                                { route: 'statistics',      moduleId: 'statistics',  hash: '#full/statistics',  title: 'Statistics',  nav: true  },
+                                { route: 'vmachines',       moduleId: 'vmachines',   hash: '#full/vmachines',   title: 'vMachines',   nav: true  },
                                 // Non-navigation routes
-                                { route: 'login',       moduleId: 'login',       hash: '#full/login',       title: 'Login',       nav: false }
+                                { route: 'login',           moduleId: 'login',       hash: '#full/login',       title: 'Login',       nav: false }
                             ])
                             .buildNavigationModel();
-    childRouter.mapUnknownRoutes('404');
+    childRouter.guardRoute = function(instance, instruction) {
+        if (instance !== undefined && instance.hasOwnProperty('guard')) {
+            if (instance.guard.authenticated === true) {
+                if (instance.shared.authentication.validate()) {
+                    return true;
+                }
+                window.localStorage.setItem('referrer', instruction.fragment);
+                return 'full/login';
+            }
+        }
+        return true;
+    };
+    childRouter.mapUnknownRoutes('../404');
 
     return {
         shared: shared,

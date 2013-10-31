@@ -8,6 +8,7 @@ define([
 
         // System
         self.shared    = shared;
+        self.guard     = { authenticated: true };
         self.refresher = new Refresher();
 
         // Data
@@ -19,7 +20,6 @@ define([
         };
 
         // Durandal
-        self.canActivate = function() { return self.shared.authentication.validate(); };
         self.activate = function() {
             self.refresher.init(self.refresh, 1000);
             self.refresher.run();

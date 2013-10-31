@@ -1,7 +1,7 @@
 define([
-    'jquery', 'knockout',
+    'jquery', 'knockout', 'plugins/router', 'plugins/history',
     'ovs/shared'
-], function($, ko, shared) {
+], function($, ko, router, history, shared) {
     "use strict";
     return function() {
         var self = this;
@@ -14,6 +14,7 @@ define([
         self.password    = ko.observable();
         self.loggedIn    = ko.observable(false);
         self.failed      = ko.observable(false);
+        self.referrer    = undefined;
 
         // Functions
         self.login = function() {
@@ -21,6 +22,9 @@ define([
             self.shared.authentication.login(self.username(), self.password())
                 .done(function() {
                     self.loggedIn(true);
+                    if (self.referrer) {
+                        router.navigate(self.referrer);
+                    }
                 })
                 .fail(function() {
                     self.password('');
@@ -30,6 +34,7 @@ define([
 
         // Durandal
         self.activate = function() {
+            self.referrer = window.localStorage.getItem('referrer');
             setTimeout(function() {
                 $('#inputUsername').focus();
             }, 250);

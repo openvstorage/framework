@@ -9,6 +9,7 @@ define([
         self.mode       = undefined;
         self.onLoggedIn = [];
         self.token      = undefined;
+        self.required   = false;
 
         self.username = ko.observable();
         self.password = ko.observable();
@@ -67,7 +68,7 @@ define([
             if (self.token !== undefined) {
                 return true;
             }
-            return { redirect: '#' + self.mode + '/login' };
+            return false;
         };
         self.header = function() {
             return 'Token ' + self.token;

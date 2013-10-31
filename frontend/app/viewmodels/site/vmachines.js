@@ -8,9 +8,10 @@
         var self = this;
 
         // System
-        self.shared = shared;
+        self.shared    = shared;
+        self.guard     = { authenticated: true };
         self.refresher = new Refresher();
-        self.widgets = [];
+        self.widgets   = [];
 
         // Data
         self.vMachineHeaders = [
@@ -98,7 +99,6 @@
         };
 
         // Durandal
-        self.canActivate = function() { return self.shared.authentication.validate(); };
         self.activate = function() {
             self.refresher.init(self.load, 5000);
             self.refresher.run();
