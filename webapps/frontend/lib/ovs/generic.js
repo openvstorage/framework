@@ -1,4 +1,4 @@
-define(function() {
+define(['jquery', 'jqp/pnotify'], function($) {
     "use strict";
     function getTimestamp() {
         return new Date().getTime();
@@ -19,6 +19,12 @@ define(function() {
         }
         return value;
     }
+    function tryGet(object, key, fallback) {
+        if (object !== undefined && object.hasOwnProperty(key)) {
+            return object[key];
+        }
+        return fallback;
+    }
     function getCookie(name) {
         var i, cookie, cookies;
         if (document.cookie && document.cookie !== '') {
@@ -32,11 +38,19 @@ define(function() {
         }
         return undefined;
     }
-    function tryGet(object, key, fallback) {
-        if (object !== undefined && object.hasOwnProperty(key)) {
-            return object[key];
+    function setCookie(name, value, expiry) {
+        var date, expires = '';
+        if (expiry) {
+            date = new Date();
+            date.setTime(date.getTime() +
+                (tryGet(expiry, 'days', 0) * 24 * 60 * 60 * 1000) +
+                (tryGet(expiry, 'hours', 0) * 60 * 60 * 1000) +
+                (tryGet(expiry, 'minutes', 0) * 60 * 1000) +
+                (tryGet(expiry, 'seconds', 0) * 1000)
+            );
+            expires = '; expires=' + date.toUTCString();
         }
-        return fallback;
+        document.cookie = name + '=' + value + expires + '; path=/';
     }
     function alert(title, message, type) {
         var data = {
@@ -48,16 +62,16 @@ define(function() {
         if (type !== undefined) {
             data.type = type;
         }
-        $.pnotify(data);
+        return $.pnotify(data);
     }
     function alertInfo(title, message) {
-        alert(title, message, 'info');
+        return alert(title, message, 'info');
     }
     function alertSuccess(title, message) {
-        alert(title, message, 'success');
+        return alert(title, message, 'success');
     }
     function alertError(title, message) {
-        alert(title, message, 'error');
+        return alert(title, message, 'error');
     }
     function keys(object) {
         var all_keys = [], key;
@@ -113,6 +127,7 @@ define(function() {
         getBytesHuman: getBytesHuman,
         padRight     : padRight,
         getCookie    : getCookie,
+        setCookie    : setCookie,
         tryGet       : tryGet,
         alert        : alert,
         alertInfo    : alertInfo,

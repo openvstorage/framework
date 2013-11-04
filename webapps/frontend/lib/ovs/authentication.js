@@ -65,10 +65,7 @@ define([
             router.navigate('');
         };
         self.validate = function() {
-            if (self.token !== undefined) {
-                return true;
-            }
-            return false;
+            return self.token !== undefined;
         };
         self.header = function() {
             return 'Token ' + self.token;
