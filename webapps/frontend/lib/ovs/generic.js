@@ -27,13 +27,11 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
     function getCookie(name) {
         var i, cookie, cookies;
-        if (document.cookie && document.cookie !== '') {
-            cookies = document.cookie.split(';');
-            for (i = 0; i < cookies.length; i++) {
-                cookie = $.trim(cookies[i]);
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    return decodeURIComponent(cookie.substring(name.length + 1));
-                }
+        cookies = document.cookie.split(';');
+        for (i = 0; i < cookies.length; i += 1) {
+            cookie = $.trim(cookies[i]);
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                return decodeURIComponent(cookie.substring(name.length + 1));
             }
         }
         return undefined;
@@ -109,13 +107,11 @@ define(['jquery', 'jqp/pnotify'], function($) {
             step_size = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
             execute = function() {
                 var current = observable();
-                if (current !== target_value) {
-                    if (Math.abs(target_value - current) > Math.abs(step_size)) {
-                        observable(observable() + step_size);
-                        window.setTimeout(execute, 75);
-                    } else {
-                        observable(target_value);
-                    }
+                if (Math.abs(target_value - current) > Math.abs(step_size)) {
+                    observable(observable() + step_size);
+                    window.setTimeout(execute, 75);
+                } else {
+                    observable(target_value);
                 }
             };
             window.setTimeout(execute, 75);

@@ -4,13 +4,17 @@ define(['ovs/refresher'], function(Refresher) {
         it('refresher behaves correctly', function() {
             jasmine.Clock.useMock();
             var refresher = new Refresher(),
+                value = 0,
                 dummy = {
-                    load: function() { }
+                    load: function() {
+                        value += 1;
+                    }
                 };
-            spyOn(dummy, 'load');
+            spyOn(dummy, 'load').andCallThrough();
 
             refresher.init(dummy.load, 100);
             expect(dummy.load).not.toHaveBeenCalled();
+            expect(refresher.stop).not.toThrow();
             refresher.start();
             refresher.run();
             expect(dummy.load.callCount).toEqual(1);
@@ -23,6 +27,7 @@ define(['ovs/refresher'], function(Refresher) {
             refresher.stop();
             jasmine.Clock.tick(200);
             expect(dummy.load.callCount).toEqual(4);
+            expect(value).toBe(4);
         });
     });
 });

@@ -1,4 +1,5 @@
 var tests = [];
+Object.prototype.invalid_value = 0;
 for (var file in window.__karma__.files) {
     if (window.__karma__.files.hasOwnProperty(file)) {
         if (/test.+\.js$/.test(file) && !/test.+main\.js$/.test(file)) {

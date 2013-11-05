@@ -39,7 +39,7 @@
             var self = this;
             // Config
             self.shared.mode(mode);
-            self.shared.authentication.init(mode);
+
             // Notifications
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";

@@ -10,7 +10,8 @@ module.exports = function(config) {
             { pattern: 'tests/**/*.js', included: false }
         ],
         exclude: [
-            'app/main.js'
+            'app/main.js',
+            'tests/coverage/**/*.js'
         ],
         preprocessors: {
             'lib/ovs/*.js'       : ['coverage'],

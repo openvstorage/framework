@@ -6,7 +6,6 @@ define([
     return function() {
         var self = this;
 
-        self.mode       = undefined;
         self.onLoggedIn = [];
         self.token      = undefined;
         self.required   = false;
@@ -15,9 +14,6 @@ define([
         self.password = ko.observable();
         self.loggedIn = ko.observable(false);
 
-        self.init = function(mode) {
-            self.mode = mode;
-        };
         self.login = function(username, password) {
             return $.Deferred(function(deferred) {
                 var callData = {

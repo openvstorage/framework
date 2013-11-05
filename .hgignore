@@ -6,6 +6,7 @@
 .idea
 .pydevproject
 .metadata
+webapps/frontend/tests/coverage
 syntax: regexp
 .project
 \._.*

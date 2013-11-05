@@ -2,7 +2,7 @@ define([
     'jquery',
     'ovs/shared', 'ovs/generic'
 ], function($, shared, generic) {
-   "use strict";
+    'use strict';
     function call(api, data, filter, type) {
         var querystring = [], key;
 

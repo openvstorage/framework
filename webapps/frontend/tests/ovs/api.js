@@ -91,7 +91,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
                 returnValue, finished = false;
 
             runs(function() {
-                generic.setCookie('csrftoken', 'def', { seconds: 10 });
+                generic.setCookie('csrftoken', 'def', { seconds: 1 });
                 api.get('api/dummy', { abc: 123, def: 456 }, {})
                     .done(function(value) {
                         returnValue = value;
@@ -119,6 +119,36 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
                 expect(returnValue.url).toContain('abc=123&def=456');
             });
         });
+
+        it ('the filter should fall back', function() {
+            var finished = false;
+            runs(function() {
+                api.get('api/dummy', {})
+                    .always(function() {
+                        finished = true;
+                    });
+            });
+            waitsFor(function() { return finished; }, 'The call should complete', 250);
+            runs(function() {
+                expect(finished).toBe(true);
+            });
+        });
+
+        it ('iterating the filter should only iterate the properties', function() {
+            Object.prototype.invalid_value = 0;
+            var finished = false;
+
+            runs(function() {
+                api.get('api/dummy', {}, {})
+                    .always(function() {
+                        finished = true;
+                    });
+            });
+            waitsFor(function() { return finished; }, 'The call should complete', 250);
+            runs(function() {
+                expect(finished).toBe(true);
+            });
+        });
     });
 
     describe('API2', function() {
@@ -129,7 +159,6 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
                 }).promise();
             });
         });
-        shared.authentication = { header: function() { return 'abc'; } };
 
         it('a failed call should reject the promise', function() {
             var returnValue, finished = false;
@@ -151,6 +180,36 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
                 expect(returnValue.textStatus).toBe('textStatus');
                 expect(returnValue.errorThrown).toBe('errorThrown');
             });
-        })
+        });
+    });
+
+    describe('API3', function() {
+        beforeEach(function() {
+            spyOn($, 'ajax').andCallFake(function(url, data) {
+                return $.Deferred(function(deferred) {
+                    deferred.reject({ readyState: 0, status: 0 }, 'textStatus', 'errorThrown');
+                }).promise();
+            });
+        });
+
+        it('navigating away should not call reject or resolve', function() {
+            var deferred, promise, finished = false;
+            runs(function() {
+                deferred = $.Deferred(function(dfd) {
+                    api.get('api/dummy', {}, {}).always(dfd.resolve);
+                });
+                deferred.always(function() { finished = true; });
+                promise = deferred.promise();
+            });
+            waits(10);
+            runs(function() {
+                expect(finished).toBe(false);
+                deferred.resolve();
+            });
+            waitsFor(function() { return finished; }, 'The call should complete', 250);
+            runs(function() {
+                expect(finished).toBe(true);
+            })
+        });
     });
 });
