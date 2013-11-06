@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api'
@@ -8,23 +9,23 @@ define([
 
         self.shared = shared;
         self.hooks = {};
-        self.wait = function(task_id) {
-            self.hooks[task_id] = $.Deferred();
-            return self.hooks[task_id].promise();
+        self.wait = function(taskID) {
+            self.hooks[taskID] = $.Deferred();
+            return self.hooks[taskID].promise();
         };
 
-        self.shared.messaging.subscribe('TASK_COMPLETE', function(task_id) {
-            if (self.hooks.hasOwnProperty(task_id)) {
-                api.get('tasks/' + task_id)
+        self.shared.messaging.subscribe('TASK_COMPLETE', function(taskID) {
+            if (self.hooks.hasOwnProperty(taskID)) {
+                api.get('tasks/' + taskID)
                     .done(function(data) {
                         if (data.successful === true) {
-                            self.hooks[task_id].resolve(data.result);
+                            self.hooks[taskID].resolve(data.result);
                         } else {
-                            self.hooks[task_id].reject(data.result);
+                            self.hooks[taskID].reject(data.result);
                         }
                     })
                     .fail(function(data) {
-                        self.hooks[task_id].reject(data);
+                        self.hooks[taskID].reject(data);
                     });
             }
         });

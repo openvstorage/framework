@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/refresher'
@@ -70,19 +71,19 @@ define([
         self.viewportItems = ko.computed(function() {
             var i,
                 items = self.items(),
-                v_items = [],
-                v_indexes = [],
+                vItems = [],
+                vIndexes = [],
                 start = (self.current() - 1) * self.pagesize(),
                 max = Math.min(start + self.pagesize(), items.length);
             for (i = start; i < max; i += 1) {
                 if (self.enterViewport !== undefined && $.inArray(i, self.viewportIndexes) === -1) {
                     items[i][self.enterViewport]();
                 }
-                v_indexes.push(i);
-                v_items.push(items[i]);
+                vIndexes.push(i);
+                vItems.push(items[i]);
             }
-            self.viewportIndexes = v_indexes.slice();
-            return v_items;
+            self.viewportIndexes = vIndexes.slice();
+            return vItems;
         });
 
         self.step = function(next) {
@@ -96,7 +97,7 @@ define([
                 }
             }
         };
-        self.viewport_refresh = function() {
+        self.viewportRefresh = function() {
             var i, items = self.viewportItems();
             for (i = 0; i < items.length; i += 1) {
                 if (self.enterViewport !== undefined) {
@@ -121,7 +122,7 @@ define([
             self.controls(generic.tryGet(settings, 'controls', true));
 
             if (self.refresh !== undefined) {
-                self.refresher.init(self.viewport_refresh, self.refresh);
+                self.refresher.init(self.viewportRefresh, self.refresh);
                 self.refresher.start();
                 settings.bindingContext.$root.widgets.push(self);
             }

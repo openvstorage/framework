@@ -1,3 +1,4 @@
+/*global define */
 define([
     'knockout',
     'ovs/generic', 'ovs/api'
@@ -37,13 +38,13 @@ define([
                 self.bytesWritten(generic.getBytesHuman(data.bytes_written));
                 self.uptime(data.uptime);
 
-                var raw_string = '', attribute;
+                var rawString = '', attribute;
                 for (attribute in data) {
                     if (data.hasOwnProperty(attribute)) {
-                        raw_string += generic.padRight(attribute, ' ', 25) + data[attribute].toString() + '\n';
+                        rawString += generic.padRight(attribute, ' ', 25) + data[attribute].toString() + '\n';
                     }
                 }
-                self.raw(raw_string);
+                self.raw(rawString);
             });
         };
     };

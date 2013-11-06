@@ -1,4 +1,5 @@
-﻿define([
+﻿/*global define */
+define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vmachine', '../wizards/clone/index'

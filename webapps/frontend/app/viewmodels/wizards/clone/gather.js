@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery', 'knockout',
     '../../containers/vmachine', './data'

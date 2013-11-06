@@ -1,3 +1,4 @@
+/*global define, describe, spyOn, it, expect, jasmine */
 define(['ovs/refresher'], function(Refresher) {
     'use strict';
     describe('Refresher', function() {

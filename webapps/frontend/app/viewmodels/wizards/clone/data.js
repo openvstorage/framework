@@ -1,3 +1,4 @@
+/*global define */
 define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {

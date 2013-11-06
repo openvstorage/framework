@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery',
     'ovs/api', 'ovs/generic'
@@ -48,8 +49,8 @@ define([
         self.start = function() {
             self.abort = false;
             self.getLastMessageID()
-                .then(function(message_id) {
-                    self.lastMessageID = message_id;
+                .then(function(messageID) {
+                    self.lastMessageID = messageID;
                 })
                 .then(self.sendSubscriptions)
                 .done(function() {

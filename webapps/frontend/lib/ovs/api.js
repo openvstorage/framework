@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery',
     'ovs/shared', 'ovs/generic'

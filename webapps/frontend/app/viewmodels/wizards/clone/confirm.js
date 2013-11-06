@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery', 'knockout',
     './data', 'ovs/shared', 'ovs/generic', 'ovs/api'
@@ -11,11 +12,11 @@ define([
 
         self.canContinue = ko.observable({value: true, reason: undefined});
 
-        self._clone = function(i, vm, call_data) {
-            var current_data = $.extend({}, call_data);
-            current_data.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
+        self._clone = function(i, vm, callData) {
+            var currentData = $.extend({}, callData);
+            currentData.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
             return $.Deferred(function(deferred) {
-                api.post('vmachines/' + vm.guid() + '/clone', current_data)
+                api.post('vmachines/' + vm.guid() + '/clone', currentData)
                     .then(self.shared.tasks.wait)
                     .done(function() {
                         deferred.resolve(true);
@@ -30,15 +31,15 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var i, clones = [],
-                    call_data = {},
+                    callData = {},
                     vm = self.data.vm(),
                     disks = vm.vDisks();
-                call_data.disks = {};
+                callData.disks = {};
                 for (i = 0; i < disks.length; i += 1) {
-                    call_data.disks[disks[i].guid()] = disks[i].selectedSnapshot();
+                    callData.disks[disks[i].guid()] = disks[i].selectedSnapshot();
                 }
                 for (i = 1; i <= self.data.amount(); i += 1) {
-                    clones.push(self._clone(i, vm, call_data));
+                    clones.push(self._clone(i, vm, callData));
                 }
                 generic.alertInfo('Clone started', 'Machine ' + vm.name() + ' cloning in progress...');
                 deferred.resolve();

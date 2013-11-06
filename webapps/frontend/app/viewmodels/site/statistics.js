@@ -1,3 +1,4 @@
+/*global define */
 define([
     'ovs/shared', 'ovs/refresher',
     '../containers/memcached'

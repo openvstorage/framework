@@ -1,3 +1,4 @@
+/*global define */
 define(['jquery', 'jqp/pnotify'], function($) {
     "use strict";
     function getTimestamp() {
@@ -72,13 +73,13 @@ define(['jquery', 'jqp/pnotify'], function($) {
         return alert(title, message, 'error');
     }
     function keys(object) {
-        var all_keys = [], key;
+        var allKeys = [], key;
         for (key in object) {
             if (object.hasOwnProperty(key)) {
-                all_keys.push(key);
+                allKeys.push(key);
             }
         }
-        return all_keys;
+        return allKeys;
     }
     function xhrAbort(token) {
         if (token !== undefined && token.state() === 'pending') {
@@ -95,23 +96,23 @@ define(['jquery', 'jqp/pnotify'], function($) {
             array.splice(index, 1);
         }
     }
-    function smooth(observable, target_value, steps) {
-        var start_value, diff, step_size, decimals, execute;
+    function smooth(observable, targetValue, steps) {
+        var startValue, diff, stepSize, decimals, execute;
         if (steps === undefined) {
             steps = 3;
         }
-        start_value = observable() || 0;
-        diff = target_value - start_value;
+        startValue = observable() || 0;
+        diff = targetValue - startValue;
         if (diff !== 0) {
-            decimals = Math.max((start_value.toString().split('.')[1] || []).length, (target_value.toString().split('.')[1] || []).length);
-            step_size = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
+            decimals = Math.max((startValue.toString().split('.')[1] || []).length, (targetValue.toString().split('.')[1] || []).length);
+            stepSize = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
             execute = function() {
                 var current = observable();
-                if (Math.abs(target_value - current) > Math.abs(step_size)) {
-                    observable(observable() + step_size);
+                if (Math.abs(targetValue - current) > Math.abs(stepSize)) {
+                    observable(observable() + stepSize);
                     window.setTimeout(execute, 75);
                 } else {
-                    observable(target_value);
+                    observable(targetValue);
                 }
             };
             window.setTimeout(execute, 75);

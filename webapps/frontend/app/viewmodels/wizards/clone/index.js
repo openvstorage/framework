@@ -1,3 +1,4 @@
+/*global define */
 define([
     'jquery', 'ovs/generic',
     '../build', './gather', './confirm', './data'

@@ -1,4 +1,5 @@
-﻿define([
+﻿/*global define */
+define([
     'knockout',
     'ovs/shared'
 ], function(ko, shared) {

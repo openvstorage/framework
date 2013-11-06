@@ -1,3 +1,4 @@
+/*global define, describe, spyOn, it, expect, jasmine */
 define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
     'use strict';
     describe('Generic', function() {
@@ -39,7 +40,7 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
         });
 
         it('keys should list all object keys', function() {
-            Object.prototype.invalid_value = 0;
+            Object.prototype.invalidValue = 0;
             expect(generic.keys({ abc: 1, def: 2, xyz: 3 })).toEqual(['abc', 'def', 'xyz']);
         });
 
@@ -146,7 +147,7 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
             generic.xhrAbort(token);
             expect(token.abort).toHaveBeenCalled();
             expect(aborts).toBe(1);
-            token = {
+            var token2 = {
                 abort: function() {
                     throw 'error';
                 },
@@ -154,7 +155,7 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
                     return 'pending';
                 }
             };
-            expect(function() { generic.xhrAbort(token); }).not.toThrow();
+            expect(function() { generic.xhrAbort(token2); }).not.toThrow();
         });
     });
 });

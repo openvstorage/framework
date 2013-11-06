@@ -1,3 +1,4 @@
+/*global define */
 define([
     'plugins/router', 'jquery', 'knockout',
     'ovs/generic'

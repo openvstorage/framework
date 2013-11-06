@@ -1,3 +1,4 @@
+/*global define */
 define([
     'durandal/activator', 'plugins/dialog', 'knockout'
 ], function(activator, dialog, ko) {

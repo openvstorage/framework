@@ -1,8 +1,10 @@
-﻿define([
+﻿/*global define */
+define([
     'plugins/router', 'jqp/pnotify',
     'ovs/shared'
 ], function(router, $, shared) {
     "use strict";
+    var mode = router.activeInstruction().params[0];
     var childRouter = router.createChildRouter()
                             .makeRelative({
                                 moduleId: 'viewmodels/site',
@@ -11,11 +13,11 @@
                             })
                             .map([
                                 // Navigation routes
-                                { route: '',                moduleId: 'dashboard',   hash: '#full',             title: 'Dashboard',   nav: true  },
-                                { route: 'statistics',      moduleId: 'statistics',  hash: '#full/statistics',  title: 'Statistics',  nav: true  },
-                                { route: 'vmachines',       moduleId: 'vmachines',   hash: '#full/vmachines',   title: 'vMachines',   nav: true  },
+                                { route: '',                moduleId: 'dashboard',   hash: '#' + mode,                  title: 'Dashboard',   nav: true  },
+                                { route: 'statistics',      moduleId: 'statistics',  hash: '#' + mode + '/statistics',  title: 'Statistics',  nav: true  },
+                                { route: 'vmachines',       moduleId: 'vmachines',   hash: '#' + mode + '/vmachines',   title: 'vMachines',   nav: true  },
                                 // Non-navigation routes
-                                { route: 'login',           moduleId: 'login',       hash: '#full/login',       title: 'Login',       nav: false }
+                                { route: 'login',           moduleId: 'login',       hash: '#' + mode + '/login',       title: 'Login',       nav: false }
                             ])
                             .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {
@@ -25,7 +27,7 @@
                     return true;
                 }
                 window.localStorage.setItem('referrer', instruction.fragment);
-                return 'full/login';
+                return instruction.params[0] + '/login';
             }
         }
         return true;

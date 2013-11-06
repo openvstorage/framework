@@ -1,3 +1,4 @@
+/*global define, describe, beforeEach, spyOn, it, waitsFor, waits, runs, expect */
 define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared, generic, $) {
     'use strict';
     describe('API', function() {
@@ -135,7 +136,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
         });
 
         it ('iterating the filter should only iterate the properties', function() {
-            Object.prototype.invalid_value = 0;
+            Object.prototype.invalidValue = 0;
             var finished = false;
 
             runs(function() {
@@ -153,7 +154,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
 
     describe('API2', function() {
         beforeEach(function() {
-            spyOn($, 'ajax').andCallFake(function(url, data) {
+            spyOn($, 'ajax').andCallFake(function() {
                 return $.Deferred(function(deferred) {
                     deferred.reject({ readyState: 1, status: 1 }, 'textStatus', 'errorThrown');
                 }).promise();
@@ -185,7 +186,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
 
     describe('API3', function() {
         beforeEach(function() {
-            spyOn($, 'ajax').andCallFake(function(url, data) {
+            spyOn($, 'ajax').andCallFake(function() {
                 return $.Deferred(function(deferred) {
                     deferred.reject({ readyState: 0, status: 0 }, 'textStatus', 'errorThrown');
                 }).promise();
