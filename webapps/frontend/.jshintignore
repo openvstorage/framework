@@ -1,0 +1,8 @@
+tests/coverage
+lib/bootstrap
+lib/durandal
+lib/font-awesome
+lib/jquery
+lib/jquery-plugins
+lib/knockout
+lib/require
