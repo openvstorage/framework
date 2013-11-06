@@ -11,32 +11,34 @@ define([
 
         self.canContinue = ko.observable({value: true, reason: undefined});
 
+        self._clone = function(i, vm, call_data) {
+            var current_data = $.extend({}, call_data);
+            current_data.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
+            return $.Deferred(function(deferred) {
+                api.post('vmachines/' + vm.guid() + '/clone', current_data)
+                    .then(self.shared.tasks.wait)
+                    .done(function() {
+                        deferred.resolve(true);
+                    })
+                    .fail(function(error) {
+                        generic.alertError('Error', 'Error while cloning ' + vm.name() + ': ' + error);
+                        deferred.resolve(false);
+                    });
+            }).promise();
+        };
+
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var i, clones = [],
-                    data = {},
+                    call_data = {},
                     vm = self.data.vm(),
                     disks = vm.vDisks();
-                data.disks = {};
+                call_data.disks = {};
                 for (i = 0; i < disks.length; i += 1) {
-                    data.disks[disks[i].guid()] = disks[i].selectedSnapshot();
+                    call_data.disks[disks[i].guid()] = disks[i].selectedSnapshot();
                 }
                 for (i = 1; i <= self.data.amount(); i += 1) {
-                    (function() {
-                        var current_data = $.extend({}, data);
-                        current_data.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
-                        clones.push($.Deferred(function(entry_deferred) {
-                            api.post('vmachines/' + vm.guid() + '/clone', current_data)
-                                .then(self.shared.tasks.wait)
-                                .done(function() {
-                                    entry_deferred.resolve(true);
-                                })
-                                .fail(function(error) {
-                                    generic.alertError('Error', 'Error while cloning ' + vm.name() + ': ' + error);
-                                    entry_deferred.resolve(false);
-                                });
-                        }).promise());
-                    }());
+                    clones.push(self._clone(i, vm, call_data));
                 }
                 generic.alertInfo('Clone started', 'Machine ' + vm.name() + ' cloning in progress...');
                 deferred.resolve();

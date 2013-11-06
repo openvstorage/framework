@@ -209,7 +209,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             waitsFor(function() { return finished; }, 'The call should complete', 250);
             runs(function() {
                 expect(finished).toBe(true);
-            })
+            });
         });
     });
 });
