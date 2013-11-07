@@ -1,6 +1,7 @@
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
 from backend.decorators import required_roles
+from backend.toolbox import Toolbox
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -9,6 +10,7 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.hybrids.user import User
 from ovs.dal.lists.userlist import UserList
 from django.http import Http404
+import hashlib
 
 
 class UserViewSet(viewsets.ViewSet):
@@ -53,14 +55,16 @@ class UserViewSet(viewsets.ViewSet):
             user.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @required_roles(['view', 'update', 'system'])
     @action()
+    @required_roles(['view'])
     def set_password(self, request, pk=None, format=None):
         user = self._get_object(pk)
-        serializer = PasswordSerializer(data=request.DATA)
-        if serializer.is_valid():
-            user.password = serializer.data['password']
-            user.save()
-            return Response(FullSerializer(User, user).data, status=status.HTTP_202_ACCEPTED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        loggedin_user = User(request.user.username)
+        if user.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['update', 'system']):
+            serializer = PasswordSerializer(data=request.DATA)
+            if serializer.is_valid():
+                if user.password == hashlib.sha256(str(serializer.data['current_password'])).hexdigest():
+                    user.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
+                    user.save()
+                    return Response(FullSerializer(User, user).data, status=status.HTTP_202_ACCEPTED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

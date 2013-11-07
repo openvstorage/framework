@@ -29,10 +29,16 @@
                     <!-- /ko -->
                 </ul>
                 <!-- below: navbar-right has float: right behavior -->
-                <p class="navbar-text navbar-right" data-bind="visible: shared.authentication.loggedIn">
-                    Signed in as <i><span data-bind="text: shared.authentication.username"></span></i>.
-                    <a data-bind="click: shared.authentication.logout" class="hand navbar-link">Log out</a>
-                </p>
+                <ul class="nav navbar-nav navbar-right" data-bind="visible: shared.authentication.loggedIn">
+                    <li class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span data-bind="text: shared.authentication.username"></span> <b class="caret"></b></a>
+                        <ul class="dropdown-menu">
+                            <li><a class="hand" data-bind="click: changePassword">Change password</a></li>
+                            <li class="divider"></li>
+                            <li><a class="hand" data-bind="click: shared.authentication.logout" >Logout</a></li>
+                        </ul>
+                    </li>
+                </ul>
                 <p class="navbar-text navbar-right" data-bind="visible: router.isNavigating">
                     <i class="icon-spinner icon-spin"></i>
                 </p>

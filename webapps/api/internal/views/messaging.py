@@ -25,8 +25,8 @@ class MessagingViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.subscriptions(pk), status=status.HTTP_200_OK)
 
-    @required_roles(['view'])
     @link()
+    @required_roles(['view'])
     def wait(self, request, pk=None, format=None):
         try:
             pk = int(pk)
@@ -49,8 +49,8 @@ class MessagingViewSet(viewsets.ViewSet):
                          'last_message_id': last_message_id,
                          'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
 
-    @required_roles(['view'])
     @link()
+    @required_roles(['view'])
     def last(self, request, pk=None, format=None):
         try:
             pk = int(pk)
@@ -58,8 +58,8 @@ class MessagingViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.last_message_id(), status=status.HTTP_200_OK)
 
-    @required_roles(['view'])
     @action()
+    @required_roles(['view'])
     def subscribe(self, request, pk=None, format=None):
         try:
             pk = int(pk)

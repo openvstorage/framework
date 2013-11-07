@@ -52,8 +52,8 @@ class VMachineViewSet(viewsets.ViewSet):
         task = VMachineController.delete.s(machineguid=vmachine.guid).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)
 
-    @required_roles(['view', 'create'])
     @action()
+    @required_roles(['view', 'create'])
     def clone(self, request, pk=None, format=None):
         """
         Clones a machine
