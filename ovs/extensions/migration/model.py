@@ -5,7 +5,7 @@ from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.rolegroup import RoleGroup
 
 
-class Migration():
+class Model():
     def __init__(self):
         pass
 

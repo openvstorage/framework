@@ -21,13 +21,14 @@ define([
                     timeout: 1000 * 60 * 60,
                     contentType: 'application/json',
                     data: JSON.stringify(data),
-                    headers: {
-                        'Authorization': shared.authentication.header()
-                    }
+                    headers: { }
                 },
                 cookie = generic.getCookie('csrftoken');
             if (cookie !== undefined) {
                 callData.headers['X-CSRFToken'] = cookie;
+            }
+            if (shared.authentication.validate()) {
+                callData.headers.Authorization = shared.authentication.header();
             }
             $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
                 .done(deferred.resolve)

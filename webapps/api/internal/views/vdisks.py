@@ -20,7 +20,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Overview of all machines
         """
-        vmachineguid = username = self.request.QUERY_PARAMS.get('vmachineguid', None)
+        vmachineguid = self.request.QUERY_PARAMS.get('vmachineguid', None)
         if vmachineguid is None:
             vdisks = vDiskList.get_vdisks().reduced
         else:
