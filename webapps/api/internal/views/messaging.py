@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
 from ovs.lib.messaging import MessageController
+from backend.decorators import required_roles
 
 
 class MessagingViewSet(viewsets.ViewSet):
@@ -12,9 +13,11 @@ class MessagingViewSet(viewsets.ViewSet):
     """
     permission_classes = (IsAuthenticated,)
 
+    @required_roles(['view'])
     def list(self, request, format=None):
         return Response(MessageController.all_subscriptions(), status=status.HTTP_200_OK)
 
+    @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         try:
             pk = int(pk)
@@ -22,6 +25,7 @@ class MessagingViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.subscriptions(pk), status=status.HTTP_200_OK)
 
+    @required_roles(['view'])
     @link()
     def wait(self, request, pk=None, format=None):
         try:
@@ -45,6 +49,7 @@ class MessagingViewSet(viewsets.ViewSet):
                          'last_message_id': last_message_id,
                          'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
 
+    @required_roles(['view'])
     @link()
     def last(self, request, pk=None, format=None):
         try:
@@ -53,6 +58,7 @@ class MessagingViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.last_message_id(), status=status.HTTP_200_OK)
 
+    @required_roles(['view'])
     @action()
     def subscribe(self, request, pk=None, format=None):
         try:

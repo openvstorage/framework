@@ -7,7 +7,7 @@ from ovs.dal.hybrids.vmachine import vMachine
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
-
+from backend.decorators import required_roles
 
 
 class VMachineViewSet(viewsets.ViewSet):
@@ -16,6 +16,7 @@ class VMachineViewSet(viewsets.ViewSet):
     """
     permission_classes = (IsAuthenticated,)
 
+    @required_roles(['view'])
     def list(self, request, format=None):
         """
         Overview of all machines
@@ -24,6 +25,7 @@ class VMachineViewSet(viewsets.ViewSet):
         serializer = SimpleSerializer(vmachines, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """
         Load information about a given task
@@ -36,6 +38,7 @@ class VMachineViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(FullSerializer(vMachine, instance=vmachine).data, status=status.HTTP_200_OK)
 
+    @required_roles(['view', 'delete'])
     def destroy(self, request, pk=None):
         """
         Deletes a machine
@@ -49,6 +52,7 @@ class VMachineViewSet(viewsets.ViewSet):
         task = VMachineController.delete.s(machineguid=vmachine.guid).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)
 
+    @required_roles(['view', 'create'])
     @action()
     def clone(self, request, pk=None, format=None):
         """

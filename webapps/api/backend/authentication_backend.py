@@ -7,6 +7,7 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 import logging
 import settings
+import hashlib
 
 logger = logging.getLogger(settings.SYSTEM_NAME)
 
@@ -21,7 +22,7 @@ class UPAuthenticationBackend(object):
             logger.error('User with username %s could not be found' % username)
             return None
 
-        if password != cuser.password:
+        if cuser.password != hashlib.sha256(password).hexdigest():
             logger.error('Wrong password provided for %s' % username)
             return None
 
@@ -32,10 +33,10 @@ class UPAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = DUser.objects.get(username=cuser.username)
+            user = DUser.objects.get(username=cuser.guid)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
-            logger.info('Created user %s' % username)
+            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.guid)
             user.is_active = cuser.is_active
             user.is_staff = False
             user.is_superuser = False
@@ -97,10 +98,10 @@ class TokenAuthenticationBackend(BaseAuthentication):
             raise exceptions.AuthenticationFailed()
 
         try:
-            user = DUser.objects.get(username=cuser.username)
+            user = DUser.objects.get(username=cuser.guid)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.username)
+            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.guid)
             user.is_active = cuser.is_active
             user.is_staff = False
             user.is_superuser = False
@@ -148,10 +149,10 @@ class HashAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = DUser.objects.get(username=cuser.username)
+            user = DUser.objects.get(username=cuser.guid)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.username)
+            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.guid)
             user.is_active = cuser.is_active
             user.is_staff = True
             user.is_superuser = True

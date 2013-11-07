@@ -1,5 +1,6 @@
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
+from backend.decorators import required_roles
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -22,16 +23,19 @@ class UserViewSet(viewsets.ViewSet):
         except ObjectNotFoundException:
             raise Http404
 
+    @required_roles(['view', 'system'])
     def list(self, request, format=None):
         users = UserList.get_users()
         serializer = FullSerializer(User, instance=users, many=True)
         return Response(serializer.data)
 
+    @required_roles(['view', 'system'])
     def retrieve(self, request, pk=None, format=None):
         user = self._get_object(pk)
         serializer = FullSerializer(User, instance=user)
         return Response(serializer.data)
 
+    @required_roles(['view', 'create', 'system'])
     def create(self, request, format=None):
         serializer = FullSerializer(User, User(), request.DATA)
         if serializer.is_valid():
@@ -40,6 +44,7 @@ class UserViewSet(viewsets.ViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @required_roles(['view', 'delete', 'system'])
     def delete(self, request, pk=None, format=None):
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
@@ -48,6 +53,7 @@ class UserViewSet(viewsets.ViewSet):
             user.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @required_roles(['view', 'update', 'system'])
     @action()
     def set_password(self, request, pk=None, format=None):
         user = self._get_object(pk)
