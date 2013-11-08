@@ -10,7 +10,7 @@ define([
         self.data = data;
         build(self);
 
-        self.title(generic.tryGet(options, 'title', 'Clone'));
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.clone.title')));
         self.modal(generic.tryGet(options, 'modal', false));
 
         self.data.machineGuid(options.machineguid);

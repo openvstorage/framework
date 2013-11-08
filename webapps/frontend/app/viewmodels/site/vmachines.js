@@ -16,15 +16,15 @@ define([
 
         // Data
         self.vMachineHeaders = [
-            { key: 'name',       value: 'Name',        width: 150,       colspan: undefined },
-            { key: undefined,    value: 'vDisks',      width: 60,        colspan: undefined },
-            { key: 'storedData', value: 'Stored data', width: 100,       colspan: undefined },
-            { key: 'cache',      value: 'Cache',       width: 70,        colspan: undefined },
-            { key: 'iops',       value: 'IOPS',        width: 55,        colspan: undefined },
-            { key: 'latency',    value: 'Latency',     width: 70,        colspan: undefined },
-            { key: 'readSpeed',  value: 'Read speed',  width: 100,       colspan: undefined },
-            { key: 'writeSpeed', value: 'Write speed', width: undefined, colspan: undefined },
-            { key: undefined,    value: 'Actions',     width: undefined, colspan: 2 }
+            { key: 'name',       value: $.t('ovs:generic.name'),       width: 150,       colspan: undefined },
+            { key: undefined,    value: $.t('ovs:generic.vdisks'),     width: 60,        colspan: undefined },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 100,       colspan: undefined },
+            { key: 'cache',      value: $.t('ovs:generic.cache'),      width: 70,        colspan: undefined },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55,        colspan: undefined },
+            { key: 'latency',    value: $.t('ovs:generic.latency'),    width: 70,        colspan: undefined },
+            { key: 'readSpeed',  value: $.t('ovs:generic.readspeed'),  width: 100,       colspan: undefined },
+            { key: 'writeSpeed', value: $.t('ovs:generic.writespeed'), width: undefined, colspan: undefined },
+            { key: undefined,    value: $.t('ovs:generic.actions'),    width: undefined, colspan: 2 }
         ];
         self.vMachines = ko.observableArray([]);
         self.vMachineGuids =  [];
@@ -79,18 +79,22 @@ define([
             }
             if (vm !== undefined) {
                 (function(vm) {
-                    app.showMessage('Are you sure you want to delete "' + vm.name() + '"?', 'Are you sure?', ['Yes', 'No'])
+                    app.showMessage(
+                            $.t('ovs:vmachines.suretodelete', { what: vm.name() }),
+                            $.t('ovs:generic.areyousure'),
+                            [$.t('ovs:generic.yes'), $.t('ovs:generic.no')]
+                        )
                         .done(function(answer) {
-                            if (answer === 'Yes') {
+                            if (answer === $.t('ovs:generic.yes')) {
                                 self.vMachines.destroy(vm);
-                                generic.alertInfo('Marked for deletion', 'Machine ' + vm.name() + ' is marked for deletion...');
+                                generic.alertInfo($.t('ovs:generic.vmachines.marked'), $.t('ovs:generic.vmachine.machinemarked', { what: vm.name() }));
                                 api.del('vmachines/' + vm.guid())
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
-                                        generic.alertSuccess('Machine deleted', 'Machine ' + vm.name() + ' deleted.');
+                                        generic.alertSuccess($.t('ovs:vmachines.deleted'), $.t('ovs:vmachines.machinedeleted', { what: vm.name() }));
                                     })
                                     .fail(function(error) {
-                                        generic.alertSuccess('Error', 'Machine ' + vm.name() + ' could not be deleted: ' + error);
+                                        generic.alertSuccess($.t('ovs:generic.error'), 'Machine ' + vm.name() + ' could not be deleted: ' + error);
                                     });
                             }
                         });

@@ -14,16 +14,16 @@ define([
         self.newPassword2 = ko.observable('');
         self.canContinue = ko.computed(function() {
             if (self.currentPassword() === '') {
-                return { value: false, reason: 'Enter current password' };
+                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.entercurrent') };
             }
             if (self.currentPassword() !== self.shared.authentication.password()) {
-                return { value: false, reason: 'Current password invalid' };
+                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.currentinvalid') };
             }
             if (self.newPassword() === '') {
-                return { value: false, reason: 'Enter new password' };
+                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.enternew') };
             }
             if (self.newPassword() !== self.newPassword2()) {
-                return { value: false, reason: 'New passwords should match' };
+                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.shouldmatch') };
             }
             return { value: true, reason: undefined };
         });
@@ -35,11 +35,11 @@ define([
                         new_password: self.newPassword()
                     })
                     .done(function() {
-                        generic.alertSuccess('Saved', 'Password saved successfully.');
+                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:generic.savesuccessfully', { what: $.t('ovs:generic.password') }));
                         deferred.resolve();
                     })
                     .fail(function(error) {
-                        generic.alertError('Error', 'An error occurred while updating the password.');
+                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.errorwhile', { what: $.t('ovs:wizards.changepassword.confirm.updatingpassword') }));
                         deferred.reject(error);
                     });
             }).promise();

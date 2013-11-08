@@ -1,5 +1,5 @@
 ﻿<section>
-    <h2>Virtual Machines</h2>
+    <h2 data-i18n="ovs:vmachines.title"></h2>
     <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
                              enterViewport: 'load', viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
@@ -9,12 +9,12 @@
                     <span data-bind="text: name"></span>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
-                <td><span data-bind="text: storedData"></span> MiB</td>
-                <td><span data-bind="text: cache"></span> MiB</td>
+                <td><span data-bind="text: storedData"></span> <span data-i18n="ovs:generic.mib"></span></td>
+                <td><span data-bind="text: cache"></span> <span data-i18n="ovs:generic.mib"></span></td>
                 <td><span data-bind="text: iops"></span></td>
                 <td data-bind="css: { danger: latency() >= 100 }"><span data-bind="text: latency"></span> ms</td>
-                <td><span data-bind="text: readSpeed"></span> MiB/s</td>
-                <td><span data-bind="text: writeSpeed"></span> MiB/s</td>
+                <td><span data-bind="text: readSpeed"></span> <span data-i18n="ovs:generic.mibs"></span></td>
+                <td><span data-bind="text: writeSpeed"></span> <span data-i18n="ovs:generic.mibs"></span></td>
                 <td style="width: 35px;">
                     <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
                 </td>

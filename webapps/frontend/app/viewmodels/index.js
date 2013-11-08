@@ -13,11 +13,11 @@ define([
                             })
                             .map([
                                 // Navigation routes
-                                { route: '',                moduleId: 'dashboard',   hash: '#' + mode,                  title: 'Dashboard',   nav: true  },
-                                { route: 'statistics',      moduleId: 'statistics',  hash: '#' + mode + '/statistics',  title: 'Statistics',  nav: true  },
-                                { route: 'vmachines',       moduleId: 'vmachines',   hash: '#' + mode + '/vmachines',   title: 'vMachines',   nav: true  },
+                                { route: '',           moduleId: 'dashboard',  hash: '#' + mode,                 title: $.t('ovs:dashboard.title'),  titlecode: 'ovs:dashboard.title',  nav: true  },
+                                { route: 'statistics', moduleId: 'statistics', hash: '#' + mode + '/statistics', title: $.t('ovs:statistics.title'), titlecode: 'ovs:statistics.title', nav: true  },
+                                { route: 'vmachines',  moduleId: 'vmachines',  hash: '#' + mode + '/vmachines',  title: $.t('ovs:vmachines.title'),  titlecode: 'ovs:vmachines.title',  nav: true  },
                                 // Non-navigation routes
-                                { route: 'login',           moduleId: 'login',       hash: '#' + mode + '/login',       title: 'Login',       nav: false }
+                                { route: 'login',      moduleId: 'login',      hash: '#' + mode + '/login',      title: $.t('ovs:login.title'),      titlecode: 'ovs:login.title',      nav: false }
                             ])
                             .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {

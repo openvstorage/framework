@@ -9,7 +9,7 @@ define([
 
         build(self);
 
-        self.title(generic.tryGet(options, 'title', 'Change password'));
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.changepassword.title')));
         self.modal(generic.tryGet(options, 'modal', false));
 
         self.steps([new Confirm()]);

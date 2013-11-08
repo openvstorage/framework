@@ -21,7 +21,8 @@ requirejs.config({
         'bootstrap'  : '../lib/bootstrap/js/bootstrap',
         'jquery'     : '../lib/jquery/jquery-1.9.1',
         'jqp'        : '../lib/jquery-plugins/js',
-        'ovs'        : '../lib/ovs'
+        'ovs'        : '../lib/ovs',
+        'i18next'    : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
     },
     shim: {
         'bootstrap': {

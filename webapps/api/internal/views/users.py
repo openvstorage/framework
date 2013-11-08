@@ -31,11 +31,14 @@ class UserViewSet(viewsets.ViewSet):
         serializer = FullSerializer(User, instance=users, many=True)
         return Response(serializer.data)
 
-    @required_roles(['view', 'system'])
+    @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         user = self._get_object(pk)
-        serializer = FullSerializer(User, instance=user)
-        return Response(serializer.data)
+        loggedin_user = User(request.user.username)
+        if user.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['system']):
+            serializer = FullSerializer(User, instance=user)
+            return Response(serializer.data)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
 
     @required_roles(['view', 'create', 'system'])
     def create(self, request, format=None):

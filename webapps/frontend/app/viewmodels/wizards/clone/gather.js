@@ -11,12 +11,12 @@ define([
 
         self.canContinue = ko.computed(function() {
             if (self.data.vm() === undefined) {
-                return {value: false, reason: 'No machine loaded'};
+                return {value: false, reason: $.t('ovs:wizards.clone.gather.nomachine')};
             }
             var i, disks = self.data.vm().vDisks();
             for(i = 0; i < disks.length; i += 1) {
                 if (disks[i].snapshots().length === 0) {
-                    return {value: false, reason: 'Not all disks have snapshots'};
+                    return {value: false, reason: $.t('ovs:wizards.clone.gather.nosnapshots')};
                 }
             }
             return {value: true, reason: undefined};

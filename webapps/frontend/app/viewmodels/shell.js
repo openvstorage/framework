@@ -1,8 +1,8 @@
 ﻿/*global define */
 define([
-    'plugins/router', 'bootstrap',
+    'plugins/router', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader'
-], function(router, bootstrap, shared, Messaging, generic, Tasks, Authentication, api, cssLoader) {
+], function(router, bootstrap, i18n, shared, Messaging, generic, Tasks, Authentication, api, cssLoader) {
     "use strict";
     router.map([
                { route: '',              moduleId: 'viewmodels/redirect',   nav: false },
@@ -12,6 +12,15 @@ define([
 
     return function() {
         var self = this;
+
+        self._translate = function() {
+            return $.Deferred(function(deferred) {
+                i18n.setLng(self.shared.language, function() {
+                    $('html').i18n(); // Force retranslation of complete UI
+                    deferred.resolve();
+                });
+            }).promise();
+        };
 
         self.shared = shared;
         self.router = router;
@@ -37,6 +46,17 @@ define([
             self.shared.tasks          = new Tasks();
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
+            self.shared.authentication.onLoggedIn.push(function() {
+                return api.get('users/' + self.shared.authentication.token)
+                    .then(function(data) {
+                        self.shared.language = data.language;
+                    })
+                    .then(self._translate);
+            });
+            self.shared.authentication.onLoggedOut.push(function() {
+                self.shared.language = self.shared.defaultLanguage;
+                return self._translate();
+            });
             return router.activate();
         };
     };

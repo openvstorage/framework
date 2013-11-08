@@ -14,8 +14,8 @@
     </table>
     <div data-bind="if: showControls()">
         <p style="margin-bottom: -15px;">
-            Showing <span data-bind="text: pageFirst"></span>-<span data-bind="text: pageLast"></span>
-            from <span data-bind="text: totalItems()"></span> results.</p>
+            <span data-i18n="ovs:generic.showing"></span> <span data-bind="text: pageFirst"></span>-<span data-bind="text: pageLast"></span>
+            <span data-i18n="ovs:generic.from"></span> <span data-bind="text: totalItems()"></span> <span data-i18n="ovs:generic.results"></span>.</p>
         <ul class="pagination">
             <!-- ko if: hasPrevious() -->
                 <li><a data-bind="click: function() { current(1); }" class="hand">&laquo;&laquo;</a></li>
