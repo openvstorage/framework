@@ -12,7 +12,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
             value = value / 1024;
             counter += 1;
         }
-        return (Math.round(value * 100) / 100).toString() + ' ' + $.t(units[counter]);
+        return (Math.round(value * 100) / 100).toString() + ' ' + $.t('ovs:generic.' + units[counter]);
     }
     function padRight(value, character, length) {
         while (value.length < length) {

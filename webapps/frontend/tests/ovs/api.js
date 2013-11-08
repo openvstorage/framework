@@ -11,8 +11,15 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
                     });
                 }).promise();
             });
+            shared.authentication = {
+                header: function() {
+                    return 'abc';
+                },
+                validate: function() {
+                    return true;
+                }
+            };
         });
-        shared.authentication = { header: function() { return 'abc'; } };
 
         it('every call should have a timestamp attached', function() {
             var returnValue, finished = false;
@@ -159,6 +166,11 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
                     deferred.reject({ readyState: 1, status: 1 }, 'textStatus', 'errorThrown');
                 }).promise();
             });
+            shared.authentication = {
+                validate: function() {
+                    return false;
+                }
+            };
         });
 
         it('a failed call should reject the promise', function() {

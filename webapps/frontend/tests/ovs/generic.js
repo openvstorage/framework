@@ -2,19 +2,26 @@
 define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
     'use strict';
     describe('Generic', function() {
+        beforeEach(function() {
+            $.t = function(code) {
+                return code;
+            };
+        });
+
         it('getTimestamp should generate timestamp', function() {
             expect(generic.getTimestamp()).toBeCloseTo((new Date()).getTime(), -1);
         });
 
         it('getBytesByHuman should format correctly', function() {
-            expect(generic.getBytesHuman(1)).toBe('1 B');
-            expect(generic.getBytesHuman(1000)).toBe('1000 B');
-            expect(generic.getBytesHuman(2 * 1000)).toBe('2000 B');
-            expect(generic.getBytesHuman(3 * 1000)).toBe('2.93 KiB');
-            expect(generic.getBytesHuman(3 * 1024 * 1000)).toBe('2.93 MiB');
-            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1000)).toBe('2.93 GiB');
-            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1024 * 1000)).toBe('2.93 TiB');
-            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1024 * 1024)).toBe('3 TiB');
+            var namespace = 'ovs:generic.';
+            expect(generic.getBytesHuman(1)).toBe('1 ' + namespace + 'b');
+            expect(generic.getBytesHuman(1000)).toBe('1000 ' + namespace + 'b');
+            expect(generic.getBytesHuman(2 * 1000)).toBe('2000 ' + namespace + 'b');
+            expect(generic.getBytesHuman(3 * 1000)).toBe('2.93 ' + namespace + 'kib');
+            expect(generic.getBytesHuman(3 * 1024 * 1000)).toBe('2.93 ' + namespace + 'mib');
+            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'gib');
+            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'tib');
+            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1024 * 1024)).toBe('3 ' + namespace + 'tib');
         });
 
         it('padRight to pad correctly', function() {

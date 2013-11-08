@@ -1,7 +1,7 @@
-/*global requirejs */
-var tests = [];
+/*global requirejs, window */
+var tests = [], file;
 Object.prototype.invalidValue = 0;
-for (var file in window.__karma__.files) {
+for (file in window.__karma__.files) {
     if (window.__karma__.files.hasOwnProperty(file)) {
         if (/test.+\.js$/.test(file) && !/test.+main\.js$/.test(file)) {
             tests.push(file);
@@ -21,8 +21,7 @@ requirejs.config({
         'bootstrap'  : '../lib/bootstrap/js/bootstrap',
         'jquery'     : '../lib/jquery/jquery-1.9.1',
         'jqp'        : '../lib/jquery-plugins/js',
-        'ovs'        : '../lib/ovs',
-        'i18next'    : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
+        'ovs'        : '../lib/ovs'
     },
     shim: {
         'bootstrap': {
