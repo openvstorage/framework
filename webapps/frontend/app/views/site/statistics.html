@@ -1,0 +1,17 @@
+<section>
+    <h2>Statistics</h2>
+    <p>
+        This page contains various system statistics.
+    </p>
+    <h3>Memcached</h3>
+    <ul>
+        <li>memory usage: <span data-bind="text: memcached.bytes"></span></li>
+        <li>keys in cache: <span data-bind="text: memcached.currItems"></span> of <span data-bind="text: memcached.totalItems"></span></li>
+        <li>cache hits: <span data-bind="text: memcached.getHits"></span> of <span data-bind="text: memcached.cmdGet"></span>: <b><span data-bind="text: memcached.hitRate"></span>%</b></li>
+        <li>cache traffic: <span data-bind="text: memcached.bytesRead"></span> in, <span data-bind="text: memcached.bytesWritten"></span> out</li>
+        <li>uptime: <span data-bind="text: memcached.uptime"></span></li>
+    </ul>
+    <p>Raw memcached information:</p>
+    <pre data-bind="html: memcached.raw">
+    </pre>
+</section>

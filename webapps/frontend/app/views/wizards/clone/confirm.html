@@ -1,0 +1,16 @@
+<div style="min-width: 600px;">
+    <h4 style="margin-top: 5px;">Verify the entered information</h4>
+    <p>
+        Name of the clone: &quot;<span data-bind="text: data.name"></span>&quot;<br />
+        Amount of clones: <span data-bind="text: data.amount"></span>
+    </p>
+    <p>
+        Please validate the selected snapshots below. These will be used for the clone:
+    </p>
+    <ul data-bind="foreach: data.vm().vDisks()">
+        <li>
+            Disk <b><span data-bind="text: name"></span></b>:
+            <span data-bind="text: selectedSnapshot"></span>
+        </li>
+    </ul>
+</div>
