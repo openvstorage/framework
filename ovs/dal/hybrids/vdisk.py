@@ -17,19 +17,19 @@ class vDisk(DataObject):
                   'volumeid'           : (None,                  str),
                   'parentsnapshot'     : (None,                  str),
                   'children'           : ([],                    list),
-                  'retentionpolicyguid': (None,                  str),
-                  'snapshotpolicyguid' : (None,                  str),
+                  'retentionpolicyid'  : (None,                  str),
+                  'snapshotpolicyid'   : (None,                  str),
                   'tags'               : ([],                    list),
                   'replicationguid'    : (None,                  str),
                   'environmentguid'    : (None,                  str),
-                  'cloudspaceguid'     : (None,                  str),
                   'autobackup'         : (False,                 bool),
                   'templatesnapshot'   : (None,                  str)}
     _relations = {'machine': (vMachine, 'disks'),
                   'vpool'  : (vPool,    'disks')}
     _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 60,
-               'status'   : 30}
+               'status': 30,
+               'storage_server': 30}
 
     @property
     def used_size(self):
@@ -49,5 +49,11 @@ class vDisk(DataObject):
     def status(self):
         def get_data():
             return 'ATTACHED'
+        return self._backend_property(get_data)
+
+    @property
+    def storage_server(self):
+        def get_data():
+            return _vsrClient.info(self.volumeid)
         return self._backend_property(get_data)
 

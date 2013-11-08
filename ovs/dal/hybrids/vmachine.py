@@ -9,7 +9,8 @@ class vMachine(DataObject):
                   'cpu'        : (1,    int),
                   'memory'     : (1024, int),
                   'vmid'       : (None, str),
-                  'template'   : (True, bool)}
+                  'template'   : (True, bool),
+                  'system'     : (False, bool)}
     _relations = {'node': (pMachine, 'guests')}
     _expiry = {'iops': 30,
                'stored_data': 120,

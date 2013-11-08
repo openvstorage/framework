@@ -5,12 +5,12 @@ from ovs.dal.hybrids.vdisk import vDisk
 
 class vDiskList(object):
     @staticmethod
-    def get_vdisks():
+    def get_vdisks(template=False):
         vdisks = DataList(key   = 'vdisks',
                           query = {'object': vDisk,
                                    'data': DataList.select.DESCRIPTOR,
                                    'query': {'type': DataList.where_operator.AND,
-                                             'items': []}}).data
+                                             'items': [('template', DataList.operator.EQUALS, template)]}}).data
         return DataObjectList(vdisks, vDisk)
 
     @staticmethod
