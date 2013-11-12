@@ -2,15 +2,19 @@ import os
 import ConfigParser
 
 parser = ConfigParser.RawConfigParser()
-parser.read(os.path.dirname(__file__) + '/config/settings.cfg')
+parser.read('/opt/openvStorage/config/api.cfg')
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 UI_NAME = parser.get('main', 'ui_name')
-SYSTEM_NAME = parser.get('main', 'system_name')
+APP_NAME = parser.get('main', 'app_name')
 BASE_WWW_DIR = os.path.dirname(__file__)
-BASE_LOG_DIR = parser.get('main', 'log_folder') + '/' + SYSTEM_NAME
+
+BASE_FOLDER = parser.get('main', 'base_folder') + '/' + APP_NAME
+
+BASE_LOG_DIR = parser.get('logging', 'base_folder')
+LOG_FILENAME = parser.get('logging', 'filename')
 
 FRONTEND_ROOT = '/' + UI_NAME
 STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
@@ -18,7 +22,7 @@ STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    ('Kenneth Henderick', 'kenneth.henderick@cloudfounders.com'),
+    (parser.get('id', 'admin_name'), parser.get('id', 'admin_email')),
 )
 
 MANAGERS = ADMINS
@@ -26,14 +30,14 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_WWW_DIR + '/' + SYSTEM_NAME + '.db.sqlite3'
+        'NAME': BASE_FOLDER + '/' + parser.get('main', 'db_name')
     }
 }
 
 ALLOWED_HOSTS = []
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
-LOGIN_URL = SYSTEM_NAME + '.frontend.login_view'
+LOGIN_URL = APP_NAME + '.frontend.login_view'
 
 SITE_ID = 1
 USE_I18N = True
@@ -50,7 +54,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder'
 )
 
-SECRET_KEY = '6e-%9ce4rx125jw69vp-ar1fpu9ta5#g6w73^vvrf65+14ovpi'
+SECRET_KEY = parser.get('main', 'secret_key')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
@@ -61,14 +65,14 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    SYSTEM_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
+    APP_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware'
 )
 
 AUTHENTICATION_BACKENDS = (
-    SYSTEM_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
-    SYSTEM_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
+    APP_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
+    APP_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 )
 
@@ -77,7 +81,7 @@ TEMPLATE_CONTEXT_PROCESSORS += (
     'django.core.context_processors.request',
 )
 
-ROOT_URLCONF = SYSTEM_NAME + '.urls'
+ROOT_URLCONF = APP_NAME + '.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'django.wsgi.application'
@@ -100,14 +104,13 @@ INSTALLED_APPS = (
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        SYSTEM_NAME + '.backend.authentication_backend.TokenAuthenticationBackend'
+        APP_NAME + '.backend.authentication_backend.TokenAuthenticationBackend'
     )
 }
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        'LOCATION': '10.100.138.253:11211',
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
     }
 }
 
@@ -123,30 +126,15 @@ LOGGING = {
     'handlers': {
         'logfile': {
             'class': 'logging.handlers.WatchedFileHandler',
-            'filename': BASE_LOG_DIR + '/django.log',
-            'formatter': 'simple',
-        },
-        'accessfile': {
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': BASE_LOG_DIR + '/access.log',
+            'filename': BASE_LOG_DIR + '/' + LOG_FILENAME,
             'formatter': 'simple',
         },
     },
     'loggers': {
-        'django': {
-            'handlers': ['logfile'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        SYSTEM_NAME: {
+        'default': {
             'handlers': ['logfile'],
             'level': 'INFO',
             'propogate': False
-        },
-        'access': {
-            'handlers': ['accessfile'],
-            'level': 'INFO',
-            'propagate': False,
         },
     },
 }

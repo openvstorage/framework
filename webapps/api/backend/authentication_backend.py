@@ -6,10 +6,9 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from rest_framework.authentication import BaseAuthentication
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 import logging
-import settings
 import hashlib
 
-logger = logging.getLogger(settings.SYSTEM_NAME)
+logger = logging.getLogger('default')
 
 
 class UPAuthenticationBackend(object):

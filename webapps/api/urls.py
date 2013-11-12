@@ -5,7 +5,7 @@ from views import ObtainAuthToken
 
 urlpatterns = patterns('',
     url(r'^auth/',     ObtainAuthToken.as_view()),
-    url(r'^customer/', include(settings.SYSTEM_NAME + '.customer.urls')),
-    url(r'^internal/', include(settings.SYSTEM_NAME + '.internal.urls')),
+    url(r'^customer/', include(settings.APP_NAME + '.customer.urls')),
+    url(r'^internal/', include(settings.APP_NAME + '.internal.urls')),
     url(r'^$',         RedirectView.as_view(url='customer/')),
 )

@@ -1,6 +1,6 @@
 import re
 import datetime
-import settings
+import ConfigParser
 from backend.serializers.memcached import MemcacheSerializer
 from backend.decorators import required_roles
 from rest_framework import status, viewsets
@@ -13,6 +13,12 @@ class MemcacheViewSet(viewsets.ViewSet):
     Information about memcache instances
     """
     permission_classes = (IsAuthenticated,)
+
+    def _get_memcachelocation(self):
+        parser = ConfigParser.RawConfigParser()
+        parser.read('/opt/openvStorage/config/memcache.cfg')
+        local_node = parser.get('main', 'local_node')
+        return parser.get(local_node, 'location')
 
     def _get_instance(self, host):
         class Stats:
@@ -43,7 +49,7 @@ class MemcacheViewSet(viewsets.ViewSet):
 
     @required_roles(['view'])
     def list(self, request, format=None):
-        match = re.match("([.\w]+:\d+)", settings.CACHES['default']['LOCATION'])
+        match = re.match("([.\w]+:\d+)", self._get_memcachelocation())
         if not match:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         stats = self._get_instance(match.group(1))
@@ -52,7 +58,7 @@ class MemcacheViewSet(viewsets.ViewSet):
 
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
-        match = re.match("([.\w]+:\d+)", settings.CACHES['default']['LOCATION'])
+        match = re.match("([.\w]+:\d+)", self._get_memcachelocation())
         if not match:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         stats = self._get_instance(match.group(1))
