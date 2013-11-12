@@ -70,6 +70,7 @@ define([
             return api.post('messages/' + self.subscriberID + '/subscribe', generic.keys(self.subscriptions));
         };
         self.wait = function() {
+            generic.xhrAbort(self.requestHandle);
             self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', undefined, {'message_id': self.lastMessageID})
                 .done(function(data) {
                     var i, subscriptions = generic.keys(self.subscriptions), resubscribe = false;
