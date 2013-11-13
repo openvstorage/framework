@@ -1,6 +1,4 @@
 from rest_framework import serializers
-from django import forms
-from ovs.dal.hybrids.vmachine import vMachine
 
 
 class SimpleSerializer(serializers.Serializer):
@@ -25,7 +23,7 @@ class FullSerializer(SimpleSerializer):
             for key in self.hybrid._blueprint:
                 setattr(instance, key, attrs.get(key, getattr(instance, key)))
             return instance
-        return vMachine(data=attrs)
+        return self.hybrid(data=attrs)
 
     @staticmethod
     def _map_type_to_field(type):

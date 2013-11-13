@@ -1,12 +1,12 @@
-import uuid
 import logging
 
 from ovs.celery import celery
-from ovs.dal.hybrids.vdisk import vDisk
-from ovs.dal.hybrids.vmachine import vMachine
-from ovs.dal.lists.vdisklist import vDiskList
+from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 vsrClient = VolumeStorageRouterClient().load()
+
 
 class VDiskController(object):
     #celery = Celery('tasks')
@@ -60,12 +60,12 @@ class VDiskController(object):
 #                                  minSize                = '0B',
 #                                  maxNonDisposableSize   = '%sMiB'%maxSize)
 #        kwargs['result'] = Volume.getDevice(name)
-        disk = vDisk()
+        disk = VDisk()
         disk.name = name
         disk.description = description
         disk.devicename = devicename
         disk.volumeid = volumeid
-        disk.machine = vMachine(machineguid) if machineguid else None
+        disk.machine = VMachine(machineguid) if machineguid else None
         disk.save()
         return kwargs
 
@@ -77,7 +77,7 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         diskguid = kwargs['diskguid']
-        disk = vDisk(diskguid)
+        disk = VDisk(diskguid)
         logging.info('Delete disk %s'%disk.name)
         #if disk.volumeid in vsrClient.listVolumes():
             #if Volume.info()['attached']:
@@ -105,8 +105,8 @@ class VDiskController(object):
         description = '{0} {1}'.format(location, deviceNamePrefix)
         propertiesToClone = ['description', 'size', 'type', 'retentionpolicyguid', 'snapshotpolicyguid', 'autobackup', 'machine']
 
-        newDisk = vDisk()
-        disk = vDisk(diskguid)
+        newDisk = VDisk()
+        disk = VDisk(diskguid)
         logging.info('Clone snapshot %s of disk %s'%(snapshotid, disk.name))
         volumeid = vsrClient.clone('{0}/{1}'.format(location, '%s-flat.vmdk'%deviceNamePrefix), disk.volumeid, snapshotid)
         for property in propertiesToClone:
@@ -118,7 +118,7 @@ class VDiskController(object):
         newDisk.volumeid = volumeid
         newDisk.devicename = '%s.vmdk'%deviceNamePrefix
         newDisk.parentsnapshot = snapshotid
-        newDisk.machine = vMachine(machineguid) if machineguid else disk.machine
+        newDisk.machine = VMachine(machineguid) if machineguid else disk.machine
         newDisk.save()
         return {'diskguid': newDisk.guid,'name': newDisk.name, 'backingdevice': '{0}/{1}.vmdk'.format(location, deviceNamePrefix)}
 
@@ -130,7 +130,7 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         diskguid = kwargs['diskguid']
-        disk = vDisk(diskguid)
+        disk = VDisk(diskguid)
         logging.info('Create snapshot for disk %s'%(disk.name))
         #if not srClient.canTakeSnapshot(diskguid):
         #    raise ValueError('Volume %s not found'%diskguid)

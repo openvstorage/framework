@@ -1,8 +1,14 @@
+"""
+User module
+"""
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.group import Group
 
 
 class User(DataObject):
+    """
+    The User class represents a user account that can use the product.
+    """
     _blueprint = {'username': (None,  str),
                   'password': (None,  str),
                   'email': (None,  str),

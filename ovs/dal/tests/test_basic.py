@@ -1,3 +1,6 @@
+"""
+Basic test module
+"""
 import uuid
 import time
 import sys
@@ -11,13 +14,23 @@ from ovs.dal.relations.relations import RelationMapper
 
 
 class Basic(TestCase):
+    """
+    The basic unittestsuite will test all basic functionality of the DAL framework
+    It will also try accessing all dynamic properties of all hybrids making sure
+    that code actually works. This however means that all loaded 3rd party libs
+    need to be mocked
+    """
     @classmethod
     def setUpClass(cls):
+        """
+        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
+        This makes sure the unittests can be executed without those libraries installed
+        """
         # Mocking
         sys.modules['ovs.extensions.storage.memcachefactory'] = MCF
         sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VSR
-        from ovs.dal.hybrids.vdisk import vDisk
-        global vDisk
+        from ovs.dal.hybrids.vdisk import VDisk
+        global VDisk
         from ovs.dal.hybrids._testmachine import TestMachine
         from ovs.dal.hybrids._testdisk import TestDisk
         global TestMachine
@@ -32,18 +45,30 @@ class Basic(TestCase):
 
     @classmethod
     def setUp(cls):
+        """
+        (Re)Sets the stores on every test
+        """
         StoredObject.persistent = DummyPersistentStore()
         StoredObject.volatile = DummyVolatileStore()
 
     @classmethod
     def tearDownClass(cls):
+        """
+        Clean up the unittest
+        """
         pass
 
     def test_invalidobject(self):
+        """
+        Validates the behavior when a non-existing object is loaded
+        """
         # Loading an non-existing object should raise
         self.assertRaises(ObjectNotFoundException, TestDisk, uuid.uuid4(), None)
 
     def test_newobjet_delete(self):
+        """
+        Validates the behavior on object deletions
+        """
         disk = TestDisk()
         disk.save()
         # An object should always have a guid
@@ -54,6 +79,9 @@ class Basic(TestCase):
         self.assertRaises(Exception, TestDisk,  guid, None)
 
     def test_discard(self):
+        """
+        Validates the behavior regarding pending changes discard
+        """
         disk = TestDisk()
         disk.name = 'one'
         disk.save()
@@ -64,6 +92,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_updateproperty(self):
+        """
+        Validates the behavior regarding updating properties
+        """
         disk = TestDisk()
         disk.name = 'test'
         disk.description = 'desc'
@@ -73,12 +104,18 @@ class Basic(TestCase):
         disk.delete()
 
     def test_preinit(self):
+        """
+        Validates whether initial data is loaded on object creation
+        """
         disk = TestDisk(data={'name': 'diskx'})
         disk.save()
         self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
         disk.delete()
 
     def test_datapersistent(self):
+        """
+        Checks whether data is persisted correctly
+        """
         disk = TestDisk()
         guid = disk.guid
         disk.name = 'test'
@@ -89,12 +126,18 @@ class Basic(TestCase):
         disk.delete()
 
     def test_readonlyproperty(self):
+        """
+        Checks whether all dynamic properties are actually read-only
+        """
         disk = TestDisk()
         # Readonly properties should return data
         self.assertIsNotNone(disk.used_size, 'RO property should return data')
         disk.delete()
 
     def test_datastorewins(self):
+        """
+        Validates the "datastore_wins" behavior in the usecase where it wins
+        """
         disk = TestDisk()
         disk.name = 'initial'
         disk.save()
@@ -108,6 +151,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_datastoreloses(self):
+        """
+        Validates the "datastore_wins" behavior in the usecase where it loses
+        """
         disk = TestDisk()
         disk.name = 'initial'
         disk.save()
@@ -121,6 +167,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_datastoreraises(self):
+        """
+        Validates the "datastore_wins" behavior in the usecase where it's supposed to raise
+        """
         disk = TestDisk()
         disk.name = 'initial'
         disk.save()
@@ -133,6 +182,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_volatileproperty(self):
+        """
+        Validates the volatile behavior of dynamic properties
+        """
         disk = TestDisk()
         disk.size = 1000000
         value = disk.used_size
@@ -147,6 +199,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_persistency(self):
+        """
+        Validates whether the object is fetches from the correct storage backend
+        """
         disk = TestDisk()
         disk.name = 'test'
         disk.save()
@@ -163,6 +218,11 @@ class Basic(TestCase):
         disk.delete()
 
     def test_objectproperties(self):
+        """
+        Validates the correctness of all hybrid objects:
+        * They should contain all required properties
+        * All dynamic properties should be implemented
+        """
         # Some stuff here to dynamically test all hybrid properties
         for cls in HybridRunner.get_hybrids():
             relation_info = RelationMapper.load_foreign_relations(cls)
@@ -203,6 +263,9 @@ class Basic(TestCase):
             instance.delete()
 
     def test_queries(self):
+        """
+        Validates whether executing queries returns the expected results
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -305,6 +368,9 @@ class Basic(TestCase):
         machine.delete()
 
     def test_invalidpropertyassignment(self):
+        """
+        Validates whether the correct exception is raised when properties are assigned with a wrong type
+        """
         disk = TestDisk()
         disk.size = 100
         with self.assertRaises(TypeError):
@@ -312,6 +378,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_recursive(self):
+        """
+        Validates the recursive save
+        """
         machine = TestMachine()
         machine.name = 'original'
         machine.save()
@@ -351,12 +420,19 @@ class Basic(TestCase):
         diskx.delete()
 
     def test_descriptors(self):
+        """
+        Validates the correct behavior of the Descriptor
+        """
         with self.assertRaises(RuntimeError):
             descriptor = Descriptor().descriptor
         with self.assertRaises(RuntimeError):
             value = Descriptor().get_object()
 
     def test_relationcache(self):
+        """
+        Validates whether the relational properties are cached correctly, and whether
+        they are invalidated when required
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -393,6 +469,9 @@ class Basic(TestCase):
         machine.delete()
 
     def test_datalistactions(self):
+        """
+        Validates all actions that can be executed agains DataLists
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -421,6 +500,9 @@ class Basic(TestCase):
         machine.delete()
 
     def test_listcache(self):
+        """
+        Validates whether lists are cached and invalidated correctly
+        """
         disk0 = TestDisk()
         disk0.save()
         list_cache = DataList(key   = 'list_cache',
@@ -474,6 +556,9 @@ class Basic(TestCase):
         disk0.delete()
 
     def test_emptyquery(self):
+        """
+        Validates whether an certain query returns an empty set
+        """
         amount = DataList(key   = 'some_list',
                           query = {'object': TestDisk,
                                    'data'  : DataList.select.COUNT,
@@ -482,6 +567,9 @@ class Basic(TestCase):
         self.assertEqual(amount, 0, 'There should be no data')
 
     def test_nofilterquery(self):
+        """
+        Validates whether empty queries return the full resultset
+        """
         disk1 = TestDisk()
         disk1.save()
         disk2 = TestDisk()
@@ -505,6 +593,9 @@ class Basic(TestCase):
         disk3.delete()
 
     def test_invalidqueries(self):
+        """
+        Validates invalid queries
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -537,6 +628,9 @@ class Basic(TestCase):
         machine.delete()
 
     def test_clearedcache(self):
+        """
+        Validates the correct behavior when the volatile cache is cleared
+        """
         disk = TestDisk()
         disk.name = 'somedisk'
         disk.save()
@@ -546,6 +640,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_serialization(self):
+        """
+        Validates whether serialization works as expected
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -565,6 +662,9 @@ class Basic(TestCase):
         machine.delete()
 
     def test_primarykeys(self):
+        """
+        Validates whether the primary keys are kept in sync
+        """
         disk = TestDisk()
         StoredObject.volatile.delete('ovs_primarykeys_%s' % disk._name)
         keys = DataList.get_pks(disk._namespace, disk._name)
@@ -577,29 +677,56 @@ class Basic(TestCase):
 
 # Mocking classes
 class SRC():
+    """
+    Mocks the StorageRouterClient
+    """
     @staticmethod
     def listSnapShots(volumeid):
+        """
+        Returns a fake set of snapshots
+        """
         return ["test1-%s" % str(volumeid), "test2-%s" % str(volumeid)]
 
     @staticmethod
     def info(volumeID):
+        """
+        Return fake info
+        """
         return volumeID
 
 
 class VSRC():
+    """
+    Mocks the VolumeStorageRouterClient
+    """
     def load(self):
+        """
+        Returns the mocked StorageRouterClient
+        """
         return SRC()
 
 
 class VSR():
+    """
+    Mocks the VolumeStorageRouter
+    """
     VolumeStorageRouterClient = VSRC
 
 
 class MF():
+    """
+    Mocks the MemcacheFactory
+    """
     @staticmethod
     def load():
+        """
+        Returns a dummy volatile store
+        """
         return DummyVolatileStore()
 
 
 class MCF():
+    """
+    Mocks the MemcacheClientFactory
+    """
     MemcacheFactory = MF

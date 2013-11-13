@@ -5,9 +5,7 @@ import logging
 from celery import group, chain
 from ovs.celery import celery
 from ovs.lib.vdisk import VDiskController
-from ovs.lib.dummy import DummyController
-from ovs.dal.hybrids.vdisk import vDisk
-from ovs.dal.hybrids.vmachine import vMachine
+from ovs.dal.hybrids.vmachine import VMachine
 from ovs.hypervisor.factory import Factory
 
 class VMachineController(object):
@@ -15,12 +13,12 @@ class VMachineController(object):
     @celery.task(name='ovs.machine.snapshot')
     def snapshot(*args, **kwargs):
         """
-        Snapshot vMachine disks
+        Snapshot VMachine disks
 
         @param machineguid: guid of the machine
         """
         machineguid = kwargs['machineguid']
-        machine = vMachine(machineguid)
+        machine = VMachine(machineguid)
         tasks = []
         for disk in machine.disks:
             t = VDiskController().createSnapshot.s(diskguid = disk.guid)
@@ -42,14 +40,14 @@ class VMachineController(object):
         disks = kwargs['disks']
         name = kwargs['name']
 
-        machine = vMachine(machineguid)
-        newMachine = vMachine()
+        machine = VMachine(machineguid)
+        newMachine = VMachine()
         propertiesToClone = ['description', 'hvtype', 'cpu', 'memory', 'node']
         for property in propertiesToClone:
             setattr(newMachine, property, getattr(machine, property))
         newMachine.name = name
         newMachine.save()
-        
+
         diskTasks = []
         diskClones = []
         disksByOrder = sorted(machine.disks, key=lambda x: x.order)
@@ -73,12 +71,12 @@ class VMachineController(object):
                     VDiskController.delete(diskguid = taskResult.get()['diskguid'])
             newMachine.delete()
             return None
-        
+
         hv = Factory.get(machine.node)
         provision_machine_task = hv.cloneVM.s(hv, machine.vmid, name, disks, None, True)
         provision_machine_task.link_error(VMachineController.delete.s(machineguid = newMachine.guid))
         result = provision_machine_task()
-        
+
         newMachine.vmid = result.get()
         newMachine.save()
         return newMachine.guid
@@ -91,7 +89,7 @@ class VMachineController(object):
         @param machineguid: guid of the machine
         """
         machineguid = kwargs['machineguid']
-        machine = vMachine(machineguid)
+        machine = VMachine(machineguid)
 
         diskTasks = []
         hv = Factory.get(machine.node)
@@ -107,14 +105,14 @@ class VMachineController(object):
     def setAsTemplate(*args, **kwargs):
         """
         Set a vmachine as template
-        
+
         @param machineguid: guid of the machine
         @param snapshots: dictionary of diskguids(key)/snapshotid(value)
         """
         machineguid = kwargs['machineguid']
         snapshots = kwargs['snapshots']
-        vmachine = vMachine(machineguid)
-        
+        vmachine = VMachine(machineguid)
+
         if vmachine.template:
             return
         hv = Factory.get(vmachine.node)

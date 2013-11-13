@@ -1,3 +1,6 @@
+"""
+UserList module
+"""
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObjectList
 from ovs.dal.hybrids.user import User
@@ -5,8 +8,14 @@ from ovs.dal.helpers import Descriptor
 
 
 class UserList(object):
+    """
+    This UserList class contains various lists regarding to the User class
+    """
     @staticmethod
     def get_user_by_username(username):
+        """
+        Returns a single User for the given username. Returns None if no user was found
+        """
         users = DataList(key   = 'user_%s' % username,
                          query = {'object': User,
                                   'data'  : DataList.select.DESCRIPTOR,
@@ -18,21 +27,12 @@ class UserList(object):
 
     @staticmethod
     def get_users():
+        """
+        Returns a list of all Users
+        """
         users = DataList(key   = 'users',
                          query = {'object': User,
                                   'data': DataList.select.DESCRIPTOR,
                                   'query': {'type': DataList.where_operator.AND,
                                             'items': []}}).data
         return DataObjectList(users, User)
-
-    @staticmethod
-    def get_user_by_token(token):
-        users = DataList(key   = 'user_%s' % token,
-                         query = {'object': User,
-                                  'data'  : DataList.select.DESCRIPTOR,
-                                  'query' : {'type' : DataList.where_operator.AND,
-                                             'items': [('token', DataList.operator.EQUALS, token)]}}).data
-        if len(users) == 1:
-            return Descriptor().load(users[0]).get_object(True)
-        return None
-

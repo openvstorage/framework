@@ -9,7 +9,7 @@ class ScheduledTaskController(object):
     @celery.task(name='ovs.scheduled.snapshotall')
     def snapshot_all_vms(*args, **kwargs):
         """
-        Snapshots all vMachines
+        Snapshots all VMachines
         """
         print '[SSA] started'
         loghandler.logger.info('[SSA] started')

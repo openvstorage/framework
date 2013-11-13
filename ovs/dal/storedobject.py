@@ -1,4 +1,15 @@
+"""
+StoredObject module
+"""
+
+
 class StoredObject(object):
+    """
+    The StoredObject class provides static access to a volatile and persistent store
+    When instantiated, and if no stores are yet loaded, it will load the default ones:
+    * Persistent: arakoon
+    * Volatile: memcache
+    """
     persistent = None
     volatile   = None
 

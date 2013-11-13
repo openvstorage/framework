@@ -1,7 +1,13 @@
+"""
+PMachine module
+"""
 from ovs.dal.dataobject import DataObject
 
 
-class pMachine(DataObject):
+class PMachine(DataObject):
+    """
+    The PMachine class represents a physical machine
+    """
     _blueprint = {'name'       : (None, str),
                   'description': (None, str),
                   'hvtype'     : (None, str),

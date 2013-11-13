@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.hybrids.vmachine import vMachine
+from ovs.dal.hybrids.vmachine import VMachine
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
@@ -33,10 +33,10 @@ class VMachineViewSet(viewsets.ViewSet):
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            vmachine = vMachine(pk)
+            vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(FullSerializer(vMachine, instance=vmachine).data, status=status.HTTP_200_OK)
+        return Response(FullSerializer(VMachine, instance=vmachine).data, status=status.HTTP_200_OK)
 
     @required_roles(['view', 'delete'])
     def destroy(self, request, pk=None):
@@ -46,7 +46,7 @@ class VMachineViewSet(viewsets.ViewSet):
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            vmachine = vMachine(pk)
+            vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
         task = VMachineController.delete.s(machineguid=vmachine.guid).apply_async()
@@ -61,7 +61,7 @@ class VMachineViewSet(viewsets.ViewSet):
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
-            vmachine = vMachine(pk)
+            vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
         # POC, assuming data is correct

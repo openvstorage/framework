@@ -1,23 +1,32 @@
+"""
+Performance unittest module
+"""
 import time
 from unittest import TestCase
-from ovs.dal.hybrids.vdisk import vDisk
-from ovs.dal.hybrids.vmachine import vMachine
+from ovs.dal.hybrids._testdisk import TestDisk
+from ovs.dal.hybrids._testmachine import TestMachine
 from ovs.dal.datalist import DataList
 
 
 class LotsOfObjects(TestCase):
+    """
+    Executes a performance test by working with a large set of objects
+    """
     def test_lotsofobjects(self):
+        """
+        Main and only test in this testcase
+        """
         print 'start test'
         print 'start loading data'
         start = time.time()
         mguids = []
         for i in xrange(0, 100):
-            machine = vMachine()
+            machine = TestMachine()
             machine.name = 'machine_%d' % i
             machine.save()
             mguids.append(machine.guid)
             for ii in xrange(0, 100):
-                disk = vDisk()
+                disk = TestDisk()
                 disk.name = 'disk_%d_%d' % (i, ii)
                 disk.size = ii * 100
                 disk.machine = machine
@@ -30,7 +39,7 @@ class LotsOfObjects(TestCase):
         print 'start queries'
         start = time.time()
         for i in xrange(0, 100):
-            machine = vMachine(mguids[i])
+            machine = TestMachine(mguids[i])
             self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
             seconds_passed = (time.time() - start)
             itemspersec = ((i + 1) * 10000.0) / seconds_passed
@@ -40,7 +49,7 @@ class LotsOfObjects(TestCase):
         print 'start cached queries'
         start = time.time()
         for i in xrange(0, 100):
-            machine = vMachine(mguids[i])
+            machine = TestMachine(mguids[i])
             self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
         seconds_passed = (time.time() - start)
         print 'completed in %d seconds' % seconds_passed
@@ -48,7 +57,7 @@ class LotsOfObjects(TestCase):
         print 'start full query on disk property'
         start = time.time()
         amount = DataList(key   = 'size_between_4k_7k',
-                          query = {'object': vDisk,
+                          query = {'object': TestDisk,
                                    'data': DataList.select.COUNT,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('size', DataList.operator.GT, 4000),
@@ -60,7 +69,7 @@ class LotsOfObjects(TestCase):
         print 'cleaning up'
         start = time.time()
         for i in xrange(0, 100):
-            machine = vMachine(mguids[i])
+            machine = TestMachine(mguids[i])
             for disk in machine.disks:
                 disk.delete()
             machine.delete()

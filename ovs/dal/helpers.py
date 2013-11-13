@@ -1,14 +1,27 @@
+"""
+Module containing certain helper classes providing various logic
+"""
 import inspect
 import os
 import imp
 import copy
-import fcntl
 import re
 from storedobject import StoredObject
 
 
 class Descriptor(StoredObject):
+    """
+    The descriptor class contains metadata to instanciate objects that can be serialized.
+    It points towards the sourcefile, class name and class type
+    """
     def __init__(self, object_type=None, guid=None):
+        """
+        Initializes a descriptor for a given type. Optionally already providing a guid for the instanciator
+        """
+
+        # Initialize super class
+        super(Descriptor, self).__init__()
+
         if object_type is None:
             self.initialized = False
         else:
@@ -25,18 +38,27 @@ class Descriptor(StoredObject):
             self._descriptor['guid'] = guid
 
     def load(self, descriptor):
+        """
+        Loads an instance from a descriptor dictionary representation
+        """
         self._descriptor = copy.deepcopy(descriptor)
         self.initialized = True
         return self
 
     @property
     def descriptor(self):
+        """
+        Returns a dictionary representation of the descriptor class
+        """
         if self.initialized:
             return copy.deepcopy(self._descriptor)
         else:
             raise RuntimeError('Descriptor not yet initialized')
 
     def get_object(self, instantiate=False):
+        """
+        This method will yield an instance or the class to which the decriptor points
+        """
         if not self.initialized:
             raise RuntimeError('Descriptor not yet initialized')
 
@@ -52,8 +74,15 @@ class Descriptor(StoredObject):
 
 
 class HybridRunner(object):
+    """
+    The HybridRunner provides access to generic properties from the hybrid object by means
+    of dynamic code reflection
+    """
     @staticmethod
     def get_hybrids():
+        """
+        Yields all hybrid classes
+        """
         path = os.path.join(os.path.dirname(__file__), 'hybrids')
         for filename in os.listdir(path):
             if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
@@ -65,8 +94,16 @@ class HybridRunner(object):
 
 
 class Toolbox(StoredObject):
+    """
+    Generic class for various methods
+    """
     @staticmethod
     def try_get(key, fallback):
+        """
+        Returns a value linked to a certain key from the volatile store.
+        If not found in the volatile store, it will try fetch it from the persistent
+        store. If not found, it returns the fallback
+        """
         data = StoredObject.volatile.get(key)
         if data is None:
             try:

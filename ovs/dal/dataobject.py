@@ -1,3 +1,6 @@
+"""
+DataObject module
+"""
 import inspect
 import uuid
 import copy
@@ -147,31 +150,53 @@ class DataObject(StoredObject):
     #######################
 
     def _add_sproperty(self, attribute, value):
+        """
+        Adds a simple property to the object
+        """
         fget = lambda s: s._get_sproperty(attribute)
         fset = lambda s, v: s._set_sproperty(attribute, v)
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
     def _add_cproperty(self, attribute, value):
+        """
+        Adds a complex property to the object (hybrids)
+        """
         fget = lambda s: s._get_cproperty(attribute)
         fset = lambda s, v: s._set_cproperty(attribute, v)
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
     def _add_lproperty(self, attribute):
+        """
+        Adds a list (readonly) property to the object
+        """
         fget = lambda s: s._get_lproperty(attribute)
         setattr(self.__class__, attribute, property(fget))
 
     # Helper method spporting property fetching
     def _get_sproperty(self, attribute):
+        """
+        Getter for a simple property
+        """
         return self._data[attribute]
 
     def _get_cproperty(self, attribute):
+        """
+        Getter for a complex property (hybrid)
+        It will only load the object once and caches it for the lifetime of this object
+        """
         if attribute not in self._objects:
             self._objects[attribute] = Descriptor().load(self._data[attribute]).get_object(instantiate=True)
         return self._objects[attribute]
 
     def _get_lproperty(self, attribute):
+        """
+        Getter for the list property
+        It will execute the related query every time to return a list of hybrid objects that
+        refer to this object. The resulting data will be stored or merged into the cached list
+        preserving as much already loaded objects as possible
+        """
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
@@ -189,6 +214,9 @@ class DataObject(StoredObject):
 
     # Helper method supporting property setting
     def _set_sproperty(self, attribute, value):
+        """
+        Setter for a simple property that will validate the type
+        """
         self.dirty = True
         if isinstance(value, self._blueprint[attribute][1]):
             self._data[attribute] = value
@@ -196,6 +224,9 @@ class DataObject(StoredObject):
             raise TypeError('Property %s should be of type %s' % (attribute, self._blueprint[attribute][1].__name__))
 
     def _set_cproperty(self, attribute, value):
+        """
+        Setter for a complex property (hybrid) that will validate the type
+        """
         self.dirty = True
         if value is None:
             self._objects[attribute] = None
@@ -208,6 +239,10 @@ class DataObject(StoredObject):
             self._data[attribute]['guid'] = value.guid
 
     def __setattr__(self, key, value):
+        """
+        __setattr__ hook that will block creating on the fly new properties, except
+        the predefined ones
+        """
         if not hasattr(self, '_frozen') or not self._frozen:
             allowed = True
         else:
@@ -229,7 +264,8 @@ class DataObject(StoredObject):
     def save(self, recursive=False, skip=None):
         """
         Save the object to the persistent backend and clear cache, making use
-        of the specified conflict resolve settings
+        of the specified conflict resolve settings.
+        It will also invalidate certain caches if required. For example lists pointing towards this object
         """
 
         if recursive:
@@ -325,7 +361,7 @@ class DataObject(StoredObject):
 
     def delete(self):
         """
-        Delete the given object
+        Delete the given object. It also invalidates certain lists
         """
 
         # Invalidate no-filter queries/lists pointing to this object
@@ -356,6 +392,9 @@ class DataObject(StoredObject):
                       datastore_wins = self._datastore_wins)
 
     def serialize(self, depth=0):
+        """
+        Serializes the internal data, getting rid of certain metadata like descriptors
+        """
         data = {'guid': self.guid}
         for key, relation in self._relations.iteritems():
             if depth == 0:
@@ -378,6 +417,9 @@ class DataObject(StoredObject):
 
     @property
     def guid(self):
+        """
+        The primary key of the object
+        """
         return self._guid
 
     #######################
@@ -385,6 +427,9 @@ class DataObject(StoredObject):
     #######################
 
     def _backend_property(self, function):
+        """
+        Handles the internal caching of dynamic properties
+        """
         caller_name = inspect.stack()[1][3]
         cache_key   = '%s_%s' % (self._key, caller_name)
         cached_data = StoredObject.volatile.get(cache_key)
@@ -394,6 +439,9 @@ class DataObject(StoredObject):
         return cached_data
 
     def _add_pk(self, key):
+        """
+        This adds the current primary key to the primary key index
+        """
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
             self._mutex.acquire(10)
@@ -407,6 +455,9 @@ class DataObject(StoredObject):
             self._mutex.release()
 
     def _delete_pk(self, key):
+        """
+        This deletes the current primary key from the primary key index
+        """
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
             self._mutex.acquire(10)
@@ -423,4 +474,7 @@ class DataObject(StoredObject):
             self._mutex.release()
 
     def __str__(self):
+        """
+        The string representation of a DataObject is the serialized value
+        """
         return str(self.serialize())
