@@ -8,6 +8,7 @@ class DataObjectList(object):
     The DataObjectList works on the resulting dataset from a DataList query. It uses the
     descriptor metadata to provide a list-alike experience
     """
+
     def __init__(self, query_result, cls, reduced=False):
         """
         Initializes a DataObjectList object, using a query result and a class type
@@ -37,7 +38,7 @@ class DataObjectList(object):
         for guid in new_guids:
             if guid not in self._guids:
                 self._guids.append(guid)
-        # Cleaning out old cached objects
+            # Cleaning out old cached objects
         for guid in self._objects.keys():
             if guid not in self._guids:
                 del self._objects[guid]
@@ -116,10 +117,13 @@ class DataObjectList(object):
         """
         This method generates a dummy class with the correct naming
         """
+
         class Dummy(object):
             """ Dummy class """
+
             def __init__(self):
                 """ Dummy initializer """
                 pass
+
         Dummy.__name__ = name
         return Dummy

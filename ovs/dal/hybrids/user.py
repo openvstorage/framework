@@ -9,9 +9,9 @@ class User(DataObject):
     """
     The User class represents a user account that can use the product.
     """
-    _blueprint = {'username': (None,  str),
-                  'password': (None,  str),
-                  'email': (None,  str),
+    _blueprint = {'username': (None, str),
+                  'password': (None, str),
+                  'email': (None, str),
                   'is_active': (False, bool),
                   'language': ('en-US', str)}
     _relations = {'group': (Group, 'users')}

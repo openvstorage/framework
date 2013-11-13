@@ -10,6 +10,7 @@ class RelationMapper(StoredObject):
     The RelationMapper is responsible for loading the relational structure
     of the hybrid objects.
     """
+
     @staticmethod
     def load_foreign_relations(object_type):
         """
@@ -24,6 +25,6 @@ class RelationMapper(StoredObject):
                 for key, item in cls._relations.iteritems():
                     if item[0].__name__ == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
-                                                  'key'  : key}
+                                                  'key': key}
             StoredObject.volatile.set(relation_key, relation_info)
         return relation_info

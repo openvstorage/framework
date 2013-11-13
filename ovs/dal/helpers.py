@@ -6,7 +6,7 @@ import os
 import imp
 import copy
 import re
-from storedobject import StoredObject
+from ovs.dal.storedobject import StoredObject
 
 
 class Descriptor(StoredObject):
@@ -14,6 +14,7 @@ class Descriptor(StoredObject):
     The descriptor class contains metadata to instanciate objects that can be serialized.
     It points towards the sourcefile, class name and class type
     """
+
     def __init__(self, object_type=None, guid=None):
         """
         Initializes a descriptor for a given type. Optionally already providing a guid for the
@@ -32,11 +33,11 @@ class Descriptor(StoredObject):
             self._descriptor = StoredObject.volatile.get(key)
             if self._descriptor is None:
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
-                name = filename.replace(os.path.dirname(filename) + os.path.sep, '')\
-                               .replace('.py', '')
-                self._descriptor = {'name'  : name,
+                name = filename.replace(os.path.dirname(filename) + os.path.sep, '') \
+                    .replace('.py', '')
+                self._descriptor = {'name': name,
                                     'source': os.path.relpath(filename, os.path.dirname(__file__)),
-                                    'type'  : object_type.__name__}
+                                    'type': object_type.__name__}
                 StoredObject.volatile.set(key, self._descriptor)
             self._descriptor['guid'] = guid
 
@@ -81,6 +82,7 @@ class HybridRunner(object):
     The HybridRunner provides access to generic properties from the hybrid object by means
     of dynamic code reflection
     """
+
     @staticmethod
     def get_hybrids():
         """
@@ -100,6 +102,7 @@ class Toolbox(StoredObject):
     """
     Generic class for various methods
     """
+
     @staticmethod
     def try_get(key, fallback):
         """

@@ -151,10 +151,10 @@ class DataObject(StoredObject):
         """
         Adds a simple property to the object
         """
-        # pylint: disable=protected-access, locally-disabled
+        # pylint: disable=protected-access
         fget = lambda s: s._get_sproperty(attribute)
         fset = lambda s, v: s._set_sproperty(attribute, v)
-        # pylint: enable=protected-access, locally-disabled
+        # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
@@ -162,10 +162,10 @@ class DataObject(StoredObject):
         """
         Adds a complex property to the object (hybrids)
         """
-        # pylint: disable=protected-access, locally-disabled
+        # pylint: disable=protected-access
         fget = lambda s: s._get_cproperty(attribute)
         fset = lambda s, v: s._set_cproperty(attribute, v)
-        # pylint: enable=protected-access, locally-disabled
+        # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
@@ -173,9 +173,9 @@ class DataObject(StoredObject):
         """
         Adds a list (readonly) property to the object
         """
-        # pylint: disable=protected-access, locally-disabled
+        # pylint: disable=protected-access
         fget = lambda s: s._get_lproperty(attribute)
-        # pylint: enable=protected-access, locally-disabled
+        # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget))
 
     # Helper method spporting property fetching
@@ -205,13 +205,13 @@ class DataObject(StoredObject):
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
-        # pylint: disable=line-too-long, locally-disabled
+        # pylint: disable=line-too-long
         datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
                             query = {'object': remote_class,
                                      'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
-                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
-        # pylint: enable=line-too-long, locally-disabled
+                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})  # noqa
+        # pylint: enable=line-too-long
 
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)

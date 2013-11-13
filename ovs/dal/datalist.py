@@ -1,9 +1,9 @@
 """
 DataList module
 """
-from storedobject import StoredObject
-from helpers import Descriptor, Toolbox
-from exceptions import ObjectNotFoundException
+from ovs.dal.storedobject import StoredObject
+from ovs.dal.helpers import Descriptor, Toolbox
+from ovs.dal.exceptions import ObjectNotFoundException
 
 
 class DataList(StoredObject):
@@ -209,7 +209,6 @@ class DataList(StoredObject):
         field_list = self._invalidation.get(object_name, [])
         field_list.append(field)
         self._invalidation[object_name] = field_list
-        pass
 
     def _update_listinvalidation(self):
         """

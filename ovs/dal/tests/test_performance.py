@@ -12,6 +12,7 @@ class LotsOfObjects(TestCase):
     """
     Executes a performance test by working with a large set of objects
     """
+
     def test_lotsofobjects(self):
         """
         Main and only test in this testcase
@@ -56,15 +57,17 @@ class LotsOfObjects(TestCase):
 
         print 'start full query on disk property'
         start = time.time()
-        amount = DataList(key   = 'size_between_4k_7k',
-                          query = {'object': TestDisk,
-                                   'data': DataList.select.COUNT,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': [('size', DataList.operator.GT, 4000),
-                                                       ('size', DataList.operator.LT, 7000)]}}).data
-        self.assertEqual(amount, 2900, 'Correct number of disks should be found. Found: %s' % str(amount))
+        amount = DataList(key='size_between_4k_7k',
+                          query={'object': TestDisk,
+                                 'data': DataList.select.COUNT,
+                                 'query': {'type': DataList.where_operator.AND,
+                                           'items': [('size', DataList.operator.GT, 4000),
+                                                     ('size', DataList.operator.LT, 7000)]}}).data
+        self.assertEqual(amount, 2900,
+                         'Correct number of disks should be found. Found: %s' % str(amount))
         seconds_passed = (time.time() - start)
-        print 'completed in %d seconds (filtering %d disks per second)' % (seconds_passed, (10000.0 / seconds_passed))
+        print 'completed in %d seconds (filtering %d disks per second)' \
+              % (seconds_passed, (10000.0 / seconds_passed))
 
         print 'cleaning up'
         start = time.time()
