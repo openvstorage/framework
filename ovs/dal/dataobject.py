@@ -6,15 +6,16 @@ import uuid
 import copy
 from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
 from ovs.dal.helpers import Descriptor, Toolbox
-from ovs.dal.storedobject import StoredObject
 from ovs.dal.relations.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.datalist import DataList
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
-class DataObject(StoredObject):
+class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
     * Storage backends:
@@ -89,15 +90,17 @@ class DataObject(StoredObject):
         self._key = '%s_%s_%s' % (self._namespace, self._name, self._guid)
 
         # Load data from cache or persistent backend where appropriate
+        self._volatile = VolatileFactory.get_client()
+        self._persistent = PersistentFactory.get_client()
         self._metadata['cache'] = None
         if new:
             self._data = {}
         else:
-            self._data = StoredObject.volatile.get(self._key)
+            self._data = self._volatile.get(self._key)
             if self._data is None:
                 self._metadata['cache'] = False
                 try:
-                    self._data = StoredObject.persistent.get(self._key)
+                    self._data = self._persistent.get(self._key)
                 except KeyNotFoundException:
                     raise ObjectNotFoundException()
             else:
@@ -133,7 +136,7 @@ class DataObject(StoredObject):
 
         if not new:
             # Re-cache the object
-            StoredObject.volatile.set(self._key, self._data)
+            self._volatile.set(self._key, self._data)
 
         # Freeze property creation
         self._frozen = True
@@ -295,7 +298,7 @@ class DataObject(StoredObject):
 
         new = False
         try:
-            data = StoredObject.persistent.get(self._key)
+            data = self._persistent.get(self._key)
         except KeyNotFoundException:
             new = True
             data = {}
@@ -323,7 +326,7 @@ class DataObject(StoredObject):
 
         # Save the data
         self._data = copy.deepcopy(data)
-        StoredObject.persistent.set(self._key, self._data)
+        self._persistent.set(self._key, self._data)
         self._add_pk(self._key)
 
         # Invalidate lists/queries
@@ -332,14 +335,14 @@ class DataObject(StoredObject):
         for key, default in self._relations.iteritems():
             if self._original[key]['guid'] != self._data[key]['guid']:
                 # The field points to another object
-                StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                              default[0].__name__.lower(),
-                                                              self._original[key]['guid'],
-                                                              default[1]))
-                StoredObject.volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                              default[0].__name__.lower(),
-                                                              self._data[key]['guid'],
-                                                              default[1]))
+                self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
+                                                       default[0].__name__.lower(),
+                                                       self._original[key]['guid'],
+                                                       default[1]))
+                self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
+                                                       default[0].__name__.lower(),
+                                                       self._data[key]['guid'],
+                                                       default[1]))
         # Second, invalidate property lists
         cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
         for field in cache_list.keys():
@@ -356,12 +359,12 @@ class DataObject(StoredObject):
                 clear = True
             if clear:
                 for list_key in cache_list[field]:
-                    StoredObject.volatile.delete(list_key)
+                    self._volatile.delete(list_key)
 
         # Invalidate the cache
         for key in self._expiry.keys():
-            StoredObject.volatile.delete('%s_%s' % (self._key, key))
-        StoredObject.volatile.delete(self._key)
+            self._volatile.delete('%s_%s' % (self._key, key))
+        self._volatile.delete(self._key)
 
         self._original = copy.deepcopy(self._data)
         self.dirty = False
@@ -379,18 +382,18 @@ class DataObject(StoredObject):
         cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
         if '__all' in cache_list.keys():
             for list_key in cache_list['__all']:
-                StoredObject.volatile.delete(list_key)
+                self._volatile.delete(list_key)
 
         # Delete the object out of the persistent store
         try:
-            StoredObject.persistent.delete(self._key)
+            self._persistent.delete(self._key)
         except KeyNotFoundException:
             pass
 
         # Delete the object and its properties out of the volatile store
         for key in self._expiry.keys():
-            StoredObject.volatile.delete('%s_%s' % (self._key, key))
-        StoredObject.volatile.delete(self._key)
+            self._volatile.delete('%s_%s' % (self._key, key))
+        self._volatile.delete(self._key)
         self._delete_pk(self._key)
 
     # Discard all pending changes
@@ -443,10 +446,10 @@ class DataObject(StoredObject):
         """
         caller_name = inspect.stack()[1][3]
         cache_key   = '%s_%s' % (self._key, caller_name)
-        cached_data = StoredObject.volatile.get(cache_key)
+        cached_data = self._volatile.get(cache_key)
         if cached_data is None:
             cached_data = function()  # Load data from backend
-            StoredObject.volatile.set(cache_key, cached_data, self._expiry[caller_name])
+            self._volatile.set(cache_key, cached_data, self._expiry[caller_name])
         return cached_data
 
     def _add_pk(self, key):
@@ -456,13 +459,13 @@ class DataObject(StoredObject):
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
             self._mutex.acquire(10)
-            keys = StoredObject.volatile.get(internal_key)
+            keys = self._volatile.get(internal_key)
             if keys is None:
-                keys = set(StoredObject.persistent.prefix('%s_%s_'
-                                                          % (self._namespace, self._name)))
+                keys = set(self._persistent.prefix('%s_%s_'
+                                                   % (self._namespace, self._name)))
             else:
                 keys.add(key)
-            StoredObject.volatile.set(internal_key, keys)
+            self._volatile.set(internal_key, keys)
         finally:
             self._mutex.release()
 
@@ -473,16 +476,16 @@ class DataObject(StoredObject):
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
             self._mutex.acquire(10)
-            keys = StoredObject.volatile.get(internal_key)
+            keys = self._volatile.get(internal_key)
             if keys is None:
-                keys = set(StoredObject.persistent.prefix('%s_%s_'
-                                                          % (self._namespace, self._name)))
+                keys = set(self._persistent.prefix('%s_%s_'
+                                                   % (self._namespace, self._name)))
             else:
                 try:
                     keys.remove(key)
                 except KeyError:
                     pass
-            StoredObject.volatile.set(internal_key, keys)
+            self._volatile.set(internal_key, keys)
         finally:
             self._mutex.release()
 

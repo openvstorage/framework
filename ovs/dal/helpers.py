@@ -6,10 +6,11 @@ import os
 import imp
 import copy
 import re
-from ovs.dal.storedobject import StoredObject
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
-class Descriptor(StoredObject):
+class Descriptor(object):
     """
     The descriptor class contains metadata to instanciate objects that can be serialized.
     It points towards the sourcefile, class name and class type
@@ -30,7 +31,8 @@ class Descriptor(StoredObject):
             self.initialized = True
 
             key = 'ovs_descriptor_%s' % re.sub('[\W_]+', '', str(object_type))
-            self._descriptor = StoredObject.volatile.get(key)
+            self._volatile = VolatileFactory.get_client()
+            self._descriptor = self._volatile.get(key)
             if self._descriptor is None:
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
                 name = filename.replace(os.path.dirname(filename) + os.path.sep, '') \
@@ -38,7 +40,7 @@ class Descriptor(StoredObject):
                 self._descriptor = {'name': name,
                                     'source': os.path.relpath(filename, os.path.dirname(__file__)),
                                     'type': object_type.__name__}
-                StoredObject.volatile.set(key, self._descriptor)
+                self._volatile.set(key, self._descriptor)
             self._descriptor['guid'] = guid
 
     def load(self, descriptor):
@@ -98,7 +100,7 @@ class HybridRunner(object):
                         yield member[1]
 
 
-class Toolbox(StoredObject):
+class Toolbox(object):
     """
     Generic class for various methods
     """
@@ -110,11 +112,13 @@ class Toolbox(StoredObject):
         If not found in the volatile store, it will try fetch it from the persistent
         store. If not found, it returns the fallback
         """
-        data = StoredObject.volatile.get(key)
+        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
+        data = volatile.get(key)
         if data is None:
             try:
-                data = StoredObject.persistent.get(key)
+                data = persistent.get(key)
             except:
                 data = fallback
-            StoredObject.volatile.set(key, data)
+            volatile.set(key, data)
         return data

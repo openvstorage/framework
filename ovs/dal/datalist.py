@@ -1,12 +1,13 @@
 """
 DataList module
 """
-from ovs.dal.storedobject import StoredObject
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 
 
-class DataList(StoredObject):
+class DataList(object):
     """
     The DataList is a class that provide query functionality for the hybrid DAL
     """
@@ -49,6 +50,8 @@ class DataList(StoredObject):
         super(DataList, self).__init__()
 
         self._key = None if key is None else ('%s_%s' % (DataList.namespace, key))
+        self._volatile = VolatileFactory.get_client()
+        self._persistent = PersistentFactory.get_client()
         self._query = query
         self._invalidation = {}
         self.data = None
@@ -61,10 +64,12 @@ class DataList(StoredObject):
         This method will load the primary keys for a given namespace and name
         (typically, for ovs_data_*)
         """
+        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
         key = 'ovs_primarykeys_%s' % name
-        keys = StoredObject.volatile.get(key)
+        keys = volatile.get(key)
         if keys is None:
-            keys = StoredObject.persistent.prefix('%s_%s_' % (namespace, name))
+            keys = persistent.prefix('%s_%s_' % (namespace, name))
         return keys
 
     def _exec_and(self, instance, items):
@@ -141,7 +146,7 @@ class DataList(StoredObject):
         Tries to load the result for the given key from the volatile cache, or executes the query
         if not yet available. Afterwards (if a key is given), the result will be (re)cached
         """
-        self.data = StoredObject.volatile.get(self._key) if self._key is not None else None
+        self.data = self._volatile.get(self._key) if self._key is not None else None
         if self.data is None:
             # The query should be a dictionary:
             #     {'object': Disk,  # Object on which the query should be executed
@@ -195,7 +200,7 @@ class DataList(StoredObject):
                     pass
 
             if self._key is not None and len(keys) > 0:
-                StoredObject.volatile.set(self._key, self.data)
+                self._volatile.set(self._key, self.data)
             self._update_listinvalidation()
         else:
             self.from_cache = True
@@ -223,5 +228,5 @@ class DataList(StoredObject):
                     if self._key not in list_list:
                         list_list.append(self._key)
                     cache_list[field] = list_list
-                StoredObject.volatile.set(key, cache_list)
-                StoredObject.persistent.set(key, cache_list)
+                self._volatile.set(key, cache_list)
+                self._persistent.set(key, cache_list)

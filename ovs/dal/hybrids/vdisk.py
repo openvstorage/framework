@@ -18,7 +18,7 @@ class VDisk(DataObject):
                   'description': ('Test disk', str),
                   'size': (100, int),
                   'type': ('DSSVOL', str),
-                  'role': ('BOOT', str), # BOOT, DATA, TEMP
+                  'role': ('BOOT', str),  # BOOT, DATA, TEMP
                   'devicename': ('123456789-flat.vmdk', str),
                   'order': (None, int),
                   'volumeid': (None, str),
@@ -33,7 +33,7 @@ class VDisk(DataObject):
                   'templatesnapshot': (None, str)}
     _relations = {'machine': (VMachine, 'disks'),
                   'vpool': (VPool, 'disks')}
-    _expiry = {'used_size': 5, # Timeout in seconds of individual RO properties
+    _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
                'snapshots': 60,
                'status': 30,
                'storage_server': 30}

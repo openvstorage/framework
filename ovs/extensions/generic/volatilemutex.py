@@ -2,7 +2,7 @@
 Volatile mutex module
 """
 import time
-from ovs.extensions.storage.memcachefactory import MemcacheFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 class VolatileMutex(object):
@@ -16,7 +16,7 @@ class VolatileMutex(object):
         """
         Creates a volatile mutex object
         """
-        self._volatile = MemcacheFactory.load()
+        self._volatile = VolatileFactory.get_client()
         self.name = name
         self._has_lock = False
         self._start = 0

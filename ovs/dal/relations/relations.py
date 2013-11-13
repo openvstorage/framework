@@ -1,11 +1,11 @@
 """
 RelationMapper module
 """
-from ovs.dal.storedobject import StoredObject
 from ovs.dal.helpers import HybridRunner, Descriptor
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
-class RelationMapper(StoredObject):
+class RelationMapper(object):
     """
     The RelationMapper is responsible for loading the relational structure
     of the hybrid objects.
@@ -18,7 +18,8 @@ class RelationMapper(StoredObject):
         The resulting mapping will be stored in volatile storage so it can be fetched faster
         """
         relation_key = 'ovs_relations_%s' % object_type.__name__.lower()
-        relation_info = StoredObject.volatile.get(relation_key)
+        volatile = VolatileFactory.get_client()
+        relation_info = volatile.get(relation_key)
         if relation_info is None:
             relation_info = {}
             for cls in HybridRunner.get_hybrids():
@@ -26,5 +27,5 @@ class RelationMapper(StoredObject):
                     if item[0].__name__ == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
                                                   'key': key}
-            StoredObject.volatile.set(relation_key, relation_info)
+            volatile.set(relation_key, relation_info)
         return relation_info
