@@ -16,11 +16,13 @@ class UserList(object):
         """
         Returns a single User for the given username. Returns None if no user was found
         """
+        # pylint: disable=line-too-long
         users = DataList(key   = 'user_%s' % username,
                          query = {'object': User,
                                   'data'  : DataList.select.DESCRIPTOR,
                                   'query' : {'type' : DataList.where_operator.AND,
                                              'items': [('username', DataList.operator.EQUALS, username)]}}).data
+        # pylint: enable=line-too-long
         if len(users) == 1:
             return Descriptor().load(users[0]).get_object(True)
         return None

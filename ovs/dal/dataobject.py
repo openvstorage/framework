@@ -19,7 +19,8 @@ class DataObject(StoredObject):
     * Storage backends:
       * Persistent backend for persistent storage (key-value store)
       * Volatile backend for volatile but fast storage (key-value store)
-      * Storage backends are abstracted and injected into this class, making it possible to use fake backends
+      * Storage backends are abstracted and injected into this class, making it possible to use
+        fake backends
     * Features:
       * Hybrid property access:
         * Persistent backend
@@ -28,9 +29,8 @@ class DataObject(StoredObject):
       * 1-n relations with automatic property propagation
       * Recursive save
     """
-    # @TODO: When deleting an object that has children, those children will still refer to a non-existing fetch_object, possibly raising ObjectNotFoundExceptions
-    # @TODO: Currently, there is a limit to the amount of objects per type that is situated around 10k objects. Mostly related to memcache object size
-    # @TODO: Currently, self-pointing relations are not yet possible
+    # @TODO: Deleting is not recursive
+    # @TODO: There is a soft limit to the amount of objects per type that is situated around 10k
 
     #######################
     ## Attributes
@@ -187,7 +187,8 @@ class DataObject(StoredObject):
         It will only load the object once and caches it for the lifetime of this object
         """
         if attribute not in self._objects:
-            self._objects[attribute] = Descriptor().load(self._data[attribute]).get_object(instantiate=True)
+            descriptor = Descriptor().load(self._data[attribute])
+            self._objects[attribute] = descriptor.get_object(instantiate=True)
         return self._objects[attribute]
 
     def _get_lproperty(self, attribute):
@@ -200,11 +201,13 @@ class DataObject(StoredObject):
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
+        # pylint: disable=line-too-long
         datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
                             query = {'object': remote_class,
                                      'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
                                                'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
+        # pylint: enable=line-too-long
 
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
@@ -221,7 +224,8 @@ class DataObject(StoredObject):
         if isinstance(value, self._blueprint[attribute][1]):
             self._data[attribute] = value
         else:
-            raise TypeError('Property %s should be of type %s' % (attribute, self._blueprint[attribute][1].__name__))
+            raise TypeError('Property %s should be of type %s'
+                            % (attribute, self._blueprint[attribute][1].__name__))
 
     def _set_cproperty(self, attribute, value):
         """
@@ -265,7 +269,8 @@ class DataObject(StoredObject):
         """
         Save the object to the persistent backend and clear cache, making use
         of the specified conflict resolve settings.
-        It will also invalidate certain caches if required. For example lists pointing towards this object
+        It will also invalidate certain caches if required. For example lists pointing towards this
+        object
         """
 
         if recursive:
@@ -309,7 +314,8 @@ class DataObject(StoredObject):
             else:
                 data[attribute] = self._data[attribute]
         if data_conflicts:
-            raise ConcurrencyException('Got field conflicts while saving %s. Conflicts: %s' % (self._name, ', '.join(data_conflicts)))
+            raise ConcurrencyException('Got field conflicts while saving %s. Conflicts: %s'
+                                       % (self._name, ', '.join(data_conflicts)))
 
         # Save the data
         self._data = copy.deepcopy(data)
@@ -317,7 +323,8 @@ class DataObject(StoredObject):
         self._add_pk(self._key)
 
         # Invalidate lists/queries
-        # First, invalidate reverse lists (where we point to a remote object, invalidating that remote list)
+        # First, invalidate reverse lists (where we point to a remote object,
+        # invalidating that remote list)
         for key, default in self._relations.iteritems():
             if self._original[key]['guid'] != self._data[key]['guid']:
                 # The field points to another object
@@ -333,7 +340,7 @@ class DataObject(StoredObject):
         cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
         for field in cache_list.keys():
             clear = False
-            if field == '__all' and new:  # This is a no-filter query hook, which can be ignored here
+            if field == '__all' and new:  # This is a no-filter query hook, which can be ignored
                 clear = True
             if field in self._blueprint:
                 if self._original[field] != self._data[field]:
@@ -447,7 +454,8 @@ class DataObject(StoredObject):
             self._mutex.acquire(10)
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
-                keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
+                keys = set(StoredObject.persistent.prefix('%s_%s_'
+                                                          % (self._namespace, self._name)))
             else:
                 keys.add(key)
             StoredObject.volatile.set(internal_key, keys)
@@ -463,7 +471,8 @@ class DataObject(StoredObject):
             self._mutex.acquire(10)
             keys = StoredObject.volatile.get(internal_key)
             if keys is None:
-                keys = set(StoredObject.persistent.prefix('%s_%s_' % (self._namespace, self._name)))
+                keys = set(StoredObject.persistent.prefix('%s_%s_'
+                                                          % (self._namespace, self._name)))
             else:
                 try:
                     keys.remove(key)

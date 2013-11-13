@@ -27,11 +27,13 @@ class VMachineList(object):
         """
         Returns all VMachines which have a given name
         """
+        # pylint: disable=line-too-long
         vmachines = DataList(key   = 'vmachine_%s' % vmname,
                              query = {'object': VMachine,
                                       'data'  : DataList.select.DESCRIPTOR,
                                       'query' : {'type' : DataList.where_operator.AND,
                                                  'items': [('name', DataList.operator.EQUALS, vmname)]}}).data
+        # pylint: enable=line-too-long
         if vmachines:
             return DataObjectList(vmachines, VMachine)
         return None

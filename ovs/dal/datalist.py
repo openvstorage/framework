@@ -10,19 +10,20 @@ class DataList(StoredObject):
     """
     The DataList is a class that provide query functionality for the hybrid DAL
     """
+
     class Select(object):
         """
         The Select class provides enum-alike properties for what to select
         """
         DESCRIPTOR = 'DESCRIPTOR'
-        COUNT      = 'COUNT'
+        COUNT = 'COUNT'
 
     class WhereOperator(object):
         """
         The WhereOperator class provides enum-alike properties for the Where-operators
         """
         AND = 'AND'
-        OR  = 'OR'
+        OR = 'OR'
 
     class Operator(object):
         """
@@ -30,9 +31,9 @@ class DataList(StoredObject):
         """
         # In case more operators are required, add them here, and implement them in
         # the _evaluate method below
-        EQUALS    = 'EQUALS'
-        LT        = 'LT'
-        GT        = 'GT'
+        EQUALS = 'EQUALS'
+        LT = 'LT'
+        GT = 'GT'
 
     select = Select()
     where_operator = WhereOperator()
@@ -57,7 +58,8 @@ class DataList(StoredObject):
     @staticmethod
     def get_pks(namespace, name):
         """
-        This method will load the primary keys for a given namespace and name (typically, for ovs_data_*)
+        This method will load the primary keys for a given namespace and name
+        (typically, for ovs_data_*)
         """
         key = 'ovs_primarykeys_%s' % name
         keys = StoredObject.volatile.get(key)
@@ -136,27 +138,28 @@ class DataList(StoredObject):
 
     def _load(self):
         """
-        Tries to load the result for the given key from the volatile cache, or executes the query if not
-        yet available. Afterwards (if a key is given), the result will be (re)cached
+        Tries to load the result for the given key from the volatile cache, or executes the query
+        if not yet available. Afterwards (if a key is given), the result will be (re)cached
         """
         self.data = StoredObject.volatile.get(self._key) if self._key is not None else None
         if self.data is None:
             # The query should be a dictionary:
-            #     {'object': Disk,                           # Object on which the query should be executed
-            #      'data'  : DataList.select.XYZ,            # The requested result; a list of object descriptors, or a count
-            #      'query' : <query>}                        # The actual query
+            #     {'object': Disk,  # Object on which the query should be executed
+            #      'data'  : DataList.select.XYZ,  # The requested result
+            #      'query' : <query>}  # The actual query
             # Where <query> is a query(group) dictionary:
-            #     {'type' : DataList.where_operator.ABC,     # Defines whether the given items should be considered in an AND or OR group
-            #      'items': <items>}                         # The items in the group
+            #     {'type' : DataList.where_operator.ABC,  # Whether the items should be AND/OR
+            #      'items': <items>}  # The items in the group
             # Where the <items> is any combination of one or more <filter> or <query>
             # A <filter> tuple example:
-            #     (<field>, DataList.operator.GHI, <value>)  # The operator can be for example EQUALS
-            # The field is any property you would also find on the given object. In case of properties, you can dot as far as you like
-            # This means you can combine AND and OR in any possible combination
+            #     (<field>, DataList.operator.GHI, <value>)  # For example EQUALS
+            # The field is any property you would also find on the given object. In case of
+            # properties, you can dot as far as you like. This means you can combine AND and OR
+            # in any possible combination
 
-            items        = self._query['query']['items']
-            query_type   = self._query['query']['type']
-            query_data   = self._query['data']
+            items = self._query['query']['items']
+            query_type = self._query['query']['type']
+            query_data = self._query['data']
             query_object = self._query['object']
 
             self.from_cache = False
@@ -187,7 +190,7 @@ class DataList(StoredObject):
                         elif query_data == DataList.select.DESCRIPTOR:
                             self.data.append(Descriptor(query_object, guid).descriptor)
                         else:
-                            raise NotImplementedError('The given selector type is not yet implemented.')
+                            raise NotImplementedError('The given selector type is not implemented')
                 except ObjectNotFoundException:
                     pass
 

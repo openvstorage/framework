@@ -207,14 +207,17 @@ class Basic(TestCase):
         disk.save()
         # Right after a save, the cache is invalidated
         disk2 = TestDisk(disk.guid)
-        self.assertFalse(disk2._metadata['cache'], 'Object should be retreived from persistent backend')
+        self.assertFalse(disk2._metadata['cache'],
+                         'Object should be retreived from persistent backend')
         # Subsequent calls will retreive the object from cache
         disk3 = TestDisk(disk.guid)
-        self.assertTrue(disk3._metadata['cache'], 'Object should be retreived from cache')
+        self.assertTrue(disk3._metadata['cache'],
+                        'Object should be retreived from cache')
         # After the object expiry passed, it will be retreived from backend again
         DummyVolatileStore().delete(disk._key)  # We clear the entry
         disk4 = TestDisk(disk.guid)
-        self.assertFalse(disk4._metadata['cache'], 'Object should be retreived from persistent backend')
+        self.assertFalse(disk4._metadata['cache'],
+                         'Object should be retreived from persistent backend')
         disk.delete()
 
     def test_objectproperties(self):
@@ -231,9 +234,12 @@ class Basic(TestCase):
                 for key in relation_info.keys():
                     remote_properties.append(key)
             # Make sure certain attributes are correctly set
-            self.assertIsInstance(cls._blueprint, dict, '_blueprint is a required property on %s' % cls.__name__)
-            self.assertIsInstance(cls._relations, dict, '_relations is a required property on %s' % cls.__name__)
-            self.assertIsInstance(cls._expiry, dict, '_expiry is a required property on %s' % cls.__name__)
+            self.assertIsInstance(cls._blueprint, dict,
+                                  '_blueprint is a required property on %s' % cls.__name__)
+            self.assertIsInstance(cls._relations, dict,
+                                  '_relations is a required property on %s' % cls.__name__)
+            self.assertIsInstance(cls._expiry, dict,
+                                  '_expiry is a required property on %s' % cls.__name__)
             instance = cls()
             # Make sure the type can be instantiated
             self.assertIsNotNone(instance.guid)
@@ -248,7 +254,9 @@ class Basic(TestCase):
                     missing_props.append(attribute)
                 else:  # ... and should work
                     data = getattr(instance, attribute)
-            self.assertEqual(len(missing_props), 0, 'Missing dynamic properties in %s: %s' % (cls.__name__, missing_props))
+            self.assertEqual(len(missing_props), 0,
+                             'Missing dynamic properties in %s: %s'
+                             % (cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry
             missing_metadata = []
             for prop in properties:
@@ -259,7 +267,9 @@ class Basic(TestCase):
                     or prop == 'guid'
                 if not found:
                     missing_metadata.append(prop)
-            self.assertEqual(len(missing_metadata), 0, 'Missing metadata for properties in %s: %s' % (cls.__name__, missing_metadata))
+            self.assertEqual(len(missing_metadata), 0,
+                             'Missing metadata for properties in %s: %s'
+                             % (cls.__name__, missing_metadata))
             instance.delete()
 
     def test_queries(self):
@@ -279,12 +289,14 @@ class Basic(TestCase):
                 disk.storage = machine
             disk.save()
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
+        # pylint: disable=line-too-long
         list_1 = DataList(key   = 'list_1',
                           query = {'object': TestDisk,
                                    'data'  : DataList.select.COUNT,
                                    'query' : {'type': DataList.where_operator.AND,
                                               'items': [('size', DataList.operator.EQUALS, 1)]}}).data
         self.assertEqual(list_1, 1, 'list should contain int 1')
+        # pylint: disable=line-too-long
         list_2 = DataList(key   = 'list_2',
                           query = {'object': TestDisk,
                                    'data'  : DataList.select.DESCRIPTOR,
@@ -292,6 +304,7 @@ class Basic(TestCase):
                                               'items': [('size', DataList.operator.EQUALS, 1)]}}).data
         found_object = Descriptor().load(list_2[0]).get_object(True)
         self.assertEqual(found_object.name, 'test_1', 'list should contain corret machine')
+        # pylint: disable=line-too-long
         list_3 = DataList(key   = 'list_3',
                           query = {'object': TestDisk,
                                    'data'  : DataList.select.COUNT,
@@ -299,6 +312,7 @@ class Basic(TestCase):
                                               'items': [('size', DataList.operator.GT, 3),
                                                         ('size', DataList.operator.LT, 6)]}}).data
         self.assertEqual(list_3, 2, 'list should contain int 2')  # disk 4 and 5
+        # pylint: disable=line-too-long
         list_4 = DataList(key   = 'list_4',
                           query = {'object': TestDisk,
                                    'data'  : DataList.select.COUNT,

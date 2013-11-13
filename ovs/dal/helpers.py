@@ -16,7 +16,8 @@ class Descriptor(StoredObject):
     """
     def __init__(self, object_type=None, guid=None):
         """
-        Initializes a descriptor for a given type. Optionally already providing a guid for the instanciator
+        Initializes a descriptor for a given type. Optionally already providing a guid for the
+        instanciator
         """
 
         # Initialize super class
@@ -31,7 +32,9 @@ class Descriptor(StoredObject):
             self._descriptor = StoredObject.volatile.get(key)
             if self._descriptor is None:
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
-                self._descriptor = {'name'  : filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', ''),
+                name = filename.replace(os.path.dirname(filename) + os.path.sep, '')\
+                               .replace('.py', '')
+                self._descriptor = {'name'  : name,
                                     'source': os.path.relpath(filename, os.path.dirname(__file__)),
                                     'type'  : object_type.__name__}
                 StoredObject.volatile.set(key, self._descriptor)

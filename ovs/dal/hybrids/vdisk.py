@@ -87,4 +87,3 @@ class VDisk(DataObject):
             """
             return _vsrClient.info(self.volumeid)
         return self._backend_property(get_data)
-
