@@ -29,15 +29,16 @@ class Basic(TestCase):
         This makes sure the unittests can be executed without those libraries installed
         """
         # Mocking
+
         sys.modules['ovs.extensions.storage.memcachefactory'] = MCF
         sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VSR
         from ovs.dal.hybrids.vdisk import VDisk
         from ovs.extensions.generic.volatilemutex import VolatileMutex
-
         global VDisk
+        global VolatileMutex
+
         from ovs.dal.hybrids._testmachine import TestMachine
         from ovs.dal.hybrids._testdisk import TestDisk
-
         global TestMachine
         global TestDisk
 
