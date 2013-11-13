@@ -114,7 +114,7 @@ class Basic(TestCase):
 
     def test_datapersistent(self):
         """
-        Checks whether data is persisted correctly
+        Validates whether data is persisted correctly
         """
         disk = TestDisk()
         guid = disk.guid
@@ -127,7 +127,7 @@ class Basic(TestCase):
 
     def test_readonlyproperty(self):
         """
-        Checks whether all dynamic properties are actually read-only
+        Validates whether all dynamic properties are actually read-only
         """
         disk = TestDisk()
         # Readonly properties should return data

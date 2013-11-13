@@ -1,5 +1,6 @@
 import time
 import json
+from exceptions import KeyNotFoundException
 
 
 class DummyPersistentStore(object):
@@ -23,7 +24,11 @@ class DummyPersistentStore(object):
         return data
 
     def get(self, key):
-        return self._read()[key]
+        data = self._read()
+        if key in data:
+            return self._read()[key]
+        else:
+            raise KeyNotFoundException(key)
 
     def prefix(self, key):
         data = self._read()
@@ -36,8 +41,11 @@ class DummyPersistentStore(object):
 
     def delete(self, key):
         data = self._read()
-        del data[key]
-        self._save(data)
+        if key in data:
+            del data[key]
+            self._save(data)
+        else:
+            raise KeyNotFoundException(key)
 
     def _save(self, data):
         f = open(self._path, 'w+')

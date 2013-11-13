@@ -4,13 +4,14 @@ DataObject module
 import inspect
 import uuid
 import copy
-from exceptions import *
-from helpers import Descriptor, Toolbox
-from storedobject import StoredObject
-from relations.relations import RelationMapper
-from dataobjectlist import DataObjectList
-from datalist import DataList
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
+from ovs.dal.helpers import Descriptor, Toolbox
+from ovs.dal.storedobject import StoredObject
+from ovs.dal.relations.relations import RelationMapper
+from ovs.dal.dataobjectlist import DataObjectList
+from ovs.dal.datalist import DataList
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.storage.exceptions import KeyNotFoundException
 
 
 class DataObject(StoredObject):
@@ -92,15 +93,12 @@ class DataObject(StoredObject):
         if new:
             self._data = {}
         else:
-            try:
-                self._data = StoredObject.volatile.get(self._key)
-            except:
-                self._data = None
+            self._data = StoredObject.volatile.get(self._key)
             if self._data is None:
                 self._metadata['cache'] = False
                 try:
                     self._data = StoredObject.persistent.get(self._key)
-                except:
+                except KeyNotFoundException:
                     raise ObjectNotFoundException()
             else:
                 self._metadata['cache'] = True
@@ -153,8 +151,10 @@ class DataObject(StoredObject):
         """
         Adds a simple property to the object
         """
+        # pylint: disable=protected-access, locally-disabled
         fget = lambda s: s._get_sproperty(attribute)
         fset = lambda s, v: s._set_sproperty(attribute, v)
+        # pylint: enable=protected-access, locally-disabled
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
@@ -162,8 +162,10 @@ class DataObject(StoredObject):
         """
         Adds a complex property to the object (hybrids)
         """
+        # pylint: disable=protected-access, locally-disabled
         fget = lambda s: s._get_cproperty(attribute)
         fset = lambda s, v: s._set_cproperty(attribute, v)
+        # pylint: enable=protected-access, locally-disabled
         setattr(self.__class__, attribute, property(fget, fset))
         self._data[attribute] = value
 
@@ -171,7 +173,9 @@ class DataObject(StoredObject):
         """
         Adds a list (readonly) property to the object
         """
+        # pylint: disable=protected-access, locally-disabled
         fget = lambda s: s._get_lproperty(attribute)
+        # pylint: enable=protected-access, locally-disabled
         setattr(self.__class__, attribute, property(fget))
 
     # Helper method spporting property fetching
@@ -201,13 +205,13 @@ class DataObject(StoredObject):
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
-        # pylint: disable=line-too-long
+        # pylint: disable=line-too-long, locally-disabled
         datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
                             query = {'object': remote_class,
                                      'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
                                                'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})
-        # pylint: enable=line-too-long
+        # pylint: enable=line-too-long, locally-disabled
 
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
@@ -292,7 +296,7 @@ class DataObject(StoredObject):
         new = False
         try:
             data = StoredObject.persistent.get(self._key)
-        except:
+        except KeyNotFoundException:
             new = True
             data = {}
         data_conflicts = []
@@ -380,7 +384,7 @@ class DataObject(StoredObject):
         # Delete the object out of the persistent store
         try:
             StoredObject.persistent.delete(self._key)
-        except:
+        except KeyNotFoundException:
             pass
 
         # Delete the object and its properties out of the volatile store
@@ -403,7 +407,7 @@ class DataObject(StoredObject):
         Serializes the internal data, getting rid of certain metadata like descriptors
         """
         data = {'guid': self.guid}
-        for key, relation in self._relations.iteritems():
+        for key in self._relations:
             if depth == 0:
                 data['%s_guid' % key] = self._data[key]['guid']
             else:
@@ -412,7 +416,7 @@ class DataObject(StoredObject):
                     data[key] = getattr(self, key).serialize(depth=(depth - 1))
                 else:
                     data[key] = None
-        for key, default in self._blueprint.iteritems():
+        for key in self._blueprint:
             data[key] = self._data[key]
         for key in self._expiry.keys():
             data[key] = getattr(self, key)

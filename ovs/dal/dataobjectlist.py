@@ -116,8 +116,10 @@ class DataObjectList(object):
         """
         This method generates a dummy class with the correct naming
         """
-        class Dummy():
+        class Dummy(object):
             """ Dummy class """
-            pass
+            def __init__(self):
+                """ Dummy initializer """
+                pass
         Dummy.__name__ = name
         return Dummy

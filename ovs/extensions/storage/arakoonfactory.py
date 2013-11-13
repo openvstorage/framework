@@ -1,4 +1,6 @@
 from arakoon import Arakoon
+from arakoon.ArakoonExceptions import ArakoonNotFound
+from exceptions import KeyNotFoundException
 import json
 
 
@@ -17,7 +19,10 @@ class ArakoonStore(object):
         self._client = Arakoon.ArakoonClient(config=self._config)
 
     def get(self, key):
-        return json.loads(self._client.get(key))
+        try:
+            return json.loads(self._client.get(key))
+        except ArakoonNotFound as field:
+            raise KeyNotFoundException(field)
 
     def set(self, key, value):
         return self._client.set(key, json.dumps(value))
@@ -26,4 +31,7 @@ class ArakoonStore(object):
         return self._client.prefix(prefix)
 
     def delete(self, key):
-        return self._client.delete(key)
+        try:
+            return self._client.delete(key)
+        except ArakoonNotFound as field:
+            raise KeyNotFoundException(field)
