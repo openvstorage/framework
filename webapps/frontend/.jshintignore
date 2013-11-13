@@ -6,3 +6,4 @@ lib/jquery
 lib/jquery-plugins
 lib/knockout
 lib/require
+lib/i18next
