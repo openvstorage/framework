@@ -579,7 +579,11 @@ class Basic(TestCase):
 class SRC():
     @staticmethod
     def listSnapShots(volumeid):
-        return ["TEST1", "TEST2"]
+        return ["test1-%s" % str(volumeid), "test2-%s" % str(volumeid)]
+
+    @staticmethod
+    def info(volumeID):
+        return volumeID
 
 
 class VSRC():
