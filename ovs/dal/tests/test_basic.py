@@ -7,7 +7,7 @@ import sys
 from unittest import TestCase
 from ovs.dal.storedobject import StoredObject
 from ovs.dal.datalist import DataList
-from ovs.dal.dataobject import DataObjectList
+from ovs.dal.dataobjectlist import DataObjectList
 from ovs.extensions.storage.dummies import DummyPersistentStore, DummyVolatileStore
 from ovs.dal.exceptions import *
 from ovs.dal.helpers import HybridRunner, Descriptor
