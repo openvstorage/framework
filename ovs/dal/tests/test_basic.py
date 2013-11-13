@@ -9,7 +9,6 @@ from ovs.dal.storedobject import StoredObject
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobject import DataObjectList
 from ovs.extensions.storage.dummies import DummyPersistentStore, DummyVolatileStore
-from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.dal.exceptions import *
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations.relations import RelationMapper
@@ -33,6 +32,7 @@ class Basic(TestCase):
         sys.modules['ovs.extensions.storage.memcachefactory'] = MCF
         sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VSR
         from ovs.dal.hybrids.vdisk import VDisk
+        from ovs.extensions.generic.volatilemutex import VolatileMutex
 
         global VDisk
         from ovs.dal.hybrids._testmachine import TestMachine
