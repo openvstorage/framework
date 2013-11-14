@@ -1,2 +1,2 @@
 import sys
-sys.path.append('/opt/openvStorage')
+sys.path.append('/opt/OpenvStorage')
