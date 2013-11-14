@@ -29,7 +29,7 @@ class PersistentFactory(object):
                 node = parser.get('main', 'local_node')
                 name = parser.get(node, 'name')
                 ip = parser.get(node, 'ip')
-                port = parser.get(node, 'port')
+                port = int(parser.get(node, 'port'))
                 PersistentFactory.store = ArakoonStore(cluster, {name: ([ip], port)})
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
