@@ -1,8 +1,17 @@
+"""
+Branding migration module
+"""
+
 from ovs.dal.hybrids.branding import Branding
 
 
 class Brander():
+    """
+    Handles all branded related migrations
+    """
+
     def __init__(self):
+        """ Init method """
         pass
 
     @staticmethod

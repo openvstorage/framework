@@ -1,3 +1,7 @@
+"""
+Model migration module
+"""
+
 import hashlib
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
@@ -6,7 +10,12 @@ from ovs.dal.hybrids.rolegroup import RoleGroup
 
 
 class Model():
+    """
+    Handles all model related migrations
+    """
+
     def __init__(self):
+        """ Init method """
         pass
 
     @staticmethod
