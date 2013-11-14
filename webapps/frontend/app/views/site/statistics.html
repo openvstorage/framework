@@ -1,0 +1,34 @@
+<section>
+    <h2 data-i18n="ovs:statistics.title"></h2>
+    <p data-i18n="ovs:statistics.introduction"></p>
+    <h3 data-i18n="ovs:statistics.memcache.title"></h3>
+    <ul>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.memoryusage"></span>
+            <span data-bind="text: memcached.bytes"></span>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.keysincache"></span>
+            <span data-bind="text: memcached.currItems"></span>
+            <span data-i18n="ovs:generic.of"></span>
+            <span data-bind="text: memcached.totalItems"></span>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.cachehits"></span>
+            <span data-bind="text: memcached.getHits"></span>
+            <span data-i18n="ovs:generic.of"></span>
+            <span data-bind="text: memcached.cmdGet"></span>: <b><span data-bind="text: memcached.hitRate"></span>%</b>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.cachetraffic"></span>
+            <span data-bind="text: memcached.bytesRead"></span> in, <span data-bind="text: memcached.bytesWritten"></span> out
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.uptime"></span>
+            <span data-bind="text: memcached.uptime"></span>
+        </li>
+    </ul>
+    <p data-i18n="ovs:statistics.memcache.rawinfo"></p>
+    <pre data-bind="html: memcached.raw">
+    </pre>
+</section>
