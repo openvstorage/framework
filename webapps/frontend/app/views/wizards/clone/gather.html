@@ -1,0 +1,46 @@
+<div style="min-width: 700px;">
+    <h4 style="margin-top: 5px;" data-i18n="ovs:wizards.clone.gather.title"></h4>
+    <div data-bind="visible: canContinue().value">
+        <form role="form form-horizontal" class="form-horizontal">
+            <p data-i18n="ovs:wizards.clone.gather.basicinfo"></p>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.clone.gather.name"></label>
+                <div class="col-lg-4">
+                    <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="amount" data-i18n="ovs:wizards.clone.gather.amount"></label>
+                <div class="col-lg-3">
+                    <div class="input-group">
+                        <span class="input-group-btn">
+                            <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(Math.max(1, parseInt('0' + data.amount(), 10) - 1)); }">
+                                <span class="glyphicon glyphicon-minus"></span>
+                            </button>
+                        </span>
+                        <input type="text" id="amount" class="form-control" data-bind="value: data.amount, valueUpdate: 'afterkeydown'">
+                        <span class="input-group-btn">
+                            <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(parseInt('0' + data.amount(), 10) + 1); }">
+                                <span class="glyphicon glyphicon-plus"></span>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <p data-i18n="ovs:wizards.clone.gather.selectsnapshots"></p>
+            <!-- ko foreach: data.vm().vDisks() -->
+                <div class="form-group">
+                    <label class="col-lg-3 control-label" data-bind="attr: { for: 'snapshot_' + guid }">
+                        <span data-i18n="ovs:generic.disk"></span> <span data-bind="text: name"></span>
+                    </label>
+                    <div class="col-lg-8">
+                        <select class="form-control" data-bind="attr: { id: 'snapshot_' + guid }, options: snapshots, value: selectedSnapshot"></select>
+                    </div>
+                </div>
+            <!-- /ko -->
+        </form>
+    </div>
+    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
+        <p data-bind="text: canContinue().reason"></p>
+    </div>
+</div>

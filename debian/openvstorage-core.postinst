@@ -1,0 +1,4 @@
+#!/bin/bash
+
+/etc/init.d/rabbitmq-server start
+celery flower --port=5555 --broker=amqp://guest:guest@localhost:5672//

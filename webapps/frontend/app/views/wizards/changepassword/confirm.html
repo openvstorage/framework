@@ -1,0 +1,29 @@
+<div style="min-width: 700px;">
+    <h4 style="margin-top: 5px;" data-i18n="ovs:wizards.changepassword.confirm.title"></h4>
+    <div>
+        <p data-i18n="ovs:wizards.changepassword.confirm.introduction"></p>
+        <form role="form form-horizontal" class="form-horizontal">
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="currentpassword" data-i18n="ovs:wizards.changepassword.confirm.currentpassword"></label>
+                <div class="col-lg-4">
+                    <input type="password" id="currentpassword" class="autofocus form-control" data-bind="value: currentPassword, valueUpdate: 'afterkeydown'">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="newpassword" data-i18n="ovs:wizards.changepassword.confirm.newpassword"></label>
+                <div class="col-lg-4">
+                    <input type="password" id="newpassword" class="autofocus form-control" data-bind="value: newPassword, valueUpdate: 'afterkeydown'">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="newpassword2" data-i18n="ovs:wizards.changepassword.confirm.retype"></label>
+                <div class="col-lg-4">
+                    <input type="password" id="newpassword2" class="autofocus form-control" data-bind="value: newPassword2, valueUpdate: 'afterkeydown'">
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
+        <p data-bind="text: canContinue().reason"></p>
+    </div>
+</div>
