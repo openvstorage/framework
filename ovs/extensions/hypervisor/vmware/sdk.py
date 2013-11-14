@@ -1,7 +1,7 @@
-from ovs.extensions.suds.client import Client
-from ovs.extensions.suds.cache import ObjectCache
-from ovs.extensions.suds.sudsobject import Property
-from ovs.extensions.suds.plugin import MessagePlugin
+from suds.client import Client
+from suds.cache import ObjectCache
+from suds.sudsobject import Property
+from suds.plugin import MessagePlugin
 
 from time import sleep
 
