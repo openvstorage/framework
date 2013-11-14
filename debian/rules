@@ -47,7 +47,7 @@ openvstorage:
 	dh_testdir
 	dh_testroot
 	dh_installdirs  -p$@
-	dh_installchangelogs  -p$@  ChangeLog
+	dh_installchangelogs  -p$@
 	dh_install -p$@
 	dh_installman  -p$@
 	dh_link  -p$@
