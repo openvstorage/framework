@@ -5,7 +5,7 @@ from ConfigParser import ConfigParser
 class VolumeStorageRouterClient(object):
     def __init__(self):
         config = ConfigParser()
-        config.read('/opt/openvStorage/ovs/config/volumestoragerouter.cfg')
+        config.read('/opt/OpenvStorage/ovs/config/volumestoragerouter.cfg')
         self._host = config.defaults()['host']
         self._port = int(config.defaults()['port'])
 

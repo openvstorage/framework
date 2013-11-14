@@ -2,7 +2,7 @@ import os
 import ConfigParser
 
 parser = ConfigParser.RawConfigParser()
-parser.read('/opt/openvStorage/config/api.cfg')
+parser.read('/opt/OpenvStorage/config/api.cfg')
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG

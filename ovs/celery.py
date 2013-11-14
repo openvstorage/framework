@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 import sys
-sys.path.append('/opt/openvStorage')
+sys.path.append('/opt/OpenvStorage')
 
 from celery import Celery
 from celery.schedules import crontab

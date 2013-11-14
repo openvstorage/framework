@@ -59,7 +59,10 @@ openvstorage:
 	dh_gencontrol  -p$@
 	dh_md5sums  -p$@
 	dh_builddeb  -p$@
-	dh_clean -p$@
 
 clean:
-	dh_clean
+	if [ -f debian/files ]; then rm debian/files; fi
+
+binary: openvstorage-core openvstorage-webapps openvstorage
+
+.PHONY: clean build
