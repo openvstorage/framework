@@ -18,13 +18,13 @@ class VolatileFactory(object):
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
             parser = ConfigParser.RawConfigParser()
             if client_type is None:
-                parser.read('/opt/openvStorage/config/storage.cfg')
+                parser.read('/opt/OpenvStorage/config/storage.cfg')
                 client_type = parser.get('main', 'volatile')
 
             VolatileFactory.store = None
             if client_type == 'memcache':
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
-                parser.read('/opt/openvStorage/config/memcache.cfg')
+                parser.read('/opt/OpenvStorage/config/memcache.cfg')
                 node = parser.get('main', 'local_node')
                 location = parser.get(node, 'location')
                 VolatileFactory.store = MemcacheStore([location])

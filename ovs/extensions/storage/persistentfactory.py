@@ -18,13 +18,13 @@ class PersistentFactory(object):
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
             parser = ConfigParser.RawConfigParser()
             if client_type is None:
-                parser.read('/opt/openvStorage/config/storage.cfg')
+                parser.read('/opt/OpenvStorage/config/storage.cfg')
                 client_type = parser.get('main', 'persistent')
 
             PersistentFactory.store = None
             if client_type == 'arakoon':
                 from ovs.extensions.storage.persistent.arakoonstore import ArakoonStore
-                parser.read('/opt/openvStorage/config/arakoon.cfg')
+                parser.read('/opt/OpenvStorage/config/arakoon.cfg')
                 cluster = parser.get('main', 'cluster')
                 node = parser.get('main', 'local_node')
                 name = parser.get(node, 'name')

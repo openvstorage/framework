@@ -1,6 +1,7 @@
-from suds.client import Client, ObjectCache
-from suds.sudsobject import Property
-from suds.plugin import MessagePlugin
+from ovs.extensions.suds.client import Client
+from ovs.extensions.suds.cache import ObjectCache
+from ovs.extensions.suds.sudsobject import Property
+from ovs.extensions.suds.plugin import MessagePlugin
 
 from time import sleep
 
@@ -350,7 +351,7 @@ class Sdk(object):
         if wait:
             self.waitForTask(task)
         return task
-        
+
 
     @validate_session
     def updateVM(self, vm, name, os, disks, kvmport, esxHost=None, wait=True):
@@ -499,18 +500,18 @@ class Sdk(object):
     def cloneVM(self, vmid, name, disks, esxHost=None, wait=True):
         """
         Clone a existing VM configuration
-        
+
         @param vmid: unique id of the vm
         @param name: name of the clone vm
         @param disks: list of disks to use in vm configuration
         @param kvmport: kvm port for the clone vm
         @param esxHost: esx host identifier on which to clone the vm
-        @param wait: wait for task to complete or not (True/False) 
+        @param wait: wait for task to complete or not (True/False)
         """
-        
+
         esxHost = self._validateHost(esxHost)
         hostData = self._getHostData(esxHost)
-        
+
         sourceVMObject = self.exists(key=vmid)
         if not sourceVMObject:
             raise Exception("VM with key reference %s not found" % vmid)
