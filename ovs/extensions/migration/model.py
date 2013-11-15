@@ -106,3 +106,5 @@ class Model():
             # Execute some code that upgrades to version 2
             # working_version = 2
             pass
+
+        return working_version

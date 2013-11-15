@@ -44,3 +44,5 @@ class Brander():
             slate.productname = 'Open vStorage'
             slate.is_default = False
             slate.save()
+
+        return working_version
