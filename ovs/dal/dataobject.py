@@ -15,24 +15,52 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
+class MetaClass(type):
+    """
+    This metaclass provides dynamic __doc__ generation feeding doc generators
+    """
+    def __new__(mcs, name, bases, dct):
+        """
+        Overrides instance creation of all DataObject instances
+        """
+        if name != 'DataObject':
+            for attribute, default in dct['_blueprint'].iteritems():
+                dct[attribute] = property(
+                    doc='[persistent] %s\n@type: %s' % (default[2] if len(default) == 3 else '', default[1].__name__)
+                )
+            for attribute, relation in dct['_relations'].iteritems():
+                dct[attribute] = property(
+                    doc='[relation] one-to-many relation with %s.%s\n@type: %s' % (relation[0].__name__, relation[1], relation[0].__name__)
+                )
+            for attribute, timeout in dct['_expiry'].iteritems():
+                dct[attribute] = property(
+                    fget=dct[attribute].__get__,
+                    doc='[dynamic] (%ds) %s' % (timeout, dct[attribute].__doc__.strip())
+                )
+
+        return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
+
+
 class DataObject(object):
     """
     This base class contains all logic to support our multiple backends and the caching
-    * Storage backends:
-      * Persistent backend for persistent storage (key-value store)
-      * Volatile backend for volatile but fast storage (key-value store)
-      * Storage backends are abstracted and injected into this class, making it possible to use
-        fake backends
-    * Features:
-      * Hybrid property access:
-        * Persistent backend
-        * 3rd party component for "live" properties
-      * Individual cache settings for "live" properties
-      * 1-n relations with automatic property propagation
-      * Recursive save
+      - Storage backends:
+        - Persistent backend for persistent storage (key-value store)
+        - Volatile backend for volatile but fast storage (key-value store)
+        - Storage backends are abstracted and injected into this class, making it possible to use
+          fake backends
+      - Features:
+        - Hybrid property access:
+          - Persistent backend
+          - 3rd party component for "live" properties
+        - Individual cache settings for "live" properties
+        - 1-n relations with automatic property propagation
+        - Recursive save
     """
     # @TODO: Deleting is not recursive
     # @TODO: There is a soft limit to the amount of objects per type that is situated around 10k
+
+    __metaclass__ = MetaClass
 
     #######################
     ## Attributes
@@ -113,15 +141,13 @@ class DataObject(object):
 
         # Add properties where appropriate, hooking in the correct dictionary
         for attribute, default in self._blueprint.iteritems():
-            if attribute not in dir(self):
-                self._add_sproperty(attribute, self._data[attribute])
+            self._add_sproperty(attribute, self._data[attribute])
 
         # Load relations
         for attribute, relation in self._relations.iteritems():
             if attribute not in self._data:
                 self._data[attribute] = Descriptor(relation[0]).descriptor
-            if attribute not in dir(self):
-                self._add_cproperty(attribute, self._data[attribute])
+            self._add_cproperty(attribute, self._data[attribute])
 
         # Load foreign keys
         relations = RelationMapper.load_foreign_relations(self.__class__)
