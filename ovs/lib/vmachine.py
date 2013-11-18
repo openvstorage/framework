@@ -73,7 +73,7 @@ class VMachineController(object):
             return None
 
         hv = Factory.get(machine.node)
-        provision_machine_task = hv.cloneVM.s(hv, machine.vmid, name, disks, None, True)
+        provision_machine_task = hv.clone_vm.s(hv, machine.vmid, name, disks, None, True)
         provision_machine_task.link_error(VMachineController.delete.s(machineguid = newMachine.guid))
         result = provision_machine_task()
 
@@ -93,7 +93,7 @@ class VMachineController(object):
 
         diskTasks = []
         hv = Factory.get(machine.node)
-        delete_vmachine_task = hv.deleteVM.si(hv, machine.vmid, None, True)
+        delete_vmachine_task = hv.delete_vm.si(hv, machine.vmid, None, True)
         asyncResult = delete_vmachine_task()
         asyncResult.wait()
         if asyncResult.successful():
@@ -118,7 +118,7 @@ class VMachineController(object):
         hv = Factory.get(vmachine.node)
         #Configure disks as Independent Non-persistent
         disks = map(lambda d: '[{0}] {1}/{2}'.format(d.vpool.name, d.machine.name, devicename),vmachine.disks)
-        hv.setAsTemplate.s(hv, vmachine.vmid, disks, esxHost=None, wait=True)
+        hv.set_as_template.s(hv, vmachine.vmid, disks, esxhost=None, wait=True)
 
         """
         Do some magic on the storage layer?
