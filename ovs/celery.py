@@ -1,3 +1,6 @@
+"""
+Celery entry point module
+"""
 from __future__ import absolute_import
 
 import sys
@@ -27,13 +30,6 @@ celery.conf.CELERYBEAT_SCHEDULE = {
         'schedule': crontab(minute='0', hour='2-22', day_of_week='mon,tue,wed,thu,fri'),
         'args': [],
     },
-    # Dummy
-    # > Executes every minute
-    #'dummy': {
-    #    'task': 'ovs.scheduled.dummy',
-    #    'schedule': crontab(minute='*'),
-    #    'args': []
-    #}
 }
 
 loghandler = LogHandler('celery.log')

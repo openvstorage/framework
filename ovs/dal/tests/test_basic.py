@@ -253,13 +253,15 @@ class Basic(TestCase):
                               '_blueprint types in %s should be one of %s'
                               % (cls.__name__, str(allowed_types)))
             instance = cls()
+            for key, default in cls._blueprint.iteritems():
+                self.assertEqual(getattr(instance, key), default[0], 'Default property set correctly')
             # Make sure the type can be instantiated
             self.assertIsNotNone(instance.guid)
             properties = []
             for item in dir(instance):
                 if hasattr(cls, item) and isinstance(getattr(cls, item), property):
                     properties.append(item)
-                # All expiries should be implemented
+            # All expiries should be implemented
             missing_props = []
             for attribute in instance._expiry.keys():
                 if attribute not in properties:
