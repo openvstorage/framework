@@ -1,3 +1,6 @@
+"""
+VDisk module
+"""
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -20,6 +23,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Overview of all machines
         """
+        _ = request, format
         vmachineguid = self.request.QUERY_PARAMS.get('vmachineguid', None)
         if vmachineguid is None:
             vdisks = VDiskList.get_vdisks().reduced
@@ -33,6 +37,7 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Load information about a given task
         """
+        _ = request, format
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:

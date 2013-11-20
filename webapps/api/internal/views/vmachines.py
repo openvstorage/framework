@@ -1,3 +1,6 @@
+"""
+VMachine module
+"""
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -21,6 +24,7 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Overview of all machines
         """
+        _ = request, format
         vmachines = VMachineList.get_vmachines().reduced
         serializer = SimpleSerializer(vmachines, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -30,6 +34,7 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Load information about a given task
         """
+        _ = request, format
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
@@ -43,6 +48,7 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Deletes a machine
         """
+        _ = request
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
@@ -58,10 +64,12 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Clones a machine
         """
+        _ = format
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:
             vmachine = VMachine(pk)
+            _ = vmachine
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
         # POC, assuming data is correct

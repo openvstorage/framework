@@ -1,3 +1,6 @@
+"""
+Contains the MessageViewSet
+"""
 import time
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -15,10 +18,18 @@ class MessagingViewSet(viewsets.ViewSet):
 
     @required_roles(['view'])
     def list(self, request, format=None):
+        """
+        Provides a list of subscriptions
+        """
+        _ = request, format
         return Response(MessageController.all_subscriptions(), status=status.HTTP_200_OK)
 
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
+        """
+        Retrieves the subscriptions for a given subscriber
+        """
+        _ = request, format
         try:
             pk = int(pk)
         except (ValueError, TypeError):
@@ -28,6 +39,10 @@ class MessagingViewSet(viewsets.ViewSet):
     @link()
     @required_roles(['view'])
     def wait(self, request, pk=None, format=None):
+        """
+        Wait for messages to appear for a given subscriber
+        """
+        _ = request, format
         try:
             pk = int(pk)
             message_id = int(self.request.QUERY_PARAMS.get('message_id', None))
@@ -52,8 +67,13 @@ class MessagingViewSet(viewsets.ViewSet):
     @link()
     @required_roles(['view'])
     def last(self, request, pk=None, format=None):
+        """
+        Get the last messageid
+        """
+        _ = request, format
         try:
             pk = int(pk)
+            _ = pk
         except (ValueError, TypeError):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.last_message_id(), status=status.HTTP_200_OK)
@@ -61,6 +81,10 @@ class MessagingViewSet(viewsets.ViewSet):
     @action()
     @required_roles(['view'])
     def subscribe(self, request, pk=None, format=None):
+        """
+        Subscribes a subscriber to a set of types
+        """
+        _ = request, format
         try:
             pk = int(pk)
             subscriptions = self.request.DATA

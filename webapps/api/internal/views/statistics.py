@@ -1,3 +1,6 @@
+"""
+Statistics module
+"""
 import re
 import datetime
 import ConfigParser
@@ -14,14 +17,25 @@ class MemcacheViewSet(viewsets.ViewSet):
     """
     permission_classes = (IsAuthenticated,)
 
-    def _get_memcachelocation(self):
+    @staticmethod
+    def _get_memcachelocation():
+        """
+        Reads the memcache location out of the configuration files
+        """
         parser = ConfigParser.RawConfigParser()
         parser.read('/opt/OpenvStorage/config/memcache.cfg')
         local_node = parser.get('main', 'local_node')
         return parser.get(local_node, 'location')
 
-    def _get_instance(self, host):
+    @staticmethod
+    def _get_instance(host):
+        """
+        Returns a class with more information about a given memcache instance
+        """
         class Stats:
+            """
+            Placeholder class for statistics
+            """
             pass
 
         import memcache
@@ -49,18 +63,26 @@ class MemcacheViewSet(viewsets.ViewSet):
 
     @required_roles(['view'])
     def list(self, request, format=None):
-        match = re.match("([.\w]+:\d+)", self._get_memcachelocation())
+        """
+        Returns statistics information
+        """
+        _ = request, format
+        match = re.match("([.\w]+:\d+)", MemcacheViewSet._get_memcachelocation())
         if not match:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        stats = self._get_instance(match.group(1))
+        stats = MemcacheViewSet._get_instance(match.group(1))
         serializer = MemcacheSerializer(stats)
         return Response(serializer.data)
 
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
-        match = re.match("([.\w]+:\d+)", self._get_memcachelocation())
+        """
+        Returns statistics information
+        """
+        _ = request, format, pk
+        match = re.match("([.\w]+:\d+)", MemcacheViewSet._get_memcachelocation())
         if not match:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        stats = self._get_instance(match.group(1))
+        stats = MemcacheViewSet._get_instance(match.group(1))
         serializer = MemcacheSerializer(stats)
         return Response(serializer.data)

@@ -1,3 +1,6 @@
+"""
+Contains the BrandingViewSet
+"""
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from ovs.dal.lists.brandinglist import BrandingList
@@ -15,7 +18,7 @@ class BrandingViewSet(viewsets.ViewSet):
         """
         Overview of all brandings
         """
-
+        _ = request, format
         brands = BrandingList.get_brandings()
         serializer = FullSerializer(Branding, instance=brands, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -24,6 +27,7 @@ class BrandingViewSet(viewsets.ViewSet):
         """
         Load information about a given task
         """
+        _ = request, format
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         try:

@@ -1,3 +1,6 @@
+"""
+Django Views module for main API
+"""
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework import parsers
@@ -21,6 +24,9 @@ class ObtainAuthToken(APIView):
     model = Token
 
     def post(self, request):
+        """
+        Handles authentication post for Django REST framework
+        """
         serializer = self.serializer_class(data=request.DATA)
         if serializer.is_valid():
             user = User(serializer.object['user'].username)

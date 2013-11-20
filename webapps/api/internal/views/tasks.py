@@ -1,3 +1,6 @@
+"""
+Module for working with celery tasks
+"""
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -18,6 +21,7 @@ class TaskViewSet(viewsets.ViewSet):
         """
         Overview of active, scheduled, reserved and revoked tasks
         """
+        _ = request, format
         inspector = inspect()
         data = {'active'   : inspector.active(),
                 'scheduled': inspector.scheduled(),
@@ -30,6 +34,7 @@ class TaskViewSet(viewsets.ViewSet):
         """
         Load information about a given task
         """
+        _ = request, format
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         result = celery.AsyncResult(pk)
@@ -51,6 +56,7 @@ class TaskViewSet(viewsets.ViewSet):
         """
         Gets a given task's result
         """
+        _ = request, format
         if pk is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         result = celery.AsyncResult(pk)

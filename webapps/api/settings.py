@@ -1,3 +1,6 @@
+"""
+Django settings module
+"""
 import os
 import ConfigParser
 

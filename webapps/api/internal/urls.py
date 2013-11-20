@@ -1,3 +1,6 @@
+"""
+Django URL module for Internal API
+"""
 from views.statistics import MemcacheViewSet
 from views.vmachines import VMachineViewSet
 from views.vdisks import VDiskViewSet
