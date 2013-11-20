@@ -47,5 +47,5 @@ class Migration(object):
             parser.write(configfile)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     Migration.migrate()

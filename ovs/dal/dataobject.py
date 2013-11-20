@@ -25,12 +25,20 @@ class MetaClass(type):
         """
         if name != 'DataObject':
             for attribute, default in dct['_blueprint'].iteritems():
+                docstring = default[2] if len(default) == 3 else ''
+                if isinstance(default[1], type):
+                    itemtype = default[1].__name__
+                    extra_info = ''
+                else:
+                    itemtype = 'enum(%s)' % default[1][0].__class__.__name__
+                    extra_info = '(enum values: %s)' % ', '.join([str(item) for item in default[1]])
                 dct[attribute] = property(
-                    doc='[persistent] %s\n@type: %s' % (default[2] if len(default) == 3 else '', default[1].__name__)
+                    doc='[persistent] %s %s\n@type: %s' % (docstring, extra_info, itemtype)
                 )
             for attribute, relation in dct['_relations'].iteritems():
+                itemtype = relation[0].__name__
                 dct[attribute] = property(
-                    doc='[relation] one-to-many relation with %s.%s\n@type: %s' % (relation[0].__name__, relation[1], relation[0].__name__)
+                    doc='[relation] one-to-many relation with %s.%s\n@type: %s' % (itemtype, relation[1], itemtype)
                 )
             for attribute, timeout in dct['_expiry'].iteritems():
                 dct[attribute] = property(
@@ -260,18 +268,22 @@ class DataObject(object):
             field_type = self._blueprint[attribute][1]
             if field_type is str:
                 correct = isinstance(value, basestring)
-                allowed_types = [str, unicode, basestring]
+                allowed_types = ['str', 'unicode', 'basestring']
             elif field_type is float:
                 correct = isinstance(value, float) or isinstance(value, int)
-                allowed_types = [float, int]
+                allowed_types = ['float', 'int']
+            elif isinstance(field_type, list):
+                # We're in an enum scenario. Field_type isn't a real type, but a list containing
+                # all possible enum values
+                correct = value in field_type
+                allowed_types = field_type
             else:
                 correct = isinstance(value, field_type)
-                allowed_types = [field_type]
+                allowed_types = [field_type.__name__]
 
             if correct:
                 self._data[attribute] = value
             else:
-                allowed_types = [t.__name__ for t in allowed_types]
                 raise TypeError('Property %s allows types %s. %s given'
                                 % (attribute, str(allowed_types), type(value)))
 

@@ -24,8 +24,8 @@ class Model():
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 (0.0.1) and this script is at
         verison 3 (0.0.3) it will execute two steps:
-        - 0.0.1 > 0.0.2
-        - 0.0.2 > 0.0.3
+          - 0.0.1 > 0.0.2
+          - 0.0.2 > 0.0.3
         @param previous_version: The previous version from which to start the migration.
         """
 

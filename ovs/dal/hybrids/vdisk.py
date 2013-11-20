@@ -18,7 +18,7 @@ class VDisk(DataObject):
                   'description': ('Test disk', str),
                   'size': (100, float),
                   'type': ('DSSVOL', str),
-                  'role': ('BOOT', str),  # BOOT, DATA, TEMP
+                  'role': ('BOOT', ['BOOT', 'DATA', 'TEMP']),
                   'devicename': ('123456789-flat.vmdk', str),
                   'order': (None, int),
                   'volumeid': (None, str),
