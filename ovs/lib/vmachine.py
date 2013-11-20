@@ -26,8 +26,8 @@ class VMachineController(object):
         machine = VMachine(machineguid)
         tasks = []
         for disk in machine.disks:
-            t = VDiskController().create_snapshot.s(diskguid = disk.guid)
-            t.link_error(VDiskController().delete_snapshot.s())
+            t = VDiskController.create_snapshot.s(diskguid = disk.guid)
+            t.link_error(VDiskController.delete_snapshot.s())
             tasks.append(t)
         snapshot_vmachine_wf = group(t for t in tasks)
         snapshot_vmachine_wf()

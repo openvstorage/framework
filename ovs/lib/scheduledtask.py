@@ -24,8 +24,8 @@ class ScheduledTaskController(object):
         machines = VMachineList.get_vmachines()
         for machine in machines:
             for disk in machine.disks:
-                task = VDiskController().create_snapshot.s(diskguid=disk.guid)
-                task.link_error(VDiskController().delete_snapshot.s())
+                task = VDiskController.create_snapshot.s(diskguid=disk.guid)
+                task.link_error(VDiskController.delete_snapshot.s())
                 tasks.append(task)
         workflow = group(task for task in tasks)
         loghandler.logger.info('[SSA] %d disk snapshots launched' % len(tasks))
