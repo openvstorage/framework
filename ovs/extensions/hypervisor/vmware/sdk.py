@@ -943,7 +943,7 @@ class Sdk(object):
                             part_counter += 1
                             if part_counter < len(path):
                                 if not part in working_item.__dict__:
-                                    setattr(working_item, part, self._create_class(part)())
+                                    setattr(working_item, part, type(part, (), {})())
                                 working_item = working_item.__dict__[part]
                             else:
                                 setattr(working_item, part, propSet.val)
@@ -1005,19 +1005,6 @@ class Sdk(object):
                 self._sessionID = self._client.service.Login(self._serviceContent.sessionManager,
                                                              self._username,
                                                              self._password, None).key
-
-    def _create_class(self, name):
-        """
-        Creates a dummy class with a certain name
-        """
-        class Dummy():
-            """
-            Dummy class
-            """
-            pass
-
-        Dummy.__name__ = name
-        return Dummy
 
     def _logout(self):
         """

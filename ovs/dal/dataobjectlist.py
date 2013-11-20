@@ -52,7 +52,7 @@ class DataObjectList(object):
         """
         if guid not in self._objects:
             if self._reduced:
-                self._objects[guid] = DataObjectList._create_class(self.type.__name__)()
+                self._objects[guid] = type(self.type.__name__, (), {})()
                 setattr(self._objects[guid], 'guid', guid)
             else:
                 self._objects[guid] = self.type(guid)
@@ -111,19 +111,3 @@ class DataObjectList(object):
         """
         guid = self._guids[item]
         return self._get_object(guid)
-
-    @staticmethod
-    def _create_class(name):
-        """
-        This method generates a dummy class with the correct naming
-        """
-
-        class Dummy(object):
-            """ Dummy class """
-
-            def __init__(self):
-                """ Dummy initializer """
-                pass
-
-        Dummy.__name__ = name
-        return Dummy

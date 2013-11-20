@@ -249,12 +249,15 @@ class Basic(TestCase):
             # Check blueprint types
             allowed_types = [int, float, str, bool, list, dict]
             for key in cls._blueprint:
-                self.assertIn(cls._blueprint[key][1], allowed_types,
-                              '_blueprint types in %s should be one of %s'
-                              % (cls.__name__, str(allowed_types)))
+                is_allowed_type = cls._blueprint[key][1] in allowed_types \
+                    or isinstance(cls._blueprint[key][1], list)
+                self.assertTrue(is_allowed_type,
+                                '_blueprint types in %s should be one of %s'
+                                % (cls.__name__, str(allowed_types)))
             instance = cls()
             for key, default in cls._blueprint.iteritems():
-                self.assertEqual(getattr(instance, key), default[0], 'Default property set correctly')
+                self.assertEqual(getattr(instance, key), default[0],
+                                 'Default property set correctly')
             # Make sure the type can be instantiated
             self.assertIsNotNone(instance.guid)
             properties = []
