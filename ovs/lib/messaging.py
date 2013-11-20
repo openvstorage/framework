@@ -2,10 +2,10 @@
 Messaging module
 """
 from celery.signals import task_postrun
-from ovs.extensions.storage.memcachefactory import MemcacheFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-_cache = MemcacheFactory.load()
+_cache = VolatileFactory.get_client()
 
 
 def synchronized():
