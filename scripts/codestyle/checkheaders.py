@@ -65,6 +65,16 @@ def list_dirs(dir_):
     return dirs
 
 def get_all_files(root_folder, extensions = []):
+    for skip_dir in skip_dirs:
+        dirskip = False
+        if skip_dir in root_folder:
+            dirskip = True
+            for except_skip_dir in except_skip_dirs:
+                if except_skip_dir in root_folder:
+                    dirskip = False
+                    break
+            if dirskip:
+                return []
     files_to_process = []
     if not os.path.exists(root_folder):
         raise ValueError('Root folder {0} does not exist'.format(root_folder))
