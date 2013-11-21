@@ -22,7 +22,8 @@ help: script.py --help
 skip_files = ['/webapps/frontend/index.html',]
 skip_dirs = ['/webapps/frontend/lib',
              '/webapps/api/static/rest_framework/css',
-             '/webapps/frontend/css']
+             '/webapps/frontend/css',
+             '/webapps/api/static/rest_framework/js']
 #define files and directories to except from skip
 # should be subdirectories of the skip directories
 # or files inside the skip_dirs
