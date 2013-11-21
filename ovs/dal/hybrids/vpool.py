@@ -44,20 +44,6 @@ class VPool(DataObject):
         return self._backend_property(get_data)
 
     @property
-    def volumestoragerouterid(self):
-        """
-        Returns the VSR on which the virtual disk is stored
-        """
-
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return None
-
-        return self._backend_property(get_data)
-
-    @property
     def cache_hits(self):
         """
         Loads the cache hits (counter)
@@ -210,4 +196,3 @@ class VPool(DataObject):
             return sum([d.stored_data for d in self.disks])
 
         return self._backend_property(get_data)
-

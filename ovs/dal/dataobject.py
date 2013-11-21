@@ -38,7 +38,8 @@ class MetaClass(type):
             for attribute, relation in dct['_relations'].iteritems():
                 itemtype = relation[0].__name__
                 dct[attribute] = property(
-                    doc='[relation] one-to-many relation with %s.%s\n@type: %s' % (itemtype, relation[1], itemtype)
+                    doc='[relation] one-to-many relation with %s.%s\n@type: %s'
+                        % (itemtype, relation[1], itemtype)
                 )
             for attribute, timeout in dct['_expiry'].iteritems():
                 dct[attribute] = property(
