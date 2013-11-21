@@ -1,396 +1,547 @@
 #!/usr/bin/env python
 import re
 import os
-import tempfile
+import shutil
 import subprocess
 from debian.changelog import Changelog, Version
 from datetime import datetime
 from time import time
 
-sourcedir = '/var/cache/apt/sources'
-archivedir = '/var/cache/apt/archives'
-author = 'OVS Automatic Packager <packager@openvstorage.com>'
-ct = datetime.now()
-if ct.utcoffset():
-    cts = ct.strftime('%a, %d %b %Y %H:%M:%S %z')
-else:
-    cts = '{} +0000'.format(ct.strftime('%a, %d %b %Y %H:%M:%S'))
-scripttime = int(time())
-
-def _call(*popenargs, **kwargs):
-    retcode = subprocess.call(*popenargs, **kwargs)
-    if retcode == 0:
-        return
-    raise RuntimeError(retcode)
-
-def _check_output(*popenargs, **kwargs):
-    output = subprocess.check_output(*popenargs, **kwargs)
-    return output
-
-def _increment_version(versionnumber, increment):
-    """
-    Increments a <major>.<minor>.<patch> version number as desired
-    """
-    versionlist = versionnumber.split('.')
-    major = versionlist[0]
-    minor = versionlist[1]
-    patchandbuild = versionlist[2]
-    patch = patchandbuild.split('-')[0]
-    newversion = versionnumber
-
-    if increment == 'major':
-        newversion = "{}.{}.{}".format(int(major) + 1, minor, patch)
-    elif increment == 'minor':
-        newversion = "{}.{}.{}".format(major, int(minor) + 1, patch)
-    elif increment == 'patch':
-        newversion = "{}.{}.{}".format(major, minor, int(patch) + 1)
-
-    try:
-        build = patchandbuild.split('-')[1]
-        newversion = "{}-{}".format(newversion, build)
-    except IndexError:
-        newversion = newversion
-
-    return newversion
-
-def _gather_version(repopath, incrementversion):
-    """
-    extracts version from repository changelog
-    returns incremented part of version if indicated or just version
-    
-    """
-    changelog = Changelog()
-    changelogfile = os.path.join(repopath, 'debian', 'changelog')
-    changelogfilehandler = open(changelogfile, 'r') 
-
-    changelog.parse_changelog(changelogfilehandler)
-    currentversion = changelog.full_version.split('~')[0]
-    if incrementversion:
-        version = _increment_version(currentversion, 'patch')
-    else:
-        version = currentversion
-
-    return version
-
-def process_command(args, cwd=None):
-    if not isinstance(args, (list, tuple)):
-        raise RuntimeError, 'args passed must be in a list'
-    print 'Executing {} with CWD {}'.format(args, cwd)
-    _call(args, cwd=cwd)
-
-def dpkg_source(b_or_x, dsc, options=None, output=None, cwd=None):
-    'call dpkg-source [options] -b|x dsc'
-    assert b_or_x in ['-b', '-x']
-    args = ['/usr/bin/dpkg-source', b_or_x, dsc]
-    if options:
-        args.insert(1, options)
-    if output:
-        args.append(output)
-    process_command(args, cwd=cwd)
-
-def clone_bitbucket(credentials, repository, repodir, branch):
+class OvsPackaging(object):
     """
     """
-    if branch != 'default':
-        clonecommand = ['hg', '-yq', '--cwd', repodir, 'clone', '-u', branch]
-    else:
-        clonecommand = ['hg', '-yq', '--cwd', repodir, 'clone']
 
-    if os.path.exists(credentials):
-        sshcommand = 'ssh -i {} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'.format(credentials)
-        sshurl = 'ssh://hg@bitbucket.org/openvstorage/{}'.format(repository)
-        clonecommand.extend(['-e', sshcommand, sshurl])
-    else:
-        clonecommand.append('https://{}@bitbucket.org/openvstorage/{}'.format(credentials, repository))
+    def __init__(self, args):
 
-    process_command(clonecommand)
+        if args.repopath:
+            self.repopath = os.path.abspath(args.repopath)
+        else:
+            self.repopath = os.path.join(os.sep, 'opt', 'mercurial', 'openvstorage')
 
-def push_bitbucket(credentials, repopath):
-    """
-    """
-    pushcommand = ['hg', '-yq', '--cwd', repopath, 'push']
+        if args.repository:
+            self.repository = args.repository
+        else:
+            self.repository = 'openvstorage/openvstorage'
 
-    repository = os.path.split(repopath)[1]
-    if os.path.exists(credentials):
-        sshcommand = 'ssh -i {} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'.format(credentials)
-        sshurl = 'ssh://hg@bitbucket.org/openvstorage/{}'.format(repository)
-        pushcommand.extend(['-e', sshcommand, sshurl])
-    else:
-        pushcommand.append('https://{}@bitbucket.org/openvstorage/{}'.format(credentials, repository))
+        if args.distribution:
+            self.distribution = args.distribution
+        else:
+            self.distribution = 'revision'
 
-    process_command(pushcommand)
+        if args.tag:
+            self.tag = args.tag
+        else:
+            self.tag = None
 
-def add_version_to_changelog(repopath, version, qualitylevel):
-    """
-    add new version to main source changelog
-    """
+        if args.branch:
+            self.branch = args.branch
+        else:
+            self.branch = 'default'
 
-    currentversion = Version(version)
-    changelogfile = os.path.join(repopath, 'debian', 'changelog')
-    changelogfilehandler = open(changelogfile, 'r')
+        if args.promote:
+            self.promote = args.promote
+        else:
+            self.promote = None
 
-    changelog = Changelog()
-    changelog.parse_changelog(changelogfilehandler)
-    if not currentversion in changelog.versions:
-        changelog.new_block(
-                package='openvstorage',
-                version=currentversion,
-                distributions='ovs-{}'.format(qualitylevel),
-                urgency='low',
-                author=author,
-                date=cts)
+        if args.author:
+            self.athor = args.author
+        else:
+            self.author = 'OVS Automatic Packager <packager@openvstorage.com>'
 
-    change = '\n   * CloudFounders {} Open vStorage release '
-    change += '( see changelog for more info on changes )\n'
-    changelog.add_change(change.format(version))
+        if args.ssh_credentials:
+            self.ssh_credentials = args.ssh_credentials
+        else:
+            self.ssh_credentials = '~/.ssh/id_rsa'
 
-    changelogfilehandler = open(changelogfile, 'w')
-    changelog.write_to_open_file(changelogfilehandler)
-    changelogfilehandler.close()
+        if args.bb_credentials:
+            self.bb_credentials = args.bb_credentials
+        else:
+            self.bb_credentials = '~/.ssh/id_rsa'
 
-def act_on_changelog(repopath, changelog_action, version, credentials):
-    """
-    """
-    if changelog_action == 'commit':
-        changelogcommand = ['hg', '-yq', '--cwd', repopath, changelog_action, '-m ovs release {}'.format(version)]
-        process_command(changelogcommand)
-        push_bitbucket(credentials, repopath)
-    elif changelog_action == 'revert':
-        changelogpath = os.path.join(repopath, 'debian', 'changelog')
-        changelogcommand = ['hg', '-yq', changelog_action, '-a', changelogpath]
-        process_command(changelogcommand, cwd=repopath)
-    else:
-        return 1
-    
-def compile_changelog(codedir, package, version, qualitylevel):
-    """
-    Parse changelog
-    Retrieve last revision from current or previous block and request changelog since that revision
-    hg log -b default --rev 62: --template '{date|shortdate} {rev} {desc|firstline}\n' ovs
-    2013-10-17 60 The classes in ovs.lib are now called <object>Controller
-    """
-    def _get_last_revision(changelog):
-        regex = re.compile('\s+\*\s+[0-9]+-[0-9]+-[0-9]+\s(?P<rev>[0-9]+)\s(?P<desc>.*)')
-        for block in changelog._blocks:
-            for change in block.changes():
-                m = regex.match(change)
-                if m:
-                    return m.groupdict()['rev']
-        return '1'
+        if args.debug:
+            self.debug = args.debug
+        else:
+            self.debug = False
 
-    def _getcommits(sincerevision):
-        print 'getting commits since {}'.format(sincerevision)
-        commits = list()
-        branch = _check_output(['hg', 'branch']).strip()
-        installfile = open('{}/debian/{}.install'.format(codedir, package), 'r')
-        for entry in installfile.readlines():
-            sd = entry.split(' ')[0]
-            args = ['/usr/bin/hg', 'log', '-b', branch, '--prune', sincerevision, '--template', '{date|shortdate} {rev} {desc|firstline}\n', sd]
-            commits.extend(_check_output(args).splitlines())
-        commitset = set(commits)
-        return sorted(commitset, key=lambda k:str(k).split(' ')[1], reverse=True)
-    
-    changelog = Changelog()
-    changelogfile = '{}/{}.changelog'.format(codedir, package)
-    if os.path.exists(changelogfile):
-        print 'Changelog file exists'
-        changelogfilehandler = open(changelogfile, 'r')
+        self._hg_command = ['hg', '-yq', '--cwd', self.repopath] 
+        self._parent_repopath = os.path.split(self.repopath)[0]
+        self._needed_directories = ['', 'sources', 'binary']
+        self.changelogpath = os.path.join(self.repopath, 'debian', 'changelog')
+
+        if os.path.exists(os.path.expanduser(self.bb_credentials)):
+            self._bb_username = None
+            self._bb_password = None
+        else:
+            bb_split = self.bb_credentials.split(':')
+            self._bb_username = bb_split[0]
+            self._bb_password = ''.join(bb_split[1:])
+
+        if os.path.exists(os.path.expanduser(self.ssh_credentials)):
+            self._ssh_username = None
+            self._ssh_password = None
+        else:
+            ssh_split = self.ssh_credentials.split(':')
+            self._ssh_username = ssh_split[0]
+            self._ssh_password = ''.join(ssh_split[1:])
+
+        self.scripttime = int(time())
+        _packagetime = datetime.now()
+        if _packagetime.utcoffset():
+            self.packagetimestring = _packagetime.strftime('%a, %d %b %Y %H:%M:%S %z')
+        else:
+            self.packagetimestring = '{} +0000'.format(_packagetime.strftime('%a, %d %b %Y %H:%M:%S'))
+
+        self.incrementversion = False
+        self.changelog_action = None
+        if (self.tag and self.distribution == 'release'):
+            self.incrementversion = True
+            self.changelog_action = 'commit'
+        if self.distribution == 'development':
+            # perhaps keeping all the recent changes in the changelog 
+            # is good here
+            # changelog_action = 'revert'
+            self.incrementversion = True
+
+    def _call(self, *popenargs, **kwargs):
+        retcode = subprocess.call(*popenargs, **kwargs)
+        if retcode == 0:
+            return
+        raise RuntimeError(retcode)
+
+    def _check_output(self, *popenargs, **kwargs):
+        output = subprocess.check_output(*popenargs, **kwargs)
+        return output
+
+    def process_command(self, args, cwd=None):
+        if not isinstance(args, (list, tuple)):
+            raise RuntimeError, 'args passed must be in a list'
+        print 'Executing {} with working directory {}'.format(args, cwd)
+        self._call(args, cwd=cwd)
+
+    def _increment_version(self, versionnumber, increment):
+        """
+        Increments a <major>.<minor>.<patch>-<build> version number as desired
+        This should never increment the build number
+        """
+        versionlist = versionnumber.split('.')
+        major = versionlist[0]
+        minor = versionlist[1]
+        patchandbuild = versionlist[2]
+        patch = patchandbuild.split('-')[0]
+        newversion = versionnumber
+
+        if increment == 'major':
+            newversion = "{}.{}.{}".format(int(major) + 1, minor, patch)
+        elif increment == 'minor':
+            newversion = "{}.{}.{}".format(major, int(minor) + 1, patch)
+        elif increment == 'patch':
+            newversion = "{}.{}.{}".format(major, minor, int(patch) + 1)
+
         try:
-            changelog.parse_changelog(changelogfilehandler)
-        except:
-            pass
-    sincerevision = _get_last_revision(changelog)
-    commits = _getcommits(sincerevision=sincerevision)
-    if not Version(version) in changelog.versions:
-        print 'adding new version to changelog {}'.format(version)
-        changelog.new_block(package=package,
-                            version=Version(version),
-                            distributions=qualitylevel,
-                            urgency='low',
-                            author=author,
-                            date=cts)
-    if commits:
-        for commit in commits:
-            changelog.add_change('   * {})'.format(commit))
-    else:
-        changelog.add_change('   *  No Commits')
-    changelogfilehandler = open(changelogfile, 'w')
-    changelog.write_to_open_file(changelogfilehandler)
-    changelogfilehandler.close()
+            build = patchandbuild.split('-')[1]
+            newversion = "{}-{}".format(newversion, build)
+        except IndexError:
+            newversion = newversion
 
-def build_dsc(repopath, qualitylevel, tag, credentials=None, incrementversion=False):
-    """
-    create the source deb
-    """
+        return newversion
 
-    abscodedir = os.path.abspath(repopath)
-    if not os.path.exists(abscodedir):
-        raise OSError('Code directory {} must exist to continue'.format(abscodedir))
+    def _gather_version(self):
+        """
+        extracts version from repository changelog
+        returns incremented part of version if indicated or just version
+        """
 
-    versionnumber = _gather_version(repopath, incrementversion)
-    changelog_action = None
-    if qualitylevel == 'development':
-        version = '{}~{}~{}'.format(versionnumber, scripttime, tag)
-        add_version_to_changelog(repopath, version, qualitylevel)
-        # changelog_action = 'revert'
-    elif tag and qualitylevel == 'release': 
-        patchnumber = versionnumber.split('.')[2]
-        versionnumber.split('.')[2] = int(patchnumber) + 1
-        newversion = '.'.join(versionnumber)
-        version = '{}~{}'.format(newversion, tag)
-        add_version_to_changelog(repopath, version, qualitylevel, credentials)
-        changelog_action = 'commit'
-    else:
-        version = versionnumber
+        changelog = Changelog()
+        changelogfile = open(self.changelogpath, 'r')
 
-    packages = list()
-    cwd = os.path.abspath(os.curdir)
-    package = os.path.basename(repopath)
+        changelog.parse_changelog(changelogfile)
+        currentversion = changelog.full_version.split('~')[0]
+        if self.incrementversion:
+            version = self._increment_version(currentversion, 'patch')
+        else:
+            version = currentversion
 
-    if not os.path.exists(sourcedir):
-        os.mkdir(sourcedir)
+        changelogfile.close() 
 
-    os.chdir(abscodedir)
-    debianfiles = os.listdir('{}/debian'.format(abscodedir))
-    for debfile in debianfiles:
-        filename, ext =  os.path.splitext(debfile)
-        if ext == '.install':
-            packages.append(filename)
+        return version
 
-    for package in packages:
-        print 'packaging {} with version {}'.format(package, version)
-        compile_changelog(repopath, package, version, qualitylevel)
-    
-    exclude_patterns = ['.hg', '.project', '.settings', '.hgignore']
-    exclude_args = ''
-    for pattern in exclude_patterns:
-        exclude_args += '-I{} '.format(pattern)
-    os.chdir(sourcedir)
-    dpkg_source('-b', repopath, exclude_args)
+    def dpkg_source(self, b_or_x, dscpath, options=None, output=None, cwd=None):
+        """
+        call dpkg-source [options] -b|x dsc
+        """
 
-    if changelog_action:
-        act_on_changelog(repopath, changelog_action, version, credentials)
+        assert b_or_x in ['-b', '-x']
+        args = ['/usr/bin/dpkg-source', b_or_x, dscpath]
+        if options:
+            args.insert(1, options)
+        if output:
+            args.append(output)
+        self.process_command(args, cwd=cwd)
 
-    os.chdir(cwd)
+    def _bitbucket_command(self, command):
+        """
+        check credentials and run specified command
+        """
+        
+        _bb_command = self._hg_command[:]
+        _bb_command.extend(command)
 
-    srcdebpath = None
+        if 'clone' in command:
+            _repopath_index = _bb_command.index(self.repopath)
+            _bb_command[_repopath_index] = self._parent_repopath
 
-    srcdebdir = os.path.split(repopath)[0]
-    for srcdeb in os.listdir(srcdebdir):
-        print 'found {} looking for file ending with "{}.dsc" in {}'.format(srcdeb, version, srcdebdir)
-        if srcdeb.endswith('{}.dsc'.format(version)):
-            srcdebpath = os.path.join(srcdebdir, srcdeb)
+        if self._bb_username and self._bb_password:
+            urlstring = 'https://{}:{}@bitbucket.org/{}'
+            url = urlstring.format(self._bb_username, 
+                    self._bb_password, self.repository)
+            _bb_command.append(url)
+        else:
+            sshstring = 'ssh -i {} -o StrictHostKeyChecking=no '
+            sshstring += '-o UserKnownHostsFile=/dev/null' 
+            sshcommand = sshstring.format(self.bb_credentials)
+            sshurl = 'ssh://hg@bitbucket.org/{}'.format(self.repository)
+            _bb_command.extend(['-e', sshcommand, sshurl])
 
-    if not srcdebpath:
-        raise RuntimeError('Source Debian Package Failure - Source Deb Not Found')
+        self.process_command(_bb_command)
 
-    print 'source deb file path: {}'.format(srcdebpath)
-    return srcdebpath
+    def clone_bitbucket(self):
+        """
+        Clone the defined mercurial repository from bitbucket
+        """
 
-def list_dsc():
-    dscfiles = list() 
-    for fd in os.listdir(sourcedir):
-        filename, ext = os.path.splitext(fd)
-        if ext == '.dsc':
-            dscfiles.append(fd)
-    return dscfiles
+        _clonecommand = ['clone', '-u', self.branch]
+        self._bitbucket_command(_clonecommand)
 
-def dpkg_buildpackage(tmpdir, package, cwd=None):
-    """
-    @param destPath: Destination path 
-    @param package: Name of the package to build
-    """
-    os.chdir(tmpdir)
-    if package:
-        args = ['/usr/bin/dpkg-buildpackage', '-rfakeroot', '-uc', '-us', '-b', '-T', package]
-    else:
-        args = ['/usr/bin/dpkg-buildpackage', '-rfakeroot', '-uc', '-us']
-    process_command(args)
-    if cwd:
+    def pull_bitbucket(self):
+        """
+        Pull and update the defined mercurial repository from bitbucket
+        """
+
+        _pullcommand = ['pull', '-u']
+        self._bitbucket_command(_pullcommand)
+
+    def push_bitbucket(self):
+        """
+        Push the defined mercurial repository to bitbucket
+        """
+
+        _pushcommand = ['push']
+        self._bitbucket_command(_pushcommand)
+
+    def add_version_to_changelog(self, version):
+        """
+        add new version to main source changelog
+        """
+
+        currentversion = Version(version)
+        changelogfile= open(self.changelogpath, 'r')
+
+        changelog = Changelog()
+        changelog.parse_changelog(changelogfile)
+        if not currentversion in changelog.versions:
+            changelog.new_block(
+                    package='openvstorage',
+                    version=currentversion,
+                    distributions='ovs-{}'.format(self.distribution),
+                    urgency='low',
+                    author=self.author,
+                    date=self.packagetimestring)
+
+        change = '\n   * CloudFounders {} Open vStorage release '
+        change += '( see changelog for more info on changes )\n'
+        changelog.add_change(change.format(version))
+
+        changelogfile = open(self.changelogpath, 'w')
+        changelog.write_to_open_file(changelogfile)
+        changelogfile.close()
+
+    def act_on_changelog(self, changelog_action, version):
+        """
+        Act on a changelog in a Bitbucket Mercurial repository
+        """
+
+        _push = False
+        _hg_command = self._hg_command[:]
+        changelogcommand = _hg_command.append(changelog_action)
+        if changelog_action == 'commit':
+            commitmessage = 'ovs release {}'.format(version)
+            changelogcommand = _hg_command.extend(['-m', commitmessage])
+            _push = True
+        elif changelog_action == 'revert':
+            changelogcommand = _hg_command.append('-a')
+
+        changelogcommand.append(self.changelogpath)
+        self.process_command(changelogcommand, cwd=self.repopath)
+        if _push:
+            self.push_bitbucket()
+
+    def compile_changelog(self, package, version):
+        """
+        Parse changelog
+        Retrieve last revision from current or previous block and request changelog since that revision
+        hg log -b default --rev 62: --template '{date|shortdate} {rev} {desc|firstline}\n' ovs
+        2013-10-17 60 The classes in ovs.lib are now called <object>Controller
+        """
+        def _get_last_revision(changelog):
+            regex = re.compile('\s+\*\s+[0-9]+-[0-9]+-[0-9]+\s(?P<rev>[0-9]+)\s(?P<desc>.*)')
+            for block in changelog._blocks:
+                for change in block.changes():
+                    m = regex.match(change)
+                    if m:
+                        return m.groupdict()['rev']
+            return '1'
+
+        def _getcommits(sincerevision):
+            print 'getting commits since {}'.format(sincerevision)
+            commits = list()
+            branch = self._check_output(['hg', 'branch']).strip()
+            installstring = '{}/debian/{}.install'
+            installpath = installstring.format(self.repopath, package)
+            installfile = open(installpath, 'r')
+            for entry in installfile.readlines():
+                sd = entry.split(' ')[0]
+                args = ['/usr/bin/hg', 'log', '-b', branch, '--prune', \
+                        sincerevision, '--template', \
+                        '{date|shortdate} {rev} {desc|firstline}\n', sd]
+                commits.extend(self._check_output(args).splitlines())
+            commitset = set(commits)
+            return sorted(commitset, key=lambda k:str(k).split(' ')[1], reverse=True)
+
+        changelog = Changelog()
+        changelogfile = '{}/{}.changelog'.format(self.repopath, package)
+        if os.path.exists(changelogfile):
+            print 'Changelog file exists'
+            changelogfilehandler = open(changelogfile, 'r')
+            try:
+                changelog.parse_changelog(changelogfilehandler)
+            except:
+                print 'Changelog parse error, continuing'
+        sincerevision = _get_last_revision(changelog)
+        commits = _getcommits(sincerevision)
+        version_object = Version(version)
+        if not version_object in changelog.versions:
+            print 'adding new version to changelog {}'.format(version)
+            changelog.new_block(package=package,
+                                version=version_object,
+                                distributions=self.distribution,
+                                urgency='low',
+                                author=self.author,
+                                date=self.packagetimestring)
+        if commits:
+            for commit in commits:
+                changelog.add_change('   * {})'.format(commit))
+        else:
+            changelog.add_change('   *  No Commits')
+        changelogfilehandler = open(changelogfile, 'w')
+        changelog.write_to_open_file(changelogfilehandler)
+        changelogfilehandler.close()
+
+    def _changelog_version(self):
+        """
+        """
+        versionnumber = self._gather_version()
+        if self.distribution == 'development':
+            version = '{}~{}~{}'.format(versionnumber,
+                    self.scripttime, self.tag)
+            self.add_version_to_changelog(version)
+            return version
+        elif self.tag and self.distribution == 'release':
+            version = '{}~{}'.format(versionnumber, self.tag)
+            self.add_version_to_changelog(version)
+            return version
+        else:
+            return versionnumber
+
+    def find_src_deb(self, version, sourcepath):
+        for sourcedeb in os.listdir(sourcepath):
+            print 'found {} looking for file ending with "{}.dsc" in {}'.format(sourcedeb, version, sourcepath)
+            if sourcedeb.endswith('{}.dsc'.format(version)):
+                sourcedebpath = os.path.join(sourcepath, sourcedeb)
+
+        if not sourcedebpath:
+            raise RuntimeError('Source Debian Package Failure - Source Deb Not Found')
+
+        print 'source deb file path: {}'.format(sourcedebpath)
+        return sourcedebpath
+
+    def build_dsc(self, version):
+        """
+        create the source deb
+        """
+
+        packages = list()
+        cwd = os.path.abspath(os.curdir)
+        sourcepath = os.path.join(self._parent_repopath, 'sources')
+
+        os.chdir(self.repopath)
+        debianfiles = os.listdir('{}/debian'.format(self.repopath))
+        for debfile in debianfiles:
+            filename, ext = os.path.splitext(debfile)
+            if ext == '.install':
+                packages.append(filename)
+
+        for package in packages:
+            print 'packaging {} with version {}'.format(package, version)
+            self.compile_changelog(package, version)
+
+        exclude_patterns = ['.hg', '.project', '.settings', '.hgignore']
+        exclude_args = ''
+        for pattern in exclude_patterns:
+            exclude_args += '-I{} '.format(pattern)
+        os.chdir(sourcepath)
+        self.dpkg_source('-b', self.repopath, options=exclude_args)
+
         os.chdir(cwd)
 
-def build_deb(sourcedebpath, package=None):
-    """
-    @param sourcedeb: Name of the debian source file(*.dsc)
-    """
-    packagetmp = sourcedebpath.split('_')[0]
-    if not os.path.exists(sourcedebpath):
-        raise ValueError('Source package {} not found'.format(sourcedebpath))
-    tmpdir = os.path.join(tempfile.gettempdir(), '{}_{}'.format(packagetmp, scripttime))
-    os.chdir(sourcedir)
-    dpkg_source('-x', sourcedebpath, output=tmpdir)
-    cwd = os.path.abspath(os.curdir)
-    os.chdir(archivedir)
-    dpkg_buildpackage(tmpdir, package)
-    os.chdir(cwd)
-    
-def update_repository(repository, credentials, branch):
-    """
-    default branch = unstable
-    credentials: 
-        string
-         - user:pass or path to private key
-    """
-    repodir = os.path.join(os.sep, 'opt', 'mercurial')
-    if not os.path.exists(repodir):
-        os.mkdir(repodir)
+        return sourcepath
 
-    repopath = os.path.join(repodir, repository)
-    if os.path.exists(repopath):
-        updatecommand = ['hg', '-yq', '--cwd', repopath, 'update', '-C', branch]
-        process_command(updatecommand)
-    else:
-        clone_bitbucket(credentials, repository, repodir, branch)
+    def dpkg_buildpackage(self, tmpdir, package=None):
+        """
+        Run buildpackage at a prepared directory
+        """
+        os.chdir(tmpdir)
+        args = ['/usr/bin/dpkg-buildpackage', '-rfakeroot', '-uc', '-us']
+        if package:
+            args.extend(['-b', '-T', package])
+        self.process_command(args)
 
-def upload(changesfile, credentials):
-    """
-    uploads deb to apt server using dput
-    - assumes a correct working dput.cf
-    - dput.cf to be created at a later date
-    credentials: user:pass or path to private key
-    """
+    def build_deb(self, sourcedebpath, package=None):
+        """
+        @param sourcedeb: Name of the debian source file(*.dsc)
+        """
+        if not os.path.exists(sourcedebpath):
+            error = 'Source package {} not found'.format(sourcedebpath)
+            raise ValueError(error)
 
-    # TODO: copy sshconfig, write a new one, and move the old one back after success
-    def _writesshconfig(addconfig):
-        easykeylist = ['UserKnownHostsFile /dev/null\n', 'StrictHostKeyChecking no\n']
-        sshconfig = os.path.expanduser('~/.ssh/config')
-        if not os.path.exists(sshconfig):
-            configf = open(sshconfig, 'w+')
+        packagebinary = os.path.join(self._parent_repopath, 'binary')
+        tmpdir = os.path.join(packagebinary, '{}'.format(self.scripttime))
+
+        os.chdir(packagebinary)
+        self.dpkg_source('-x', sourcedebpath, output=tmpdir)
+
+        self.dpkg_buildpackage(tmpdir, package)
+
+    def upload(self, changesfile):
+        """
+        uploads deb to apt server using dput
+        """
+
+        dput_cf_path = os.path.join(self.repopath, 'packaging', 
+                'dput.cf')
+        dputcommand = ['dput', '-u', '-c', dput_cf_path, 'ovs',
+                changesfile]
+
+        if self.debug:
+            print 'dput command:\n{}'.format(dputcommand)
+
+        if self._ssh_password:
+            import pexpect
+            _password = '{}\n'.format(self._ssh_password)
+            eventsdict={'(?i)password:': _password}
+            pexpect.run(' '.join(dputcommand), events=eventsdict)
         else:
-            configf = open(sshconfig, 'r+')
-        configlines = configf.readlines()
-        for easykey in easykeylist:
-            if easykey not in configlines:
-                configf.write(easykey)
-        if addconfig not in configlines:
-            configf.write(addconfig)
-        configf.close()
+            self.process_command(dputcommand)
 
+    def config_ssh(self):
+        """
+        Copy configurations from repository to proper places
+        """
+        config = os.path.expanduser(os.path.join('~', '.ssh'))
+        config_path = os.path.join(config, 'config')
+        config_temp_name = 'config_{}'.format(self.scripttime)
+        config_temp_path = os.path.join(config, config_temp_name)
+        config_dput = os.path.join(self.repopath, 'packaging', 
+                'dput_ssh_config')
 
-    dputcommand = ['dput', '-u', 'ovs', changesfile]
+        if os.path.exists(config_path):
+            shutil.copyfile(config_path, config_temp_path)
 
-    print 'dput command:\n{}'.format(dputcommand)
+        shutil.copyfile(config_dput, config_path)
 
-    if os.path.exists(credentials):
-        _writesshconfig('IdentityFile {}'.format(credentials))
-        process_command(dputcommand)
-    else:
-        splitcreds = credentials.split(':')
-        username = splitcreds[0]
-        password = ''.join(splitcreds[1:])
-        _writesshconfig('User {}\n'.format(username))
-        import pexpect
-        pexpect.run(' '.join(dputcommand), events={'(?i)password:': '{}\n'.format(password)})
+        config_file = open(config_path, 'a')
+        if self._ssh_username:
+            id_config = 'User {}\n'.format(self._ssh_username)
+        else:
+            id_config = 'IdentityFile {}'.format(self.ssh_credentials)
+        config_file.write(id_config)
+        config_file.close()
+
+    def update_repository(self):
+        """
+        update repository to specified branch or clone if not around
+        """
+
+        if os.path.exists(self.repopath):
+            self.pull_bitbucket()
+            _updatecommand = self._hg_command[:]
+            _updatecommand.extend(['update', '-C', self.branch])
+            self.process_command(_updatecommand)
+        else:
+            self.clone_bitbucket()
+
+    def check_directories(self):
+        """
+        Check for and create needed packaging directories in repository path
+        """
+
+        for directory in self._needed_directories:
+            try:
+                dirpath = os.path.join(self._parent_repopath, directory)
+                os.mkdir(dirpath)
+                print "Required Directory {} created".format(dirpath)
+            except OSError:
+                print "Required Directory {} exists".format(dirpath)
+
+    def cleanup_packaging(self):
+        """
+        Cleanup unnecessary leftover directories and reset configs
+        
+        Something like this:
+
+        if os.path.exists(config_temp_path):
+            shutil.move(config_temp_path, config_path)
+        else:
+            os.remove(config_path)
+
+        shutil.rmtree(os.path.join(self._parent_repopath, 'binary', self.scripttime))
+        shutil.rmtree(os.path.join(self._parent_repopath, 'sources'))
+        """
+        
+    def package(self):
+        """
+        Do the actual method calls to create a packaging
+        """
+
+        self.check_directories()
+
+        self.update_repository()
+        self.config_ssh()
+
+        version = self._changelog_version()
+        sourcepath = self.build_dsc(version)
+        if self.changelog_action:
+            self.act_on_changelog(self.changelog_action, version)
+
+        dscpath = self.find_src_deb(version, sourcepath)
+        self.build_deb(dscpath)
+
+        packagebinary = os.path.join(self._parent_repopath, 'binary')
+        changesstring = 'openvstorage_{}_amd64.changes'.format(version)
+        changespath = os.path.join(packagebinary, changesstring)
+
+        self.upload(changespath)
+
+        self.cleanup_packaging()
 
 if __name__ == '__main__':
     """
-    repopath: 
+    repopath:
         Path to repository for this package
         - should contain a debian subdirectory describing the debian package
-    qualitylevel: 
-        Level of quality to determine distribution from
+    distribution:
+        Apt distribution to be used as target upload
         - development, release, revision
-    tag: 
+    tag:
         Tag to add to version during package creation
         - development string for differentiating between developers (wick, joske, phile..etc)
         - release string for defining pre-release builds (alpha, beta, rc1, rc2..etc)
@@ -399,50 +550,23 @@ if __name__ == '__main__':
         Branch of repository to update to
         - if not set, default will be used
     promote:
-        Promote a Prerelease to this level 
+        Promote a Prerelease to this level
     """
 
     import argparse
     parser = argparse.ArgumentParser(description='OpenvStorage Packager')
-    parser.add_argument('-r', '--repopath', dest='repopath', required=True, help='Path to OpenvStorage Repository')
-    parser.add_argument('-q', '--qualitylevel', dest='qualitylevel', required=True, help='OpenvStorage Quality level: (release | revision | development)')
-    parser.add_argument('-t', '--tag', dest='tag', help='Tag For Development or Prerelease Builds')
-    parser.add_argument('-s', '--sshcredentials', dest='ssh_credentials', required=True, help='apt repository upload user:password or path to ssh private key')
 
-    parser.add_argument('-b', '--branch', dest='branch', help='Repository Branch')
-    parser.add_argument('-c', '--bbcredentials', dest='bb_credentials', help='bitbucket user:password or path to ssh private key')
-    parser.add_argument('-p', '--promote', dest='promote', help='Indicate Change in Release Tag but not Increment Patch Version')
-    # instead of passing url, create a dput.cf file
-    # maybe can create from a url.. maybe need it out of this script
-    # parser.add_argument('-u', '--url', dest='url', help='destination upload apt repository ftp:// or scp://')
-
-    parser.add_argument('-n', '--non-interactive', dest='noninteractive', action='store_true', help='Non-interactive mode')
-    parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='Debug mode')
+    parser.add_argument('-rp', '--repopath', dest='repopath', help='Path to OpenvStorage Repository. Default: /opt/mercurial/openvstorage')
+    parser.add_argument('-r', '--repository', dest='repository', help='Bitbucket Mercurial Owner/Repository to use. Default: openvstorage/openvstorage')
+    parser.add_argument('-dn', '--distribution', dest='distribution', help='OpenvStorage Apt Repository Distribution: (release | revision | development). Default: revision')
+    parser.add_argument('-t', '--tag', dest='tag', help='Tag For Development or Prerelease Builds. Default: None')
+    parser.add_argument('-b', '--branch', dest='branch', help='Repository Branch. Default: default')
+    parser.add_argument('-p', '--promote', dest='promote', help='Indicate Change in Release Tag but not Increment Patch Version. Default: None')
+    parser.add_argument('-a', '--author', dest='author', help='Author of the Debian Package Default: OVS Automatic Packager <packager@openvstorage.com>')
+    parser.add_argument('-s', '--sshcredentials', dest='ssh_credentials', help='apt repository upload user:password or path to ssh private key. Default: ~/.ssh/id_rsa')
+    parser.add_argument('-c', '--bbcredentials', dest='bb_credentials', help='bitbucket user:password or path to ssh private key. Default: ~/.ssh/id_rsa')
+    parser.add_argument('-d', '--debug', dest='debug', action='store_true', help='Debug mode. Default: False')
 
     args = parser.parse_args()
 
-    repopath = args.repopath
-    quality = args.qualitylevel
-    tag = args.tag
-
-    incrementversion = False
-    if (args.tag and args.qualitylevel == 'release') or args.qualitylevel == 'development':
-        incrementversion = True
-
-    if (args.branch or incrementversion):
-        if args.bb_credentials:
-            credentials = args.bb_credentials
-        else:
-            raise AttributeError('Bitbucket credentials necessary')
-
-    if args.branch:
-        update_repository(repopath, args.branch, credentials)
-
-    if incrementversion:
-        dscpath = build_dsc(repopath, quality, tag, credentials, incrementversion)
-    else:
-        dscpath = build_dsc(repopath, quality, tag)
-
-    build_deb(dscpath)
-    changesfile = '{}_amd64.changes'.format(dscpath[:-4])
-    upload(changesfile, args.ssh_credentials)
+    OvsPackaging(args).package()
