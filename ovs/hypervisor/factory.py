@@ -19,10 +19,10 @@ class Factory(object):
         ip       = node.ip
         username = node.username
         password = node.password
-        if hvtype == 'hyperv':
+        if hvtype == 'HYPERV':
             return HyperV(ip, username, password)
-        if hvtype == 'vmware':
+        if hvtype == 'VMWARE':
             return VMware(ip, username, password)
-        if hvtype == 'xen':
+        if hvtype == 'XEN':
             return Xen(ip, username, password)
         raise Exception('Invalid hypervisor')

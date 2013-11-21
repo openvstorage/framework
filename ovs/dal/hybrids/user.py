@@ -13,6 +13,6 @@ class User(DataObject):
                   'password': (None, str),
                   'email': (None, str),
                   'is_active': (False, bool),
-                  'language': ('en-US', str)}
+                  'language': ('en-US', ['en-US'])}
     _relations = {'group': (Group, 'users')}
     _expiry = {}

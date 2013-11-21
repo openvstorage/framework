@@ -10,7 +10,7 @@ class PMachine(DataObject):
     """
     _blueprint = {'name': (None, str),
                   'description': (None, str),
-                  'hvtype': (None, str),
+                  'hvtype': (None, ['HYPERV', 'VMWARE', 'XEN']),
                   'username': (None, str),
                   'password': (None, str),
                   'ip': (None, str)}

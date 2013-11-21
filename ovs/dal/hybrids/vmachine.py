@@ -12,111 +12,233 @@ class VMachine(DataObject):
     """
     _blueprint = {'name': (None, str),
                   'description': (None, str),
-                  'hvtype': (None, str, 'Hypervisor type serving the VMachine'),
-                  'cpu': (1, int),
-                  'memory': (1024, int),
-                  'vmid': (None, str, 'Identifier of the VMachine on the hypervisor'),
+                  'hvtype': (None, ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine'),
+                  'hypervisorid': (None, str, 'Identifier of the VMachine on the hypervisor'),
                   'template': (True, bool),
                   'system': (False, bool)}
-    _relations = {'node': (PMachine, 'guests')}
-    _expiry = {'iops': 1,
-               'stored_data': 120,
-               'cache': 60,
-               'latency': 15,
-               'read_speed': 30,
-               'write_speed': 30}
+    _relations = {}
+    _expiry = {'snapshots': 60,
+               'status': 30,
+               'storage_server': 30,
+               'cache_hits': 5,
+               'cache_misses': 5,
+               'read_operations': 5,
+               'write_operations': 5,
+               'bytes_read': 5,
+               'bytes_written': 5,
+               'backend_read_operations': 5,
+               'backend_write_operations': 5,
+               'backend_bytes_read': 5,
+               'backend_bytes_written': 5,
+               'stored_data': 5,
+               'foc_status': 5}
 
     @property
-    def iops(self):
+    def snapshots(self):
         """
-        Returns the IOPS counter for this VM
+        Fetches a list of snapshots for this virtual machine
         """
 
         def get_data():
             """
             Loads the actual data
             """
-            import time
-            return time.time()
+            return None
+
+        return self._backend_property(get_data)
+
+    @property
+    def status(self):
+        """
+        Fetches the status of the volume
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return None
+
+        return self._backend_property(get_data)
+
+    @property
+    def storage_server(self):
+        """
+        Returns the storage server on which the virtual disk is stored
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return None
+
+        return self._backend_property(get_data)
+
+    @property
+    def cache_hits(self):
+        """
+        Loads the cache hits (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.cache_hits for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def cache_misses(self):
+        """
+        Loads the cache misses (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.cache_misses for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def read_operations(self):
+        """
+        Loads the read operations (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.read_operations for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def write_operations(self):
+        """
+        Loads the write operations (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.write_operations for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def bytes_read(self):
+        """
+        Loads the total of bytes read (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.bytes_read for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def bytes_written(self):
+        """
+        Loads the bytes written (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.bytes_written for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def backend_read_operations(self):
+        """
+        Loads the backend read operations (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.backend_read_operations for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def backend_write_operations(self):
+        """
+        Loads the backend write operations
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.backend_write_operations for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def backend_bytes_read(self):
+        """
+        Loads the bytes read (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.backend_bytes_read for d in self.disks])
+
+        return self._backend_property(get_data)
+
+    @property
+    def backend_bytes_written(self):
+        """
+        Loads the bytes written (counter)
+        """
+
+        def get_data():
+            """
+            Loads the actual data
+            """
+            return sum([d.backend_bytes_written for d in self.disks])
 
         return self._backend_property(get_data)
 
     @property
     def stored_data(self):
         """
-        Returns the amount of stored data for this VM
+        Loads the stored data (counter)
         """
 
         def get_data():
             """
             Loads the actual data
             """
-            from random import randint
-
-            return randint(0, 500)
+            return sum([d.stored_data for d in self.disks])
 
         return self._backend_property(get_data)
 
     @property
-    def cache(self):
+    def foc_status(self):
         """
-        Returns the cache hits percentage on this VM
-        """
-
-        def get_data():
-            """
-            Loads the actual data
-            """
-            from random import randint
-
-            return randint(100, 200)
-
-        return self._backend_property(get_data)
-
-    @property
-    def latency(self):
-        """
-        Returns the latency for this VM
+        Loads the FOC status
         """
 
         def get_data():
             """
             Loads the actual data
             """
-            from random import randint
-
-            return randint(10, 125)
-
-        return self._backend_property(get_data)
-
-    @property
-    def read_speed(self):
-        """
-        Returns the current read speed for this VM
-        """
-
-        def get_data():
-            """
-            Loads the actual data
-            """
-            from random import randint
-
-            return randint(0, 250)
-
-        return self._backend_property(get_data)
-
-    @property
-    def write_speed(self):
-        """
-        Returns the current write speed for this VM
-        """
-
-        def get_data():
-            """
-            Loads the actual data
-            """
-            from random import randint
-
-            return randint(0, 250)
+            return None
 
         return self._backend_property(get_data)

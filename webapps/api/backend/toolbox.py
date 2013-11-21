@@ -21,7 +21,7 @@ class Toolbox:
         """
         Checks whether a user is member of a set of roles
         """
-        user_roles = [rolegroup.role.code for rolegroup in user.group.rolegroups]
+        user_roles = [j.role.code for j in user.group.roles]
         for required_role in roles:
             if required_role not in user_roles:
                 return False

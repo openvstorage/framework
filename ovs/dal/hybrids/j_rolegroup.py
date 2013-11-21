@@ -11,6 +11,6 @@ class RoleGroup(DataObject):
     The RoleGroup class represents the junction table between Role and Group
     """
     _blueprint = {}
-    _relations = {'role': (Role, 'rolegroups'),
-                  'group': (Group, 'rolegroups')}
+    _relations = {'role': (Role, 'groups'),
+                  'group': (Group, 'roles')}
     _expiry = {}

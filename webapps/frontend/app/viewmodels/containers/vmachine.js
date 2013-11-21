@@ -17,12 +17,11 @@ define([
 
         self.guid       = ko.observable(guid);
         self.name       = ko.observable();
-        self.iops       = ko.deltaObservable();
-        self.storedData = ko.smoothObservable();
+        self.iops       = ko.smoothDeltaObservable();
+        self.storedData = ko.smoothDeltaObservable();
         self.cache      = ko.smoothObservable();
-        self.latency    = ko.smoothObservable();
-        self.readSpeed  = ko.smoothObservable();
-        self.writeSpeed = ko.smoothObservable();
+        self.readSpeed  = ko.smoothDeltaObservable();
+        self.writeSpeed = ko.smoothDeltaObservable();
 
         self.vDisks     = ko.observableArray([]);
         self.vDiskGuids = [];
@@ -55,13 +54,14 @@ define([
                             generic.xhrAbort(self.loadHandle);
                             self.loadHandle = api.get('vmachines/' + self.guid())
                                 .done(function(data) {
+                                    var cache_tries = data.cache_hits + data.cache_misses,
+                                        cache_ratio = cache_tries / (data.cache_hits !== 0 ? data.cache_hits : 1) * 100;
                                     self.name(data.name);
-                                    self.iops(data.iops);
+                                    self.iops(data.write_operations + data.read_operations);
                                     self.storedData(data.stored_data);
-                                    self.cache(data.cache);
-                                    self.latency(data.latency);
-                                    self.readSpeed(data.read_speed);
-                                    self.writeSpeed(data.write_speed);
+                                    self.cache(cache_ratio);
+                                    self.readSpeed(data.bytes_read);
+                                    self.writeSpeed(data.bytes_written);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

@@ -11,7 +11,7 @@ class Role(DataObject):
     the data
     """
     _blueprint = {'name': (None, str),
-                  'code': (None, str),
+                  'code': (None, str, 'Contains a code which is referenced from the API code'),
                   'description': (None, str)}
     _relations = {}
     _expiry = {}
