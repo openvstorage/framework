@@ -8,10 +8,10 @@ class VolumeStorageRouter(DataObject):
     """
     The VolumeStorageRouter class represents a volume storage router
     """
-    _blueprint = {'name': (None, str),
-                  'description': (None, str),
-                  'port': (None, int),
-                  'ip': (None, str)}
+    _blueprint = {'name': (None, str, 'Name of the VSR'),
+                  'description': (None, str, 'Description of the VSR'),
+                  'port': (None, int, 'Port on which the VSR is listening'),
+                  'ip': (None, str, 'IP address on which the VSR is listening')}
     _relations = {}
     _expiry = {'status': 30,
                'cache_hits': 5,

@@ -11,26 +11,26 @@
                 <td><span data-bind="text: vDisks().length"></span>
                 </td>
                 <td>
-                    <span data-bind="visible: !storedData.initialized()">...</span>
+                    <span data-bind="visible: !storedData.initialized()"><i class="fa fa-spinner fa-spin"></i></span>
                     <span data-bind="visible: storedData.initialized()">
                         <span data-bind="text: storedData"></span> <span data-i18n="ovs:generic.mib"></span>
                     </span>
                 </td>
                 <td><span data-bind="text: cache"></span> %</td>
                 <td>
-                    <span data-bind="visible: !iops.initialized()">...</span>
+                    <span data-bind="visible: !iops.initialized()"><i class="fa fa-spinner fa-spin"></i></span>
                     <span data-bind="visible: iops.initialized()">
                         <span data-bind="text: iops"></span>
                     </span>
                 </td>
                 <td>
-                    <span data-bind="visible: !readSpeed.initialized()">...</span>
+                    <span data-bind="visible: !readSpeed.initialized()"><i class="fa fa-spinner fa-spin"></i></span>
                     <span data-bind="visible: readSpeed.initialized()">
                         <span data-bind="text: readSpeed"></span> <span data-i18n="ovs:generic.mibs"></span>
                     </span>
                 </td>
                 <td>
-                    <span data-bind="visible: !writeSpeed.initialized()">...</span>
+                    <span data-bind="visible: !writeSpeed.initialized()"><i class="fa fa-spinner fa-spin"></i></span>
                     <span data-bind="visible: writeSpeed.initialized()">
                         <span data-bind="text: writeSpeed"></span> <span data-i18n="ovs:generic.mibs"></span>
                     </span>

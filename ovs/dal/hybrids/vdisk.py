@@ -14,19 +14,19 @@ class VDisk(DataObject):
     The VDisk class represents a virtual disk that can be used by virtual machines. It has
     a one-to-one link with the volumedriver which is responsible for that particular volume
     """
-    _blueprint = {'name': (None, str),
-                  'description': (None, str),
-                  'size': (0, int),
-                  'type': ('DSSVOL', ['DSSVOL']),
+    _blueprint = {'name': (None, str, 'Name of the virtual disk'),
+                  'description': (None, str, 'Description of the virtual disk'),
+                  'size': (0, int, 'Size of the virtual disk'),
+                  'type': ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk'),
                   'devicename': (None, str, 'The name of the container file backing the vDisk'),
-                  'order': (None, int),
-                  'volumeid': (None, str),
+                  'order': (None, int, 'Order of the virtual disk in which they are attached'),
+                  'volumeid': (None, str, 'Volume ID representing the virtual disk'),
                   'parentsnapshot': (None, str, 'Points to a parent voldrvsnapshotid'),
                   'children': ([], list, 'List of child vDisks'),  # @TODO: discuss purpose of field, there might be a better solution
-                  'retentionpolicyid': (None, str),
-                  'snapshotpolicyid': (None, str),
-                  'tags': ([], list),
-                  'autobackup': (False, bool)}
+                  'retentionpolicyid': (None, str, 'Retention policy used by the virtual disk'),
+                  'snapshotpolicyid': (None, str, 'Snapshot polity used by the virtual disk'),
+                  'tags': ([], list, 'Tags of the virtual disk'),
+                  'autobackup': (False, bool, 'Indicates whether this disk has autobackup')}
     _relations = {'machine': (VMachine, 'disks'),
                   'vpool': (VPool, 'disks')}
     _expiry = {'snapshots': 60,
@@ -140,7 +140,8 @@ class VDisk(DataObject):
             """
             Loads the actual data
             """
-            return 0
+            import time
+            return time.time()
 
         return self._backend_property(get_data)
 
@@ -154,7 +155,8 @@ class VDisk(DataObject):
             """
             Loads the actual data
             """
-            return 0
+            import time
+            return time.time()
 
         return self._backend_property(get_data)
 

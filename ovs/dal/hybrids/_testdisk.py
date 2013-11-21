@@ -10,10 +10,10 @@ class TestDisk(DataObject):
     This TestDisk object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    _blueprint = {'name': (None, str),
-                  'description': (None, str),
-                  'size': (0, float),
-                  'order': (0, int)}
+    _blueprint = {'name': (None, str, 'Name of the test disk'),
+                  'description': (None, str, 'Description of the test disk'),
+                  'size': (0, float, 'Size of the test disk'),
+                  'order': (0, int, 'Order of the test disk')}
     _relations = {'machine': (TestMachine, 'disks'),
                   'storage': (TestMachine, 'stored_disks')}
     _expiry = {'used_size': 5}

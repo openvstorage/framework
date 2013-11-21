@@ -8,13 +8,13 @@ class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool covers a given backend
     """
-    _blueprint = {'name': (None, str),
-                  'description': (None, str),
-                  'size': (None, int),
-                  'backend_type': (None, ['S3', 'FILESYSTEM']),
-                  'backend_login': (None, str),
-                  'backend_password': (None, str),
-                  'backend_connection': (None, str)}
+    _blueprint = {'name': (None, str, 'Name of the virtual pool'),
+                  'description': (None, str, 'Description of the virtual pool'),
+                  'size': (None, int, 'Size of the virtual pool'),
+                  'backend_type': (None, ['S3', 'FILESYSTEM'], 'Type of the backend'),
+                  'backend_login': (None, str, 'Login for the backend'),
+                  'backend_password': (None, str, 'Password for the backend'),
+                  'backend_connection': (None, str, 'Connection for the backend')}
     _relations = {}
     _expiry = {'status': 10,
                'cache_hits': 5,

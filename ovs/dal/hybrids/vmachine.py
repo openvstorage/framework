@@ -10,12 +10,12 @@ class VMachine(DataObject):
     A VMachine represents a virtual machine in the model. A virtual machine is
     always served by a hypervisor
     """
-    _blueprint = {'name': (None, str),
-                  'description': (None, str),
+    _blueprint = {'name': (None, str, 'Name of the virtual machine'),
+                  'description': (None, str, 'Description of the virtual machine'),
                   'hvtype': (None, ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine'),
                   'hypervisorid': (None, str, 'Identifier of the VMachine on the hypervisor'),
-                  'template': (True, bool),
-                  'system': (False, bool)}
+                  'template': (True, bool, 'Indicates whether this virtual machine is a template'),
+                  'system': (False, bool, 'Indicates whether this virtual machine represents the system')}
     _relations = {}
     _expiry = {'snapshots': 60,
                'status': 30,
