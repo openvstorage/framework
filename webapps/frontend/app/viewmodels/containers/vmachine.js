@@ -11,19 +11,18 @@ define([
         // Variables
         self.loadVDisksHandle = undefined;
         self.loadHandle       = undefined;
-        self.initial          = true;
 
         // Obserables
         self.loading    = ko.observable(false);
 
         self.guid       = ko.observable(guid);
         self.name       = ko.observable();
-        self.iops       = ko.observable();
-        self.storedData = ko.observable();
-        self.cache      = ko.observable();
-        self.latency    = ko.observable();
-        self.readSpeed  = ko.observable();
-        self.writeSpeed = ko.observable();
+        self.iops       = ko.deltaObservable();
+        self.storedData = ko.smoothObservable();
+        self.cache      = ko.smoothObservable();
+        self.latency    = ko.smoothObservable();
+        self.readSpeed  = ko.smoothObservable();
+        self.writeSpeed = ko.smoothObservable();
 
         self.vDisks     = ko.observableArray([]);
         self.vDiskGuids = [];
@@ -57,22 +56,12 @@ define([
                             self.loadHandle = api.get('vmachines/' + self.guid())
                                 .done(function(data) {
                                     self.name(data.name);
-                                    if (self.initial) {
-                                        self.initial = false;
-                                        self.iops(data.iops);
-                                        self.storedData(data.stored_data);
-                                        self.cache(data.cache);
-                                        self.latency(data.latency);
-                                        self.readSpeed(data.read_speed);
-                                        self.writeSpeed(data.write_speed);
-                                    } else {
-                                        generic.smooth(self.iops, data.iops);
-                                        generic.smooth(self.storedData, data.stored_data);
-                                        generic.smooth(self.cache, data.cache);
-                                        generic.smooth(self.latency, data.latency);
-                                        generic.smooth(self.readSpeed, data.read_speed);
-                                        generic.smooth(self.writeSpeed, data.write_speed);
-                                    }
+                                    self.iops(data.iops);
+                                    self.storedData(data.stored_data);
+                                    self.cache(data.cache);
+                                    self.latency(data.latency);
+                                    self.readSpeed(data.read_speed);
+                                    self.writeSpeed(data.write_speed);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

@@ -27,7 +27,8 @@ requirejs.config({
 
 define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next',
-    'ovs/shared'
+    'ovs/shared',
+    'ovs/extensions/knockout-helpers'
 ],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
     system.debug(true);

@@ -19,7 +19,7 @@ class VMachine(DataObject):
                   'template': (True, bool),
                   'system': (False, bool)}
     _relations = {'node': (PMachine, 'guests')}
-    _expiry = {'iops': 30,
+    _expiry = {'iops': 1,
                'stored_data': 120,
                'cache': 60,
                'latency': 15,
@@ -36,9 +36,8 @@ class VMachine(DataObject):
             """
             Loads the actual data
             """
-            from random import randint
-
-            return randint(50, 250)
+            import time
+            return time.time()
 
         return self._backend_property(get_data)
 

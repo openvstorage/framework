@@ -96,28 +96,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
             array.splice(index, 1);
         }
     }
-    function smooth(observable, targetValue, steps) {
-        var startValue, diff, stepSize, decimals, execute;
-        if (steps === undefined) {
-            steps = 3;
-        }
-        startValue = observable() || 0;
-        diff = targetValue - startValue;
-        if (diff !== 0) {
-            decimals = Math.max((startValue.toString().split('.')[1] || []).length, (targetValue.toString().split('.')[1] || []).length);
-            stepSize = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
-            execute = function() {
-                var current = observable();
-                if (Math.abs(targetValue - current) > Math.abs(stepSize)) {
-                    observable(observable() + stepSize);
-                    window.setTimeout(execute, 75);
-                } else {
-                    observable(targetValue);
-                }
-            };
-            window.setTimeout(execute, 75);
-        }
-    }
 
     return {
         getTimestamp : getTimestamp,
@@ -132,7 +110,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
         alertError   : alertError,
         keys         : keys,
         xhrAbort     : xhrAbort,
-        removeElement: removeElement,
-        smooth       : smooth
+        removeElement: removeElement
     };
 });
