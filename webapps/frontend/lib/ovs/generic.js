@@ -109,7 +109,8 @@ define(['jquery', 'jqp/pnotify'], function($) {
             diff = targetValue - startValue;
             if (diff !== 0) {
                 decimals = Math.max((startValue.toString().split('.')[1] || []).length, (targetValue.toString().split('.')[1] || []).length);
-                stepSize = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
+                stepSize = decimals === 0 ? Math.ceil(diff / steps) : Math.ceil(diff / steps * (10 * decimals)) / (10 * decimals);
+                stepSize = stepSize === 0 ? 1 : stepSize;
                 execute = function() {
                     var current = observable();
                     if (Math.abs(targetValue - current) > Math.abs(stepSize)) {

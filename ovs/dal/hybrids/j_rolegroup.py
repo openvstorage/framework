@@ -10,7 +10,9 @@ class RoleGroup(DataObject):
     """
     The RoleGroup class represents the junction table between Role and Group
     """
+    # pylint: disable=line-too-long
     _blueprint = {}
-    _relations = {'role': (Role, 'groups'),
+    _relations = {'role':  (Role,  'groups'),
                   'group': (Group, 'roles')}
     _expiry = {}
+    # pylint: enable=line-too-long

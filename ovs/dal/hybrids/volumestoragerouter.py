@@ -8,23 +8,25 @@ class VolumeStorageRouter(DataObject):
     """
     The VolumeStorageRouter class represents a volume storage router
     """
-    _blueprint = {'name': (None, str, 'Name of the VSR'),
+    # pylint: disable=line-too-long
+    _blueprint = {'name':        (None, str, 'Name of the VSR'),
                   'description': (None, str, 'Description of the VSR'),
-                  'port': (None, int, 'Port on which the VSR is listening'),
-                  'ip': (None, str, 'IP address on which the VSR is listening')}
+                  'port':        (None, int, 'Port on which the VSR is listening'),
+                  'ip':          (None, str, 'IP address on which the VSR is listening')}
     _relations = {}
-    _expiry = {'status': 30,
-               'cache_hits': 5,
-               'cache_misses': 5,
-               'read_operations': 5,
-               'write_operations': 5,
-               'bytes_read': 5,
-               'bytes_written': 5,
-               'backend_read_operations': 5,
+    _expiry = {'status':                  30,
+               'cache_hits':               5,
+               'cache_misses':             5,
+               'read_operations':          5,
+               'write_operations':         5,
+               'bytes_read':               5,
+               'bytes_written':            5,
+               'backend_read_operations':  5,
                'backend_write_operations': 5,
-               'backend_bytes_read': 5,
-               'backend_bytes_written': 5,
-               'stored_data': 5}
+               'backend_bytes_read':       5,
+               'backend_bytes_written':    5,
+               'stored_data':              5}
+    # pylint: enable=line-too-long
 
     @property
     def status(self):

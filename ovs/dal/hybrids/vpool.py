@@ -8,26 +8,28 @@ class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool covers a given backend
     """
-    _blueprint = {'name': (None, str, 'Name of the virtual pool'),
-                  'description': (None, str, 'Description of the virtual pool'),
-                  'size': (None, int, 'Size of the virtual pool'),
-                  'backend_type': (None, ['S3', 'FILESYSTEM'], 'Type of the backend'),
-                  'backend_login': (None, str, 'Login for the backend'),
-                  'backend_password': (None, str, 'Password for the backend'),
-                  'backend_connection': (None, str, 'Connection for the backend')}
+    # pylint: disable=line-too-long
+    _blueprint = {'name':               (None, str, 'Name of the virtual pool'),
+                  'description':        (None, str, 'Description of the virtual pool'),
+                  'size':               (None, int, 'Size of the virtual pool'),
+                  'backend_login':      (None, str, 'Login for the backend'),
+                  'backend_password':   (None, str, 'Password for the backend'),
+                  'backend_connection': (None, str, 'Connection for the backend'),
+                  'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the backend')}
     _relations = {}
-    _expiry = {'status': 10,
-               'cache_hits': 5,
-               'cache_misses': 5,
-               'read_operations': 5,
-               'write_operations': 5,
-               'bytes_read': 5,
-               'bytes_written': 5,
-               'backend_read_operations': 5,
+    _expiry = {'status':                  10,
+               'cache_hits':               5,
+               'cache_misses':             5,
+               'read_operations':          5,
+               'write_operations':         5,
+               'bytes_read':               5,
+               'bytes_written':            5,
+               'backend_read_operations':  5,
                'backend_write_operations': 5,
-               'backend_bytes_read': 5,
-               'backend_bytes_written': 5,
-               'stored_data': 5}
+               'backend_bytes_read':       5,
+               'backend_bytes_written':    5,
+               'stored_data':              5}
+    # pylint: enable=line-too-long
 
     @property
     def status(self):

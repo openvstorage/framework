@@ -10,28 +10,30 @@ class VMachine(DataObject):
     A VMachine represents a virtual machine in the model. A virtual machine is
     always served by a hypervisor
     """
-    _blueprint = {'name': (None, str, 'Name of the virtual machine'),
-                  'description': (None, str, 'Description of the virtual machine'),
-                  'hvtype': (None, ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine'),
-                  'hypervisorid': (None, str, 'Identifier of the VMachine on the hypervisor'),
-                  'template': (True, bool, 'Indicates whether this virtual machine is a template'),
-                  'system': (False, bool, 'Indicates whether this virtual machine represents the system')}
+    # pylint: disable=line-too-long
+    _blueprint = {'name':         (None,  str,  'Name of the virtual machine'),
+                  'description':  (None,  str,  'Description of the virtual machine'),
+                  'hypervisorid': (None,  str,  'Identifier of the VMachine on the hypervisor'),
+                  'template':     (True,  bool, 'Indicates whether this virtual machine is a template'),
+                  'system':       (False, bool, 'Indicates whether this virtual machine represents the system'),
+                  'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine')}
     _relations = {}
-    _expiry = {'snapshots': 60,
-               'status': 30,
-               'storage_server': 30,
-               'cache_hits': 5,
-               'cache_misses': 5,
-               'read_operations': 5,
-               'write_operations': 5,
-               'bytes_read': 5,
-               'bytes_written': 5,
-               'backend_read_operations': 5,
+    _expiry = {'snapshots':               60,
+               'status':                  30,
+               'storage_server':          30,
+               'cache_hits':               5,
+               'cache_misses':             5,
+               'read_operations':          5,
+               'write_operations':         5,
+               'bytes_read':               5,
+               'bytes_written':            5,
+               'backend_read_operations':  5,
                'backend_write_operations': 5,
-               'backend_bytes_read': 5,
-               'backend_bytes_written': 5,
-               'stored_data': 5,
-               'foc_status': 5}
+               'backend_bytes_read':       5,
+               'backend_bytes_written':    5,
+               'stored_data':              5,
+               'foc_status':               5}
+    # pylint: enable=line-too-long
 
     @property
     def snapshots(self):

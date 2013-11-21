@@ -14,37 +14,39 @@ class VDisk(DataObject):
     The VDisk class represents a virtual disk that can be used by virtual machines. It has
     a one-to-one link with the volumedriver which is responsible for that particular volume
     """
-    _blueprint = {'name': (None, str, 'Name of the virtual disk'),
-                  'description': (None, str, 'Description of the virtual disk'),
-                  'size': (0, int, 'Size of the virtual disk'),
-                  'type': ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk'),
-                  'devicename': (None, str, 'The name of the container file backing the vDisk'),
-                  'order': (None, int, 'Order of the virtual disk in which they are attached'),
-                  'volumeid': (None, str, 'Volume ID representing the virtual disk'),
-                  'parentsnapshot': (None, str, 'Points to a parent voldrvsnapshotid'),
-                  'children': ([], list, 'List of child vDisks'),  # @TODO: discuss purpose of field, there might be a better solution
-                  'retentionpolicyid': (None, str, 'Retention policy used by the virtual disk'),
-                  'snapshotpolicyid': (None, str, 'Snapshot polity used by the virtual disk'),
-                  'tags': ([], list, 'Tags of the virtual disk'),
-                  'autobackup': (False, bool, 'Indicates whether this disk has autobackup')}
+    # pylint: disable=line-too-long
+    _blueprint = {'name':              (None,  str,  'Name of the virtual disk'),
+                  'description':       (None,  str,  'Description of the virtual disk'),
+                  'size':              (0,     int,  'Size of the virtual disk'),
+                  'devicename':        (None,  str,  'The name of the container file backing the vDisk'),
+                  'order':             (None,  int,  'Order of the virtual disk in which they are attached'),
+                  'volumeid':          (None,  str,  'Volume ID representing the virtual disk'),
+                  'parentsnapshot':    (None,  str,  'Points to a parent voldrvsnapshotid'),
+                  'children':          ([],    list, 'List of child vDisks'),  # @TODO: discuss purpose of field, there might be a better solution
+                  'retentionpolicyid': (None,  str,  'Retention policy used by the virtual disk'),
+                  'snapshotpolicyid':  (None,  str,  'Snapshot polity used by the virtual disk'),
+                  'tags':              ([],    list, 'Tags of the virtual disk'),
+                  'autobackup':        (False, bool, 'Indicates whether this disk has autobackup'),
+                  'type':             ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk')}
     _relations = {'machine': (VMachine, 'disks'),
-                  'vpool': (VPool, 'disks')}
-    _expiry = {'snapshots': 60,
-               'status': 30,
-               'storage_server': 30,
-               'volumestoragerouterid': 30,
-               'cache_hits': 5,
-               'cache_misses': 5,
-               'read_operations': 5,
-               'write_operations': 5,
-               'bytes_read': 5,
-               'bytes_written': 5,
-               'backend_read_operations': 5,
+                  'vpool':   (VPool,    'disks')}
+    _expiry = {'snapshots':               60,
+               'status':                  30,
+               'storage_server':          30,
+               'volumestoragerouterid':   30,
+               'cache_hits':               5,
+               'cache_misses':             5,
+               'read_operations':          5,
+               'write_operations':         5,
+               'bytes_read':               5,
+               'bytes_written':            5,
+               'backend_read_operations':  5,
                'backend_write_operations': 5,
-               'backend_bytes_read': 5,
-               'backend_bytes_written': 5,
-               'stored_data': 5,
-               'foc_status': 5}
+               'backend_bytes_read':       5,
+               'backend_bytes_written':    5,
+               'stored_data':              5,
+               'foc_status':               5}
+    # pylint: enable=line-too-long
 
     @property
     def snapshots(self):
