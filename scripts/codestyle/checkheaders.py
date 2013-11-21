@@ -70,7 +70,7 @@ def get_all_files(root_folder, extensions = []):
         if skip_dir in root_folder:
             dirskip = True
             for except_skip_dir in except_skip_dirs:
-                if except_skip_dir in root_folder:
+                if skip_dir in except_skip_dir:
                     dirskip = False
                     break
             if dirskip:
