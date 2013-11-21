@@ -58,50 +58,6 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
             generic.removeElement(array, 0);
         });
 
-        it('smooth should smooth a transition', function() {
-            // Steps at: 75, 150, 225, 300
-            // Default (at time of writing test) 3 steps
-            jasmine.Clock.useMock();
-            var testModel = {
-                value: ko.observable(undefined)
-            };
-            // Smooth undefined > 100
-            generic.smooth(testModel.value, 100, 1);
-            jasmine.Clock.tick(80);  // 80
-            expect(testModel.value()).toBe(100);
-            // Smooth 100 > 160
-            generic.smooth(testModel.value, 160);
-            jasmine.Clock.tick(50);  // 50
-            expect(testModel.value()).toBe(100);
-            jasmine.Clock.tick(50);  // 100
-            expect(testModel.value()).toBe(120);
-            jasmine.Clock.tick(40);  // 140
-            expect(testModel.value()).toBe(120);
-            jasmine.Clock.tick(15);  // 155
-            expect(testModel.value()).toBe(140);
-            jasmine.Clock.tick(100);  // 255
-            expect(testModel.value()).toBe(160);
-            jasmine.Clock.tick(100);  // 355
-            expect(testModel.value()).toBe(160);
-            testModel.value(100);
-            // Smooth 100 > 100
-            generic.smooth(testModel.value, 100, 2);
-            expect(testModel.value()).toBe(100);
-            // Smooth 100 > 103
-            generic.smooth(testModel.value, 103, 2);
-            jasmine.Clock.tick(80);  // 80
-            expect(testModel.value()).toBe(102);
-            jasmine.Clock.tick(80);  // 160
-            expect(testModel.value()).toBe(103);
-            testModel.value(100.5);
-            // Smooth 100.5 > 103.5
-            generic.smooth(testModel.value, 103.5, 2);
-            jasmine.Clock.tick(80);  // 80
-            expect(testModel.value()).toBe(102);
-            jasmine.Clock.tick(80);  // 160
-            expect(testModel.value()).toBe(103.5);
-        });
-
         it('alerting should work correctly', function() {
             spyOn($, 'pnotify').andCallFake(function(data) {
                 return data;
