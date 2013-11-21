@@ -21,7 +21,7 @@ define(['knockout'], function(ko) {
                     diff = newValue - startValue;
                     if (diff !== 0) {
                         decimals = Math.max((startValue.toString().split('.')[1] || []).length, (newValue.toString().split('.')[1] || []).length);
-                        stepSize = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
+                        stepSize = decimals === 0 ? Math.round(diff / stepsSetting) : Math.round(diff / stepsSetting * (10 * decimals)) / (10 * decimals);
                         execute = function() {
                             var current = workingValue();
                             if (Math.abs(newValue - current) > Math.abs(stepSize)) {
