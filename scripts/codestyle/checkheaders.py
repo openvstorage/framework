@@ -1,3 +1,5 @@
+#license see http://www.openvstorage.com/licenses/opensource/
+
 """
 script to update files in the codebase:
 - starting from root folder (argument after all options : /folder/ovs/)
@@ -14,6 +16,18 @@ only works for text files (no binary files)
 call: script.py [--extensions="cfg,txt"] [--fix] /folder/ovs "license text"
 help: script.py --help
 """
+
+#define files and directories to skip checking
+# relative paths to the root
+skip_files = ['/webapps/frontend/index.html',]
+skip_dirs = ['/webapps/frontend/lib',
+             '/webapps/api/static/rest_framework/css',
+             '/webapps/frontend/css']
+#define files and directories to except from skip
+# should be subdirectories of the skip directories
+# or files inside the skip_dirs
+except_skip_dirs = ['/webapps/frontend/lib/ovs',]
+except_skip_files = ['/webapps/frontend/css/ovs.css']
 
 import getopt
 import sys
@@ -108,31 +122,54 @@ files_to_process = get_all_files(root_folder, extensions)
 print('Total files to process (based on extensions {0}): {1}'.format(str(extensions), len(files_to_process)))
 
 for file in files_to_process:
-    with open(file, 'r+') as f:
-        lines = f.readlines()
-        if lines:
-            if lines[0].strip().replace(codecs.BOM_UTF8, b'') == get_text(file, text):
-                pass
+    skip = False
+    for skip_file in skip_files:
+        if file.endswith(skip_file):
+            print('skipping file {0}'.format(file))
+            skip = True
+            break
+    for skip_dir in skip_dirs:
+        dirskip = False
+        if skip_dir in file:
+            dirskip = True
+            for except_skip_dir in except_skip_dirs:
+                if except_skip_dir in file:
+                    dirskip = False
+                    break
+            if dirskip:
+                skip = True
+                print('skipped file {0}'.format(file))
+                break
+    for except_skip_file in except_skip_files:
+        if except_skip_file in file:
+            skip = False
+            break
+    if not skip:
+        with open(file, 'r+') as f:
+            lines = f.readlines()
+            if lines:
+                if lines[0].strip().replace(codecs.BOM_UTF8, b'') == get_text(file, text):
+                    pass
+                else:
+                    if fix:
+                        #insert new line after BOM
+                        if lines[0].startswith(codecs.BOM_UTF8):
+                            lines[0] = lines[0].replace(codecs.BOM_UTF8, b'')
+                            lines.insert(0, codecs.BOM_UTF8 + get_text(file, text, True).encode('utf-8'))
+                        else:
+                            lines.insert(0, get_text(file, text, True))
+                        f.seek(0)
+                        f.writelines(lines)
+                        print('fixed file {0}'.format(file))
+                    else:
+                        print('not fixing, file does not contain header {0}'.format(file))
             else:
                 if fix:
-                    #insert new line after BOM
-                    if lines[0].startswith(codecs.BOM_UTF8):
-                        lines[0] = lines[0].replace(codecs.BOM_UTF8, b'')
-                        lines.insert(0, codecs.BOM_UTF8 + get_text(file, text, True).encode('utf-8'))
-                    else:
-                        lines.insert(0, get_text(file, text, True))
+                    print('fixed empty file {0}, no header'.format(file))
+                    lines.insert(0, get_text(file, text, True))
                     f.seek(0)
                     f.writelines(lines)
-                    print('fixed file {0}'.format(file))
                 else:
                     print('not fixing, file does not contain header {0}'.format(file))
-        else:
-            if fix:
-                print('fixed empty file {0}, no header'.format(file))
-                lines.insert(0, get_text(file, text, True))
-                f.seek(0)
-                f.writelines(lines)
-            else:
-                print('not fixing, file does not contain header {0}'.format(file))
 
 print('Done processing...')
