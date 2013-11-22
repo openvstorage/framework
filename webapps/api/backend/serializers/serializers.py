@@ -34,6 +34,12 @@ class FullSerializer(SimpleSerializer):
         for key in self.hybrid._expiry:
             self.fields[key] = serializers.Field()
 
+    def get_identity(self, data):
+        """
+        This hook makes sure the guid is returned as primary key
+        """
+        return data.get('guid', None)
+
     def restore_object(self, attrs, instance=None):
         """
         Provides deserializing functionality for persistent properties

@@ -11,7 +11,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
-from backend.decorators import required_roles
+from backend.decorators import required_roles, internal, customer
 
 
 class VMachineViewSet(viewsets.ViewSet):
@@ -20,6 +20,8 @@ class VMachineViewSet(viewsets.ViewSet):
     """
     permission_classes = (IsAuthenticated,)
 
+    @internal()
+    @customer()
     @required_roles(['view'])
     def list(self, request, format=None):
         """
@@ -30,6 +32,8 @@ class VMachineViewSet(viewsets.ViewSet):
         serializer = SimpleSerializer(vmachines, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @internal()
+    @customer()
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """
@@ -44,6 +48,8 @@ class VMachineViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(FullSerializer(VMachine, instance=vmachine).data, status=status.HTTP_200_OK)
 
+    @internal()
+    @customer()
     @required_roles(['view', 'delete'])
     def destroy(self, request, pk=None):
         """
@@ -60,6 +66,8 @@ class VMachineViewSet(viewsets.ViewSet):
         return Response(task.id, status=status.HTTP_200_OK)
 
     @action()
+    @internal()
+    @customer()
     @required_roles(['view', 'create'])
     def clone(self, request, pk=None, format=None):
         """

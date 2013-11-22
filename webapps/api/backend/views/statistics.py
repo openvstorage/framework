@@ -6,7 +6,7 @@ import re
 import datetime
 import ConfigParser
 from backend.serializers.memcached import MemcacheSerializer
-from backend.decorators import required_roles
+from backend.decorators import required_roles, internal
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -62,6 +62,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         host.close_socket()
         return stats
 
+    @internal()
     @required_roles(['view'])
     def list(self, request, format=None):
         """
@@ -75,6 +76,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         serializer = MemcacheSerializer(stats)
         return Response(serializer.data)
 
+    @internal()
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """

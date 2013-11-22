@@ -6,7 +6,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
-from backend.decorators import required_roles
+from backend.decorators import required_roles, internal, customer
 from celery.task.control import inspect
 from ovs.celery import celery
 
@@ -17,6 +17,8 @@ class TaskViewSet(viewsets.ViewSet):
     """
     permission_classes = (IsAuthenticated,)
 
+    @internal()
+    @customer()
     @required_roles(['view'])
     def list(self, request, format=None):
         """
@@ -30,6 +32,8 @@ class TaskViewSet(viewsets.ViewSet):
                 'revoked'  : inspector.revoked()}
         return Response(data, status=status.HTTP_200_OK)
 
+    @internal()
+    @customer()
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """
@@ -52,6 +56,8 @@ class TaskViewSet(viewsets.ViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @link()
+    @internal()
+    @customer()
     @required_roles(['view'])
     def get(self, request, pk=None, format=None):
         """

@@ -10,7 +10,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
-from backend.decorators import required_roles
+from backend.decorators import required_roles, internal, customer
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -19,6 +19,8 @@ class VDiskViewSet(viewsets.ViewSet):
     """
     permission_classes = (IsAuthenticated,)
 
+    @internal()
+    @customer()
     @required_roles(['view'])
     def list(self, request, format=None):
         """
@@ -33,6 +35,8 @@ class VDiskViewSet(viewsets.ViewSet):
         serializer = SimpleSerializer(vdisks, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @internal()
+    @customer()
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """
