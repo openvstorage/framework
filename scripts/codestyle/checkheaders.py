@@ -11,7 +11,8 @@ script to update files in the codebase:
 -- ".cfg, .txt" NOK
 - check if it doesn't exist
 - add to all files (but check first if it exists) (option --fix)
--- text: "license see http://www.openvstorage.com/licenses/opensource/" (second argument after folder : "license see... ")
+-- text: "license see http://www.openvstorage.com/licenses/opensource/"
+    (second argument after folder : "license see... ")
 only works for text files (no binary files)
 
 call: script.py [--extensions="cfg,txt"] [--fix] /folder/ovs "license text"
@@ -20,16 +21,18 @@ help: script.py --help
 
 #define files and directories to skip checking
 # relative paths to the root
-skip_files = ['/webapps/frontend/index.html',]
+skip_files = ['/webapps/frontend/index.html',
+              '/config/gunicorn.cfg.py']
 skip_dirs = ['/webapps/frontend/lib',
              '/webapps/api/static/rest_framework/css',
              '/webapps/frontend/css',
              '/webapps/api/static/rest_framework/js',
-             '/.hg']
+             '/.hg',
+             '/scripts/']
 #define files and directories to except from skip
 # should be subdirectories of the skip directories
 # or files inside the skip_dirs
-except_skip_dirs = ['/webapps/frontend/lib/ovs',]
+except_skip_dirs = ['/webapps/frontend/lib/ovs', ]
 except_skip_files = ['/webapps/frontend/css/ovs.css']
 
 import getopt
@@ -37,7 +40,8 @@ import sys
 import os
 import codecs
 
-def list_files(dir_, extensions = []):
+
+def list_files(dir_, extensions=[]):
     """
     list all files in dir
     """
@@ -56,7 +60,11 @@ def list_files(dir_, extensions = []):
                 files.append(path)
     return files
 
+
 def list_dirs(dir_):
+    """
+    list all directories in dir
+    """
     dirs = []
     files_dirs = os.listdir(dir_)
     for file in files_dirs:
@@ -65,7 +73,11 @@ def list_dirs(dir_):
             dirs.append(path)
     return dirs
 
-def get_all_files(root_folder, extensions = []):
+
+def get_all_files(root_folder, extensions=[]):
+    """
+    recursively get all files in root_folder
+    """
     for skip_dir in skip_dirs:
         dirskip = False
         if skip_dir in root_folder:
@@ -85,19 +97,28 @@ def get_all_files(root_folder, extensions = []):
         files_to_process.extend(get_all_files(dir_path, extensions))
     return files_to_process
 
+
 def get_comment_style(fextension):
-    #extension: (before, after)
+    """
+    get the comment style for the specific extension
+    extension: (before, after)
+    """
     comments = {'.py': ('#', ''),
                 '.cfg': ('#', ''),
-                '.js' : ('//', ''),
+                '.js': ('//', ''),
                 '.html': ('<!--', '//-->'),
                 '.css': ('/*', '*/')}
     if not fextension in comments:
-        print('[WARNING] Unkown extension {0} will assume comment style "#TEXT" '.format(fextension))
+        print('[WARNING] Unkown extension {0} will assume comment style "#TEXT" '\
+              .format(fextension))
     values = comments.get(fextension, ('#', ''))
     return values
 
+
 def get_text(filename, text, lineend=False):
+    """
+    construct the license text line
+    """
     _, fextension = os.path.splitext(filename)
     if lineend:
         if fextension in ('.html',):
@@ -108,6 +129,7 @@ def get_text(filename, text, lineend=False):
         end = ""
     before, after = get_comment_style(fextension)
     return "{0} {1}{2}{3}".format(before, text, after, end)
+
 
 short_options = ''
 long_options = ['extensions=', 'fix', 'help']
@@ -132,7 +154,8 @@ else:
 fix = 'fix' in opts
 
 files_to_process = get_all_files(root_folder, extensions)
-print('Total files to process (based on extensions {0}): {1}'.format(str(extensions), len(files_to_process)))
+print('Total files to process (based on extensions {0}): {1}'\
+      .format(str(extensions), len(files_to_process)))
 
 for file in files_to_process:
     skip = False
@@ -168,7 +191,8 @@ for file in files_to_process:
                         #insert new line after BOM
                         if lines[0].startswith(codecs.BOM_UTF8):
                             lines[0] = lines[0].replace(codecs.BOM_UTF8, b'')
-                            lines.insert(0, codecs.BOM_UTF8 + get_text(file, text, True).encode('utf-8'))
+                            lines.insert(0, codecs.BOM_UTF8 + get_text(file, text, True)\
+                                         .encode('utf-8'))
                         else:
                             lines.insert(0, get_text(file, text, True))
                         f.seek(0)
