@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 #!/usr/bin/env python
 """
 Consumes messages from rabbitmq, dispatching them to the process method and acknowledges them

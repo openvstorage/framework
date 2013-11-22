@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 Module containing certain helper classes providing various logic
 """

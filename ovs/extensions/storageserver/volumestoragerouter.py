@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 Wrapper class for the storagerouterclient of the voldrv team
 """

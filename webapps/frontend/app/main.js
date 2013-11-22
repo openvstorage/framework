@@ -1,4 +1,5 @@
-﻿/*global requirejs, define */
+﻿// license see http://www.openvstorage.com/licenses/opensource/
+/*global requirejs, define */
 requirejs.config({
     paths: {
         'text'       : '../lib/require/text',

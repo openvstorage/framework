@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 WSGI config for Open vStorage project.
 

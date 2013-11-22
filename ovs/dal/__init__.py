@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 The Open vStorage Data Access Layer contains hybrid objects, providing a transparent access method
 for data that consists of persistent model objects extended with extra reality properties coverd by

@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 import multiprocessing
 
 bind = '127.0.0.1:8000'

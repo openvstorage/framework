@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define, describe, spyOn, it, expect, jasmine */
 define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
     'use strict';

@@ -1,4 +1,5 @@
-﻿/*global define */
+﻿// license see http://www.openvstorage.com/licenses/opensource/
+/*global define */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
     'ovs/shared', 'viewmodels/wizards/changepassword/index'

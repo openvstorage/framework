@@ -1,4 +1,5 @@
-﻿/*global define */
+﻿// license see http://www.openvstorage.com/licenses/opensource/
+/*global define */
 define([
     'plugins/router', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader'

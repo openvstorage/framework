@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 #license see http://www.openvstorage.com/licenses/opensource/
 
 """

@@ -1,4 +1,5 @@
-﻿/*global define */
+﻿// license see http://www.openvstorage.com/licenses/opensource/
+/*global define */
 define([
     'knockout',
     'ovs/shared'

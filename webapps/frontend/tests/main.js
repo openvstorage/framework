@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global requirejs, window */
 var tests = [], file;
 Object.prototype.invalidValue = 0;

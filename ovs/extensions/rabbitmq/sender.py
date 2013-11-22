@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 #!/usr/bin/env python
 """
 This script can be used for testing purposes, adding data passed in as the only argument to the

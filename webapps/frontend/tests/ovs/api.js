@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define, describe, beforeEach, spyOn, it, waitsFor, waits, runs, expect */
 define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared, generic, $) {
     'use strict';

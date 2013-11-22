@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global module */
 module.exports = function(config) {
     "use strict";
