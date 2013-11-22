@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
 define([
     'jquery', 'knockout',
@@ -17,11 +18,11 @@ define([
 
         self.guid       = ko.observable(guid);
         self.name       = ko.observable();
-        self.iops       = ko.smoothDeltaObservable();
-        self.storedData = ko.smoothDeltaObservable();
+        self.iops       = ko.smoothDeltaObservable(0);
+        self.storedData = ko.smoothDeltaObservable(2);
         self.cache      = ko.smoothObservable();
-        self.readSpeed  = ko.smoothDeltaObservable();
-        self.writeSpeed = ko.smoothDeltaObservable();
+        self.readSpeed  = ko.smoothDeltaObservable(2);
+        self.writeSpeed = ko.smoothDeltaObservable(2);
 
         self.vDisks     = ko.observableArray([]);
         self.vDiskGuids = [];

@@ -1,4 +1,4 @@
-/*global define, window */
+/*global define */
 define(['knockout', 'ovs/generic'], function(ko, generic) {
     "use strict";
     ko.smoothObservable = function(initialValue, steps) {
@@ -12,7 +12,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
         });
     };
-    ko.deltaObservable = function() {
+    ko.deltaObservable = function(decimals) {
         var workingValue = ko.observable(), initialized = ko.observable(false),
             timestamp, newTimestamp, previousCounter, delta, timeDelta, result;
         result = ko.computed({
@@ -27,7 +27,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     delta = newCounter - previousCounter;
                     newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    workingValue(Math.round((delta / timeDelta) * 100) / 100);
+                    workingValue(generic.round(delta / timeDelta, decimals));
                     timestamp = newTimestamp;
                     previousCounter = newCounter;
                     initialized(true);
@@ -37,7 +37,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         result.initialized = initialized;
         return result;
     };
-    ko.smoothDeltaObservable = function() {
+    ko.smoothDeltaObservable = function(decimals) {
         var workingValue = ko.observable(), initialized = ko.observable(false),
             timestamp, newTimestamp, previousCounter, delta, timeDelta, result;
         result = ko.computed({
@@ -52,7 +52,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     delta = newCounter - previousCounter;
                     newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    generic.smooth(workingValue, Math.round((delta / timeDelta) * 100) / 100);
+                    generic.smooth(workingValue, generic.round(delta / timeDelta, decimals));
                     timestamp = newTimestamp;
                     previousCounter = newCounter;
                     initialized(true);

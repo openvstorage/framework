@@ -81,6 +81,20 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return allKeys;
     }
+    function round(value, decimals) {
+        decimals = decimals || 0;
+        if (decimals === 0) {
+            return Math.round(value);
+        }
+        return Math.round(value * (10 * decimals)) / (10 * decimals);
+    }
+    function ceil(value, decimals) {
+        decimals = decimals || 0;
+        if (decimals === 0) {
+            return Math.ceil(value);
+        }
+        return Math.ceil(value * (10 * decimals)) / (10 * decimals);
+    }
     function xhrAbort(token) {
         if (token !== undefined && token.state() === 'pending') {
             try {
@@ -109,12 +123,12 @@ define(['jquery', 'jqp/pnotify'], function($) {
             diff = targetValue - startValue;
             if (diff !== 0) {
                 decimals = Math.max((startValue.toString().split('.')[1] || []).length, (targetValue.toString().split('.')[1] || []).length);
-                stepSize = decimals === 0 ? Math.ceil(diff / steps) : Math.ceil(diff / steps * (10 * decimals)) / (10 * decimals);
+                stepSize = ceil(diff / steps, decimals);
                 stepSize = stepSize === 0 ? 1 : stepSize;
                 execute = function() {
                     var current = observable();
                     if (Math.abs(targetValue - current) > Math.abs(stepSize)) {
-                        observable(observable() + stepSize);
+                        observable(round(observable() + stepSize, decimals));
                         window.setTimeout(execute, 75);
                     } else {
                         observable(targetValue);
@@ -139,6 +153,8 @@ define(['jquery', 'jqp/pnotify'], function($) {
         keys         : keys,
         xhrAbort     : xhrAbort,
         removeElement: removeElement,
-        smooth       : smooth
+        smooth       : smooth,
+        round        : round,
+        ceil         : ceil
     };
 });
