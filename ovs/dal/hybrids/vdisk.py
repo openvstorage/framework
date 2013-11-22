@@ -28,7 +28,7 @@ class VDisk(DataObject):
                   'snapshotpolicyid':  (None,  str,  'Snapshot polity used by the virtual disk'),
                   'tags':              ([],    list, 'Tags of the virtual disk'),
                   'has_autobackup':    (False, bool, 'Indicates whether this disk has autobackup'),
-                  'type':             ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk')}
+                  'type':              ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk')}
     _relations = {'machine': (VMachine, 'disks'),
                   'vpool':   (VPool,    'disks')}
     _expiry = {'snapshots':               (60, list),

@@ -31,10 +31,11 @@ class MetaClass(type):
                     itemtype = default[1].__name__
                     extra_info = ''
                 else:
-                    itemtype = 'enum(%s)' % default[1][0].__class__.__name__
+                    itemtype = 'Enum(%s)' % default[1][0].__class__.__name__
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in default[1]])
                 dct[attribute] = property(
-                    doc='[persistent] %s %s\n@type: %s' % (docstring, extra_info, itemtype)
+                    doc='[persistent] %s %s\n@type: %s'
+                        % (docstring, extra_info, itemtype)
                 )
             for attribute, relation in dct['_relations'].iteritems():
                 itemtype = relation[0].__name__
@@ -48,11 +49,12 @@ class MetaClass(type):
                     itemtype = info[1].__name__
                     extra_info = ''
                 else:
-                    itemtype = 'enum(%s)' % info[1][0].__class__.__name__
+                    itemtype = 'Enum(%s)' % info[1][0].__class__.__name__
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
                 dct[attribute] = property(
                     fget=dct[attribute].__get__,
-                    doc='[dynamic] (%ds) %s %s\n@type: %s' % (info[0], docstring, extra_info, itemtype)
+                    doc='[dynamic] (%ds) %s %s\n@type: %s'
+                        % (info[0], docstring, extra_info, itemtype)
                 )
 
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)

@@ -1,2 +1,10 @@
 #!/bin/bash
-epydoc --graph umlclasstree ovs -o $1 -v --exclude=test --no-sourcecode --no-private > /dev/null
+rm -rf $1/*
+mkdir $1/lib
+epydoc --graph umlclasstree ovs.lib -o $1/lib -v --exclude=test --no-sourcecode --no-private --parse-only > /dev/null
+mkdir $1/dal
+epydoc --graph umlclasstree ovs.dal -o $1/dal -v --exclude=test --no-sourcecode --no-private > /dev/null
+mkdir $1/extensions
+epydoc --graph umlclasstree ovs.extensions -o $1/extensions -v --exclude=test --no-sourcecode --no-private > /dev/null
+mkdir $1/hypervisor
+epydoc --graph umlclasstree ovs.hypervisor -o $1/hypervisor -v --exclude=test --no-sourcecode --no-private --parse-only > /dev/null
