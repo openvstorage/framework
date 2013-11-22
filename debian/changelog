@@ -1,3 +1,9 @@
+openvstorage (0.1.1-1~alpha) ovs-release; urgency=low
+
+   * CloudFounders 0.1.1-1~alpha Open vStorage release ( see changelog for more info on changes )
+
+ -- OVS Automatic Packager <packager@openvstorage.com>  Fri, 22 Nov 2013 09:44:35 +0000
+
 openvstorage (0.1.0-1) UNRELEASED; urgency=low
 
    * CloudFounders 0.1.0-1 Open vStorage release ( see changelog for more info on changes )
