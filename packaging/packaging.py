@@ -1,5 +1,9 @@
 # license see http://www.openvstorage.com/licenses/opensource/
 #!/usr/bin/env python
+"""
+Packaging script
+"""
+
 import re
 import os
 import shutil
@@ -10,6 +14,18 @@ from time import time
 
 class OvsPackaging(object):
     """
+    A class to facilitate the following:
+      - retrieving code from a repository
+        - alternatively updating an existing repository
+        - ability to select specific branches
+      - based on the code's layout
+        - build a distributeable binary package or set of packages
+      - upload the binary packages to a server
+    Current possibilities:
+      - Bitbucket
+      - Mercurial
+      - Deb files
+      - Apt server
     """
 
     def __init__(self, args):
@@ -45,7 +61,7 @@ class OvsPackaging(object):
             self.promote = None
 
         if args.author:
-            self.athor = args.author
+            self.author = args.author
         else:
             self.author = 'OVS Automatic Packager <packager@openvstorage.com>'
 
@@ -97,29 +113,34 @@ class OvsPackaging(object):
         if (self.tag and self.distribution == 'release'):
             self.incrementversion = True
             self.changelog_action = 'commit'
+            if self.promote:
+                self.incrementversion = False
         if self.distribution == 'development':
             # perhaps keeping all the recent changes in the changelog 
             # is good here
             # changelog_action = 'revert'
             self.incrementversion = True
 
-    def _call(self, *popenargs, **kwargs):
+    @staticmethod
+    def _call(*popenargs, **kwargs):
         retcode = subprocess.call(*popenargs, **kwargs)
         if retcode == 0:
             return
         raise RuntimeError(retcode)
 
-    def _check_output(self, *popenargs, **kwargs):
+    @staticmethod
+    def _check_output(*popenargs, **kwargs):
         output = subprocess.check_output(*popenargs, **kwargs)
         return output
 
-    def process_command(self, args, cwd=None):
-        if not isinstance(args, (list, tuple)):
+    def process_command(self, commandargs, cwd=None):
+        if not isinstance(commandargs, (list, tuple)):
             raise RuntimeError, 'args passed must be in a list'
-        print 'Executing {} with working directory {}'.format(args, cwd)
-        self._call(args, cwd=cwd)
+        print 'Executing {} with working directory {}'.format(commandargs, cwd)
+        self._call(commandargs, cwd=cwd)
 
-    def _increment_version(self, versionnumber, increment):
+    @staticmethod
+    def _increment_version(versionnumber, increment):
         """
         Increments a <major>.<minor>.<patch>-<build> version number as desired
         This should never increment the build number
@@ -172,12 +193,12 @@ class OvsPackaging(object):
         """
 
         assert b_or_x in ['-b', '-x']
-        args = ['/usr/bin/dpkg-source', b_or_x, dscpath]
+        dpkgsourceargs = ['/usr/bin/dpkg-source', b_or_x, dscpath]
         if options:
-            args.insert(1, options)
+            dpkgsourceargs.insert(1, options)
         if output:
-            args.append(output)
-        self.process_command(args, cwd=cwd)
+            dpkgsourceargs.append(output)
+        self.process_command(dpkgsourceargs, cwd=cwd)
 
     def _bitbucket_command(self, command):
         """
@@ -263,16 +284,16 @@ class OvsPackaging(object):
 
         _push = False
         _hg_command = self._hg_command[:]
-        changelogcommand = _hg_command.append(changelog_action)
+        _hg_command.append(changelog_action)
         if changelog_action == 'commit':
             commitmessage = 'ovs release {}'.format(version)
-            changelogcommand = _hg_command.extend(['-m', commitmessage])
+            _hg_command.extend(['-m', commitmessage])
             _push = True
         elif changelog_action == 'revert':
-            changelogcommand = _hg_command.append('-a')
+            _hg_command.append('-a')
 
-        changelogcommand.append(self.changelogpath)
-        self.process_command(changelogcommand, cwd=self.repopath)
+        _hg_command.append(self.changelogpath)
+        self.process_command(_hg_command, cwd=self.repopath)
         if _push:
             self.push_bitbucket()
 
@@ -463,7 +484,9 @@ class OvsPackaging(object):
         if self._ssh_username:
             id_config = 'User {}\n'.format(self._ssh_username)
         else:
-            id_config = 'IdentityFile {}'.format(self.ssh_credentials)
+            id_config = 'IdentityFile {}\n'.format(self.ssh_credentials)
+        if not self._bb_username:
+            id_config += 'IdentityFile {}\n'.format(self.bb_credentials)
         config_file.write(id_config)
         config_file.close()
 
@@ -562,7 +585,7 @@ if __name__ == '__main__':
     parser.add_argument('-dn', '--distribution', dest='distribution', help='OpenvStorage Apt Repository Distribution: (release | revision | development). Default: revision')
     parser.add_argument('-t', '--tag', dest='tag', help='Tag For Development or Prerelease Builds. Default: None')
     parser.add_argument('-b', '--branch', dest='branch', help='Repository Branch. Default: default')
-    parser.add_argument('-p', '--promote', dest='promote', help='Indicate Change in Release Tag but not Increment Patch Version. Default: None')
+    parser.add_argument('-p', '--promote', dest='promote', action='store_true' , help='Indicate Change in Release Tag but not Increment Patch Version. Default: False')
     parser.add_argument('-a', '--author', dest='author', help='Author of the Debian Package Default: OVS Automatic Packager <packager@openvstorage.com>')
     parser.add_argument('-s', '--sshcredentials', dest='ssh_credentials', help='apt repository upload user:password or path to ssh private key. Default: ~/.ssh/id_rsa')
     parser.add_argument('-c', '--bbcredentials', dest='bb_credentials', help='bitbucket user:password or path to ssh private key. Default: ~/.ssh/id_rsa')
