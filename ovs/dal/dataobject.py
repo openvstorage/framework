@@ -43,9 +43,16 @@ class MetaClass(type):
                         % (itemtype, relation[1], itemtype)
                 )
             for attribute, info in dct['_expiry'].iteritems():
+                docstring = dct[attribute].__doc__.strip()
+                if isinstance(info[1], type):
+                    itemtype = info[1].__name__
+                    extra_info = ''
+                else:
+                    itemtype = 'enum(%s)' % info[1][0].__class__.__name__
+                    extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
                 dct[attribute] = property(
                     fget=dct[attribute].__get__,
-                    doc='[dynamic] (%ds) %s\n@type: %s' % (info[0], dct[attribute].__doc__.strip(), info[1])
+                    doc='[dynamic] (%ds) %s %s\n@type: %s' % (info[0], docstring, extra_info, itemtype)
                 )
 
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
