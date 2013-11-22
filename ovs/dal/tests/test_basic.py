@@ -246,13 +246,19 @@ class Basic(TestCase):
             self.assertIsInstance(cls._blueprint, dict, '_blueprint required: %s' % cls.__name__)
             self.assertIsInstance(cls._relations, dict, '_relations required: %s' % cls.__name__)
             self.assertIsInstance(cls._expiry, dict, '_expiry required: %s' % cls.__name__)
-            # Check blueprint types
+            # Check types
             allowed_types = [int, float, str, bool, list, dict]
             for key in cls._blueprint:
                 is_allowed_type = cls._blueprint[key][1] in allowed_types \
                     or isinstance(cls._blueprint[key][1], list)
                 self.assertTrue(is_allowed_type,
                                 '_blueprint types in %s should be one of %s'
+                                % (cls.__name__, str(allowed_types)))
+            for key in cls._expiry:
+                is_allowed_type = cls._expiry[key][1] in allowed_types \
+                    or isinstance(cls._expiry[key][1], list)
+                self.assertTrue(is_allowed_type,
+                                '_expiry types in %s should be one of %s'
                                 % (cls.__name__, str(allowed_types)))
             instance = cls()
             for key, default in cls._blueprint.iteritems():
@@ -270,7 +276,7 @@ class Basic(TestCase):
                 if attribute not in properties:
                     missing_props.append(attribute)
                 else:  # ... and should work
-                    data = getattr(instance, attribute)
+                    _ = getattr(instance, attribute)
             self.assertEqual(len(missing_props), 0,
                              'Missing dynamic properties in %s: %s'
                              % (cls.__name__, missing_props))
@@ -756,12 +762,19 @@ class Basic(TestCase):
         disk = TestDisk()
         disk.name = 'test'
         disk.name = u'test'
+        disk.name = None
         disk.size = 100
         disk.size = 100.5
         disk.order = 100
         with self.assertRaises(TypeError):
             disk.order = 100.5
-
+        with self.assertRaises(TypeError):
+            disk.__dict__['wrong_type_data'] = None
+            disk.wrong_type_data = 'string'
+            _ = disk.wrong_type
+        with self.assertRaises(TypeError):
+            disk.type = 'THREE'
+        disk.type = 'ONE'
 
 
 # Mocking classes
@@ -802,23 +815,3 @@ class VSR():
     Mocks the VolumeStorageRouter
     """
     VolumeStorageRouterClient = VSRC
-
-
-class MF():
-    """
-    Mocks the MemcacheFactory
-    """
-
-    @staticmethod
-    def load():
-        """
-        Returns a dummy volatile store
-        """
-        return DummyVolatileStore()
-
-
-class MCF():
-    """
-    Mocks the MemcacheClientFactory
-    """
-    MemcacheFactory = MF

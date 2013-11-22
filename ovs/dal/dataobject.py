@@ -41,10 +41,10 @@ class MetaClass(type):
                     doc='[relation] one-to-many relation with %s.%s\n@type: %s'
                         % (itemtype, relation[1], itemtype)
                 )
-            for attribute, timeout in dct['_expiry'].iteritems():
+            for attribute, info in dct['_expiry'].iteritems():
                 dct[attribute] = property(
                     fget=dct[attribute].__get__,
-                    doc='[dynamic] (%ds) %s' % (timeout, dct[attribute].__doc__.strip())
+                    doc='[dynamic] (%ds) %s\n@type: %s' % (info[0], dct[attribute].__doc__.strip(), info[1])
                 )
 
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
@@ -266,22 +266,7 @@ class DataObject(object):
         if value is None:
             self._data[attribute] = value
         else:
-            field_type = self._blueprint[attribute][1]
-            if field_type is str:
-                correct = isinstance(value, basestring)
-                allowed_types = ['str', 'unicode', 'basestring']
-            elif field_type is float:
-                correct = isinstance(value, float) or isinstance(value, int)
-                allowed_types = ['float', 'int']
-            elif isinstance(field_type, list):
-                # We're in an enum scenario. Field_type isn't a real type, but a list containing
-                # all possible enum values
-                correct = value in field_type
-                allowed_types = field_type
-            else:
-                correct = isinstance(value, field_type)
-                allowed_types = [field_type.__name__]
-
+            correct, allowed_types = Toolbox.check_type(value, self._blueprint[attribute][1])
             if correct:
                 self._data[attribute] = value
             else:
@@ -503,7 +488,12 @@ class DataObject(object):
         cached_data = self._volatile.get(cache_key)
         if cached_data is None:
             cached_data = function()  # Load data from backend
-            self._volatile.set(cache_key, cached_data, self._expiry[caller_name])
+            if cached_data is not None:
+                correct, allowed_types = Toolbox.check_type(cached_data, self._expiry[caller_name][1])
+                if not correct:
+                    raise TypeError('Dynamic property %s allows types %s. %s given'
+                                    % (caller_name, str(allowed_types), type(cached_data)))
+            self._volatile.set(cache_key, cached_data, self._expiry[caller_name][0])
         return cached_data
 
     def _add_pk(self, key):

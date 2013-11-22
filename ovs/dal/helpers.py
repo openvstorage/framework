@@ -122,3 +122,29 @@ class Toolbox(object):
                 data = fallback
             volatile.set(key, data)
         return data
+
+    @staticmethod
+    def check_type(value, required_type):
+        """
+        Validates whether a certain value is of a given type. Some types are treated as special
+        case:
+          - A 'str' type accepts 'str', 'unicode' and 'basestring'
+          - A 'float' type accepts 'float', 'int'
+          - A list instance acts like an enum
+        """
+        if required_type is str:
+            correct = isinstance(value, basestring)
+            allowed_types = ['str', 'unicode', 'basestring']
+        elif required_type is float:
+            correct = isinstance(value, float) or isinstance(value, int)
+            allowed_types = ['float', 'int']
+        elif isinstance(required_type, list):
+            # We're in an enum scenario. Field_type isn't a real type, but a list containing
+            # all possible enum values
+            correct = value in required_type
+            allowed_types = required_type
+        else:
+            correct = isinstance(value, required_type)
+            allowed_types = [required_type.__name__]
+
+        return correct, allowed_types

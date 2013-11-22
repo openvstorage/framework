@@ -26,26 +26,26 @@ class VDisk(DataObject):
                   'retentionpolicyid': (None,  str,  'Retention policy used by the virtual disk'),
                   'snapshotpolicyid':  (None,  str,  'Snapshot polity used by the virtual disk'),
                   'tags':              ([],    list, 'Tags of the virtual disk'),
-                  'autobackup':        (False, bool, 'Indicates whether this disk has autobackup'),
+                  'has_autobackup':    (False, bool, 'Indicates whether this disk has autobackup'),
                   'type':             ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk')}
     _relations = {'machine': (VMachine, 'disks'),
                   'vpool':   (VPool,    'disks')}
-    _expiry = {'snapshots':               60,
-               'status':                  30,
-               'storage_server':          30,
-               'volumestoragerouterid':   30,
-               'cache_hits':               5,
-               'cache_misses':             5,
-               'read_operations':          5,
-               'write_operations':         5,
-               'bytes_read':               5,
-               'bytes_written':            5,
-               'backend_read_operations':  5,
-               'backend_write_operations': 5,
-               'backend_bytes_read':       5,
-               'backend_bytes_written':    5,
-               'stored_data':              5,
-               'foc_status':               5}
+    _expiry = {'snapshots':               (60, list),
+               'status':                  (30, str),
+               'vsaid':                   (30, str),
+               'volumestoragerouterid':   (30, str),
+               'cache_hits':               (5, int),
+               'cache_misses':             (5, int),
+               'read_operations':          (5, int),
+               'write_operations':         (5, int),
+               'bytes_read':               (5, int),
+               'bytes_written':            (5, int),
+               'backend_read_operations':  (5, int),
+               'backend_write_operations': (5, int),
+               'backend_bytes_read':       (5, int),
+               'backend_bytes_written':    (5, int),
+               'stored_data':              (5, int),
+               'foc_status':               (5, str)}
     # pylint: enable=line-too-long
 
     @property
@@ -77,7 +77,7 @@ class VDisk(DataObject):
         return self._backend_property(get_data)
 
     @property
-    def storage_server(self):
+    def vsaid(self):
         """
         Returns the storage server on which the virtual disk is stored
         """
@@ -143,7 +143,7 @@ class VDisk(DataObject):
             Loads the actual data
             """
             import time
-            return time.time()
+            return int(time.time())
 
         return self._backend_property(get_data)
 
@@ -158,7 +158,7 @@ class VDisk(DataObject):
             Loads the actual data
             """
             import time
-            return time.time()
+            return int(time.time())
 
         return self._backend_property(get_data)
 

@@ -14,25 +14,25 @@ class VMachine(DataObject):
     _blueprint = {'name':         (None,  str,  'Name of the virtual machine'),
                   'description':  (None,  str,  'Description of the virtual machine'),
                   'hypervisorid': (None,  str,  'Identifier of the VMachine on the hypervisor'),
-                  'template':     (True,  bool, 'Indicates whether this virtual machine is a template'),
-                  'system':       (False, bool, 'Indicates whether this virtual machine represents the system'),
+                  'is_template':  (True,  bool, 'Indicates whether this virtual machine is a template'),
+                  'is_vsa':       (False, bool, 'Indicates whether this virtual machine represents a VSA'),
                   'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine')}
     _relations = {}
-    _expiry = {'snapshots':               60,
-               'status':                  30,
-               'storage_server':          30,
-               'cache_hits':               5,
-               'cache_misses':             5,
-               'read_operations':          5,
-               'write_operations':         5,
-               'bytes_read':               5,
-               'bytes_written':            5,
-               'backend_read_operations':  5,
-               'backend_write_operations': 5,
-               'backend_bytes_read':       5,
-               'backend_bytes_written':    5,
-               'stored_data':              5,
-               'foc_status':               5}
+    _expiry = {'snapshots':               (60, list),
+               'status':                  (30, str),
+               'vsaid':                   (30, str),
+               'cache_hits':               (5, int),
+               'cache_misses':             (5, int),
+               'read_operations':          (5, int),
+               'write_operations':         (5, int),
+               'bytes_read':               (5, int),
+               'bytes_written':            (5, int),
+               'backend_read_operations':  (5, int),
+               'backend_write_operations': (5, int),
+               'backend_bytes_read':       (5, int),
+               'backend_bytes_written':    (5, int),
+               'stored_data':              (5, int),
+               'foc_status':               (5, str)}
     # pylint: enable=line-too-long
 
     @property
@@ -64,7 +64,7 @@ class VMachine(DataObject):
         return self._backend_property(get_data)
 
     @property
-    def storage_server(self):
+    def vsaid(self):
         """
         Returns the storage server on which the virtual disk is stored
         """

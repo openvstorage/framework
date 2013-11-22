@@ -17,18 +17,18 @@ class VPool(DataObject):
                   'backend_connection': (None, str, 'Connection for the backend'),
                   'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the backend')}
     _relations = {}
-    _expiry = {'status':                  10,
-               'cache_hits':               5,
-               'cache_misses':             5,
-               'read_operations':          5,
-               'write_operations':         5,
-               'bytes_read':               5,
-               'bytes_written':            5,
-               'backend_read_operations':  5,
-               'backend_write_operations': 5,
-               'backend_bytes_read':       5,
-               'backend_bytes_written':    5,
-               'stored_data':              5}
+    _expiry = {'status':                  (10, str),
+               'cache_hits':               (5, int),
+               'cache_misses':             (5, int),
+               'read_operations':          (5, int),
+               'write_operations':         (5, int),
+               'bytes_read':               (5, int),
+               'bytes_written':            (5, int),
+               'backend_read_operations':  (5, int),
+               'backend_write_operations': (5, int),
+               'backend_bytes_read':       (5, int),
+               'backend_bytes_written':    (5, int),
+               'stored_data':              (5, int)}
     # pylint: enable=line-too-long
 
     @property
