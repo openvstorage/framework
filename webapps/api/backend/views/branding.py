@@ -8,7 +8,7 @@ from ovs.dal.lists.brandinglist import BrandingList
 from ovs.dal.hybrids.branding import Branding
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import internal
+from backend.decorators import expose
 
 
 class BrandingViewSet(viewsets.ViewSet):
@@ -16,7 +16,7 @@ class BrandingViewSet(viewsets.ViewSet):
     Information about branding
     """
 
-    @internal()
+    @expose(internal=True)
     def list(self, request, format=None):
         """
         Overview of all brandings
@@ -26,7 +26,7 @@ class BrandingViewSet(viewsets.ViewSet):
         serializer = FullSerializer(Branding, instance=brands, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @internal()
+    @expose(internal=True)
     def retrieve(self, request, pk=None, format=None):
         """
         Load information about a given task

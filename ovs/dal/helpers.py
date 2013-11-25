@@ -133,6 +133,7 @@ class Toolbox(object):
           - A 'float' type accepts 'float', 'int'
           - A list instance acts like an enum
         """
+        given_type = type(value)
         if required_type is str:
             correct = isinstance(value, basestring)
             allowed_types = ['str', 'unicode', 'basestring']
@@ -141,11 +142,15 @@ class Toolbox(object):
             allowed_types = ['float', 'int']
         elif isinstance(required_type, list):
             # We're in an enum scenario. Field_type isn't a real type, but a list containing
-            # all possible enum values
+            # all possible enum values. Here as well, we need to do some str/unicode/basestring
+            # checking.
+            if isinstance(required_type[0], basestring):
+                value = str(value)
             correct = value in required_type
             allowed_types = required_type
+            given_type = value
         else:
             correct = isinstance(value, required_type)
             allowed_types = [required_type.__name__]
 
-        return correct, allowed_types
+        return correct, allowed_types, given_type

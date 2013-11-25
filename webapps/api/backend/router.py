@@ -79,6 +79,8 @@ class OVSRouter(DefaultRouter):
                 api_mode = getattr(attr, 'api_mode', None)
                 if self.api_mode in api_mode:
                     bound_methods[method] = action
+                    # To debug the loaded/exposed methods:
+                    # print '[%s] %s.%s' % (self.api_mode, viewset.__name__, action)
         return bound_methods
 
     def get_api_root_view(self):

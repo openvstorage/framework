@@ -4,7 +4,7 @@ Module for users
 """
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, internal, customer
+from backend.decorators import required_roles, expose
 from backend.toolbox import Toolbox
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -33,8 +33,7 @@ class UserViewSet(viewsets.ViewSet):
         except ObjectNotFoundException:
             raise Http404
 
-    @internal()
-    @customer()
+    @expose(internal=True, customer=True)
     @required_roles(['view', 'system'])
     def list(self, request, format=None):
         """
@@ -45,8 +44,7 @@ class UserViewSet(viewsets.ViewSet):
         serializer = FullSerializer(User, instance=users, many=True)
         return Response(serializer.data)
 
-    @internal()
-    @customer()
+    @expose(internal=True, customer=True)
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """
@@ -62,7 +60,7 @@ class UserViewSet(viewsets.ViewSet):
             return Response(serializer.data)
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
-    @internal()
+    @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
     def create(self, request, format=None):
         """
@@ -76,9 +74,9 @@ class UserViewSet(viewsets.ViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @internal()
+    @expose(internal=True)
     @required_roles(['view', 'delete', 'system'])
-    def delete(self, request, pk=None, format=None):
+    def destroy(self, request, pk=None, format=None):
         """
         Deletes a user
         """
@@ -91,8 +89,7 @@ class UserViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action()
-    @internal()
-    @customer()
+    @expose(internal=True, customer=True)
     @required_roles(['view'])
     def set_password(self, request, pk=None, format=None):
         """

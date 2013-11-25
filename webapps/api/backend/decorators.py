@@ -28,25 +28,16 @@ def required_roles(roles):
     return wrap
 
 
-def internal():
+def expose(internal=False, customer=False):
     """
-    Used to mark a method on a ViewSet that should be included for the internal API
-    """
-    def decorator(func):
-        modes = getattr(func, 'api_mode', [])
-        modes.append('internal')
-        func.api_mode = modes
-        return func
-    return decorator
-
-
-def customer():
-    """
-    Used to mark a method on a ViewSet that should be included for the customer API
+    Used to mark a method on a ViewSet that should be included for which API
     """
     def decorator(func):
-        modes = getattr(func, 'api_mode', [])
-        modes.append('customer')
+        modes = []
+        if internal:
+            modes.append('internal')
+        if customer:
+            modes.append('customer')
         func.api_mode = modes
         return func
     return decorator
