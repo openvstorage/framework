@@ -297,12 +297,12 @@ class DataObject(object):
         if value is None:
             self._data[attribute] = value
         else:
-            correct, allowed_types = Toolbox.check_type(value, self._blueprint[attribute][1])
+            correct, allowed_types, given_type = Toolbox.check_type(value, self._blueprint[attribute][1])
             if correct:
                 self._data[attribute] = value
             else:
                 raise TypeError('Property %s allows types %s. %s given'
-                                % (attribute, str(allowed_types), type(value)))
+                                % (attribute, str(allowed_types), given_type))
 
     def _set_cproperty(self, attribute, value):
         """
@@ -516,10 +516,10 @@ class DataObject(object):
         if cached_data is None:
             cached_data = function()  # Load data from backend
             if cached_data is not None:
-                correct, allowed_types = Toolbox.check_type(cached_data, self._expiry[caller_name][1])
+                correct, allowed_types, given_type = Toolbox.check_type(cached_data, self._expiry[caller_name][1])
                 if not correct:
                     raise TypeError('Dynamic property %s allows types %s. %s given'
-                                    % (caller_name, str(allowed_types), type(cached_data)))
+                                    % (caller_name, str(allowed_types), given_type))
             self._volatile.set(cache_key, cached_data, self._expiry[caller_name][0])
         return cached_data
 

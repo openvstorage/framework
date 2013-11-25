@@ -15,7 +15,7 @@ class User(DataObject):
                   'password':  (None,    str,  'Password of the user'),
                   'email':     (None,    str,  'Email address of the user'),
                   'is_active': (False,   bool, 'Indicates whether the user is active'),
-                  'language':  ('en-US', ['en-US'], 'Language of the user')}
+                  'language':  ('en-US', ['en-US', 'nl-NL'], 'Language of the user')}
     _relations = {'group': (Group, 'users')}
     _expiry = {}
     # pylint: enable=line-too-long
