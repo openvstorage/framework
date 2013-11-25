@@ -36,212 +36,96 @@ class VMachine(DataObject):
                'foc_status':               (5, str)}
     # pylint: enable=line-too-long
 
-    @property
-    def snapshots(self):
+    def _snapshots(self):
         """
         Fetches a list of snapshots for this virtual machine
         """
+        _ = self
+        return None
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return None
-
-        return self._backend_property(get_data)
-
-    @property
-    def status(self):
+    def _status(self):
         """
         Fetches the status of the volume
         """
+        _ = self
+        return None
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return None
-
-        return self._backend_property(get_data)
-
-    @property
-    def vsaid(self):
+    def _vsaid(self):
         """
         Returns the storage server on which the virtual disk is stored
         """
+        _ = self
+        return None
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return None
-
-        return self._backend_property(get_data)
-
-    @property
-    def cache_hits(self):
+    def _cache_hits(self):
         """
         Loads the cache hits (counter)
         """
+        return sum([d.cache_hits for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.cache_hits for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def cache_misses(self):
+    def _cache_misses(self):
         """
         Loads the cache misses (counter)
         """
+        return sum([d.cache_misses for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.cache_misses for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def read_operations(self):
+    def _read_operations(self):
         """
         Loads the read operations (counter)
         """
+        return sum([d.read_operations for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.read_operations for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def write_operations(self):
+    def _write_operations(self):
         """
         Loads the write operations (counter)
         """
+        return sum([d.write_operations for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.write_operations for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def bytes_read(self):
+    def _bytes_read(self):
         """
         Loads the total of bytes read (counter)
         """
+        return sum([d.bytes_read for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.bytes_read for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def bytes_written(self):
+    def _bytes_written(self):
         """
         Loads the bytes written (counter)
         """
+        return sum([d.bytes_written for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.bytes_written for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def backend_read_operations(self):
+    def _backend_read_operations(self):
         """
         Loads the backend read operations (counter)
         """
+        return sum([d.backend_read_operations for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.backend_read_operations for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def backend_write_operations(self):
+    def _backend_write_operations(self):
         """
         Loads the backend write operations
         """
+        return sum([d.backend_write_operations for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.backend_write_operations for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def backend_bytes_read(self):
+    def _backend_bytes_read(self):
         """
         Loads the bytes read (counter)
         """
+        return sum([d.backend_bytes_read for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.backend_bytes_read for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def backend_bytes_written(self):
+    def _backend_bytes_written(self):
         """
         Loads the bytes written (counter)
         """
+        return sum([d.backend_bytes_written for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.backend_bytes_written for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def stored_data(self):
+    def _stored_data(self):
         """
         Loads the stored data (counter)
         """
+        return sum([d.stored_data for d in self.disks])
 
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return sum([d.stored_data for d in self.disks])
-
-        return self._backend_property(get_data)
-
-    @property
-    def foc_status(self):
+    def _foc_status(self):
         """
         Loads the FOC status
         """
-
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return None
-
-        return self._backend_property(get_data)
+        _ = self
+        return None

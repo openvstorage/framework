@@ -44,7 +44,7 @@ class MetaClass(type):
                         % (itemtype, relation[1], itemtype)
                 )
             for attribute, info in dct['_expiry'].iteritems():
-                docstring = dct[attribute].__doc__.strip()
+                docstring = dct['_%s' % attribute].__doc__.strip()
                 if isinstance(info[1], type):
                     itemtype = info[1].__name__
                     extra_info = ''
@@ -52,7 +52,7 @@ class MetaClass(type):
                     itemtype = 'Enum(%s)' % info[1][0].__class__.__name__
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
                 dct[attribute] = property(
-                    fget=dct[attribute].__get__,
+                    fget=dct['_%s' % attribute],
                     doc='[dynamic] (%ds) %s %s\n@type: %s'
                         % (info[0], docstring, extra_info, itemtype)
                 )
@@ -168,6 +168,10 @@ class DataObject(object):
                 self._data[attribute] = Descriptor(relation[0]).descriptor
             self._add_cproperty(attribute, self._data[attribute])
 
+        # Add wrapped properties
+        for attribute, expiry in self._expiry.iteritems():
+            self._add_dproperty(attribute)
+
         # Load foreign keys
         relations = RelationMapper.load_foreign_relations(self.__class__)
         if relations is not None:
@@ -226,6 +230,15 @@ class DataObject(object):
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget))
 
+    def _add_dproperty(self, attribute):
+        """
+        Adds a dynamic property to the object
+        """
+        # pylint: disable=protected-access
+        fget = lambda s: s._get_dproperty(attribute)
+        # pylint: enable=protected-access
+        setattr(self.__class__, attribute, property(fget))
+
     # Helper method spporting property fetching
     def _get_sproperty(self, attribute):
         """
@@ -266,6 +279,14 @@ class DataObject(object):
         else:
             self._objects[attribute]['data'].merge(datalist.data)
         return self._objects[attribute]['data']
+
+    def _get_dproperty(self, attribute):
+        """
+        Getter for dynamic property, wrapping the internal data loading property
+        in a caching layer
+        """
+        data_loader = getattr(self, '_%s' % attribute)
+        return self._backend_property(data_loader, attribute)
 
     # Helper method supporting property setting
     def _set_sproperty(self, attribute, value):
@@ -328,7 +349,6 @@ class DataObject(object):
         It will also invalidate certain caches if required. For example lists pointing towards this
         object
         """
-
         if recursive:
             # Save objects that point to us (e.g. disk.machine - if this is disk)
             for attribute, default in self._relations.iteritems():
@@ -426,7 +446,6 @@ class DataObject(object):
         """
         Delete the given object. It also invalidates certain lists
         """
-
         # Invalidate no-filter queries/lists pointing to this object
         cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
         if '__all' in cache_list.keys():
@@ -450,7 +469,6 @@ class DataObject(object):
         """
         Discard all pending changes, reloading the data from the persistent backend
         """
-
         self.__init__(guid           = self._guid,
                       datastore_wins = self._datastore_wins)
 
@@ -489,11 +507,10 @@ class DataObject(object):
     ## Helper methods
     #######################
 
-    def _backend_property(self, function):
+    def _backend_property(self, function, caller_name):
         """
         Handles the internal caching of dynamic properties
         """
-        caller_name = inspect.stack()[1][3]
         cache_key   = '%s_%s' % (self._key, caller_name)
         cached_data = self._volatile.get(cache_key)
         if cached_data is None:

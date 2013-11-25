@@ -26,32 +26,15 @@ class TestDisk(DataObject):
     # For testing purposes
     wrong_type_data = 0
 
-    @property
-    def used_size(self):
+    def _used_size(self):
         """
         Returns a certain fake used_size value
         """
+        from random import randint
+        return randint(0, self._data['size'])
 
-        def get_data():
-            """
-            Loads the actualy fake data
-            """
-            from random import randint
-
-            return randint(0, self._data['size'])
-
-        return self._backend_property(get_data)
-
-    @property
-    def wrong_type(self):
+    def _wrong_type(self):
         """
         Returns the wrong type, should always fail
         """
-
-        def get_data():
-            """
-            Loads the actual data
-            """
-            return self.wrong_type_data
-
-        return self._backend_property(get_data)
+        return self.wrong_type_data
