@@ -69,7 +69,7 @@ class VDisk(DataObject):
         _ = self
         return None
 
-    def _volumestoragerouterid(self):
+    def _vsrid(self):
         """
         Returns the VSR on which the virtual disk is stored
         """
