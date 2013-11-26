@@ -48,6 +48,16 @@
         "yes": "Ja",
         "no": "Nee"
     },
+    "vpools" : {
+        "title": "vPools",
+        "backendtype": "Type",
+        "backendtypes": {
+            "S3": "Amazon S3",
+            "FILESYSTEM": "Bestandssystem"
+        },
+        "backendconnection": "Connectie",
+        "backendlogin": "Login"
+    },
     "statistics": {
         "title": "Statistieken",
         "introduction": "Deze pagina bevat de statistieken van uw omgeving",

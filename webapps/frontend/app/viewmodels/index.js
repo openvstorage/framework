@@ -13,12 +13,15 @@ define([
                                 fromParent: true
                             })
                             .map([
+                                // Dashboard
+                                { route: '',            moduleId: 'dashboard',    hash: '#' + mode,                  title: $.t('ovs:dashboard.title'),     titlecode: 'ovs:dashboard.title',     nav: false },
                                 // Navigation routes
-                                { route: '',           moduleId: 'dashboard',  hash: '#' + mode,                 title: $.t('ovs:dashboard.title'),  titlecode: 'ovs:dashboard.title',  nav: true  },
-                                { route: 'statistics', moduleId: 'statistics', hash: '#' + mode + '/statistics', title: $.t('ovs:statistics.title'), titlecode: 'ovs:statistics.title', nav: true  },
-                                { route: 'vmachines',  moduleId: 'vmachines',  hash: '#' + mode + '/vmachines',  title: $.t('ovs:vmachines.title'),  titlecode: 'ovs:vmachines.title',  nav: true  },
+                                { route: 'vpools',      moduleId: 'vpools',       hash: '#' + mode + '/vpools',      title: $.t('ovs:vpools.title'),        titlecode: 'ovs:vpools.title',        nav: true  },
+                                { route: 'vpool/:guid', moduleId: 'vpool-detail', hash: '#' + mode + '/vpool/:guid', title: $.t('ovs:vpools.detail.title'), titlecode: 'ovs:vpools.detail.title', nav: false },
+                                { route: 'vmachines',   moduleId: 'vmachines',    hash: '#' + mode + '/vmachines',   title: $.t('ovs:vmachines.title'),     titlecode: 'ovs:vmachines.title',     nav: true  },
                                 // Non-navigation routes
-                                { route: 'login',      moduleId: 'login',      hash: '#' + mode + '/login',      title: $.t('ovs:login.title'),      titlecode: 'ovs:login.title',      nav: false }
+                                { route: 'statistics',  moduleId: 'statistics',   hash: '#' + mode + '/statistics',  title: $.t('ovs:statistics.title'),    titlecode: 'ovs:statistics.title',    nav: false },
+                                { route: 'login',       moduleId: 'login',        hash: '#' + mode + '/login',       title: $.t('ovs:login.title'),         titlecode: 'ovs:login.title',         nav: false }
                             ])
                             .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {

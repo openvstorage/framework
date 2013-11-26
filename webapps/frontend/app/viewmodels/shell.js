@@ -6,8 +6,8 @@ define([
 ], function(router, bootstrap, i18n, shared, Messaging, generic, Tasks, Authentication, api, cssLoader) {
     "use strict";
     router.map([
-               { route: '',              moduleId: 'viewmodels/redirect',   nav: false },
-               { route: ':mode*details', moduleId: 'viewmodels/index', nav: false }
+               { route: '',              moduleId: 'viewmodels/redirect', nav: false },
+               { route: ':mode*details', moduleId: 'viewmodels/index',    nav: false }
            ]).buildNavigationModel()
           .mapUnknownRoutes('viewmodels/404');
 

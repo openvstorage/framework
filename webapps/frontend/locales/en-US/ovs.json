@@ -33,6 +33,10 @@
         "disk": "Disk",
         "vdisks": "vDisks",
         "disks": "Disks",
+        "vmachine": "vMachine",
+        "machine": "Machine",
+        "vmachines": "vMachines",
+        "machines": "Machines",
         "name": "Name",
         "storeddata": "Stored data",
         "cache": "Cache",
@@ -47,6 +51,23 @@
         "areyousure": "Are you sure?",
         "yes": "Yes",
         "no": "No"
+    },
+    "vpools" : {
+        "title": "vPools",
+        "backendtype": "Type",
+        "backendtypes": {
+            "S3": "Amazon S3",
+            "FILESYSTEM": "File system"
+        },
+        "backendconnection": "Connection",
+        "backendlogin": "Login",
+        "statistics": "Statistics",
+        "backend": "Backend",
+        "freespace": "Free space",
+        "detail": {
+            "title": "vPool",
+            "introduction": "Below an overview of the vPool properties."
+        }
     },
     "statistics": {
         "title": "Statistics",

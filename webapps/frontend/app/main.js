@@ -40,8 +40,9 @@ define([
         lng: shared.defaultLanguage,
         fallbackLng: 'en-US',
         ns: 'ovs',
-        resGetPath: 'locales/__lng__/__ns__.json',
-        useCookie: false
+        resGetPath: requirejs.toUrl('/locales/__lng__/__ns__.json'),
+        useCookie: false,
+        useLocalStorage: false
     };
 
     i18n.init(i18nOptions, function() {
@@ -53,7 +54,7 @@ define([
         });
         app.configurePlugins({
             widget: {
-                kinds: ['pager']
+                kinds: ['pager', 'lazyloader']
             }
         });
         app.start().then(function() {

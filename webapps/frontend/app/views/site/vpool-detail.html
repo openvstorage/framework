@@ -1,0 +1,63 @@
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section data-bind="with: vPool()">
+	<ol class="breadcrumb">
+	    <li class="active" data-bind="text: name"></li>
+	</ol>
+    <h2><span data-i18n="ovs:vpools.detail.title"></span>: <span data-bind="text: name"></span></h2>
+    <p data-i18n="ovs:vpools.detail.introduction"></p>
+    <table style="width: 100%;">
+        <thead>
+            <tr>
+                <th data-i18n="ovs:vpools.statistics" colspan="2"></th>
+                <th data-i18n="ovs:vpools.backend" colspan="2"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
+                <td style="width: 35%;"><span data-bind="text: storedData"></span> <span data-i18n="ovs:generic.mib"></span></td>
+                <td style="width: 15%;" data-i18n="ovs:vpools.backendtype"></td>
+                <td style="width: 35%;"><span data-bind="text: backendType"></span></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:vpools.freespace"></td>
+                <td><span data-bind="text: freeSpace"></span> %</td>
+                <td data-i18n="ovs:vpools.backendconnection"></td>
+                <td><span data-bind="text: backendConnection"></span></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.cache"></td>
+                <td><span data-bind="text: cache"></span> %</td>
+                <td data-i18n="ovs:vpools.backendlogin"></td>
+                <td><span data-bind="text: backendLogin"></span></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.iops"></td>
+                <td data-bind="lazyloader: { item: iops }"></td>
+                <td data-i18n="ovs:generic.readspeed"></td>
+                <td data-bind="lazyloader: { item: backendReadSpeed, unit: 'ovs:generic.mibs' }"></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.readspeed"></td>
+                <td data-bind="lazyloader: { item: readSpeed, unit: 'ovs:generic.mibs' }"></td>
+                <td data-i18n="ovs:generic.writespeed"></td>
+                <td data-bind="lazyloader: { item: backendWriteSpeed, unit: 'ovs:generic.mibs' }"></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.writespeed"></td>
+                <td data-bind="lazyloader: { item: writeSpeed, unit: 'ovs:generic.mibs' }"></td>
+                <td colspan="2">&nbsp;</td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.vmachines"></td>
+                <td><span data-bind="text: numberOfMachines"></span></td>
+                <td colspan="2">&nbsp;</td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.vdisks"></td>
+                <td><span data-bind="text: numberOfDisks"></span></td>
+                <td colspan="2">&nbsp;</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
