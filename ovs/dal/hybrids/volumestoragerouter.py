@@ -44,65 +44,65 @@ class VolumeStorageRouter(DataObject):
         """
         Loads the cache hits (counter)
         """
-        return sum([j.vpool.cache_hits for j in self.vpools])
+        return self.vpool.cache_hits
 
     def _cache_misses(self):
         """
         Loads the cache misses (counter)
         """
-        return sum([j.vpool.cache_misses for j in self.vpools])
+        return self.vpool.cache_misses
 
     def _read_operations(self):
         """
         Loads the read operations (counter)
         """
-        return sum([j.vpool.read_operations for j in self.vpools])
+        return self.vpool.read_operations
 
     def _write_operations(self):
         """
         Loads the write operations (counter)
         """
-        return sum([j.vpool.write_operations for j in self.vpools])
+        return self.vpool.write_operations
 
     def _bytes_read(self):
         """
         Loads the total of bytes read (counter)
         """
-        return sum([j.vpool.bytes_read for j in self.vpools])
+        return self.vpool.bytes_read
 
     def _bytes_written(self):
         """
         Loads the bytes written (counter)
         """
-        return sum([j.vpool.bytes_written for j in self.vpools])
+        return self.vpool.bytes_written
 
     def _backend_read_operations(self):
         """
         Loads the backend read operations (counter)
         """
-        return sum([j.vpool.backend_read_operations for j in self.vpools])
+        return self.vpool.backend_read_operations
 
     def _backend_write_operations(self):
         """
         Loads the backend write operations
         """
-        return sum([j.vpool.backend_write_operations for j in self.vpools])
+        return self.vpool.backend_write_operations
 
     def _backend_bytes_read(self):
         """
         Loads the bytes read (counter)
         """
-        return sum([j.vpool.backend_bytes_read for j in self.vpools])
+        return self.vpool.backend_bytes_read
 
     def _backend_bytes_written(self):
         """
         Loads the bytes written (counter)
         """
-        return sum([j.vpool.backend_bytes_written for j in self.vpools])
+        return self.vpool.backend_bytes_written
 
     def _stored_data(self):
         """
         Loads the stored data (counter)
         """
         _ = self
-        return sum([j.vpool.stored_data for j in self.vpools])
+        return self.vpool.stored_data

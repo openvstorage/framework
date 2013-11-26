@@ -43,64 +43,64 @@ class VPool(DataObject):
         """
         Loads the cache hits (counter)
         """
-        return sum([d.cache_hits for d in self.disks])
+        return sum([d.cache_hits for d in self.vdisks])
 
     def _cache_misses(self):
         """
         Loads the cache misses (counter)
         """
-        return sum([d.cache_misses for d in self.disks])
+        return sum([d.cache_misses for d in self.vdisks])
 
     def _read_operations(self):
         """
         Loads the read operations (counter)
         """
-        return sum([d.read_operations for d in self.disks])
+        return sum([d.read_operations for d in self.vdisks])
 
     def _write_operations(self):
         """
         Loads the write operations (counter)
         """
-        return sum([d.write_operations for d in self.disks])
+        return sum([d.write_operations for d in self.vdisks])
 
     def _bytes_read(self):
         """
         Loads the total of bytes read (counter)
         """
-        return sum([d.bytes_read for d in self.disks])
+        return sum([d.bytes_read for d in self.vdisks])
 
     def _bytes_written(self):
         """
         Loads the bytes written (counter)
         """
-        return sum([d.bytes_written for d in self.disks])
+        return sum([d.bytes_written for d in self.vdisks])
 
     def _backend_read_operations(self):
         """
         Loads the backend read operations (counter)
         """
-        return sum([d.backend_read_operations for d in self.disks])
+        return sum([d.backend_read_operations for d in self.vdisks])
 
     def _backend_write_operations(self):
         """
         Loads the backend write operations
         """
-        return sum([d.backend_write_operations for d in self.disks])
+        return sum([d.backend_write_operations for d in self.vdisks])
 
     def _backend_bytes_read(self):
         """
         Loads the bytes read (counter)
         """
-        return sum([d.backend_bytes_read for d in self.disks])
+        return sum([d.backend_bytes_read for d in self.vdisks])
 
     def _backend_bytes_written(self):
         """
         Loads the bytes written (counter)
         """
-        return sum([d.backend_bytes_written for d in self.disks])
+        return sum([d.backend_bytes_written for d in self.vdisks])
 
     def _stored_data(self):
         """
         Loads the stored data (counter)
         """
-        return sum([d.stored_data for d in self.disks])
+        return sum([d.stored_data for d in self.vdisks])
