@@ -126,7 +126,7 @@ class VMachineController(object):
         hv = Factory.get(vmachine.node)
         # Configure disks as Independent Non-persistent
         disks = map(lambda d: '[{0}] {1}/{2}'.format(d.vpool.name,
-                                                     d.machine.name,
+                                                     d.vmachine.name,
                                                      d.devicename), vmachine.disks)
         hv.set_as_template.s(hv, vmachine.vmid, disks, esxhost=None, wait=True)
 

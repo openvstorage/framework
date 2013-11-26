@@ -29,12 +29,12 @@ class VDisk(DataObject):
                   'tags':              ([],    list, 'Tags of the virtual disk'),
                   'has_autobackup':    (False, bool, 'Indicates whether this disk has autobackup'),
                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk')}
-    _relations = {'machine': (VMachine, 'disks'),
-                  'vpool':   (VPool,    'disks')}
+    _relations = {'vmachine': (VMachine, 'vdisks'),
+                  'vpool':    (VPool,    'vdisks')}
     _expiry = {'snapshots':               (60, list),
                'status':                  (30, str),
                'vsaid':                   (30, str),
-               'volumestoragerouterid':   (30, str),
+               'vsrid':                   (60, str),
                'cache_hits':               (5, int),
                'cache_misses':             (5, int),
                'read_operations':          (5, int),

@@ -3,6 +3,8 @@
 VolumeStorageRouter module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.vmachine import VMachine
 
 
 class VolumeStorageRouter(DataObject):
@@ -13,8 +15,10 @@ class VolumeStorageRouter(DataObject):
     _blueprint = {'name':        (None, str, 'Name of the VSR'),
                   'description': (None, str, 'Description of the VSR'),
                   'port':        (None, int, 'Port on which the VSR is listening'),
-                  'ip':          (None, str, 'IP address on which the VSR is listening')}
-    _relations = {}
+                  'ip':          (None, str, 'IP address on which the VSR is listening'),
+                  'vsrid':       (None, str, 'Internal volumedriver reference ID')}
+    _relations = {'vpool':            (VPool,    'vsrs'),
+                  'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':                  (30, str),
                'cache_hits':               (5, int),
                'cache_misses':             (5, int),

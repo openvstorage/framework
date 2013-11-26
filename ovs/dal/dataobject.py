@@ -350,7 +350,7 @@ class DataObject(object):
         object
         """
         if recursive:
-            # Save objects that point to us (e.g. disk.machine - if this is disk)
+            # Save objects that point to us (e.g. disk.vmachine - if this is disk)
             for attribute, default in self._relations.iteritems():
                 if attribute != skip:  # disks will be skipped
                     item = getattr(self, attribute)

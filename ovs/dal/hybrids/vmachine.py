@@ -18,7 +18,7 @@ class VMachine(DataObject):
                   'is_vtemplate': (True,  bool, 'Indicates whether this virtual machine is a template'),
                   'is_internal':  (False, bool, 'Indicates whether this virtual machine represents an internal machine'),
                   'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine')}
-    _relations = {}
+    _relations = {'pmachine': (PMachine, 'vmachines')}
     _expiry = {'snapshots':               (60, list),
                'status':                  (30, str),
                'vsaid':                   (30, str),

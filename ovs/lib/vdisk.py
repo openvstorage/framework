@@ -64,7 +64,7 @@ class VDiskController(object):
         disk.description = description
         disk.devicename = devicename
         disk.volumeid = volumeid
-        disk.machine = VMachine(machineguid) if machineguid else None
+        disk.vmachine = VMachine(machineguid) if machineguid else None
         disk.save()
         return kwargs
 
@@ -112,7 +112,7 @@ class VDiskController(object):
         new_disk.volumeid = volumeid
         new_disk.devicename = '%s.vmdk' % devicename
         new_disk.parentsnapshot = snapshotid
-        new_disk.machine = VMachine(machineguid) if machineguid else disk.machine
+        new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
         new_disk.save()
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': '{0}/{1}.vmdk'.format(location, devicename)}
