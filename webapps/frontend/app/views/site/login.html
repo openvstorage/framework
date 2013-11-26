@@ -1,0 +1,34 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section>
+    <h2 data-i18n="ovs:login.title"></h2>
+    <p data-i18n="ovs:login.introduction"></p>
+    <p>&nbsp;</p>
+    <form class="form-horizontal" data-bind="submit: login, visible: !loggedIn()">
+        <div class="form-group">
+            <label class="col-lg-1 control-label" for="inputUsername" data-i18n="ovs:generic.username"></label>
+            <div class="col-lg-2">
+                <input type="text" class="form-control" id="inputUsername"
+                       data-bind="value: username, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-1 control-label" for="inputPassword" data-i18n="ovs:generic.password"></label>
+            <div class="col-lg-2">
+                <input type="password" class="form-control" id="inputPassword"
+                       data-bind="value: password, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-lg-offset-1 col-lg-10" style="padding-top: 5px;">
+                <button type="submit" class="btn btn-primary" style="margin-top: -3px;" data-i18n="ovs:generic.signin"></button>
+                <span class="alert alert-danger"
+                      data-bind="visible: failed()" style="padding: 8px; margin-left: 15px;"
+                      data-i18n="ovs:login.invalidcredentials"></span>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-success" data-bind="visible: loggedIn()">
+      <h4><span data-i18n="ovs:generic.welcome"></span>, <span data-bind="text: username"></span></h4>
+      <p data-i18n="ovs:login.welcome"></p>
+    </div>
+</section>

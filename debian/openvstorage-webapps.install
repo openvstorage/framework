@@ -1,0 +1,5 @@
+webapps opt/OpenvStorage
+config/django/django_gunicorn_ovs.cfg.py opt/OpenvStorage/config
+config/django/api.cfg opt/OpenvStorage/config
+config/nginx/443.conf etc/nginx/sites-enabled
+config/supervisor/ovswebapps.conf etc/supervisor/conf.d

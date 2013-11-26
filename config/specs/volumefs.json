@@ -1,0 +1,59 @@
+{
+    "content_addressed_cache": {
+        "read_cache_serialization_path" : "/mnt/rsp",
+        "clustercache_mount_points": [
+            {
+                "path": "/mnt/cache/read1", 
+                "size": "UNLIMITED"
+            }
+        ]
+    }, 
+    "volume_manager": {
+        "metadata_path": "/mnt/metadata", 
+        "clean_interval": 1, 
+        "tlog_path": "/mnt/tlogs",
+        "foc_throttle_usecs": 4000
+    }, 
+    "scocache": {
+        "backoff_gap": "2GB",
+        "trigger_gap": "1GB", 
+        "scocache_mount_points": [
+            {
+                "path": "/mnt/cache/sco1",
+                "size": "UNLIMITED"
+            }
+        ]
+    }, 
+    "backend_connection_manager": {
+        "backend_type": "LOCAL",
+        "local_connection_path": "/mnt/bfs"
+    },
+    "filesystem": {
+        "fs_xmlrpc_port" : "12323",
+        "fs_ignore_sync": "false",
+        "fs_arakoon_cluster_id" : "voldrv",
+        "fs_arakoon_cluster_nodes": [
+            { "node_id" : "voldrv1",
+              "host" : "127.0.0.1",
+              "port" : "8872"
+            }
+        ],
+        "fs_policy_id" : "17427d6ab4c84687b47a596498213336",
+        "fs_namespace" : "volumedriverfs",
+        "fs_cache_path" : "/mnt/vfs_src",
+        "fs_volume_regex" : ".*-flat.vmdk",
+        "vrouter_policy_id" : "17427d6ab4c84687b47a596498213336"
+    },
+    "volume_router": {
+        "vrouter_arakoon_cluster_id" : "voldrv",
+        "vrouter_arakoon_cluster_nodes": [{"node_id" : "voldrv1",
+                                           "host" : "127.0.0.1",
+                                           "port" : "8872"}],
+        "vrouter_redirect_timeout_ms" : "5000",
+        "vrouter_migrate_timeout_ms" : "5000",
+        "vrouter_remote_host" : "",
+        "vrouter_remote_port" : "12321",
+        "vrouter_local_port" : "12321",
+        "write_threshold" : 1024
+    }
+}
