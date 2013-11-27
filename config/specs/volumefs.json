@@ -29,6 +29,7 @@
         "local_connection_path": "/mnt/bfs"
     },
     "filesystem": {
+        "fs_backend_path" : "/mnt/dfs",
         "fs_xmlrpc_port" : "12323",
         "fs_ignore_sync": "false",
         "fs_arakoon_cluster_id" : "voldrv",

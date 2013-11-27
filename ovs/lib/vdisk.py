@@ -9,7 +9,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
-vsrClient = VolumeStorageRouterClient().load()
+vsr_client = VolumeStorageRouterClient().load()
 
 
 class VDiskController(object):
@@ -18,24 +18,12 @@ class VDiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.listVolumes')
+    @celery.task(name='ovs.disk.list_volumes')
     def list_volumes():
         """
         List all known volumes
         """
-        response = vsrClient.list_volumes()
-        return response
-
-    @staticmethod
-    @celery.task(name='ovs.disk.getInfo')
-    def get_info(diskguid, **kwargs):
-        """
-        Get info from a specific disk
-
-        @param diskguid: Guid of the disk
-        """
-        _ = kwargs
-        response = vsrClient.info(diskguid)
+        response = vsr_client.list_volumes()
         return response
 
     @staticmethod
@@ -55,16 +43,16 @@ class VDiskController(object):
         @param machineguid: guid of the machine to assign the disk to
         """
         name = name if name else devicename
-        description = '{0} {1}'.format(location, name)
-        volumeid = vsrClient.create_volume(targetPath='{0}/{1}'.format(location, devicename),
-                                           volumeSize='%sMiB' % size,
-                                           scoMultiplier=1024)
+        description = '{} {}'.format(location, name)
+        volumeid = vsr_client.create_volume(targetPath='{}/{}'.format(location, devicename),
+                                    volumeSize='{}MiB'.format(size),
+                                    scoMultiplier=1024)
         disk = VDisk()
         disk.name = name
         disk.description = description
         disk.devicename = devicename
         disk.volumeid = volumeid
-        disk.vmachine = VMachine(machineguid) if machineguid else None
+        disk.machine = VMachine(machineguid) if machineguid else None
         disk.save()
         return kwargs
 
@@ -77,7 +65,7 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         disk = VDisk(diskguid)
-        logging.info('Delete disk %s' % disk.name)
+        logging.info('Delete disk {}'.format(disk.name))
         disk.delete()
         return kwargs
 
@@ -94,31 +82,34 @@ class VDiskController(object):
         @param machineguid: guid of the machine to assign disk to
         """
         _ = kwargs
-        description = '{0} {1}'.format(location, devicename)
+        description = '{} {}'.format(location, devicename)
         properties_to_clone = ['description', 'size', 'type', 'retentionpolicyguid',
                              'snapshotpolicyguid', 'autobackup', 'machine']
 
         new_disk = VDisk()
         disk = VDisk(diskguid)
-        logging.info('Clone snapshot %s of disk %s' % (snapshotid, disk.name))
-        volumeid = vsrClient.create_clone('{0}/{1}'.format(location, '%s-flat.vmdk' % devicename),
-                                          disk.volumeid, snapshotid)
+        _log = 'Clone snapshot {} of disk {} to location {}'
+        _location = '{}/{}-flat.vmdk'.format(location, devicename)
+        _id = '{}'.format(disk.volumeid)
+        _snap = '{}'.format(snapshotid)
+        logging.info(_log.format(_snap, disk.name, _location))
+        volumeid = vsr_client.create_clone(_location, _id, _snap)
         for item in properties_to_clone:
             setattr(new_disk, item, getattr(disk, item))
         disk.children.append(new_disk.guid)
         disk.save()
-        new_disk.name = '%s-clone' % disk.name
+        new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
         new_disk.volumeid = volumeid
-        new_disk.devicename = '%s.vmdk' % devicename
+        new_disk.devicename = '{}.vmdk'.format(devicename)
         new_disk.parentsnapshot = snapshotid
-        new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
+        new_disk.machine = VMachine(machineguid) if machineguid else disk.machine
         new_disk.save()
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
-                'backingdevice': '{0}/{1}.vmdk'.format(location, devicename)}
+                'backingdevice': '{}/{}.vmdk'.format(location, devicename)}
 
     @staticmethod
-    @celery.task(name='ovs.disk.createSnapshot')
+    @celery.task(name='ovs.disk.create_snapshot')
     def create_snapshot(diskguid, **kwargs):
         """
         Create a disk snapshot
@@ -126,15 +117,16 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         disk = VDisk(diskguid)
-        logging.info('Create snapshot for disk %s' % disk.name)
+        _id = '{}'.format(disk.volumeid)
+        logging.info('Create snapshot for disk {}'.format(disk.name))
         #if not srClient.canTakeSnapshot(diskguid):
-        #    raise ValueError('Volume %s not found'%diskguid)
-        snapshotguid = vsrClient.create_snapshot(disk.volumeid)
+        #    raise ValueError('Volume {} not found'.format(diskguid))
+        snapshotguid = vsr_client.create_snapshot(_id)
         kwargs['result'] = snapshotguid
         return kwargs
 
     @staticmethod
-    @celery.task(name='ovs.disk.deleteSnapshot')
+    @celery.task(name='ovs.disk.delete_snapshot')
     def delete_snapshot(diskguid, snapshotid, **kwargs):
         """
         Delete a disk snapshot
@@ -146,6 +138,7 @@ class VDiskController(object):
         to block it from being deleted if a clone was created from it.
         """
         disk = VDisk(diskguid)
-        logging.info('Deleting snapshot %s from disk %s' % (snapshotid, diskguid))
-        vsrClient.snapShotDestroy(disk.volumeid, snapshotid)
+        _snap = '{}'.format(snapshotid)
+        logging.info('Deleting snapshot {} from disk {}'.format(_snap, diskguid))
+        vsr_client.destroy_snapshot(disk.volumeid, _snap)
         return kwargs

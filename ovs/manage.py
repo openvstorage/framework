@@ -52,7 +52,7 @@ class Configure():
                ovsCoreSupervisorConfig['group:ovscore']['programs'].insert(0, programName)
             ovsCoreSupervisorConfig.write()
 
-    def volumedriver(self, cache='/mnt/cache', backendfs='/mnt/bfs', rspath='/var/rsp', fscpath='/var/fsc', mdpath='/mnt/md', ):
+    def volumedriver(self, cache='/mnt/cache', dfspath='/mnt/dfs', backendfs='/mnt/bfs', rspath='/var/rsp', fscpath='/var/fsc', mdpath='/mnt/md', ):
         """
         Configure NFS Volumedriver
         1. Create JSON file for volumedriver
@@ -89,6 +89,7 @@ class Configure():
         j['backend_connection_manager']['local_connection_path'] = backendfs
         j['content_addressed_cache']['read_cache_serialization_path'] = rspath
         j['filesystem']['fs_cache_path'] = fscpath
+        j['filesystem']['fs_backend_path'] = dfspath
         j['volume_manager']['metadata_path'] = metadatapath
         j['volume_manager']['tlog_path'] = tlogpath
         j['content_addressed_cache']['clustercache_mount_points'][0]['path'] = readcache
