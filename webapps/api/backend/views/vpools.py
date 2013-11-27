@@ -59,7 +59,7 @@ class VPoolViewSet(viewsets.ViewSet):
             vpool = VPool(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(len(vpool.disks), status=status.HTTP_200_OK)
+        return Response(len(vpool.vdisks), status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True, customer=True)
@@ -76,7 +76,7 @@ class VPoolViewSet(viewsets.ViewSet):
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
         vmachine_guids = []
-        for disk in vpool.disks:
+        for disk in vpool.vdisks:
             if disk.vmachine.guid not in vmachine_guids:
                 vmachine_guids.append(disk.vmachine.guid)
         return Response(len(vmachine_guids), status=status.HTTP_200_OK)
