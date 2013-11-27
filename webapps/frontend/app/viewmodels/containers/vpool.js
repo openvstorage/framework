@@ -47,21 +47,22 @@ define([
                             generic.xhrAbort(self.loadHandle);
                             self.loadHandle = api.get('vpools/' + self.guid())
                                 .done(function(data) {
-                                    var type = '',
-                                        cache_tries = data.cache_hits + data.cache_misses,
-                                        cache_ratio = cache_tries / (data.cache_hits !== 0 ? data.cache_hits : 1) * 100;
+                                    var type = '', stats = data.statistics,
+                                        cache_hits = stats.sco_cache_hits + stats.cluster_cache_hits,
+                                        cache_tries = cache_hits + stats.sco_cache_misses,
+                                        cache_ratio = cache_hits / (cache_tries !== 0 ? cache_tries : 1) * 100;
                                     if (data.backend_type) {
                                         type = $.t('ovs:vpools.backendtypes.' + data.backend_type);
                                     }
                                     self.name(data.name);
-                                    self.iops(data.write_operations + data.read_operations);
+                                    self.iops(stats.write_operations + stats.read_operations);
                                     self.size(data.size);
                                     self.storedData(data.stored_data);
                                     self.cache(cache_ratio);
-                                    self.readSpeed(data.bytes_read);
-                                    self.writeSpeed(data.bytes_written);
-                                    self.backendReadSpeed(data.backend_bytes_read);
-                                    self.backendWriteSpeed(data.backend_bytes_written);
+                                    self.readSpeed(stats.data_read);
+                                    self.writeSpeed(stats.data_written);
+                                    self.backendReadSpeed(stats.backend_data_read);
+                                    self.backendWriteSpeed(stats.backend_data_written);
                                     self.backendType(type);
                                     self.backendConnection(data.backend_connection);
                                     self.backendLogin(data.backend_login);

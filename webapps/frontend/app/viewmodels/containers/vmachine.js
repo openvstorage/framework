@@ -55,14 +55,16 @@ define([
                             generic.xhrAbort(self.loadHandle);
                             self.loadHandle = api.get('vmachines/' + self.guid())
                                 .done(function(data) {
-                                    var cache_tries = data.cache_hits + data.cache_misses,
-                                        cache_ratio = cache_tries / (data.cache_hits !== 0 ? data.cache_hits : 1) * 100;
+                                    var stats = data.statistics,
+                                        cache_hits = stats.sco_cache_hits + stats.cluster_cache_hits,
+                                        cache_tries = cache_hits + stats.sco_cache_misses,
+                                        cache_ratio = cache_hits / (cache_tries !== 0 ? cache_tries : 1) * 100;
                                     self.name(data.name);
-                                    self.iops(data.write_operations + data.read_operations);
+                                    self.iops(stats.write_operations + stats.read_operations);
                                     self.storedData(data.stored_data);
                                     self.cache(cache_ratio);
-                                    self.readSpeed(data.bytes_read);
-                                    self.writeSpeed(data.bytes_written);
+                                    self.readSpeed(stats.data_read);
+                                    self.writeSpeed(stats.data_written);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

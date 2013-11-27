@@ -31,22 +31,26 @@ class VDisk(DataObject):
                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the virtual disk')}
     _relations = {'vmachine': (VMachine, 'vdisks'),
                   'vpool':    (VPool,    'vdisks')}
-    _expiry = {
-               'info':                    (60, dict),
-               'statistics':              (60, dict),
-               'vsrid':                   (60, str),
-               }
+    _expiry = {'snapshots':  (60, list),
+               'info':       (60, dict),
+               'statistics':  (5, dict),
+               'vsrid':      (60, str)}
     # pylint: enable=line-too-long
+
+    def _snapshots(self):
+        """
+        Fetches a list of snapshots for this virtual disk
+        """
+        if not self.volumeid:
+            return []
+        return _vsr_client.list_snapShots(str(self.volumeid))
 
     def _info(self):
         """
         Fetches the info for this volume and converts it to a dict
         """
-        _ = self
-
         if self.volumeid:
-            _id = "{}".format(self.volumeid)
-            vdiskinfo = _vsr_client.info_volume(_id)
+            vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
             vdiskinfodict = dict()
 
             for infoattribute in dir(vdiskinfo):
@@ -61,11 +65,8 @@ class VDisk(DataObject):
         """
         Fetches the statistics for this volume and converts it to a dict
         """
-        _ = self
-
         if self.volumeid:
-            _id = "{}".format(self.volumeid)
-            vdiskstats = _vsr_client.statistics_volume(_id)
+            vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
             vdiskstatsdict = dict()
 
             for statsattribute in dir(vdiskstats):

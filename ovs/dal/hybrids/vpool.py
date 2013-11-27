@@ -18,18 +18,9 @@ class VPool(DataObject):
                   'backend_connection': (None, str, 'Connection for the backend'),
                   'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the backend')}
     _relations = {}
-    _expiry = {'status':                  (10, str),
-               'cache_hits':               (5, int),
-               'cache_misses':             (5, int),
-               'read_operations':          (5, int),
-               'write_operations':         (5, int),
-               'bytes_read':               (5, int),
-               'bytes_written':            (5, int),
-               'backend_read_operations':  (5, int),
-               'backend_write_operations': (5, int),
-               'backend_bytes_read':       (5, int),
-               'backend_bytes_written':    (5, int),
-               'stored_data':              (5, int)}
+    _expiry = {'status':      (10, str),
+               'statistics':   (5, dict),
+               'stored_data': (60, int)}
     # pylint: enable=line-too-long
 
     def _status(self):
@@ -39,68 +30,19 @@ class VPool(DataObject):
         _ = self
         return None
 
-    def _cache_hits(self):
+    def _statistics(self):
         """
-        Loads the cache hits (counter)
+        Agregates the statistics for this vpool
         """
-        return sum([d.cache_hits for d in self.vdisks])
-
-    def _cache_misses(self):
-        """
-        Loads the cache misses (counter)
-        """
-        return sum([d.cache_misses for d in self.vdisks])
-
-    def _read_operations(self):
-        """
-        Loads the read operations (counter)
-        """
-        return sum([d.read_operations for d in self.vdisks])
-
-    def _write_operations(self):
-        """
-        Loads the write operations (counter)
-        """
-        return sum([d.write_operations for d in self.vdisks])
-
-    def _bytes_read(self):
-        """
-        Loads the total of bytes read (counter)
-        """
-        return sum([d.bytes_read for d in self.vdisks])
-
-    def _bytes_written(self):
-        """
-        Loads the bytes written (counter)
-        """
-        return sum([d.bytes_written for d in self.vdisks])
-
-    def _backend_read_operations(self):
-        """
-        Loads the backend read operations (counter)
-        """
-        return sum([d.backend_read_operations for d in self.vdisks])
-
-    def _backend_write_operations(self):
-        """
-        Loads the backend write operations
-        """
-        return sum([d.backend_write_operations for d in self.vdisks])
-
-    def _backend_bytes_read(self):
-        """
-        Loads the bytes read (counter)
-        """
-        return sum([d.backend_bytes_read for d in self.vdisks])
-
-    def _backend_bytes_written(self):
-        """
-        Loads the bytes written (counter)
-        """
-        return sum([d.backend_bytes_written for d in self.vdisks])
+        data = dict()
+        for disk in self.vdisks:
+            statistics = disk.statistics
+            for key, value in statistics.iteritems():
+                data[key] = data.get(key, 0) + value
+        return data
 
     def _stored_data(self):
         """
-        Loads the stored data (counter)
+        Agregates the stored data for this vpool
         """
-        return sum([d.stored_data for d in self.vdisks])
+        return sum([disk.info['stored'] for disk in self.vdisks])
