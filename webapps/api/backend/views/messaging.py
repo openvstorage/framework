@@ -3,6 +3,7 @@
 Contains the MessageViewSet
 """
 import time
+import gevent
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -39,6 +40,22 @@ class MessagingViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.subscriptions(pk), status=status.HTTP_200_OK)
 
+    @staticmethod
+    def _wait(subscriber_id, message_id):
+        messages = []
+        last_message_id = 0
+        counter = 0
+        while len(messages) == 0:
+            messages, last_message_id = MessageController.get_messages(subscriber_id, message_id)
+            if len(messages) == 0:
+                counter += 1
+                if counter >= 240:
+                    break
+                gevent.sleep(.5)
+        if len(messages) == 0:
+            last_message_id = MessageController.last_message_id()
+        return messages, last_message_id
+
     @link()
     @expose(internal=True)
     @required_roles(['view'])
@@ -52,18 +69,9 @@ class MessagingViewSet(viewsets.ViewSet):
             message_id = int(self.request.QUERY_PARAMS.get('message_id', None))
         except (ValueError, TypeError):
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        messages = []
-        last_message_id = 0
-        counter = 0
-        while len(messages) == 0:
-            messages, last_message_id = MessageController.get_messages(pk, message_id)
-            if len(messages) == 0:
-                counter += 1
-                if counter >= 240:
-                    break
-                time.sleep(.5)
-        if len(messages) == 0:
-            last_message_id = MessageController.last_message_id()
+        thread = gevent.spawn(MessagingViewSet._wait, pk, message_id)
+        gevent.joinall([thread])
+        messages, last_message_id = thread.value
         return Response({'messages'       : messages,
                          'last_message_id': last_message_id,
                          'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)

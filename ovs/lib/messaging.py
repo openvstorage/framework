@@ -5,6 +5,7 @@ Messaging module
 from celery.signals import task_postrun
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.generic.filemutex import FileMutex
 
 _cache = VolatileFactory.get_client()
 
@@ -21,12 +22,15 @@ def synchronized():
             """
             Executes the decorated function in a locked context
             """
+            filemutex = FileMutex('messaging')
+            filemutex.acquire(wait=5)
             mutex = VolatileMutex('messaging')
-            mutex.acquire()
+            mutex.acquire(wait=5)
             try:
                 return f(*args, **kw)
             finally:
                 mutex.release()
+                filemutex.release()
         return new_function
     return wrap
 

@@ -30,6 +30,7 @@ class VolatileMutex(object):
             return True
         self._start = time.time()
         while not self._volatile.add(self.key(), 1, 60):
+            time.sleep(0.005)
             passed = time.time() - self._start
             if wait is not None and passed > wait:
                 raise RuntimeError('Could not aquire lock %s' % self.key())
