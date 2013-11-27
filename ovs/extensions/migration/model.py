@@ -7,7 +7,7 @@ import hashlib
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.role import Role
-from ovs.dal.hybrids.rolegroup import RoleGroup
+from ovs.dal.hybrids.j_rolegroup import RoleGroup
 
 
 class Model():
