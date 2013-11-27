@@ -2,21 +2,28 @@
 """
 Contains the process method for processing rabbitmq messages
 """
-import json
 
+from ovs.lib.vdisk import VDiskController
 
 def process(queue, body):
     """
     Processes the actual received body
     """
     if queue == 'voldrv_queue':
-        data = json.loads(body)
-        if 'task' not in data or 'data' not in data:
-            raise RuntimeError('Invalid data received')
+        import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
+        vdmsg = EventMessages.EventMessage()
+        data = vdmsg.FromString(body)
+        print "\ntype:{}\nstring:{}\ntypeofdata:{}\nfields:\n{}\n".format(vdmsg.type, data, type(data), data.ListFields())
+        
+        if isinstance(data, vdmsg.VolumeCreate):
+            _name = data.volume_create.name
+            _size = data.volume_create.size
+            _path = data.volume_create.path
 
-        if data['task'] == 'ovs.volume.created':
-            print '... creating volume with data: %s' % data['data']
+            VDiskController._create(_path, _name, _size)
+
+            print '[voldrv_queue] Created Volume {} Size {} location {}'.format(_name, _size, _path) 
         else:
             raise RuntimeError('Invalid task specified')
     else:
-        raise NotImplementedError('Queue %s is not yet implemented' % queue)
+        raise NotImplementedError('Queue {} is not yet implemented'.format(queue))

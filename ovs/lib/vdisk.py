@@ -27,8 +27,8 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    @celery.task(name='ovs.disk.create')
-    def create(location, devicename, size, name=None, machineguid=None, **kwargs):
+    @celery.task(name='ovs.disk.new_volume')
+    def new_volume(location, devicename, size, name=None, machineguid=None, **kwargs):
         """
         Create a new disk
 
@@ -54,6 +54,24 @@ class VDiskController(object):
         disk.volumeid = volumeid
         disk.machine = VMachine(machineguid) if machineguid else None
         disk.save()
+        return kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk._create')
+    def _create(volumepath, volumename, volumesize, **kwargs):
+        """
+        Adds an existing volume to the disk model
+        Called by volumedriver queue messages
+         - VDiskController._create(_path, _name, _size)
+
+        """
+
+        disk = VDisk()
+        disk.devicename = volumepath
+        disk.volumeid = volumename
+        disk.size = volumesize
+        disk.save()
+
         return kwargs
 
     @staticmethod
