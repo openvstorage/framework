@@ -26,7 +26,7 @@ class VMachineController(object):
         _ = kwargs
         machine = VMachine(machineguid)
         tasks = []
-        for disk in machine.disks:
+        for disk in machine.vdisks:
             t = VDiskController.create_snapshot.s(diskguid = disk.guid)
             t.link_error(VDiskController.delete_snapshot.s())
             tasks.append(t)
@@ -55,7 +55,7 @@ class VMachineController(object):
         new_machine.save()
 
         disk_tasks = []
-        disks_by_order = sorted(machine.disks, key=lambda x: x.order)
+        disks_by_order = sorted(machine.vdisks, key=lambda x: x.order)
         for currentDisk in disks_by_order:
             if machine.template and currentDisk.templatesnapshot:
                 snapshotid = currentDisk.templatesnapshot
@@ -106,7 +106,7 @@ class VMachineController(object):
         async_result = delete_vmachine_task()
         async_result.wait()
         if async_result.successful():
-            for disk in machine.disks:
+            for disk in machine.vdisks:
                 disk.delete()
             machine.delete()
 
@@ -127,7 +127,7 @@ class VMachineController(object):
         # Configure disks as Independent Non-persistent
         disks = map(lambda d: '[{0}] {1}/{2}'.format(d.vpool.name,
                                                      d.vmachine.name,
-                                                     d.devicename), vmachine.disks)
+                                                     d.devicename), vmachine.vdisks)
         hv.set_as_template.s(hv, vmachine.vmid, disks, esxhost=None, wait=True)
 
         # Do some magic on the storage layer?
@@ -141,7 +141,7 @@ class VMachineController(object):
         # Save templatesnapshot to each relevant disk
         vmachine.template = True
         disks_not_in_template = []
-        for disk in vmachine.disks:
+        for disk in vmachine.vdisks:
             if disk.guid in snapshots.keys():
                 disk.templatesnapshot = snapshots[disk.guid]
                 disk.save()

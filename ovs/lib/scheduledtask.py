@@ -24,7 +24,7 @@ class ScheduledTaskController(object):
         tasks = []
         machines = VMachineList.get_vmachines()
         for machine in machines:
-            for disk in machine.disks:
+            for disk in machine.vdisks:
                 task = VDiskController.create_snapshot.s(diskguid=disk.guid)
                 task.link_error(VDiskController.delete_snapshot.s())
                 tasks.append(task)
