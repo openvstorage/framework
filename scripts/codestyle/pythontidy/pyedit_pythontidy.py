@@ -1,8 +1,8 @@
 # license see http://www.openvstorage.com/licenses/opensource/
 
 """
-PyDev script to trigger autopep8 code formatting on demand
-by pressing CTRL + 2 and p8
+PyDev script to trigger pythontidy code formatting on demand
+by pressing CTRL + 2 and pt
 """
 
 import tempfile
@@ -13,13 +13,13 @@ if False:
     cmd = 'command string'
     editor = PyEdit
 
-SCRIPT = '/usr/local/bin/autopep8'
+SCRIPT = '/usr/local/bin/PythonTidy'
 
-ACTIVATION_STRING = 'p8'
+ACTIVATION_STRING = 'pt'
 WAIT_FOR_ENTER = False
 
 
-class Autopep8Wrapper(object):
+class PythonTidyWrapper(object):
 
     """
     Provides automatic code formatting based on pep8
@@ -31,16 +31,14 @@ class Autopep8Wrapper(object):
 
     def get_filename(self):
         """return editor filename"""
-
         return self.filename
 
     def get_document(self):
         """return editor document"""
-
         return self.document
 
     def parse(self):
-        """format source file using external Autopep8 command"""
+        """format source file using external PythonTidy command"""
 
         if not self.document.getNumberOfLines():
             print 'skipping empty source file'
@@ -55,7 +53,7 @@ class Autopep8Wrapper(object):
             input_file.flush()
             input_file.close()
 
-            os.system(SCRIPT + ' %s > %s' % (tmp_input_file,
+            os.system(SCRIPT + ' %s %s' % (tmp_input_file,
                       tmp_output_file))
 
             output_file = open(tmp_output_file, 'r')
@@ -74,8 +72,7 @@ class Autopep8Wrapper(object):
 
 if cmd == 'onCreateActions':
 
-
-    class Autopep8(Action):
+    class PythonTidy(Action):
 
         def __init__(self):
             pass
@@ -83,10 +80,9 @@ if cmd == 'onCreateActions':
         def run(self):
             """eclipse action entry point for code formatting"""
 
-            formatter = Autopep8Wrapper()
+            formatter = PythonTidyWrapper()
             formatter.parse()
 
-
-    editor.addOfflineActionListener(ACTIVATION_STRING, Autopep8(),
-                                    'Format code using autopep8',
+    editor.addOfflineActionListener(ACTIVATION_STRING, PythonTidy(),
+                                    'Format code using pythontidy',
                                     WAIT_FOR_ENTER)
