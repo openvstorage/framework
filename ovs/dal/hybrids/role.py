@@ -9,7 +9,6 @@ class Role(DataObject):
     """
     The Role class represents a Role. A Role is used to allow execution of a certain set of
     actions. E.g. a "Viewer" Role can view all data but has no update/write permission.
-    the data
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':        (None, str, 'Name of the Role'),

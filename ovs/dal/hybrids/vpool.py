@@ -8,7 +8,7 @@ from ovs.dal.dataobject import DataObject
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to 
-	deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend.
+    deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':               (None, str, 'Name of the vPool.'),
@@ -28,7 +28,7 @@ class VPool(DataObject):
         """
         Fetches the Status of the vPool.
         @return: dict
-		"""
+        """
         _ = self
         return None
 
@@ -36,7 +36,7 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         @return: dict
-		"""
+        """
         data = dict()
         for disk in self.vdisks:
             statistics = disk.statistics
@@ -47,5 +47,6 @@ class VPool(DataObject):
     def _stored_data(self):
         """
         Aggregates the Stored Data of each vDisk served by the vPool.
+        @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])

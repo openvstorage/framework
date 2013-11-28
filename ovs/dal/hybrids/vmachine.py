@@ -8,7 +8,8 @@ from ovs.dal.hybrids.pmachine import PMachine
 
 class VMachine(DataObject):
     """
-    The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks or a Virtual Machine running the Open vStorage software.
+    The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks 
+    or a Virtual Machine running the Open vStorage software.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
@@ -27,7 +28,7 @@ class VMachine(DataObject):
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vMachine.
-		@return: list
+        @return: list
         """
         _ = self
         return None
@@ -35,7 +36,7 @@ class VMachine(DataObject):
     def _status(self):
         """
         Fetches the Status of the vMachine.
-		@return: dict
+        @return: dict
         """
         _ = self
         return None
@@ -43,7 +44,7 @@ class VMachine(DataObject):
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
-		@return: dict
+        @return: dict
         """
         data = dict()
         for disk in self.vdisks:
@@ -55,6 +56,6 @@ class VMachine(DataObject):
     def _stored_data(self):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
-		@return: long
+        @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])

@@ -10,7 +10,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 class VolumeStorageRouter(DataObject):
     """
     The VolumeStorageRouter class represents a Volume Storage Router (VSR). A VSR is an application
-	on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
+    on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':        (None, str, 'Name of the VSR.'),
@@ -28,7 +28,7 @@ class VolumeStorageRouter(DataObject):
     def _status(self):
         """
         Fetches the Status of the VSR.
-		@return: dict
+        @return: dict
         """
         _ = self
         return None
@@ -36,7 +36,7 @@ class VolumeStorageRouter(DataObject):
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
-		@return: dict
+        @return: dict
         """
         data = dict()
         if self.vpool is not None:
@@ -50,9 +50,8 @@ class VolumeStorageRouter(DataObject):
     def _stored_data(self):
         """
         Agregates the Stored Data in Bytes of the vDisks connected to the VSR.
-		@return: long
+        @return: int
         """
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
         return 0
-
