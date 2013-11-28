@@ -18,7 +18,7 @@ class VDisk(DataObject):
     # pylint: disable=line-too-long
     _blueprint = {'name':              (None,   str,  'Name of the virtual disk'),
                   'description':       (None,   str,  'Description of the virtual disk'),
-                  'size':              (0,      int,  'Size of the virtual disk'),
+                  'size':              (0,      long,  'Size of the virtual disk'),
                   'devicename':        (None,   str,  'The name of the container file backing the vDisk'),
                   'order':             (None,   int,  'Order of the virtual disk in which they are attached'),
                   'volumeid':          (None,   str,  'Volume ID representing the virtual disk'),
@@ -49,6 +49,7 @@ class VDisk(DataObject):
         """
         Fetches the info for this volume and converts it to a dict
         """
+        _ = self
         if self.volumeid:
             vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
             vdiskinfodict = dict()
@@ -65,6 +66,7 @@ class VDisk(DataObject):
         """
         Fetches the statistics for this volume and converts it to a dict
         """
+        _ = self
         if self.volumeid:
             vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
             vdiskstatsdict = dict()

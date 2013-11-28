@@ -9,6 +9,7 @@ import uuid
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 vsr_client = VolumeStorageRouterClient().load()
@@ -66,9 +67,11 @@ class VDiskController(object):
     def _create(volumepath, volumename, volumesize, **kwargs):
         """
         Adds an existing volume to the disk model
-        Called by volumedriver queue messages
-         - VDiskController._create(_path, _name, _size)
+        Triggered by volumedriver messages on the queue
 
+        @param volumepath: path on hypervisor to the volume
+        @param volumename: volume id of the disk
+        @param volumesize: size of the volume
         """
 
         disk = VDisk()
@@ -81,15 +84,58 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.delete')
-    def delete(diskguid, **kwargs):
+    def _delete(volumepath, volumename, **kwargs):
         """
         Delete a disk
+        Triggered by volumedriver messages on the queue
 
-        @param diskguid: guid of the disk
+        @param volumepath: path on hypervisor to the volume
+        @param volumename: volume id of the disk
+        TODO: as there are multiple delete paths create a tag object
+              with an identifier to lock out multiple delete actions
+              on the same disk
         """
-        disk = VDisk(diskguid)
+
+        disk = VDiskList.get_vdisk_by_volumeid(volumename)
+        if disk is not None:
+            logging.info('Delete disk {}'.format(disk.name))
+            disk.delete()
+        return kwargs
+
+
+    @staticmethod
+    @celery.task(name='ovs.disk.resize')
+    def resize(volumepath, volumename, volumesize, **kwargs):
+        """
+        Resize a disk
+        Triggered by volumedriver messages on the queue
+
+        @param volumepath: path on hypervisor to the volume
+        @param volumename: volume id of the disk
+        @param volumesize: size of the volume
+        """
+
+        disk = VDiskList.get_vdisk_by_volumeid(volumename)
         logging.info('Delete disk {}'.format(disk.name))
-        disk.delete()
+        disk.size = volumesize
+        disk.save()
+        return kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk.rename')
+    def rename(volumename, volume_old_path, volume_new_path, **kwargs):
+        """
+        Delete a disk
+        Triggered by volumedriver messages
+
+        @param volumename: volume id of the disk
+        @param volume_old_path: old path on hypervisor to the volume
+        @param volume_new_path: new path on hypervisor to the volume
+        """
+        disk = VDiskList.get_vdisk_by_volumeid(volumename)
+        logging.info('Delete disk {}'.format(disk.name))
+        disk.devicename = volume_new_path
+        disk.save()
         return kwargs
 
     @staticmethod

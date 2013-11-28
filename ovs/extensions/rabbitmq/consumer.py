@@ -4,11 +4,11 @@
 Consumes messages from rabbitmq, dispatching them to the process method and acknowledges them
 """
 import pika
-import logging
+# import logging
 import sys
 from ovs.extensions.rabbitmq.processor import process
 
-logging.basicConfig(level='ERROR')
+# logging.basicConfig(level='ERROR')
 
 
 def callback(ch, method, properties, body):
@@ -33,4 +33,7 @@ if __name__ == '__main__':
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(callback, queue=queue)
 
-    channel.start_consuming()
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        sys.exit('Exiting consumption of rabbitmq queue {}'.format(queue))
