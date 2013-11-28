@@ -11,15 +11,15 @@ def process(queue, body):
     """
     if queue == 'voldrv_queue':
         import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
-        vdmsg = EventMessages.EventMessage()
-        data = vdmsg.FromString(body)
+        volumedrivermessage = EventMessages.EventMessage()
+        data = volumedrivermessage.FromString(body)
         
         if data.type == EventMessages.EventMessage.VolumeCreate:
             _name = data.volume_create.name
             _size = data.volume_create.size
             _path = data.volume_create.path
 
-            VDiskController._create(_path, _name, _size)
+            VDiskController._create.s(_path, _name, _size).apply_async()
 
             print '[voldrv_queue] Created Volume {} Size {} location {}'.format(_name, _size, _path) 
 
@@ -27,7 +27,7 @@ def process(queue, body):
             _name = data.volume_delete.name
             _path = data.volume_delete.path
 
-            VDiskController._delete(_path, _name)
+            VDiskController._delete.s(_path, _name).apply_async()
 
             print '[voldrv_queue] Deleted Volume {} location {}'.format(_name, _path) 
 
@@ -36,7 +36,7 @@ def process(queue, body):
             _size = data.volume_resize.size
             _path = data.volume_resize.path
 
-            VDiskController.resize(_path, _name, _size)
+            VDiskController.resize.s(_path, _name, _size).apply_async()
 
             print '[voldrv_queue] Resized Volume {} location {} to size {}'.format(_name, _path, _size)
 
@@ -45,7 +45,7 @@ def process(queue, body):
             _old_path = data.volume_rename.old_path
             _new_path = data.volume_rename.new_path
 
-            VDiskController.rename(_name, _old_path, _new_path)
+            VDiskController.rename.s(_name, _old_path, _new_path).apply_async()
 
             print '[voldrv_queue] Renamed Volume {} from location {} to location {}'.format(_name, _old_path, _new_path)
         else:

@@ -30,7 +30,7 @@ class VDiskList(object):
         Returns a list of all VDisks based on a given volumeid
         """
         # pylint: disable=line-too-long
-        vdisks = DataList(key='volumeid',
+        vdisks = DataList(key='volumeid_{}'.format(volumeid),
                           query={'object': VDisk,
                                  'data': DataList.select.DESCRIPTOR,
                                  'query': {'type': DataList.where_operator.AND,

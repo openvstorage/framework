@@ -4,11 +4,11 @@
 Consumes messages from rabbitmq, dispatching them to the process method and acknowledges them
 """
 import pika
-# import logging
+import logging
 import sys
 from ovs.extensions.rabbitmq.processor import process
 
-# logging.basicConfig(level='ERROR')
+logging.basicConfig(level='ERROR')
 
 
 def callback(ch, method, properties, body):
