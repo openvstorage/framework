@@ -12,7 +12,7 @@ _vsr_client = VolumeStorageRouterClient().load()
 
 class VDisk(DataObject):
     """
-    The VDisk class represents a virtual disk that can be used by virtual machines. It has
+    The VDisk class represents a vDisk that can be used by vMachines. It has
     a one-to-one link with the volumedriver which is responsible for that particular volume
     """
     # pylint: disable=line-too-long
