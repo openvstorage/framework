@@ -26,7 +26,9 @@ celery.conf.CELERYBEAT_SCHEDULE = {
     # > Executes every weekday between 2 and 22 hour, every 15 minutes
     'take-snapshots': {
         'task': 'ovs.scheduled.snapshotall',
-        'schedule': crontab(minute='0', hour='2-22', day_of_week='mon,tue,wed,thu,fri'),
+        'schedule': crontab(minute='*/15',
+                            hour='2-22',
+                            day_of_week='mon,tue,wed,thu,fri'),
         'args': [],
     },
 }
