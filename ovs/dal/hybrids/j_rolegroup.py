@@ -9,7 +9,7 @@ from ovs.dal.hybrids.group import Group
 
 class RoleGroup(DataObject):
     """
-    The RoleGroup class represents the junction table between Role and Group
+    The RoleGroup class represents the junction table between Role and Group.
     """
     # pylint: disable=line-too-long
     _blueprint = {}

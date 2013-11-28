@@ -7,16 +7,16 @@ from ovs.dal.dataobject import DataObject
 
 class VPool(DataObject):
     """
-    The VPool class represents a vPool. A vPool covers a given backend
+    The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':               (None, str, 'Name of the virtual pool'),
-                  'description':        (None, str, 'Description of the virtual pool'),
-                  'size':               (None, int, 'Size of the virtual pool'),
-                  'backend_login':      (None, str, 'Login for the backend'),
-                  'backend_password':   (None, str, 'Password for the backend'),
-                  'backend_connection': (None, str, 'Connection for the backend'),
-                  'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the backend')}
+    _blueprint = {'name':               (None, str, 'Name of the vPool.'),
+                  'description':        (None, str, 'Description of the vPool.'),
+                  'size':               (None, int, 'Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
+                  'backend_login':      (None, str, 'Login/Username for the Storage Backend.'),
+                  'backend_password':   (None, str, 'Password for the Storage Backend.'),
+                  'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
+                  'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the Storage Backend.')}
     _relations = {}
     _expiry = {'status':      (10, str),
                'statistics':   (5, dict),
@@ -25,15 +25,17 @@ class VPool(DataObject):
 
     def _status(self):
         """
-        Fetches the status of the volume
-        """
+        Fetches the Status of the vPool.
+        @return: dict
+		"""
         _ = self
         return None
 
     def _statistics(self):
         """
-        Agregates the statistics for this vpool
-        """
+        Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
+        @return: dict
+		"""
         data = dict()
         for disk in self.vdisks:
             statistics = disk.statistics
@@ -43,6 +45,6 @@ class VPool(DataObject):
 
     def _stored_data(self):
         """
-        Agregates the stored data for this vpool
+        Aggregates the Stored Data of each vDisk served by the vPool.
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
