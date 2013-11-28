@@ -140,6 +140,9 @@ class Toolbox(object):
         elif required_type is float:
             correct = isinstance(value, float) or isinstance(value, int)
             allowed_types = ['float', 'int']
+        elif required_type is int:
+            correct = isinstance(value, int) or isinstance(value, long)
+            allowed_types = ['int', 'long']
         elif isinstance(required_type, list):
             # We're in an enum scenario. Field_type isn't a real type, but a list containing
             # all possible enum values. Here as well, we need to do some str/unicode/basestring

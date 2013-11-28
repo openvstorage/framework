@@ -36,16 +36,19 @@ class VolumeStorageRouter(DataObject):
         Agregates the statistics for this vsr
         """
         data = dict()
-        for disk in self.vpool.vdisks:
-            if disk.vsrid == self.vsrid:
-                statistics = disk.statistics
-                for key, value in statistics.iteritems():
-                    data[key] = data.get(key, 0) + value
+        if self.vpool is not None:
+            for disk in self.vpool.vdisks:
+                if disk.vsrid == self.vsrid:
+                    statistics = disk.statistics
+                    for key, value in statistics.iteritems():
+                        data[key] = data.get(key, 0) + value
         return data
 
     def _stored_data(self):
         """
         Agregates the stored data for this vsr
         """
-        return sum([disk.info['stored'] for disk in self.vpool.vdisks])
+        if self.vpool is not None:
+            return sum([disk.info['stored'] for disk in self.vpool.vdisks])
+        return 0
 
