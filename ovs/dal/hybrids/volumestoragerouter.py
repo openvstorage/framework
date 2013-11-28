@@ -9,14 +9,15 @@ from ovs.dal.hybrids.vmachine import VMachine
 
 class VolumeStorageRouter(DataObject):
     """
-    The VolumeStorageRouter class represents a volume storage router
+    The VolumeStorageRouter class represents a Volume Storage Router (VSR). A VSR is an application
+    on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':        (None, str, 'Name of the VSR'),
-                  'description': (None, str, 'Description of the VSR'),
-                  'port':        (None, int, 'Port on which the VSR is listening'),
-                  'ip':          (None, str, 'IP address on which the VSR is listening'),
-                  'vsrid':       (None, str, 'Internal volumedriver reference ID')}
+    _blueprint = {'name':        (None, str, 'Name of the VSR.'),
+                  'description': (None, str, 'Description of the VSR.'),
+                  'port':        (None, int, 'Port on which the VSR is listening.'),
+                  'ip':          (None, str, 'IP address on which the VSR is listening.'),
+                  'vsrid':       (None, str, 'ID of the VSR in the Open vStorage Volume Driver.')}
     _relations = {'vpool':            (VPool,    'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':      (30, str),
@@ -26,14 +27,16 @@ class VolumeStorageRouter(DataObject):
 
     def _status(self):
         """
-        Fetches the status of the volume
+        Fetches the Status of the VSR.
+        @return: dict
         """
         _ = self
         return None
 
     def _statistics(self):
         """
-        Agregates the statistics for this vsr
+        Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
+        @return: dict
         """
         data = dict()
         if self.vpool is not None:
@@ -46,9 +49,9 @@ class VolumeStorageRouter(DataObject):
 
     def _stored_data(self):
         """
-        Agregates the stored data for this vsr
+        Agregates the Stored Data in Bytes of the vDisks connected to the VSR.
+        @return: int
         """
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
         return 0
-

@@ -8,16 +8,16 @@ from ovs.dal.hybrids.pmachine import PMachine
 
 class VMachine(DataObject):
     """
-    A VMachine represents a virtual machine in the model. A virtual machine is
-    always served by a hypervisor
+    The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks 
+    or a Virtual Machine running the Open vStorage software.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':         (None,  str,  'Name of the virtual machine'),
-                  'description':  (None,  str,  'Description of the virtual machine'),
-                  'hypervisorid': (None,  str,  'Identifier of the VMachine on the hypervisor'),
-                  'is_vtemplate': (True,  bool, 'Indicates whether this virtual machine is a template'),
-                  'is_internal':  (False, bool, 'Indicates whether this virtual machine represents an internal machine'),
-                  'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the VMachine')}
+    _blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
+                  'description':  (None,  str,  'Description of the vMachine.'),
+                  'hypervisorid': (None,  str,  'The Identifier of the vMachine on the Hypervisor.'),
+                  'is_vtemplate': (True,  bool, 'Indicates whether this vMachine is a vTemplate.'),
+                  'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
+                  'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.')}
     _relations = {'pmachine': (PMachine, 'vmachines')}
     _expiry = {'snapshots':   (60, list),
                'status':      (30, str),
@@ -27,21 +27,24 @@ class VMachine(DataObject):
 
     def _snapshots(self):
         """
-        Fetches a list of snapshots for this virtual machine
+        Fetches a list of Snapshots for the vMachine.
+        @return: list
         """
         _ = self
         return None
 
     def _status(self):
         """
-        Fetches the status of the volume
+        Fetches the Status of the vMachine.
+        @return: dict
         """
         _ = self
         return None
 
     def _statistics(self):
         """
-        Agregates the statistics for this machine
+        Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
+        @return: dict
         """
         data = dict()
         for disk in self.vdisks:
@@ -52,6 +55,7 @@ class VMachine(DataObject):
 
     def _stored_data(self):
         """
-        Agregates the stored data for this vmachine
+        Aggregates the Stored Data of each vDisk of the vMachine.
+        @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
