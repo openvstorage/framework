@@ -76,8 +76,26 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        # POC, assuming data is correct
         task = VMachineController.clone.s(parentmachineguid=vmachine.guid,
                                           disks=request.DATA['disks'],
                                           name=request.DATA['name']).apply_async()
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'create'])
+    def snapshot(self, request, pk=None, format=None):
+        """
+        Snapshots a given machine
+        """
+        _ = format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            vmachine = VMachine(pk)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        task = VMachineController.snapshot.s(machineguid=vmachine.guid,
+                                             name=request.DATA['name'],
+                                             consistent=request.DATA['consistent']).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)

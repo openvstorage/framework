@@ -49,6 +49,7 @@ class VDisk(DataObject):
         Fetches the info (see Volume Driver API) for the vDisk.
 		@return: dict
         """
+        _ = self
         if self.volumeid:
             vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
             vdiskinfodict = dict()
@@ -66,6 +67,7 @@ class VDisk(DataObject):
         Fetches the Statistics for the vDisk.
 		@return: dict
         """
+        _ = self
         if self.volumeid:
             vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
             vdiskstatsdict = dict()

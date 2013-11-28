@@ -38,11 +38,12 @@ class VolumeStorageRouter(DataObject):
 		@return: dict
         """
         data = dict()
-        for disk in self.vpool.vdisks:
-            if disk.vsrid == self.vsrid:
-                statistics = disk.statistics
-                for key, value in statistics.iteritems():
-                    data[key] = data.get(key, 0) + value
+        if self.vpool is not None:
+            for disk in self.vpool.vdisks:
+                if disk.vsrid == self.vsrid:
+                    statistics = disk.statistics
+                    for key, value in statistics.iteritems():
+                        data[key] = data.get(key, 0) + value
         return data
 
     def _stored_data(self):
@@ -50,5 +51,7 @@ class VolumeStorageRouter(DataObject):
         Agregates the Stored Data in Bytes of the vDisks connected to the VSR.
 		@return: long
         """
-        return sum([disk.info['stored'] for disk in self.vpool.vdisks])
+        if self.vpool is not None:
+            return sum([disk.info['stored'] for disk in self.vpool.vdisks])
+        return 0
 

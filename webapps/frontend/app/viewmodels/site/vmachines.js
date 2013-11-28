@@ -3,8 +3,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../wizards/clone/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, CloneWizard) {
+    '../containers/vmachine', '../wizards/clone/index', '../wizards/snapshot/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, CloneWizard, SnapshotWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -24,7 +24,7 @@ define([
             { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55,        colspan: undefined },
             { key: 'readSpeed',  value: $.t('ovs:generic.readspeed'),  width: 100,       colspan: undefined },
             { key: 'writeSpeed', value: $.t('ovs:generic.writespeed'), width: undefined, colspan: undefined },
-            { key: undefined,    value: $.t('ovs:generic.actions'),    width: undefined, colspan: 2 }
+            { key: undefined,    value: $.t('ovs:generic.actions'),    width: 80,        colspan: undefined }
         ];
         self.vMachines = ko.observableArray([]);
         self.vMachineGuids =  [];
@@ -64,6 +64,17 @@ define([
             for (i = 0; i < vms.length; i += 1) {
                 if (vms[i].guid() === guid) {
                     dialog.show(new CloneWizard({
+                        modal: true,
+                        machineguid: guid
+                    }));
+                }
+            }
+        };
+        self.snapshot = function(guid) {
+            var i, vms = self.vMachines();
+            for (i = 0; i < vms.length; i += 1) {
+                if (vms[i].guid() === guid) {
+                    dialog.show(new SnapshotWizard({
                         modal: true,
                         machineguid: guid
                     }));

@@ -11,18 +11,43 @@ def process(queue, body):
     """
     if queue == 'voldrv_queue':
         import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
-        vdmsg = EventMessages.EventMessage()
-        data = vdmsg.FromString(body)
-        print "\ntype:{}\nstring:{}\ntypeofdata:{}\nfields:\n{}\n".format(vdmsg.type, data, type(data), data.ListFields())
+        volumedrivermessage = EventMessages.EventMessage()
+        data = volumedrivermessage.FromString(body)
         
-        if isinstance(data, vdmsg.VolumeCreate):
+        if data.type == EventMessages.EventMessage.VolumeCreate:
             _name = data.volume_create.name
             _size = data.volume_create.size
             _path = data.volume_create.path
 
-            VDiskController._create(_path, _name, _size)
+            VDiskController._create.s(_path, _name, _size).apply_async()
 
             print '[voldrv_queue] Created Volume {} Size {} location {}'.format(_name, _size, _path) 
+
+        elif data.type == EventMessages.EventMessage.VolumeDelete:
+            _name = data.volume_delete.name
+            _path = data.volume_delete.path
+
+            VDiskController._delete.s(_path, _name).apply_async()
+
+            print '[voldrv_queue] Deleted Volume {} location {}'.format(_name, _path) 
+
+        elif data.type == EventMessages.EventMessage.VolumeResize:
+            _name = data.volume_resize.name 
+            _size = data.volume_resize.size
+            _path = data.volume_resize.path
+
+            VDiskController.resize.s(_path, _name, _size).apply_async()
+
+            print '[voldrv_queue] Resized Volume {} location {} to size {}'.format(_name, _path, _size)
+
+        elif data.type == EventMessages.EventMessage.VolumeRename:
+            _name = data.volume_rename.name
+            _old_path = data.volume_rename.old_path
+            _new_path = data.volume_rename.new_path
+
+            VDiskController.rename.s(_name, _old_path, _new_path).apply_async()
+
+            print '[voldrv_queue] Renamed Volume {} from location {} to location {}'.format(_name, _old_path, _new_path)
         else:
             raise RuntimeError('Invalid task specified')
     else:

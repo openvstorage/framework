@@ -125,6 +125,7 @@
                 "amount": "Number of clones",
                 "selectsnapshots": "Select the snapshots from which you want to clone:",
                 "nomachine": "No machine loaded",
+                "noname": "No name was entered",
                 "nosnapshots": "Not all disks have snapshots"
             },
             "confirm": {
@@ -139,6 +140,26 @@
                 "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
                 "allfailed": "All clones for machine __what__ failed.",
                 "complete": "Clones completed"
+            }
+        },
+        "snapshot": {
+            "title": "Snapshot",
+            "gather": {
+                "title": "Please provide the required information",
+                "name": "Snapshot name",
+                "consistent": "Label as Consistent snapshot",
+                "basicinfo": "Enter basic information",
+                "nomachine": "No machine loaded",
+                "noname": "No name was entered"
+            },
+            "confirm": {
+                "title": "Verify the entered information",
+                "snapshotstarted": "Snapshot started",
+                "inprogress": "Machine __what__ snapshotting in progress...",
+                "failed": "Machine __what__ snapshot failed.",
+                "success": "Machine __what__ snapshot successfully.",
+                "name": "Snapshot name",
+                "consistent": "Label as Consistent snapshot"
             }
         },
         "changepassword": {

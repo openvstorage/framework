@@ -14,6 +14,9 @@ define([
             if (self.data.vm() === undefined) {
                 return {value: false, reason: $.t('ovs:wizards.clone.gather.nomachine')};
             }
+            if (!self.data.name()) {
+                return {value: false, reason: $.t('ovs:wizards.clone.gather.noname')};
+            }
             var i, disks = self.data.vm().vDisks();
             for(i = 0; i < disks.length; i += 1) {
                 if (disks[i].snapshots().length === 0) {
