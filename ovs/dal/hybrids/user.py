@@ -8,7 +8,8 @@ from ovs.dal.hybrids.group import Group
 
 class User(DataObject):
     """
-    The User class represents a User.  A user is an individual who can perform actions on objects in Open vStorage.
+    The User class represents a User.  A user is an individual who can perform actions 
+	on objects in Open vStorage.
     """
     # pylint: disable=line-too-long
     _blueprint = {'username':  (None,    str,  'Username of the User.'),

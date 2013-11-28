@@ -7,7 +7,8 @@ from ovs.dal.dataobject import DataObject
 
 class VPool(DataObject):
     """
-    The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend
+    The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to 
+	deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':               (None, str, 'Name of the vPool.'),

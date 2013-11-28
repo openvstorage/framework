@@ -9,7 +9,8 @@ from ovs.dal.hybrids.vmachine import VMachine
 
 class VolumeStorageRouter(DataObject):
     """
-    The VolumeStorageRouter class represents a Volume Storage Router (VSR). A VSR is an application on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
+    The VolumeStorageRouter class represents a Volume Storage Router (VSR). A VSR is an application
+	on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':        (None, str, 'Name of the VSR.'),

@@ -27,6 +27,7 @@ class VMachine(DataObject):
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vMachine.
+		@return: list
         """
         _ = self
         return None
@@ -34,6 +35,7 @@ class VMachine(DataObject):
     def _status(self):
         """
         Fetches the Status of the vMachine.
+		@return: dict
         """
         _ = self
         return None
@@ -41,6 +43,7 @@ class VMachine(DataObject):
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
+		@return: dict
         """
         data = dict()
         for disk in self.vdisks:
@@ -52,5 +55,6 @@ class VMachine(DataObject):
     def _stored_data(self):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
+		@return: long
         """
         return sum([disk.info['stored'] for disk in self.vdisks])

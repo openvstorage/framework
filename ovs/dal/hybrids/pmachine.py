@@ -7,7 +7,8 @@ from ovs.dal.dataobject import DataObject
 
 class PMachine(DataObject):
     """
-    The PMachine class represents a pMachine. A pMachine is the physical machine running the Hypervisor.
+    The PMachine class represents a pMachine. A pMachine is the physical machine 
+	running the Hypervisor.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':        (None, str, 'Name of the pMachine.'),
