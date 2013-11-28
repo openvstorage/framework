@@ -18,13 +18,13 @@ define([
 
         self.guid              = ko.observable(guid);
         self.name              = ko.observable();
-        self.size              = ko.smoothObservable(0, generic.formatBytes);
+        self.size              = ko.smoothObservable(undefined, generic.formatBytes);
         self.iops              = ko.smoothDeltaObservable(generic.formatShort);
-        self.storedData        = ko.smoothObservable(0, generic.formatBytes);
+        self.storedData        = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits         = ko.smoothDeltaObservable();
         self.cacheMisses       = ko.smoothDeltaObservable();
-        self.numberOfDisks     = ko.smoothObservable(0);
-        self.numberOfMachines  = ko.smoothObservable(0);
+        self.numberOfDisks     = ko.smoothObservable(undefined);
+        self.numberOfMachines  = ko.smoothObservable(undefined);
         self.readSpeed         = ko.smoothDeltaObservable(generic.formatSpeed);
         self.writeSpeed        = ko.smoothDeltaObservable(generic.formatSpeed);
         self.backendWriteSpeed = ko.smoothDeltaObservable(generic.formatSpeed);

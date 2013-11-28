@@ -19,7 +19,7 @@ define([
         self.guid        = ko.observable(guid);
         self.name        = ko.observable();
         self.iops        = ko.smoothDeltaObservable(generic.formatShort);
-        self.storedData  = ko.smoothObservable(0, generic.formatBytes);
+        self.storedData  = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits   = ko.smoothDeltaObservable();
         self.cacheMisses = ko.smoothDeltaObservable();
         self.readSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
