@@ -8,7 +8,6 @@ define([
         var self = this;
 
         self.item = undefined;
-        self.unit = ko.observable('');
         self.isLazyLoader = ko.observable(false);
 
         self.activate = function(settings) {
@@ -18,9 +17,6 @@ define([
             self.item = settings.item;
             if (self.item.hasOwnProperty('initialized') && self.item.initialized.call) {
                 self.isLazyLoader(true);
-            }
-            if (settings.hasOwnProperty('unit') && settings.unit !== undefined && settings.unit !== '') {
-                self.unit($.t(settings.unit));
             }
         };
     };

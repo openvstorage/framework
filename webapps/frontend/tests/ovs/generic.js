@@ -15,14 +15,14 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
 
         it('getBytesByHuman should format correctly', function() {
             var namespace = 'ovs:generic.';
-            expect(generic.getBytesHuman(1)).toBe('1 ' + namespace + 'b');
-            expect(generic.getBytesHuman(1000)).toBe('1000 ' + namespace + 'b');
-            expect(generic.getBytesHuman(2 * 1000)).toBe('2000 ' + namespace + 'b');
-            expect(generic.getBytesHuman(3 * 1000)).toBe('2.93 ' + namespace + 'kib');
-            expect(generic.getBytesHuman(3 * 1024 * 1000)).toBe('2.93 ' + namespace + 'mib');
-            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'gib');
-            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'tib');
-            expect(generic.getBytesHuman(3 * 1024 * 1024 * 1024 * 1024)).toBe('3 ' + namespace + 'tib');
+            expect(generic.formatBytes(1)).toBe('1.00 ' + namespace + 'b');
+            expect(generic.formatBytes(1000)).toBe('1000.00 ' + namespace + 'b');
+            expect(generic.formatBytes(2 * 1000)).toBe('2000.00 ' + namespace + 'b');
+            expect(generic.formatBytes(3 * 1000)).toBe('2.93 ' + namespace + 'kib');
+            expect(generic.formatBytes(3 * 1024 * 1000)).toBe('2.93 ' + namespace + 'mib');
+            expect(generic.formatBytes(3 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'gib');
+            expect(generic.formatBytes(3 * 1024 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'tib');
+            expect(generic.formatBytes(3 * 1024 * 1024 * 1024 * 1024)).toBe('3.00 ' + namespace + 'tib');
         });
 
         it('padRight to pad correctly', function() {
@@ -61,17 +61,17 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
 
         it('smooth should smooth a transition', function() {
             // Steps at: 75, 150, 225, 300
-            // Default (at time of writing test) 3 steps
             jasmine.Clock.useMock();
             var testModel = {
                 value: ko.observable(undefined)
-            };
+                },
+                smoother = function(value) { return value; };
             // Smooth undefined > 100
-            generic.smooth(testModel.value, 100, 1);
+            generic.smooth(testModel.value, undefined, 100, 1, smoother);
             jasmine.Clock.tick(80);  // 80
             expect(testModel.value()).toBe(100);
             // Smooth 100 > 160
-            generic.smooth(testModel.value, 160);
+            generic.smooth(testModel.value, testModel.value(), 160, 3, smoother);
             jasmine.Clock.tick(50);  // 50
             expect(testModel.value()).toBe(100);
             jasmine.Clock.tick(50);  // 100
@@ -86,17 +86,17 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
             expect(testModel.value()).toBe(160);
             testModel.value(100);
             // Smooth 100 > 100
-            generic.smooth(testModel.value, 100, 2);
+            generic.smooth(testModel.value, testModel.value(), 100, 2, smoother);
             expect(testModel.value()).toBe(100);
             // Smooth 100 > 103
-            generic.smooth(testModel.value, 103, 2);
+            generic.smooth(testModel.value, testModel.value(), 103, 2, smoother);
             jasmine.Clock.tick(80);  // 80
             expect(testModel.value()).toBe(102);
             jasmine.Clock.tick(80);  // 160
             expect(testModel.value()).toBe(103);
             testModel.value(100.5);
             // Smooth 100.5 > 103.5
-            generic.smooth(testModel.value, 103.5, 2);
+            generic.smooth(testModel.value, testModel.value(), 103.5, 2, smoother);
             jasmine.Clock.tick(80);  // 80
             expect(testModel.value()).toBe(102);
             jasmine.Clock.tick(80);  // 160

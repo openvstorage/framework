@@ -29,14 +29,14 @@ define([
             generic.xhrAbort(self.refreshHandle);
             self.refreshHandle = api.get('statistics/memcache')
             .done(function(data) {
-                self.bytes(generic.getBytesHuman(data.bytes));
+                self.bytes(generic.formatBytes(data.bytes));
                 self.currItems(data.curr_items);
                 self.totalItems(data.total_items);
                 self.getHits(data.get_hits);
                 self.cmdGet(data.cmd_get);
                 self.hitRate(data.cmd_get === 0 ? 0 : Math.round(data.get_hits / data.cmd_get * 1000) / 10);
-                self.bytesRead(generic.getBytesHuman(data.bytes_read));
-                self.bytesWritten(generic.getBytesHuman(data.bytes_written));
+                self.bytesRead(generic.formatBytes(data.bytes_read));
+                self.bytesWritten(generic.formatBytes(data.bytes_written));
                 self.uptime(data.uptime);
 
                 var rawString = '', attribute;

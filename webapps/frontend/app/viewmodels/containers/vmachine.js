@@ -16,13 +16,21 @@ define([
         // Obserables
         self.loading    = ko.observable(false);
 
-        self.guid       = ko.observable(guid);
-        self.name       = ko.observable();
-        self.iops       = ko.smoothDeltaObservable(0);
-        self.storedData = ko.smoothObservable();
-        self.cache      = ko.smoothObservable();
-        self.readSpeed  = ko.smoothDeltaObservable(2);
-        self.writeSpeed = ko.smoothDeltaObservable(2);
+        self.guid        = ko.observable(guid);
+        self.name        = ko.observable();
+        self.iops        = ko.smoothDeltaObservable(generic.formatShort);
+        self.storedData  = ko.smoothObservable(0, generic.formatBytes);
+        self.cacheHits   = ko.smoothDeltaObservable();
+        self.cacheMisses = ko.smoothDeltaObservable();
+        self.readSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.writeSpeed  = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.cacheRatio  = ko.computed(function() {
+            var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
+            if (total === 0) {
+                total = 1;
+            }
+            return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
+        });
 
         self.vDisks     = ko.observableArray([]);
         self.vDiskGuids = [];
@@ -55,14 +63,12 @@ define([
                             generic.xhrAbort(self.loadHandle);
                             self.loadHandle = api.get('vmachines/' + self.guid())
                                 .done(function(data) {
-                                    var stats = data.statistics,
-                                        cache_hits = stats.sco_cache_hits + stats.cluster_cache_hits,
-                                        cache_tries = cache_hits + stats.sco_cache_misses,
-                                        cache_ratio = cache_hits / (cache_tries !== 0 ? cache_tries : 1) * 100;
+                                    var stats = data.statistics;
                                     self.name(data.name);
                                     self.iops(stats.write_operations + stats.read_operations);
                                     self.storedData(data.stored_data);
-                                    self.cache(cache_ratio);
+                                    self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
+                                    self.cacheMisses(stats.sco_cache_misses);
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
                                     deferred.resolve();

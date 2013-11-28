@@ -9,15 +9,12 @@
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;" class="fa fa-spinner fa-spin"></i>
                     <span data-bind="text: name"></span>
                 </td>
-                <td><span data-bind="text: vDisks().length"></span>
-                </td>
-                <td>
-                    <span data-bind="text: storedData"></span> <span data-i18n="ovs:generic.mib"></span>
-                </td>
-                <td><span data-bind="text: cache"></span> %</td>
+                <td><span data-bind="text: vDisks().length"></span></td>
+                <td><span data-bind="text: storedData"></span></td>
+                <td><span data-bind="text: cacheRatio"></span></td>
                 <td data-bind="lazyloader: { item: iops }"></td>
-                <td data-bind="lazyloader: { item: readSpeed, unit: 'ovs:generic.mibs' }"></td>
-                <td data-bind="lazyloader: { item: writeSpeed, unit: 'ovs:generic.mibs' }"></td>
+                <td data-bind="lazyloader: { item: readSpeed }"></td>
+                <td data-bind="lazyloader: { item: writeSpeed }"></td>
                 <td style="width: 35px;">
                     <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand glyphicon glyphicon-random"></i>
                 </td>

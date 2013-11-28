@@ -2,23 +2,27 @@
 /*global define */
 define(['knockout', 'ovs/generic'], function(ko, generic) {
     "use strict";
-    ko.smoothObservable = function(initialValue, steps) {
-        var workingValue = ko.observable(initialValue);
-        return ko.computed({
+    ko.smoothObservable = function(initialValue, formatFunction) {
+        var formattedValue = ko.observable(initialValue),
+            rawValue = ko.observable(initialValue), computed;
+        computed = ko.computed({
             read: function() {
-                return workingValue();
+                return formattedValue();
             },
             write: function(newValue) {
-                generic.smooth(workingValue, newValue, steps);
+                generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
+                rawValue(newValue);
             }
         });
+        computed.raw = rawValue;
+        return computed;
     };
-    ko.deltaObservable = function(decimals) {
-        var workingValue = ko.observable(), initialized = ko.observable(false),
+    ko.deltaObservable = function(formatFunction) {
+        var formattedValue = ko.observable(), rawValue = ko.observable(), initialized = ko.observable(false),
             timestamp, newTimestamp, previousCounter, delta, timeDelta, result;
         result = ko.computed({
             read: function() {
-                return workingValue();
+                return formattedValue();
             },
             write: function(newCounter) {
                 if ((typeof previousCounter) === 'undefined') {
@@ -28,7 +32,12 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     delta = newCounter - previousCounter;
                     newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    workingValue(generic.round(delta / timeDelta, decimals));
+                    rawValue(delta / timeDelta);
+                    if (formatFunction.call) {
+                        formattedValue(formatFunction(delta / timeDelta));
+                    } else {
+                        formattedValue(delta / timeDelta);
+                    }
                     timestamp = newTimestamp;
                     previousCounter = newCounter;
                     initialized(true);
@@ -36,14 +45,15 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
         });
         result.initialized = initialized;
+        result.raw = rawValue;
         return result;
     };
-    ko.smoothDeltaObservable = function(decimals) {
-        var workingValue = ko.observable(), initialized = ko.observable(false),
-            timestamp, newTimestamp, previousCounter, delta, timeDelta, result;
+    ko.smoothDeltaObservable = function(formatFunction) {
+        var formattedValue = ko.observable(), rawValue = ko.observable(), initialized = ko.observable(false),
+            timestamp, newTimestamp, previousCounter, delta, timeDelta, newValue, result;
         result = ko.computed({
             read: function() {
-                return workingValue();
+                return formattedValue();
             },
             write: function(newCounter) {
                 if ((typeof previousCounter) === 'undefined') {
@@ -53,7 +63,9 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     delta = newCounter - previousCounter;
                     newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    generic.smooth(workingValue, generic.round(delta / timeDelta, decimals));
+                    newValue = delta / timeDelta;
+                    generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
+                    rawValue(newValue);
                     timestamp = newTimestamp;
                     previousCounter = newCounter;
                     initialized(true);
@@ -61,6 +73,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
         });
         result.initialized = initialized;
+        result.raw = rawValue;
         return result;
     };
 });

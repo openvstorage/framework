@@ -20,7 +20,7 @@ define([
             { key: 'name',              value: $.t('ovs:generic.name'),             width: 150,       colspan: undefined },
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 100,       colspan: undefined },
             { key: 'freeSpace',         value: $.t('ovs:vpools.freespace'),         width: 100,       colspan: undefined },
-            { key: 'cache',             value: $.t('ovs:generic.cache'),            width: 70,        colspan: undefined },
+            { key: 'cacheRatio',        value: $.t('ovs:generic.cache'),            width: 100,       colspan: undefined },
             { key: 'iops',              value: $.t('ovs:generic.iops'),             width: 55,        colspan: undefined },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 100,       colspan: undefined },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100,       colspan: undefined },

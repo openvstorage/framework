@@ -19,8 +19,8 @@ define([
         self.vMachineHeaders = [
             { key: 'name',       value: $.t('ovs:generic.name'),       width: 150,       colspan: undefined },
             { key: undefined,    value: $.t('ovs:generic.vdisks'),     width: 60,        colspan: undefined },
-            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 100,       colspan: undefined },
-            { key: 'cache',      value: $.t('ovs:generic.cache'),      width: 70,        colspan: undefined },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 110,       colspan: undefined },
+            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),      width: 100,       colspan: undefined },
             { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55,        colspan: undefined },
             { key: 'readSpeed',  value: $.t('ovs:generic.readspeed'),  width: 100,       colspan: undefined },
             { key: 'writeSpeed', value: $.t('ovs:generic.writespeed'), width: undefined, colspan: undefined },

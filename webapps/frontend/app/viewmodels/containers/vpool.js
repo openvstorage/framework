@@ -18,25 +18,33 @@ define([
 
         self.guid              = ko.observable(guid);
         self.name              = ko.observable();
-        self.size              = ko.smoothObservable(0);
-        self.iops              = ko.smoothDeltaObservable(0);
-        self.storedData        = ko.smoothObservable(0);
-        self.cache             = ko.smoothObservable();
-        self.numberOfDisks     = ko.smoothObservable();
-        self.numberOfMachines  = ko.smoothObservable();
-        self.readSpeed         = ko.smoothDeltaObservable(2);
-        self.writeSpeed        = ko.smoothDeltaObservable(2);
-        self.backendWriteSpeed = ko.smoothDeltaObservable(2);
-        self.backendReadSpeed  = ko.smoothDeltaObservable(2);
+        self.size              = ko.smoothObservable(0, generic.formatBytes);
+        self.iops              = ko.smoothDeltaObservable(generic.formatShort);
+        self.storedData        = ko.smoothObservable(0, generic.formatBytes);
+        self.cacheHits         = ko.smoothDeltaObservable();
+        self.cacheMisses       = ko.smoothDeltaObservable();
+        self.numberOfDisks     = ko.smoothObservable(0);
+        self.numberOfMachines  = ko.smoothObservable(0);
+        self.readSpeed         = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.writeSpeed        = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.backendWriteSpeed = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.backendReadSpeed  = ko.smoothDeltaObservable(generic.formatSpeed);
         self.backendType       = ko.observable();
         self.backendConnection = ko.observable();
         self.backendLogin      = ko.observable();
 
+        self.cacheRatio = ko.computed(function() {
+            var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
+            if (total === 0) {
+                total = 1;
+            }
+            return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
+        });
         self.freeSpace = ko.computed(function() {
-            if (self.size() === 0 || self.storedData() === 0) {
+            if (self.size.raw() === 0 || self.storedData.raw() === 0) {
                 return 0;
             }
-            return generic.round((self.size() - self.storedData()) / self.storedData() * 100, 2);
+            return generic.formatRatio((self.size.raw() - self.storedData.raw()) / self.size.raw() * 100);
         });
 
         self.load = function() {
@@ -47,10 +55,7 @@ define([
                             generic.xhrAbort(self.loadHandle);
                             self.loadHandle = api.get('vpools/' + self.guid())
                                 .done(function(data) {
-                                    var type = '', stats = data.statistics,
-                                        cache_hits = stats.sco_cache_hits + stats.cluster_cache_hits,
-                                        cache_tries = cache_hits + stats.sco_cache_misses,
-                                        cache_ratio = cache_hits / (cache_tries !== 0 ? cache_tries : 1) * 100;
+                                    var type = '', stats = data.statistics;
                                     if (data.backend_type) {
                                         type = $.t('ovs:vpools.backendtypes.' + data.backend_type);
                                     }
@@ -58,7 +63,8 @@ define([
                                     self.iops(stats.write_operations + stats.read_operations);
                                     self.size(data.size);
                                     self.storedData(data.stored_data);
-                                    self.cache(cache_ratio);
+                                    self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
+                                    self.cacheMisses(stats.sco_cache_misses);
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
                                     self.backendReadSpeed(stats.backend_data_read);
