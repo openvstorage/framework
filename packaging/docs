@@ -1,0 +1,13 @@
+# Create debian dir inside repo
+Will need basic utils to do this
+# Create source package
+dpkg-source -I.hg -b poc_openvstorage
+# Create binary packages from source
+
+openvstorage-webapps
+\python-django
+openvstorage-core
+\arakoon
+\celery(pip, we need latest 3.0.x version)
+\rabbitmq-server
+volumedriver

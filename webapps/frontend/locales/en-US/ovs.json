@@ -1,0 +1,161 @@
+{
+    "generic": {
+        "username": "Username",
+        "password": "Password",
+        "logout": "Log out",
+        "user": "User",
+        "togglenavigation": "Toggle navigation",
+        "changepassword": "Change password",
+        "signin": "Sign in",
+        "welcome": "Welcome",
+        "of": "of",
+        "next": "Next &raquo;",
+        "previous": "&laquo; Previous",
+        "cancel": "Cancel",
+        "finish": "Finish",
+        "ki": "Ki",
+        "mi": "Mi",
+        "gi": "Gi",
+        "ti": "Ti",
+        "k": "k",
+        "m": "M",
+        "g": "G",
+        "t": "T",
+        "ok": "OK",
+        "bs": "B/s",
+        "b": "B",
+        "kibs": "KiB/s",
+        "kib": "KiB",
+        "mibs": "MiB/s",
+        "mib": "MiB",
+        "gibs": "GiB/s",
+        "gib": "GiB",
+        "tibs": "TiB/s",
+        "tib": "TiB",
+        "savesuccessfully": "__what__ saved successfully.",
+        "errorwhile": "An error occurred while __what__.",
+        "errorwhile_error": "An error occurred while __what__: __error__",
+        "saved": "Saved",
+        "error": "Error",
+        "vdisk": "vDisk",
+        "disk": "Disk",
+        "vdisks": "vDisks",
+        "disks": "Disks",
+        "vmachine": "vMachine",
+        "machine": "Machine",
+        "vmachines": "vMachines",
+        "machines": "Machines",
+        "name": "Name",
+        "storeddata": "Stored data",
+        "cache": "Cache",
+        "iops": "IOPS",
+        "latency": "Latency",
+        "readspeed": "Read speed",
+        "writespeed": "Write speed",
+        "actions": "Actions",
+        "showing": "Showing",
+        "from": "from",
+        "results": "results",
+        "areyousure": "Are you sure?",
+        "yes": "Yes",
+        "no": "No"
+    },
+    "vpools" : {
+        "title": "vPools",
+        "backendtype": "Type",
+        "backendtypes": {
+            "S3": "Amazon S3",
+            "FILESYSTEM": "File system"
+        },
+        "backendconnection": "Connection",
+        "backendlogin": "Login",
+        "statistics": "Statistics",
+        "backend": "Backend",
+        "freespace": "Free space",
+        "detail": {
+            "title": "vPool",
+            "introduction": "Below an overview of the vPool properties."
+        }
+    },
+    "statistics": {
+        "title": "Statistics",
+        "introduction": "This page contains various system statistics.",
+        "memcache": {
+            "title": "Memcache",
+            "memoryusage": "Memory usage:",
+            "keysincache": "Keys in cache:",
+            "cachehits": "Cache hits:",
+            "cachetraffic": "Cache traffic",
+            "uptime": "uptime",
+            "rawinfo": "Raw memcached information"
+        }
+    },
+    "vmachines": {
+        "title": "vMachines",
+        "suretodelete": "Are you sure you want to delete __what__?",
+        "marked": "Marked for deletion",
+        "machinemarked": "Machine __what__ is marked for deletion...",
+        "deleted": "Machine deleted",
+        "machinedeleted": "Machine __what__ deleted"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "introduction": "Open vStorage is the next generation storage."
+    },
+    "login": {
+        "title": "Login",
+        "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
+        "invalidcredentials": "The username/password combination were invalid or could not be validated.",
+        "welcome": "Use the navigation to browse trough the interface."
+    },
+    "notfound": {
+        "title": "Page not found",
+        "introduction": "The page you've requested was not found. Please navigate back, and try again or update your bookmarks."
+    },
+    "keywords": {
+        "vpool": "vPool"
+    },
+    "wizards" : {
+        "clone": {
+            "title": "Clone",
+            "gather": {
+                "title": "Please provide the required information",
+                "basicinfo": "Enter basic information",
+                "name": "Clone name",
+                "amount": "Number of clones",
+                "selectsnapshots": "Select the snapshots from which you want to clone:",
+                "nomachine": "No machine loaded",
+                "nosnapshots": "Not all disks have snapshots"
+            },
+            "confirm": {
+                "title": "Verify the entered information",
+                "clonename": "Name of the clone:",
+                "cloneamount": "Amount of clones:",
+                "verifysnapshots": "Please validate the selected snapshots below. These will be used for the clone:",
+                "cloning": "cloning __what__",
+                "clonestarted": "Clone started",
+                "inprogress": "Machine __what__ cloning in progress...",
+                "success": "Cloned __what__ successfully",
+                "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
+                "allfailed": "All clones for machine __what__ failed.",
+                "complete": "Clones completed"
+            }
+        },
+        "changepassword": {
+            "title": "Change password",
+            "confirm": {
+                "title": "Please provide the required information",
+                "introduction": "Enter the requested information carefully.",
+                "newpassword": "New password",
+                "currentpassword": "Current password",
+                "retype": "Retype",
+                "entercurrent": "Enter current password",
+                "currentinvalid": "Invalid password",
+                "enternew": "Enter new password",
+                "shouldmatch": "New passwords should match",
+                "updatingpassword": "updating the password"
+            }
+        }
+    },
+    "title": "Open vStorage"
+}
