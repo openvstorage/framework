@@ -1,0 +1,26 @@
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section>
+    <h2 data-i18n="ovs:vmachines.title"></h2>
+    <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
+                             enterViewport: 'load', viewportRefresh: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;" class="fa fa-spinner fa-spin"></i>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td><span data-bind="text: vDisks().length"></span></td>
+                <td><span data-bind="text: storedData"></span></td>
+                <td><span data-bind="text: cacheRatio"></span></td>
+                <td data-bind="lazyloader: { item: iops }"></td>
+                <td data-bind="lazyloader: { item: readSpeed }"></td>
+                <td data-bind="lazyloader: { item: writeSpeed }"></td>
+                <td>
+                    <i data-bind="click: function() { $root.clone($data.guid()); }"  class="hand fa fa-code-fork fa-fw"></i>
+                    <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
+                    <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand fa fa-trash-o fa-fw"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>
