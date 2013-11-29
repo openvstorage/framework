@@ -44,7 +44,7 @@ define([
         self.fetchVSAGuids = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVSAGuid);
-                self.loadVSAGuid = api.get('vmachine/' + self.guid() + '/get_vsas')
+                self.loadVSAGuid = api.get('vmachines/' + self.guid() + '/get_vsas')
                     .done(function(data) {
                         var i;
                         for (i = 0; i < data.length; i += 1) {
