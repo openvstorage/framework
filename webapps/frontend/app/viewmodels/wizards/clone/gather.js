@@ -17,11 +17,8 @@ define([
             if (!self.data.name()) {
                 return {value: false, reason: $.t('ovs:wizards.clone.gather.noname')};
             }
-            var i, disks = self.data.vm().vDisks();
-            for(i = 0; i < disks.length; i += 1) {
-                if (disks[i].snapshots().length === 0) {
-                    return {value: false, reason: $.t('ovs:wizards.clone.gather.nosnapshots')};
-                }
+            if (self.data.vm().snapshots().length === 0) {
+                return {value: false, reason: $.t('ovs:wizards.clone.gather.nosnapshots')};
             }
             return {value: true, reason: undefined};
         });
@@ -33,17 +30,6 @@ define([
                     .load()
                     .done(function() {
                         self.data.name(self.data.vm().name() + '-clone');
-                        var i, disks = self.data.vm().vDisks(),
-                            loads = [];
-                        for(i = 0; i < disks.length; i += 1) {
-                            loads.push(disks[i].load());
-                        }
-                        $.when.apply($, loads)
-                            .done(function() {
-                                self.data.vm().vDisks.sort(function(a, b) {
-                                   return a.order() - b.order();
-                                });
-                            });
                     });
             }
         };

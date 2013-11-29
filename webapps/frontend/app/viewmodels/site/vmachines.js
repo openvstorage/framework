@@ -100,7 +100,7 @@ define([
                         .done(function(answer) {
                             if (answer === $.t('ovs:generic.yes')) {
                                 self.vMachines.destroy(vm);
-                                generic.alertInfo($.t('ovs:generic.vmachines.marked'), $.t('ovs:generic.vmachine.machinemarked', { what: vm.name() }));
+                                generic.alertInfo($.t('ovs:vmachines.marked'), $.t('ovs:vmachines.machinemarked', { what: vm.name() }));
                                 api.del('vmachines/' + vm.guid())
                                     .then(self.shared.tasks.wait)
                                     .done(function() {

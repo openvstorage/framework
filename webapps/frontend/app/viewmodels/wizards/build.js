@@ -26,7 +26,7 @@ define([
             if (parent.running()) {
                 return false;
             }
-            if (parent.step() < parent.stepsLength() - 1) {
+            if (parent.step() < parent.stepsLength() - 1 && parent.stepsLength() > 1) {
                 return parent.canContinue().value;
             }
             return false;

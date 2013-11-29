@@ -6,10 +6,7 @@
         <span data-i18n="ovs:wizards.clone.confirm.cloneamount"></span> <span data-bind="text: data.amount"></span>
     </p>
     <p data-i18n="ovs:wizards.clone.confirm.verifysnapshots"></p>
-    <ul data-bind="foreach: data.vm().vDisks()">
-        <li>
-            <span data-i18n="ovs:generic.disk"></span> <b><span data-bind="text: name"></span></b>:
-            <span data-bind="text: selectedSnapshot"></span>
-        </li>
-    </ul>
+    <p>
+        <span data-i18n="ovs:wizards.clone.confirm.snapshot"></span> <span data-bind="text: data.snapshotDisplay"></span>
+    </p>
 </div>

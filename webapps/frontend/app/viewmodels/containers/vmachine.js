@@ -20,6 +20,7 @@ define([
         self.vpool       = ko.observable();
         self.vsa         = ko.observable();
         self.name        = ko.observable();
+        self.snapshots   = ko.observable();
         self.iops        = ko.smoothDeltaObservable(generic.formatShort);
         self.storedData  = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits   = ko.smoothDeltaObservable();
@@ -88,6 +89,7 @@ define([
                                     self.cacheMisses(stats.sco_cache_misses);
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
+                                    self.snapshots(data.snapshots);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

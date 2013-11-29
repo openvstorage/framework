@@ -116,7 +116,7 @@ class VDiskController(object):
         """
 
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Delete disk {}'.format(disk.name))
+        logging.info('Resize disk {} from {} to {}'.format(disk.name, disk.size, volumesize))
         disk.size = volumesize
         disk.save()
         return kwargs
@@ -125,7 +125,7 @@ class VDiskController(object):
     @celery.task(name='ovs.disk.rename')
     def rename(volumename, volume_old_path, volume_new_path, **kwargs):
         """
-        Delete a disk
+        Rename a disk
         Triggered by volumedriver messages
 
         @param volumename: volume id of the disk
@@ -133,7 +133,7 @@ class VDiskController(object):
         @param volume_new_path: new path on hypervisor to the volume
         """
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Delete disk {}'.format(disk.name))
+        logging.info('Move disk {} from {} to {}'.format(disk.name, volume_old_path, volume_new_path))
         disk.devicename = volume_new_path
         disk.save()
         return kwargs

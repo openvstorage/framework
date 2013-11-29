@@ -35,21 +35,26 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.clone')
-    def clone(machineguid, disks, name, **kwargs):
+    def clone(machineguid, timestamp, name, **kwargs):
         """
-        Clone a vmachine using the specified disks
+        Clone a vmachine using the disk snapshot based on a snapshot timestamp
 
         @param machineguid: guid of the machine to clone
-        @param disks: dict with key/value pairs of diskguid/snapshotid (Will be ignored
-        if cloning from template)
+        @param timestamp: timestamp of the disk snapshots to use for the clone
         @param name: name for the new machine
         """
 
         _ = kwargs
         machine = VMachine(machineguid)
+
+        disks = {}
+        for snapshot in machine.snapshots:
+            if snapshot['timestamp'] == timestamp:
+                for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
+                    disks[diskguid] = snapshotguid
+
         new_machine = VMachine()
-        properties_to_clone = ['description', 'hvtype', 'cpu', 'memory', 'node']
-        for item in properties_to_clone:
+        for item in machine._blueprint.keys():
             setattr(new_machine, item, getattr(machine, item))
         new_machine.name = name
         new_machine.save()
@@ -101,11 +106,18 @@ class VMachineController(object):
         _ = kwargs
         machine = VMachine(machineguid)
 
-        hv = Factory.get(machine.node)
-        delete_vmachine_task = hv.delete_vm.si(hv, machine.vmid, None, True)
-        async_result = delete_vmachine_task()
-        async_result.wait()
-        if async_result.successful():
+        clean_dal = False
+        if machine.pmachine:
+            hv = Factory.get(machine.pmachine)
+            delete_vmachine_task = hv.delete_vm.si(hv, machine.hypervisorid, None, True)
+            async_result = delete_vmachine_task()
+            async_result.wait()
+            if async_result.successful():
+                clean_dal = True
+        else:
+            clean_dal = True
+
+        if clean_dal:
             for disk in machine.vdisks:
                 disk.delete()
             machine.delete()
