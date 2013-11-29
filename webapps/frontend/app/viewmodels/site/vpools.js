@@ -62,6 +62,9 @@ define([
                     .fail(deferred.reject);
             }).promise();
         };
+        self.loadVPool = function(vpool) {
+            vpool.load();
+        };
 
         // Durandal
         self.activate = function() {

@@ -3,22 +3,24 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
-], function($, ko, generic, api, VDisk, VMachine) {
+    'viewmodels/containers/vdisk'
+], function($, ko, generic, api, VDisk) {
     "use strict";
     return function(guid) {
         var self = this;
 
         // Variables
         self.loadVDisksHandle = undefined;
+        self.loadVSAGuid      = undefined;
         self.loadHandle       = undefined;
 
         // Obserables
         self.loading    = ko.observable(false);
+        self.loaded     = ko.observable(false);
 
         self.guid        = ko.observable(guid);
         self.vpool       = ko.observable();
-        self.vsa         = ko.observable();
+        self.vsaGuids    = ko.observableArray([]);
         self.name        = ko.observable();
         self.snapshots   = ko.observable();
         self.iops        = ko.smoothDeltaObservable(generic.formatShort);
@@ -39,18 +41,20 @@ define([
         self.vDiskGuids = [];
 
         // Functions
-        self.loadVsa = function() {
-        	return $.Deferred(function(deferred) {
-        		generic.xhrAbort(self.loadVDisksHandle);
-        		self.loadVDisksHandle = api.get('vdisks/' + self.vDiskGuids[0] + '/get_vsa')
+        self.fetchVSAGuids = function() {
+            return $.Deferred(function(deferred) {
+                generic.xhrAbort(self.loadVSAGuid);
+                self.loadVSAGuid = api.get('vmachine/' + self.guid() + '/get_vsas')
                     .done(function(data) {
-                        self.vsa = new VMachine(data).name
+                        var i;
+                        for (i = 0; i < data.length; i += 1) {
+                            self.vsaGuids.push(data[i]);
+                        }
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
-        	}).promise();
+            }).promise();
         };
-
         self.loadDisks = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVDisksHandle);
@@ -62,9 +66,6 @@ define([
                             if ($.inArray(item.guid, self.vDiskGuids) === -1) {
                                 self.vDiskGuids.push(item.guid);
                                 self.vDisks.push(new VDisk(item));
-                            }
-                            if (self.vDisk.length) {
-                            	self.loadVsa();
                             }
                         }
                         deferred.resolve();
@@ -95,7 +96,10 @@ define([
                                 .fail(deferred.reject);
                         }).promise()
                     ])
-                    .done(deferred.resolve)
+                    .done(function() {
+                        self.loaded(true);
+                        deferred.resolve();
+                    })
                     .fail(deferred.reject)
                     .always(function() {
                         self.loading(false);

@@ -44,22 +44,39 @@ define([
                         for (i = 0; i < data.length; i += 1) {
                             guids.push(data[i].guid);
                         }
-                        for (i = 0; i < guids.length; i += 1) {
-                            if ($.inArray(guids[i], self.vMachineGuids) === -1) {
-                                self.vMachineGuids.push(guids[i]);
-                                self.vMachines.push(new VMachine(guids[i]));
+                        generic.crossFiller(
+                            guids, self.vMachineGuids, self.vMachines,
+                            function(guid) {
+                                return new VMachine(guid);
                             }
-                        }
-                        for (i = 0; i < self.vMachineGuids.length; i += 1) {
-                            if ($.inArray(self.vMachineGuids[i], guids) === -1) {
-                                self.vMachineGuids.splice(i, 1);
-                                self.vMachines.splice(i, 1);
-                            }
-                        }
+                        );
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
             }).promise();
+        };
+        self.loadVMachine = function(vm) {
+            $.when.apply($, [
+                    vm.load(),
+                    vm.fetchVSAGuids()
+                ])
+                .done(function() {
+                    if (!vm.hasOwnProperty('vsas')) {
+                        vm.vsas = ko.observableArray([]);
+                    }
+                    var i, currentGuids = [];
+                    for (i = 0; i < vm.vsas().length; i += 1) {
+                        currentGuids.push(vm.vsas()[i].guid());
+                    }
+                    generic.crossFiller(
+                        vm.vsaGuids, currentGuids, vm.vsas,
+                        function(guid) {
+                            var vm = new VMachine(guid);
+                            vm.load();
+                            return vm;
+                        }
+                    );
+                });
         };
         self.clone = function(guid) {
             var i, vms = self.vMachines();

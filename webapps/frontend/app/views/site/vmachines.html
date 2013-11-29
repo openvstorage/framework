@@ -2,7 +2,7 @@
 <section>
     <h2 data-i18n="ovs:vmachines.title"></h2>
     <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
-                             enterViewport: 'load', viewportRefresh: 5000, controls: true }">
+                             enterViewport: loadVMachine, viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>
@@ -10,7 +10,7 @@
                     <span data-bind="text: name"></span>
                 </td>
                 <td><span data-bind="text: vpool"></span></td>
-                <td><span data-bind="text: vsa"></span></td>
+                <td><!--<span data-bind="text: vsa"></span>--></td>
                 <td><span data-bind="text: vDisks().length"></span></td>
                 <td><span data-bind="text: storedData"></span></td>
                 <td><span data-bind="text: cacheRatio"></span></td>
