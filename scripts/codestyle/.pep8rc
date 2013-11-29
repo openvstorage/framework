@@ -1,0 +1,4 @@
+# pep8 -h for details
+[pep8]
+max-line-length = 100
+exclude = ovs/extensions/suds
