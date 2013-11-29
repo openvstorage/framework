@@ -76,8 +76,8 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.clone.s(parentmachineguid=vmachine.guid,
-                                          disks=request.DATA['disks'],
+        task = VMachineController.clone.s(machineguid=vmachine.guid,
+                                          timestamp=request.DATA['snapshot'],
                                           name=request.DATA['name']).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)
 

@@ -126,20 +126,22 @@
                 "selectsnapshots": "Select the snapshots from which you want to clone:",
                 "nomachine": "No machine loaded",
                 "noname": "No name was entered",
-                "nosnapshots": "Not all disks have snapshots"
+                "nosnapshots": "Not all disks have snapshots",
+                "snapshot": "Snapshots"
             },
             "confirm": {
                 "title": "Verify the entered information",
                 "clonename": "Name of the clone:",
                 "cloneamount": "Amount of clones:",
-                "verifysnapshots": "Please validate the selected snapshots below. These will be used for the clone:",
+                "verifysnapshots": "Please validate the selected snapshot below. It will be used for the clone:",
                 "cloning": "cloning __what__",
                 "clonestarted": "Clone started",
                 "inprogress": "Machine __what__ cloning in progress...",
                 "success": "Cloned __what__ successfully",
                 "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
                 "allfailed": "All clones for machine __what__ failed.",
-                "complete": "Clones completed"
+                "complete": "Clones completed",
+                "snapshot": "Snapshot:"
             }
         },
         "snapshot": {

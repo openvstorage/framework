@@ -18,8 +18,6 @@ define([
         self.snapshots = ko.observableArray([]);
         self.size      = ko.observable(0);
 
-        self.selectedSnapshot = ko.observable();
-
         // Functions
         self.load = function() {
             return $.Deferred(function(deferred) {
