@@ -1,0 +1,5 @@
+#!/bin/bash
+
+source /etc/profile
+mkdir -p /var/log/ovs
+chown ovs:ovs /var/log/ovs

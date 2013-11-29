@@ -1,0 +1,142 @@
+{
+    "generic": {
+        "username": "Gebruikersnaam",
+        "password": "Paswoord",
+        "logout": "Uitloggen",
+        "user": "Gebruiker",
+        "togglenavigation": "Navigatie aanpassen",
+        "changepassword": "Paswoord wijzigen",
+        "signin": "Inloggen",
+        "welcome": "Welkom",
+        "of": "of",
+        "next": "Volgende &raquo;",
+        "previous": "&laquo; Vorige",
+        "cancel": "Stop",
+        "finish": "Voltooien",
+        "ok": "OK",
+        "bs": "B/s",
+        "b": "B",
+        "kibs": "KiB/s",
+        "kib": "KiB",
+        "mibs": "MiB/s",
+        "mib": "MiB",
+        "gibs": "GiB/s",
+        "gib": "GiB",
+        "tibs": "TiB/s",
+        "tib": "TiB",
+        "savesuccessfully": "__what__ is succesvol bewaard.",
+        "errorwhile": "Een fout deed zich voor tijdens __what__.",
+        "errorwhile_error": "Een fout deed zich voor tijdens __what__: __error__",
+        "saved": "Bewaard",
+        "error": "Fout",
+        "vdisk": "vDisk",
+        "disk": "Schijf",
+        "vdisks": "vDisks",
+        "disks": "Disks",
+        "name": "Naam",
+        "storeddata": "Opgeslagen data",
+        "cache": "Cache",
+        "iops": "IOPS",
+        "latency": "Latency",
+        "readspeed": "Lees snelheid",
+        "writespeed": "Schrijf snelheid",
+        "actions": "Acties",
+        "showing": "",
+        "from": "van",
+        "results": "resultaten",
+        "areyousure": "Bent u zeker?",
+        "yes": "Ja",
+        "no": "Nee"
+    },
+    "vpools" : {
+        "title": "vPools",
+        "backendtype": "Type",
+        "backendtypes": {
+            "S3": "Amazon S3",
+            "FILESYSTEM": "Bestandssystem"
+        },
+        "backendconnection": "Connectie",
+        "backendlogin": "Login"
+    },
+    "statistics": {
+        "title": "Statistieken",
+        "introduction": "Deze pagina bevat de statistieken van uw omgeving",
+        "memcache": {
+            "title": "Memcache",
+            "memoryusage": "Geheugen in gebruik:",
+            "keysincache": "Keys in de cache:",
+            "cachehits": "Cache hits:",
+            "cachetraffic": "Cache traffic",
+            "uptime": "Actief",
+            "rawinfo": "Raw memcached informatie"
+        }
+    },
+    "vmachines": {
+        "title": "vMachines",
+        "suretodelete": "Bent u zeker dat u __what__ wil verwijderen?",
+        "marked": "Klaar om te verwijderen",
+        "machinemarked": "Machine __what__ zal worden verwijderd ...",
+        "deleted": "Machine verwijdered",
+        "machinedeleted": "Machine __what__ werd verwijderd"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "introduction": "Open vStorage is de volgende generatie in Software-Defined Storage."
+    },
+    "login": {
+        "title": "Gebruikersnaam",
+        "introduction": "Geef uw gebruikersnaam en paswoord op.",
+        "invalidcredentials": "Ongeldige gebruikersnaam en paswoord combinatie.",
+        "welcome": "U kunt de navigatie gebruiken om machine en disk statistieken op te vragen."
+    },
+    "notfound": {
+        "title": "De opgevraagde pagina bestaat niet",
+        "introduction": "De opgevraagde pagina bestaat niet. Kijk het webadres na en pas uw bladwijzer aan."
+    },
+    "keywords": {
+        "vpool": "vPool"
+    },
+    "wizards" : {
+        "clone": {
+            "title": "Kloon",
+            "gather": {
+                "title": "Gelieve de nodige informatie te voorzien",
+                "basicinfo": "Algemene informatie",
+                "name": "Naam van de kloon",
+                "amount": "Aantal",
+                "selectsnapshots": "Selecteer de snapshot om van te klonen:",
+                "nomachine": "Geen machine gevonden",
+                "nosnapshots": "Niet alle vDisks hebben een snapshot"
+            },
+            "confirm": {
+                "title": "Bevestig de informatie",
+                "clonename": "Naam van de kloon",
+                "cloneamount": "Aantal",
+                "verifysnapshots": "Volgende snapshots werden gekozen om van te klonen:",
+                "cloning": "Bezig met klonen __what__",
+                "clonestarted": "Het kloon proces werd gestart",
+                "inprogress": "bezig met het klonen van  __what__ ...",
+                "success": "__what__ werd succesvol gekloond",
+                "somefailed": "Machine __what__ werd gekloond. Sommige disken konden echte niet worden gekloond",
+                "allfailed": "De machine __what__ kon niet worden gekloond.",
+                "complete": "Het kloon proces is afgerond"
+            }
+        },
+        "changepassword": {
+            "title": "Paswoord wijzigen",
+            "confirm": {
+                "title": "Gelieve de nodige informatie te voorzien",
+                "introduction": "Let op tijdens het wijzigen van de paswoord informatie",
+                "newpassword": "Nieuw paswoord",
+                "currentpassword": "Huidig paswoord",
+                "retype": "Herhaal",
+                "entercurrent": "Geef uw huidig paswoord in",
+                "currentinvalid": "Ongeldig paswoord",
+                "enternew": "Geef een nieuw paswoord in",
+                "shouldmatch": "De opgegeven paswoorden zijn niet dezelfde",
+                "updatingpassword": "Het paswoord wordt aangepast"
+            }
+        }
+    },
+    "title": "Open vStorage"
+}
