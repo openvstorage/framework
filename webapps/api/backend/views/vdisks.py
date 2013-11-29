@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
@@ -67,6 +68,6 @@ class VDiskViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         vsa_vmachine_guid = None
         if vdisk.vsrid:
-            vsr = VolumeStorageRouter(vdisk.vsrid)
+            vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
             vsa_vmachine_guid = vsr.serving_vmachine.guid
         return Response(vsa_vmachine_guid, status=status.HTTP_200_OK)

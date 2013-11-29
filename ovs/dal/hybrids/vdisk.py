@@ -87,4 +87,5 @@ class VDisk(DataObject):
         Returns the Volume Storage Router ID to which the vDisk is connected.
         """
         _ = self
-        return None
+        #temporary workaround for testing purposes
+        return self.volumeid
