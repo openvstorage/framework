@@ -46,10 +46,7 @@ define([
                 generic.xhrAbort(self.loadVSAGuid);
                 self.loadVSAGuid = api.get('vmachines/' + self.guid() + '/get_vsas')
                     .done(function(data) {
-                        var i;
-                        for (i = 0; i < data.length; i += 1) {
-                            self.vsaGuids.push(data[i]);
-                        }
+                        self.vsaGuids(data);
                         deferred.resolve();
                     })
                     .fail(deferred.reject);

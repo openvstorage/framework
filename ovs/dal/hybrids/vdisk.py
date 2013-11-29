@@ -12,7 +12,7 @@ _vsr_client = VolumeStorageRouterClient().load()
 
 class VDisk(DataObject):
     """
-    The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage. 
+    The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     vDisks can be part of a vMachine or stand-alone.
     """
     # pylint: disable=line-too-long
