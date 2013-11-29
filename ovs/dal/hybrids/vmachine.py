@@ -8,7 +8,7 @@ from ovs.dal.hybrids.pmachine import PMachine
 
 class VMachine(DataObject):
     """
-    The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks 
+    The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks
     or a Virtual Machine running the Open vStorage software.
     """
     # pylint: disable=line-too-long
@@ -31,7 +31,26 @@ class VMachine(DataObject):
         @return: list
         """
         _ = self
-        return None
+        import time
+        import uuid
+        first = time.time() - (60 * 60 * 24 * 3)
+        second = time.time() - (60 * 60 * 24 * 2)
+        third = time.time() - (60 * 60 * 24)
+        return [{'timestamp': first,
+                 'label': 'My first snapshot',
+                 'is_consistent': True,
+                 'snapshots': {str(uuid.uuid4()): uuid.uuid4(),
+                               str(uuid.uuid4()): uuid.uuid4()}},
+                {'timestamp': second,
+                 'label': None,
+                 'is_consistent': False,
+                 'snapshots': {str(uuid.uuid4()): uuid.uuid4(),
+                               str(uuid.uuid4()): uuid.uuid4()}},
+                {'timestamp': third,
+                 'label': 'My Third snapshot',
+                 'is_consistent': True,
+                 'snapshots': {str(uuid.uuid4()): uuid.uuid4(),
+                               str(uuid.uuid4()): uuid.uuid4()}}]
 
     def _status(self):
         """
