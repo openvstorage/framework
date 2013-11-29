@@ -57,8 +57,4 @@
         "vrouter_local_port" : "12321",
         "write_threshold" : 1024
     }
-    "event_publisher": {
-        "events_amqp_routing_key": "storagerouter",
-        "events_amqp_uri": "amqp://localhost:5672"
-    }
 }

@@ -22,5 +22,5 @@ incoming		= /srv/ovs-apt-repository/ovs/mini-dinstall/incoming/
 login			= root
 run_dinstall		= 0
 allow_dcut		= 1
-allowed_distributions	= ovs-(development|release|unstable|stable)
+allowed_distributions	= ovs-development
 allow_unsigned_upload   = 1

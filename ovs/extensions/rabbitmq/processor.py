@@ -9,7 +9,7 @@ def process(queue, body):
     """
     Processes the actual received body
     """
-    if queue == 'storagerouter':
+    if queue == 'voldrv_queue':
         import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
         volumedrivermessage = EventMessages.EventMessage()
         data = volumedrivermessage.FromString(body)
