@@ -15,6 +15,7 @@ define([
 
         // Obserables
         self.loading           = ko.observable(false);
+        self.loaded            = ko.observable(false);
 
         self.guid              = ko.observable(guid);
         self.name              = ko.observable();
@@ -95,7 +96,10 @@ define([
                                 .fail(machineDeferred.reject);
                         }).promise()
                     ])
-                    .done(deferred.resolve)
+                    .done(function() {
+                        self.loaded(true);
+                        deferred.resolve();
+                    })
                     .fail(deferred.reject)
                     .always(function() {
                         self.loading(false);

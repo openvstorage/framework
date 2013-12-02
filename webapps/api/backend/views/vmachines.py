@@ -120,3 +120,22 @@ class VMachineViewSet(viewsets.ViewSet):
             vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
             vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
         return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True, customer=True)
+    @required_roles(['view'])
+    def get_vpools(self, request, pk=None, format=None):
+        """
+        Returns the vpool guids associated with the given VM
+        """
+        _ = request, format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            vmachine = VMachine(pk)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        vpool_guids = []
+        for vdisk in vmachine.vdisks:
+            vpool_guids.append(vdisk.vpool.guid)
+        return Response(vpool_guids, status=status.HTTP_200_OK)

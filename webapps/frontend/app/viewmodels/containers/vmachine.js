@@ -13,14 +13,38 @@ define([
         self.loadVDisksHandle = undefined;
         self.loadVSAGuid      = undefined;
         self.loadHandle       = undefined;
+        self.loadVpoolGuid    = undefined;
+
+        // External dependencies
+        self.vsas        = ko.observableArray([]);
+        self.vsaNames    = ko.computed(function() {
+            var i, names = [];
+            for (i = 0; i < self.vsas().length; i += 1) {
+                if (self.vsas()[i].loaded()) {
+                    names.push(self.vsas()[i].name());
+                }
+            }
+            return names.join(', ');
+        });
+        self.vpools      = ko.observableArray([]);
+        self.vpoolNames  = ko.computed(function() {
+            var i, names = [];
+            for (i = 0; i < self.vpools().length; i += 1) {
+                if (self.vpools()[i].loaded()) {
+                    names.push(self.vpools()[i].name());
+                }
+            }
+            return names.join(', ');
+        });
 
         // Obserables
-        self.loading    = ko.observable(false);
-        self.loaded     = ko.observable(false);
+        self.loading     = ko.observable(false);
+        self.loaded      = ko.observable(false);
 
         self.guid        = ko.observable(guid);
         self.vpool       = ko.observable();
         self.vsaGuids    = ko.observableArray([]);
+        self.vPoolGuids  = ko.observableArray([]);
         self.name        = ko.observable();
         self.snapshots   = ko.observable();
         self.iops        = ko.smoothDeltaObservable(generic.formatShort);
@@ -47,6 +71,17 @@ define([
                 self.loadVSAGuid = api.get('vmachines/' + self.guid() + '/get_vsas')
                     .done(function(data) {
                         self.vsaGuids(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise();
+        };
+        self.fetchVPoolGuids = function() {
+            return $.Deferred(function(deferred) {
+                generic.xhrAbort(self.loadVpoolGuid);
+                self.loadVpoolGuid = api.get('vmachines/' + self.guid() + '/get_vpools')
+                    .done(function(data) {
+                        self.vPoolGuids(data);
                         deferred.resolve();
                     })
                     .fail(deferred.reject);

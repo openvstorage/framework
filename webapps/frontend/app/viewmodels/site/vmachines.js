@@ -3,8 +3,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../wizards/clone/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, CloneWizard, SnapshotWizard) {
+    '../containers/vmachine', '../containers/vpool', '../wizards/clone/index', '../wizards/snapshot/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, VPool, CloneWizard, SnapshotWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -58,12 +58,11 @@ define([
         self.loadVMachine = function(vm) {
             $.when.apply($, [
                     vm.load(),
-                    vm.fetchVSAGuids()
+                    vm.fetchVSAGuids(),
+                    vm.fetchVPoolGuids()
                 ])
                 .done(function() {
-                    if (!vm.hasOwnProperty('vsas')) {
-                        vm.vsas = ko.observableArray([]);
-                    }
+                    // Merge in the VSAs
                     var i, currentGuids = [];
                     for (i = 0; i < vm.vsas().length; i += 1) {
                         currentGuids.push(vm.vsas()[i].guid());
@@ -72,6 +71,19 @@ define([
                         vm.vsaGuids, currentGuids, vm.vsas,
                         function(guid) {
                             var vm = new VMachine(guid);
+                            vm.load();
+                            return vm;
+                        }
+                    );
+                    // Merge in the vPools
+                    currentGuids = [];
+                    for (i = 0; i < vm.vpools().length; i += 1) {
+                        currentGuids.push(vm.vpools()[i].guid());
+                    }
+                    generic.crossFiller(
+                        vm.vPoolGuids, currentGuids, vm.vpools,
+                        function(guid) {
+                            var vm = new VPool(guid);
                             vm.load();
                             return vm;
                         }
