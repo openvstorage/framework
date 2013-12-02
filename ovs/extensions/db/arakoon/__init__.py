@@ -1,4 +1,3 @@
-# license see http://www.openvstorage.com/licenses/opensource/
 '''
 This file is part of Arakoon, a distributed key-value store. Copyright
 (C) 2010 Incubaid BVBA
