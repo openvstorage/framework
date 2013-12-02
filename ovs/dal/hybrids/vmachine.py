@@ -19,10 +19,11 @@ class VMachine(DataObject):
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
                   'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.')}
     _relations = {'pmachine': (PMachine, 'vmachines')}
-    _expiry = {'snapshots':   (60, list),
-               'status':      (30, str),
-               'statistics':   (5, dict),
-               'stored_data': (60, int)}
+    _expiry = {'snapshots':     (60, list),
+               'status':        (30, str),
+               'statistics':     (5, dict),
+               'stored_data':   (60, int),
+               'failover_mode': (60, str)}
     # pylint: enable=line-too-long
 
     def _snapshots(self):
@@ -78,3 +79,13 @@ class VMachine(DataObject):
         @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
+
+    def _failover_mode(self):
+        """
+        Gets the agregated failover mode
+        """
+        status = None
+        for disk in self.vdisks:
+            if status is None or 'OK' not in disk.info['failover_mode']:
+                status = disk.info['failover_mode']
+        return status

@@ -7,7 +7,7 @@ from ovs.dal.dataobject import DataObject
 
 class VPool(DataObject):
     """
-    The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to 
+    The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
     deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend.
     """
     # pylint: disable=line-too-long
@@ -19,9 +19,10 @@ class VPool(DataObject):
                   'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
                   'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the Storage Backend.')}
     _relations = {}
-    _expiry = {'status':      (10, str),
-               'statistics':   (5, dict),
-               'stored_data': (60, int)}
+    _expiry = {'status':        (10, str),
+               'statistics':     (5, dict),
+               'stored_data':   (60, int),
+               'failover_mode': (60, str)}
     # pylint: enable=line-too-long
 
     def _status(self):
@@ -50,3 +51,13 @@ class VPool(DataObject):
         @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
+
+    def _failover_mode(self):
+        """
+        Gets the agregated failover mode
+        """
+        status = None
+        for disk in self.vdisks:
+            if status is None or 'OK' not in disk.info['failover_mode']:
+                status = disk.info['failover_mode']
+        return status

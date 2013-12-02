@@ -16,26 +16,27 @@ define([
         self.loadVpoolGuid    = undefined;
 
         // External dependencies
-        self.vsas        = ko.observableArray([]);
-        self.vpools      = ko.observableArray([]);
+        self.vsas         = ko.observableArray([]);
+        self.vpools       = ko.observableArray([]);
 
         // Obserables
-        self.loading     = ko.observable(false);
-        self.loaded      = ko.observable(false);
+        self.loading      = ko.observable(false);
+        self.loaded       = ko.observable(false);
 
-        self.guid        = ko.observable(guid);
-        self.vpool       = ko.observable();
-        self.vsaGuids    = ko.observableArray([]);
-        self.vPoolGuids  = ko.observableArray([]);
-        self.name        = ko.observable();
-        self.snapshots   = ko.observable();
-        self.iops        = ko.smoothDeltaObservable(generic.formatShort);
-        self.storedData  = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits   = ko.smoothDeltaObservable();
-        self.cacheMisses = ko.smoothDeltaObservable();
-        self.readSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.writeSpeed  = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.cacheRatio  = ko.computed(function() {
+        self.guid         = ko.observable(guid);
+        self.vpool        = ko.observable();
+        self.vsaGuids     = ko.observableArray([]);
+        self.vPoolGuids   = ko.observableArray([]);
+        self.name         = ko.observable();
+        self.snapshots    = ko.observable();
+        self.iops         = ko.smoothDeltaObservable(generic.formatShort);
+        self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
+        self.cacheHits    = ko.smoothDeltaObservable();
+        self.cacheMisses  = ko.smoothDeltaObservable();
+        self.readSpeed    = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.writeSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.failoverMode = ko.observable();
+        self.cacheRatio   = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
@@ -43,8 +44,8 @@ define([
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
 
-        self.vDisks     = ko.observableArray([]);
-        self.vDiskGuids = [];
+        self.vDisks      = ko.observableArray([]);
+        self.vDiskGuids  = [];
 
         // Functions
         self.fetchVSAGuids = function() {
@@ -105,6 +106,7 @@ define([
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
                                     self.snapshots(data.snapshots);
+                                    self.failoverMode(data.failover_mode);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

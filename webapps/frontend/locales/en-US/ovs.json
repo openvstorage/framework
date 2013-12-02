@@ -62,7 +62,8 @@
         "yes": "Yes",
         "no": "No",
         "size": "Size",
-        "customerapi": "Customer API"
+        "customerapi": "Customer API",
+        "focstatus": "FOC"
     },
     "vpools" : {
         "title": "vPools",

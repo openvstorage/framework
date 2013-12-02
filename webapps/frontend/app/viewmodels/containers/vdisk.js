@@ -16,6 +16,7 @@ define([
         // External dependencies
         self.vsa          = ko.observable();
         self.vMachine     = ko.observable();
+        self.vpool        = ko.observable();
 
         // Obserables
         self.loading      = ko.observable(false);
@@ -35,6 +36,7 @@ define([
         self.vsaGuid      = ko.observable();
         self.vpoolGuid    = ko.observable();
         self.vMachineGuid = ko.observable();
+        self.failoverMode = ko.observable();
 
         self.cacheRatio = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
@@ -77,6 +79,7 @@ define([
                                     self.snapshots(data.snapshots);
                                     self.size(data.size);
                                     self.storedData(data.info.stored);
+                                    self.failoverMode(data.info.failover_mode);
                                     self.vpoolGuid(data.vpool_guid);
                                     self.vMachineGuid(data.vmachine_guid);
                                     deferred.resolve();

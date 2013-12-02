@@ -3,8 +3,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../wizards/clone/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, CloneWizard, SnapshotWizard) {
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool) {
     "use strict";
     return function() {
         var self = this;
@@ -17,18 +17,18 @@ define([
 
         // Data
         self.vDiskHeaders = [
-            { key: 'name',       value: $.t('ovs:generic.name'),         width: 150,       colspan: undefined },
-            { key: 'vmachine',   value: $.t('ovs:generic.vmachine'),     width: 110,       colspan: undefined },
-            { key: 'vpool',      value: $.t('ovs:generic.vpool'),        width: 110,       colspan: undefined },
-            { key: 'vsa',        value: $.t('ovs:generic.vsa'),          width: 110,       colspan: undefined },
-            { key: 'size',       value: $.t('ovs:generic.size'),         width: 100,       colspan: undefined },
-            { key: 'storedData', value: $.t('ovs:generic.storeddata'),   width: 110,       colspan: undefined },
-            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),        width: 100,       colspan: undefined },
-            { key: 'iops',       value: $.t('ovs:generic.iops'),         width: 55,        colspan: undefined },
-            { key: 'readSpeed',  value: $.t('ovs:generic.readspeed'),    width: 100,       colspan: undefined },
-            { key: 'writeSpeed', value: $.t('ovs:generic.writespeed'),   width: undefined, colspan: undefined },
-            //{ key: 'foc',        value: $.t('ovs:generic.foc'),          width: 50,        colspan: undefined },
-            { key: undefined,    value: $.t('ovs:generic.actions'),      width: 80,        colspan: undefined }
+            { key: 'name',         value: $.t('ovs:generic.name'),         width: 150,       colspan: undefined },
+            { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),     width: 110,       colspan: undefined },
+            { key: 'vpool',        value: $.t('ovs:generic.vpool'),        width: 110,       colspan: undefined },
+            { key: 'vsa',          value: $.t('ovs:generic.vsa'),          width: 110,       colspan: undefined },
+            { key: 'size',         value: $.t('ovs:generic.size'),         width: 100,       colspan: undefined },
+            { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110,       colspan: undefined },
+            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),        width: 100,       colspan: undefined },
+            { key: 'iops',         value: $.t('ovs:generic.iops'),         width: 55,        colspan: undefined },
+            { key: 'readSpeed',    value: $.t('ovs:generic.readspeed'),    width: 100,       colspan: undefined },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.writespeed'),   width: 100,       colspan: undefined },
+            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: undefined, colspan: undefined },
+            { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80,        colspan: undefined }
         ];
         self.vDisks = ko.observableArray([]);
         self.vDiskGuids =  [];
@@ -37,6 +37,12 @@ define([
         self.loadVDisksHandle = undefined;
 
         // Functions
+        self.vpoolUrl = function(guid) {
+            return '#' + self.shared.mode() + '/vpool/' + (guid.call ? guid() : guid);
+        };
+        self.vmachineUrl = function(guid) {
+            return '#' + self.shared.mode() + '/vmachine/' + (guid.call ? guid() : guid);
+        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVDisksHandle);
@@ -63,7 +69,7 @@ define([
                     vdisk.fetchVSAGuid()
                 ])
                 .done(function() {
-                    var vm;
+                    var vm, pool;
                     if (vdisk.vsa() === undefined || vdisk.vsa().guid() !== vdisk.vsaGuid()) {
                         vm = new VMachine(vdisk.vsaGuid());
                         vm.load();
@@ -73,6 +79,11 @@ define([
                         vm = new VMachine(vdisk.vMachineGuid());
                         vm.load();
                         vdisk.vMachine(vm);
+                    }
+                    if (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vdisk.vpoolGuid()) {
+                        pool = new VPool(vdisk.vpoolGuid());
+                        pool.load();
+                        vdisk.vpool(pool);
                     }
                 });
         };

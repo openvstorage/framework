@@ -11,13 +11,17 @@
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded' }">
-                        <span data-part="entry" data-bind="text: item().name()"></span>
+                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
                     </span>
                 </td>
-                <td><!--<span data-bind="text: vpool"></span>--></td>
+                <td>
+                    <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded' }">
+                        <a data-part="lazy-entry" data-bind="text: item().name, attr: { href: $root.vpoolUrl(item().guid) }"></a>
+                    </span>
+                </td>
                 <td>
                     <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded' }">
-                        <span data-part="entry" data-bind="text: item().name()"></span>
+                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
                     </span>
                 </td>
                 <td><span data-bind="text: size"></span></td>
@@ -26,7 +30,15 @@
                 <td data-bind="lazyloader: { item: iops }"></td>
                 <td data-bind="lazyloader: { item: readSpeed }"></td>
                 <td data-bind="lazyloader: { item: writeSpeed }"></td>
-                <!--<td><span data-bind="text: FOC"></span></td>-->
+                <td>
+                    <span data-bind="status: {
+                                         colors: {
+                                             green: failoverMode() == 'OK_STANDALONE',
+                                             red: failoverMode() == 'NOK_STANDALONE'
+                                         },
+                                         defaultColor: 'lightgrey'
+                                     }"></span>
+                </td>
                 <td>
                     <i data-bind="click: function() { $root.rollback($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
                 </td>

@@ -11,12 +11,12 @@
                 </td>
                 <td>
                     <span data-bind="lazylist: { items: vpools, loadedObservable: 'loaded' }">
-                        <a data-part="item" data-bind="text: name, attr: { href: $root.vpoolUrl(guid) }"></a>
+                        <a data-part="entry" data-bind="text: name, attr: { href: $root.vpoolUrl(guid) }"></a>
                     </span>
                 </td>
                 <td>
                     <span data-bind="lazylist: { items: vsas, loadedObservable: 'loaded' }">
-                        <span data-part="item" data-bind="text: name"></span>
+                        <span data-part="entry" data-bind="text: name"></span>
                     </span>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
@@ -25,6 +25,15 @@
                 <td data-bind="lazyloader: { item: iops }"></td>
                 <td data-bind="lazyloader: { item: readSpeed }"></td>
                 <td data-bind="lazyloader: { item: writeSpeed }"></td>
+                <td>
+                    <span data-bind="status: {
+                                         colors: {
+                                             green: failoverMode() == 'OK_STANDALONE',
+                                             red: failoverMode() == 'NOK_STANDALONE'
+                                         },
+                                         defaultColor: 'lightgrey'
+                                     }"></span>
+                </td>
                 <td>
                     <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
                     <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand fa fa-trash-o fa-fw"></i>
