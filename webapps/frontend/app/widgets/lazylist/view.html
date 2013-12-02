@@ -1,0 +1,8 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<span data-bind="foreach: items">
+    <span data-bind="visible: $index() > 0">,</span>
+    <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spinner fa-spin"></i></span>
+    <span data-bind="visible: $parent.isLoaded($data)">
+        <span data-part="item" data-bind="text: $data"></span>
+    </span>
+</span>

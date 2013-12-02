@@ -54,7 +54,7 @@ define([
         });
         app.configurePlugins({
             widget: {
-                kinds: ['pager', 'lazyloader']
+                kinds: ['pager', 'lazyloader', 'lazylist']
             }
         });
         app.start().then(function() {

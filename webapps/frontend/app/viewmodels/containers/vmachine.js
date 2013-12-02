@@ -17,25 +17,7 @@ define([
 
         // External dependencies
         self.vsas        = ko.observableArray([]);
-        self.vsaNames    = ko.computed(function() {
-            var i, names = [];
-            for (i = 0; i < self.vsas().length; i += 1) {
-                if (self.vsas()[i].loaded()) {
-                    names.push(self.vsas()[i].name());
-                }
-            }
-            return names.join(', ');
-        });
         self.vpools      = ko.observableArray([]);
-        self.vpoolNames  = ko.computed(function() {
-            var i, names = [];
-            for (i = 0; i < self.vpools().length; i += 1) {
-                if (self.vpools()[i].loaded()) {
-                    names.push(self.vpools()[i].name());
-                }
-            }
-            return names.join(', ');
-        });
 
         // Obserables
         self.loading     = ko.observable(false);
