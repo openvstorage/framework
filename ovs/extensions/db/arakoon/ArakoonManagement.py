@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 import os
 import subprocess
 import signal

@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 # This file is part of Pyrakoon, a distributed key-value store client.
 #
 # Copyright (C) 2010 Incubaid BVBA
