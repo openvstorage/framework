@@ -117,8 +117,9 @@ class VMachineViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         vsa_vmachine_guids = []
         for vdisk in vmachine.vdisks:
-            vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
-            vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
+            if vdisk.vsrid:
+                vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
+                vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
         return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
 
     @link()

@@ -12,9 +12,12 @@ define([
         self.item             = ko.observable();
         self.isLazyLoader     = ko.observable(false);
         self.isLoaded         = ko.computed(function() {
-            if (self.isLazyLoader()) {
-                return self.item[self.loadedObservable]();
-            }
+        	if (self.isLazyLoader()) {
+	            if (self.item.hasOwnProperty(self.loadedObservable)) {
+	            	return self.item[self.loadedObservable]();
+	            } else {
+	            	return self.item()[self.loadedObservable]();
+        	}
             return true;
         });
 
@@ -24,8 +27,8 @@ define([
             }
             self.loadedObservable = generic.tryGet(settings, 'loadedObservable', 'initialized');
             self.item = settings.item;
-            if (self.item.hasOwnProperty(self.loadedObservable) && self.item[self.loadedObservable].call) {
-                self.isLazyLoader(true);
+            if (self.item() !== undefined && self.item().hasOwnProperty(self.loadedObservable) && self.item()[self.loadedObservable].call) {
+            	self.isLazyLoader(true);
             }
         };
     };

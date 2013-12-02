@@ -5,6 +5,6 @@
         <span data-part="item" data-bind="text: item"></span>
     </span>
 </span>
-<span data-bind="if: !isLazyLoader()">
+<span data-bind="if: !isLazyLoader() && item() !== undefined">
     <span data-part="item" data-bind="text: item"></span>
 </span>
