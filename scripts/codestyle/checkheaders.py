@@ -29,7 +29,8 @@ skip_dirs = ['/webapps/frontend/lib',
              '/webapps/frontend/css',
              '/webapps/api/static/rest_framework/js',
              '/.hg',
-             '/scripts/']
+             '/scripts/',
+             '/extensions/db/arakoon/']
 #define files and directories to except from skip
 # should be subdirectories of the skip directories
 # or files inside the skip_dirs
