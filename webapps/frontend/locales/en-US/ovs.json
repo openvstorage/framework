@@ -60,7 +60,8 @@
         "results": "results",
         "areyousure": "Are you sure?",
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "size": "Size"
     },
     "vpools" : {
         "title": "vPools",

@@ -21,7 +21,7 @@ define([
             { key: 'vmachine',   value: $.t('ovs:generic.vmachine'),     width: 110,       colspan: undefined },
             { key: 'vpool',      value: $.t('ovs:generic.vpool'),        width: 110,       colspan: undefined },
             { key: 'vsa',        value: $.t('ovs:generic.vsa'),          width: 110,       colspan: undefined },
-            { key: 'size',       value: $.t('ovs:generic.size'),         width: 55,        colspan: undefined },
+            { key: 'size',       value: $.t('ovs:generic.size'),         width: 100,       colspan: undefined },
             { key: 'storedData', value: $.t('ovs:generic.storeddata'),   width: 110,       colspan: undefined },
             { key: 'cacheRatio', value: $.t('ovs:generic.cache'),        width: 100,       colspan: undefined },
             { key: 'iops',       value: $.t('ovs:generic.iops'),         width: 55,        colspan: undefined },
@@ -61,31 +61,20 @@ define([
             $.when.apply($, [
                     vdisk.load(),
                     vdisk.fetchVSAGuid(),
-                    vdisk,fetchVMachineGuid()
+                    vdisk.fetchVMachineGuid()
                 ])
                 .done(function() {
-                    if (!vdisk.hasOwnProperty('vsa')) {
-                    	vdisk.vsa = ko.observable();
+                    var vm;
+                    if (vdisk.vsa() === undefined || vdisk.vsa().guid() !== vdisk.vsaGuid()) {
+                        vm = new VMachine(vdisk.vsaGuid());
+                        vm.load();
+                        vdisk.vsa(vm);
                     }
-                    generic.crossFiller(
-                    	[vdisk.vsaGuid,], [], vdisk.vsa,
-                        function(guid) {
-                            var vm = new VMachine(guid);
-                            vm.load();
-                            return vm;
-                        }
-                    );
-                    if (!vdisk.hasOwnProperty('vmachine')) {
-                    	vdisk.vmachine = ko.observable();
+                    if (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vdisk.vMachineGuid()) {
+                        vm = new VMachine(vdisk.vMachineGuid());
+                        vm.load();
+                        vdisk.vMachine(vm);
                     }
-                    generic.crossFiller(
-                    	[vdisk.vMachineGuid,], [], vdisk.vsa,
-                        function(guid) {
-                            var vm = new VMachine(guid);
-                            vm.load();
-                            return vm;
-                        }
-                    );
                 });
         };
 

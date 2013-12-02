@@ -71,7 +71,7 @@ class VDiskViewSet(viewsets.ViewSet):
             vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
             vsa_vmachine_guid = vsr.serving_vmachine.guid
         return Response(vsa_vmachine_guid, status=status.HTTP_200_OK)
-    
+
     @link()
     @expose(internal=True, customer=True)
     @required_roles(['view'])

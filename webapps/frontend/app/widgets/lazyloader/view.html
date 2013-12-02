@@ -2,9 +2,9 @@
 <span data-bind="if: isLazyLoader()">
     <span data-bind="visible: !isLoaded()"><i class="fa fa-spinner fa-spin"></i></span>
     <span data-bind="visible: isLoaded()">
-        <span data-part="item" data-bind="text: item"></span>
+        <span data-part="entry" data-bind="text: item"></span>
     </span>
 </span>
 <span data-bind="if: !isLazyLoader() && item() !== undefined">
-    <span data-part="item" data-bind="text: item"></span>
+    <span data-part="entry" data-bind="text: item"></span>
 </span>

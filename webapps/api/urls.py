@@ -50,6 +50,7 @@ the <a href='%(customerapi)s'>Customer API</a>.
 
 urlpatterns = patterns('',
     url(r'^auth/',      ObtainAuthToken.as_view()),
+    url(r'^api-auth/',  include('rest_framework.urls', namespace='rest_framework')),
     url(r'^customer/',  include(build_router_urls('customer', customer_docs))),
     url(r'^internal/',  include(build_router_urls('internal', internal_docs))),
     url(r'^$',          RedirectView.as_view(url='customer/')),

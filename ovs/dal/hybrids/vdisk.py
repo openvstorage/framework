@@ -44,7 +44,7 @@ class VDisk(DataObject):
         """
         if not self.volumeid:
             return []
-        return _vsr_client.list_snapShots(str(self.volumeid))
+        return _vsr_client.list_snapshots(str(self.volumeid))
 
     def _info(self):
         """
