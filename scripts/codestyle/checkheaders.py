@@ -22,13 +22,15 @@ help: script.py --help
 #define files and directories to skip checking
 # relative paths to the root
 skip_files = ['/webapps/frontend/index.html',
-              '/config/gunicorn.cfg.py']
+              '/config/gunicorn.cfg.py',
+              '/config/django/django_gunicorn_ovs.cfg.py']
 skip_dirs = ['/webapps/frontend/lib',
              '/webapps/api/static/rest_framework/css',
              '/webapps/frontend/css',
              '/webapps/api/static/rest_framework/js',
              '/.hg',
-             '/scripts/']
+             '/scripts/',
+             '/extensions/db/arakoon/']
 #define files and directories to except from skip
 # should be subdirectories of the skip directories
 # or files inside the skip_dirs
@@ -106,7 +108,7 @@ def get_comment_style(fextension):
     comments = {'.py': ('#', ''),
                 '.cfg': ('#', ''),
                 '.js': ('//', ''),
-                '.html': ('<!--', '//-->'),
+                '.html': ('<!--', ' -->'),
                 '.css': ('/*', '*/')}
     if not fextension in comments:
         print('[WARNING] Unkown extension {0} will assume comment style "#TEXT" '\
@@ -130,6 +132,34 @@ def get_text(filename, text, lineend=False):
     before, after = get_comment_style(fextension)
     return "{0} {1}{2}{3}".format(before, text, after, end)
 
+def fix_lines(fix, lines):
+    """
+    add header to lines
+    check for UTF8 BOM
+    check for shebang
+    """
+    if fix:
+        #insert new line after BOM
+        if lines[0].startswith(codecs.BOM_UTF8):
+
+            if lines[0].replace(codecs.BOM_UTF8, b'').startswith(b'#!'): #shebang
+                print('fixed line with shebang and bom')
+                lines.insert(1, get_text(file, text, True).encode('utf-8'))
+            else:
+                lines[0] = lines[0].replace(codecs.BOM_UTF8, b'')
+                lines.insert(0, codecs.BOM_UTF8 + get_text(file, text, True)\
+                             .encode('utf-8'))
+        else:
+            if lines[0].startswith(b'#!'):
+                print('fixed line with shebang')
+                lines.insert(1, get_text(file, text, True).encode('utf-8'))
+            else:
+                lines.insert(0, get_text(file, text, True).encode('utf-8'))
+        f.seek(0)
+        f.writelines(lines)
+        print('fixed file {0}'.format(file))
+    else:
+        print('not fixing, file does not contain header {0}'.format(file))
 
 short_options = ''
 long_options = ['extensions=', 'fix', 'help']
@@ -186,20 +216,11 @@ for file in files_to_process:
             if lines:
                 if lines[0].strip().replace(codecs.BOM_UTF8, b'') == get_text(file, text):
                     pass
+                elif lines[0].strip().replace(codecs.BOM_UTF8, b'').startswith(b'#!') and\
+                    lines[1].strip().replace(codecs.BOM_UTF8, b'') == get_text(file, text):
+                    pass
                 else:
-                    if fix:
-                        #insert new line after BOM
-                        if lines[0].startswith(codecs.BOM_UTF8):
-                            lines[0] = lines[0].replace(codecs.BOM_UTF8, b'')
-                            lines.insert(0, codecs.BOM_UTF8 + get_text(file, text, True)\
-                                         .encode('utf-8'))
-                        else:
-                            lines.insert(0, get_text(file, text, True))
-                        f.seek(0)
-                        f.writelines(lines)
-                        print('fixed file {0}'.format(file))
-                    else:
-                        print('not fixing, file does not contain header {0}'.format(file))
+                    fix_lines(fix, lines)
             else:
                 if fix:
                     print('fixed empty file {0}, no header'.format(file))

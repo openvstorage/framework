@@ -42,10 +42,10 @@ class UPAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = DUser.objects.get(username=cuser.guid)
+            user = DUser.objects.get(username=cuser.username)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.guid)
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = False
             user.is_superuser = False
@@ -104,10 +104,10 @@ class TokenAuthenticationBackend(BaseAuthentication):
             raise exceptions.AuthenticationFailed()
 
         try:
-            user = DUser.objects.get(username=cuser.guid)
+            user = DUser.objects.get(username=cuser.username)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.guid)
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = False
             user.is_superuser = False
@@ -173,10 +173,10 @@ class HashAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = DUser.objects.get(username=cuser.guid)
+            user = DUser.objects.get(username=cuser.username)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.guid)
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = True
             user.is_superuser = True

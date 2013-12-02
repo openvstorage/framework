@@ -1,4 +1,4 @@
-﻿<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <div>
     <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() == 'full'">
         <div class="container">
@@ -23,6 +23,7 @@
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span data-i18n="ovs:generic.user"></span>: <i><span data-bind="text: shared.authentication.username"></span></i> <b class="caret"></b></a>
                         <ul class="dropdown-menu">
                             <li><a class="hand" data-bind="click: changePassword" data-i18n="ovs:generic.changepassword"></a></li>
+                            <li><a class="hand" href="/api/customer" data-i18n="ovs:generic.customerapi"></a></li>
                             <li class="divider"></li>
                             <li><a class="hand" data-bind="click: shared.authentication.logout" data-i18n="ovs:generic.logout"></a></li>
                         </ul>
