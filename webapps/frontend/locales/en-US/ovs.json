@@ -58,7 +58,8 @@
         "results": "results",
         "areyousure": "Are you sure?",
         "yes": "Yes",
-        "no": "No"
+        "no": "No",
+        "customerapi": "Customer API"
     },
     "vpools" : {
         "title": "vPools",
