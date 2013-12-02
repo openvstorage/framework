@@ -23,7 +23,6 @@ define([
 
         self.guid         = ko.observable(guid);
         self.name         = ko.observable();
-        self.vpool        = ko.observable();
         self.order        = ko.observable(0);
         self.snapshots    = ko.observableArray([]);
         self.size         = ko.smoothObservable(undefined, generic.formatBytes);
@@ -34,6 +33,7 @@ define([
         self.readSpeed    = ko.smoothDeltaObservable(generic.formatSpeed);
         self.writeSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
         self.vsaGuid      = ko.observable();
+        self.vpoolGuid    = ko.observable();
         self.vMachineGuid = ko.observable();
 
         self.cacheRatio = ko.computed(function() {
@@ -51,17 +51,6 @@ define([
                 self.loadVSAGuid = api.get('vdisks/' + self.guid() + '/get_vsa')
                     .done(function(data) {
                         self.vsaGuid(data);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
-            }).promise();
-        };
-        self.fetchVMachineGuid = function() {
-            return $.Deferred(function(deferred) {
-                generic.xhrAbort(self.loadVMachineGuidHandle);
-                self.loadVMachineGuidHandle = api.get('vdisks/' + self.guid() + '/get_vmachine')
-                    .done(function(data) {
-                        self.vMachineGuid(data);
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -87,8 +76,9 @@ define([
                                     self.order(data.order);
                                     self.snapshots(data.snapshots);
                                     self.size(data.size);
-                                    self.storedData(data.info['stored']);
-                                    self.vpool(data.vpool);
+                                    self.storedData(data.info.stored);
+                                    self.vpoolGuid(data.vpool_guid);
+                                    self.vMachineGuid(data.vmachine_guid);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

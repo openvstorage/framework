@@ -217,8 +217,10 @@ class DataObject(object):
         # pylint: disable=protected-access
         fget = lambda s: s._get_cproperty(attribute)
         fset = lambda s, v: s._set_cproperty(attribute, v)
+        gget = lambda s: s._get_gproperty(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget, fset))
+        setattr(self.__class__, '%s_guid' % attribute, property(gget))
         self._data[attribute] = value
 
     def _add_lproperty(self, attribute):
@@ -255,6 +257,12 @@ class DataObject(object):
             descriptor = Descriptor().load(self._data[attribute])
             self._objects[attribute] = descriptor.get_object(instantiate=True)
         return self._objects[attribute]
+
+    def _get_gproperty(self, attribute):
+        """
+        Getter for a foreign key property
+        """
+        return self._data[attribute]['guid']
 
     def _get_lproperty(self, attribute):
         """

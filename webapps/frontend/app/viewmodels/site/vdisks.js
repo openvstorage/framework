@@ -60,8 +60,7 @@ define([
         self.loadVDisk = function(vdisk) {
             $.when.apply($, [
                     vdisk.load(),
-                    vdisk.fetchVSAGuid(),
-                    vdisk.fetchVMachineGuid()
+                    vdisk.fetchVSAGuid()
                 ])
                 .done(function() {
                     var vm;

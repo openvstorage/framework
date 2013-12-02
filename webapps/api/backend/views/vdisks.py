@@ -71,19 +71,3 @@ class VDiskViewSet(viewsets.ViewSet):
             vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
             vsa_vmachine_guid = vsr.serving_vmachine.guid
         return Response(vsa_vmachine_guid, status=status.HTTP_200_OK)
-
-    @link()
-    @expose(internal=True, customer=True)
-    @required_roles(['view'])
-    def get_vmachine(self, request, pk=None, format=None):
-        """
-        Returns the vMachine guid of the disk
-        """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vdisk = VDisk(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(vdisk.vmachine.guid, status=status.HTTP_200_OK)
