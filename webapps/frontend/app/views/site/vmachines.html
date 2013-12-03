@@ -9,15 +9,11 @@
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;" class="fa fa-spinner fa-spin"></i>
                     <span data-bind="text: name"></span>
                 </td>
-                <td>
-                    <span data-bind="lazylist: { items: vpools, loadedObservable: 'loaded' }">
-                        <a data-part="entry" data-bind="text: name, attr: { href: $root.vpoolUrl(guid) }"></a>
-                    </span>
+                <td data-bind="lazylist: { items: vpools, loadedObservable: 'loaded' }">
+                    <a data-part="entry" data-bind="text: name, attr: { href: $root.vpoolUrl(guid) }"></a>
                 </td>
-                <td>
-                    <span data-bind="lazylist: { items: vsas, loadedObservable: 'loaded' }">
-                        <span data-part="entry" data-bind="text: name"></span>
-                    </span>
+                <td data-bind="lazylist: { items: vsas, loadedObservable: 'loaded' }">
+                    <span data-part="entry" data-bind="text: name"></span>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
                 <td><span data-bind="text: storedData"></span></td>

@@ -17,9 +17,8 @@ class VPoolList(object):
         """
         Returns a list of all VPools
         """
-        vpools = DataList(key='vpools',
-                          query={'object': VPool,
-                                 'data': DataList.select.DESCRIPTOR,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': []}}).data
+        vpools = DataList({'object': VPool,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': []}}).data
         return DataObjectList(vpools, VPool)

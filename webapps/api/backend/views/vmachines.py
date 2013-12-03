@@ -9,6 +9,8 @@ from rest_framework.decorators import action, link
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.datalist import DataList
+from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
@@ -140,3 +142,19 @@ class VMachineViewSet(viewsets.ViewSet):
         for vdisk in vmachine.vdisks:
             vpool_guids.append(vdisk.vpool.guid)
         return Response(vpool_guids, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view'])
+    def filter(self, request, pk=None, format=None):
+        """
+        Filters vMachines based on a filter object
+        """
+        _ = request, pk, format
+        query_result = DataList({'object': VMachine,
+                                 'data': DataList.select.DESCRIPTOR,
+                                 'query': request.DATA['query']}).data  # noqa
+        # pylint: enable=line-too-long
+        vmachines = DataObjectList(query_result, VMachine).reduced
+        serializer = SimpleSerializer(vmachines, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

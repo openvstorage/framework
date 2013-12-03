@@ -17,11 +17,10 @@ class VolumeStorageRouterList(object):
         """
         Returns a list of all VolumeStorageRouters
         """
-        volumestoragerouters = DataList(key='volumestoragerouters',
-                                        query={'object': VolumeStorageRouter,
-                                               'data': DataList.select.DESCRIPTOR,
-                                               'query': {'type': DataList.where_operator.AND,
-                                                         'items': []}}).data
+        volumestoragerouters = DataList({'object': VolumeStorageRouter,
+                                         'data': DataList.select.DESCRIPTOR,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': []}}).data
         return DataObjectList(volumestoragerouters, VolumeStorageRouter)
 
     @staticmethod
@@ -30,11 +29,10 @@ class VolumeStorageRouterList(object):
         Returns a list of all VolumeStorageRouters based on a given vsrid
         """
         # pylint: disable=line-too-long
-        volumestoragerouters = DataList(key='vsrid_{}'.format(vsrid),
-                                        query={'object': VolumeStorageRouter,
-                                               'data': DataList.select.DESCRIPTOR,
-                                               'query': {'type': DataList.where_operator.AND,
-                                                         'items': [('vsrid', DataList.operator.EQUALS, vsrid)]}}).data
+        volumestoragerouters = DataList({'object': VolumeStorageRouter,
+                                         'data': DataList.select.DESCRIPTOR,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('vsrid', DataList.operator.EQUALS, vsrid)]}}).data
         # pylint: enable=line-too-long
         if volumestoragerouters:
             return DataObjectList(volumestoragerouters, VolumeStorageRouter)[0]

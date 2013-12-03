@@ -11,6 +11,7 @@ _vsrClient = VolumeStorageRouterClient().load()
 
 import pickle
 
+
 class VMachine(DataObject):
     """
     The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks
@@ -22,6 +23,7 @@ class VMachine(DataObject):
                   'hypervisorid': (None, str, 'The Identifier of the vMachine on the Hypervisor.'),
                   'is_vtemplate': (True, bool, 'Indicates whether this vMachine is a vTemplate.'),
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
+                  'ip_address':   (None,  str, 'IP Address of the vMachine, if available'),
                   'hvtype':       (None, ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.')}
     _relations = {'pmachine': (PMachine, 'vmachines')}
     _expiry = {'snapshots':     (60, list),
@@ -43,7 +45,7 @@ class VMachine(DataObject):
                 snapshot = _vsrClient.info_snapshot(str(disk.volumeid), guid)
                 metadata = pickle.loads(snapshot.metadata)
                 timestamp = metadata['timestamp']
-                if _tmp_snapshots.has_key(timestamp):
+                if timestamp in _tmp_snapshots:
                     _tmp_snapshots[timestamp]['snapshots'][disk.guid] = guid
                 else:
                     snapshot_default = {'label' : metadata['label'],

@@ -275,11 +275,11 @@ class DataObject(object):
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
         # pylint: disable=line-too-long
-        datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
-                            query = {'object': remote_class,
+        datalist = DataList(query = {'object': remote_class,
                                      'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
-                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})  # noqa
+                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}},  # noqa
+                            key   = '%s_%s_%s' % (self._name, self._guid, attribute))
         # pylint: enable=line-too-long
 
         if self._objects[attribute]['data'] is None:

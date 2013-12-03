@@ -1,5 +1,51 @@
 ﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <section>
-    <h2 data-i18n="ovs:dashboard.title"></h2>
-    <p data-i18n="ovs:dashboard.introduction"></p>
+    <div class="row">
+        <div class="col-md-4">
+            <!-- Left column -->
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <b data-i18n="ovs:dashboard.panels.vsa.title"></b>
+                    <div style="float:right;">
+                        <span data-bind="popover: {
+                                             title: 'ovs:dashboard.panels.vsa.helptitle',
+                                             content: 'ovs:dashboard.panels.vsa.helpcontent'
+                                         }" class="hand fa fa-question-circle" style="color: darkgray;">
+                        </span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div data-bind="lazylist: {
+                                        displaymode: 'table', items: vsas,
+                                        loadedObservable: 'loaded', colspan: 4
+                                    }" >
+                        <table data-dummy="dummy">
+                            <thead data-part="head">
+                                <tr>
+                                    <th></th>
+                                    <th data-i18n="ovs:generic.name"></th>
+                                    <th data-i18n="ovs:generic.ip"></th>
+                                    <th data-i18n="ovs:generic.vdisks"></th>
+                                </tr>
+                            </thead>
+                            <tbody data-dummy="dummy">
+                                <tr data-part="table-entry">
+                                        <td><span class="fa fa-cloud" style="color: green;"></span></td>
+                                        <td data-bind="text: name"></td>
+                                        <td data-bind="text: ipAddress"></td>
+                                        <td data-bind="text: vDisks().length"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                 </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <!-- Center column -->
+        </div>
+        <div class="col-md-4">
+            <!-- Right column -->
+        </div>
+    </div>
 </section>

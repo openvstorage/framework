@@ -13,6 +13,8 @@
         "previous": "&laquo; Previous",
         "cancel": "Cancel",
         "finish": "Finish",
+        "ip": "IP",
+        "name": "Name",
         "ki": "Ki",
         "mi": "Mi",
         "gi": "Gi",
@@ -108,7 +110,13 @@
     },
     "dashboard": {
         "title": "Dashboard",
-        "introduction": "Open vStorage is the next generation storage."
+        "panels": {
+            "vsa": {
+                "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Environment. For each VSA the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - VSA",
+                "title": "VSA"
+            }
+        }
     },
     "login": {
         "title": "Login",

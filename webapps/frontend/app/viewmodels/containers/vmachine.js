@@ -28,6 +28,7 @@ define([
         self.vsaGuids     = ko.observableArray([]);
         self.vPoolGuids   = ko.observableArray([]);
         self.name         = ko.observable();
+        self.ipAddress    = ko.observable();
         self.snapshots    = ko.observable();
         self.iops         = ko.smoothDeltaObservable(generic.formatShort);
         self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
@@ -105,6 +106,7 @@ define([
                                     self.cacheMisses(stats.sco_cache_misses);
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
+                                    self.ipAddress(data.ip_address);
                                     self.snapshots(data.snapshots);
                                     self.failoverMode(data.failover_mode);
                                     deferred.resolve();

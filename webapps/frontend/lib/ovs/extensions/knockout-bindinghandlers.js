@@ -34,4 +34,16 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 .style('fill', color);
         }
     };
+    ko.bindingHandlers.popover = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor();
+            $(element).popover({
+                html: true,
+                placement: 'auto',
+                trigger: 'click',
+                title: $.t(value.title),
+                content: $.t(value.content)
+            });
+        }
+    };
 });
