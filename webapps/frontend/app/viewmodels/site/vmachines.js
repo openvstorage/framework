@@ -42,7 +42,7 @@ define([
         self.vmachineUrl = function(guid) {
             return '#' + self.shared.mode() + '/vmachine/' + (guid.call ? guid() : guid);
         };
-        self.load = function() {
+        self.fetchVMachines = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVMachinesHandle);
                 var query = {
@@ -160,7 +160,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(self.load, 5000);
+            self.refresher.init(self.fetchVMachines, 5000);
             self.refresher.run();
             self.refresher.start();
         };

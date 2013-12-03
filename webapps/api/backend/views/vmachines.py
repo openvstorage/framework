@@ -104,7 +104,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return Response(task.id, status=status.HTTP_200_OK)
 
     @link()
-    @expose(internal=True, customer=True)
+    @expose(internal=True)
     @required_roles(['view'])
     def get_vsas(self, request, pk=None, format=None):
         """
@@ -125,7 +125,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
 
     @link()
-    @expose(internal=True, customer=True)
+    @expose(internal=True)
     @required_roles(['view'])
     def get_vpools(self, request, pk=None, format=None):
         """
@@ -143,8 +143,7 @@ class VMachineViewSet(viewsets.ViewSet):
             vpool_guids.append(vdisk.vpool.guid)
         return Response(vpool_guids, status=status.HTTP_200_OK)
 
-    @action()
-    @expose(internal=True, customer=True)
+    @expose(internal=True)
     @required_roles(['view'])
     def filter(self, request, pk=None, format=None):
         """

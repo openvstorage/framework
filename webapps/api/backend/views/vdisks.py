@@ -33,7 +33,13 @@ class VDiskViewSet(viewsets.ViewSet):
         if vmachineguid is None:
             vdisks = VDiskList.get_vdisks().reduced
         else:
-            vdisks = VMachine(vmachineguid).vdisks.reduced
+            vmachine = VMachine(vmachineguid)
+            if vmachine.is_internal:
+                vdisks = None
+                for vsr in vmachine.served_vsrs:
+                    vdisks += vsr.vpool.vdisks.reduced
+            else:
+                vdisks = vmachine.vdisks.reduced
         serializer = SimpleSerializer(vdisks, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

@@ -29,6 +29,8 @@ define([
         self.vPoolGuids   = ko.observableArray([]);
         self.name         = ko.observable();
         self.ipAddress    = ko.observable();
+        self.isInternal   = ko.observable();
+        self.isVTemplate  = ko.observable();
         self.snapshots    = ko.observable();
         self.iops         = ko.smoothDeltaObservable(generic.formatShort);
         self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
@@ -76,14 +78,16 @@ define([
                 generic.xhrAbort(self.loadVDisksHandle);
                 self.loadVDisksHandle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
                     .done(function(data) {
-                        var i, item;
+                        var i, guids = [];
                         for (i = 0; i < data.length; i += 1) {
-                            item = data[i];
-                            if ($.inArray(item.guid, self.vDiskGuids) === -1) {
-                                self.vDiskGuids.push(item.guid);
-                                self.vDisks.push(new VDisk(item));
-                            }
+                            guids.push(data[i].guid);
                         }
+                        generic.crossFiller(
+                            guids, self.vDiskGuids, self.vDisks,
+                            function(guid) {
+                                return new VDisk(guid);
+                            }
+                        );
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -107,6 +111,8 @@ define([
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
                                     self.ipAddress(data.ip_address);
+                                    self.isInternal(data.is_internal);
+                                    self.isVTemplate(data.is_vtemplate);
                                     self.snapshots(data.snapshots);
                                     self.failoverMode(data.failover_mode);
                                     deferred.resolve();
