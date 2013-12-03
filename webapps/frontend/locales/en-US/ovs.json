@@ -69,7 +69,9 @@
         "customerapi": "Customer API",
         "focstatus": "FOC",
         "performance": "Performance",
-        "current": "Current"
+        "current": "Current",
+        "bandwidth": "Bandwidth",
+        "thousandseparator": ","
     },
     "vpools" : {
         "title": "vPools",

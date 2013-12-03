@@ -128,6 +128,9 @@
                     <b data-i18n="ovs:dashboard.panels.vpools.title"></b>
                     <div style="float:right;">
                         <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <select data-bind="options: topVpoolModes, value: topVPoolMode,
+                                           optionsText: function(item) { return $.t('ovs:generic.' + item); }"
+                                style="margin-left: 5px;"></select>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vpools.helptitle',
                                              content: 'ovs:dashboard.panels.vpools.helpcontent'
@@ -135,8 +138,14 @@
                         </span>
                     </div>
                 </div>
-                <div class="panel-body">
-                    <div style="height: 50px;">Temporary content</div>
+                <div class="panel-body" data-bind="foreach: topVPools">
+                    <div class="row">
+                        <div class="col-md-8"><a data-bind="attr: { href: $parent.vpoolUrl(guid) }, text: name"></a></div>
+                        <div class="col-md-4">
+                            <span data-bind="visible: $parent.topVPoolMode() === 'storeddata', lazyloader: { item: storedData }"></span>
+                            <span data-bind="visible: $parent.topVPoolMode() === 'bandwidth', lazyloader: { item: bandwidth }"></span>
+                        </div>
+                    </div>
                  </div>
             </div>
         </div>

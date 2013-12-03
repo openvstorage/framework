@@ -30,7 +30,7 @@ define([
         self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits    = ko.smoothDeltaObservable();
         self.cacheMisses  = ko.smoothDeltaObservable();
-        self.iops         = ko.smoothDeltaObservable(generic.formatShort);
+        self.iops         = ko.smoothDeltaObservable(generic.formatNumber);
         self.readSpeed    = ko.smoothDeltaObservable(generic.formatSpeed);
         self.writeSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
         self.vsaGuid      = ko.observable();

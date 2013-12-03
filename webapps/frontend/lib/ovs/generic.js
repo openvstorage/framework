@@ -86,6 +86,17 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return returnValue;
     }
+    function formatNumber(value) {
+        if (value !== undefined) {
+            value = round(value).toString();
+            var regex = /(\d+)(\d{3})/;
+            while (regex.test(value)) {
+                value = value.replace(regex, '$1' + $.t('ovs:generic.thousandseparator') + '$2');
+            }
+            return value;
+        }
+        return undefined;
+    }
     function padRight(value, character, length) {
         while (value.length < length) {
             value += character;
@@ -239,6 +250,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         formatSpeed     : formatSpeed,
         formatRatio     : formatRatio,
         formatShort     : formatShort,
+        formatNumber    : formatNumber,
         padRight        : padRight,
         getCookie       : getCookie,
         setCookie       : setCookie,

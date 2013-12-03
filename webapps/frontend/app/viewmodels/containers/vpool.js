@@ -20,7 +20,7 @@ define([
         self.guid              = ko.observable(guid);
         self.name              = ko.observable();
         self.size              = ko.smoothObservable(undefined, generic.formatBytes);
-        self.iops              = ko.smoothDeltaObservable(generic.formatShort);
+        self.iops              = ko.smoothDeltaObservable(generic.formatNumber);
         self.storedData        = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits         = ko.smoothDeltaObservable();
         self.cacheMisses       = ko.smoothDeltaObservable();
@@ -46,6 +46,21 @@ define([
                 return 0;
             }
             return generic.formatRatio((self.size.raw() - self.storedData.raw()) / self.size.raw() * 100);
+        });
+
+        self._bandwidth = ko.computed(function() {
+            var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0),
+                initialized = self.readSpeed.initialized() && self.writeSpeed.initialized();
+            return {
+                value: generic.formatSpeed(total),
+                initialized: initialized
+            };
+        });
+        self.bandwidth = ko.computed(function() {
+            return self._bandwidth().value;
+        });
+        self.bandwidth.initialized = ko.computed(function() {
+            return self._bandwidth().initialized;
         });
 
         self.load = function() {

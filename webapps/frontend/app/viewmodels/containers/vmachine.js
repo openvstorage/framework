@@ -32,7 +32,7 @@ define([
         self.isInternal   = ko.observable();
         self.isVTemplate  = ko.observable();
         self.snapshots    = ko.observable();
-        self.iops         = ko.smoothDeltaObservable(generic.formatShort);
+        self.iops         = ko.smoothDeltaObservable(generic.formatNumber);
         self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits    = ko.smoothDeltaObservable();
         self.cacheMisses  = ko.smoothDeltaObservable();

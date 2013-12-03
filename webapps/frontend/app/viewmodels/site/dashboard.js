@@ -1,10 +1,10 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
 define([
-    'knockout',
+    'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api', 'ovs/refresher',
     '../containers/vmachine', '../containers/vpool'
-], function(ko, shared, generic, api, Refresher, VMachine, VPool) {
+], function(ko, $, shared, generic, api, Refresher, VMachine, VPool) {
     "use strict";
     return function() {
         var self = this;
@@ -55,7 +55,7 @@ define([
                 total += (self.vpools()[i].iops.raw() || 0);
             }
             return {
-                value: generic.formatShort(total),
+                value: generic.formatNumber(total),
                 initialized: initialized
             };
         });
@@ -100,7 +100,32 @@ define([
             return self._writeSpeed().initialized;
         });
 
+        self.topVpoolModes = ko.observableArray(['storeddata', 'bandwidth']);
+        self.topVPoolMode = ko.observable('storeddata');
+        self.topVPools = ko.computed(function() {
+            var vpools = [], i;
+            self.vpools.sort(function(a, b) {
+                if (self.topVPoolMode() === 'storeddata') {
+                    return ((a.storedData.raw() || 0) - (b.storedData.raw() || 0));
+                }
+                return (
+                    ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0)) -
+                    ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0))
+                );
+            });
+            for (i = 0; i < Math.min(10, self.vpools().length); i += 1) {
+                vpools.push(self.vpools()[i]);
+            }
+            return vpools;
+        });
+
         // Functions
+        self.vpoolUrl = function(guid) {
+            return '#' + self.shared.mode() + '/vpool/' + (guid.call ? guid() : guid);
+        };
+        self.vmachineUrl = function(guid) {
+            return '#' + self.shared.mode() + '/vmachine/' + (guid.call ? guid() : guid);
+        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 $.when.apply($, [
