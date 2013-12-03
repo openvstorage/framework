@@ -45,7 +45,13 @@ define([
         self.load = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVMachinesHandle);
-                self.loadVMachinesHandle = api.get('vmachines')
+                var query = {
+                        query: {
+                            type: 'AND',
+                            items: [['is_internal', 'EQUALS', false]]
+                        }
+                    };
+                self.loadVMachinesHandle = api.post('vmachines/filter', query)
                     .done(function(data) {
                         var i, guids = [];
                         for (i = 0; i < data.length; i += 1) {
