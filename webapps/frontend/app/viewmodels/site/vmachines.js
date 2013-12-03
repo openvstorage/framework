@@ -24,8 +24,8 @@ define([
             { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110,       colspan: undefined },
             { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100,       colspan: undefined },
             { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55,        colspan: undefined },
-            { key: 'readSpeed',    value: $.t('ovs:generic.readspeed'),  width: 100,       colspan: undefined },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.writespeed'), width: 100,       colspan: undefined },
+            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 100,       colspan: undefined },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 100,       colspan: undefined },
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: undefined, colspan: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80,        colspan: undefined }
         ];

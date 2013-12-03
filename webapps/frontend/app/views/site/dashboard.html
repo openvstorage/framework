@@ -4,13 +4,15 @@
         <div class="col-md-4">
             <!-- Left column -->
             <div class="panel panel-default">
+                <!-- VSA -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vsa.title"></b>
                     <div style="float:right;">
+                        <span data-bind="visible: vsasLoading()"><i class="fa fa-spinner fa-spin"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vsa.helptitle',
                                              content: 'ovs:dashboard.panels.vsa.helpcontent'
-                                         }" class="hand fa fa-question-circle" style="color: darkgray;">
+                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
@@ -43,9 +45,100 @@
         </div>
         <div class="col-md-4">
             <!-- Center column -->
+            <div class="panel panel-default">
+                <!-- Cache -->
+                <div class="panel-heading">
+                    <b data-i18n="ovs:dashboard.panels.cache.title"></b>
+                    <div style="float:right;">
+                        <span data-bind="popover: {
+                                             title: 'ovs:dashboard.panels.cache.helptitle',
+                                             content: 'ovs:dashboard.panels.cache.helpcontent'
+                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                        </span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div style="height: 240px;">Temporary content</div>
+                 </div>
+            </div>
+            <div class="panel panel-default">
+                <!-- vMachines -->
+                <div class="panel-heading">
+                    <b data-i18n="ovs:dashboard.panels.vmachines.title"></b>
+                    <div style="float:right;">
+                        <span data-bind="popover: {
+                                             title: 'ovs:dashboard.panels.vmachines.helptitle',
+                                             content: 'ovs:dashboard.panels.vmachines.helpcontent'
+                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                        </span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div style="height: 110px;">Temporary content</div>
+                 </div>
+            </div>
         </div>
         <div class="col-md-4">
             <!-- Right column -->
+            <div class="panel panel-default">
+                <!-- Statistics -->
+                <div class="panel-heading">
+                    <b data-i18n="ovs:dashboard.panels.statistics.title"></b>
+                    <div style="float:right;">
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="popover: {
+                                             title: 'ovs:dashboard.panels.statistics.helptitle',
+                                             content: 'ovs:dashboard.panels.statistics.helpcontent'
+                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                        </span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th data-i18n="ovs:generic.performance"></th>
+                                <th data-i18n="ovs:generic.current"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td data-i18n="ovs:generic.iops"></td>
+                                <td data-bind="lazyloader: { item: iops }"></td>
+                            </tr>
+                            <tr>
+                                <td data-i18n="ovs:generic.readspeed"></td>
+                                <td data-bind="lazyloader: { item: readSpeed }"></td>
+                            </tr>
+                            <tr>
+                                <td data-i18n="ovs:generic.writespeed"></td>
+                                <td data-bind="lazyloader: { item: writeSpeed }"></td>
+                            </tr>
+                            <tr>
+                                <td data-i18n="ovs:generic.cacheratio"></td>
+                                <td data-bind="lazyloader: { item: cacheRatio }"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                 </div>
+            </div>
+            <div class="panel panel-default">
+                <!-- vPools -->
+                <div class="panel-heading">
+                    <b data-i18n="ovs:dashboard.panels.vpools.title"></b>
+                    <div style="float:right;">
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="popover: {
+                                             title: 'ovs:dashboard.panels.vpools.helptitle',
+                                             content: 'ovs:dashboard.panels.vpools.helpcontent'
+                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                        </span>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div style="height: 50px;">Temporary content</div>
+                 </div>
+            </div>
         </div>
     </div>
 </section>

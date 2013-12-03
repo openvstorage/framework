@@ -47,15 +47,17 @@
         "machine": "Machine",
         "vmachines": "vMachines",
         "machines": "Machines",
-        "name": "Name",
         "vpool": "vPool",
         "vsa": "VSA",
         "storeddata": "Stored data",
         "cache": "Cache",
+        "cacheratio": "Cache Hit Ratio",
         "iops": "IOPS",
         "latency": "Latency",
-        "readspeed": "Read",
-        "writespeed": "Write",
+        "readspeed": "Read speed",
+        "writespeed": "Write speed",
+        "read": "Read",
+        "write": "Write",
         "actions": "Actions",
         "showing": "Showing",
         "from": "from",
@@ -65,7 +67,9 @@
         "no": "No",
         "size": "Size",
         "customerapi": "Customer API",
-        "focstatus": "FOC"
+        "focstatus": "FOC",
+        "performance": "Performance",
+        "current": "Current"
     },
     "vpools" : {
         "title": "vPools",
@@ -115,6 +119,26 @@
                 "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Environment. For each VSA the status, name, IP address and amount of vDisks is displayed.",
                 "helptitle": "Help - VSA",
                 "title": "VSA"
+            },
+            "cache": {
+                "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits and the total amount of cache lookups for all vMachines. Below the amount of the current amount of IOPS is displayed for the whole Environment. This panel gets updated every 5 seconds.",
+                "helptitle": "Help - Cache Hit Ratio",
+                "title": "Cache Hit Ratio"
+            },
+            "vmachines": {
+                "helpcontent": "This panels lists the top vMachines accoring to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to Vmachine to go directlt to the list of vMachines.",
+                "helptitle": "Help - vMachines",
+                "title": "vMachines"
+            },
+            "statistics": {
+                "helpcontent": "This panels lists the average on IOPS, bandwidth and Cache Hits over 5 Seconds. The values are updated automatically every 5 seconds.",
+                "helptitle": "Help - Statistics",
+                "title": "Statistics"
+            },
+            "vpools": {
+                "helpcontent": "This panels lists the top vPools accoring to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",
+                "helptitle": "Help - vPools",
+                "title": "vPools"
             }
         }
     },
