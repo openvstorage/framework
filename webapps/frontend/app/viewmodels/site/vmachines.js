@@ -48,7 +48,8 @@ define([
                 var query = {
                         query: {
                             type: 'AND',
-                            items: [['is_internal', 'EQUALS', false]]
+                            items: [['is_internal', 'EQUALS', false],
+                                    ['is_vtemplate', 'EQUALS', false]]
                         }
                     };
                 self.loadVMachinesHandle = api.post('vmachines/filter', query)
