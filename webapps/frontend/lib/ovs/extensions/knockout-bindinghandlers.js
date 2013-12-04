@@ -66,7 +66,6 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 .style('fill', 'grey')
                 .attr('transform', 'translate(150, 195)');
             svg.append('text')
-                .text('100.00 %')
                 .attr('class', 'primary-text')
                 .attr('text-anchor', 'middle')
                 .style('font-weight', 'bold')

@@ -10,7 +10,7 @@
                     <span data-bind="text: name"></span>
                 </td>
                 <td>
-                    <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded' }">
+                    <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded' }">
                         <span data-part="lazy-entry" data-bind="text: item().name"></span>
                     </span>
                 </td>
@@ -22,7 +22,7 @@
                     </span>
                 </td>
                 <td>
-                    <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded' }">
+                    <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded' }">
                         <span data-part="lazy-entry" data-bind="text: item().name"></span>
                     </span>
                 </td>
