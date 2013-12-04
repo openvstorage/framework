@@ -143,6 +143,26 @@ class VMachineViewSet(viewsets.ViewSet):
             vpool_guids.append(vdisk.vpool.guid)
         return Response(vpool_guids, status=status.HTTP_200_OK)
 
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    def get_children(self, request, pk=None, format=None):
+        """
+        Returns list of children vmachines guids
+        """
+        _ = request, format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            vmachine = VMachine(pk)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        children_vmachine_guids = set()
+        for vdisk in vmachine.vdisks:
+            for cdisk in vdisk.child_vdisks:
+                children_vmachine_guids.add(cdisk.vmachine_guid)
+        return Response(children_vmachine_guids, status=status.HTTP_200_OK)
+
     @expose(internal=True)
     @required_roles(['view'])
     def filter(self, request, pk=None, format=None):
