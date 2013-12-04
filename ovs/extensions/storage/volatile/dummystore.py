@@ -86,6 +86,7 @@ class DummyVolatileStore(object):
         """
         Saves the local json file
         """
+        rawdata = json.dumps(data, sort_keys=True, indent=2)
         f = open(self._path, 'w+')
-        f.write(json.dumps(data, sort_keys=True, indent=2))
+        f.write(rawdata)
         f.close()

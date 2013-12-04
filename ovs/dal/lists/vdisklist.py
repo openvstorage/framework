@@ -17,11 +17,10 @@ class VDiskList(object):
         """
         Returns a list of all VDisks
         """
-        vdisks = DataList(key='vdisks',
-                          query={'object': VDisk,
-                                 'data': DataList.select.DESCRIPTOR,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': []}}).data
+        vdisks = DataList({'object': VDisk,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': []}}).data
         return DataObjectList(vdisks, VDisk)
 
     @staticmethod
@@ -30,11 +29,10 @@ class VDiskList(object):
         Returns a list of all VDisks based on a given volumeid
         """
         # pylint: disable=line-too-long
-        vdisks = DataList(key='volumeid_{}'.format(volumeid),
-                          query={'object': VDisk,
-                                 'data': DataList.select.DESCRIPTOR,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('volumeid', DataList.operator.EQUALS, volumeid)]}}).data
+        vdisks = DataList({'object': VDisk,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('volumeid', DataList.operator.EQUALS, volumeid)]}}).data
         # pylint: enable=line-too-long
         if vdisks:
             return DataObjectList(vdisks, VDisk)[0]

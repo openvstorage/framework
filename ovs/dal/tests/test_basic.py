@@ -286,6 +286,7 @@ class Basic(TestCase):
             for prop in properties:
                 found = prop in cls._blueprint \
                     or prop in cls._relations \
+                    or prop in ['%s_guid' % key for key in cls._relations.keys()] \
                     or prop in cls._expiry \
                     or prop in remote_properties \
                     or prop == 'guid'
@@ -314,89 +315,78 @@ class Basic(TestCase):
             disk.save()
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
         # pylint: disable=line-too-long
-        list_1 = DataList(key='list_1',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('size', DataList.operator.EQUALS, 1)]}}).data  # noqa
+        list_1 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.EQUALS, 1)]}}).data  # noqa
         self.assertEqual(list_1, 1, 'list should contain int 1')
-        list_2 = DataList(key='list_2',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.DESCRIPTOR,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('size', DataList.operator.EQUALS, 1)]}}).data  # noqa
+        list_2 = DataList({'object': TestDisk,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.EQUALS, 1)]}}).data  # noqa
         found_object = Descriptor().load(list_2[0]).get_object(True)
         self.assertEqual(found_object.name, 'test_1', 'list should contain corret machine')
-        list_3 = DataList(key='list_3',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('size', DataList.operator.GT, 3),
-                                                     ('size', DataList.operator.LT, 6)]}}).data  # noqa
+        list_3 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.GT, 3),
+                                               ('size', DataList.operator.LT, 6)]}}).data  # noqa
         self.assertEqual(list_3, 2, 'list should contain int 2')  # disk 4 and 5
-        list_4 = DataList(key='list_4',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.OR,
-                                           'items': [('size', DataList.operator.LT, 3),
-                                                     ('size', DataList.operator.GT, 6)]}}).data  # noqa
+        list_4 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.OR,
+                                     'items': [('size', DataList.operator.LT, 3),
+                                               ('size', DataList.operator.GT, 6)]}}).data  # noqa
         # at least disk 0, 1, 2, 7, 8, 9, 10-19
         self.assertGreaterEqual(list_4, 16, 'list should contain >= 16')
-        list_5 = DataList(key='list_5',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),  # noqa
-                                                     {'type': DataList.where_operator.OR,
-                                                      'items': [('size', DataList.operator.LT, 3),
-                                                                ('size', DataList.operator.GT, 6)]}]}}).data  # noqa
+        list_5 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),  # noqa
+                                               {'type': DataList.where_operator.OR,
+                                                'items': [('size', DataList.operator.LT, 3),
+                                                          ('size', DataList.operator.GT, 6)]}]}}).data  # noqa
         self.assertEqual(list_5, 6, 'list should contain int 6')  # disk 0, 1, 2, 7, 8, 9
-        list_6 = DataList(key='list_6',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('size', DataList.operator.LT, 3),
-                                                     ('size', DataList.operator.GT, 6)]}}).data  # noqa
+        list_6 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.LT, 3),
+                                               ('size', DataList.operator.GT, 6)]}}).data  # noqa
         self.assertEqual(list_6, 0, 'list should contain int 0')  # no disks
-        list_7 = DataList(key='list_7',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.OR,
-                                           'items': [('machine.guid', DataList.operator.EQUALS, '123'),  # noqa
-                                                     ('used_size', DataList.operator.EQUALS, -1),
-                                                     {'type': DataList.where_operator.AND,
-                                                      'items': [('size', DataList.operator.GT, 3),
-                                                                ('size', DataList.operator.LT, 6)]}]}}).data  # noqa
+        list_7 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.OR,
+                                     'items': [('machine.guid', DataList.operator.EQUALS, '123'),  # noqa
+                                               ('used_size', DataList.operator.EQUALS, -1),
+                                               {'type': DataList.where_operator.AND,
+                                                'items': [('size', DataList.operator.GT, 3),
+                                                          ('size', DataList.operator.LT, 6)]}]}}).data  # noqa
         self.assertEqual(list_7, 2, 'list should contain int 2')  # disk 4 and 5
-        list_8 = DataList(key='list_8',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('machine.name', DataList.operator.EQUALS, 'machine'),  # noqa
-                                                     ('name', DataList.operator.EQUALS, 'test_3')]}}).data  # noqa
+        list_8 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine'),  # noqa
+                                               ('name', DataList.operator.EQUALS, 'test_3')]}}).data  # noqa
         self.assertEqual(list_8, 1, 'list should contain int 1')  # disk 3
-        list_9 = DataList(key='list_9',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('size', DataList.operator.GT, 3),
-                                                     {'type': DataList.where_operator.AND,
-                                                      'items': [('size', DataList.operator.LT, 6)]}]}}).data  # noqa
+        list_9 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.GT, 3),
+                                               {'type': DataList.where_operator.AND,
+                                                'items': [('size', DataList.operator.LT, 6)]}]}}).data  # noqa
         self.assertEqual(list_9, 2, 'list should contain int 2')  # disk 4 and 5
-        list_10 = DataList(key='list_10',
-                           query={'object': TestDisk,
-                                  'data': DataList.select.COUNT,
-                                  'query': {'type': DataList.where_operator.OR,
-                                            'items': [('size', DataList.operator.LT, 3),
-                                                      {'type': DataList.where_operator.OR,
-                                                       'items': [('size', DataList.operator.GT, 6)]}]}}).data  # noqa
+        list_10 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.OR,
+                                      'items': [('size', DataList.operator.LT, 3),
+                                                {'type': DataList.where_operator.OR,
+                                                 'items': [('size', DataList.operator.GT, 6)]}]}}).data  # noqa
         # at least disk 0, 1, 2, 7, 8, 9, 10-19
         self.assertGreaterEqual(list_10, 16, 'list should contain >= 16')
-        list_11 = DataList(key='list_11',
-                           query={'object': TestDisk,
-                                  'data': DataList.select.COUNT,
-                                  'query': {'type': DataList.where_operator.AND,
-                                            'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
+        list_11 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
         self.assertEqual(list_11, 10, 'list should contain int 10')  # disk 10-19
         # pylint: enable=line-too-long
         for disk in machine.stored_disks:
@@ -546,67 +536,68 @@ class Basic(TestCase):
         """
         Validates whether lists are cached and invalidated correctly
         """
-        disk0 = TestDisk()
-        disk0.save()
-        list_cache = DataList(key='list_cache',
-                              query={'object': TestDisk,
-                                     'data': DataList.select.COUNT,
-                                     'query': {'type': DataList.where_operator.AND,
-                                               'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 0, 'List should find no entries')
-        machine = TestMachine()
-        machine.name = 'machine'
-        machine.save()
-        disk1 = TestDisk()
-        disk1.machine = machine
-        disk1.save()
-        list_cache = DataList(key='list_cache',
-                              query={'object': TestDisk,
-                                     'data': DataList.select.COUNT,
-                                     'query': {'type': DataList.where_operator.AND,
-                                               'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 1, 'List should find one entry')
-        list_cache = DataList(key='list_cache',
-                              query={'object': TestDisk,
-                                     'data': DataList.select.COUNT,
-                                     'query': {'type': DataList.where_operator.AND,
-                                               'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-        self.assertTrue(list_cache.from_cache, 'List should be loaded from cache')
-        disk2 = TestDisk()
-        disk2.machine = machine
-        disk2.save()
-        list_cache = DataList(key='list_cache',
-                              query={'object': TestDisk,
-                                     'data': DataList.select.COUNT,
-                                     'query': {'type': DataList.where_operator.AND,
-                                               'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 2, 'List should find two entries')
-        machine.name = 'x'
-        machine.save()
-        list_cache = DataList(key='list_cache',
-                              query={'object': TestDisk,
-                                     'data': DataList.select.COUNT,
-                                     'query': {'type': DataList.where_operator.AND,
-                                               'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 0, 'List should have no matches')
-        for disk in machine.disks:
-            disk.delete()
-        machine.delete()
-        disk0.delete()
+        keys = ['list_cache', None]
+        for key in keys:
+            disk0 = TestDisk()
+            disk0.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 0, 'List should find no entries (mode: %s)' % key)
+            machine = TestMachine()
+            machine.name = 'machine'
+            machine.save()
+            disk1 = TestDisk()
+            disk1.machine = machine
+            disk1.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 1, 'List should find one entry (mode: %s)' % key)
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: %s)' % key)
+            disk2 = TestDisk()
+            disk2.machine = machine
+            disk2.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 2, 'List should find two entries (mode: %s)' % key)
+            machine.name = 'x'
+            machine.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 0, 'List should have no matches (mode: %s)' % key)
+            for disk in machine.disks:
+                disk.delete()
+            machine.delete()
+            disk0.delete()
 
     def test_emptyquery(self):
         """
         Validates whether an certain query returns an empty set
         """
-        amount = DataList(key='some_list',
-                          query={'object': TestDisk,
-                                 'data': DataList.select.COUNT,
-                                 'query': {'type': DataList.where_operator.AND,
-                                           'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
+        amount = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
         self.assertEqual(amount, 0, 'There should be no data')
 
     def test_nofilterquery(self):
@@ -648,25 +639,22 @@ class Basic(TestCase):
         disk.save()
         setattr(DataList.select, 'SOMETHING', 'SOMETHING')
         with self.assertRaises(NotImplementedError):
-            DataList(key='some_list',
-                     query={'object': TestDisk,
-                            'data': DataList.select.SOMETHING,
-                            'query': {'type': DataList.where_operator.AND,
-                                      'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            DataList({'object': TestDisk,
+                      'data': DataList.select.SOMETHING,
+                      'query': {'type': DataList.where_operator.AND,
+                                'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
         setattr(DataList.where_operator, 'SOMETHING', 'SOMETHING')
         with self.assertRaises(NotImplementedError):
-            DataList(key='some_list',
-                     query={'object': TestDisk,
-                            'data': DataList.select.COUNT,
-                            'query': {'type': DataList.where_operator.SOMETHING,
-                                      'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            DataList({'object': TestDisk,
+                      'data': DataList.select.COUNT,
+                      'query': {'type': DataList.where_operator.SOMETHING,
+                                'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
         setattr(DataList.operator, 'SOMETHING', 'SOMETHING')
         with self.assertRaises(NotImplementedError):
-            DataList(key='some_list',
-                     query={'object': TestDisk,
-                            'data': DataList.select.COUNT,
-                            'query': {'type': DataList.where_operator.AND,
-                                      'items': [('machine.name', DataList.operator.SOMETHING, 'machine')]}})  # noqa
+            DataList({'object': TestDisk,
+                      'data': DataList.select.COUNT,
+                      'query': {'type': DataList.where_operator.AND,
+                                'items': [('machine.name', DataList.operator.SOMETHING, 'machine')]}})  # noqa
         disk.delete()
         machine.delete()
 
@@ -726,11 +714,10 @@ class Basic(TestCase):
         disk = TestDisk()
         disk.name = 'test'
         disk.save()
-        data = DataList(key='reducedlist',
-                        query={'object': TestDisk,
-                               'data': DataList.select.DESCRIPTOR,
-                               'query': {'type': DataList.where_operator.AND,
-                                         'items': []}}).data
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
         datalist = DataObjectList(data, TestDisk)
         self.assertEqual(len(datalist), 1, 'There should be only one item (%s)' % len(datalist))
         item = datalist.reduced[0]

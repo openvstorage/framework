@@ -1,21 +1,30 @@
-﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource///-->
 <section>
-    <h2 data-i18n="ovs:vmachines.title"></h2>
-    <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, pagesize: 10,
-                             enterViewport: loadVMachine, viewportRefresh: 5000, controls: true }">
+    <h2 data-i18n="ovs:vdisks.title"></h2>
+    <div data-bind="pager: { items: vDisks, headers: vDiskHeaders, pagesize: 10,
+                             enterViewport: loadVDisk, viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;" class="fa fa-spinner fa-spin"></i>
                     <span data-bind="text: name"></span>
                 </td>
-                <td data-bind="lazylist: { items: vpools, loadedObservable: 'loaded' }">
-                    <a data-part="entry" data-bind="text: name, attr: { href: $root.vpoolUrl(guid) }"></a>
+                <td>
+                    <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded' }">
+                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
+                    </span>
                 </td>
-                <td data-bind="lazylist: { items: vsas, loadedObservable: 'loaded' }">
-                    <span data-part="entry" data-bind="text: name"></span>
+                <td>
+                    <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded' }">
+                        <a data-part="lazy-entry" data-bind="text: item().name, attr: { href: $root.vpoolUrl(item().guid) }"></a>
+                    </span>
                 </td>
-                <td><span data-bind="text: vDisks().length"></span></td>
+                <td>
+                    <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded' }">
+                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
+                    </span>
+                </td>
+                <td><span data-bind="text: size"></span></td>
                 <td><span data-bind="text: storedData"></span></td>
                 <td><span data-bind="text: cacheRatio"></span></td>
                 <td data-bind="lazyloader: { item: iops }"></td>
@@ -31,8 +40,7 @@
                                      }"></span>
                 </td>
                 <td>
-                    <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
-                    <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand fa fa-trash-o fa-fw"></i>
+                    <i data-bind="click: function() { $root.rollback($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
                 </td>
             </tr>
         </table>

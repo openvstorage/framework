@@ -2,6 +2,9 @@
 """
 DataList module
 """
+import hashlib
+import json
+import copy
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -43,14 +46,20 @@ class DataList(object):
     namespace = 'ovs_list'
     cachelink = 'ovs_listcache'
 
-    def __init__(self, key, query):
+    def __init__(self, query, key=None):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         """
         # Initialize super class
         super(DataList, self).__init__()
 
-        self._key = None if key is None else ('%s_%s' % (DataList.namespace, key))
+        if key is not None:
+            self._key = key
+        else:
+            identifier = copy.deepcopy(query)
+            identifier['object'] = identifier['object'].__name__
+            self._key = hashlib.sha256(json.dumps(identifier)).hexdigest()
+        self._key = '%s_%s' % (DataList.namespace, self._key)
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query

@@ -21,6 +21,7 @@ class DataObjectList(object):
         self.type = cls
         self._objects = {}
         self._reduced = reduced
+        self._query_result = query_result
         if not reduced:
             self.reduced = DataObjectList(query_result, cls, reduced=True)
 
@@ -92,6 +93,23 @@ class DataObjectList(object):
         for guid in self._guids:
             if guid in self._objects:
                 yield self._objects[guid]
+
+    def __add__(self, other):
+        if not isinstance(other, DataObjectList):
+            raise TypeError('Both operands should be of type DataObjectList')
+        new_dol = DataObjectList(self._query_result, self.type)
+        new_dol.merge(other._query_result)
+        return new_dol
+
+    def __radd__(self, other):
+        # This will typically called when "other" is no DataObjectList.
+        if other is None:
+            return self
+        elif not isinstance(other, DataObjectList):
+            raise TypeError('Both operands should be of type DataObjectList')
+        new_dol = DataObjectList(self._query_result, self.type)
+        new_dol.merge(other._query_result)
+        return new_dol
 
     def __iter__(self):
         """

@@ -217,8 +217,10 @@ class DataObject(object):
         # pylint: disable=protected-access
         fget = lambda s: s._get_cproperty(attribute)
         fset = lambda s, v: s._set_cproperty(attribute, v)
+        gget = lambda s: s._get_gproperty(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget, fset))
+        setattr(self.__class__, '%s_guid' % attribute, property(gget))
         self._data[attribute] = value
 
     def _add_lproperty(self, attribute):
@@ -256,6 +258,12 @@ class DataObject(object):
             self._objects[attribute] = descriptor.get_object(instantiate=True)
         return self._objects[attribute]
 
+    def _get_gproperty(self, attribute):
+        """
+        Getter for a foreign key property
+        """
+        return self._data[attribute]['guid']
+
     def _get_lproperty(self, attribute):
         """
         Getter for the list property
@@ -267,11 +275,11 @@ class DataObject(object):
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
         # pylint: disable=line-too-long
-        datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
-                            query = {'object': remote_class,
+        datalist = DataList(query = {'object': remote_class,
                                      'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
-                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})  # noqa
+                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}},  # noqa
+                            key   = '%s_%s_%s' % (self._name, self._guid, attribute))
         # pylint: enable=line-too-long
 
         if self._objects[attribute]['data'] is None:

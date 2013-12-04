@@ -5,9 +5,12 @@ VMachine module
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
+from rest_framework.decorators import action, link
 from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.datalist import DataList
+from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
@@ -99,3 +102,58 @@ class VMachineViewSet(viewsets.ViewSet):
                                              name=request.DATA['name'],
                                              consistent=request.DATA['consistent']).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    def get_vsas(self, request, pk=None, format=None):
+        """
+        Returns list of VSA machine guids
+        """
+        _ = request, format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            vmachine = VMachine(pk)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        vsa_vmachine_guids = []
+        for vdisk in vmachine.vdisks:
+            if vdisk.vsrid:
+                vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
+                vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
+        return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    def get_vpools(self, request, pk=None, format=None):
+        """
+        Returns the vpool guids associated with the given VM
+        """
+        _ = request, format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            vmachine = VMachine(pk)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        vpool_guids = []
+        for vdisk in vmachine.vdisks:
+            vpool_guids.append(vdisk.vpool.guid)
+        return Response(vpool_guids, status=status.HTTP_200_OK)
+
+    @expose(internal=True)
+    @required_roles(['view'])
+    def filter(self, request, pk=None, format=None):
+        """
+        Filters vMachines based on a filter object
+        """
+        _ = request, pk, format
+        query_result = DataList({'object': VMachine,
+                                 'data': DataList.select.DESCRIPTOR,
+                                 'query': request.DATA['query']}).data  # noqa
+        # pylint: enable=line-too-long
+        vmachines = DataObjectList(query_result, VMachine).reduced
+        serializer = SimpleSerializer(vmachines, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

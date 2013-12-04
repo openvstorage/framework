@@ -33,6 +33,8 @@ class FullSerializer(SimpleSerializer):
             self.fields[key] = FullSerializer._map_type_to_field(default[1])
         for key in self.hybrid._expiry:
             self.fields[key] = serializers.Field()
+        for key in self.hybrid._relations:
+            self.fields['%s_guid' % key] = serializers.Field()
 
     def get_identity(self, data):
         """

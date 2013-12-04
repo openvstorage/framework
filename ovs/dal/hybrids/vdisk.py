@@ -12,7 +12,7 @@ _vsr_client = VolumeStorageRouterClient().load()
 
 class VDisk(DataObject):
     """
-    The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage. 
+    The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     vDisks can be part of a vMachine or stand-alone.
     """
     # pylint: disable=line-too-long
@@ -44,7 +44,7 @@ class VDisk(DataObject):
         """
         if not self.volumeid:
             return []
-        return _vsr_client.list_snapShots(str(self.volumeid))
+        return _vsr_client.list_snapshots(str(self.volumeid))
 
     def _info(self):
         """
@@ -87,4 +87,5 @@ class VDisk(DataObject):
         Returns the Volume Storage Router ID to which the vDisk is connected.
         """
         _ = self
-        return None
+        #temporary workaround for testing purposes
+        return self.volumeid

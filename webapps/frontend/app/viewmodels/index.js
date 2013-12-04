@@ -2,28 +2,20 @@
 /*global define */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared', 'viewmodels/wizards/changepassword/index'
-], function(router, dialog, $, shared, ChangePasswordWizard) {
+    'ovs/shared', 'ovs/routing', 'viewmodels/wizards/changepassword/index'
+], function(router, dialog, $, shared, routing, ChangePasswordWizard) {
     "use strict";
-    var mode = router.activeInstruction().params[0];
-    var childRouter = router.createChildRouter()
-                            .makeRelative({
-                                moduleId: 'viewmodels/site',
-                                route: ':mode',
-                                fromParent: true
-                            })
-                            .map([
-                                // Dashboard
-                                { route: '',            moduleId: 'dashboard',    hash: '#' + mode,                  title: $.t('ovs:dashboard.title'),     titlecode: 'ovs:dashboard.title',     nav: false },
-                                // Navigation routes
-                                { route: 'vpools',      moduleId: 'vpools',       hash: '#' + mode + '/vpools',      title: $.t('ovs:vpools.title'),        titlecode: 'ovs:vpools.title',        nav: true  },
-                                { route: 'vpool/:guid', moduleId: 'vpool-detail', hash: '#' + mode + '/vpool/:guid', title: $.t('ovs:vpools.detail.title'), titlecode: 'ovs:vpools.detail.title', nav: false },
-                                { route: 'vmachines',   moduleId: 'vmachines',    hash: '#' + mode + '/vmachines',   title: $.t('ovs:vmachines.title'),     titlecode: 'ovs:vmachines.title',     nav: true  },
-                                // Non-navigation routes
-                                { route: 'statistics',  moduleId: 'statistics',   hash: '#' + mode + '/statistics',  title: $.t('ovs:statistics.title'),    titlecode: 'ovs:statistics.title',    nav: false },
-                                { route: 'login',       moduleId: 'login',        hash: '#' + mode + '/login',       title: $.t('ovs:login.title'),         titlecode: 'ovs:login.title',         nav: false }
-                            ])
-                            .buildNavigationModel();
+    var mode, childRouter;
+    mode = router.activeInstruction().params[0];
+    routing.buildSiteRoutes(mode);
+    childRouter = router.createChildRouter()
+                        .makeRelative({
+                            moduleId: 'viewmodels/site',
+                            route: ':mode',
+                            fromParent: true
+                        })
+                        .map(routing.siteRoutes)
+                        .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
             if (instance.guard.authenticated === true) {
@@ -41,6 +33,7 @@ define([
     return {
         shared: shared,
         router: childRouter,
+        routing: routing,
         changePassword: function() {
             dialog.show(new ChangePasswordWizard({
                 modal: true

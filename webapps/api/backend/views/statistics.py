@@ -24,7 +24,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         Reads the memcache location out of the configuration files
         """
         parser = ConfigParser.RawConfigParser()
-        parser.read('/opt/OpenvStorage/config/memcache.cfg')
+        parser.read('/opt/OpenvStorage/config/memcacheclient.cfg')
         local_node = parser.get('main', 'local_node')
         return parser.get(local_node, 'location')
 

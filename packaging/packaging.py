@@ -1,5 +1,5 @@
-# license see http://www.openvstorage.com/licenses/opensource/
 #!/usr/bin/env python
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 Packaging script
 """
@@ -80,7 +80,7 @@ class OvsPackaging(object):
         else:
             self.debug = False
 
-        self._hg_command = ['hg', '-yq', '--cwd', self.repopath] 
+        self._hg_command = ['hg', '-yq', '--cwd', self.repopath]
         self._parent_repopath = os.path.split(self.repopath)[0]
         self._needed_directories = ['', 'sources', 'binary']
         self.changelogpath = os.path.join(self.repopath, 'debian', 'changelog')
@@ -117,7 +117,7 @@ class OvsPackaging(object):
             if self.promote:
                 self.incrementversion = False
         if self.distribution == 'development':
-            # perhaps keeping all the recent changes in the changelog 
+            # perhaps keeping all the recent changes in the changelog
             # is good here
             # changelog_action = 'revert'
             self.incrementversion = True
@@ -185,7 +185,7 @@ class OvsPackaging(object):
         else:
             version = currentversion
 
-        changelogfile.close() 
+        changelogfile.close()
 
         return version
 
@@ -206,7 +206,7 @@ class OvsPackaging(object):
         """
         check credentials and run specified command
         """
-        
+
         _bb_command = self._hg_command[:]
         _bb_command.extend(command)
 
@@ -216,12 +216,12 @@ class OvsPackaging(object):
 
         if self._bb_username and self._bb_password:
             urlstring = 'https://{}:{}@bitbucket.org/{}'
-            url = urlstring.format(self._bb_username, 
+            url = urlstring.format(self._bb_username,
                     self._bb_password, self.repository)
             _bb_command.append(url)
         else:
             sshstring = 'ssh -i {} -o StrictHostKeyChecking=no '
-            sshstring += '-o UserKnownHostsFile=/dev/null' 
+            sshstring += '-o UserKnownHostsFile=/dev/null'
             sshcommand = sshstring.format(self.bb_credentials)
             sshurl = 'ssh://hg@bitbucket.org/{}'.format(self.repository)
             _bb_command.extend(['-e', sshcommand, sshurl])
@@ -450,7 +450,7 @@ class OvsPackaging(object):
         uploads deb to apt server using dput
         """
 
-        dput_cf_path = os.path.join(self.repopath, 'packaging', 
+        dput_cf_path = os.path.join(self.repopath, 'packaging',
                 'dput.cf')
         dputcommand = ['dput', '-u', '-c', dput_cf_path, 'ovs',
                 changesfile]
@@ -474,7 +474,7 @@ class OvsPackaging(object):
         config_path = os.path.join(config, 'config')
         config_temp_name = 'config_{}'.format(self.scripttime)
         config_temp_path = os.path.join(config, config_temp_name)
-        config_dput = os.path.join(self.repopath, 'packaging', 
+        config_dput = os.path.join(self.repopath, 'packaging',
                 'dput_ssh_config')
 
         if os.path.exists(config_path):
@@ -521,7 +521,7 @@ class OvsPackaging(object):
     def cleanup_packaging(self):
         """
         Cleanup unnecessary leftover directories and reset configs
-        
+
         Something like this:
 
         if os.path.exists(config_temp_path):
@@ -532,7 +532,7 @@ class OvsPackaging(object):
         shutil.rmtree(os.path.join(self._parent_repopath, 'binary', self.scripttime))
         shutil.rmtree(os.path.join(self._parent_repopath, 'sources'))
         """
-        
+
     def package(self):
         """
         Do the actual method calls to create a packaging

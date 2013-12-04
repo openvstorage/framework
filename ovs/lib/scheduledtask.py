@@ -10,7 +10,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.celery import loghandler
 
-import datetime
+import time
 
 
 class ScheduledTaskController(object):
@@ -31,10 +31,11 @@ class ScheduledTaskController(object):
         tasks = []
         machines = VMachineList.get_vmachines()
         for machine in machines:
-            timestamp = str(datetime.datetime.now()).split('.')[0]
+            timestamp = str(time.time()).split('.')[0]
             for disk in machine.vdisks:
                 metadata = dict()
                 metadata['label'] = ''
+                metadata['is_consistent'] = False
                 metadata['timestamp'] = timestamp
                 metadata['machineguid'] = machine.guid
                 task = VDiskController.create_snapshot.s(diskguid=disk.guid,

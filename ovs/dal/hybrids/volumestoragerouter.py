@@ -20,9 +20,10 @@ class VolumeStorageRouter(DataObject):
                   'vsrid':       (None, str, 'ID of the VSR in the Open vStorage Volume Driver.')}
     _relations = {'vpool':            (VPool,    'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
-    _expiry = {'status':      (30, str),
-               'statistics':   (5, dict),
-               'stored_data': (60, int)}
+    _expiry = {'status':        (30, str),
+               'statistics':     (5, dict),
+               'stored_data':   (60, int),
+               'failover_mode': (60, str)}
     # pylint: enable=line-too-long
 
     def _status(self):
@@ -55,3 +56,14 @@ class VolumeStorageRouter(DataObject):
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
         return 0
+
+    def _failover_mode(self):
+        """
+        Gets the agregated failover mode
+        """
+        status = None
+        if self.vpool is not None:
+            for disk in self.vpool.vdisks:
+                if status is None or 'OK' not in disk.info['failover_mode']:
+                    status = disk.info['failover_mode']
+        return status
