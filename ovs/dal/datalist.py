@@ -139,7 +139,11 @@ class DataList(object):
             if value is None and itemcounter != len(path):
                 # We loaded a None in the middle of our path
                 if target_class is not None:
-                    self._add_invalidation(target_class[0].__name__.lower(), path[itemcounter])
+                    if target_class[0] is None:
+                        classname = value.__class__.__name__.lower()
+                    else:
+                        classname = target_class[0].__name__.lower()
+                    self._add_invalidation(classname, path[itemcounter])
                 return False  # Fail the filter
 
         # Apply operators

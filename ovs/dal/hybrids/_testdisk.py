@@ -18,7 +18,8 @@ class TestDisk(DataObject):
                   'order':       (0,    int,   'Order of the test disk'),
                   'type':        (None, ['ONE', 'TWO'], 'Type of the test disk')}
     _relations = {'machine': (TestMachine, 'disks'),
-                  'storage': (TestMachine, 'stored_disks')}
+                  'storage': (TestMachine, 'stored_disks'),
+                  'parent':  (None,        'children')}
     _expiry = {'used_size':  (5, int),
                'wrong_type': (5, int)}
     # pylint: enable=line-too-long

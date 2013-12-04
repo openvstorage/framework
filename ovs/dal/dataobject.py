@@ -38,7 +38,7 @@ class MetaClass(type):
                         % (docstring, extra_info, itemtype)
                 )
             for attribute, relation in dct['_relations'].iteritems():
-                itemtype = relation[0].__name__
+                itemtype = relation[0].__name__ if relation[0] is not None else name
                 dct[attribute] = property(
                     doc='[relation] one-to-many relation with %s.%s\n@type: %s'
                         % (itemtype, relation[1], itemtype)
@@ -165,7 +165,11 @@ class DataObject(object):
         # Load relations
         for attribute, relation in self._relations.iteritems():
             if attribute not in self._data:
-                self._data[attribute] = Descriptor(relation[0]).descriptor
+                if relation[0] is None:
+                    cls = self.__class__
+                else:
+                    cls = relation[0]
+                self._data[attribute] = Descriptor(cls).descriptor
             self._add_cproperty(attribute, self._data[attribute])
 
         # Add wrapped properties
@@ -411,13 +415,17 @@ class DataObject(object):
         # invalidating that remote list)
         for key, default in self._relations.iteritems():
             if self._original[key]['guid'] != self._data[key]['guid']:
+                if default[0] is None:
+                    classname = self.__class__.__name__.lower()
+                else:
+                    classname = default[0].__name__.lower()
                 # The field points to another object
                 self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                       default[0].__name__.lower(),
+                                                       classname,
                                                        self._original[key]['guid'],
                                                        default[1]))
                 self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                       default[0].__name__.lower(),
+                                                       classname,
                                                        self._data[key]['guid'],
                                                        default[1]))
         # Second, invalidate property lists
