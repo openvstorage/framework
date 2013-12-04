@@ -33,9 +33,6 @@ define([
         self.loadVPoolsHandle = undefined;
 
         // Functions
-        self.detailUrl = function(guid) {
-            return '#' + self.shared.mode() + '/vpool/' + (guid.call ? guid() : guid);
-        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVPoolsHandle);

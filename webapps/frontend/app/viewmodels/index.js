@@ -2,19 +2,19 @@
 /*global define */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared', 'ovs/routing', 'viewmodels/wizards/changepassword/index'
-], function(router, dialog, $, shared, routing, ChangePasswordWizard) {
+    'ovs/shared', 'viewmodels/wizards/changepassword/index'
+], function(router, dialog, $, shared, ChangePasswordWizard) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
-    routing.buildSiteRoutes(mode);
+    shared.routing.buildSiteRoutes(mode);
     childRouter = router.createChildRouter()
                         .makeRelative({
                             moduleId: 'viewmodels/site',
                             route: ':mode',
                             fromParent: true
                         })
-                        .map(routing.siteRoutes)
+                        .map(shared.routing.siteRoutes)
                         .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
@@ -33,7 +33,6 @@ define([
     return {
         shared: shared,
         router: childRouter,
-        routing: routing,
         changePassword: function() {
             dialog.show(new ChangePasswordWizard({
                 modal: true

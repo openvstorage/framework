@@ -12,6 +12,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return returnvalue;
     }
+    function deg2rad(deg) {
+		return deg * Math.PI / 180;
+	}
     function setDecimals(value, decimals) {
         decimals = decimals || 2;
         var parts = [];
@@ -267,6 +270,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         ceil            : ceil,
         buildString     : buildString,
         setDecimals     : setDecimals,
-        crossFiller     : crossFiller
+        crossFiller     : crossFiller,
+        deg2rad         : deg2rad
     };
 });

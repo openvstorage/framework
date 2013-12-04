@@ -16,7 +16,9 @@
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded' }">
-                        <a data-part="lazy-entry" data-bind="text: item().name, attr: { href: $root.vpoolUrl(item().guid) }"></a>
+                        <a data-part="lazy-entry"
+                           data-bind="text: item().name,
+                                      attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
                     </span>
                 </td>
                 <td>

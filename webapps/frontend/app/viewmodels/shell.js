@@ -23,7 +23,6 @@ define([
 
         self.shared = shared;
         self.router = router;
-        self.routing = routing;
         self.compositionComplete = function() {
             return api.get('branding')
                 .then(function(brandings) {
@@ -44,6 +43,7 @@ define([
             self.shared.messaging      = new Messaging();
             self.shared.authentication = new Authentication();
             self.shared.tasks          = new Tasks();
+            self.shared.routing        = routing;
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function() {

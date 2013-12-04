@@ -166,8 +166,7 @@ class VDiskController(object):
         volumeid = vsr_client.create_clone(_location, _id, _snap)
         for item in properties_to_clone:
             setattr(new_disk, item, getattr(disk, item))
-        disk.children.append(new_disk.guid)
-        disk.save()
+        new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
         new_disk.volumeid = volumeid

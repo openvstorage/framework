@@ -52,6 +52,21 @@ define([
         self.vDiskGuids            = [];
         self.templateChildrenGuids = ko.observableArray([]);
 
+        self._bandwidth = ko.computed(function() {
+            var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0),
+                initialized = self.readSpeed.initialized() && self.writeSpeed.initialized();
+            return {
+                value: generic.formatSpeed(total),
+                initialized: initialized
+            };
+        });
+        self.bandwidth = ko.computed(function() {
+            return self._bandwidth().value;
+        });
+        self.bandwidth.initialized = ko.computed(function() {
+            return self._bandwidth().initialized;
+        });
+
         // Functions
         self.fetchVSAGuids = function() {
             return $.Deferred(function(deferred) {
