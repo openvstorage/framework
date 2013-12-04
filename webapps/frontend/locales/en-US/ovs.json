@@ -49,6 +49,7 @@
         "machines": "Machines",
         "vpool": "vPool",
         "vsa": "VSA",
+        "children": "Children",
         "storeddata": "Stored data",
         "cache": "Cache",
         "cacheratio": "Cache Hit Ratio",
@@ -113,6 +114,9 @@
     },
     "vdisks": {
         "title": "vDisks"
+    },
+    "vtemplates": {
+        "title": "vTemplates"
     },
     "dashboard": {
         "title": "Dashboard",

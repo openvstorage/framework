@@ -14,6 +14,7 @@ define([
         self.loadVSAGuid      = undefined;
         self.loadHandle       = undefined;
         self.loadVpoolGuid    = undefined;
+        self.loadChildrenGuid = undefined;
 
         // External dependencies
         self.vsas         = ko.observableArray([]);
@@ -47,8 +48,9 @@ define([
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
 
-        self.vDisks      = ko.observableArray([]);
-        self.vDiskGuids  = [];
+        self.vDisks                = ko.observableArray([]);
+        self.vDiskGuids            = [];
+        self.templateChildrenGuids = ko.observableArray([]);
 
         // Functions
         self.fetchVSAGuids = function() {
@@ -68,6 +70,17 @@ define([
                 self.loadVpoolGuid = api.get('vmachines/' + self.guid() + '/get_vpools')
                     .done(function(data) {
                         self.vPoolGuids(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise();
+        };
+        self.fetchTemplateChildrenGuids = function() {
+            return $.Deferred(function(deferred) {
+                generic.xhrAbort(self.loadChildrenGuid);
+                self.loadChildrenGuid = api.get('vmachines/' + self.guid() + '/get_children')
+                    .done(function(data) {
+                        self.templateChildrenGuids(data);
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
