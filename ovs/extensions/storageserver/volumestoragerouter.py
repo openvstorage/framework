@@ -4,7 +4,7 @@ Wrapper class for the storagerouterclient of the voldrv team
 """
 
 from volumedriver.storagerouter import storagerouterclient
-from configobj import ConfigObj
+from JumpScale import j
 
 
 class VolumeStorageRouterClient(object):
@@ -15,9 +15,8 @@ class VolumeStorageRouterClient(object):
         """
         Initializes the wrapper given a configfile for the RPC communication
         """
-        config = ConfigObj('/opt/OpenvStorage/config/volumestoragerouterclient.cfg')
-        self._host = config['local']['host']
-        self._port = int(config['local']['port'])
+        self._host = j.application.config.get('volumedriver.filesystem.xmlrpc.ip')
+        self._port = int(j.application.config.get('volumedriver.filesystem.xmlrpc.port'))
 
     def load(self):
         """

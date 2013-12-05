@@ -10,6 +10,7 @@ from backend.decorators import required_roles, expose
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from jumpscale import j
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -21,12 +22,10 @@ class MemcacheViewSet(viewsets.ViewSet):
     @staticmethod
     def _get_memcachelocation():
         """
-        Reads the memcache location out of the configuration files
+        Get the memcache location from hrd
         """
-        parser = ConfigParser.RawConfigParser()
-        parser.read('/opt/OpenvStorage/config/memcache.cfg')
-        local_node = parser.get('main', 'local_node')
-        return parser.get(local_node, 'location')
+        return '{}:{}'.format(j.application.config.get('ovscore.memcache.localnode.ip'),
+                              j.application.config.get('ovscore.memcache.localnode.port'))
 
     @staticmethod
     def _get_instance(host):
