@@ -40,7 +40,7 @@ define([
                     .then(self.shared.tasks.wait)
                     .done(function() {
                         generic.alertSuccess(
-                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.finished'),
                             $.t('ovs:wizards.snapshot.confirm.success', { what: self.data.vm().name() })
                         );
                     })

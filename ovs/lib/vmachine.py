@@ -18,17 +18,24 @@ class VMachineController(object):
     """
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, **kwargs):
+    def snapshot(machineguid, label=None, is_consistent=False, **kwargs):
         """
         Snapshot VMachine disks
 
         @param machineguid: guid of the machine
+        @param label: label to give the snapshots
+        @param is_consistent: flag indicating the snapshot was consistent or not
         """
         _ = kwargs
+        metadata = {'label': label,
+                    'is_consistent': is_consistent,
+                    'timestamp': str(time.time()).split('.')[0],
+                    'machineguid': machineguid}
         machine = VMachine(machineguid)
         tasks = []
         for disk in machine.vdisks:
-            t = VDiskController.create_snapshot.s(diskguid=disk.guid)
+            t = VDiskController.create_snapshot.s(diskguid=disk.guid,
+                                                  metadata=metadata)
             t.link_error(VDiskController.delete_snapshot.s())
             tasks.append(t)
         snapshot_vmachine_wf = group(t for t in tasks)
