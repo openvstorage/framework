@@ -131,7 +131,7 @@
             "machinemarked": "Machine __what__ is marked for setting as template...",
             "done": "Machine set as template",
             "machinesetastemplate": "Machine __what__ set as template"
-        }        
+        }
     },
     "vdisks": {
         "title": "vDisks"

@@ -137,7 +137,7 @@ define([
                         .done(function(answer) {
                         	if (answer === $.t('ovs:vmachines.setastemplate.yes')) {
                                 generic.alertInfo(
-                                		$.t('ovs:vmachines.setastemplate.marked'), 
+                                		$.t('ovs:vmachines.setastemplate.marked'),
                                 		$.t('ovs:vmachines.setastemplate.machinemarked', { what: vm.name() })
                                 	);
                                 api.get('vmachines/' + vm.guid() + '/set_as_template')
@@ -145,7 +145,7 @@ define([
                                     .done(function() {
                                     	self.vMachines.destroy(vm);
                                         generic.alertSuccess(
-                                        		$.t('ovs:vmachines.setastemplate.done'), 
+                                        		$.t('ovs:vmachines.setastemplate.done'),
                                         		$.t('ovs:vmachines.setastemplate.machinesetastemplate', { what: vm.name() }));
                                     })
                                     .fail(function(error) {
