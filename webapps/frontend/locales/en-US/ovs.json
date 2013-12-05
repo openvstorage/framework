@@ -1,0 +1,261 @@
+{
+    "generic": {
+        "username": "Username",
+        "password": "Password",
+        "logout": "Log out",
+        "user": "User",
+        "togglenavigation": "Toggle navigation",
+        "changepassword": "Change password",
+        "signin": "Sign in",
+        "welcome": "Welcome",
+        "of": "of",
+        "next": "Next &raquo;",
+        "previous": "&laquo; Previous",
+        "cancel": "Cancel",
+        "finish": "Finish",
+        "ip": "IP",
+        "name": "Name",
+        "ki": "Ki",
+        "mi": "Mi",
+        "gi": "Gi",
+        "ti": "Ti",
+        "k": "k",
+        "m": "M",
+        "g": "G",
+        "t": "T",
+        "ok": "OK",
+        "bs": "B/s",
+        "b": "B",
+        "kibs": "KiB/s",
+        "kib": "KiB",
+        "mibs": "MiB/s",
+        "mib": "MiB",
+        "gibs": "GiB/s",
+        "gib": "GiB",
+        "tibs": "TiB/s",
+        "tib": "TiB",
+        "savesuccessfully": "__what__ saved successfully.",
+        "errorwhile": "An error occurred while __what__.",
+        "errorwhile_error": "An error occurred while __what__: __error__",
+        "saved": "Saved",
+        "error": "Error",
+        "vdisk": "vDisk",
+        "disk": "Disk",
+        "vdisks": "vDisks",
+        "disks": "Disks",
+        "vmachine": "vMachine",
+        "machine": "Machine",
+        "vmachines": "vMachines",
+        "machines": "Machines",
+        "vpool": "vPool",
+        "vsa": "VSA",
+        "children": "Children",
+        "storeddata": "Stored data",
+        "topstoreddata": "Top Stored Data",
+        "cache": "Cache",
+        "cacheratio": "Cache Hit Ratio",
+        "iops": "IOPS",
+        "latency": "Latency",
+        "readspeed": "Read Speed",
+        "writespeed": "Write Speed",
+        "read": "Read",
+        "write": "Write",
+        "actions": "Actions",
+        "showing": "Showing",
+        "from": "from",
+        "results": "results",
+        "areyousure": "Are you sure?",
+        "yes": "Yes",
+        "no": "No",
+        "size": "Size",
+        "customerapi": "Customer API",
+        "focstatus": "FOC",
+        "performance": "Performance",
+        "current": "Current",
+        "bandwidth": "Bandwidth",
+        "topbandwidth": "Top Bandwidth",
+        "thousandseparator": ","
+    },
+    "vpools" : {
+        "title": "vPools",
+        "backendtype": "Type",
+        "backendtypes": {
+            "S3": "Amazon S3",
+            "FILESYSTEM": "File system"
+        },
+        "backendconnection": "Connection",
+        "backendlogin": "Login",
+        "statistics": "Statistics",
+        "backend": "Backend",
+        "freespace": "Free space",
+        "detail": {
+            "title": "vPool",
+            "introduction": "Below an overview of the vPool properties."
+        }
+    },
+    "statistics": {
+        "title": "Statistics",
+        "introduction": "This page contains various system statistics.",
+        "memcache": {
+            "title": "Memcache",
+            "memoryusage": "Memory usage:",
+            "keysincache": "Keys in cache:",
+            "cachehits": "Cache hits:",
+            "cachetraffic": "Cache traffic",
+            "uptime": "uptime",
+            "rawinfo": "Raw memcached information"
+        },
+        "dal": {
+            "title": "Open vStorage DAL",
+            "relations": "Relation structure loads",
+            "descriptor": "Descriptor loads",
+            "datalist": "Datalist queries",
+            "objectload": "Objects loads",
+            "hitsratio": "Hits and hitratio:",
+            "loadspeed": "Loads per second:"
+        }
+    },
+    "vmachines": {
+        "title": "vMachines",
+        "delete": {
+            "warning": "Are you sure you want to delete __what__?",
+            "marked": "Marked for deletion",
+            "markedmsg": "Machine __what__ is marked for deletion...",
+            "done": "Machine deleted",
+            "donemsg": "Machine __what__ deleted",
+            "errormsg": "deleting __what__"
+        },
+        "setastemplate": {
+            "title": "Set Virtual Machine __what__ as Template",
+            "warning": "Warning: converting a vMachine into a Template will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
+            "yes": "Set as Template",
+            "no": "Close",
+            "marked": "Marked for setting as template",
+            "markedmsg": "Machine __what__ is marked for setting as template...",
+            "done": "Machine set as template",
+            "donemsg": "Machine __what__ set as template",
+            "errormsg": "setting __what__ as template"
+        }
+    },
+    "vdisks": {
+        "title": "vDisks"
+    },
+    "vtemplates": {
+        "title": "vTemplates"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "panels": {
+            "vsa": {
+                "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Cluster. For each VSA the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - VSA",
+                "title": "VSA"
+            },
+            "cache": {
+                "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
+                "helptitle": "Help - Cache Hit Ratio",
+                "title": "Cache Hit Ratio"
+            },
+            "vmachines": {
+                "helpcontent": "This panels lists the top vMachines according to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to the vMachines title to go directly to the list of vMachines.",
+                "helptitle": "Help - vMachines",
+                "title": "vMachines"
+            },
+            "statistics": {
+                "helpcontent": "This panels lists the average on IOPS, Read and Write Speed and Cache Hits over 5 seconds summarized for all vDisks in the Cluster. The values are updated automatically every 5 seconds.",
+                "helptitle": "Help - vDisk Statistics",
+                "title": "vDisk Statistics"
+            },
+            "vpools": {
+                "helpcontent": "This panels lists the top vPools according to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",
+                "helptitle": "Help - vPools",
+                "title": "vPools"
+            }
+        }
+    },
+    "login": {
+        "title": "Login",
+        "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
+        "invalidcredentials": "The username/password combination were invalid or could not be validated.",
+        "welcome": "Use the navigation to browse trough the interface."
+    },
+    "notfound": {
+        "title": "Page not found",
+        "introduction": "The page you've requested was not found. Please navigate back, and try again or update your bookmarks."
+    },
+    "keywords": {
+        "vpool": "vPool"
+    },
+    "wizards" : {
+        "clone": {
+            "title": "Clone",
+            "gather": {
+                "title": "Please provide the required information",
+                "basicinfo": "Enter basic information",
+                "name": "Clone name",
+                "amount": "Number of clones",
+                "selectsnapshots": "Select the snapshots from which you want to clone:",
+                "nomachine": "No machine loaded",
+                "noname": "No name was entered",
+                "nosnapshots": "Not all disks have snapshots",
+                "snapshot": "Snapshots"
+            },
+            "confirm": {
+                "title": "Verify the entered information",
+                "clonename": "Name of the clone:",
+                "cloneamount": "Amount of clones:",
+                "verifysnapshots": "Please validate the selected snapshot below. It will be used for the clone:",
+                "cloning": "cloning __what__",
+                "clonestarted": "Clone started",
+                "inprogress": "Machine __what__ cloning in progress...",
+                "success": "Cloned __what__ successfully",
+                "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
+                "allfailed": "All clones for machine __what__ failed.",
+                "complete": "Clones completed",
+                "snapshot": "Snapshot:"
+            }
+        },
+        "snapshot": {
+            "title": "Snapshot",
+            "gather": {
+                "title": "Please provide the required information",
+                "name": "Snapshot name",
+                "consistent": "Label as Consistent snapshot",
+                "basicinfo": "Enter basic information",
+                "nomachine": "No machine loaded",
+                "noname": "No name was entered"
+            },
+            "confirm": {
+                "title": "Verify the entered information",
+                "snapshotstarted": "Snapshot started",
+                "inprogress": "Machine __what__ snapshotting in progress...",
+                "failed": "Machine __what__ snapshot failed.",
+                "success": "Machine __what__ snapshot successfully.",
+                "name": "Snapshot name",
+                "consistent": "Label as Consistent snapshot"
+            }
+        },
+        "changepassword": {
+            "title": "Change password",
+            "confirm": {
+                "title": "Please provide the required information",
+                "introduction": "Enter the requested information carefully.",
+                "newpassword": "New password",
+                "currentpassword": "Current password",
+                "retype": "Retype",
+                "entercurrent": "Enter current password",
+                "currentinvalid": "Invalid password",
+                "enternew": "Enter new password",
+                "shouldmatch": "New passwords should match",
+                "updatingpassword": "updating the password"
+            }
+        }
+    },
+    "footer" : {
+        "cachereads": "Reads served from the Cache:",
+        "datawritten": "Data written to the Backend:",
+        "dataread": "Data read from the Backend:",
+        "bandwidthsaved": "Bandwidth Saved:"
+    },
+    "title": "Open vStorage"
+}

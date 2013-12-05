@@ -1,0 +1,9 @@
+#!/bin/bash
+
+/usr/bin/easy_install -U setuptools
+pip install celery
+pip install flower
+pip install logstash_formatter
+pip install python-logstash
+pip install configobj
+pip install suds-jurko --pre
