@@ -1,0 +1,26 @@
+Source: openvstorage
+Maintainer: Stefaan Aelbrecht <stefaan.aelbrecht@cloudfounders.com>
+Section: python
+Priority: optional
+Build-Depends: python (>= 2.7.2-7ubuntu2)
+Vcs-Browser: https://bitbucket.org/cloudfounders/poc_openvstorage/wiki/Home
+Vcs-Hg: https://bitbucket.org/cloudfounders/poc_openvstorage/
+
+Package: openvstorage-core
+Architecture: all
+Pre-Depends: python (>= 2.7.2-7ubuntu2), python-pip (>= 1.3.1-0ubuntu1),
+Depends: rabbitmq-server (>= 3.0.2-1), python-memcache (>= 1.47-2), memcached (>= 1.4.7-0.1ubuntu1), volumedriver-server (>= 3.6.0), arakoon (>= 1.6.5),
+Description: openvStorage core
+ <CLOUDFOUNDERS OPENVSTORAGE CORE SHORT README>
+
+Package: openvstorage-webapps
+Architecture: all
+Depends: python (>= 2.7.2-7ubuntu2), python-django (>= 1.5.1-2), nginx (>= 1.2.6-1ubuntu3.2), gunicorn (>= 0.15.0-1), python-gevent (>= 0.13.0-1build2), python-markdown (>= 2.3.1-1)
+Description: openvStorage Web Applications
+ <CLOUDFOUNDERS OPENVSTORAGE WEB APPLICATIONS SHORT README>
+
+Package: openvstorage
+Architecture: amd64
+Depends: ipython, openvstorage-core (>= 0.1.0), openvstorage-webapps (>= 0.1.0), supervisor (>= 3.0a8-1.1), nfs-kernel-server,
+Description: openvStorage
+ <CLOUDFOUNDERS OPENVSTORAGE SHORT README>

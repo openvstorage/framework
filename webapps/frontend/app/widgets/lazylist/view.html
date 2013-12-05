@@ -1,0 +1,31 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section>
+    <!-- ko if: displaymode() === 'span' -->
+        <span data-bind="foreach: items">
+            <span data-bind="visible: $index() > 0">,</span>
+            <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spinner fa-spin"></i></span>
+            <span data-bind="visible: $parent.isLoaded($data)">
+                <span data-part="entry" data-bind="text: $data"></span>
+            </span>
+        </span>
+    <!-- /ko -->
+    <!-- ko if: displaymode() === 'table' -->
+        <table class="table table-striped table-hover" >
+            <thead data-part="head"></thead>
+            <!-- ko foreach: items -->
+                <tbody>
+                    <!-- ko if: !$parent.isLoaded($data) -->
+                        <tr>
+                            <td data-bind="attr: { colspan: $parent.colspan() }"><i class="fa fa-spinner fa-spin"></i></td>
+                        </tr>
+                    <!-- /ko -->
+                    <!-- ko if: $parent.isLoaded($data) -->
+                        <tr data-part="table-entry">
+                            <td data-bind="attr: { colspan: $parent.colspan() }, text: $data"></td>
+                        </tr>
+                    <!-- /ko -->
+                </tbody>
+            <!-- /ko -->
+        </table>
+    <!-- /ko -->
+</section>
