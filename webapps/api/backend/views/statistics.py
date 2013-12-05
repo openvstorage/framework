@@ -10,6 +10,7 @@ from backend.decorators import required_roles, expose
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -62,6 +63,19 @@ class MemcacheViewSet(viewsets.ViewSet):
         host.close_socket()
         return stats
 
+    @staticmethod
+    def _add_dal_stats(stats):
+        """
+        Adds ovs dal statistics to the stats object
+        """
+        volatile = VolatileFactory.get_client()
+        setattr(stats, 'ovs_dal', {})
+        keys = ['datalist', 'object_load', 'descriptor', 'relations']
+        for key in keys:
+            for hittype in ['hit', 'miss']:
+                cachekey = 'ovs_stats_cache_%s_%s' % (key, hittype)
+                stats.ovs_dal['%s_%s' % (key, hittype)] = volatile.get(cachekey) or 0
+
     @expose(internal=True)
     @required_roles(['view'])
     def list(self, request, format=None):
@@ -73,6 +87,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         if not match:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         stats = MemcacheViewSet._get_instance(match.group(1))
+        MemcacheViewSet._add_dal_stats(stats)
         serializer = MemcacheSerializer(stats)
         return Response(serializer.data)
 
@@ -87,5 +102,6 @@ class MemcacheViewSet(viewsets.ViewSet):
         if not match:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         stats = MemcacheViewSet._get_instance(match.group(1))
+        MemcacheViewSet._add_dal_stats(stats)
         serializer = MemcacheSerializer(stats)
         return Response(serializer.data)

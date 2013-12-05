@@ -17,30 +17,34 @@ define([
         self.loadChildrenGuid = undefined;
 
         // External dependencies
-        self.vsas         = ko.observableArray([]);
-        self.vpools       = ko.observableArray([]);
+        self.vsas           = ko.observableArray([]);
+        self.vpools         = ko.observableArray([]);
 
         // Obserables
-        self.loading      = ko.observable(false);
-        self.loaded       = ko.observable(false);
+        self.loading        = ko.observable(false);
+        self.loaded         = ko.observable(false);
 
-        self.guid         = ko.observable(guid);
-        self.vpool        = ko.observable();
-        self.vsaGuids     = ko.observableArray([]);
-        self.vPoolGuids   = ko.observableArray([]);
-        self.name         = ko.observable();
-        self.ipAddress    = ko.observable();
-        self.isInternal   = ko.observable();
-        self.isVTemplate  = ko.observable();
-        self.snapshots    = ko.observable();
-        self.iops         = ko.smoothDeltaObservable(generic.formatNumber);
-        self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits    = ko.smoothDeltaObservable();
-        self.cacheMisses  = ko.smoothDeltaObservable();
-        self.readSpeed    = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.writeSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.failoverMode = ko.observable();
-        self.cacheRatio   = ko.computed(function() {
+        self.guid           = ko.observable(guid);
+        self.vpool          = ko.observable();
+        self.vsaGuids       = ko.observableArray([]);
+        self.vPoolGuids     = ko.observableArray([]);
+        self.name           = ko.observable();
+        self.ipAddress      = ko.observable();
+        self.isInternal     = ko.observable();
+        self.isVTemplate    = ko.observable();
+        self.snapshots      = ko.observable();
+        self.iops           = ko.smoothDeltaObservable(generic.formatNumber);
+        self.storedData     = ko.smoothObservable(undefined, generic.formatBytes);
+        self.cacheHits      = ko.smoothDeltaObservable();
+        self.cacheMisses    = ko.smoothDeltaObservable();
+        self.readSpeed      = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.writeSpeed     = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.backendReads   = ko.smoothObservable(undefined, generic.formatNumber);
+        self.backendWritten = ko.smoothObservable(undefined, generic.formatBytes);
+        self.backendRead    = ko.smoothObservable(undefined, generic.formatBytes);
+        self.bandwidthSaved = ko.smoothObservable(undefined, generic.formatBytes);
+        self.failoverMode   = ko.observable();
+        self.cacheRatio     = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
@@ -51,6 +55,21 @@ define([
         self.vDisks                = ko.observableArray([]);
         self.vDiskGuids            = [];
         self.templateChildrenGuids = ko.observableArray([]);
+
+        self._bandwidth = ko.computed(function() {
+            var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0),
+                initialized = self.readSpeed.initialized() && self.writeSpeed.initialized();
+            return {
+                value: generic.formatSpeed(total),
+                initialized: initialized
+            };
+        });
+        self.bandwidth = ko.computed(function() {
+            return self._bandwidth().value;
+        });
+        self.bandwidth.initialized = ko.computed(function() {
+            return self._bandwidth().initialized;
+        });
 
         // Functions
         self.fetchVSAGuids = function() {
@@ -123,6 +142,10 @@ define([
                                     self.cacheMisses(stats.sco_cache_misses);
                                     self.readSpeed(stats.data_read);
                                     self.writeSpeed(stats.data_written);
+                                    self.backendWritten(stats.data_written);
+                                    self.backendRead(stats.data_read);
+                                    self.backendReads(stats.backend_read_operations);
+                                    self.bandwidthSaved(stats.data_read - stats.backend_data_read);
                                     self.ipAddress(data.ip_address);
                                     self.isInternal(data.is_internal);
                                     self.isVTemplate(data.is_vtemplate);

@@ -5,6 +5,7 @@ VolumeStorageRouter module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
 class VolumeStorageRouter(DataObject):
@@ -39,7 +40,7 @@ class VolumeStorageRouter(DataObject):
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
         @return: dict
         """
-        data = dict()
+        data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.vsrid == self.vsrid:

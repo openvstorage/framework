@@ -1,6 +1,6 @@
 // license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
-define(['jquery'], function($){
+define(['jquery', 'ovs/generic'], function($, generic){
     "use strict";
     var mainRoutes, siteRoutes, buildSiteRoutes, loadHash;
 
@@ -25,12 +25,19 @@ define(['jquery'], function($){
             siteRoutes[i].hash = '#' + mode + '/' + siteRoutes[i].route;
         }
     };
-    loadHash = function(module) {
-        var i;
+    loadHash = function(module, params) {
+        var i, item, hash;
+        params = params || {};
         module = '/' + module;
         for (i = 0; i < siteRoutes.length; i += 1) {
             if (siteRoutes[i].moduleId.indexOf(module, siteRoutes[i].moduleId.length - module.length) !== -1) {
-                return siteRoutes[i].hash;
+                hash = siteRoutes[i].hash;
+                for (item in params) {
+                    if (params.hasOwnProperty(item)) {
+                        hash = hash.replace(':' + item, params[item].call ? params[item]() : params[item]);
+                    }
+                }
+                return hash;
             }
         }
         return '/';

@@ -1,5 +1,6 @@
 ﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <section>
+    <p data-bind="visible: shared.mode() !== 'full'">&nbsp;</p>
     <div class="row">
         <div class="col-md-4">
             <!-- Left column -->
@@ -50,6 +51,7 @@
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.cache.title"></b>
                     <div style="float:right;">
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.cache.helptitle',
                                              content: 'ovs:dashboard.panels.cache.helpcontent'
@@ -57,15 +59,20 @@
                         </span>
                     </div>
                 </div>
-                <div class="panel-body">
-                    <div style="height: 240px;">Temporary content</div>
-                 </div>
+                <div class="panel-body" data-bind="gauge: { primary: cacheRatio, secondary: iops }"></div>
             </div>
             <div class="panel panel-default">
                 <!-- vMachines -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vmachines.title"></b>
+                    <a data-bind="text: vmachines().length,
+                                  attr: { href: $root.shared.routing.loadHash('vmachines', {}) }"
+                       class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
+                        <span data-bind="visible: vMachinesLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <select data-bind="options: topVmachineModes, value: topVmachineMode,
+                                           optionsText: function(item) { return $.t('ovs:generic.' + item); }"
+                                style="margin-left: 5px;"></select>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vmachines.helptitle',
                                              content: 'ovs:dashboard.panels.vmachines.helpcontent'
@@ -73,8 +80,14 @@
                         </span>
                     </div>
                 </div>
-                <div class="panel-body">
-                    <div style="height: 110px;">Temporary content</div>
+                <div class="panel-body" data-bind="foreach: topVmachines">
+                    <div class="row">
+                        <div class="col-md-8"><span data-bind="text: name"></span></div>
+                        <div class="col-md-4">
+                            <span data-bind="visible: $parent.topVmachineMode() === 'topstoreddata', lazyloader: { item: storedData }"></span>
+                            <span data-bind="visible: $parent.topVmachineMode() === 'topbandwidth', lazyloader: { item: bandwidth }"></span>
+                        </div>
+                    </div>
                  </div>
             </div>
         </div>
@@ -126,6 +139,9 @@
                 <!-- vPools -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vpools.title"></b>
+                    <a data-bind="text: vpools().length,
+                                  attr: { href: $root.shared.routing.loadHash('vpools', {}) }"
+                       class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
                         <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
                         <select data-bind="options: topVpoolModes, value: topVPoolMode,
@@ -140,10 +156,11 @@
                 </div>
                 <div class="panel-body" data-bind="foreach: topVPools">
                     <div class="row">
-                        <div class="col-md-8"><a data-bind="attr: { href: $parent.vpoolUrl(guid) }, text: name"></a></div>
+                        <div class="col-md-8"><a data-bind="attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) },
+                                                            text: name"></a></div>
                         <div class="col-md-4">
-                            <span data-bind="visible: $parent.topVPoolMode() === 'storeddata', lazyloader: { item: storedData }"></span>
-                            <span data-bind="visible: $parent.topVPoolMode() === 'bandwidth', lazyloader: { item: bandwidth }"></span>
+                            <span data-bind="visible: $parent.topVPoolMode() === 'topstoreddata', lazyloader: { item: storedData }"></span>
+                            <span data-bind="visible: $parent.topVPoolMode() === 'topbandwidth', lazyloader: { item: bandwidth }"></span>
                         </div>
                     </div>
                  </div>

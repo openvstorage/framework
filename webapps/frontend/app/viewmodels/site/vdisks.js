@@ -37,12 +37,6 @@ define([
         self.loadVDisksHandle = undefined;
 
         // Functions
-        self.vpoolUrl = function(guid) {
-            return '#' + self.shared.mode() + '/vpool/' + (guid.call ? guid() : guid);
-        };
-        self.vmachineUrl = function(guid) {
-            return '#' + self.shared.mode() + '/vmachine/' + (guid.call ? guid() : guid);
-        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVDisksHandle);
@@ -105,6 +99,7 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vDisks);
         };
         self.deactivate = function() {
             var i;
@@ -112,6 +107,7 @@ define([
                 self.widgets[i].deactivate();
             }
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });
