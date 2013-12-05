@@ -98,9 +98,11 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        label = str(request.DATA['name'])
+        is_consistent = True if request.DATA['consistent'] else False  # Assure boolean type
         task = VMachineController.snapshot.s(machineguid=vmachine.guid,
-                                             name=request.DATA['name'],
-                                             consistent=request.DATA['consistent']).apply_async()
+                                             label=label,
+                                             is_consistent=is_consistent).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)
 
     @link()

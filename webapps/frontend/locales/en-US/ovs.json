@@ -74,7 +74,8 @@
         "current": "Current",
         "bandwidth": "Bandwidth",
         "topbandwidth": "Top Bandwidth",
-        "thousandseparator": ","
+        "thousandseparator": ",",
+        "finished": "Finished"
     },
     "vpools" : {
         "title": "vPools",

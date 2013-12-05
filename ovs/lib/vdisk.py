@@ -181,20 +181,23 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.create_snapshot')
-    def create_snapshot(diskguid, **kwargs):
+    def create_snapshot(diskguid, metadata, **kwargs):
         """
         Create a disk snapshot
 
         @param diskguid: guid of the disk
+        @param metadata: dict of metadata
         """
         disk = VDisk(diskguid)
-        _id = '{}'.format(disk.volumeid)
         logging.info('Create snapshot for disk {}'.format(disk.name))
         # if not srClient.canTakeSnapshot(diskguid):
         #    raise ValueError('Volume {} not found'.format(diskguid))
-        metadata = pickle.dumps(kwargs['metadata'])
+        metadata = pickle.dumps(metadata)
         snapshotguid = vsr_client.create_snapshot(
-            _id, snapshot_id=str(uuid.uuid4()), metadata=metadata)
+            str(disk.volumeid),
+            snapshot_id=str(uuid.uuid4()),
+            metadata=metadata
+        )
         kwargs['result'] = snapshotguid
         return kwargs
 
