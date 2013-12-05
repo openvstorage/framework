@@ -17,7 +17,7 @@ define([
 
         // Data
         self.vTemplateHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),       width: 150,       colspan: undefined },
+            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined, colspan: undefined },
             { key: undefined,      value: $.t('ovs:generic.disks'),      width: 60,        colspan: undefined },
             { key: 'children',     value: $.t('ovs:generic.children'),   width: 110,       colspan: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80,        colspan: undefined }
@@ -100,6 +100,7 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vTemplates);
         };
         self.deactivate = function() {
             var i;
@@ -107,6 +108,7 @@ define([
                 self.widgets[i].deactivate();
             }
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });

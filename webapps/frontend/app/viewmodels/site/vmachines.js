@@ -120,6 +120,42 @@ define([
                 }
             }
         };
+        self.setAsTemplate = function(guid) {
+            var i, vms = self.vMachines(), vm;
+            for (i = 0; i < vms.length; i += 1) {
+                if (vms[i].guid() === guid) {
+                	vm = vms[i];
+                }
+            }
+            if (vm !== undefined) {
+                (function(vm) {
+                    app.showMessage(
+                            $.t('ovs:vmachines.setastemplate.warning'),
+                            $.t('ovs:vmachines.setastemplate.title', { what: vm.name() }),
+                            [$.t('ovs:vmachines.setastemplate.no'), $.t('ovs:vmachines.setastemplate.yes')]
+                        )
+                        .done(function(answer) {
+                        	if (answer === $.t('ovs:vmachines.setastemplate.yes')) {
+                                generic.alertInfo(
+                                		$.t('ovs:vmachines.setastemplate.marked'), 
+                                		$.t('ovs:vmachines.setastemplate.machinemarked', { what: vm.name() })
+                                	);
+                                api.get('vmachines/' + vm.guid() + '/set_as_template')
+                                    .then(self.shared.tasks.wait)
+                                    .done(function() {
+                                    	self.vMachines.destroy(vm);
+                                        generic.alertSuccess(
+                                        		$.t('ovs:vmachines.setastemplate.done'), 
+                                        		$.t('ovs:vmachines.setastemplate.machinesetastemplate', { what: vm.name() }));
+                                    })
+                                    .fail(function(error) {
+                                        generic.alertSuccess($.t('ovs:generic.error'), 'Machine ' + vm.name() + ' could not be set as template: ' + error);
+                                    });
+                            }
+                        });
+                }(vm));
+            }
+        };
         self.deleteVM = function(guid) {
             var i, vms = self.vMachines(), vm;
             for (i = 0; i < vms.length; i += 1) {
@@ -157,6 +193,7 @@ define([
             self.refresher.init(self.fetchVMachines, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vMachines);
         };
         self.deactivate = function() {
             var i;
@@ -164,6 +201,7 @@ define([
                 self.widgets[i].deactivate();
             }
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });

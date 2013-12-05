@@ -104,6 +104,15 @@
             "cachetraffic": "Cache traffic",
             "uptime": "uptime",
             "rawinfo": "Raw memcached information"
+        },
+        "dal": {
+            "title": "Open vStorage DAL",
+            "relations": "Relation structure loads",
+            "descriptor": "Descriptor loads",
+            "datalist": "Datalist queries",
+            "objectload": "Objects loads",
+            "hitsratio": "Hits and hitratio:",
+            "loadspeed": "Loads per second:"
         }
     },
     "vmachines": {
@@ -112,7 +121,17 @@
         "marked": "Marked for deletion",
         "machinemarked": "Machine __what__ is marked for deletion...",
         "deleted": "Machine deleted",
-        "machinedeleted": "Machine __what__ deleted"
+        "machinedeleted": "Machine __what__ deleted",
+        "setastemplate": {
+            "title": "Set Virtual Machine __what__ as Template",
+            "warning": "Warning: converting a vMachine into a Template will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
+            "yes": "Set as Template",
+            "no": "Close",
+            "marked": "Marked for setting as template",
+            "machinemarked": "Machine __what__ is marked for setting as template...",
+            "done": "Machine set as template",
+            "machinesetastemplate": "Machine __what__ set as template"
+        }        
     },
     "vdisks": {
         "title": "vDisks"
@@ -124,27 +143,27 @@
         "title": "Dashboard",
         "panels": {
             "vsa": {
-                "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Environment. For each VSA the status, name, IP address and amount of vDisks is displayed.",
+                "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Cluster. For each VSA the status, name, IP address and amount of vDisks is displayed.",
                 "helptitle": "Help - VSA",
                 "title": "VSA"
             },
             "cache": {
-                "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits and the total amount of cache lookups for all vMachines. Below the amount of the current amount of IOPS is displayed for the whole Environment. This panel gets updated every 5 seconds.",
+                "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
                 "helptitle": "Help - Cache Hit Ratio",
                 "title": "Cache Hit Ratio"
             },
             "vmachines": {
-                "helpcontent": "This panels lists the top vMachines accoring to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to Vmachine to go directly to the list of vMachines.",
+                "helpcontent": "This panels lists the top vMachines according to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to the vMachines title to go directly to the list of vMachines.",
                 "helptitle": "Help - vMachines",
                 "title": "vMachines"
             },
             "statistics": {
-                "helpcontent": "This panels lists the average on IOPS, bandwidth and Cache Hits over 5 Seconds. The values are updated automatically every 5 seconds.",
+                "helpcontent": "This panels lists the average on IOPS, Read and Write Speed and Cache Hits over 5 seconds summarized for all vDisks in the Cluster. The values are updated automatically every 5 seconds.",
                 "helptitle": "Help - vDisk Statistics",
                 "title": "vDisk Statistics"
             },
             "vpools": {
-                "helpcontent": "This panels lists the top vPools accoring to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",
+                "helpcontent": "This panels lists the top vPools according to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",
                 "helptitle": "Help - vPools",
                 "title": "vPools"
             }
@@ -227,6 +246,12 @@
                 "updatingpassword": "updating the password"
             }
         }
+    },
+    "footer" : {
+        "cachereads": "Reads served from the Cache:",
+        "datawritten": "Data written to the Backend:",
+        "dataread": "Data read from the Backend:",
+        "bandwidthsaved": "Bandwidth Saved:"
     },
     "title": "Open vStorage"
 }

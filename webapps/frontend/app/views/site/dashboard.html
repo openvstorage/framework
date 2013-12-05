@@ -1,5 +1,6 @@
 ﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <section>
+    <p data-bind="visible: shared.mode() !== 'full'">&nbsp;</p>
     <div class="row">
         <div class="col-md-4">
             <!-- Left column -->
@@ -50,6 +51,7 @@
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.cache.title"></b>
                     <div style="float:right;">
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.cache.helptitle',
                                              content: 'ovs:dashboard.panels.cache.helpcontent'

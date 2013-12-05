@@ -176,6 +176,8 @@ class DataList(object):
             # properties, you can dot as far as you like. This means you can combine AND and OR
             # in any possible combination
 
+            Toolbox.log_cache_hit('datalist', False)
+
             items = self._query['query']['items']
             query_type = self._query['query']['type']
             query_data = self._query['data']
@@ -217,6 +219,7 @@ class DataList(object):
                 self._volatile.set(self._key, self.data)
             self._update_listinvalidation()
         else:
+            Toolbox.log_cache_hit('datalist', True)
             self.from_cache = True
         return self
 

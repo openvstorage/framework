@@ -34,6 +34,7 @@
                 </td>
                 <td>
                     <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
+                    <i data-bind="click: function() { $root.setAsTemplate($data.guid()); }"  class="hand fa fa-lock fa-fw"></i>
                     <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand fa fa-trash-o fa-fw"></i>
                 </td>
             </tr>

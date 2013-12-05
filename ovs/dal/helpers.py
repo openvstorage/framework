@@ -35,6 +35,7 @@ class Descriptor(object):
             self._volatile = VolatileFactory.get_client()
             self._descriptor = self._volatile.get(key)
             if self._descriptor is None:
+                Toolbox.log_cache_hit('descriptor', False)
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
                 name = filename.replace(os.path.dirname(filename) + os.path.sep, '') \
                     .replace('.py', '')
@@ -42,6 +43,8 @@ class Descriptor(object):
                                     'source': os.path.relpath(filename, os.path.dirname(__file__)),
                                     'type': object_type.__name__}
                 self._volatile.set(key, self._descriptor)
+            else:
+                Toolbox.log_cache_hit('descriptor', True)
             self._descriptor['guid'] = guid
 
     def load(self, descriptor):
@@ -157,3 +160,14 @@ class Toolbox(object):
             allowed_types = [required_type.__name__]
 
         return correct, allowed_types, given_type
+
+    @staticmethod
+    def log_cache_hit(type, hit):
+        """
+        Registers a cache hit or miss with a specific type
+        """
+        volatile = VolatileFactory.get_client()
+        key = 'ovs_stats_cache_%s_%s' % (type, 'hit' if hit else 'miss')
+        successfull = volatile.incr(key)
+        if not successfull:
+            volatile.set(key, 1)

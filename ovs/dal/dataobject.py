@@ -145,12 +145,14 @@ class DataObject(object):
         else:
             self._data = self._volatile.get(self._key)
             if self._data is None:
+                Toolbox.log_cache_hit('object_load', False)
                 self._metadata['cache'] = False
                 try:
                     self._data = self._persistent.get(self._key)
                 except KeyNotFoundException:
                     raise ObjectNotFoundException()
             else:
+                Toolbox.log_cache_hit('object_load', True)
                 self._metadata['cache'] = True
 
         # Set default values on new fields
