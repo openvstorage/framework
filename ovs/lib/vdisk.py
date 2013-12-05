@@ -102,7 +102,6 @@ class VDiskController(object):
             disk.delete()
         return kwargs
 
-
     @staticmethod
     @celery.task(name='ovs.disk.resize')
     def resize(volumepath, volumename, volumesize, **kwargs):
@@ -116,7 +115,8 @@ class VDiskController(object):
         """
 
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Resize disk {} from {} to {}'.format(disk.name, disk.size, volumesize))
+        logging.info('Resize disk {} from {} to {}'.format(
+            disk.name, disk.size, volumesize))
         disk.size = volumesize
         disk.save()
         return kwargs
@@ -133,7 +133,8 @@ class VDiskController(object):
         @param volume_new_path: new path on hypervisor to the volume
         """
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Move disk {} from {} to {}'.format(disk.name, volume_old_path, volume_new_path))
+        logging.info('Move disk {} from {} to {}'.format(
+            disk.name, volume_old_path, volume_new_path))
         disk.devicename = volume_new_path
         disk.save()
         return kwargs
@@ -215,4 +216,19 @@ class VDiskController(object):
         logging.info(
             'Deleting snapshot {} from disk {}'.format(_snap, diskguid))
         vsr_client.delete_snapshot(disk.volumeid, _snap)
+        return kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk.set_as_template')
+    def set_as_template(diskguid, **kwargs):
+        """
+        Set a disk as template
+
+        @param diskguid: guid of the disk
+        """
+
+        # @todo: enable when method is exposed on vsr client
+        # disk = VDisk(diskguid)
+        # vsr_client.set_as_template(disk.volumeid)
+
         return kwargs
