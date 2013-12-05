@@ -7,7 +7,7 @@ define([
     return function() {
         var self = this;
 
-        self.loaders         = ko.observable(0);
+        self.dataLoading     = ko.observable(false);
         self.widgetActivated = ko.observable(false);
         self.data            = ko.observable();
         self.hasData         = ko.computed(function() {
@@ -17,13 +17,10 @@ define([
                 // The observed data is not set, or an empyt list
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
-        });
-        self.dataLoading = ko.computed(function() {
-            return self.loaders() > 0;
-        });
+        }).extend({ throttle: 50 });
 
         self._fetchData = function(observable, property) {
-            self.loaders(self.loaders() + 1);
+            self.dataLoading(true);
             var total = 0, i;
             if (observable instanceof Array) {
                 for (i = 0; i < observable.length; i += 1) {
@@ -32,7 +29,7 @@ define([
             } else {
                 total = observable[property].raw() || 0;
             }
-            self.loaders(self.loaders() - 1);
+            self.dataLoading(false);
             return total;
         };
 
