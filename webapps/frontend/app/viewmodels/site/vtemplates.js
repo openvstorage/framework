@@ -100,6 +100,7 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vTemplates);
         };
         self.deactivate = function() {
             var i;
@@ -107,6 +108,7 @@ define([
                 self.widgets[i].deactivate();
             }
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });

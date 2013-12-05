@@ -3,6 +3,7 @@
 VPool module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
 class VPool(DataObject):
@@ -38,7 +39,7 @@ class VPool(DataObject):
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         @return: dict
         """
-        data = dict()
+        data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         for disk in self.vdisks:
             statistics = disk.statistics
             for key, value in statistics.iteritems():

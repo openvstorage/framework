@@ -11,6 +11,23 @@ class VolumeStorageRouterClient(object):
     """
     Client to access storagerouterclient
     """
+
+    STATISTICS_KEYS = ['cluster_cache_hits',
+                       'backend_write_operations',
+                       'backend_data_read',
+                       'metadata_store_hits',
+                       'data_written',
+                       'data_read',
+                       'write_time',
+                       'metadata_store_misses',
+                       'backend_data_written',
+                       'sco_cache_misses',
+                       'backend_read_operations',
+                       'sco_cache_hits',
+                       'write_operations',
+                       'cluster_cache_misses',
+                       'read_operations']
+
     def __init__(self):
         """
         Initializes the wrapper given a configfile for the RPC communication

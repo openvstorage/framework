@@ -69,18 +69,14 @@ class VDisk(DataObject):
         Fetches the Statistics for the vDisk.
         @return: dict
         """
-        _ = self
+        vdiskstatsdict = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         if self.volumeid:
             vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
-            vdiskstatsdict = dict()
 
-            for statsattribute in dir(vdiskstats):
-                if not statsattribute.startswith('_'):
-                    vdiskstatsdict[statsattribute] = getattr(vdiskstats, statsattribute)
+            for key in VolumeStorageRouterClient.STATISTICS_KEYS:
+                    vdiskstatsdict[key] = getattr(vdiskstats, key)
 
-            return vdiskstatsdict
-        else:
-            return dict()
+        return vdiskstatsdict
 
     def _vsrid(self):
         """

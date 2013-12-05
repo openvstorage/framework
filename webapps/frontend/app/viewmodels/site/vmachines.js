@@ -157,6 +157,7 @@ define([
             self.refresher.init(self.fetchVMachines, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vMachines);
         };
         self.deactivate = function() {
             var i;
@@ -164,6 +165,7 @@ define([
                 self.widgets[i].deactivate();
             }
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });

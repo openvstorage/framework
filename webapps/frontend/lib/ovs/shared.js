@@ -10,7 +10,8 @@ define(['knockout'], function(ko){
             defaultLanguage: 'en-US',
             language       : 'en-US',
             mode           : ko.observable('full'),
-            routing        : undefined
+            routing        : undefined,
+            footerData     : ko.observable(ko.observable())
         };
     };
     return singleton();

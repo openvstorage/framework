@@ -261,9 +261,11 @@ define([
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vpools);
         };
         self.deactivate = function() {
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });

@@ -14,29 +14,33 @@ define([
         self.loadVMachineGuidHandle = undefined;
 
         // External dependencies
-        self.vsa          = ko.observable();
-        self.vMachine     = ko.observable();
-        self.vpool        = ko.observable();
+        self.vsa            = ko.observable();
+        self.vMachine       = ko.observable();
+        self.vpool          = ko.observable();
 
         // Obserables
-        self.loading      = ko.observable(false);
-        self.loaded       = ko.observable(false);
+        self.loading        = ko.observable(false);
+        self.loaded         = ko.observable(false);
 
-        self.guid         = ko.observable(guid);
-        self.name         = ko.observable();
-        self.order        = ko.observable(0);
-        self.snapshots    = ko.observableArray([]);
-        self.size         = ko.smoothObservable(undefined, generic.formatBytes);
-        self.storedData   = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits    = ko.smoothDeltaObservable();
-        self.cacheMisses  = ko.smoothDeltaObservable();
-        self.iops         = ko.smoothDeltaObservable(generic.formatNumber);
-        self.readSpeed    = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.writeSpeed   = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.vsaGuid      = ko.observable();
-        self.vpoolGuid    = ko.observable();
-        self.vMachineGuid = ko.observable();
-        self.failoverMode = ko.observable();
+        self.guid           = ko.observable(guid);
+        self.name           = ko.observable();
+        self.order          = ko.observable(0);
+        self.snapshots      = ko.observableArray([]);
+        self.size           = ko.smoothObservable(undefined, generic.formatBytes);
+        self.storedData     = ko.smoothObservable(undefined, generic.formatBytes);
+        self.cacheHits      = ko.smoothDeltaObservable();
+        self.cacheMisses    = ko.smoothDeltaObservable();
+        self.iops           = ko.smoothDeltaObservable(generic.formatNumber);
+        self.readSpeed      = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.writeSpeed     = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.backendReads   = ko.smoothObservable(undefined, generic.formatNumber);
+        self.backendWritten = ko.smoothObservable(undefined, generic.formatBytes);
+        self.backendRead    = ko.smoothObservable(undefined, generic.formatBytes);
+        self.bandwidthSaved = ko.smoothObservable(undefined, generic.formatBytes);
+        self.vsaGuid        = ko.observable();
+        self.vpoolGuid      = ko.observable();
+        self.vMachineGuid   = ko.observable();
+        self.failoverMode   = ko.observable();
 
         self.cacheRatio = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
@@ -68,13 +72,15 @@ define([
                                 .done(function(data) {
                                     var stats = data.statistics;
                                     self.name(data.name);
-                                    if (stats !== undefined) {
-                                        self.iops(stats.write_operations + stats.read_operations);
-                                        self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
-                                        self.cacheMisses(stats.sco_cache_misses);
-                                        self.readSpeed(stats.data_read);
-                                        self.writeSpeed(stats.data_written);
-                                    }
+                                    self.iops(stats.write_operations + stats.read_operations);
+                                    self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
+                                    self.cacheMisses(stats.sco_cache_misses);
+                                    self.readSpeed(stats.data_read);
+                                    self.writeSpeed(stats.data_written);
+                                    self.backendWritten(stats.data_written);
+                                    self.backendRead(stats.data_read);
+                                    self.backendReads(stats.backend_read_operations);
+                                    self.bandwidthSaved(stats.data_read - stats.backend_data_read);
                                     self.order(data.order);
                                     self.snapshots(data.snapshots);
                                     self.size(data.size);

@@ -36,5 +36,8 @@
             </div>
         </div>
     </nav>
-    <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
+    <div class="wrapper">
+        <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
+    </div>
+    <div class="footer" data-bind="footer: { data: shared.footerData }"></div>
 </div>

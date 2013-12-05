@@ -104,6 +104,15 @@
             "cachetraffic": "Cache traffic",
             "uptime": "uptime",
             "rawinfo": "Raw memcached information"
+        },
+        "dal": {
+            "title": "Open vStorage DAL",
+            "relations": "Relation structure loads",
+            "descriptor": "Descriptor loads",
+            "datalist": "Datalist queries",
+            "objectload": "Objects loads",
+            "hitsratio": "Hits and hitratio:",
+            "loadspeed": "Loads per second:"
         }
     },
     "vmachines": {
@@ -227,6 +236,12 @@
                 "updatingpassword": "updating the password"
             }
         }
+    },
+    "footer" : {
+        "cachereads": "Reads served from the Cache:",
+        "datawritten": "Data written to the Backend:",
+        "dataread": "Data read from the Backend:",
+        "bandwidthsaved": "Bandwidth Saved:"
     },
     "title": "Open vStorage"
 }

@@ -1,3 +1,28 @@
+* {
+    margin: 0;
+}
+
+html, body {
+    height: 100%;
+}
+.stretch {
+    height: 100%;
+}
+div[data-view] {
+    height: 100%;
+}
+
+.wrapper {
+    min-height: 100%;
+    height: auto !important; /* Required for semi-sticking footer */
+    height: 100%;
+    margin: 0 auto -60px;
+}
+
+.footer {
+    height: 50px;
+}
+
 .hand {
     cursor: pointer;
 }
