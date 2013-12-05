@@ -10,7 +10,9 @@
                     <span data-bind="text: name"></span>
                 </td>
                 <td data-bind="lazylist: { items: vpools, loadedObservable: 'loaded' }">
-                    <a data-part="entry" data-bind="text: name, attr: { href: $root.vpoolUrl(guid) }"></a>
+                    <a data-part="entry"
+                       data-bind="text: name,
+                                  attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
                 <td data-bind="lazylist: { items: vsas, loadedObservable: 'loaded' }">
                     <span data-part="entry" data-bind="text: name"></span>

@@ -23,14 +23,14 @@ class VDisk(DataObject):
                   'order':             (None,   int,  'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                   'volumeid':          (None,   str,  'ID of the vDisk in the Open vStorage Volume Driver.'),
                   'parentsnapshot':    (None,   str,  'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
-                  'children':          (list(), list, 'List of child vDisks.'),  # @TODO: discuss purpose of field, there might be a better solution
                   'retentionpolicyid': (None,   str,  'Retention policy used by the vDisk.'),
                   'snapshotpolicyid':  (None,   str,  'Snapshot policy used by the vDisk.'),
                   'tags':              (list(), list, 'Tags of the vDisk.'),
                   'has_autobackup':    (False,  bool, 'Indicates whether this vDisk has autobackup enabled.'),
                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.')}
-    _relations = {'vmachine': (VMachine, 'vdisks'),
-                  'vpool':    (VPool,    'vdisks')}
+    _relations = {'vmachine':     (VMachine, 'vdisks'),
+                  'vpool':        (VPool,    'vdisks'),
+                  'parent_vdisk': (None,     'child_vdisks')}
     _expiry = {'snapshots':  (60, list),
                'info':       (60, dict),
                'statistics':  (5, dict),

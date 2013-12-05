@@ -764,6 +764,43 @@ class Basic(TestCase):
             disk.type = 'THREE'
         disk.type = 'ONE'
 
+    def test_ownrelations(self):
+        """
+        Validates whether relations to the object itself are working
+        """
+        pdisk = TestDisk()
+        pdisk.name = 'parent'
+        pdisk.save()
+        cdisk1 = TestDisk()
+        cdisk1.name = 'child 1'
+        cdisk1.size = 100
+        cdisk1.parent = pdisk
+        cdisk1.save()
+        cdisk2 = TestDisk()
+        cdisk2.name = 'child 2'
+        cdisk2.size = 100
+        cdisk2.parent = pdisk
+        cdisk2.save()
+        self.assertEqual(len(pdisk.children), 2, 'There should be 2 children.')
+        self.assertEqual(cdisk1.parent.name, 'parent', 'Parent should be loaded correctly')
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('parent.name', DataList.operator.EQUALS, 'parent')]}}).data
+        datalist = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist), 2, 'There should be two items (%s)' % len(datalist))
+        cdisk2.parent = None
+        cdisk2.save()
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('parent.name', DataList.operator.EQUALS, 'parent')]}}).data
+        datalist = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist), 1, 'There should be one item (%s)' % len(datalist))
+        cdisk1.delete()
+        cdisk2.delete()
+        pdisk.delete()
+
 
 # Mocking classes
 class SRC():

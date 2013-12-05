@@ -21,7 +21,7 @@ class VMachine(DataObject):
     _blueprint = {'name':         (None, str, 'Name of the vMachine.'),
                   'description':  (None, str, 'Description of the vMachine.'),
                   'hypervisorid': (None, str, 'The Identifier of the vMachine on the Hypervisor.'),
-                  'is_vtemplate': (True, bool, 'Indicates whether this vMachine is a vTemplate.'),
+                  'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
                   'ip_address':   (None,  str, 'IP Address of the vMachine, if available'),
                   'hvtype':       (None, ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.')}

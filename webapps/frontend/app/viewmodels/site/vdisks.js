@@ -37,12 +37,6 @@ define([
         self.loadVDisksHandle = undefined;
 
         // Functions
-        self.vpoolUrl = function(guid) {
-            return '#' + self.shared.mode() + '/vpool/' + (guid.call ? guid() : guid);
-        };
-        self.vmachineUrl = function(guid) {
-            return '#' + self.shared.mode() + '/vmachine/' + (guid.call ? guid() : guid);
-        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVDisksHandle);

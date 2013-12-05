@@ -49,13 +49,15 @@
         "machines": "Machines",
         "vpool": "vPool",
         "vsa": "VSA",
+        "children": "Children",
         "storeddata": "Stored data",
+        "topstoreddata": "Top Stored Data",
         "cache": "Cache",
         "cacheratio": "Cache Hit Ratio",
         "iops": "IOPS",
         "latency": "Latency",
-        "readspeed": "Read speed",
-        "writespeed": "Write speed",
+        "readspeed": "Read Speed",
+        "writespeed": "Write Speed",
         "read": "Read",
         "write": "Write",
         "actions": "Actions",
@@ -71,6 +73,7 @@
         "performance": "Performance",
         "current": "Current",
         "bandwidth": "Bandwidth",
+        "topbandwidth": "Top Bandwidth",
         "thousandseparator": ","
     },
     "vpools" : {
@@ -114,6 +117,9 @@
     "vdisks": {
         "title": "vDisks"
     },
+    "vtemplates": {
+        "title": "vTemplates"
+    },
     "dashboard": {
         "title": "Dashboard",
         "panels": {
@@ -128,14 +134,14 @@
                 "title": "Cache Hit Ratio"
             },
             "vmachines": {
-                "helpcontent": "This panels lists the top vMachines accoring to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to Vmachine to go directlt to the list of vMachines.",
+                "helpcontent": "This panels lists the top vMachines accoring to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to Vmachine to go directly to the list of vMachines.",
                 "helptitle": "Help - vMachines",
                 "title": "vMachines"
             },
             "statistics": {
                 "helpcontent": "This panels lists the average on IOPS, bandwidth and Cache Hits over 5 Seconds. The values are updated automatically every 5 seconds.",
-                "helptitle": "Help - Statistics",
-                "title": "Statistics"
+                "helptitle": "Help - vDisk Statistics",
+                "title": "vDisk Statistics"
             },
             "vpools": {
                 "helpcontent": "This panels lists the top vPools accoring to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",

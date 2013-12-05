@@ -25,7 +25,11 @@ class RelationMapper(object):
             relation_info = {}
             for cls in HybridRunner.get_hybrids():
                 for key, item in cls._relations.iteritems():
-                    if item[0].__name__ == object_type.__name__:
+                    if item[0] is None:
+                        itemname = cls.__name__
+                    else:
+                        itemname = item[0].__name__
+                    if itemname == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
                                                   'key': key}
             volatile.set(relation_key, relation_info)
