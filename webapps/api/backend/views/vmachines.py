@@ -68,7 +68,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    def clone(self, request, pk=None, format=None):
+    def rollback(self, request, pk=None, format=None):
         """
         Clones a machine
         """
@@ -79,9 +79,8 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.clone.s(machineguid=vmachine.guid,
-                                          timestamp=request.DATA['snapshot'],
-                                          name=request.DATA['name']).apply_async()
+        task = VMachineController.rollback.s(machineguid=vmachine.guid,
+                                             timestamp=request.DATA['timestamp']).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)
 
     @action()

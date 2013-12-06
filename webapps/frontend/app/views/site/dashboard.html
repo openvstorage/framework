@@ -9,11 +9,11 @@
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vsa.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: vsasLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="visible: vsasLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vsa.helptitle',
                                              content: 'ovs:dashboard.panels.vsa.helpcontent'
-                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
@@ -33,7 +33,7 @@
                             </thead>
                             <tbody data-dummy="dummy">
                                 <tr data-part="table-entry">
-                                        <td><span class="fa fa-cloud" style="color: green;"></span></td>
+                                        <td><span class="fa" data-i18n="[html]ovs:icons.vsa" style="color: green;"></span></td>
                                         <td data-bind="text: name"></td>
                                         <td data-bind="text: ipAddress"></td>
                                         <td data-bind="text: vDisks().length"></td>
@@ -51,11 +51,11 @@
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.cache.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.cache.helptitle',
                                              content: 'ovs:dashboard.panels.cache.helpcontent'
-                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
@@ -69,14 +69,14 @@
                                   attr: { href: $root.shared.routing.loadHash('vmachines', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
-                        <span data-bind="visible: vMachinesLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="visible: vMachinesLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <select data-bind="options: topVmachineModes, value: topVmachineMode,
                                            optionsText: function(item) { return $.t('ovs:generic.' + item); }"
                                 style="margin-left: 5px;"></select>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vmachines.helptitle',
                                              content: 'ovs:dashboard.panels.vmachines.helpcontent'
-                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
@@ -98,11 +98,11 @@
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.statistics.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.statistics.helptitle',
                                              content: 'ovs:dashboard.panels.statistics.helpcontent'
-                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
@@ -143,14 +143,14 @@
                                   attr: { href: $root.shared.routing.loadHash('vpools', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
-                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spinner fa-spin"></i></span>
+                        <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <select data-bind="options: topVpoolModes, value: topVPoolMode,
                                            optionsText: function(item) { return $.t('ovs:generic.' + item); }"
                                 style="margin-left: 5px;"></select>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vpools.helptitle',
                                              content: 'ovs:dashboard.panels.vpools.helpcontent'
-                                         }" class="hand fa fa-question-circle" style="margin-left: 5px; color: darkgray;">
+                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>

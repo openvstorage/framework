@@ -6,6 +6,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import pickle
 
 _vsr_client = VolumeStorageRouterClient().load()
 
@@ -42,16 +43,23 @@ class VDisk(DataObject):
         Fetches a list of Snapshots for the vDisk
         @return: list
         """
-        if not self.volumeid:
-            return []
-        return _vsr_client.list_snapshots(str(self.volumeid))
+
+        volumeid = str(self.volumeid)
+        snapshots = []
+        for guid in _vsr_client.list_snapshots(volumeid):
+            snapshot = _vsr_client.info_snapshot(volumeid, guid)
+            metadata = pickle.loads(snapshot.metadata)
+            snapshots.append({'guid': guid,
+                              'timestamp': metadata['timestamp'],
+                              'label': metadata['label'],
+                              'is_consistent': metadata['is_consistent']})
+        return snapshots
 
     def _info(self):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
         @return: dict
         """
-        _ = self
         if self.volumeid:
             vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
             vdiskinfodict = dict()
@@ -82,6 +90,5 @@ class VDisk(DataObject):
         """
         Returns the Volume Storage Router ID to which the vDisk is connected.
         """
-        _ = self
-        #temporary workaround for testing purposes
+        # Temporary workaround for testing purposes
         return self.volumeid

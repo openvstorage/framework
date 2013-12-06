@@ -3,7 +3,7 @@
     <!-- ko if: displaymode() === 'span' -->
         <span data-bind="foreach: items">
             <span data-bind="visible: $index() > 0">,</span>
-            <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spinner fa-spin"></i></span>
+            <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
             <span data-bind="visible: $parent.isLoaded($data)">
                 <span data-part="entry" data-bind="text: $data"></span>
             </span>
@@ -16,7 +16,7 @@
                 <tbody>
                     <!-- ko if: !$parent.isLoaded($data) -->
                         <tr>
-                            <td data-bind="attr: { colspan: $parent.colspan() }"><i class="fa fa-spinner fa-spin"></i></td>
+                            <td data-bind="attr: { colspan: $parent.colspan() }"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></td>
                         </tr>
                     <!-- /ko -->
                     <!-- ko if: $parent.isLoaded($data) -->

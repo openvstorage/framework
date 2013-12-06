@@ -1,0 +1,20 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section>
+    <div class="btn-group">
+        <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown">
+            <span data-bind="with: target">
+                <span data-part="selected-item"></span>&nbsp;
+                <span data-bind="text: $parent.text($data)"></span> <span class="caret"></span>
+            </span>
+        </button>
+        <ul class="dropdown-menu" role="menu" data-bind="visible: items().length > 0, foreach: items">
+            <li class="hand" data-bind="css: { disabled: $parent.target == $data }, click: function() { $parent.set($data); }">
+                <a>
+                    <span data-part="list-item"></span>&nbsp;
+                    <span data-bind="text: $parent.text($data)"></span>
+                </a>
+            </li>
+        </ul>
+        <span data-bind="visible: items().length === 0" class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+    </div>
+</section>

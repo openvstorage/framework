@@ -26,7 +26,7 @@ define([
                 for (i = 0; i < observable.length; i += 1) {
                     total += (observable[i][property].raw() || 0);
                 }
-            } else {
+            } else if (observable !== undefined) {
                 total = observable[property].raw() || 0;
             }
             self.dataLoading(false);

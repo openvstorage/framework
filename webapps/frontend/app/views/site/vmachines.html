@@ -6,7 +6,8 @@
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>
-                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;" class="fa fa-spinner fa-spin"></i>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     <span data-bind="text: name"></span>
                 </td>
                 <td data-bind="lazylist: { items: vpools, loadedObservable: 'loaded' }">
@@ -33,9 +34,10 @@
                                      }"></span>
                 </td>
                 <td>
-                    <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-camera fa-fw"></i>
-                    <i data-bind="click: function() { $root.setAsTemplate($data.guid()); }"  class="hand fa fa-lock fa-fw"></i>
-                    <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand fa fa-trash-o fa-fw"></i>
+                    <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.snapshot"></i>
+                    <i data-bind="click: function() { $root.setAsTemplate($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.setastemplate"></i>
+                    <i data-bind="click: function() { $root.rollback($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.rollback"></i>
+                    <i data-bind="click: function() { $root.deleteVM($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                 </td>
             </tr>
         </table>

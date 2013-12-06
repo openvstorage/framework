@@ -1,0 +1,33 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<div style="min-width: 700px;">
+    <h4 style="margin-top: 5px;" data-i18n="ovs:wizards.rollback.gather.title"></h4>
+    <div data-bind="if: canContinue().value">
+        <form role="form form-horizontal" class="form-horizontal">
+            <p data-i18n="ovs:wizards.rollback.gather.selectsnapshots"></p>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="snapshot" data-i18n="ovs:wizards.rollback.gather.snapshot"></label>
+                <div class="col-lg-8">
+                    <span data-bind="dropdown: {
+                                         items: data.vm().snapshots, target: data.snapshot,
+                                         text: function(item) {
+                                             var text = '', date = new Date(item.timestamp * 1000);
+                                             if (item.label !== undefined && item.label !== '') {
+                                                 text += item.label
+                                             }
+                                             text += ' (' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + ')';
+                                             return text;
+                                         }
+                                     }">
+                        <span data-bind="icon: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')"
+                              data-part="selected-item" class="fa"></span>
+                        <span data-bind="icon: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')"
+                              data-part="list-item" class="fa"></span>
+                    </span>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
+        <p data-bind="text: canContinue().reason"></p>
+    </div>
+</div>

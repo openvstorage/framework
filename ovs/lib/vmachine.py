@@ -177,3 +177,11 @@ class VMachineController(object):
         vmachine.save()
 
         return group_result.successful()
+
+    @staticmethod
+    @celery.task(name='ovs.machine.rollback')
+    def rollback(machineguid, timestamp, **kwargs):
+        """
+        Rolls back a VM based on a given disk snapshot timestamp
+        """
+        _ = machineguid, timestamp, kwargs

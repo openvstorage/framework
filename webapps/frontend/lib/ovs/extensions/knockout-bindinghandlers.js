@@ -111,4 +111,14 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
             });
         }
     };
+    ko.bindingHandlers.icon = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor();
+            $(element).html($.t(value));
+        },
+        update: function(element, valueAccessor) {
+            var value = valueAccessor();
+            $(element).html($.t(value));
+        }
+    }
 });

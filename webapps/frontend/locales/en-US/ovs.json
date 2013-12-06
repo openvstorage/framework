@@ -188,6 +188,21 @@
         "vpool": "vPool"
     },
     "wizards" : {
+        "rollback": {
+            "title": "Rollback",
+            "gather": {
+                "title": "Please provide the required information",
+                "selectsnapshots": "Select the snapshots to which you want to roll back:",
+                "nomachine": "No machine loaded",
+                "noname": "No name was entered",
+                "nosnapshots": "No snapshots found",
+                "snapshot": "Snapshots",
+                "rollbackstarted": "Rollback started",
+                "inprogress": "Machine __what__ rollback in progress...",
+                "failed": "Machine __what__ rollback failed.",
+                "success": "Machine __what__ rollback successfully."
+            }
+        },
         "clone": {
             "title": "Clone",
             "gather": {
@@ -258,5 +273,17 @@
         "dataread": "Data read from the Backend:",
         "bandwidthsaved": "Bandwidth Saved:"
     },
-    "title": "Open vStorage"
+    "title": "Open vStorage",
+    "icons": {
+        "separator": "&#xf101;",
+        "delete": "&#xf014;",
+        "loading": "&#xf110;",
+        "consistent": "&#xf005;",
+        "inconsistent": "&#xf006;",
+        "help": "&#xf059;",
+        "snapshot": "&#xf030;",
+        "setastemplate": "&#xf023;",
+        "rollback": "&#xf01e;",
+        "vsa": "&#xf0c2;"
+    }
 }
