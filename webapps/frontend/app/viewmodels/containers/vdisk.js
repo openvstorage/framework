@@ -88,6 +88,12 @@ define([
                                     self.failoverMode(data.info.failover_mode);
                                     self.vpoolGuid(data.vpool_guid);
                                     self.vMachineGuid(data.vmachine_guid);
+
+                                    self.snapshots.sort(function(a, b) {
+                                        // Sorting based on newest first
+                                        return b.timestamp - a.timestamp;
+                                    });
+
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

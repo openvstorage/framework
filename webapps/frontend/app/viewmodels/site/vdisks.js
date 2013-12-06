@@ -3,8 +3,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool) {
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../wizards/rollback/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, RollbackWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -88,7 +88,8 @@ define([
                 if (vdisks[i].guid() === guid) {
                     dialog.show(new RollbackWizard({
                         modal: true,
-                        diskguid: guid
+                        type: 'vdisk',
+                        guid: guid
                     }));
                 }
             }

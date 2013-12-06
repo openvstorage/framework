@@ -104,7 +104,8 @@ define([
                 if (vms[i].guid() === guid) {
                     dialog.show(new RollbackWizard({
                         modal: true,
-                        machineguid: guid
+                        type: 'vmachine',
+                        guid: guid
                     }));
                 }
             }
@@ -176,7 +177,7 @@ define([
                     app.showMessage(
                             $.t('ovs:vmachines.delete.warning', { what: vm.name() }),
                             $.t('ovs:generic.areyousure'),
-                            [$.t('ovs:generic.yes'), $.t('ovs:generic.no')]
+                            [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                         )
                         .done(function(answer) {
                             if (answer === $.t('ovs:generic.yes')) {

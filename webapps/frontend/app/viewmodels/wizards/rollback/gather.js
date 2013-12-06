@@ -3,8 +3,8 @@
 define([
     'jquery', 'knockout',
     'ovs/api', 'ovs/shared', 'ovs/generic',
-    '../../containers/vmachine', './data'
-], function($, ko, api, shared, generic, VMachine, data) {
+    '../../containers/vmachine', '../../containers/vdisk', './data'
+], function($, ko, api, shared, generic, VMachine, VDisk, data) {
     "use strict";
     return function() {
         var self = this;
@@ -13,10 +13,10 @@ define([
         self.shared = shared;
 
         self.canContinue = ko.computed(function() {
-            if (self.data.vm() === undefined) {
-                return {value: false, reason: $.t('ovs:wizards.rollback.gather.nomachine')};
+            if (self.data.velement() === undefined) {
+                return {value: false, reason: $.t('ovs:wizards.rollback.gather.no' + self.data.type)};
             }
-            if (self.data.vm().snapshots() === undefined || self.data.vm().snapshots().length === 0) {
+            if (self.data.velement().snapshots() === undefined || self.data.velement().snapshots().length === 0) {
                 return {value: false, reason: $.t('ovs:wizards.rollback.gather.nosnapshots')};
             }
             return {value: true, reason: undefined};
@@ -27,11 +27,11 @@ define([
                 var data = {
                     timestamp: self.data.snapshot().timestamp
                 };
-                api.post('vmachines/' + self.data.vm().guid() + '/rollback', data)
+                api.post(self.data.type + 's/' + self.data.velement().guid() + '/rollback', data)
                     .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.rollback.gather.rollbackstarted'),
-                            $.t('ovs:wizards.rollback.gather.inprogress', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.rollback.gather.inprogress' + self.data.type, { what: self.data.velement().name() })
                         );
                         deferred.resolve();
                         return taskID;
@@ -40,13 +40,13 @@ define([
                     .done(function() {
                         generic.alertSuccess(
                             $.t('ovs:generic.finished'),
-                            $.t('ovs:wizards.rollback.gather.success', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.rollback.gather.success' + self.data.type, { what: self.data.velement().name() })
                         );
                     })
                     .fail(function() {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:wizards.rollback.gather.failed', { what: self.data.vm().name() })
+                            $.t('ovs:wizards.rollback.gather.failed' + self.data.type, { what: self.data.velement().name() })
                         );
                         deferred.resolve(false);
                     });
@@ -54,9 +54,13 @@ define([
         };
 
         self.activate = function() {
-            if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.machineGuid()) {
-                self.data.vm(new VMachine(self.data.machineGuid()));
-                self.data.vm().load();
+            if (self.data.velement() === undefined || self.data.velement().guid() !== self.data.guid()) {
+                if (self.data.type === 'vmachine') {
+                    self.data.velement(new VMachine(self.data.guid()));
+                } else {
+                    self.data.velement(new VDisk(self.data.guid()));
+                }
+                self.data.velement().load();
             }
         };
     };

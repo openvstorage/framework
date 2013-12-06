@@ -75,7 +75,9 @@
         "bandwidth": "Bandwidth",
         "topbandwidth": "Top Bandwidth",
         "thousandseparator": ",",
-        "finished": "Finished"
+        "finished": "Finished",
+        "consistentss": "Consistent snapshots",
+        "inconsistentss": "Inconsistent snapshots"
     },
     "vpools" : {
         "title": "vPools",
@@ -192,15 +194,19 @@
             "title": "Rollback",
             "gather": {
                 "title": "Please provide the required information",
-                "selectsnapshots": "Select the snapshots to which you want to roll back:",
-                "nomachine": "No machine loaded",
+                "selectsnapshots": "Select the Snapshots to which you want to Rollback:",
+                "novmachine": "No machine loaded",
+                "novdisk": "No disk loaded",
                 "noname": "No name was entered",
-                "nosnapshots": "No snapshots found",
+                "nosnapshots": "No Snapshots found",
                 "snapshot": "Snapshots",
                 "rollbackstarted": "Rollback started",
-                "inprogress": "Machine __what__ rollback in progress...",
-                "failed": "Machine __what__ rollback failed.",
-                "success": "Machine __what__ rollback successfully."
+                "inprogressvmachine": "Machine __what__ rollback in progress...",
+                "failedvmachine": "Machine __what__ rollback failed.",
+                "successvmachine": "Machine __what__ rollback successfully.",
+                "inprogressvdisk": "Disk __what__ rollback in progress...",
+                "failedvdisk": "Disk __what__ rollback failed.",
+                "successvdisk": "Disk __what__ rollback successfully."
             }
         },
         "clone": {
@@ -210,17 +216,17 @@
                 "basicinfo": "Enter basic information",
                 "name": "Clone name",
                 "amount": "Number of clones",
-                "selectsnapshots": "Select the snapshots from which you want to clone:",
+                "selectsnapshots": "Select the Snapshots from which you want to clone:",
                 "nomachine": "No machine loaded",
                 "noname": "No name was entered",
-                "nosnapshots": "Not all disks have snapshots",
+                "nosnapshots": "Not all disks have Snapshots",
                 "snapshot": "Snapshots"
             },
             "confirm": {
                 "title": "Verify the entered information",
                 "clonename": "Name of the clone:",
                 "cloneamount": "Amount of clones:",
-                "verifysnapshots": "Please validate the selected snapshot below. It will be used for the clone:",
+                "verifysnapshots": "Please validate the selected Snapshot below. It will be used for the clone:",
                 "cloning": "cloning __what__",
                 "clonestarted": "Clone started",
                 "inprogress": "Machine __what__ cloning in progress...",
@@ -236,7 +242,7 @@
             "gather": {
                 "title": "Please provide the required information",
                 "name": "Snapshot name",
-                "consistent": "Label as Consistent snapshot",
+                "consistent": "Label as Consistent Snapshot",
                 "basicinfo": "Enter basic information",
                 "nomachine": "No machine loaded",
                 "noname": "No name was entered"
@@ -244,11 +250,11 @@
             "confirm": {
                 "title": "Verify the entered information",
                 "snapshotstarted": "Snapshot started",
-                "inprogress": "Machine __what__ snapshotting in progress...",
-                "failed": "Machine __what__ snapshot failed.",
-                "success": "Machine __what__ snapshot successfully.",
+                "inprogress": "Machine __what__ Snapshotting in progress...",
+                "failed": "Machine __what__ Snapshot failed.",
+                "success": "Machine __what__ Snapshot successfully.",
                 "name": "Snapshot name",
-                "consistent": "Label as Consistent snapshot"
+                "consistent": "Label as Consistent Snapshot"
             }
         },
         "changepassword": {
@@ -278,8 +284,8 @@
         "separator": "&#xf101;",
         "delete": "&#xf014;",
         "loading": "&#xf110;",
-        "consistent": "&#xf005;",
-        "inconsistent": "&#xf006;",
+        "consistent": "&#xf02e;",
+        "inconsistent": "&#xf097;",
         "help": "&#xf059;",
         "snapshot": "&#xf030;",
         "setastemplate": "&#xf023;",

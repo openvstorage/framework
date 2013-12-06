@@ -235,3 +235,11 @@ class VDiskController(object):
         # vsr_client.set_as_template(disk.volumeid)
 
         return kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk.rollback')
+    def rollback(diskguid, timestamp, **kwargs):
+        """
+        Rolls back a disk based on a given disk snapshot timestamp
+        """
+        _ = diskguid, timestamp, kwargs

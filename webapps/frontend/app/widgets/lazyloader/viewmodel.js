@@ -9,16 +9,28 @@ define([
         var self = this;
 
         self.loadedObservable = '';
-        self.item             = ko.observable();
-        self.isLazyLoader     = ko.observable(false);
+        self._item            = ko.observable();
         self.isLoaded         = ko.computed(function() {
-            if (self.isLazyLoader()) {
-                if (self.item.hasOwnProperty(self.loadedObservable)) {
-                    return self.item[self.loadedObservable]();
-                }
-                return self.item()[self.loadedObservable]();
+            var observable = self._item();
+            if (observable === undefined) {
+                return false;
+            }
+            if (observable.hasOwnProperty(self.loadedObservable)) {
+                return observable[self.loadedObservable]();
+            }
+            if (!observable.call || observable() === undefined) {
+                return false;
+            }
+            if (observable().hasOwnProperty(self.loadedObservable)) {
+                return observable()[self.loadedObservable]();
             }
             return true;
+        });
+        self.item             = ko.computed(function() {
+            if (self.isLoaded()) {
+                return self._item()();
+            }
+            return undefined;
         });
 
         self.activate = function(settings) {
@@ -26,13 +38,7 @@ define([
                 throw 'Item should be specified';
             }
             self.loadedObservable = generic.tryGet(settings, 'loadedObservable', 'initialized');
-            self.item = settings.item;
-            if (self.item.hasOwnProperty(self.loadedObservable) && self.item[self.loadedObservable].call) {
-                self.isLazyLoader(true);
-            }
-            if (self.item() !== undefined && self.item().hasOwnProperty(self.loadedObservable) && self.item()[self.loadedObservable].call) {
-                self.isLazyLoader(true);
-            }
+            self._item(settings.item);
         };
     };
 });
