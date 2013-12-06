@@ -9,14 +9,14 @@ from JumpScale import j
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
-UI_NAME = j.application.config.get('ovswebapps.main.uiname')
-APP_NAME = j.application.config.get('ovswebapps.main.appname')
+UI_NAME = j.application.config.get('ovs.webapps.main.uiname')
+APP_NAME = j.application.config.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-BASE_FOLDER = j.application.config.get('ovswebapps.basedir') + '/' + APP_NAME
+BASE_FOLDER = j.system.fs.joinPaths(j.application.config.get('ovs.core.basedir'), j.application.config.get('ovs.webapps.dir'), APP_NAME)
 
-BASE_LOG_DIR = j.application.config.get('ovswebapps.logging.dir')
-LOG_FILENAME = j.application.config.get('ovswebapps.logging.file')
+BASE_LOG_DIR = j.application.config.get('ovs.webapps.logging.dir')
+LOG_FILENAME = j.application.config.get('ovs.webapps.logging.file')
 
 FRONTEND_ROOT = '/' + UI_NAME
 STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
@@ -24,7 +24,7 @@ STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    (j.application.config.get('ovswebapps.admin.name'), j.application.config.get('ovswebapps.admin.email')),
+    (j.application.config.get('ovs.webapps.admin.name'), j.application.config.get('ovs.webapps.admin.email')),
 )
 
 MANAGERS = ADMINS
@@ -32,7 +32,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_FOLDER + '/' + j.application.config.get('ovswebapps.main.dbname')
+        'NAME': BASE_FOLDER + '/' + j.application.config.get('ovs.webapps.main.dbname')
     }
 }
 
@@ -56,7 +56,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder'
 )
 
-SECRET_KEY = j.application.config.get('ovswebapps.main.secret')
+SECRET_KEY = j.application.config.get('ovs.webapps.main.secret')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',

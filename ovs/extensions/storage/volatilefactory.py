@@ -18,13 +18,13 @@ class VolatileFactory(object):
 
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
             if client_type is None:
-                client_type = j.application.config.get('ovscore.storage.volatile')
+                client_type = j.application.config.get('ovs.core.storage.volatile')
 
             VolatileFactory.store = None
             if client_type == 'memcache':
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
-                location = '{}:{}'.format(j.application.config.get('ovscore.memcache.localnode.ip'),
-                                          j.application.config.get('ovscore.memcache.localnode.port'))
+                location = '{}:{}'.format(j.application.config.get('ovs.core.memcache.localnode.ip'),
+                                          j.application.config.get('ovs.core.memcache.localnode.port'))
                 VolatileFactory.store = MemcacheStore([location])
             if client_type == 'default':
                 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
