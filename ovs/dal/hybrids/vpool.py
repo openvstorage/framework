@@ -22,8 +22,7 @@ class VPool(DataObject):
     _relations = {}
     _expiry = {'status':        (10, str),
                'statistics':     (5, dict),
-               'stored_data':   (60, int),
-               'failover_mode': (60, str)}
+               'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
     def _status(self):
@@ -52,13 +51,3 @@ class VPool(DataObject):
         @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
-
-    def _failover_mode(self):
-        """
-        Gets the agregated failover mode
-        """
-        status = None
-        for disk in self.vdisks:
-            if status is None or 'OK' not in disk.info['failover_mode']:
-                status = disk.info['failover_mode']
-        return status

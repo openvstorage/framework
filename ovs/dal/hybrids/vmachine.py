@@ -85,7 +85,11 @@ class VMachine(DataObject):
         Gets the aggregated failover mode
         """
         status = None
+        status_code = 0
         for disk in self.vdisks:
-            if status is None or 'OK' not in disk.info['failover_mode']:
-                status = disk.info['failover_mode']
+            mode = disk.info['failover_mode']
+            current_status_code = VolumeStorageRouterClient.FOC_STATUS[mode.lower()]
+            if current_status_code > status_code:
+                status = mode
+                status_code = current_status_code
         return status

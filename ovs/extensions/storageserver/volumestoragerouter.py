@@ -27,6 +27,10 @@ class VolumeStorageRouterClient(object):
                        'write_operations',
                        'cluster_cache_misses',
                        'read_operations']
+    FOC_STATUS = {'ok_standalone': 10,
+                  'ok_sync': 10,
+                  'catch_up': 20,
+                  'degraded': 30}
 
     def __init__(self):
         """

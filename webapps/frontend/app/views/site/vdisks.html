@@ -36,8 +36,9 @@
                 <td>
                     <span data-bind="status: {
                                          colors: {
-                                             green: failoverMode() == 'OK_STANDALONE',
-                                             red: failoverMode() == 'NOK_STANDALONE'
+                                             green: $.inArray(failoverMode(), ['OK_STANDALONE', 'OK_SYNC']) !== -1,
+                                             yellow: failoverMode() == 'CATCH_UP',
+                                             red: failoverMode() == 'DEGRADED'
                                          },
                                          defaultColor: 'lightgrey'
                                      }"></span>
