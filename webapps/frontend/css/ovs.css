@@ -27,6 +27,10 @@ div[data-view] {
     cursor: pointer;
 }
 
+.pointer {
+    cursor: default;
+}
+
 .quote {
     padding: 10px 20px;
     margin: 0 0 20px;

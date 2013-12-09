@@ -29,7 +29,6 @@ class VolumeStorageRouter(DataObject):
     def _status(self):
         """
         Fetches the Status of the VSR.
-        @return: dict
         """
         _ = self
         return None
@@ -37,7 +36,6 @@ class VolumeStorageRouter(DataObject):
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
-        @return: dict
         """
         data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         if self.vpool is not None:
@@ -51,7 +49,6 @@ class VolumeStorageRouter(DataObject):
     def _stored_data(self):
         """
         Agregates the Stored Data in Bytes of the vDisks connected to the VSR.
-        @return: int
         """
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])

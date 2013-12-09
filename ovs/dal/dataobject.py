@@ -53,7 +53,7 @@ class MetaClass(type):
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
                 dct[attribute] = property(
                     fget=dct['_%s' % attribute],
-                    doc='[dynamic] (%ds) %s %s\n@type: %s'
+                    doc='[dynamic] (%ds) %s %s\n@rtype: %s'
                         % (info[0], docstring, extra_info, itemtype)
                 )
 

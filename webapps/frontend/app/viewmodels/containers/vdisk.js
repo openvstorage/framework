@@ -85,7 +85,7 @@ define([
                                     self.snapshots(data.snapshots);
                                     self.size(data.size);
                                     self.storedData(data.info.stored);
-                                    self.failoverMode(data.info.failover_mode);
+                                    self.failoverMode(data.info.failover_mode.toLowerCase());
                                     self.vpoolGuid(data.vpool_guid);
                                     self.vMachineGuid(data.vmachine_guid);
 

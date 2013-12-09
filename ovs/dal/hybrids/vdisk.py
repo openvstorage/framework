@@ -41,7 +41,6 @@ class VDisk(DataObject):
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vDisk
-        @return: list
         """
 
         volumeid = str(self.volumeid)
@@ -58,7 +57,6 @@ class VDisk(DataObject):
     def _info(self):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
-        @return: dict
         """
         if self.volumeid:
             vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
@@ -75,7 +73,6 @@ class VDisk(DataObject):
     def _statistics(self):
         """
         Fetches the Statistics for the vDisk.
-        @return: dict
         """
         vdiskstatsdict = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         if self.volumeid:

@@ -31,7 +31,6 @@ class VMachine(DataObject):
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vMachine.
-        @return: list
         """
 
         snapshots_structure = {}
@@ -56,15 +55,13 @@ class VMachine(DataObject):
     def _status(self):
         """
         Fetches the Status of the vMachine.
-        @return: dict
         """
         _ = self
-        return None
+        return 'OK'
 
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
-        @return: dict
         """
         data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         for disk in self.vdisks:
@@ -76,7 +73,6 @@ class VMachine(DataObject):
     def _stored_data(self):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
-        @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])
 
@@ -84,7 +80,7 @@ class VMachine(DataObject):
         """
         Gets the aggregated failover mode
         """
-        status = None
+        status = 'OK_STANDALONE'
         status_code = 0
         for disk in self.vdisks:
             mode = disk.info['failover_mode']

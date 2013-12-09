@@ -27,12 +27,12 @@
                 <td>
                     <span data-bind="status: {
                                          colors: {
-                                             green: $.inArray(failoverMode(), ['OK_STANDALONE', 'OK_SYNC']) !== -1,
-                                             yellow: failoverMode() == 'CATCH_UP',
-                                             red: failoverMode() == 'DEGRADED'
+                                             green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                             yellow: failoverMode() == 'catch_up',
+                                             red: failoverMode() == 'degraded'
                                          },
                                          defaultColor: 'lightgrey'
-                                     }"></span>
+                                     }, tooltip: 'ovs:generic.status.foc.' + failoverMode()"></span>
                 </td>
                 <td>
                     <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.snapshot"></i>

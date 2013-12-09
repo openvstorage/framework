@@ -1,5 +1,17 @@
 {
     "generic": {
+        "status": {
+            "vsa": {
+                "ok": "Online",
+                "nok": "Offline"
+            },
+            "foc": {
+                "ok_standalone": "Healthy",
+                "ok_sync": "Healty",
+                "catch_up": "Rebuilding",
+                "degraded": "Degraded"
+            }
+        },
         "username": "Username",
         "password": "Password",
         "logout": "Log out",

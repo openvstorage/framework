@@ -33,7 +33,11 @@
                             </thead>
                             <tbody data-dummy="dummy">
                                 <tr data-part="table-entry">
-                                        <td><span class="fa" data-i18n="[html]ovs:icons.vsa" style="color: green;"></span></td>
+                                        <td>
+                                            <span class="fa pointer" data-i18n="[html]ovs:icons.vsa"
+                                                  data-bind="tooltip: 'ovs:generic.status.vsa.' + status(),
+                                                             style: { color: status().indexOf('ok') === -1 ? 'red' : 'green' }"></span>
+                                        </td>
                                         <td data-bind="text: name"></td>
                                         <td data-bind="text: ipAddress"></td>
                                         <td data-bind="text: vDisks().length"></td>

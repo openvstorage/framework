@@ -28,7 +28,6 @@ class VPool(DataObject):
     def _status(self):
         """
         Fetches the Status of the vPool.
-        @return: dict
         """
         _ = self
         return None
@@ -36,7 +35,6 @@ class VPool(DataObject):
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
-        @return: dict
         """
         data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         for disk in self.vdisks:
@@ -48,6 +46,5 @@ class VPool(DataObject):
     def _stored_data(self):
         """
         Aggregates the Stored Data of each vDisk served by the vPool.
-        @return: int
         """
         return sum([disk.info['stored'] for disk in self.vdisks])

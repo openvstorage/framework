@@ -33,6 +33,7 @@ define([
         self.isInternal     = ko.observable();
         self.isVTemplate    = ko.observable();
         self.snapshots      = ko.observableArray([]);
+        self.status         = ko.observable();
         self.iops           = ko.smoothDeltaObservable(generic.formatNumber);
         self.storedData     = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits      = ko.smoothDeltaObservable();
@@ -150,7 +151,8 @@ define([
                                     self.isInternal(data.is_internal);
                                     self.isVTemplate(data.is_vtemplate);
                                     self.snapshots(data.snapshots);
-                                    self.failoverMode(data.failover_mode);
+                                    self.status(data.status.toLowerCase());
+                                    self.failoverMode(data.failover_mode.toLowerCase());
 
                                     self.snapshots.sort(function(a, b) {
                                         // Newest first
