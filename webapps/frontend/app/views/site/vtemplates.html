@@ -14,6 +14,7 @@
                 <td><span data-bind="text: templateChildrenGuids().length"></span></td>
                 <td>
                     <i data-bind="click: function() { $root.deleteVT($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                    <i data-bind="click: function() { $root.createFromTemplate($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
                 </td>
             </tr>
         </table>

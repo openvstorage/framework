@@ -20,7 +20,7 @@ define([
         self.vsas           = ko.observableArray([]);
         self.vpools         = ko.observableArray([]);
 
-        // Obserables
+        // Observables
         self.loading        = ko.observable(false);
         self.loaded         = ko.observable(false);
 

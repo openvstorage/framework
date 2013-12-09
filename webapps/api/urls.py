@@ -8,6 +8,7 @@ from django.views.generic import RedirectView
 from views import ObtainAuthToken
 from backend.views.statistics import MemcacheViewSet
 from backend.views.vmachines import VMachineViewSet
+from backend.views.pmachines import PMachineViewSet
 from backend.views.vpools import VPoolViewSet
 from backend.views.vdisks import VDiskViewSet
 from backend.views.users import UserViewSet
@@ -26,6 +27,7 @@ def build_router_urls(api_mode, docs):
         {'prefix': r'tasks',               'viewset': TaskViewSet,      'base_name': 'tasks'},
         {'prefix': r'vpools',              'viewset': VPoolViewSet,     'base_name': 'vpools'},
         {'prefix': r'vmachines',           'viewset': VMachineViewSet,  'base_name': 'vmachines'},
+        {'prefix': r'pmachines',           'viewset': PMachineViewSet,  'base_name': 'pmachines'},
         {'prefix': r'vdisks',              'viewset': VDiskViewSet,     'base_name': 'vdisks'},
         {'prefix': r'messages',            'viewset': MessagingViewSet, 'base_name': 'messages'},
         {'prefix': r'branding',            'viewset': BrandingViewSet,  'base_name': 'branding'},

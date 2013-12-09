@@ -190,6 +190,32 @@
         "vpool": "vPool"
     },
     "wizards" : {
+        "createft": {
+            "title": "Create from vTemplate",
+            "gather": {
+                "name": "Name:",
+                "description": "Description:",
+                "namehelp": "Will be appended with -{###} in case of multiple vMachines.",
+                "amount": "# of VMs",
+                "startnr": "Start nr.",
+                "hosts": "Hosts:",
+                "hostshelp": "Mutiple hosts can be selected.",
+                "Description": "Description",
+                "nopmachinesselected": "Please select at least one host.",
+                "nomachine": "No vTemplate found",
+                "nopmachines": "No pMachines found.",
+                "noname": "No name was given",
+                "amountone": "The name won't be appended with a number",
+                "amountmultiple": "The first machine will be __start__ and the last one will be __end__",
+                "creating": "Creating from vTemplate __what__",
+                "started": "Create started",
+                "inprogress": "Creating from vTemplate __what__ in progress...",
+                "success": "Creating from __what__ successfully",
+                "somefailed": "Create from __what__ finished. However, some of the machines could not be created.",
+                "allfailed": "All create actions from __what__ failed.",
+                "complete": "Create completed"
+            }
+        },
         "rollback": {
             "title": "Rollback",
             "gather": {
@@ -290,6 +316,9 @@
         "snapshot": "&#xf030;",
         "setastemplate": "&#xf023;",
         "rollback": "&#xf01e;",
-        "vsa": "&#xf0c2;"
+        "vsa": "&#xf0c2;",
+        "fromtemplate": "&#xf045;",
+        "notchecked": "&#xf096;",
+        "checked": "&#xf046;"
     }
 }

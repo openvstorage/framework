@@ -1,0 +1,75 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<div style="min-width: 700px;">
+    <form data-bind="visible: canStart().value" role="form form-horizontal" class="form-horizontal">
+        <p data-i18n="ovs:wizards.createft.gather.basicinfo"></p>
+        <div class="form-group">
+            <label class="col-lg-2 control-label" for="name" data-i18n="ovs:wizards.createft.gather.name"></label>
+            <div class="col-lg-8">
+                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-2 control-label" for="description" data-i18n="ovs:wizards.createft.gather.description"></label>
+            <div class="col-lg-8">
+                <input type="text" id="description" class="autofocus form-control" data-bind="value: data.description, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0px;">
+            <label class="col-lg-2 control-label" for="amount" data-i18n="ovs:wizards.createft.gather.amount"></label>
+            <div class="col-lg-3">
+                <div class="input-group">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(Math.max(1, parseInt('0' + data.amount(), 10) - 1)); }">
+                            <span class="fa fa-minus"></span>
+                        </button>
+                    </span>
+                    <input type="text" id="amount" class="form-control" data-bind="value: data.amount, valueUpdate: 'afterkeydown'">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(parseInt('0' + data.amount(), 10) + 1); }">
+                            <span class="fa fa-plus"></span>
+                        </button>
+                    </span>
+                </div>
+            </div>
+            <label class="col-lg-2 control-label" for="startnr" data-i18n="ovs:wizards.createft.gather.startnr"></label>
+            <div class="col-lg-3">
+                <div class="input-group">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="enabled: data.amount() > 1, click: function() { data.startnr(Math.max(1, parseInt('0' + data.startnr(), 10) - 1)); }">
+                            <span class="fa fa-minus"></span>
+                        </button>
+                    </span>
+                    <input type="text" id="startnr" class="form-control" data-bind="enabled: data.amount() > 1, value: data.startnr, valueUpdate: 'afterkeydown'">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" data-bind="enabled: data.amount() > 1, click: function() { data.startnr(parseInt('0' + data.startnr(), 10) + 1); }">
+                            <span class="fa fa-plus"></span>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-2 control-label"></label>
+            <div class="col-lg-8"><p class="help-block" data-bind="text: namehelp"></p></div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-2 control-label" for="snapshot" data-i18n="ovs:wizards.createft.gather.hosts"></label>
+            <div class="col-lg-8">
+                <span data-bind="dropdown: {
+                                     items: data.pMachines, target: data.selectedPMachines,
+                                     text: function(item) {
+                                         return item.name();
+                                     }
+                                 }">
+                </span>
+                <p class="help-block" data-i18n="ovs:wizards.createft.gather.hostshelp"></p>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
+        <p data-bind="text: canContinue().reason"></p>
+    </div>
+    <div class="alert alert-warning" data-bind="visible: !canStart().value">
+        <p data-bind="text: canStart().reason"></p>
+    </div>
+</div>

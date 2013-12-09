@@ -9,6 +9,7 @@ from rest_framework.decorators import action, link
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
@@ -194,4 +195,27 @@ class VMachineViewSet(viewsets.ViewSet):
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
         task = VMachineController.set_as_template.s(machineguid=vmachine.guid).apply_async()
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'create'])
+    def create_from_template(self, request, pk=None, format=None):
+        """
+        Creates a certain amount of vMachines based on a vTemplate
+        """
+        _ = format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        try:
+            vtemplate = VMachine(pk)
+            pmachine = PMachine(request.DATA['pmachineguid'])
+            if vtemplate.is_vtemplate is False:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        task = VMachineController.create_from_template.s(machineguid=vtemplate.guid,
+                                                         pmachineguid=pmachine.guid,
+                                                         name=str(request.DATA['name']),
+                                                         description=str(request.DATA['description'])).apply_async()
         return Response(task.id, status=status.HTTP_200_OK)

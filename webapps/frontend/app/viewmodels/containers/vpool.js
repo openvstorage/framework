@@ -13,7 +13,7 @@ define([
         self.diskHandle       = undefined;
         self.machineHandle    = undefined;
 
-        // Obserables
+        // Observables
         self.loading           = ko.observable(false);
         self.loaded            = ko.observable(false);
 

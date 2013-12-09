@@ -185,3 +185,11 @@ class VMachineController(object):
         Rolls back a VM based on a given disk snapshot timestamp
         """
         _ = machineguid, timestamp, kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.machine.create_from_template')
+    def create_from_template(machineguid, pmachineguid, name, description):
+        """
+        Creates a new VM based on a given vTemplate onto a given pMachine
+        """
+        _ = machineguid, pmachineguid, name, description

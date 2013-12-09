@@ -19,8 +19,9 @@
                                      }">
                         <span data-bind="icon: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')"
                               data-part="selected-item" class="fa"></span>
-                        <span data-bind="icon: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')"
-                              data-part="list-item" class="fa"></span>
+                        <span data-part="list-item">
+                            <span data-bind="icon: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')" class="fa"></span> &nbsp;
+                        </span>
                     </span>
                 </div>
             </div>

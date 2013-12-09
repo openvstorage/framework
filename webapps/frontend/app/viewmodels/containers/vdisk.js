@@ -18,7 +18,7 @@ define([
         self.vMachine       = ko.observable();
         self.vpool          = ko.observable();
 
-        // Obserables
+        // Observables
         self.loading        = ko.observable(false);
         self.loaded         = ko.observable(false);
 

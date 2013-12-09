@@ -3,8 +3,8 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine) {
+    '../containers/vmachine', '../wizards/createfromtemplatewizard/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, CreateFromTemplateWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -58,8 +58,8 @@ define([
             }).promise();
         };
         self.loadVTemplate = function(vt) {
-            vt.load(),
-            vt.fetchTemplateChildrenGuids()
+            vt.load();
+            vt.fetchTemplateChildrenGuids();
         };
         self.deleteVT = function(guid) {
             var i, vts = self.vTemplates(), vm;
@@ -69,41 +69,45 @@ define([
                 }
             }
             if (vm !== undefined) {
-                (function(vm) {
-                    app.showMessage(
-                            $.t('ovs:vmachines.delete.warning', { what: vm.name() }),
-                            $.t('ovs:generic.areyousure'),
-                            [$.t('ovs:generic.yes'), $.t('ovs:generic.no')]
-                        )
-                        .done(function(answer) {
-                            if (answer === $.t('ovs:generic.yes')) {
-                                self.vTemplates.destroy(vm);
-                                generic.alertInfo(
-                                    $.t('ovs:vmachines.delete.marked'),
-                                    $.t('ovs:vmachines.delete.markedmsg', { what: vm.name() })
-                                );
-                                api.del('vmachines/' + vm.guid())
-                                    .then(self.shared.tasks.wait)
-                                    .done(function() {
-                                        generic.alertSuccess(
-                                            $.t('ovs:vmachines.delete.done'),
-                                            $.t('ovs:vmachines.delete.donemsg', { what: vm.name() })
-                                        );
-                                    })
-                                    .fail(function(error) {
-                                        generic.alertError(
-                                            $.t('ovs:generic.error'),
-                                            $.t('ovs:generic.errorwhile', {
-                                                context: 'error',
-                                                what: $.t('ovs:vmachines.delete.errormsg', { what: vm.name() }),
-                                                error: error
-                                            })
-                                        );
-                                    });
-                            }
-                        });
-                }(vm));
+                app.showMessage(
+                        $.t('ovs:vmachines.delete.warning', { what: vm.name() }),
+                        $.t('ovs:generic.areyousure'),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            self.vTemplates.destroy(vm);
+                            generic.alertInfo(
+                                $.t('ovs:vmachines.delete.marked'),
+                                $.t('ovs:vmachines.delete.markedmsg', { what: vm.name() })
+                            );
+                            api.del('vmachines/' + vm.guid())
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:vmachines.delete.done'),
+                                        $.t('ovs:vmachines.delete.donemsg', { what: vm.name() })
+                                    );
+                                })
+                                .fail(function(error) {
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:generic.errorwhile', {
+                                            context: 'error',
+                                            what: $.t('ovs:vmachines.delete.errormsg', { what: vm.name() }),
+                                            error: error
+                                        })
+                                    );
+                                });
+                        }
+                    });
             }
+        };
+        self.createFromTemplate = function(guid) {
+            dialog.show(new CreateFromTemplateWizard({
+                modal: true,
+                pmachineguid: guid
+            }));
         };
 
         // Durandal

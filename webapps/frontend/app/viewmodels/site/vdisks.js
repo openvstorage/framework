@@ -83,16 +83,11 @@ define([
         };
 
         self.rollback = function(guid) {
-            var i, vdisks = self.vDisks();
-            for (i = 0; i < vdisks.length; i += 1) {
-                if (vdisks[i].guid() === guid) {
-                    dialog.show(new RollbackWizard({
-                        modal: true,
-                        type: 'vdisk',
-                        guid: guid
-                    }));
-                }
-            }
+            dialog.show(new RollbackWizard({
+                modal: true,
+                type: 'vdisk',
+                guid: guid
+            }));
         };
 
         // Durandal

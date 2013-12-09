@@ -120,5 +120,27 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
             var value = valueAccessor();
             $(element).html($.t(value));
         }
+    };
+    ko.bindingHandlers.shortText = {
+        init: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(),
+                maxLength = allBindings.get('maxLength');
+            if (maxLength !== undefined) {
+                if (value.length > maxLength - 3) {
+                    value = value.substr(0, maxLength - 3) + '...';
+                }
+            }
+            $(element).text(value);
+        },
+        update: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(),
+                maxLength = allBindings.get('maxLength');
+            if (maxLength !== undefined) {
+                if (value.length > maxLength - 3) {
+                    value = value.substr(0, maxLength - 3) + '&hellip;';
+                }
+            }
+            $(element).html(value);
+        }
     }
 });
