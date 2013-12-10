@@ -35,13 +35,13 @@
             <div class="col-lg-3">
                 <div class="input-group">
                     <span class="input-group-btn">
-                        <button class="btn btn-default" type="button" data-bind="enabled: data.amount() > 1, click: function() { data.startnr(Math.max(1, parseInt('0' + data.startnr(), 10) - 1)); }">
+                        <button class="btn btn-default" type="button" data-bind="disable: data.amount() === 1, click: function() { data.startnr(Math.max(1, parseInt('0' + data.startnr(), 10) - 1)); }">
                             <span class="fa fa-minus"></span>
                         </button>
                     </span>
-                    <input type="text" id="startnr" class="form-control" data-bind="enabled: data.amount() > 1, value: data.startnr, valueUpdate: 'afterkeydown'">
+                    <input type="text" id="startnr" class="form-control" data-bind="disable: data.amount() === 1, value: data.startnr, valueUpdate: 'afterkeydown'">
                     <span class="input-group-btn">
-                        <button class="btn btn-default" type="button" data-bind="enabled: data.amount() > 1, click: function() { data.startnr(parseInt('0' + data.startnr(), 10) + 1); }">
+                        <button class="btn btn-default" type="button" data-bind="disable: data.amount() === 1, click: function() { data.startnr(parseInt('0' + data.startnr(), 10) + 1); }">
                             <span class="fa fa-plus"></span>
                         </button>
                     </span>
@@ -62,7 +62,6 @@
                                      }
                                  }">
                 </span>
-                <p class="help-block" data-i18n="ovs:wizards.createft.gather.hostshelp"></p>
             </div>
         </div>
     </form>

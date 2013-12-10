@@ -211,7 +211,6 @@
                 "amount": "# of VMs",
                 "startnr": "Start nr.",
                 "hosts": "Hosts:",
-                "hostshelp": "Mutiple hosts can be selected.",
                 "Description": "Description",
                 "nopmachinesselected": "Please select at least one host.",
                 "nomachine": "No vTemplate found",
