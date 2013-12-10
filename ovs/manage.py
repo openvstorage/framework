@@ -28,19 +28,19 @@ class Configure():
         pmachine_list = pmachine_selector.get_pmachines()
         found_pmachine = False
         for pmachine in pmachine_list:
-            if pmachine.ip == '$(ovs.host.ip)':
+            if pmachine.ip == j.application.config.get('ovs.host.ip'):
                 found_pmachine = True
                 break
         if not found_pmachine:
             pmachine = pMachine()
     
         # Model system VMachine and Hypervisor node
-        pmachine.ip = '$(ovs.host.ip)'
-        pmachine.username = '$(ovs.host.login)'
-        pmachine.password = '$(ovs.host.password)'
-        pmachine.hvtype = '$(ovs.host.hypervisor)'
+        pmachine.ip = j.application.config.get('ovs.host.ip')
+        pmachine.username = j.application.config.get('ovs.host.login')
+        pmachine.password = j.application.config.get('ovs.host.password')
+        pmachine.hvtype = j.application.config.get('ovs.host.hypervisor')
         vmachine.name = hostname
-        vmachine.hvtype = '$(ovs.host.hypervisor)'
+        vmachine.hvtype = j.application.config.get('ovs.host.hypervisor')
         vmachine.is_vtemplate = False
         vmachine.is_internal = True
         vmachine.pmachine = pmachine
