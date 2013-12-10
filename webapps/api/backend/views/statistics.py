@@ -11,7 +11,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from jumpscale import j
+from JumpScale import j
 
 
 class MemcacheViewSet(viewsets.ViewSet):
