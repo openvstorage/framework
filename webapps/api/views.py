@@ -1,0 +1,36 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Django Views module for main API
+"""
+from rest_framework.views import APIView
+from rest_framework import status
+from rest_framework import parsers
+from rest_framework import renderers
+from rest_framework.response import Response
+from rest_framework.authtoken.models import Token
+from rest_framework.authtoken.serializers import AuthTokenSerializer
+from ovs.dal.lists.userlist import UserList
+
+
+class ObtainAuthToken(APIView):
+    """
+    Custom implementation of the Django REST framework ObtainAuthToken class, making
+    use of our own model/token system
+    """
+    throttle_classes = ()
+    permission_classes = ()
+    parser_classes = (parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser,)
+    renderer_classes = (renderers.JSONRenderer,)
+    serializer_class = AuthTokenSerializer
+    model = Token
+
+    def post(self, request):
+        """
+        Handles authentication post for Django REST framework
+        """
+        serializer = self.serializer_class(data=request.DATA)
+        if serializer.is_valid():
+            user = UserList.get_user_by_username(serializer.object['user'].username)
+            if user is not None:
+                return Response({'token': user.guid})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
