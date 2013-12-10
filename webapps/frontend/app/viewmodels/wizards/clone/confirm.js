@@ -39,13 +39,8 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var i, clones = [],
-                    callData = {},
-                    vm = self.data.vm(),
-                    disks = vm.vDisks();
-                callData.disks = {};
-                for (i = 0; i < disks.length; i += 1) {
-                    callData.disks[disks[i].guid()] = disks[i].selectedSnapshot();
-                }
+                    callData = {snapshot: self.data.snapshot().timestamp},
+                    vm = self.data.vm();
                 for (i = 1; i <= self.data.amount(); i += 1) {
                     clones.push(self._clone(i, vm, callData));
                 }

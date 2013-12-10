@@ -2,6 +2,9 @@
 """
 DataList module
 """
+import hashlib
+import json
+import copy
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -43,14 +46,20 @@ class DataList(object):
     namespace = 'ovs_list'
     cachelink = 'ovs_listcache'
 
-    def __init__(self, key, query):
+    def __init__(self, query, key=None):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         """
         # Initialize super class
         super(DataList, self).__init__()
 
-        self._key = None if key is None else ('%s_%s' % (DataList.namespace, key))
+        if key is not None:
+            self._key = key
+        else:
+            identifier = copy.deepcopy(query)
+            identifier['object'] = identifier['object'].__name__
+            self._key = hashlib.sha256(json.dumps(identifier)).hexdigest()
+        self._key = '%s_%s' % (DataList.namespace, self._key)
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query
@@ -130,7 +139,11 @@ class DataList(object):
             if value is None and itemcounter != len(path):
                 # We loaded a None in the middle of our path
                 if target_class is not None:
-                    self._add_invalidation(target_class[0].__name__.lower(), path[itemcounter])
+                    if target_class[0] is None:
+                        classname = value.__class__.__name__.lower()
+                    else:
+                        classname = target_class[0].__name__.lower()
+                    self._add_invalidation(classname, path[itemcounter])
                 return False  # Fail the filter
 
         # Apply operators
@@ -162,6 +175,8 @@ class DataList(object):
             # The field is any property you would also find on the given object. In case of
             # properties, you can dot as far as you like. This means you can combine AND and OR
             # in any possible combination
+
+            Toolbox.log_cache_hit('datalist', False)
 
             items = self._query['query']['items']
             query_type = self._query['query']['type']
@@ -204,6 +219,7 @@ class DataList(object):
                 self._volatile.set(self._key, self.data)
             self._update_listinvalidation()
         else:
+            Toolbox.log_cache_hit('datalist', True)
             self.from_cache = True
         return self
 

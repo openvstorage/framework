@@ -82,10 +82,22 @@ class DummyVolatileStore(object):
             del data['t'][key]
             self._save(data)
 
+    def incr(self, key, delta=1):
+        """
+        Increments the value of the key, expecting it exists
+        """
+        data = self._read()
+        if key in data['s']:
+            data['s'][key] += delta
+            self._save(data)
+            return True
+        return False
+
     def _save(self, data):
         """
         Saves the local json file
         """
+        rawdata = json.dumps(data, sort_keys=True, indent=2)
         f = open(self._path, 'w+')
-        f.write(json.dumps(data, sort_keys=True, indent=2))
+        f.write(rawdata)
         f.close()

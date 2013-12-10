@@ -33,9 +33,6 @@ define([
         self.loadVPoolsHandle = undefined;
 
         // Functions
-        self.detailUrl = function(guid) {
-            return '#' + self.shared.mode() + '/vpool/' + (guid.call ? guid() : guid);
-        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 generic.xhrAbort(self.loadVPoolsHandle);
@@ -62,12 +59,16 @@ define([
                     .fail(deferred.reject);
             }).promise();
         };
+        self.loadVPool = function(vpool) {
+            vpool.load();
+        };
 
         // Durandal
         self.activate = function() {
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
+            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             var i;
@@ -75,6 +76,7 @@ define([
                 self.widgets[i].deactivate();
             }
             self.refresher.stop();
+            self.shared.footerData(ko.observable());
         };
     };
 });

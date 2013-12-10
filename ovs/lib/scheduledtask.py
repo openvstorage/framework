@@ -6,11 +6,9 @@ ScheduledTaskController module
 
 from celery import group, chain
 from ovs.celery import celery
-from ovs.lib.vdisk import VDiskController
+from ovs.lib.vmachine import VMachineController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.celery import loghandler
-
-import datetime
 
 
 class ScheduledTaskController(object):
@@ -31,19 +29,11 @@ class ScheduledTaskController(object):
         tasks = []
         machines = VMachineList.get_vmachines()
         for machine in machines:
-            timestamp = str(datetime.datetime.now()).split('.')[0]
-            for disk in machine.vdisks:
-                metadata = dict()
-                metadata['label'] = ''
-                metadata['timestamp'] = timestamp
-                metadata['machineguid'] = machine.guid
-                task = VDiskController.create_snapshot.s(diskguid=disk.guid,
-                                                         metadata=metadata)
-                task.link_error(VDiskController.delete_snapshot.s())
-                tasks.append(task)
+            tasks.append(VMachineController.snapshot.s(machineguid=machine.guid,
+                                                       label='',
+                                                       is_consistent=False))
         workflow = group(task for task in tasks)
-        loghandler.logger.info('[SSA] %d disk snapshots launched'
-                               % len(tasks))
+        loghandler.logger.info('[SSA] %d disk snapshots launched' % len(tasks))
         return workflow()
 
     @celery.task(name='ovs.scheduled.dummy')

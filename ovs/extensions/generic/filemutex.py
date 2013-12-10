@@ -4,6 +4,8 @@ File mutex module
 """
 import time
 import fcntl
+import os
+import stat
 
 
 class FileMutex(object):
@@ -20,6 +22,15 @@ class FileMutex(object):
         self._has_lock = False
         self._start = 0
         self._handle = open(self.key(), 'w')
+        try:
+            os.chmod(
+                self.key(),
+                stat.S_IRUSR | stat.S_IWUSR |
+                stat.S_IRGRP | stat.S_IWGRP |
+                stat.S_IROTH | stat.S_IWOTH
+            )
+        except OSError:
+            pass
 
     def acquire(self, wait=None):
         """
@@ -62,7 +73,7 @@ class FileMutex(object):
         """
         Lock key
         """
-        return '/tmp/ovs_flock_%s' % self.name
+        return '/var/lock/ovs_flock_%s' % self.name
 
     def __del__(self):
         """

@@ -5,6 +5,7 @@ VolumeStorageRouter module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
 class VolumeStorageRouter(DataObject):
@@ -20,15 +21,14 @@ class VolumeStorageRouter(DataObject):
                   'vsrid':       (None, str, 'ID of the VSR in the Open vStorage Volume Driver.')}
     _relations = {'vpool':            (VPool,    'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
-    _expiry = {'status':      (30, str),
-               'statistics':   (5, dict),
-               'stored_data': (60, int)}
+    _expiry = {'status':        (30, str),
+               'statistics':     (5, dict),
+               'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
     def _status(self):
         """
         Fetches the Status of the VSR.
-        @return: dict
         """
         _ = self
         return None
@@ -36,9 +36,8 @@ class VolumeStorageRouter(DataObject):
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
-        @return: dict
         """
-        data = dict()
+        data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.vsrid == self.vsrid:
@@ -50,7 +49,6 @@ class VolumeStorageRouter(DataObject):
     def _stored_data(self):
         """
         Agregates the Stored Data in Bytes of the vDisks connected to the VSR.
-        @return: int
         """
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])

@@ -37,6 +37,12 @@ class MemcacheStore(object):
         """
         return self._client.add(str(key), value, time)
 
+    def incr(self, key, delta=1):
+        """
+        Increments the value of the key, expecting it exists
+        """
+        return self._client.incr(str(key), delta)
+
     def delete(self, key):
         """
         Deletes a given key from the store

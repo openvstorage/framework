@@ -17,11 +17,10 @@ class VMachineList(object):
         """
         Returns a list of all VMachines
         """
-        vmachines = DataList(key='vmachines',
-                             query={'object': VMachine,
-                                    'data': DataList.select.DESCRIPTOR,
-                                    'query': {'type': DataList.where_operator.AND,
-                                              'items': []}}).data
+        vmachines = DataList({'object': VMachine,
+                              'data': DataList.select.DESCRIPTOR,
+                              'query': {'type': DataList.where_operator.AND,
+                                        'items': []}}).data
         return DataObjectList(vmachines, VMachine)
 
     @staticmethod
@@ -30,11 +29,10 @@ class VMachineList(object):
         Returns all VMachines which have a given name
         """
         # pylint: disable=line-too-long
-        vmachines = DataList(key='vmachine_%s' % vmname,
-                             query={'object': VMachine,
-                                    'data': DataList.select.DESCRIPTOR,
-                                    'query': {'type': DataList.where_operator.AND,
-                                              'items': [('name', DataList.operator.EQUALS, vmname)]}}).data  # noqa
+        vmachines = DataList({'object': VMachine,
+                              'data': DataList.select.DESCRIPTOR,
+                              'query': {'type': DataList.where_operator.AND,
+                                        'items': [('name', DataList.operator.EQUALS, vmname)]}}).data  # noqa
         # pylint: enable=line-too-long
         if vmachines:
             return DataObjectList(vmachines, VMachine)

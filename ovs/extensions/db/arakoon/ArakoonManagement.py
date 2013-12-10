@@ -56,17 +56,17 @@ class ArakoonCluster:
 
 #         clusterConfig = q.config.getInifile("arakoonclusters")
 #         if not clusterConfig.checkSection(self._clusterName):
-# 
+#
 #             clusterPath = q.system.fs.joinPaths(q.dirs.cfgDir,"qconfig", "arakoon", clusterName)
 #             clusterConfig.addSection(clusterName)
 #             clusterConfig.addParam(clusterName, "path", clusterPath)
-# 
+#
 #             if not q.system.fs.exists(self._arakoonDir):
 #                 q.system.fs.createDir(self._arakoonDir)
-# 
+#
 #             if not q.system.fs.exists(clusterPath):
 #                 q.system.fs.createDir(clusterPath)
-# 
+#
 #         self._clusterPath = clusterConfig.getValue( clusterName, "path" )
 
     def _servernodes(self):
@@ -174,7 +174,7 @@ class ArakoonCluster:
 
     def getNodeConfig(self,name):
         """
-        Get the parameters of a node section 
+        Get the parameters of a node section
 
         @param name the name of the node
         @return dict keys and values of the nodes parameters
@@ -248,7 +248,7 @@ class ArakoonCluster:
     def stop(self):
         """
         stop all nodes in the supplied cluster
-        
+
         @param cluster the arakoon cluster name
         """
         rcs = {}

@@ -40,6 +40,15 @@ class OVSRouter(DefaultRouter):
                 name='%s-{basename}-list' % self.api_mode,
                 initkwargs={'suffix': 'List'}
             ),
+            # Filter route.
+            Route(
+                url=r'^{prefix}/filter{trailing_slash}$',
+                mapping={
+                    'post': 'filter'
+                },
+                name='%s-{basename}-filter' % self.api_mode,
+                initkwargs={'suffix': 'Filter'}
+            ),
             # Detail route.
             Route(
                 url=r'^{prefix}/{lookup}{trailing_slash}$',

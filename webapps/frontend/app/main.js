@@ -10,6 +10,7 @@ requirejs.config({
         'bootstrap'  : '../lib/bootstrap/js/bootstrap',
         'jquery'     : '../lib/jquery/jquery-1.9.1',
         'jqp'        : '../lib/jquery-plugins/js',
+        'd3'         : '../lib/d3/d3.v3.min',
         'ovs'        : '../lib/ovs',
         'i18next'    : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
     },
@@ -21,6 +22,9 @@ requirejs.config({
         'jqp/pnotify': {
             deps   : ['jquery'],
             exports: 'jQuery'
+        },
+        'd3': {
+            exports: 'd3'
         }
     },
     urlArgs: "bust=0.1.0.0b"
@@ -29,7 +33,8 @@ requirejs.config({
 define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next',
     'ovs/shared',
-    'ovs/extensions/knockout-helpers'
+    'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions',
+    'bootstrap'
 ],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
     system.debug(true);
@@ -54,7 +59,7 @@ define([
         });
         app.configurePlugins({
             widget: {
-                kinds: ['pager', 'lazyloader']
+                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown']
             }
         });
         app.start().then(function() {

@@ -2,7 +2,7 @@
 """
 RelationMapper module
 """
-from ovs.dal.helpers import HybridRunner, Descriptor
+from ovs.dal.helpers import HybridRunner, Descriptor, Toolbox
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
@@ -22,11 +22,18 @@ class RelationMapper(object):
         volatile = VolatileFactory.get_client()
         relation_info = volatile.get(relation_key)
         if relation_info is None:
+            Toolbox.log_cache_hit('relations', False)
             relation_info = {}
             for cls in HybridRunner.get_hybrids():
                 for key, item in cls._relations.iteritems():
-                    if item[0].__name__ == object_type.__name__:
+                    if item[0] is None:
+                        itemname = cls.__name__
+                    else:
+                        itemname = item[0].__name__
+                    if itemname == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
                                                   'key': key}
             volatile.set(relation_key, relation_info)
+        else:
+            Toolbox.log_cache_hit('relations', True)
         return relation_info

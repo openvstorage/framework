@@ -19,7 +19,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
     };
     ko.deltaObservable = function(formatFunction) {
         var formattedValue = ko.observable(), rawValue = ko.observable(), initialized = ko.observable(false),
-            timestamp, newTimestamp, previousCounter, delta, timeDelta, result;
+            timestamp, newTimestamp, previousCounter, delta, timeDelta, result, newRaw;
         result = ko.computed({
             read: function() {
                 return formattedValue();
@@ -32,11 +32,12 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     delta = newCounter - previousCounter;
                     newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    rawValue(delta / timeDelta);
+                    newRaw = Math.max(0, delta / timeDelta);
+                    rawValue(newRaw);
                     if (formatFunction.call) {
-                        formattedValue(formatFunction(delta / timeDelta));
+                        formattedValue(formatFunction(newRaw));
                     } else {
-                        formattedValue(delta / timeDelta);
+                        formattedValue(newRaw);
                     }
                     timestamp = newTimestamp;
                     previousCounter = newCounter;
@@ -63,7 +64,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                     delta = newCounter - previousCounter;
                     newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    newValue = delta / timeDelta;
+                    newValue = Math.max(0, delta / timeDelta);
                     generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
                     rawValue(newValue);
                     timestamp = newTimestamp;

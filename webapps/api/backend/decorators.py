@@ -2,7 +2,7 @@
 """
 Contains various decorator
 """
-from ovs.dal.hybrids.user import User
+from ovs.dal.lists.userlist import UserList
 from toolbox import Toolbox
 from django.core.exceptions import PermissionDenied
 
@@ -20,7 +20,9 @@ def required_roles(roles):
             Wrapped function
             """
             django_user = args[1].user
-            user = User(django_user.username)
+            user = UserList.get_user_by_username(django_user.username)
+            if user is None:
+                raise PermissionDenied('No user defined or not logged in.')
             if not Toolbox.is_user_in_roles(user, roles):
                 raise PermissionDenied('This call requires roles: %s' % (', '.join(roles)))
             return f(*args, **kw)

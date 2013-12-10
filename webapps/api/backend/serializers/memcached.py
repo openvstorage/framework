@@ -28,11 +28,13 @@ class MemcacheSerializer(serializers.Serializer):
     bytes_read           = serializers.Field()
     bytes_written        = serializers.Field()
     limit_maxbytes       = serializers.Field()
+    ovs_dal              = serializers.Field()
 
     class Meta:
         """
         Contains metadata regarding serializing fields
         """
-        fields = ('pid', 'uptime', 'time', 'version', 'rusage_user', 'rusage_system', 'curr_items', 'total_items',
-                  'bytes', 'curr_connections', 'total_connections', 'cmd_get', 'cmd_set',
-                  'get_hits', 'get_misses', 'evictions', 'bytes_read', 'bytes_written', 'limit_maxbytes');
+        fields = ('pid', 'uptime', 'time', 'version', 'rusage_user', 'rusage_system', 'curr_items',
+                  'total_items', 'bytes', 'curr_connections', 'total_connections', 'cmd_get',
+                  'cmd_set', 'ovs_dal', 'get_hits', 'get_misses', 'evictions', 'bytes_read',
+                  'bytes_written', 'limit_maxbytes')

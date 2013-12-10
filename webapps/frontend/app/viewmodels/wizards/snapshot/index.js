@@ -2,8 +2,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './gather', './confirm', './data'
-], function($, generic, build, Gather, Confirm, data) {
+    '../build', './gather', './data'
+], function($, generic, build, Gather, data) {
     "use strict";
     return function(options) {
         var self = this;
@@ -15,7 +15,7 @@ define([
         self.modal(generic.tryGet(options, 'modal', false));
 
         self.data.machineGuid(options.machineguid);
-        self.steps([new Gather(), new Confirm()]);
+        self.steps([new Gather()]);
 
         self.activateStep();
     };

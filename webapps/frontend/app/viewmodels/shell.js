@@ -2,13 +2,11 @@
 /*global define */
 define([
     'plugins/router', 'bootstrap', 'i18next',
-    'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader'
-], function(router, bootstrap, i18n, shared, Messaging, generic, Tasks, Authentication, api, cssLoader) {
+    'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader'
+], function(router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader) {
     "use strict";
-    router.map([
-               { route: '',              moduleId: 'viewmodels/redirect', nav: false },
-               { route: ':mode*details', moduleId: 'viewmodels/index',    nav: false }
-           ]).buildNavigationModel()
+    router.map(routing.mainRoutes)
+          .buildNavigationModel()
           .mapUnknownRoutes('viewmodels/404');
 
     return function() {
@@ -45,6 +43,7 @@ define([
             self.shared.messaging      = new Messaging();
             self.shared.authentication = new Authentication();
             self.shared.tasks          = new Tasks();
+            self.shared.routing        = routing;
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function() {

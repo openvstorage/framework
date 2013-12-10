@@ -48,6 +48,10 @@ USE_TZ = True
 MEDIA_ROOT = ''
 MEDIA_URL = ''
 
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+os.environ['HTTPS'] = 'on'
+
 STATIC_ROOT = ''
 STATICFILES_DIRS = (
 )
@@ -107,7 +111,6 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.JSONPRenderer',
-        'rest_framework.renderers.YAMLRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (

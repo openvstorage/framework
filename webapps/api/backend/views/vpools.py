@@ -1,6 +1,6 @@
 # license see http://www.openvstorage.com/licenses/opensource/
 """
-VMachine module
+VPool module
 """
 from rest_framework import status, viewsets
 from rest_framework.response import Response

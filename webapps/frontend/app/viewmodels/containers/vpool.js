@@ -13,13 +13,14 @@ define([
         self.diskHandle       = undefined;
         self.machineHandle    = undefined;
 
-        // Obserables
+        // Observables
         self.loading           = ko.observable(false);
+        self.loaded            = ko.observable(false);
 
         self.guid              = ko.observable(guid);
         self.name              = ko.observable();
         self.size              = ko.smoothObservable(undefined, generic.formatBytes);
-        self.iops              = ko.smoothDeltaObservable(generic.formatShort);
+        self.iops              = ko.smoothDeltaObservable(generic.formatNumber);
         self.storedData        = ko.smoothObservable(undefined, generic.formatBytes);
         self.cacheHits         = ko.smoothDeltaObservable();
         self.cacheMisses       = ko.smoothDeltaObservable();
@@ -29,6 +30,10 @@ define([
         self.writeSpeed        = ko.smoothDeltaObservable(generic.formatSpeed);
         self.backendWriteSpeed = ko.smoothDeltaObservable(generic.formatSpeed);
         self.backendReadSpeed  = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.backendReads      = ko.smoothObservable(undefined, generic.formatNumber);
+        self.backendWritten    = ko.smoothObservable(undefined, generic.formatBytes);
+        self.backendRead       = ko.smoothObservable(undefined, generic.formatBytes);
+        self.bandwidthSaved    = ko.smoothObservable(undefined, generic.formatBytes);
         self.backendType       = ko.observable();
         self.backendConnection = ko.observable();
         self.backendLogin      = ko.observable();
@@ -45,6 +50,21 @@ define([
                 return 0;
             }
             return generic.formatRatio((self.size.raw() - self.storedData.raw()) / self.size.raw() * 100);
+        });
+
+        self._bandwidth = ko.computed(function() {
+            var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0),
+                initialized = self.readSpeed.initialized() && self.writeSpeed.initialized();
+            return {
+                value: generic.formatSpeed(total),
+                initialized: initialized
+            };
+        });
+        self.bandwidth = ko.computed(function() {
+            return self._bandwidth().value;
+        });
+        self.bandwidth.initialized = ko.computed(function() {
+            return self._bandwidth().initialized;
         });
 
         self.load = function() {
@@ -69,6 +89,10 @@ define([
                                     self.writeSpeed(stats.data_written);
                                     self.backendReadSpeed(stats.backend_data_read);
                                     self.backendWriteSpeed(stats.backend_data_written);
+                                    self.backendWritten(stats.data_written);
+                                    self.backendRead(stats.data_read);
+                                    self.backendReads(stats.backend_read_operations);
+                                    self.bandwidthSaved(stats.data_read - stats.backend_data_read);
                                     self.backendType(type);
                                     self.backendConnection(data.backend_connection);
                                     self.backendLogin(data.backend_login);
@@ -95,7 +119,10 @@ define([
                                 .fail(machineDeferred.reject);
                         }).promise()
                     ])
-                    .done(deferred.resolve)
+                    .done(function() {
+                        self.loaded(true);
+                        deferred.resolve();
+                    })
                     .fail(deferred.reject)
                     .always(function() {
                         self.loading(false);

@@ -54,7 +54,7 @@ class UserViewSet(viewsets.ViewSet):
         """
         _ = format
         user = UserViewSet._get_object(pk)
-        loggedin_user = User(request.user.username)
+        loggedin_user = UserList.get_user_by_username(request.user.username)
         if user.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['system']):
             serializer = FullSerializer(User, instance=user)
             return Response(serializer.data)
@@ -98,7 +98,7 @@ class UserViewSet(viewsets.ViewSet):
         """
         _ = format
         user = UserViewSet._get_object(pk)
-        loggedin_user = User(request.user.username)
+        loggedin_user = UserList.get_user_by_username(request.user.username)
         if user.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['update', 'system']):
             serializer = PasswordSerializer(data=request.DATA)
             if serializer.is_valid():

@@ -38,7 +38,7 @@ class MetaClass(type):
                         % (docstring, extra_info, itemtype)
                 )
             for attribute, relation in dct['_relations'].iteritems():
-                itemtype = relation[0].__name__
+                itemtype = relation[0].__name__ if relation[0] is not None else name
                 dct[attribute] = property(
                     doc='[relation] one-to-many relation with %s.%s\n@type: %s'
                         % (itemtype, relation[1], itemtype)
@@ -53,7 +53,7 @@ class MetaClass(type):
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
                 dct[attribute] = property(
                     fget=dct['_%s' % attribute],
-                    doc='[dynamic] (%ds) %s %s\n@type: %s'
+                    doc='[dynamic] (%ds) %s %s\n@rtype: %s'
                         % (info[0], docstring, extra_info, itemtype)
                 )
 
@@ -145,12 +145,14 @@ class DataObject(object):
         else:
             self._data = self._volatile.get(self._key)
             if self._data is None:
+                Toolbox.log_cache_hit('object_load', False)
                 self._metadata['cache'] = False
                 try:
                     self._data = self._persistent.get(self._key)
                 except KeyNotFoundException:
                     raise ObjectNotFoundException()
             else:
+                Toolbox.log_cache_hit('object_load', True)
                 self._metadata['cache'] = True
 
         # Set default values on new fields
@@ -165,7 +167,11 @@ class DataObject(object):
         # Load relations
         for attribute, relation in self._relations.iteritems():
             if attribute not in self._data:
-                self._data[attribute] = Descriptor(relation[0]).descriptor
+                if relation[0] is None:
+                    cls = self.__class__
+                else:
+                    cls = relation[0]
+                self._data[attribute] = Descriptor(cls).descriptor
             self._add_cproperty(attribute, self._data[attribute])
 
         # Add wrapped properties
@@ -217,8 +223,10 @@ class DataObject(object):
         # pylint: disable=protected-access
         fget = lambda s: s._get_cproperty(attribute)
         fset = lambda s, v: s._set_cproperty(attribute, v)
+        gget = lambda s: s._get_gproperty(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget, fset))
+        setattr(self.__class__, '%s_guid' % attribute, property(gget))
         self._data[attribute] = value
 
     def _add_lproperty(self, attribute):
@@ -256,6 +264,12 @@ class DataObject(object):
             self._objects[attribute] = descriptor.get_object(instantiate=True)
         return self._objects[attribute]
 
+    def _get_gproperty(self, attribute):
+        """
+        Getter for a foreign key property
+        """
+        return self._data[attribute]['guid']
+
     def _get_lproperty(self, attribute):
         """
         Getter for the list property
@@ -267,11 +281,11 @@ class DataObject(object):
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
         # pylint: disable=line-too-long
-        datalist = DataList(key   = '%s_%s_%s' % (self._name, self._guid, attribute),
-                            query = {'object': remote_class,
+        datalist = DataList(query = {'object': remote_class,
                                      'data': DataList.select.DESCRIPTOR,
                                      'query': {'type': DataList.where_operator.AND,
-                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}})  # noqa
+                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}},  # noqa
+                            key   = '%s_%s_%s' % (self._name, self._guid, attribute))
         # pylint: enable=line-too-long
 
         if self._objects[attribute]['data'] is None:
@@ -403,13 +417,17 @@ class DataObject(object):
         # invalidating that remote list)
         for key, default in self._relations.iteritems():
             if self._original[key]['guid'] != self._data[key]['guid']:
+                if default[0] is None:
+                    classname = self.__class__.__name__.lower()
+                else:
+                    classname = default[0].__name__.lower()
                 # The field points to another object
                 self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                       default[0].__name__.lower(),
+                                                       classname,
                                                        self._original[key]['guid'],
                                                        default[1]))
                 self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                       default[0].__name__.lower(),
+                                                       classname,
                                                        self._data[key]['guid'],
                                                        default[1]))
         # Second, invalidate property lists

@@ -102,7 +102,6 @@ class VDiskController(object):
             disk.delete()
         return kwargs
 
-
     @staticmethod
     @celery.task(name='ovs.disk.resize')
     def resize(volumepath, volumename, volumesize, **kwargs):
@@ -116,7 +115,8 @@ class VDiskController(object):
         """
 
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Resize disk {} from {} to {}'.format(disk.name, disk.size, volumesize))
+        logging.info('Resize disk {} from {} to {}'.format(
+            disk.name, disk.size, volumesize))
         disk.size = volumesize
         disk.save()
         return kwargs
@@ -133,7 +133,8 @@ class VDiskController(object):
         @param volume_new_path: new path on hypervisor to the volume
         """
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Move disk {} from {} to {}'.format(disk.name, volume_old_path, volume_new_path))
+        logging.info('Move disk {} from {} to {}'.format(
+            disk.name, volume_old_path, volume_new_path))
         disk.devicename = volume_new_path
         disk.save()
         return kwargs
@@ -166,8 +167,7 @@ class VDiskController(object):
         volumeid = vsr_client.create_clone(_location, _id, _snap)
         for item in properties_to_clone:
             setattr(new_disk, item, getattr(disk, item))
-        disk.children.append(new_disk.guid)
-        disk.save()
+        new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
         new_disk.volumeid = volumeid
@@ -181,20 +181,23 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.create_snapshot')
-    def create_snapshot(diskguid, **kwargs):
+    def create_snapshot(diskguid, metadata, **kwargs):
         """
         Create a disk snapshot
 
         @param diskguid: guid of the disk
+        @param metadata: dict of metadata
         """
         disk = VDisk(diskguid)
-        _id = '{}'.format(disk.volumeid)
         logging.info('Create snapshot for disk {}'.format(disk.name))
         # if not srClient.canTakeSnapshot(diskguid):
         #    raise ValueError('Volume {} not found'.format(diskguid))
-        metadata = pickle.dumps(kwargs['metadata'])
+        metadata = pickle.dumps(metadata)
         snapshotguid = vsr_client.create_snapshot(
-            _id, snapshot_id=str(uuid.uuid4()), metadata=metadata)
+            str(disk.volumeid),
+            snapshot_id=str(uuid.uuid4()),
+            metadata=metadata
+        )
         kwargs['result'] = snapshotguid
         return kwargs
 
@@ -217,3 +220,26 @@ class VDiskController(object):
             'Deleting snapshot {} from disk {}'.format(_snap, diskguid))
         vsr_client.delete_snapshot(disk.volumeid, _snap)
         return kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk.set_as_template')
+    def set_as_template(diskguid, **kwargs):
+        """
+        Set a disk as template
+
+        @param diskguid: guid of the disk
+        """
+
+        # @todo: enable when method is exposed on vsr client
+        # disk = VDisk(diskguid)
+        # vsr_client.set_as_template(disk.volumeid)
+
+        return kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk.rollback')
+    def rollback(diskguid, timestamp, **kwargs):
+        """
+        Rolls back a disk based on a given disk snapshot timestamp
+        """
+        _ = diskguid, timestamp, kwargs
