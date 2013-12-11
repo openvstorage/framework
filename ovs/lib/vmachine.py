@@ -4,10 +4,11 @@ VMachine module
 """
 import time
 
-from celery import group, chain
+from celery import group
 from ovs.celery import celery
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.hypervisor.factory import Factory
 
 
@@ -120,8 +121,7 @@ class VMachineController(object):
         clean_dal = False
         if machine.pmachine:
             hv = Factory.get(machine.pmachine)
-            delete_vmachine_task = hv.delete_vm.si(
-                hv, machine.hypervisorid, None, True)
+            delete_vmachine_task = hv.delete_vm.si(hv, machine.hypervisorid, None, True)
             async_result = delete_vmachine_task()
             async_result.wait()
             if async_result.successful():
@@ -198,10 +198,7 @@ class VMachineController(object):
     @celery.task(name='ovs.machine.create_from_voldrv')
     def create_from_voldrv(name):
         """
-        This method creates a machine based on a given vmx filename. The vmx filename needs to
-        be linked to a hypervisor machine object from which all requred data can be retreived. It
-        should be able to cope with certain situations where for example the machine isn't yet
-        registered on the hypervisor
+        This method will create a vmachine based on a given vmx file
         """
         _ = name
 
@@ -209,9 +206,31 @@ class VMachineController(object):
     @celery.task(name='ovs.machine.update_from_voldrv')
     def update_from_voldrv(name):
         """
-        This method will update a vmachine based on a vmx file whos path is given. The vmx filename
-        needs to be linked to the hypervisor machine id which can be used to load the vmachine
-        object from our model. The model can then be updated. It should be able to copy with certain
-        situations where for example the machine isn't yet registered on the hypervisor
+        This method will be triggered when there was an update in the vmx. We'll have
+        to update the model
         """
         _ = name
+
+    @staticmethod
+    @celery.task(name='ovs.machine.delete_from_voldrv')
+    def delete_from_voldrv(name):
+        """
+        This method will delete a vmachine based on the name of the vmx given
+        """
+        vm = VMachineList.get_by_devicename(name)
+        if vm is not None:
+            vm.delete()
+
+    @staticmethod
+    @celery.task(name='ovs.machine.rename_from_voldrv')
+    def rename_from_voldrv(old_name, new_name):
+        """
+        This machine will handle the rename of a vmx file
+        """
+        vm = VMachineList.get_by_devicename(old_name)
+        if vm is not None:
+            vm.devicename = new_name
+            vm.save()
+
+
+

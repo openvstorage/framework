@@ -92,7 +92,7 @@ class VDiskViewSet(viewsets.ViewSet):
             vdisk = VDisk(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VDiskController.rollback.s(diskguid=vdisk.guid,
-                                          timestamp=request.DATA['timestamp']).apply_async()
+        task = VDiskController.rollback.delay(diskguid=vdisk.guid,
+                                              timestamp=request.DATA['timestamp'])
         return Response(task.id, status=status.HTTP_200_OK)
 

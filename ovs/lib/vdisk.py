@@ -73,13 +73,11 @@ class VDiskController(object):
         @param volumename: volume id of the disk
         @param volumesize: size of the volume
         """
-
         disk = VDisk()
         disk.devicename = volumepath
         disk.volumeid = volumename
         disk.size = volumesize
         disk.save()
-
         return kwargs
 
     @staticmethod
@@ -115,8 +113,7 @@ class VDiskController(object):
         """
         _ = volumepath
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Resize disk {} from {} to {}'.format(
-            disk.name, disk.size, volumesize))
+        logging.info('Resize disk {} from {} to {}'.format(disk.name, disk.size, volumesize))
         disk.size = volumesize
         disk.save()
         return kwargs
@@ -133,8 +130,9 @@ class VDiskController(object):
         @param volume_new_path: new path on hypervisor to the volume
         """
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Move disk {} from {} to {}'.format(
-            disk.name, volume_old_path, volume_new_path))
+        logging.info('Move disk {} from {} to {}'.format(disk.name,
+                                                         volume_old_path,
+                                                         volume_new_path))
         disk.devicename = volume_new_path
         disk.save()
         return kwargs

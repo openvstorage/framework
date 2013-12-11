@@ -37,3 +37,19 @@ class VMachineList(object):
         if vmachines:
             return DataObjectList(vmachines, VMachine)
         return None
+
+    @staticmethod
+    def get_by_devicename(devicename):
+        """
+        Returns a list of all VDisks based on a given volumeid
+        """
+        # pylint: disable=line-too-long
+        vms = DataList({'object': VMachine,
+                        'data': DataList.select.DESCRIPTOR,
+                        'query': {'type': DataList.where_operator.AND,
+                                  'items': [('devicename', DataList.operator.EQUALS, devicename)]}}).data  # noqa
+        # pylint: enable=line-too-long
+        if vms:
+            return DataObjectList(vms, VMachine)[0]
+        return None
+
