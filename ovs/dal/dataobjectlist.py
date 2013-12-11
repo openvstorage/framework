@@ -105,6 +105,8 @@ class DataObjectList(object):
         # This will typically called when "other" is no DataObjectList.
         if other is None:
             return self
+        elif isinstance(other, list) and other == []:
+            return self
         elif not isinstance(other, DataObjectList):
             raise TypeError('Both operands should be of type DataObjectList')
         new_dol = DataObjectList(self._query_result, self.type)

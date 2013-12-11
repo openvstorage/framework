@@ -35,7 +35,7 @@ class VDiskViewSet(viewsets.ViewSet):
         else:
             vmachine = VMachine(vmachineguid)
             if vmachine.is_internal:
-                vdisks = None
+                vdisks = []
                 for vsr in vmachine.served_vsrs:
                     vdisks += vsr.vpool.vdisks.reduced
             else:
