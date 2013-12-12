@@ -153,7 +153,8 @@ class VolumeStorageRouterConfiguration(object):
         self._config_file_content['volume_router_cluster'].update({'vrouter_cluster_id': vrouter_cluster})
         if 'vrouter_cluster_nodes' in self._config_file_content['volume_router_cluster']:
             for node in self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes']:
-                if node['vrouter_id'] == vrouter_config['vrouter_id']:
+                if node['vrouter_id'] == vrouter_config['vrouter_id'] or \
+                node['host'] == '127.0.0.1':
                     self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'].remove(node)
                     break
         else:
@@ -174,6 +175,7 @@ class VolumeStorageRouterConfiguration(object):
         """
         self.load_config()
         self._config_file_content['filesystem']['fs_arakoon_cluster_id'] = arakoon_cluster_id
+        self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'] = []
         for node_id,node_config in arakoon_nodes.iteritems():
             self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'].append({'node_id' : node_id,
                                                                                         'host' : node_config[0][0],
