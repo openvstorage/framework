@@ -73,12 +73,20 @@ def process(queue, body):
             for field, target in mapping[data.type]['arguments'].iteritems():
                 kwargs[target] = getattr(data_container, field)
             if 'options' in mapping[data.type]:
-                delay = mapping[data.type]['options'].get('delay')
+                delay = mapping[data.type]['options'].get('delay', None)
                 dedupe = mapping[data.type]['options'].get('dedupe', False)
-                if dedupe:
+                dedupe_key = mapping[data.type]['options'].get('dedupe_key', None)
+                if dedupe and dedupe_key: #we can't dedupe without a key
                     # Do some deduping, we might use "cache" and "mutex"
-                    pass
-                if delay:
+                    key = kwargs[dedupe_key]
+                    task_id = cache.get(key)
+                    if task_id:
+                        #key exists, task was already scheduled
+                        celery.control.revoke(task_id)
+                        #if task is already running, the revoke message will be ignored
+                    ar = task.s(**kwargs).apply_async(countdown=delay)
+                    cache.set(key, ar.id) #store the task id
+                else:
                     task.s(**kwargs).apply_async(countdown=delay)
             else:
                 task.delay(**kwargs)
