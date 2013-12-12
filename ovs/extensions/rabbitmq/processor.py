@@ -3,9 +3,9 @@
 Contains the process method for processing rabbitmq messages
 """
 
+from celery.task.control import revoke
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
-from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
@@ -17,7 +17,6 @@ def process(queue, body):
         import json
         import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
         cache = VolatileFactory.get_client()
-        mutex = VolatileMutex('voldrv_processor')
 
         data = EventMessages.EventMessage().FromString(body)
 
@@ -27,7 +26,7 @@ def process(queue, body):
                         'arguments': {'name': 'volumename',
                                       'size': 'volumesize',
                                       'path': 'volumepath',
-                                      'vrouter_id': 'vsrid'},
+                                      '[NODE_ID]': 'vsrid'},
                         'options': {'delay': 10}},
                    EventMessages.EventMessage.VolumeDelete:
                        {'property': 'volume_delete',
@@ -44,48 +43,53 @@ def process(queue, body):
                         'arguments': {'name': 'volumename',
                                       'old_path': 'volume_old_path',
                                       'new_path': 'volume_new_path'}},
-                   EventMessages.EventMessage.MachineCreate:              # Machine create
-                       {'property': 'machine_create',
+                   EventMessages.EventMessage.FileCreate:                 # Machine create
+                       {'property': 'file_create',
                         'task': VMachineController.create_from_voldrv,
-                        'arguments': {'name': 'name',
-                                      'vrouter_id': 'vsrid'}},
-                   EventMessages.EventMessage.MachineUpdate:
-                       {'property': 'machine_update',
+                        'arguments': {'path': 'name',
+                                      '[NODE_ID]': 'vsrid'}},
+                   EventMessages.EventMessage.FileWrite:
+                       {'property': 'file_write',
                         'task': VMachineController.update_from_voldrv,
-                        'arguments': {'name': 'name',
-                                      'vrouter_id': 'vsrid'},
+                        'arguments': {'path': 'name',
+                                      '[NODE_ID]': 'vsrid'},
                         'options': {'dedupe': True,
+                                    'dedupe_key': 'path',
                                     'delay': 10}},
-                   EventMessages.EventMessage.MachineDelete:
-                       {'property': 'machine_delete',
+                   EventMessages.EventMessage.FileDelete:
+                       {'property': 'file_delete',
                         'task': VMachineController.delete_from_voldrv,
-                        'arguments': {'name': 'name'}},
-                   EventMessages.EventMessage.MachineRename:
-                       {'property': 'machine_rename',
+                        'arguments': {'path': 'name'}},
+                   EventMessages.EventMessage.FileRename:
+                       {'property': 'file_rename',
                         'task': VMachineController.rename_from_voldrv,
-                        'arguments': {'old_name': 'old_name',
-                                      'new_name': 'new_name'}}}
+                        'arguments': {'old_path': 'old_name',
+                                      'new_path': 'new_name'}}}
 
         if data.type in mapping:
             task = mapping[data.type]['task']
             data_container = getattr(data, mapping[data.type]['property'])
             kwargs = {}
             for field, target in mapping[data.type]['arguments'].iteritems():
-                kwargs[target] = getattr(data_container, field)
+                if field == '[NODE_ID]':
+                    kwargs[target] = data.node_id
+                elif field == '[CLUSTER_ID]':
+                    kwargs[target] = data.cluster_id
+                else:
+                    kwargs[target] = getattr(data_container, field)
             if 'options' in mapping[data.type]:
-                delay = mapping[data.type]['options'].get('delay', None)
+                delay = mapping[data.type]['options'].get('delay', 0)
                 dedupe = mapping[data.type]['options'].get('dedupe', False)
                 dedupe_key = mapping[data.type]['options'].get('dedupe_key', None)
-                if dedupe and dedupe_key: #we can't dedupe without a key
-                    # Do some deduping, we might use "cache" and "mutex"
-                    key = kwargs[dedupe_key]
+                if dedupe and dedupe_key:  # We can't dedupe without a key
+                    key = '{}({})'.format(task.__class__, kwargs[dedupe_key])
                     task_id = cache.get(key)
                     if task_id:
-                        #key exists, task was already scheduled
-                        celery.control.revoke(task_id)
-                        #if task is already running, the revoke message will be ignored
-                    ar = task.s(**kwargs).apply_async(countdown=delay)
-                    cache.set(key, ar.id) #store the task id
+                        # Key exists, task was already scheduled
+                        # If task is already running, the revoke message will be ignored
+                        revoke(task_id)
+                    async_result = task.s(**kwargs).apply_async(countdown=delay)
+                    cache.set(key, async_result.id)  # Store the task id
                 else:
                     task.s(**kwargs).apply_async(countdown=delay)
             else:

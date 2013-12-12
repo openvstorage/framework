@@ -3,8 +3,7 @@
 Module for the HyperV hypervisor client
 """
 
-from ovs.hypervisor.hypervisor import Hypervisor
-import time
+from ovs.extensions.hypervisor.hypervisor import Hypervisor
 
 
 class HyperV(Hypervisor):

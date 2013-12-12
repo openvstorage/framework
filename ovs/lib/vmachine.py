@@ -203,10 +203,17 @@ class VMachineController(object):
         """
         This method will create a vmachine based on a given vmx file
         """
-        vmachine = VMachine()
-        vmachine.devicename = name
-        vmachine.save()
-        VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
+        if name.endswith('.vmx'):
+            vmachine = VMachine()
+            vmachine.devicename = name
+            vmachine.status = 'CREATED'
+            vmachine.save()
+            try:
+                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
+                vmachine.status = 'SYNC'
+            except:
+                vmachine.status = 'SYNC_NOK'
+            vmachine.save()
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')
@@ -215,10 +222,17 @@ class VMachineController(object):
         This method will be triggered when there was an update in the vmx. We'll have
         to update the model
         """
-        vm = VMachineList.get_by_devicename(name)
-        if vm is None:
-            raise RuntimeError('No vMachine found with devicename {}'.format(name))
-        VMachineController.sync_with_hypervisor(vm.guid, vsrid)
+        if name.endswith('.vmx'):
+            vm = VMachineList.get_by_devicename(name)
+            if vm is None:
+                VMachineController.create_from_voldrv(name, vsrid)
+            else:
+                try:
+                    VMachineController.sync_with_hypervisor(vm.guid, vsrid)
+                    vm.status = 'SYNC'
+                except:
+                    vm.status = 'SYNC_NOK'
+                vm.save()
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -226,9 +240,10 @@ class VMachineController(object):
         """
         This method will delete a vmachine based on the name of the vmx given
         """
-        vm = VMachineList.get_by_devicename(name)
-        if vm is not None:
-            vm.delete()
+        if name.endswith('.vmx'):
+            vm = VMachineList.get_by_devicename(name)
+            if vm is not None:
+                vm.delete()
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
@@ -236,10 +251,11 @@ class VMachineController(object):
         """
         This machine will handle the rename of a vmx file
         """
-        vm = VMachineList.get_by_devicename(old_name)
-        if vm is not None:
-            vm.devicename = new_name
-            vm.save()
+        if old_name.endswith('.vmx') and new_name.endswith('.vmx'):
+            vm = VMachineList.get_by_devicename(old_name)
+            if vm is not None:
+                vm.devicename = new_name
+                vm.save()
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
@@ -267,41 +283,29 @@ class VMachineController(object):
             hypervisor = Factory.get(pmachine)
             vmachine.pmachine = pmachine
             vmachine.save()
-            vm_object = hypervisor.get_vm_object_by_devicename(vmid=vmachine.devicename)
+            vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
+                                                               ip=vsr.ip,
+                                                               mountpoint=vsr.mountpoint)
         else:
             raise RuntimeError('Not enough information to sync vmachine')
 
         if vm_object is None:
             raise RuntimeError('Could not retreive hypervisor vmachine object')
         else:
-            # We received a hypervisor depending object, so we need to do some switching here
-            hvtype = vmachine.pmachine.hvtype
-            if hvtype == 'VMWARE':
-                # Updating machine information
-                regex = '\[[^\]]+\]\s(.+)'
-                match = re.search(regex, vm_object.config.files.vmPathName)
-                vmachine.name = vm_object.config.name
-                vmachine.hypervisorid = vm_object.obj_identifier.value
-                vmachine.devicename = match.group(1)
-                vmachine.save()
-                # Updating and linking disks
-                for device in vm_object.config.hardware.device:
-                    if device.__class__.__name__ == 'VirtualDisk':
-                        if device.backing is not None and \
-                                device.backing.fileName is not None:
-                            backingfile = device.backing.fileName
-                            match = re.search(regex, backingfile)
-                            if match:
-                                vmdk_name = match.group(1)
-                                datastore = device.backing.datastore.value
-                                disk = VDiskList.get_by_devicename(vmdk_name)
-                                if disk is not None:
-                                    vsr = VolumeStorageRouterList.get_by_vsrid(disk.vsrid)
-                                    if vsr is not None:
-                                        raise RuntimeError('vDisk without VSR found')
-                                    if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
-                                        # We found a correct disk
-                                        disk.vmachine = vmachine
-                                        disk.save()
-            else:
-                raise NotImplementedError('Hypervisors other than VMware cannot be synced')
+            vmachine.name = vm_object['name']
+            vmachine.hypervisorid = vm_object['id']
+            vmachine.devicename = vm_object['backing']['filename']
+            vmachine.save()
+            # Updating and linking disks
+            for disk in vm_object['disks']:
+                vdisk = VDiskList.get_by_devicename(disk['filename'])
+                if vdisk is not None:
+                    vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
+                    if vsr is None:
+                        raise RuntimeError('vDisk without VSR found')
+                    datastore = vm_object['datastores'][disk['datastore']]
+                    if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
+                        vdisk.vmachine = vmachine
+                        vdisk.name = disk['name']
+                        vdisk.order = disk['order']
+                        vdisk.save()

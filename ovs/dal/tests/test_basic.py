@@ -175,6 +175,25 @@ class Basic(TestCase):
         self.assertEqual(disk2.name, 'two', 'Data should not be overwritten')
         disk.delete()
 
+    def test_silentdatarefresh(self):
+        """
+        Validates whether the default scenario (datastore_wins=False) will execute silent
+        data refresh
+        """
+        disk = TestDisk()
+        disk.name = 'initial'
+        disk.save()
+        disk2 = TestDisk(disk.guid, datastore_wins=False)
+        disk.name = 'one'
+        disk.save()
+        disk2.name = 'two'
+        disk2.save()
+        disk.save()  # This should not overwrite anything but instead refresh data
+        # With datastore_wins set to False, the datastore loses concurrency conflicts
+        self.assertEqual(disk2.name, 'two', 'Data should not be overwritten')
+        self.assertEqual(disk.name, 'two', 'Data should be refreshed')
+        disk.delete()
+
     def test_datastoreraises(self):
         """
         Validates the "datastore_wins" behavior in the usecase where it's supposed to raise

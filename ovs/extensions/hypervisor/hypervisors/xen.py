@@ -3,8 +3,7 @@
 Module for the XEN hypervisor client
 """
 
-from ovs.hypervisor.hypervisor import Hypervisor
-import time
+from ovs.extensions.hypervisor.hypervisor import Hypervisor
 
 
 class Xen(Hypervisor):

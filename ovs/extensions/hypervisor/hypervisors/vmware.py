@@ -72,11 +72,11 @@ class VMware(Hypervisor):
         """
         Gets the VMware virtual machine object from VMware by its identifier
         """
-        return self.sdk.get_vm(vmid)
+        return self.sdk.make_agnostic_config(self.sdk.get_vm(vmid))
 
     @Hypervisor.connected
     def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
         """
         Gets the VMware virtual machine object from VMware by devicename and datastore identifiers
         """
-        return self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)
+        return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
