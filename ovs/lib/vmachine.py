@@ -3,13 +3,16 @@
 VMachine module
 """
 import time
+import re
 
 from celery import group
 from ovs.celery import celery
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.hypervisor.factory import Factory
+from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.extensions.hypervisor.factory import Factory
 
 
 class VMachineController(object):
@@ -196,20 +199,26 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.create_from_voldrv')
-    def create_from_voldrv(name):
+    def create_from_voldrv(name, vsrid):
         """
         This method will create a vmachine based on a given vmx file
         """
-        _ = name
+        vmachine = VMachine()
+        vmachine.devicename = name
+        vmachine.save()
+        VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')
-    def update_from_voldrv(name):
+    def update_from_voldrv(name, vsrid):
         """
         This method will be triggered when there was an update in the vmx. We'll have
         to update the model
         """
-        _ = name
+        vm = VMachineList.get_by_devicename(name)
+        if vm is None:
+            raise RuntimeError('No vMachine found with devicename {}'.format(name))
+        VMachineController.sync_with_hypervisor(vm.guid, vsrid)
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -232,5 +241,67 @@ class VMachineController(object):
             vm.devicename = new_name
             vm.save()
 
+    @staticmethod
+    @celery.task(name='ovs.machine.sync_with_hypervisor')
+    def sync_with_hypervisor(vmachineguid, vsrid=None):
+        """
+        Updates a given vmachine with data retreived from a given pmachine
+        """
+        vmachine = VMachine(vmachineguid)
+        if vmachine.hypervisorid is not None and vmachine.pmachine is not None:
+            # We have received a vmachine which is linked to a pmachine and has a hypervisorid.
+            hypervisor = Factory.get(vmachine.pmachine)
+            vm_object = hypervisor.get_vm_object(vmid=vmachine.hypervisorid)
+        elif vmachine.devicename is not None and vsrid is not None:
+            # We don't have a pmachine or hypervisorid, we need to load the data via the
+            # devicename and vsr.
+            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+            if vsr is None:
+                raise RuntimeError('VolumeStorageRouter could not be found')
+            vsa = vsr.serving_vmachine
+            if vsa is None:
+                raise RuntimeError('VolumeStorageRouter {} not linked to a VSA'.format(vsr.name))
+            pmachine = vsa.pmachine
+            if pmachine is None:
+                raise RuntimeError('VSA {} not linked to a pMachine'.format(vsa.name))
+            hypervisor = Factory.get(pmachine)
+            vmachine.pmachine = pmachine
+            vmachine.save()
+            vm_object = hypervisor.get_vm_object_by_devicename(vmid=vmachine.devicename)
+        else:
+            raise RuntimeError('Not enough information to sync vmachine')
 
-
+        if vm_object is None:
+            raise RuntimeError('Could not retreive hypervisor vmachine object')
+        else:
+            # We received a hypervisor depending object, so we need to do some switching here
+            hvtype = vmachine.pmachine.hvtype
+            if hvtype == 'VMWARE':
+                # Updating machine information
+                regex = '\[[^\]]+\]\s(.+)'
+                match = re.search(regex, vm_object.config.files.vmPathName)
+                vmachine.name = vm_object.config.name
+                vmachine.hypervisorid = vm_object.obj_identifier.value
+                vmachine.devicename = match.group(1)
+                vmachine.save()
+                # Updating and linking disks
+                for device in vm_object.config.hardware.device:
+                    if device.__class__.__name__ == 'VirtualDisk':
+                        if device.backing is not None and \
+                                device.backing.fileName is not None:
+                            backingfile = device.backing.fileName
+                            match = re.search(regex, backingfile)
+                            if match:
+                                vmdk_name = match.group(1)
+                                datastore = device.backing.datastore.value
+                                disk = VDiskList.get_by_devicename(vmdk_name)
+                                if disk is not None:
+                                    vsr = VolumeStorageRouterList.get_by_vsrid(disk.vsrid)
+                                    if vsr is not None:
+                                        raise RuntimeError('vDisk without VSR found')
+                                    if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
+                                        # We found a correct disk
+                                        disk.vmachine = vmachine
+                                        disk.save()
+            else:
+                raise NotImplementedError('Hypervisors other than VMware cannot be synced')

@@ -43,14 +43,35 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def start(self, vmid):
+    def delete_vm(self, vmid, wait=False):
         """
         Abstract method
         """
         pass
 
     @abc.abstractmethod
-    def stop(self, vmid):
+    def clone_vm(self, vmid, name, disks, wait=False):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def set_as_template(self, vmid, disks, wait=False):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vm_object(self, vmid):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
         """
         Abstract method
         """

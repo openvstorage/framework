@@ -122,7 +122,7 @@ class VMachineViewSet(viewsets.ViewSet):
         vsa_vmachine_guids = []
         for vdisk in vmachine.vdisks:
             if vdisk.vsrid:
-                vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
+                vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
                 vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
         return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
 

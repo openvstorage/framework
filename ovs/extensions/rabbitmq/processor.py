@@ -21,38 +21,39 @@ def process(queue, body):
 
         data = EventMessages.EventMessage().FromString(body)
 
-        mapping = {EventMessages.EventMessage.VolumeCreate:
+        mapping = {EventMessages.EventMessage.VolumeCreate:               # Disk create
                        {'property': 'volume_create',
                         'task': VDiskController.create_from_voldrv,
                         'arguments': {'name': 'volumename',
                                       'size': 'volumesize',
-                                      'path': 'volumepath'},
+                                      'path': 'volumepath',
+                                      'vrouter_id': 'vsrid'},
                         'options': {'delay': 10}},
                    EventMessages.EventMessage.VolumeDelete:
                        {'property': 'volume_delete',
                         'task': VDiskController.delete_from_voldrv,
-                        'arguments': {'name': 'volumename',
-                                      'path': 'volumepath'}},
+                        'arguments': {'name': 'volumename'}},
                    EventMessages.EventMessage.VolumeResize:
                        {'property': 'volume_resize',
                         'task': VDiskController.resize_from_voldrv,
                         'arguments': {'name': 'volumename',
-                                      'size': 'volumesize',
-                                      'path': 'volumepath'}},
+                                      'size': 'volumesize'}},
                    EventMessages.EventMessage.VolumeRename:
                        {'property': 'volume_rename',
                         'task': VDiskController.rename_from_voldrv,
                         'arguments': {'name': 'volumename',
                                       'old_path': 'volume_old_path',
                                       'new_path': 'volume_new_path'}},
-                   EventMessages.EventMessage.MachineCreate:
+                   EventMessages.EventMessage.MachineCreate:              # Machine create
                        {'property': 'machine_create',
                         'task': VMachineController.create_from_voldrv,
-                        'arguments': {'name': 'name'}},
+                        'arguments': {'name': 'name',
+                                      'vrouter_id': 'vsrid'}},
                    EventMessages.EventMessage.MachineUpdate:
                        {'property': 'machine_update',
                         'task': VMachineController.update_from_voldrv,
-                        'arguments': {'name': 'name'},
+                        'arguments': {'name': 'name',
+                                      'vrouter_id': 'vsrid'},
                         'options': {'dedupe': True,
                                     'delay': 10}},
                    EventMessages.EventMessage.MachineDelete:

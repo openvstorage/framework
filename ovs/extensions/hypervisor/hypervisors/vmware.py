@@ -4,9 +4,8 @@ Module for the VMware hypervisor client
 """
 
 from ovs.celery import celery
-from ovs.hypervisor.hypervisor import Hypervisor
-from ovs.extensions.hypervisor.vmware.sdk import Sdk
-import time
+from ovs.extensions.hypervisor.hypervisor import Hypervisor
+from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
 
 class VMware(Hypervisor):
@@ -27,44 +26,13 @@ class VMware(Hypervisor):
         """
         return True
 
-    @celery.task(name='ovs.hypervisor.vmware.startVM')
-    @Hypervisor.connected
-    def start(self, *args, **kwargs):
-        """
-        Starts a vm
-        """
-        vmid = 0
-        print '[VMW] starting machine {0}...'.format(str(vmid))
-        time.sleep(3)
-        print '[VMW] started machine {0}'.format(str(vmid))
-
-    @celery.task(name='ovs.hypervisor.vmware.stopVM')
-    @Hypervisor.connected
-    def stop(self, *args, **kwargs):
-        """
-        Stops a vm
-        """
-        vmid = 0
-        print '[VMW] stopping machine {0}...'.format(str(vmid))
-        time.sleep(3)
-        print '[VMW] stopped machine {0}'.format(str(vmid))
-
-    @celery.task(name='ovs.hypervisor.vmware.createVM')
-    @Hypervisor.connected
-    def create_vm(self, *args, **kwargs):
-        """
-        Configure the vmachine on the hypervisor
-        """
-        pass
-
     @celery.task(name='ovs.hypervisor.vmware.deleteVM')
     @Hypervisor.connected
-    def delete_vm(self, vmid, esxhost=None, wait=False):
+    def delete_vm(self, vmid, wait=False):
         """
         Remove the vmachine from the hypervisor
 
         @param vmid: hypervisor id of the virtual machine
-        @param esxhost: esx host identifier
         @param wait: wait for action to complete
         """
         if vmid and self.sdk.exists(key=vmid):
@@ -72,32 +40,43 @@ class VMware(Hypervisor):
 
     @celery.task(name='ovs.hypervisor.vmware.cloneVM')
     @Hypervisor.connected
-    def clone_vm(self, vmid, name, disks, esxhost=None, wait=False):
+    def clone_vm(self, vmid, name, disks, wait=False):
         """
         Clone a vmachine
 
         @param vmid: hypvervisor id of the virtual machine
         @param name: name of the virtual machine
         @param disks: list of disk information
-        @param esxhost: esx host identifier
         @param wait: wait for action to complete
         """
-        print '[VMW] Cloning machine {0} to {1} ...'.format(str(vmid), name)
-        task = self.sdk.clone_vm(vmid, name, disks, esxhost, wait)
-        print '[VMW] Cloned machine {0} to {1} ...'.format(str(vmid), name)
-        if wait == True:
+        task = self.sdk.clone_vm(vmid, name, disks, wait)
+        if wait is True:
             if self.sdk.validate_result(task):
-                taskInfo = self.sdk.get_task_info(task)
-                return taskInfo.info.result.value
+                task_info = self.sdk.get_task_info(task)
+                return task_info.info.result.value
         return None
 
     @celery.task(name='ovs.hypervisor.vmware.setAsTemplate')
     @Hypervisor.connected
-    def set_as_template(self, vmid, disks, esxhost=None, wait=False):
+    def set_as_template(self, vmid, disks, wait=False):
         """
         Configure a vm as template
         This lets the machine exist on the hypervisor but configures all disks as "Independent Non-persistent"
 
         @param vmid: hypervisor id of the virtual machine
         """
-        task = self.sdk.set_disk_mode(vmid, disks, 'independent_nonpersistent', esxhost, wait)
+        return self.sdk.set_disk_mode(vmid, disks, 'independent_nonpersistent', wait)
+
+    @Hypervisor.connected
+    def get_vm_object(self, vmid):
+        """
+        Gets the VMware virtual machine object from VMware by its identifier
+        """
+        return self.sdk.get_vm(vmid)
+
+    @Hypervisor.connected
+    def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
+        """
+        Gets the VMware virtual machine object from VMware by devicename and datastore identifiers
+        """
+        return self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)
