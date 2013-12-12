@@ -28,7 +28,7 @@ celery.conf.CELERY_CACHE_BACKEND = 'memcached://{}/'.format(';'.join(memcache_se
 celery.conf.BROKER_URL = '{}://{}:{}@{}:{}//'.format(j.application.config.get('ovs.core.broker.protocol'),
                                                      j.application.config.get('ovs.core.broker.login'), 
                                                      j.application.config.get('ovs.core.broker.password'),
-                                                     j.application.config.get('ovs.core.broker.host'),
+                                                     j.application.config.get('ovs.grid.ip'),
                                                      j.application.config.get('ovs.core.broker.port'))
 celery.conf.CELERYBEAT_SCHEDULE = {
     # Snapshot policy

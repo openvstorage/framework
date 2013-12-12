@@ -25,7 +25,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         Get the memcache location from hrd
         """
-        return '{}:{}'.format(j.application.config.get('ovs.core.memcache.localnode.ip'),
+        return '{}:{}'.format(j.application.config.get('ovs.grid.ip'),
                               j.application.config.get('ovs.core.memcache.localnode.port'))
 
     @staticmethod

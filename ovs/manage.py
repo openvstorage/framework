@@ -109,7 +109,10 @@ class Configure():
             if not j.system.fs.exists(path) or not j.system.fs.isMount(path):
                 raise ValueError('Path to %s does not exist or is not a mountpoint'%path)
         all_mounts = map(lambda m: m.split()[2], j.system.process.execute('mount -v', dieOnNonZeroExitCode=False)[1].splitlines())
-        filesystems = filter(lambda d: not re.match('^/$|/dev|/sys|/run|/proc', d), all_mounts)
+        mount_regex = re.compile('^/$|/dev|/sys|/run|/proc|{}|{}|{}'.format(hrd.get('ovs.core.db.mountpoint'),
+                                                                            hrd.get('volumedriver.filesystem.distributed'),
+                                                                            hrd.get('volumedriver.metadata')))
+        filesystems = filter(lambda d: not mount_regex.match(d), all_mounts)
         volumedriver_cache_mountpoint = j.console.askChoice(filesystems, 'Select cache mountpoint')
         filesystems.remove(volumedriver_cache_mountpoint)
         cache_fs = os.statvfs(volumedriver_cache_mountpoint)
@@ -200,7 +203,7 @@ class Configure():
         vrouter.name = vrouter_id.replace('_', ' ')
         vrouter.description = vrouter.name
         vrouter.vsrid = vrouter_id
-        vrouter.ip = hrd.get('volumedriver.filesystem.xmlrpc.ip')
+        vrouter.ip = hrd.get('ovs.grid.ip')
         vrouter.port = int(hrd.get('volumedriver.filesystem.xmlrpc.port'))
         vrouter.mountpoint = j.system.fs.joinPaths(os.sep, 'mnt', vpool_name)
         vrouter.serving_vmachine = this_vmachine

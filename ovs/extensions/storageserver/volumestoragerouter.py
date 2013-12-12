@@ -37,7 +37,7 @@ class VolumeStorageRouterClient(object):
         """
         Initializes the wrapper given a configfile for the RPC communication
         """
-        self._host = j.application.config.get('volumedriver.filesystem.xmlrpc.ip')
+        self._host = j.application.config.get('ovs.grid.ip')
         self._port = int(j.application.config.get('volumedriver.filesystem.xmlrpc.port'))
 
     def load(self):
