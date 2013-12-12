@@ -21,7 +21,7 @@ class ArakoonStore(object):
         """
         Initializes the client
         """
-        self._cluster = ArakoonManagement.getCluster(cluster)
+        self._cluster = ArakoonManagement().getCluster(cluster)
         self._client = self._cluster.getClient()
 
     def get(self, key):
