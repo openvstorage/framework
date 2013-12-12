@@ -16,13 +16,14 @@ from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouter
 
 
 class Configure():
-    def init_exportfs(self):
+    def init_exportfs(self, vpool_name):
         
         # Configure nfs
         from ovs.extensions.fs.exportfs import Nfsexports
-        if not j.system.fs.exists(j.application.config.get('volumedriver.filesystem.mountpoint')):
-            j.system.fs.createDir(j.application.config.get('volumedriver.filesystem.mountpoint'))
-        Nfsexports().add(j.application.config.get('volumedriver.filesystem.mountpoint'), '*', 'rw,fsid={0},sync,no_root_squash,no_subtree_check'.format(uuid.uuid4()))
+        vpool_mountpoint = j.system.fs.joinPaths(os.sep, 'mnt', vpool_name)
+        if not j.system.fs.exists(vpool_mountpoint):
+            j.system.fs.createDir(vpool_mountpoint)
+        Nfsexports().add(vpool_mountpoint, '*', 'rw,fsid={0},sync,no_root_squash,no_subtree_check'.format(uuid.uuid4()))
         subprocess.call(['service', 'nfs-kernel-server', 'start'])
 
     def loadData(self):
@@ -96,14 +97,13 @@ class Configure():
         if j.system.fs.exists('/etc/nginx/sites-enabled/default'):
             j.system.fs.remove('/etc/nginx/sites-enabled/default')
 
-    def init_storagerouter(self, vmachineguid):
-        # Configure NFS volumedriver
-        hrd = j.application.config
+    def init_storagerouter(self, vmachineguid, vpool_name):
         """
         Initializes the volume storage router.
         This requires a the OVS model to be configured and reachable
         @param vmachineguid: guid of the internal VSA machine hosting this volume storage router
         """
+        hrd = j.application.config
         mountpoints = [hrd.get('volumedriver.metadata'),]
         for path in mountpoints:
             if not j.system.fs.exists(path) or not j.system.fs.isMount(path):
@@ -132,7 +132,6 @@ class Configure():
         scocache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.2 / 4096 )* 4096 ) * 4)
         readcache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.6 / 4096 )* 4096) * 4)
         volumedriver_backend_type = j.console.askChoice(hrd.get('volumedriver.supported.backends').split(','), 'Select type of storage backend')
-        vpool_name = j.console.askString('Specify name for this storage backend')
         vrouter_id = '{}{}'.format(vpool_name, j.application.getUniqueMachineId())
         connection_host, connection_port, connection_username, connection_password = None, None, None, None
         if volumedriver_backend_type == 'LOCAL':
@@ -239,34 +238,46 @@ class Configure():
         name = 'volumedriver_{}'.format(vpool_name)
         domain = voldrv_package.domain
         ports = []
-        j.tools.startupmanager.addProcess(name=name, cmd=cmd, args=args, env={}, numprocesses=1, priority=20, \
+        j.tools.startupmanager.addProcess(name=name, cmd=cmd, args=args, env={}, numprocesses=1, priority=21, \
            shell=False, workingdir=workingdir,jpackage=voldrv_package,domain=domain,ports=ports,stopcmd=stopcmd)
 
 class Control():
     """
-    OVS Control class enabling you to start/stop all components at once
-    Single service restart needs to be done using the linux service or supervisor tool set
+    OVS Control class enabling you to
+    * init
+    * start
+    * stop
+    all components at once
     """
-    def init(self):
+    def init(self, vpool_name):
         """
         Configure & Start the OVS components in the correct order to get your environment initialized after install
         * Reset rabbitmq
         * Remove nginx file /etc/nginx/sites-enabled/default configuration
         * Load default data into model
+        * Configure volume storage router
         """
-        arakoon_dir = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), 'arakoon')
-        arakoon_clusters = map(lambda d: j.system.fs.getBaseName(d), j.system.fs.listDirsInDir(arakoon_dir))
-        for cluster in arakoon_clusters:
-            cluster_instance = ArakoonManagement().getCluster(cluster)
-            cluster_instance.createDirs(cluster_instance.listLocalNodes()[0])
-        ovsConfigure.init_rabbitmq()
-        ovsConfigure.init_nginx()
-        self._startPackage('openvstorage-core')
-        self._startPackage('openvstorage-webapps')
+        ovsConfigure = Configure()
+        if not self._packageIsRunning('openvstorage-core'):
+            arakoon_dir = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), 'arakoon')
+            arakoon_clusters = map(lambda d: j.system.fs.getBaseName(d), j.system.fs.listDirsInDir(arakoon_dir))
+            for cluster in arakoon_clusters:
+                cluster_instance = ArakoonManagement().getCluster(cluster)
+                cluster_instance.createDirs(cluster_instance.listLocalNodes()[0])
+            ovsConfigure.init_rabbitmq()
+            self._startPackage('openvstorage-core')
+        if not self._packageIsRunning('openvstorage-webapps'):
+            ovsConfigure.init_nginx()
+            self._startPackage('openvstorage-webapps')
         vmachineguid = ovsConfigure.loadData()
-        ovsConfigure.init_storagerouter(vmachineguid)
-        self._startPackage('volumedriver')
-        ovsConfigure.init_exportfs()
+        if not self._packageIsRunning('volumedriver'):
+            ovsConfigure.init_storagerouter(vmachineguid, vpool_name)
+            self._startPackage('volumedriver')
+        ovsConfigure.init_exportfs(vpool_name)
+
+    def _packageIsRunning(self, package):
+        package = j.packages.find(domain='openvstorage', name=package)[0]
+        return j.tools.startupmanager.getStatus4JPackage(package)
 
     def _startPackage(self, package):
         package = j.packages.find(domain='openvstorage', name=package)[0]
