@@ -147,7 +147,7 @@ define([
                                     self.backendRead(stats.data_read);
                                     self.backendReads(stats.backend_read_operations);
                                     self.bandwidthSaved(stats.data_read - stats.backend_data_read);
-                                    self.ipAddress(data.ip_address);
+                                    self.ipAddress(data.ip);
                                     self.isInternal(data.is_internal);
                                     self.isVTemplate(data.is_vtemplate);
                                     self.snapshots(data.snapshots);
