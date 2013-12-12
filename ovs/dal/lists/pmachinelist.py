@@ -4,7 +4,7 @@ PMachineList module
 """
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
-from ovs.dal.hybrids.vmachine import PMachine
+from ovs.dal.hybrids.pmachine import PMachine
 
 
 class PMachineList(object):
