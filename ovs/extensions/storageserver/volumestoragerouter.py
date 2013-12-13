@@ -174,10 +174,14 @@ class VolumeStorageRouterConfiguration(object):
         @param arakoon_nodes: dictionary of arakoon nodes in this cluster 
         """
         self.load_config()
+        if not 'volume_registry' in self._config_file_content:
+            self._config_file_content['volume_registry'] = {}
+        self.config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
+        self.config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
         self._config_file_content['filesystem']['fs_arakoon_cluster_id'] = arakoon_cluster_id
         self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'] = []
         for node_id,node_config in arakoon_nodes.iteritems():
-            self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'].append({'node_id' : node_id,
-                                                                                        'host' : node_config[0][0],
-                                                                                        'port' : node_config[1]})
+            node_dict = {'node_id' : node_id, 'host' : node_config[0][0], 'port' : node_config[1]}
+            self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'].append(node_dict)
+            self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'].append(node_dict)
         self.write_config()
