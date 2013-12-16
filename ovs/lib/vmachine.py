@@ -3,8 +3,7 @@
 VMachine module
 """
 import time
-
-from celery import group, chain
+from celery import group
 from ovs.celery import celery
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.hybrids.vmachine import VMachine
@@ -18,28 +17,37 @@ class VMachineController(object):
     """
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, **kwargs):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, subtasks=True):
         """
         Snapshot VMachine disks
 
         @param machineguid: guid of the machine
         @param label: label to give the snapshots
         @param is_consistent: flag indicating the snapshot was consistent or not
+        @param timestamp: override timestamp, if required. Should be a unix timestamp
         """
-        _ = kwargs
+
+        timestamp = timestamp if timestamp is not None else time.time()
+        timestamp = str(int(float(timestamp)))
+
         metadata = {'label': label,
                     'is_consistent': is_consistent,
-                    'timestamp': str(time.time()).split('.')[0],
+                    'timestamp': timestamp,
                     'machineguid': machineguid}
         machine = VMachine(machineguid)
-        tasks = []
-        for disk in machine.vdisks:
-            t = VDiskController.create_snapshot.s(diskguid=disk.guid,
-                                                  metadata=metadata)
-            t.link_error(VDiskController.delete_snapshot.s())
-            tasks.append(t)
-        snapshot_vmachine_wf = group(t for t in tasks)
-        snapshot_vmachine_wf()
+        if subtasks:
+            tasks = []
+            for disk in machine.vdisks:
+                t = VDiskController.create_snapshot.s(diskguid=disk.guid,
+                                                      metadata=metadata)
+                t.link_error(VDiskController.delete_snapshot.s())
+                tasks.append(t)
+            snapshot_vmachine_wf = group(t for t in tasks)
+            snapshot_vmachine_wf()
+        else:
+            for disk in machine.vdisks:
+                VDiskController.create_snapshot(diskguid=disk.guid,
+                                                metadata=metadata)
 
     @staticmethod
     @celery.task(name='ovs.machine.clone')
