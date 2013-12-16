@@ -77,6 +77,6 @@ class VPoolViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         vmachine_guids = []
         for disk in vpool.vdisks:
-            if disk.vmachine.guid not in vmachine_guids:
+            if disk.vmachine is not None and disk.vmachine.guid not in vmachine_guids:
                 vmachine_guids.append(disk.vmachine.guid)
         return Response(len(vmachine_guids), status=status.HTTP_200_OK)

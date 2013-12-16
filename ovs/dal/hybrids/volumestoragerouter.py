@@ -19,7 +19,7 @@ class VolumeStorageRouter(DataObject):
                   'port':        (None, int, 'Port on which the VSR is listening.'),
                   'ip':          (None, str, 'IP address on which the VSR is listening.'),
                   'vsrid':       (None, str, 'ID of the VSR in the Open vStorage Volume Driver.'),
-                  'mountpoint':  (None, str, 'Mountpoint of Open vStorage Filesystem')}
+                  'mountpoint':  (None, str, 'Mountpoint from which the VSR serves data')}
     _relations = {'vpool':            (VPool,    'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':        (30, str),

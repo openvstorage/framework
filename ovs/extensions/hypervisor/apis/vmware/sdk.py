@@ -29,7 +29,6 @@ def validate_session(function):
 
 
 class ValueExtender(MessagePlugin):
-
     """
     Plugin for SUDS for compatibility with VMware SDK
     """
@@ -49,7 +48,6 @@ class ValueExtender(MessagePlugin):
 
 
 class Sdk(object):
-
     """
     This class contains all SDK related methods
     """
@@ -77,14 +75,13 @@ class Sdk(object):
             service_reference)
 
         # In case of an ESXi host, this would be 'HostAgent'
-        self._isVCenter = self._serviceContent.about.apiType == 'VirtualCenter'
-        if not self._isVCenter:
+        self._is_vcenter = self._serviceContent.about.apiType == 'VirtualCenter'
+        if not self._is_vcenter:
             self._validate_session()
             # pylint: disable=line-too-long
             self._esxHost = self._get_object(self._serviceContent.rootFolder,
                                             prop_type='HostSystem',
-                                            traversal={
-                                                'name': 'FolderTraversalSpec',
+                                            traversal={'name': 'FolderTraversalSpec',
                                                        'type': 'Folder',
                                                        'path': 'childEntity',
                                                        'traversal': {'name': 'DatacenterTraversalSpec',  # noqa
@@ -93,10 +90,9 @@ class Sdk(object):
                                                                      'traversal': {'name': 'DFolderTraversalSpec',  # noqa
                                                                                    'type': 'Folder',
                                                                                    'path': 'childEntity',  # noqa
-                                                                                   'traversal': {
-                                                                                   'name': 'ComputeResourceTravelSpec',  # noqa
-                                                                                   'type': 'ComputeResource',  # noqa
-                                                                                   'path': 'host'}}}},  # noqa
+                                                                                   'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                                                 'type': 'ComputeResource',  # noqa
+                                                                                                 'path': 'host'}}}},  # noqa
                                             properties=['name']).obj_identifier
             # pylint: enable=line-too-long
         else:
@@ -180,6 +176,14 @@ class Sdk(object):
                 return None
         else:
             raise Exception('A name or key should be passed.')
+
+    @validate_session
+    def get_vm(self, key, esxhost=None):
+        vmid = self.exists(esxhost=esxhost, key=key)
+        if vmid is None:
+            raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
+        vm = self._get_object(vmid)
+        return vm
 
     @validate_session
     def add_physical_disk(self, vmname, devicename, disklabel, filename, esxhost=None, wait=False):
@@ -746,6 +750,39 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
+    def make_agnostic_config(self, vm_object, esxhost=None):
+        regex = '\[([^\]]+)\]\s(.+)'
+        match = re.search(regex, vm_object.config.files.vmPathName)
+        esxhost = self._validate_host(esxhost)
+
+        config = {'name': vm_object.config.name,
+                  'id': vm_object.obj_identifier.value,
+                  'backing': {'filename': match.group(2),
+                              'datastore': match.group(1)},
+                  'disks': [],
+                  'datastores': {}}
+
+        for device in vm_object.config.hardware.device:
+            if device.__class__.__name__ == 'VirtualDisk':
+                if device.backing is not None and \
+                        device.backing.fileName is not None:
+                    backingfile = device.backing.fileName
+                    match = re.search(regex, backingfile)
+                    if match:
+                        config['disks'].append({'filename': match.group(2),
+                                                'datastore': match.group(1),
+                                                'name': device.deviceInfo.label,
+                                                'order': device.unitNumber})
+
+        host_system = self._get_object(esxhost, properties=['datastore'])
+        for store in host_system.datastore[0]:
+            store = self._get_object(store)
+            if hasattr(store.info, 'nas'):
+                config['datastores'][store.info.name] = '{}:{}'.format(store.info.nas.remoteHost,
+                                                                       store.info.nas.remotePath)
+
+        return config
+
     @validate_session
     def get_vm_guest_info(self, vmid):
         """
@@ -834,7 +871,7 @@ class Sdk(object):
         Register an extension to the vcenter host we're talking to. In case the extension
         already exists, it will be updated with the given information
         """
-        if not self._isVCenter:
+        if not self._is_vcenter:
             raise Exception(
                 'An extension can only be registered to a vCenter Server')
 
@@ -911,85 +948,65 @@ class Sdk(object):
             state = self.get_task_info(task).info.state
 
     @validate_session
-    def get_nfs_datastore_object(self, ip, mountpoint, filename):
+    def get_nfs_datastore_object(self, ip, mountpoint, filename, esxhost=None):
         """
         ip : "10.130.12.200", string
         mountpoint: "/srv/volumefs", string
-        filename: "cfovs001/vhd0.vmdk"
+        filename: "cfovs001/vhd0(-flat).vmdk"
         identify nfs datastore on this esx host based on ip and mount
         check if filename is present on datastore
         if file is .vmdk return VirtualDisk object for corresponding virtual disk
         if file is .vmx return VirtualMachineConfigInfo for corresponding vm
-        """
-        directory, file = filename.split('/')  # what about vmdks in datastore?
-        extension = file.split('.')[1]
-        esxhost = self._esxHost
-        datastore_object = None
-        host_object = self._get_object(esxhost, properties=['datastore'])
-        for datastore in host_object.datastore[0]:
-            ds_object = self._get_object(datastore)
-            if hasattr(ds_object.info, 'nas'):
-                if ds_object.info.nas.remoteHost == ip and\
-                        ds_object.info.nas.remotePath == mountpoint:
-                    datastore_object = ds_object
-        if not datastore_object:
-            raise ValueError(
-                'Could not identify NFS datastore ({0}, {1}) on host {2}'.format(ip, mountpoint, self._host))
 
-        browser = self._get_object(datastore_object.browser).obj_identifier
-        ds_path = "[%s]" % datastore_object.info.name
-        file_query = self._client.factory.create('ns0:VmDiskFileQuery')
-        search_spec = self._client.factory.create(
-            'ns0:HostDatastoreBrowserSearchSpec')
-        search_spec.query = file_query
-        search_spec.matchPattern = ["*.{0}".format(extension)]
-        tid = self._client.service.SearchDatastoreSubFolders_Task(
-            browser, ds_path, search_spec)
-        self.wait_for_task(tid)
-        task = self._get_object(tid)
-        result = {}
-        for hdsbsr in task.info.result.HostDatastoreBrowserSearchResults:
-            vm_folder = hdsbsr.folderPath.replace(ds_path, '').strip()
-            files = []
-            if hasattr(hdsbsr, 'file'):
-                files = [f.path for f in hdsbsr.file]
-            result[vm_folder] = files
-        file_found = file in result.get(directory, [])
-        if not file_found:
-            raise ValueError('Could not find file {0} on NFS datastore ({1}, {2}) on host {3}'
-                             .format(filename, ip, mountpoint, self._host))
-        vm_name = directory
+        @rtype: tuple
+        @return: A tuple. First item: vm config, second item: Device if a vmdk was given
+        """
+
+        def check_filename(bf, fn):
+            match = re.search('\[[^\]]+\]\s(.+)', bf)
+            return match and match.group(1) == fn
+
+        def check_datastore(bf, ds):
+            match = re.search('\[([^\]]+)\]\s.+', bf)
+            return match and match.group(1) == ds.name
+
+        filename = filename.replace('-flat.vmdk', '.vmdk')  # Support both -flat.vmdk and .vmdk
+        esxhost = self._validate_host(esxhost)
+
+        virtual_disk_type = self._client.factory.create('ns0:VirtualDisk')
+        flat_type = self._client.factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
+
+        datastore = self.get_datastore(ip, mountpoint, esxhost=esxhost)
+        if not datastore:
+            raise RuntimeError('Could not find datastore')
+
         vms = self._get_object(esxhost,
                                prop_type='VirtualMachine',
                                traversal={'name': 'HostSystemTraversalSpec',
                                           'type': 'HostSystem',
                                           'path': 'vm'},
                                properties=['name', 'config'])
-        if isinstance(vms, list):
-            vms = [vm for vm in vms if hasattr(vm, 'name') and vm.name == vm_name]
-        else:
-            if vms.name == vm_name:
-                vms = [vms]
-            else:
-                vms = []
         if not vms:
-            raise ValueError('Could not find vmachine {0} on NFS datastore ({1}, {2}) on host {3}'
-                             .format(vm_name, ip, mountpoint, self._host))
-        vm = vms[0]
-        if file.endswith('.vmx'):
-            return vm.config
-        elif file.endswith('.vmdk'):
-            type_ = self._client.factory.create('ns0:VirtualDisk')
-            virtual_disks = [
-                dev for dev in vm.config.hardware.device if isinstance(dev, type(type_))]
-            virtual_disks = [
-                vd for vd in virtual_disks if vd.backing.fileName.replace(ds_path, '').strip() == filename]
-            if not virtual_disks:
-                raise ValueError('Could not find virtual disk {0} on vmachine {1} on NFS datastore({2}, {3}) on host {4}'
-                                 .format(filename, vm_name, ip, mountpoint, self._host))
-            return virtual_disks[0]
-        else:
-            raise ValueError('Unexpected file type {0}'.format(extension))
+            raise RuntimeError('No vMachines found')
+        for vm in vms:
+            if filename.endswith('.vmdk'):
+                for device in vm.config.hardware.device:
+                    if isinstance(device, type(virtual_disk_type)):
+                        if device.backing is not None and \
+                                isinstance(device.backing, type(flat_type)):
+                            backingfile = device.backing.fileName
+                            if check_filename(backingfile, filename) and \
+                                    check_datastore(backingfile, datastore):
+                                return vm, device
+            elif filename.endswith('.vmx'):
+                backingfile = vm.config.files.vmPathName
+                if check_filename(backingfile, filename) and \
+                        check_datastore(backingfile, datastore):
+                    return vm, None
+            else:
+                raise ValueError('Unexpected filetype')
+
+        raise RuntimeError('Could not locate given file on the given datastore')
 
     def _get_host_data(self, esxhost):
         """
@@ -1134,7 +1151,7 @@ class Sdk(object):
         Validates wheteher a given host is valid
         """
         if host is None:
-            if self._isVCenter:
+            if self._is_vcenter:
                 raise Exception(
                     'A HostSystem reference is mandatory for a vCenter Server')
             else:

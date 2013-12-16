@@ -21,7 +21,7 @@ celery = Celery('ovs',
                          'ovs.lib.vmachine',
                          'ovs.lib.messaging',
                          'ovs.lib.scheduledtask',
-                         'ovs.hypervisor.hypervisors.vmware'])
+                         'ovs.extensions.hypervisor.hypervisors.vmware'])
 
 celery.conf.CELERY_RESULT_BACKEND = "cache"
 celery.conf.CELERY_CACHE_BACKEND = 'memcached://{}/'.format(';'.join(memcache_servers))

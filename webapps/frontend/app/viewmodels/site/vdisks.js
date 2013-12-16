@@ -64,17 +64,17 @@ define([
                 ])
                 .done(function() {
                     var vm, pool;
-                    if (vdisk.vsa() === undefined || vdisk.vsa().guid() !== vdisk.vsaGuid()) {
+                    if ((vdisk.vsa() === undefined || vdisk.vsa().guid() !== vdisk.vsaGuid()) && vdisk.vsaGuid()) {
                         vm = new VMachine(vdisk.vsaGuid());
                         vm.load();
                         vdisk.vsa(vm);
                     }
-                    if (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vdisk.vMachineGuid()) {
+                    if ((vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vdisk.vMachineGuid()) && vdisk.vMachineGuid()) {
                         vm = new VMachine(vdisk.vMachineGuid());
                         vm.load();
                         vdisk.vMachine(vm);
                     }
-                    if (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vdisk.vpoolGuid()) {
+                    if ((vdisk.vpool() === undefined || vdisk.vpool().guid() !== vdisk.vpoolGuid()) && vdisk.vpoolGuid()) {
                         pool = new VPool(vdisk.vpoolGuid());
                         pool.load();
                         vdisk.vpool(pool);

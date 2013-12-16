@@ -63,7 +63,11 @@ class VDisk(DataObject):
             vdiskinfodict = dict()
 
             for infoattribute in dir(vdiskinfo):
-                if not infoattribute.startswith('_'):
+                if infoattribute.startswith('_'):
+                    continue
+                elif infoattribute == 'volume_type':
+                    vdiskinfodict[infoattribute] = str(getattr(vdiskinfo, infoattribute))
+                else:
                     vdiskinfodict[infoattribute] = getattr(vdiskinfo, infoattribute)
 
             return vdiskinfodict
@@ -87,5 +91,4 @@ class VDisk(DataObject):
         """
         Returns the Volume Storage Router ID to which the vDisk is connected.
         """
-        # Temporary workaround for testing purposes
-        return self.volumeid
+        return self.info.get('vrouter_id', None)
