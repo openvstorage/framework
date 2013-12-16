@@ -45,12 +45,10 @@ if options.filesystems:
 os.system('mountall')
 
 # Install all software components
-os.system('apt-get install python-pip')
+os.system('apt-get -y install python-pip')
 os.system('pip install https://bitbucket.org/jumpscale/jumpscale_core/get/default.zip')
 os.system('jpackage_update')
 
-blob_user = raw_input('OpenvStorage blob username: ')
-blob_password = raw_input('OpenvStorage blob password: ')
 jp_openvstorage_blobstor = """
 [jp_openvstorage]
 ftp = ftp://10.100.129.101
@@ -58,14 +56,14 @@ http = http://10.100.129.101/ovs-blobstore
 namespace = jpackages
 localpath =
 type = httpftp
-""".format(blob_user, blob_password)
+"""
 
 jp_openvstorage_repo = """
 [openvstorage]
-metadatafromtgz = 0
-qualitylevel = unstable
-metadatadownload = 
-metadataupload = 
+metadatafromtgz = 1
+qualitylevel = test
+metadatadownload = http://10.100.129.101/ovs-metadata
+metadataupload = file://opt/jumpscale/var/jpackages/metatars
 bitbucketaccount = openvstorage
 bitbucketreponame = jp_openvstorage
 blobstorremote = jp_openvstorage
