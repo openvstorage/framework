@@ -53,7 +53,7 @@ blob_user = raw_input('OpenvStorage blob username: ')
 blob_password = raw_input('OpenvStorage blob password: ')
 jp_openvstorage_blobstor = """
 [jp_openvstorage]
-ftp = ftp://{}:{}@10.100.129.101
+ftp = ftp://10.100.129.101
 http = http://10.100.129.101/ovs-blobstore
 namespace = jpackages
 localpath =

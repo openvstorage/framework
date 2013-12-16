@@ -224,6 +224,14 @@ class Configure():
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         vsr_configuration.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
 
+        queue_config = {"events_amqp_routing_key": hrd.get('ovs.core.broker.volumerouter.queue'),
+                        "events_amqp_uri": "{}://{}:{}@{}:{}".format(hrd.get('ovs.core.broker.protocol'),
+                                                                     hrd.get('ovs.core.broker.login'),
+                                                                     hrd.get('ovs.core.broker.password'),
+                                                                     hrd.get('ovs.grid.ip'),
+                                                                     hrd.get('ovs.core.broker.port'))}
+        vsr_configuration.configure_event_publisher(queue_config)
+
         for dir in dirs2create:
             if not j.system.fs.exists(dir):
                 j.system.fs.createDir(dir)

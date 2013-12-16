@@ -6,6 +6,7 @@ Consumes messages from rabbitmq, dispatching them to the process method and ackn
 import pika
 import logging
 import sys
+from JumpScale import j
 from ovs.extensions.rabbitmq.processor import process
 
 logging.basicConfig(level='ERROR')
@@ -23,7 +24,10 @@ def callback(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host = j.application.config.get('ovs.grid.ip'),
+                                                                   port = int(j.application.config.get('ovs.core.broker.port')),
+                                                                   credentials = pika.PlainCredentials(j.application.config.get('ovs.core.broker.login'),
+                                                                                                       j.application.config.get('ovs.core.broker.password'))))
     channel = connection.channel()
 
     queue = sys.argv[1] if len(sys.argv) == 2 else 'default'

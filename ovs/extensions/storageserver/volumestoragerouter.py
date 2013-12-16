@@ -176,12 +176,24 @@ class VolumeStorageRouterConfiguration(object):
         self.load_config()
         if not 'volume_registry' in self._config_file_content:
             self._config_file_content['volume_registry'] = {}
-        self.config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
-        self.config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
+        self._config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
+        self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
         self._config_file_content['filesystem']['fs_arakoon_cluster_id'] = arakoon_cluster_id
         self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'] = []
         for node_id,node_config in arakoon_nodes.iteritems():
             node_dict = {'node_id' : node_id, 'host' : node_config[0][0], 'port' : node_config[1]}
             self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'].append(node_dict)
             self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'].append(node_dict)
+        self.write_config()
+
+    def configure_event_publisher(self, queue_config):
+        """
+        Configures volume storage router event publisher
+        @param queue_config: dictionary of with queue configuration key/value
+        """
+        self.load_config()
+        if not "event_publisher" in self._config_file_content:
+            self._config_file_content["event_publisher"] = {}
+        for key,value in queue_config.iteritems():
+            self._config_file_content["event_publisher"][key] = value
         self.write_config()
