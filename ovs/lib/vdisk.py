@@ -5,6 +5,7 @@ Module for VDiskController
 import logging
 import pickle
 import uuid
+import time
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
@@ -78,7 +79,7 @@ class VDiskController(object):
         if vsr is None:
             raise RuntimeError('VolumeStorageRouter could not be found')
         disk = VDisk()
-        disk.devicename = volumepath.replace('-flat.vmdk', '.vmdk')
+        disk.devicename = volumepath.replace('-flat.vmdk', '.vmdk').strip('/')
         disk.volumeid = volumename
         disk.size = volumesize
         disk.vpool = vsr.vpool
@@ -110,8 +111,18 @@ class VDiskController(object):
         @param volumename: volume id of the disk
         @param volumesize: size of the volume
         """
+
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Resize disk {} from {} to {}'.format(disk.name, disk.size, volumesize))
+        limit = 10
+        while disk is None and limit > 0:
+            time.sleep(1)
+            limit -= 1
+            disk = VDiskList.get_vdisk_by_volumeid(volumename)
+        if disk is None:
+            raise RuntimeError('Disk with devicename {} could not be found'.format(volumename))
+        logging.info('Resize disk {} from {} to {}'.format(disk.name if disk.name else volumename,
+                                                           disk.size,
+                                                           volumesize))
         disk.size = volumesize
         disk.save()
         return kwargs
@@ -128,11 +139,12 @@ class VDiskController(object):
         @param volume_new_path: new path on hypervisor to the volume
         """
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        logging.info('Move disk {} from {} to {}'.format(disk.name,
-                                                         volume_old_path,
-                                                         volume_new_path))
-        disk.devicename = volume_new_path
-        disk.save()
+        if disk:
+            logging.info('Move disk {} from {} to {}'.format(disk.name,
+                                                             volume_old_path,
+                                                             volume_new_path))
+            disk.devicename = volume_new_path
+            disk.save()
         return kwargs
 
     @staticmethod

@@ -3,7 +3,7 @@
 VMachine module
 """
 import time
-import re
+import logging
 
 from celery import group
 from ovs.celery import celery
@@ -199,40 +199,16 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.create_from_voldrv')
-    def create_from_voldrv(name, vsrid):
+    def create_from_voldrv(name):
         """
         This method will create a vmachine based on a given vmx file
         """
+        name = name.strip('/')
         if name.endswith('.vmx'):
             vmachine = VMachine()
             vmachine.devicename = name
             vmachine.status = 'CREATED'
             vmachine.save()
-            try:
-                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
-                vmachine.status = 'SYNC'
-            except:
-                vmachine.status = 'SYNC_NOK'
-            vmachine.save()
-
-    @staticmethod
-    @celery.task(name='ovs.machine.update_from_voldrv')
-    def update_from_voldrv(name, vsrid):
-        """
-        This method will be triggered when there was an update in the vmx. We'll have
-        to update the model
-        """
-        if name.endswith('.vmx'):
-            vm = VMachineList.get_by_devicename(name)
-            if vm is None:
-                VMachineController.create_from_voldrv(name, vsrid)
-            else:
-                try:
-                    VMachineController.sync_with_hypervisor(vm.guid, vsrid)
-                    vm.status = 'SYNC'
-                except:
-                    vm.status = 'SYNC_NOK'
-                vm.save()
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -240,6 +216,7 @@ class VMachineController(object):
         """
         This method will delete a vmachine based on the name of the vmx given
         """
+        name = name.strip('/')
         if name.endswith('.vmx'):
             vm = VMachineList.get_by_devicename(name)
             if vm is not None:
@@ -247,14 +224,27 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
-    def rename_from_voldrv(old_name, new_name):
+    def rename_from_voldrv(old_name, new_name, vsrid):
         """
         This machine will handle the rename of a vmx file
         """
+        old_name = old_name.strip('/')
+        new_name = new_name.strip('/')
         if old_name.endswith('.vmx') and new_name.endswith('.vmx'):
+            # Most likely a change from path. Updaing path
             vm = VMachineList.get_by_devicename(old_name)
             if vm is not None:
                 vm.devicename = new_name
+                vm.save()
+        elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
+            vm = VMachineList.get_by_devicename(new_name)
+            # The configuration has been updated (which happens in a tempfile), start a sync
+            if vm is not None:
+                try:
+                    VMachineController.sync_with_hypervisor(vm.guid, vsrid)
+                    vm.status = 'SYNC'
+                except:
+                    vm.status = 'SYNC_NOK'
                 vm.save()
 
     @staticmethod
@@ -267,6 +257,7 @@ class VMachineController(object):
         if vmachine.hypervisorid is not None and vmachine.pmachine is not None:
             # We have received a vmachine which is linked to a pmachine and has a hypervisorid.
             hypervisor = Factory.get(vmachine.pmachine)
+            logging.info('Syncing vMachine (name {})'.format(vmachine.name))
             vm_object = hypervisor.get_vm_object(vmid=vmachine.hypervisorid)
         elif vmachine.devicename is not None and vsrid is not None:
             # We don't have a pmachine or hypervisorid, we need to load the data via the
@@ -283,12 +274,17 @@ class VMachineController(object):
             hypervisor = Factory.get(pmachine)
             vmachine.pmachine = pmachine
             vmachine.save()
+
+            logging.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
+                                                                               vsr.ip,
+                                                                               vsr.mountpoint))
             vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
                                                                ip=vsr.ip,
                                                                mountpoint=vsr.mountpoint)
         else:
             raise RuntimeError('Not enough information to sync vmachine')
 
+        vdisks_synced = 0
         if vm_object is None:
             raise RuntimeError('Could not retreive hypervisor vmachine object')
         else:
@@ -309,3 +305,8 @@ class VMachineController(object):
                         vdisk.name = disk['name']
                         vdisk.order = disk['order']
                         vdisk.save()
+                        vdisks_synced += 1
+
+        logging.info('Syncing vMachine finished (name {}, {} vdisks (re)linked)'.format(
+            vmachine.name, vdisks_synced
+        ))

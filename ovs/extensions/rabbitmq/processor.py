@@ -26,8 +26,7 @@ def process(queue, body):
                         'arguments': {'name': 'volumename',
                                       'size': 'volumesize',
                                       'path': 'volumepath',
-                                      '[NODE_ID]': 'vsrid'},
-                        'options': {'delay': 10}},
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.VolumeDelete:
                        {'property': 'volume_delete',
                         'task': VDiskController.delete_from_voldrv,
@@ -46,16 +45,7 @@ def process(queue, body):
                    EventMessages.EventMessage.FileCreate:                 # Machine create
                        {'property': 'file_create',
                         'task': VMachineController.create_from_voldrv,
-                        'arguments': {'path': 'name',
-                                      '[NODE_ID]': 'vsrid'}},
-                   EventMessages.EventMessage.FileWrite:
-                       {'property': 'file_write',
-                        'task': VMachineController.update_from_voldrv,
-                        'arguments': {'path': 'name',
-                                      '[NODE_ID]': 'vsrid'},
-                        'options': {'dedupe': True,
-                                    'dedupe_key': 'path',
-                                    'delay': 10}},
+                        'arguments': {'path': 'name'}},
                    EventMessages.EventMessage.FileDelete:
                        {'property': 'file_delete',
                         'task': VMachineController.delete_from_voldrv,
@@ -64,12 +54,17 @@ def process(queue, body):
                        {'property': 'file_rename',
                         'task': VMachineController.rename_from_voldrv,
                         'arguments': {'old_path': 'old_name',
-                                      'new_path': 'new_name'}}}
+                                      'new_path': 'new_name',
+                                      '[NODE_ID]': 'vsrid'},
+                        'options': {'delay': 5,
+                                    'dedupe': True,
+                                    'dedupe_key': 'new_name'}}}
 
         if data.type in mapping:
             task = mapping[data.type]['task']
             data_container = getattr(data, mapping[data.type]['property'])
             kwargs = {}
+            delay = 0
             for field, target in mapping[data.type]['arguments'].iteritems():
                 if field == '[NODE_ID]':
                     kwargs[target] = data.node_id
@@ -82,7 +77,7 @@ def process(queue, body):
                 dedupe = mapping[data.type]['options'].get('dedupe', False)
                 dedupe_key = mapping[data.type]['options'].get('dedupe_key', None)
                 if dedupe and dedupe_key:  # We can't dedupe without a key
-                    key = '{}({})'.format(task.__class__, kwargs[dedupe_key])
+                    key = '{}({})'.format(task.__class__.__name__, kwargs[dedupe_key])
                     task_id = cache.get(key)
                     if task_id:
                         # Key exists, task was already scheduled
@@ -94,10 +89,11 @@ def process(queue, body):
                     task.s(**kwargs).apply_async(countdown=delay)
             else:
                 task.delay(**kwargs)
-            print '[{}] mapped {} to {} with args {}'.format(queue,
-                                                             str(data.type),
-                                                             task.__name__,
-                                                             json.dumps(kwargs))
+            print '[{}] mapped {} to {} with args {}. Delay: {}s'.format(queue,
+                                                                         str(data.type),
+                                                                         task.__name__,
+                                                                         json.dumps(kwargs),
+                                                                         delay)
         else:
             raise RuntimeError('Type %s is not yet supported' % str(data.type))
     else:
