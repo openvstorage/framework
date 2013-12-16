@@ -22,28 +22,37 @@ class VMachineController(object):
     """
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, **kwargs):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, subtasks=True):
         """
         Snapshot VMachine disks
 
         @param machineguid: guid of the machine
         @param label: label to give the snapshots
         @param is_consistent: flag indicating the snapshot was consistent or not
+        @param timestamp: override timestamp, if required. Should be a unix timestamp
         """
-        _ = kwargs
+
+        timestamp = timestamp if timestamp is not None else time.time()
+        timestamp = str(int(float(timestamp)))
+
         metadata = {'label': label,
                     'is_consistent': is_consistent,
-                    'timestamp': str(time.time()).split('.')[0],
+                    'timestamp': timestamp,
                     'machineguid': machineguid}
         machine = VMachine(machineguid)
-        tasks = []
-        for disk in machine.vdisks:
-            t = VDiskController.create_snapshot.s(diskguid=disk.guid,
-                                                  metadata=metadata)
-            t.link_error(VDiskController.delete_snapshot.s())
-            tasks.append(t)
-        snapshot_vmachine_wf = group(t for t in tasks)
-        snapshot_vmachine_wf()
+        if subtasks:
+            tasks = []
+            for disk in machine.vdisks:
+                t = VDiskController.create_snapshot.s(diskguid=disk.guid,
+                                                      metadata=metadata)
+                t.link_error(VDiskController.delete_snapshot.s())
+                tasks.append(t)
+            snapshot_vmachine_wf = group(t for t in tasks)
+            snapshot_vmachine_wf()
+        else:
+            for disk in machine.vdisks:
+                VDiskController.create_snapshot(diskguid=disk.guid,
+                                                metadata=metadata)
 
     @staticmethod
     @celery.task(name='ovs.machine.clone')
@@ -196,7 +205,6 @@ class VMachineController(object):
         Creates a new VM based on a given vTemplate onto a given pMachine
         """
         _ = machineguid, pmachineguid, name, description
-
     @staticmethod
     @celery.task(name='ovs.machine.create_from_voldrv')
     def create_from_voldrv(name):
