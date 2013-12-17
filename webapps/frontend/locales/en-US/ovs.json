@@ -318,6 +318,18 @@
         "dataread": "Data read from the Backend:",
         "bandwidthsaved": "Bandwidth Saved:"
     },
+    "events": {
+        "vmachine_deleted": "vMachine deleted",
+        "vmachine_deleted_content": "vMachine __name__ was deleted.",
+        "vmachine_created": "vMachine created",
+        "vmachine_created_content": "vMachine __name__ was created.",
+        "vmachine_renamed": "vMachine renamed",
+        "vmachine_renamed_content": "vMachine __old_name__ was renamed to __new_name__.",
+        "vdisk_attached": "vDisk attached",
+        "vdisk_attached_content": "vDisk __vdisk_name__ was attached to __vmachine_name__.",
+        "vdisk_detached": "vDisk detached",
+        "vdisk_detached_content": "vDisk __vdisk_name__ was detached from __vmachine_name__"
+    },
     "title": "Open vStorage",
     "icons": {
         "separator": "&#xf101;",

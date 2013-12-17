@@ -2,8 +2,9 @@
 /*global define */
 define([
     'plugins/router', 'bootstrap', 'i18next',
-    'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader'
-], function(router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader) {
+    'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
+    'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
+], function(router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
     "use strict";
     router.map(routing.mainRoutes)
           .buildNavigationModel()
@@ -52,6 +53,9 @@ define([
                         self.shared.language = data.language;
                     })
                     .then(self._translate);
+            });
+            self.shared.authentication.onLoggedIn.push(function() {
+                self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
             });
             self.shared.authentication.onLoggedOut.push(function() {
                 self.shared.language = self.shared.defaultLanguage;
