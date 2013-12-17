@@ -50,22 +50,6 @@ class VMachineViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(FullSerializer(VMachine, instance=vmachine).data, status=status.HTTP_200_OK)
 
-    @expose(internal=True, customer=True)
-    @required_roles(['view', 'delete'])
-    def destroy(self, request, pk=None):
-        """
-        Deletes a machine
-        """
-        _ = request
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vmachine = VMachine(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.delete.delay(machineguid=vmachine.guid)
-        return Response(task.id, status=status.HTTP_200_OK)
-
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])

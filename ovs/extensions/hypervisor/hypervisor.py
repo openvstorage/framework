@@ -43,13 +43,6 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def delete_vm(self, vmid, wait=False):
-        """
-        Abstract method
-        """
-        pass
-
-    @abc.abstractmethod
     def clone_vm(self, vmid, name, disks, wait=False):
         """
         Abstract method

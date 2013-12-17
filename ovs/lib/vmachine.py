@@ -120,35 +120,6 @@ class VMachineController(object):
         return new_machine.guid
 
     @staticmethod
-    @celery.task(name='ovs.machine.delete')
-    def delete(machineguid, **kwargs):
-        """
-        Delete a vmachine
-
-        @param machineguid: guid of the machine
-        """
-        _ = kwargs
-        machine = VMachine(machineguid)
-
-        clean_dal = False
-        if machine.pmachine:
-            hv = Factory.get(machine.pmachine)
-            delete_vmachine_task = hv.delete_vm.si(hv, machine.hypervisorid, None, True)
-            async_result = delete_vmachine_task()
-            async_result.wait()
-            if async_result.successful():
-                clean_dal = True
-        else:
-            clean_dal = True
-
-        if clean_dal:
-            for disk in machine.vdisks:
-                disk.delete()
-            machine.delete()
-
-        return async_result.successful()
-
-    @staticmethod
     @celery.task(name='ovs.machine.set_as_template')
     def set_as_template(machineguid, **kwargs):
         """
