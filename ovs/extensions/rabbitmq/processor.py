@@ -78,6 +78,7 @@ def process(queue, body):
                 dedupe_key = mapping[data.type]['options'].get('dedupe_key', None)
                 if dedupe and dedupe_key:  # We can't dedupe without a key
                     key = '{}({})'.format(task.__class__.__name__, kwargs[dedupe_key])
+                    key = key.replace(' ', '_')
                     task_id = cache.get(key)
                     if task_id:
                         # Key exists, task was already scheduled
