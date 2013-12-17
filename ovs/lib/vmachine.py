@@ -281,7 +281,7 @@ class VMachineController(object):
                 MessageController.fire(MessageController.Type.EVENT,
                                        {'type': 'vmachine_created',
                                         'metadata': {'name': vm_object['name']}})
-            else:
+            elif vmachine.name != vm_object['name']:
                 MessageController.fire(MessageController.Type.EVENT,
                                        {'type': 'vmachine_renamed',
                                         'metadata': {'old_name': vmachine.name,
