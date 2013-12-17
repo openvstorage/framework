@@ -65,6 +65,7 @@ class Configure():
         vmachine.hvtype = j.application.config.get('ovs.host.hypervisor')
         vmachine.is_vtemplate = False
         vmachine.is_internal = True
+        vmachine.ip = j.application.config.get('ovs.grid.ip')
         vmachine.pmachine = pmachine
         pmachine.save()
         vmachine.save()
