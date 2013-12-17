@@ -53,3 +53,14 @@ class VMachineList(object):
             return DataObjectList(vms, VMachine)[0]
         return None
 
+    @staticmethod
+    def get_customer_vmachines():
+        """
+        Returns "real" vmachines. No vTemplates or internal machines
+        """
+        vmachines = DataList({'object': VMachine,
+                              'data': DataList.select.DESCRIPTOR,
+                              'query': {'type': DataList.where_operator.AND,
+                                        'items': [('is_vtemplate', DataList.operator.EQUALS, False),
+                                                  ('is_internal', DataList.operator.EQUALS, False)]}}).data
+        return DataObjectList(vmachines, VMachine)
