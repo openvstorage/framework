@@ -178,14 +178,10 @@ class Configure():
         volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
         vsr_configuration.configure_volumemanager(volumemanager_config)
 
-        vpools = VPoolList.get_vpools()
-        this_vpool = None
-        for vpool in vpools:
-            if vpool.backend_type == volumedriver_backend_type and vpool.name == vpool_name:
-                this_vpool = vpool
-                break
-        if not this_vpool:
-            this_vpool = VPool()
+        vpools = VPoolList.get_vpool_by_name(vpool_name)
+        this_vpool = VPool()
+        if len(vpools) == 1:
+            this_vpool = vpools[0]
         this_vpool.name = vpool_name
         this_vpool.description = "{} {}".format(volumedriver_backend_type, vpool_name)
         this_vpool.backend_type = volumedriver_backend_type
@@ -284,6 +280,14 @@ class Control():
         if not self._packageIsRunning('volumedriver'):
             ovsConfigure.init_storagerouter(vmachineguid, vpool_name)
             self._startPackage('volumedriver')
+        vfs_info = os.statvfs('/mnt/{}'.format(vpool_name))
+        vpool_size_bytes = vfs_info.f_blocks * vfs_info.f_bsize
+        vpools = VPoolList.get_vpool_by_name(vpool_name)
+        if len(vpools) != 1:
+            raise ValueError('No or multiple vpools found with name {}, should not happen at this stage, please check your configuration'.format(vpool_name))
+        this_vpool = vpools[0]
+        this_vpool.size = vpool_size_bytes
+        this_vpool.save()
         ovsConfigure.init_exportfs(vpool_name)
 
     def _packageIsRunning(self, package):
