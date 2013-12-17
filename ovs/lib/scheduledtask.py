@@ -5,6 +5,7 @@ ScheduledTaskController module
 """
 
 from celery import group
+from celery.task.control import inspect
 import copy
 import time
 from time import mktime
@@ -16,6 +17,72 @@ from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+from volumedriver.scrubber.scrubber import Scrubber
+
+_vsr_client = VolumeStorageRouterClient().load()
+_vsr_scrubber = Scrubber()
+
+
+def ensure_single(tasknames):
+    """
+    Decorator ensuring a new task cannot be started in case a certain task is
+    running, scheduled or reserved.
+
+    The task using this decorator on, must be a bound task (with bind=True argument). Keep also in
+    mind that validation will be executed by the worker itself, so if the task is scheduled on
+    a worker currently processing a "duplicate" task, it will only get validated after the first
+    one completes, which will result in the fact that the task will execute normally.
+
+    @param tasknames: list of names to check
+    @type tasknames: list
+    """
+    def wrap(function):
+        """
+        Wrapper function
+        """
+        def wrapped(self=None, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            if not hasattr(self, 'request'):
+                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
+            task_id = self.request.id
+
+            def can_run():
+                """
+                Checks whether a task is running/scheduled/reserved.
+                The check is eecuted in stages, as querying the inspector is a slow call.
+                """
+                if tasknames:
+                    inspector = inspect()
+                    active = inspector.active()
+                    for taskname in tasknames:
+                        for worker in active.values():
+                            for task in worker:
+                                if task['id'] != task_id and taskname == task['name']:
+                                    return False
+                    scheduled = inspector.scheduled()
+                    for taskname in tasknames:
+                        for worker in scheduled.values():
+                            for task in worker:
+                                if task['id'] != task_id and taskname == task['name']:
+                                    return False
+                    reserved = inspector.reserved()
+                    for taskname in tasknames:
+                        for worker in reserved.values():
+                            for task in worker:
+                                if task['id'] != task_id and taskname == task['name']:
+                                    return False
+                return True
+
+            if can_run():
+                return function(*args, **kwargs)
+            else:
+                return None
+
+        return wrapped
+    return wrap
 
 
 class ScheduledTaskController(object):
@@ -24,7 +91,9 @@ class ScheduledTaskController(object):
     executed at certain intervals and should be self-containing
     """
 
-    @celery.task(name='ovs.scheduled.snapshotall')
+    @staticmethod
+    @celery.task(name='ovs.scheduled.snapshotall', bind=True)
+    @ensure_single(['ovs.scheduled.snapshotall', 'ovs.scheduled.deletescrubsnapshots'])
     def snapshot_all_vms(*args, **kwargs):
         """
         Snapshots all VMachines
@@ -43,19 +112,20 @@ class ScheduledTaskController(object):
         return workflow()
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.deletesnapshots')
-    def deletesnapshots(timestamp=None, debug=False):
+    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True)
+    @ensure_single(['ovs.scheduled.deletescrubsnapshots'])
+    def deletescrubsnapshots(timestamp=None):
         """
-        Delete snapshots policy
+        Delete snapshots & scrubbing policy
 
-        Implemented policy:
+        Implemented delete snapshot policy:
         < 1d | 1d bucket | 1 | best of bucket   | 1d
         < 1w | 1d bucket | 6 | oldest of bucket | 7d = 1w
         < 1m | 1w bucket | 3 | oldest of bucket | 4w = 1m
         > 1m | delete
         """
 
-        loghandler.logger.info('[DS] started')
+        loghandler.logger.info('Delete snapshots started')
 
         day = 60 * 60 * 24
         week = day * 7
@@ -85,42 +155,31 @@ class ScheduledTaskController(object):
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vmachine in VMachineList.get_customer_vmachines():
-            bucket_chain = copy.deepcopy(buckets)
-            for snapshot in vmachine.snapshots:
-                timestamp = int(snapshot['timestamp'])
-                for bucket in bucket_chain:
-                    if bucket['start'] >= timestamp > bucket['end']:
-                        for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
-                            bucket['snapshots'].append({'timestamp': timestamp,
-                                                        'snapshotid': snapshotguid,
-                                                        'diskguid': diskguid,
-                                                        'is_consistent': snapshot['is_consistent']})
-            bucket_chains.append(bucket_chain)
+            if any(vd.info['volume_type'] in ['BASE', 'CLONE'] for vd in vmachine.vdisks):
+                bucket_chain = copy.deepcopy(buckets)
+                for snapshot in vmachine.snapshots:
+                    timestamp = int(snapshot['timestamp'])
+                    for bucket in bucket_chain:
+                        if bucket['start'] >= timestamp > bucket['end']:
+                            for diskguid, snapshotguid in snapshot['snapshots'].iteritems():
+                                bucket['snapshots'].append({'timestamp': timestamp,
+                                                            'snapshotid': snapshotguid,
+                                                            'diskguid': diskguid,
+                                                            'is_consistent': snapshot['is_consistent']})
+                bucket_chains.append(bucket_chain)
 
         for vdisk in VDiskList.get_without_vmachine():
-            bucket_chain = copy.deepcopy(buckets)
-            for snapshot in vdisk.snapshots:
-                timestamp = int(snapshot['timestamp'])
-                for bucket in bucket_chain:
-                    if bucket['start'] >= timestamp > bucket['end']:
-                        bucket['snapshots'].append({'timestamp': timestamp,
-                                                    'snapshotid': snapshot['guid'],
-                                                    'diskguid': vdisk.guid,
-                                                    'is_consistent': snapshot['is_consistent']})
-            bucket_chains.append(bucket_chain)
-
-        if debug:
-            print '=============================================='
-            print 'original list'
-            for bucket_chain in bucket_chains:
-                print '=============================================='
-                for bucket in bucket_chain:
-                    print '{} - {} ({}): {}'.format(
-                        datetime.fromtimestamp(bucket['start']).strftime('%Y-%m-%d'),
-                        datetime.fromtimestamp(bucket['end']).strftime('%Y-%m-%d'),
-                        bucket['type'],
-                        ', '.join([str(s['timestamp']) + '[{}]'.format('S' if s['is_consistent'] else ' ') for s in bucket['snapshots']])
-                    )
+            if vdisk.info['volume_type'] in ['BASE', 'CLONE']:
+                bucket_chain = copy.deepcopy(buckets)
+                for snapshot in vdisk.snapshots:
+                    timestamp = int(snapshot['timestamp'])
+                    for bucket in bucket_chain:
+                        if bucket['start'] >= timestamp > bucket['end']:
+                            bucket['snapshots'].append({'timestamp': timestamp,
+                                                        'snapshotid': snapshot['guid'],
+                                                        'diskguid': vdisk.guid,
+                                                        'is_consistent': snapshot['is_consistent']})
+                bucket_chains.append(bucket_chain)
 
         # Clean out the snapshot bucket_chains, we delete the snapshots we want to keep
         # And we'll remove all snapshots that remain in the buckets
@@ -153,22 +212,40 @@ class ScheduledTaskController(object):
                     bucket['snapshots'] = [s for s in bucket['snapshots'] if
                                            s['timestamp'] != oldest['timestamp']]
 
-        if debug:
-            print '=============================================='
-            print 'cleaned list'
-            for bucket_chain in bucket_chains:
-                print '=============================================='
-                for bucket in bucket_chain:
-                    print '{} - {} ({}): {}'.format(
-                        datetime.fromtimestamp(bucket['start']).strftime('%Y-%m-%d'),
-                        datetime.fromtimestamp(bucket['end']).strftime('%Y-%m-%d'),
-                        bucket['type'],
-                        ', '.join([str(s['timestamp']) + '[{}]'.format('S' if s['is_consistent'] else ' ') for s in bucket['snapshots']])
-                    )
-
         # Delete obsolete snapshots
         for bucket_chain in bucket_chains:
             for bucket in bucket_chain:
                 for snapshot in bucket['snapshots']:
                     VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
                                                     snapshotid=snapshot['snapshotid'])
+
+        loghandler.logger.info('Delete snapshots finished')
+        loghandler.logger.info('Scrubbing started')
+
+        vdisks = []
+        for vmachine in VMachineList.get_customer_vmachines():
+            for vdisk in vmachine.vdisks:
+                if vdisk.info['volume_type'] in ['BASE', 'CLONE']:
+                    vdisks.append(vdisk)
+        for vdisk in VDiskList.get_without_vmachine():
+            if vdisk.info['volume_type'] in ['BASE', 'CLONE']:
+                vdisks.append(vdisk)
+
+        total = 0
+        failed = 0
+        for vdisk in vdisks:
+            work_units = _vsr_client.get_scrubbing_workunits(str(vdisk.volumeid))
+            for work_unit in work_units:
+                try:
+                    total += 1
+                    scrubbing_result = _vsr_scrubber.scrub(work_unit)
+                    _vsr_client.apply_scrubbing_result(scrubbing_result)
+                except:
+                    failed += 1
+                    loghandler.logger.info('Failed scrubbing work unit for volume {}'.format(
+                        vdisk.volumeid
+                    ))
+
+        loghandler.logger.info('Scrubbing finished. {} out of {} items failed.'.format(
+            failed, total
+        ))

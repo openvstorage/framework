@@ -18,8 +18,6 @@ celery = Celery('ovs',
                          'ovs.lib.scheduledtask',
                          'ovs.extensions.hypervisor.hypervisors.vmware'])
 
-celery.conf.CELERY_TASK_SERIALIZER = 'json'
-celery.conf.CELERY_ACCEPT_CONTENT = ['json']
 celery.conf.CELERY_RESULT_BACKEND = "cache"
 celery.conf.CELERY_CACHE_BACKEND = 'memcached://127.0.0.1:11211/'
 celery.conf.BROKER_URL = 'amqp://guest:guest@127.0.0.1:5672//'
@@ -33,11 +31,11 @@ celery.conf.CELERYBEAT_SCHEDULE = {
     },
     # Delete snapshot policy
     # > Excutes every day at 00:30
-    #'delete-snapshots': {
-    #    'task': 'ovs.scheduled.deletesnapshots',
-    #    'schedule': crontab(minute='30', hour='0'),
-    #    'args': []
-    #}
+    'delete-scrub-snapshots': {
+        'task': 'ovs.scheduled.deletescrubsnapshots',
+        'schedule': crontab(minute='30', hour='0'),
+        'args': []
+    }
 }
 
 loghandler = LogHandler('celery.log')

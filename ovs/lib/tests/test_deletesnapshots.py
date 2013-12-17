@@ -3,7 +3,6 @@
 Delete snapshots test module
 """
 import sys
-import pickle
 import unittest
 from time import mktime
 from datetime import datetime
@@ -79,35 +78,35 @@ class DeleteSnapshots(TestCase):
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and an additional disk
-        #vmachine_1 = VMachine()
-        #vmachine_1.name = 'vmachine_1'
-        #vmachine_1.save()
-        #vdisk_1_1 = VDisk()
-        #vdisk_1_1.name = 'vdisk_1_1'
-        #vdisk_1_1.volumeid = 'vdisk_1_1'
-        #vdisk_1_1.vmachine = vmachine_1
-        #vdisk_1_1.save()
-        #vdisk_1_2 = VDisk()
-        #vdisk_1_2.name = 'vdisk_1_2'
-        #vdisk_1_2.volumeid = 'vdisk_1_2'
-        #vdisk_1_2.vmachine = vmachine_1
-        #vdisk_1_2.save()
-        #vmachine_2 = VMachine()
-        #vmachine_2.name = 'vmachine_2'
-        #vmachine_2.save()
-        #vdisk_2_1 = VDisk()
-        #vdisk_2_1.name = 'vdisk_2_1'
-        #vdisk_2_1.volumeid = 'vdisk_2_1'
-        #vdisk_2_1.vmachine = vmachine_2
-        #vdisk_2_1.save()
+        vmachine_1 = VMachine()
+        vmachine_1.name = 'vmachine_1'
+        vmachine_1.save()
+        vdisk_1_1 = VDisk()
+        vdisk_1_1.name = 'vdisk_1_1'
+        vdisk_1_1.volumeid = 'vdisk_1_1'
+        vdisk_1_1.vmachine = vmachine_1
+        vdisk_1_1.save()
+        vdisk_1_2 = VDisk()
+        vdisk_1_2.name = 'vdisk_1_2'
+        vdisk_1_2.volumeid = 'vdisk_1_2'
+        vdisk_1_2.vmachine = vmachine_1
+        vdisk_1_2.save()
+        vmachine_2 = VMachine()
+        vmachine_2.name = 'vmachine_2'
+        vmachine_2.save()
+        vdisk_2_1 = VDisk()
+        vdisk_2_1.name = 'vdisk_2_1'
+        vdisk_2_1.volumeid = 'vdisk_2_1'
+        vdisk_2_1.vmachine = vmachine_2
+        vdisk_2_1.save()
         vdisk_3 = VDisk()
         vdisk_3.name = 'vdisk_3'
         vdisk_3.volumeid = 'vdisk_3'
         vdisk_3.save()
 
-        #vdisk_1_1._expiry['snapshots'] = (0, list)
-        #vdisk_1_2._expiry['snapshots'] = (0, list)
-        #vdisk_2_1._expiry['snapshots'] = (0, list)
+        vdisk_1_1._expiry['snapshots'] = (0, list)
+        vdisk_1_2._expiry['snapshots'] = (0, list)
+        vdisk_2_1._expiry['snapshots'] = (0, list)
         vdisk_3._expiry['snapshots'] = (0, list)
 
         # Run the testing scenario
@@ -127,7 +126,7 @@ class DeleteSnapshots(TestCase):
 
             # At the start of the day, delete snapshot policy runs at 00:30
             print '- Deleting snapshots'
-            ScheduledTaskController.deletesnapshots(timestamp=base_timestamp + (minute * 30))
+            ScheduledTaskController.deletescrubsnapshots(timestamp=base_timestamp + (minute * 30))
 
             # Validate snapshots
             print '- Validating snapshots'
@@ -167,12 +166,12 @@ class DeleteSnapshots(TestCase):
                                                               'timestamp': ts,
                                                               'machineguid': None})
 
-        #for vdisk in vmachine_1.vdisks:
-        #    vdisk.delete()
-        #vmachine_1.delete()
-        #for vdisk in vmachine_2.vdisks:
-        #    vdisk.delete()
-        #vmachine_2.delete()
+        for vdisk in vmachine_1.vdisks:
+            vdisk.delete()
+        vmachine_1.delete()
+        for vdisk in vmachine_2.vdisks:
+            vdisk.delete()
+        vmachine_2.delete()
         vdisk_3.delete()
 
     def _validate(self, vdisk, current_day, initial_timestamp, amount_of_days, debug):
@@ -309,17 +308,42 @@ class StorageRouterClient():
 
     @staticmethod
     def create_snapshot(volumeid, snapshot_id, metadata):
+        """
+        Create snapshot mockup
+        """
         snapshots = StorageRouterClient.snapshots.get(volumeid, {})
         snapshots[snapshot_id] = Snapshot(metadata)
         StorageRouterClient.snapshots[volumeid] = snapshots
 
     @staticmethod
     def info_snapshot(volumeid, guid):
+        """
+        Info snapshot mockup
+        """
         return StorageRouterClient.snapshots[volumeid][guid]
 
     @staticmethod
     def delete_snapshot(volumeid, guid):
+        """
+        Delete snapshot mockup
+        """
         del StorageRouterClient.snapshots[volumeid][guid]
+
+    @staticmethod
+    def info_volume(volumeid):
+        """
+        Info volume mockup
+        """
+        _ = volumeid
+        return type('Info', (), {'volume_type': 'BASE'})()
+
+    @staticmethod
+    def get_scrubbing_workunits(volumeid):
+        """
+        Get scrubbing workload mockup
+        """
+        _ = volumeid
+        return []
 
 
 class VolumeStorageRouterClient():
