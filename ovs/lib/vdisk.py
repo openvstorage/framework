@@ -78,7 +78,9 @@ class VDiskController(object):
         vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
         if vsr is None:
             raise RuntimeError('VolumeStorageRouter could not be found')
-        disk = VDisk()
+        disk = VDiskList.get_vdisk_by_volumeid(volumename)
+        if disk is None:
+            disk = VDisk()
         disk.devicename = volumepath.replace('-flat.vmdk', '.vmdk').strip('/')
         disk.volumeid = volumename
         disk.size = volumesize
