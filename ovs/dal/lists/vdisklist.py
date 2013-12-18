@@ -52,3 +52,16 @@ class VDiskList(object):
         if vds:
             return DataObjectList(vds, VDisk)[0]
         return None
+
+    @staticmethod
+    def get_without_vmachine():
+        """
+        Gets all vDisks without a vMachine
+        """
+        # pylint: disable=line-too-long
+        vdisks = DataList({'object': VDisk,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('vmachine_guid', DataList.operator.EQUALS, None)]}}).data
+        # pylint: enable=line-too-long
+        return DataObjectList(vdisks, VDisk)

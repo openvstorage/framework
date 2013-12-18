@@ -78,7 +78,9 @@ class VDiskController(object):
         vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
         if vsr is None:
             raise RuntimeError('VolumeStorageRouter could not be found')
-        disk = VDisk()
+        disk = VDiskList.get_vdisk_by_volumeid(volumename)
+        if disk is None:
+            disk = VDisk()
         disk.devicename = volumepath.replace('-flat.vmdk', '.vmdk').strip('/')
         disk.volumeid = volumename
         disk.size = volumesize
@@ -251,3 +253,40 @@ class VDiskController(object):
         Rolls back a disk based on a given disk snapshot timestamp
         """
         _ = diskguid, timestamp, kwargs
+
+    @staticmethod
+    @celery.task(name='ovs.disk.patchvmdk')
+    def patchvmdk(source_base_name, target_base_name):
+        """
+        THIS IS A TEMPORARY SOLUTION
+        Clones/patches a vmdk from a source to a target.
+        @param source_base_name: The source base name of the vmdk, including folder
+        @param target_base_name: The target base name of the vmdk, including folder
+
+        Example:
+          source_base_name = 'test01/test01'
+          target_base_name = 'test03/test03'
+        What will be executed:
+          1. /mnt/dfs/<source_base_name>.vmdk will be opened into string
+          2. The in memory string will be updated:
+             <source_base_name>-flat.vmdk will be updated to <target_base_name>-flat.vmdk
+          3. String will be written to /mnt/dfs/target_base_name>.vmdk
+
+        How to use:
+          1. Make sure the clone is executed towards a -flat.vmdk file
+          2. Pass in the source and target (target is the above string, without the -flat.vmdk)
+          3. Since (1) will result in a vdisk being created automatically with the correct vmdk ref,
+             nothing has to be updated anymore.
+          4. Attach disk to the vm (or create the vm), which will trigger a sync of the vm,
+             which will result in the vdisk being updated and linked to the vm
+        """
+
+        with open('/mnt/dfs/{}.vmdk'.format(source_base_name), 'r') as sourcefile:
+            contents = sourcefile.read()
+
+        if contents is not None:
+            contents.replace('{}-flat.vmdk'.format(source_base_name),
+                             '{}-flat.vmdk'.format(target_base_name))
+
+        with open('/mnt/dfs/{}.vmdk'.format(target_base_name), 'w') as targetfile:
+            targetfile.write(contents)

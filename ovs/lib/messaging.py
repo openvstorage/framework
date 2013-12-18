@@ -47,7 +47,8 @@ class MessageController(object):
         Message types
         """
         TASK_COMPLETE = 'TASK_COMPLETE'
-        ALL = [TASK_COMPLETE]
+        EVENT = 'EVENT'
+        ALL = [TASK_COMPLETE, EVENT]
 
     @staticmethod
     @synchronized()

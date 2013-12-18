@@ -26,18 +26,6 @@ class VMware(Hypervisor):
         """
         return True
 
-    @celery.task(name='ovs.hypervisor.vmware.deleteVM')
-    @Hypervisor.connected
-    def delete_vm(self, vmid, wait=False):
-        """
-        Remove the vmachine from the hypervisor
-
-        @param vmid: hypervisor id of the virtual machine
-        @param wait: wait for action to complete
-        """
-        if vmid and self.sdk.exists(key=vmid):
-            self.sdk.delete_vm(vmid, wait)
-
     @celery.task(name='ovs.hypervisor.vmware.cloneVM')
     @Hypervisor.connected
     def clone_vm(self, vmid, name, disks, wait=False):

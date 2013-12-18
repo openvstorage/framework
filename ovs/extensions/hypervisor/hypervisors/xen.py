@@ -18,13 +18,6 @@ class Xen(Hypervisor):
         raise NotImplementedError()
 
     @Hypervisor.connected
-    def delete_vm(self, vmid, wait=False):
-        """
-        Dummy method
-        """
-        raise NotImplementedError()
-
-    @Hypervisor.connected
     def clone_vm(self, vmid, name, disks, wait=False):
         """
         Dummy method

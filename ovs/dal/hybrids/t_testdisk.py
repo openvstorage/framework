@@ -3,7 +3,7 @@
 TestDisk module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.hybrids._testmachine import TestMachine
+from ovs.dal.hybrids.t_testmachine import TestMachine
 
 
 class TestDisk(DataObject):

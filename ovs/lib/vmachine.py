@@ -13,6 +13,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.lib.messaging import MessageController
 
 
 class VMachineController(object):
@@ -22,28 +23,37 @@ class VMachineController(object):
     """
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, **kwargs):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, subtasks=True):
         """
         Snapshot VMachine disks
 
         @param machineguid: guid of the machine
         @param label: label to give the snapshots
         @param is_consistent: flag indicating the snapshot was consistent or not
+        @param timestamp: override timestamp, if required. Should be a unix timestamp
         """
-        _ = kwargs
+
+        timestamp = timestamp if timestamp is not None else time.time()
+        timestamp = str(int(float(timestamp)))
+
         metadata = {'label': label,
                     'is_consistent': is_consistent,
-                    'timestamp': str(time.time()).split('.')[0],
+                    'timestamp': timestamp,
                     'machineguid': machineguid}
         machine = VMachine(machineguid)
-        tasks = []
-        for disk in machine.vdisks:
-            t = VDiskController.create_snapshot.s(diskguid=disk.guid,
-                                                  metadata=metadata)
-            t.link_error(VDiskController.delete_snapshot.s())
-            tasks.append(t)
-        snapshot_vmachine_wf = group(t for t in tasks)
-        snapshot_vmachine_wf()
+        if subtasks:
+            tasks = []
+            for disk in machine.vdisks:
+                t = VDiskController.create_snapshot.s(diskguid=disk.guid,
+                                                      metadata=metadata)
+                t.link_error(VDiskController.delete_snapshot.s())
+                tasks.append(t)
+            snapshot_vmachine_wf = group(t for t in tasks)
+            snapshot_vmachine_wf()
+        else:
+            for disk in machine.vdisks:
+                VDiskController.create_snapshot(diskguid=disk.guid,
+                                                metadata=metadata)
 
     @staticmethod
     @celery.task(name='ovs.machine.clone')
@@ -111,35 +121,6 @@ class VMachineController(object):
         return new_machine.guid
 
     @staticmethod
-    @celery.task(name='ovs.machine.delete')
-    def delete(machineguid, **kwargs):
-        """
-        Delete a vmachine
-
-        @param machineguid: guid of the machine
-        """
-        _ = kwargs
-        machine = VMachine(machineguid)
-
-        clean_dal = False
-        if machine.pmachine:
-            hv = Factory.get(machine.pmachine)
-            delete_vmachine_task = hv.delete_vm.si(hv, machine.hypervisorid, None, True)
-            async_result = delete_vmachine_task()
-            async_result.wait()
-            if async_result.successful():
-                clean_dal = True
-        else:
-            clean_dal = True
-
-        if clean_dal:
-            for disk in machine.vdisks:
-                disk.delete()
-            machine.delete()
-
-        return async_result.successful()
-
-    @staticmethod
     @celery.task(name='ovs.machine.set_as_template')
     def set_as_template(machineguid, **kwargs):
         """
@@ -196,7 +177,6 @@ class VMachineController(object):
         Creates a new VM based on a given vTemplate onto a given pMachine
         """
         _ = machineguid, pmachineguid, name, description
-
     @staticmethod
     @celery.task(name='ovs.machine.create_from_voldrv')
     def create_from_voldrv(name):
@@ -220,6 +200,8 @@ class VMachineController(object):
         if name.endswith('.vmx'):
             vm = VMachineList.get_by_devicename(name)
             if vm is not None:
+                MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
+                                                                      'metadata': {'name': vm.name}})
                 vm.delete()
 
     @staticmethod
@@ -295,11 +277,21 @@ class VMachineController(object):
         if vm_object is None:
             raise RuntimeError('Could not retreive hypervisor vmachine object')
         else:
+            if vmachine.name is None:
+                MessageController.fire(MessageController.Type.EVENT,
+                                       {'type': 'vmachine_created',
+                                        'metadata': {'name': vm_object['name']}})
+            elif vmachine.name != vm_object['name']:
+                MessageController.fire(MessageController.Type.EVENT,
+                                       {'type': 'vmachine_renamed',
+                                        'metadata': {'old_name': vmachine.name,
+                                                     'new_name': vm_object['name']}})
             vmachine.name = vm_object['name']
             vmachine.hypervisorid = vm_object['id']
             vmachine.devicename = vm_object['backing']['filename']
             vmachine.save()
             # Updating and linking disks
+            vdisk_guids = []
             for disk in vm_object['disks']:
                 vdisk = VDiskList.get_by_devicename(disk['filename'])
                 if vdisk is not None:
@@ -308,11 +300,25 @@ class VMachineController(object):
                         raise RuntimeError('vDisk without VSR found')
                     datastore = vm_object['datastores'][disk['datastore']]
                     if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
+                        if vdisk.vmachine is None:
+                            MessageController.fire(MessageController.Type.EVENT,
+                                                   {'type': 'vdisk_attached',
+                                                    'metadata': {'vmachine_name': vmachine.name,
+                                                                 'vdisk_name': disk['name']}})
                         vdisk.vmachine = vmachine
                         vdisk.name = disk['name']
                         vdisk.order = disk['order']
                         vdisk.save()
+                        vdisk_guids.append(vdisk.guid)
                         vdisks_synced += 1
+            for vdisk in vmachine.vdisks:
+                if vdisk.guid not in vdisk_guids:
+                    MessageController.fire(MessageController.Type.EVENT,
+                                           {'type': 'vdisk_detached',
+                                            'metadata': {'vmachine_name': vmachine.name,
+                                                         'vdisk_name': vdisk.name}})
+                    vdisk.vmachine = None
+                    vdisk.save()
 
         logging.info('Syncing vMachine finished (name {}, {} vdisks (re)linked)'.format(
             vmachine.name, vdisks_synced

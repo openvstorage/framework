@@ -154,48 +154,6 @@ define([
                     });
             }
         };
-        self.deleteVM = function(guid) {
-            var i, vms = self.vMachines(), vm;
-            for (i = 0; i < vms.length; i += 1) {
-                if (vms[i].guid() === guid) {
-                    vm = vms[i];
-                }
-            }
-            if (vm !== undefined) {
-                app.showMessage(
-                        $.t('ovs:vmachines.delete.warning', { what: vm.name() }),
-                        $.t('ovs:generic.areyousure'),
-                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
-                    )
-                    .done(function(answer) {
-                        if (answer === $.t('ovs:generic.yes')) {
-                            self.vMachines.destroy(vm);
-                            generic.alertInfo(
-                                $.t('ovs:vmachines.delete.marked'),
-                                $.t('ovs:vmachines.delete.markedmsg', { what: vm.name() })
-                            );
-                            api.del('vmachines/' + vm.guid())
-                                .then(self.shared.tasks.wait)
-                                .done(function() {
-                                    generic.alertSuccess(
-                                        $.t('ovs:vmachines.delete.done'),
-                                        $.t('ovs:vmachines.delete.donemsg', { what: vm.name() })
-                                    );
-                                })
-                                .fail(function(error) {
-                                    generic.alertError(
-                                        $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.errorwhile', {
-                                            context: 'error',
-                                            what: $.t('ovs:vmachines.delete.errormsg', { what: vm.name() }),
-                                            error: error
-                                        })
-                                    );
-                                });
-                        }
-                    });
-            }
-        };
 
         // Durandal
         self.activate = function() {

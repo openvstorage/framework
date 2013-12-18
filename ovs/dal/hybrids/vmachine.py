@@ -43,7 +43,7 @@ class VMachine(DataObject):
                     snapshots_structure[timestamp] = {'label': snapshot['label'],
                                                       'is_consistent': snapshot['is_consistent'],
                                                       'snapshots': {}}
-                    snapshots_structure[timestamp]['snapshots'][disk.guid] = snapshot['guid']
+                snapshots_structure[timestamp]['snapshots'][disk.guid] = snapshot['guid']
 
         snapshots = []
         for timestamp in sorted(snapshots_structure.keys()):

@@ -25,21 +25,29 @@ class Basic(TestCase):
     need to be mocked
     """
 
+    VDisk = None
+    VolatileMutex = None
+    TestMachine = None
+    TestDisk = None
+
     @classmethod
     def setUpClass(cls):
         """
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        # Mocking
+        # Load dummy stores
         PersistentFactory.store = DummyPersistentStore()
         VolatileFactory.store = DummyVolatileStore()
-
-        sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VSR
+        # Replace mocked classes
+        sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VolumeStorageRouter
+        # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.vdisk import VDisk
         from ovs.extensions.generic.volatilemutex import VolatileMutex
-        from ovs.dal.hybrids._testmachine import TestMachine
-        from ovs.dal.hybrids._testdisk import TestDisk
+        from ovs.dal.hybrids.t_testmachine import TestMachine
+        from ovs.dal.hybrids.t_testdisk import TestDisk
+        _ = VDisk(), VolatileMutex('dummy'), TestMachine(), TestDisk()
+        # Globalize mocked classes
         global VDisk
         global VolatileMutex
         global TestMachine
@@ -476,9 +484,9 @@ class Basic(TestCase):
         Validates the correct behavior of the Descriptor
         """
         with self.assertRaises(RuntimeError):
-            descriptor = Descriptor().descriptor
+            _ = Descriptor().descriptor
         with self.assertRaises(RuntimeError):
-            value = Descriptor().get_object()
+            _ = Descriptor().get_object()
 
     def test_relationcache(self):
         """
@@ -822,20 +830,34 @@ class Basic(TestCase):
 
 
 # Mocking classes
-class SRC():
+class StorageRouterClient():
     """
     Mocks the StorageRouterClient
     """
 
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
     @staticmethod
-    def info(volumeID):
+    def info(volume_id):
         """
         Return fake info
         """
-        return volumeID
+        return volume_id
+
+    @staticmethod
+    def list_snapshots(volume_id):
+        """
+        Return fake info
+        """
+        _ = volume_id
+        return []
 
 
-class VSRC():
+class VolumeStorageRouterClient():
     """
     Mocks the VolumeStorageRouterClient
     """
@@ -856,15 +878,28 @@ class VSRC():
                        'cluster_cache_misses',
                        'read_operations']
 
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
     def load(self):
         """
         Returns the mocked StorageRouterClient
         """
-        return SRC()
+        _ = self
+        return StorageRouterClient()
 
 
-class VSR():
+class VolumeStorageRouter():
     """
     Mocks the VolumeStorageRouter
     """
-    VolumeStorageRouterClient = VSRC
+    VolumeStorageRouterClient = VolumeStorageRouterClient
+
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass

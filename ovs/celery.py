@@ -32,14 +32,19 @@ celery.conf.BROKER_URL = '{}://{}:{}@{}:{}//'.format(j.application.config.get('o
                                                      j.application.config.get('ovs.core.broker.port'))
 celery.conf.CELERYBEAT_SCHEDULE = {
     # Snapshot policy
-    # > Executes every weekday between 2 and 22 hour, every 15 minutes
+    # > Executes every day, hourly between 02:00 and 22:00 hour
     'take-snapshots': {
         'task': 'ovs.scheduled.snapshotall',
-        'schedule': crontab(minute='*/15',
-                            hour='2-22',
-                            day_of_week='mon,tue,wed,thu,fri'),
-        'args': [],
+        'schedule': crontab(minute='0', hour='2-22'),
+        'args': []
     },
+    # Delete snapshot policy
+    # > Excutes every day at 00:30
+    'delete-scrub-snapshots': {
+        'task': 'ovs.scheduled.deletescrubsnapshots',
+        'schedule': crontab(minute='30', hour='0'),
+        'args': []
+    }
 }
 
 loghandler = LogHandler('celery.log')

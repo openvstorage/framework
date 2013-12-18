@@ -16,8 +16,8 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
         it('getBytesByHuman should format correctly', function() {
             var namespace = 'ovs:generic.';
             expect(generic.formatBytes(1)).toBe('1.00 ' + namespace + 'b');
-            expect(generic.formatBytes(1000)).toBe('1000.00 ' + namespace + 'b');
-            expect(generic.formatBytes(2 * 1000)).toBe('2000.00 ' + namespace + 'b');
+            expect(generic.formatBytes(1000)).toBe('0.98 ' + namespace + 'kib');
+            expect(generic.formatBytes(2 * 1000)).toBe('1.95 ' + namespace + 'kib');
             expect(generic.formatBytes(3 * 1000)).toBe('2.93 ' + namespace + 'kib');
             expect(generic.formatBytes(3 * 1024 * 1000)).toBe('2.93 ' + namespace + 'mib');
             expect(generic.formatBytes(3 * 1024 * 1024 * 1000)).toBe('2.93 ' + namespace + 'gib');
