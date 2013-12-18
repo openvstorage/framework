@@ -47,11 +47,12 @@ class VDisk(DataObject):
         snapshots = []
         for guid in _vsr_client.list_snapshots(volumeid):
             snapshot = _vsr_client.info_snapshot(volumeid, guid)
-            metadata = pickle.loads(snapshot.metadata)
-            snapshots.append({'guid': guid,
-                              'timestamp': metadata['timestamp'],
-                              'label': metadata['label'],
-                              'is_consistent': metadata['is_consistent']})
+            if snapshot.metadata:
+                metadata = pickle.loads(snapshot.metadata)
+                snapshots.append({'guid': guid,
+                                  'timestamp': metadata['timestamp'],
+                                  'label': metadata['label'],
+                                  'is_consistent': metadata['is_consistent']})
         return snapshots
 
     def _info(self):
