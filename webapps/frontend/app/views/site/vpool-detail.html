@@ -23,13 +23,13 @@
                 <td data-i18n="ovs:vpools.freespace"></td>
                 <td><span data-bind="text: freeSpace"></span></td>
                 <td data-i18n="ovs:vpools.backendconnection"></td>
-                <td><span data-bind="text: backendConnection"></span></td>
+                <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
             </tr>
             <tr>
                 <td data-i18n="ovs:generic.cache"></td>
                 <td><span data-bind="text: cacheRatio"></span></td>
                 <td data-i18n="ovs:vpools.backendlogin"></td>
-                <td><span data-bind="text: backendLogin"></span></td>
+                <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
             </tr>
             <tr>
                 <td data-i18n="ovs:generic.iops"></td>
