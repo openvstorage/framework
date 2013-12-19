@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 import os
+import sys
 from optparse import OptionParser
+
+if os.getegid() != 0:
+    print 'This script should be executed as a user in the root group.'
+    sys.exit(1)
 
 parser = OptionParser(description='CloudFrames vRun Setup')
 parser.add_option('--no-filesystems', dest='filesystems', action="store_false", default=True,
@@ -14,7 +19,7 @@ if options.filesystems:
     os.system('parted /dev/sdb -s mkpart distribfs 90% 100%')
     os.system('mkfs.ext4 /dev/sdb1 -L backendfs')
     os.system('mkfs.ext4 /dev/sdb2 -L distribfs')
-    
+
     #Create partitions on SSD
     os.system('parted /dev/sdc -s mklabel gpt')
     os.system('parted /dev/sdc -s mkpart cache 2MB 50%')
@@ -28,18 +33,27 @@ if options.filesystems:
     os.system('mkdir /mnt/md')
     os.system('mkdir /mnt/bfs')
     os.system('mkdir /mnt/dfs')
-    
+
     # Add content to fstab
     fstab_content = """
+    # BEGIN Open vStorage
     LABEL=db        /mnt/db    ext4    defaults,nobootwait,noatime,discard    0    2
     LABEL=cache     /mnt/cache ext4    defaults,nobootwait,noatime,discard    0    2
     LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
     LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
     LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
+    # END Open vStorage
     """
-    fstab = open('/etc/fstab', 'a')
-    fstab.write(fstab_content)
-    fstab.close()
+    must_update = False
+    with open('/etc/fstab', 'r') as fstab:
+        contents = fstab.read()
+        if not '# BEGIN Open vStorage' in contents:
+            contents += '\n'
+            contents += fstab_content
+            must_update = True
+    if must_update:
+        with open('/etc/fstab', 'w') as fstab:
+            fstab.write(contents)
 
 # Mount all filesystems
 os.system('mountall')
