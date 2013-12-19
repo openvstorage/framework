@@ -26,7 +26,7 @@ celery = Celery('ovs',
 celery.conf.CELERY_RESULT_BACKEND = "cache"
 celery.conf.CELERY_CACHE_BACKEND = 'memcached://{}/'.format(';'.join(memcache_servers))
 celery.conf.BROKER_URL = '{}://{}:{}@{}:{}//'.format(j.application.config.get('ovs.core.broker.protocol'),
-                                                     j.application.config.get('ovs.core.broker.login'), 
+                                                     j.application.config.get('ovs.core.broker.login'),
                                                      j.application.config.get('ovs.core.broker.password'),
                                                      j.application.config.get('ovs.grid.ip'),
                                                      j.application.config.get('ovs.core.broker.port'))
@@ -42,6 +42,13 @@ celery.conf.CELERYBEAT_SCHEDULE = {
     # > Excutes every day at 00:30
     'delete-scrub-snapshots': {
         'task': 'ovs.scheduled.deletescrubsnapshots',
+        'schedule': crontab(minute='30', hour='0'),
+        'args': []
+    },
+    # Collapse arakoon tlogs
+    # > Executes every day at 00:30
+    'arakoon-collapse': {
+        'task': 'ovs.scheduled.collapse_arakoon',
         'schedule': crontab(minute='30', hour='0'),
         'args': []
     }

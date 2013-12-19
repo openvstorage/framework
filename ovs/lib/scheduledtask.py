@@ -8,15 +8,18 @@ from celery import group
 from celery.task.control import inspect
 import copy
 import time
+import os
+import traceback
 from time import mktime
 from datetime import datetime
-
+from JumpScale import j
 from ovs.celery import celery
 from ovs.celery import loghandler
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from volumedriver.scrubber.scrubber import Scrubber
 
@@ -249,3 +252,26 @@ class ScheduledTaskController(object):
         loghandler.logger.info('Scrubbing finished. {} out of {} items failed.'.format(
             failed, total
         ))
+
+    @staticmethod
+    @celery.task(name='ovs.scheduled.collapse_arakoon', bind=True)
+    @ensure_single(['ovs.scheduled.collapse_arakoon'])
+    def collapse_arakoon():
+        loghandler.logger.info('Starting arakoon collapse')
+        arakoon_dir = os.path.join(j.application.config.get('ovs.core.cfgdir'), 'arakoon')
+        arakoon_clusters = map(lambda directory: os.path.basename(directory.rstrip(os.path.sep)),
+                               os.walk(arakoon_dir).next()[1])
+        for cluster in arakoon_clusters:
+            loghandler.logger.info('  Collapsing cluster: {}'.format(cluster))
+            cluster_instance = ArakoonManagement().getCluster(cluster)
+            for node in cluster_instance.listNodes():
+                loghandler.logger.info('    Collapsing node: {}'.format(node))
+                try:
+                    cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
+                except Exception as e:
+                    loghandler.logger.info(
+                        'Error during collapsing cluster {} node {}: {}\n{}'.format(
+                            cluster, node, str(e), traceback.format_exc()
+                        )
+                    )
+        loghandler.logger.info('Arakoon collapse finished')
