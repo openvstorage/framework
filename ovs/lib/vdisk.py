@@ -337,8 +337,6 @@ class VDiskController(object):
         new_disk.vmachine = VMachine(
             machineguid) if machineguid else disk.vmachine
         new_disk.save()
-        print disk.devicename
-        print new_disk.devicename
         VDiskController.patchvmdk(disk.devicename,
                                   '{}/{}'.format(new_disk.vmachine.name,
                                                  new_disk.devicename))

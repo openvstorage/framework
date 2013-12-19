@@ -396,11 +396,21 @@ class VMachineController(object):
         if vm_object is None:
             raise RuntimeError('Could not retreive hypervisor vmachine object')
         else:
+            if vmachine.name is None:
+                MessageController.fire(MessageController.Type.EVENT,
+                                       {'type': 'vmachine_created',
+                                        'metadata': {'name': vm_object['name']}})
+            elif vmachine.name != vm_object['name']:
+                MessageController.fire(MessageController.Type.EVENT,
+                                       {'type': 'vmachine_renamed',
+                                        'metadata': {'old_name': vmachine.name,
+                                                     'new_name': vm_object['name']}})
             vmachine.name = vm_object['name']
             vmachine.hypervisorid = vm_object['id']
             vmachine.devicename = vm_object['backing']['filename']
             vmachine.save()
             # Updating and linking disks
+            vdisk_guids = []
             for disk in vm_object['disks']:
                 vdisk = VDiskList.get_by_devicename(disk['filename'])
                 if vdisk is not None:
@@ -409,11 +419,25 @@ class VMachineController(object):
                         raise RuntimeError('vDisk without VSR found')
                     datastore = vm_object['datastores'][disk['datastore']]
                     if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
+                        if vdisk.vmachine is None:
+                            MessageController.fire(MessageController.Type.EVENT,
+                                                   {'type': 'vdisk_attached',
+                                                    'metadata': {'vmachine_name': vmachine.name,
+                                                                 'vdisk_name': disk['name']}})
                         vdisk.vmachine = vmachine
                         vdisk.name = disk['name']
                         vdisk.order = disk['order']
                         vdisk.save()
+                        vdisk_guids.append(vdisk.guid)
                         vdisks_synced += 1
+            for vdisk in vmachine.vdisks:
+                if vdisk.guid not in vdisk_guids:
+                    MessageController.fire(MessageController.Type.EVENT,
+                                           {'type': 'vdisk_detached',
+                                            'metadata': {'vmachine_name': vmachine.name,
+                                                         'vdisk_name': vdisk.name}})
+                    vdisk.vmachine = None
+                    vdisk.save()
 
         logging.info('Syncing vMachine finished (name {}, {} vdisks (re)linked)'.format(
             vmachine.name, vdisks_synced
