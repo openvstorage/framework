@@ -241,8 +241,8 @@ class VDiskController(object):
         """
 
         # @todo: enable when method is exposed on vsr client
-        # disk = VDisk(diskguid)
-        # vsr_client.set_as_template(disk.volumeid)
+        disk = VDisk(diskguid)
+        vsr_client.set_volume_as_template(str(disk.volumeid))
 
         return kwargs
 
@@ -281,6 +281,12 @@ class VDiskController(object):
              which will result in the vdisk being updated and linked to the vm
         """
 
+        if source_base_name.endswith('.vmdk'):
+            source_base_name = source_base_name[:-5]
+
+        if target_base_name.endswith('.vmdk'):
+            target_base_name = target_base_name[:-5]
+
         with open('/mnt/dfs/{}.vmdk'.format(source_base_name), 'r') as sourcefile:
             contents = sourcefile.read()
 
@@ -290,3 +296,52 @@ class VDiskController(object):
 
         with open('/mnt/dfs/{}.vmdk'.format(target_base_name), 'w') as targetfile:
             targetfile.write(contents)
+
+    @staticmethod
+    @celery.task(name='ovs.disk.create_from_template')
+    def create_from_template(diskguid, location, devicename, machineguid=None, **kwargs):
+        """
+        Create a disk from a template
+
+        @param parentdiskguid: guid of the disk
+        @param location: location where virtual device should be created (eg: myVM)
+        @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
+        @param machineguid: guid of the machine to assign disk to
+        @return diskguid: guid of new disk
+        """
+
+        # @todo verify diskguid specified is actually a template
+
+        _ = kwargs
+        description = '{} {}'.format(location, devicename)
+        properties_to_clone = [
+            'description', 'size', 'type', 'retentionpolicyid',
+            'snapshotpolicyid', 'has_autobackup', 'vmachine', 'vpool']
+
+        new_disk = VDisk()
+        disk = VDisk(diskguid)
+        _log = 'Create disk from template {} to new disk {} to location {}'
+        # @todo volume driver does not support space in filenames
+        _location = '{}/{}-flat.vmdk'.format(location, devicename).replace(' ', '')
+        _id = '{}'.format(disk.volumeid)
+        logging.info(_log.format(disk.name, new_disk.name, '/' + _location))
+        volumeid = vsr_client.create_clone_from_template('/' + _location, _id)
+        for item in properties_to_clone:
+            setattr(new_disk, item, getattr(disk, item))
+        new_devicename = '{}.vmdk'.format(devicename).replace(' ', '')
+        new_disk.parent_vdisk = disk
+        new_disk.name = '{}-clone'.format(disk.name)
+        new_disk.description = description
+        new_disk.volumeid = volumeid
+        new_disk.devicename = new_devicename
+        new_disk.vmachine = VMachine(
+            machineguid) if machineguid else disk.vmachine
+        new_disk.save()
+        print disk.devicename
+        print new_disk.devicename
+        VDiskController.patchvmdk(disk.devicename,
+                                  '{}/{}'.format(new_disk.vmachine.name,
+                                                 new_disk.devicename))
+        return {'diskguid': new_disk.guid, 'name': new_disk.name,
+                'backingdevice': _location.replace('-flat', '')}
+

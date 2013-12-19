@@ -361,7 +361,7 @@ class Sdk(object):
     def _create_disk(self, factory, key, disk, unit, datastore):
         """
         Creates a disk spec for a given backing device
-        Example for paramter disk: {'name': diskname, 'backingdevice': 'disk-flat.vmdk'}
+        Example for parameter disk: {'name': diskname, 'backingdevice': 'disk-flat.vmdk'}
         """
         deviceInfo = factory.create('ns0:Description')
         deviceInfo.label = disk['name']
@@ -621,6 +621,76 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
+
+    @validate_session
+    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+        """
+        Create a vm based on an existing vtemplate on specified tgt hypervisor
+        """
+
+        esxhost = self._validate_host(esxhost)
+        host_data = self._get_host_data(esxhost)
+
+        datastore = self._get_object(source_vm.datastore[0][0])
+        # Build basic config information
+        config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
+        config.name = name
+        config.numCPUs = source_vm.config.hardware.numCPU
+        config.memoryMB = source_vm.config.hardware.memoryMB
+        config.guestId = source_vm.config.guestId
+        config.deviceChange = []
+        config.extraConfig = []
+        config.files = self._create_file_info(
+            self._client.factory, datastore.name)
+
+        disk_controller_key = -101
+        config.deviceChange.append(
+            self._create_disk_controller(self._client.factory,
+                                         disk_controller_key))
+
+        # Add disk devices
+        for disk in disks:
+            config.deviceChange.append(
+                self._create_disk(self._client.factory, disk_controller_key,
+                                  disk, disks.index(disk), datastore))
+            self.copy_file(
+                '[{0}] {1}'.format(datastore.name, '%s.vmdk'
+                                   % disk['name'].split('_')[-1].replace('-clone', '')),
+                '[{0}] {1}'.format(datastore.name, disk['backingdevice']))
+
+        # Add network
+        nw_type = type(self._client.factory.create(
+            'ns0:VirtualEthernetCardNetworkBackingInfo'))
+        for device in source_vm.config.hardware.device:
+            if hasattr(device, 'backing') and type(device.backing) == nw_type:
+                config.deviceChange.append(
+                    self._create_nic(self._client.factory,
+                                     device.__class__.__name__,
+                                     device.deviceInfo.label,
+                                     device.deviceInfo.summary,
+                                     device.backing.deviceName,
+                                     device.unitNumber))
+
+        # Copy additional properties
+        extraconfigstoskip = ['nvram']
+        for item in source_vm.config.extraConfig:
+            if not item.key in extraconfigstoskip:
+                config.extraConfig.append(
+                    self._create_option_value(self._client.factory,
+                                              item.key,
+                                              item.value))
+
+        task = self._client.service.CreateVM_Task(host_data['folder'],
+                                                  config=config,
+                                                  pool=host_data['resourcePool'],
+                                                  host=host_data['host'])
+
+        if wait:
+            self.wait_for_task(task)
+
+        return task
+
+
     @validate_session
     def clone_vm(self, vmid, name, disks, esxhost=None, wait=True):
         """
@@ -700,6 +770,14 @@ class Sdk(object):
         return task
 
     @validate_session
+    def get_vm(self, key, esxhost=None):
+        vmid = self.exists(esxhost=esxhost, key=key)
+        if vmid is None:
+            raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
+        vm = self._get_object(vmid)
+        return vm
+
+    @validate_session
     def get_datastore(self, ip, mountpoint, esxhost=None):
         """
         @param ip : hypervisor ip to query for datastore presence
@@ -733,6 +811,39 @@ class Sdk(object):
             return True
         else:
             return False
+
+    def make_agnostic_config(self, vm_object, esxhost=None):
+        regex = '\[([^\]]+)\]\s(.+)'
+        match = re.search(regex, vm_object.config.files.vmPathName)
+        esxhost = self._validate_host(esxhost)
+
+        config = {'name': vm_object.config.name,
+                  'id': vm_object.obj_identifier.value,
+                  'backing': {'filename': match.group(2),
+                              'datastore': match.group(1)},
+                  'disks': [],
+                  'datastores': {}}
+
+        for device in vm_object.config.hardware.device:
+            if device.__class__.__name__ == 'VirtualDisk':
+                if device.backing is not None and \
+                        device.backing.fileName is not None:
+                    backingfile = device.backing.fileName
+                    match = re.search(regex, backingfile)
+                    if match:
+                        config['disks'].append({'filename': match.group(2),
+                                                'datastore': match.group(1),
+                                                'name': device.deviceInfo.label,
+                                                'order': device.unitNumber})
+
+        host_system = self._get_object(esxhost, properties=['datastore'])
+        for store in host_system.datastore[0]:
+            store = self._get_object(store)
+            if hasattr(store.info, 'nas'):
+                config['datastores'][store.info.name] = '{}:{}'.format(store.info.nas.remoteHost,
+                                                                       store.info.nas.remotePath)
+
+        return config
 
     @validate_session
     def register_vm(self, vmxpath, esxhost=None, wait=False):
