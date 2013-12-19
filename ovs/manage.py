@@ -181,7 +181,7 @@ class Configure():
 
         vpools = VPoolList.get_vpool_by_name(vpool_name)
         this_vpool = VPool()
-        if len(vpools) == 1:
+        if vpools and len(vpools) == 1:
             this_vpool = vpools[0]
         this_vpool.name = vpool_name
         this_vpool.description = "{} {}".format(volumedriver_backend_type, vpool_name)
