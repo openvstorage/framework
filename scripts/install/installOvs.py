@@ -36,14 +36,14 @@ if options.filesystems:
 
     # Add content to fstab
     fstab_content = """
-    # BEGIN Open vStorage
-    LABEL=db        /mnt/db    ext4    defaults,nobootwait,noatime,discard    0    2
-    LABEL=cache     /mnt/cache ext4    defaults,nobootwait,noatime,discard    0    2
-    LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
-    LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
-    LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
-    # END Open vStorage
-    """
+# BEGIN Open vStorage
+LABEL=db        /mnt/db    ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=cache     /mnt/cache ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
+# END Open vStorage
+"""
     must_update = False
     with open('/etc/fstab', 'r') as fstab:
         contents = fstab.read()
@@ -57,6 +57,11 @@ if options.filesystems:
 
 # Mount all filesystems
 os.system('mountall')
+
+supported_quality_levels = ['unstable','test','stable']
+quality_level = raw_input('Enter qualitylevel to install from %s: '%supported_quality_levels)
+if not quality_level in supported_quality_levels:
+    raise ValueError('Please specify correct qualitylevel, one of %s'%supported_quality_levels)
 
 # Install all software components
 os.system('apt-get -y install python-pip')
@@ -74,15 +79,15 @@ type = httpftp
 
 jp_openvstorage_repo = """
 [openvstorage]
-metadatafromtgz = 1
-qualitylevel = test
+metadatafromtgz = 0
+qualitylevel = %(qualityLevel)s
 metadatadownload = http://10.100.129.101/ovs-metadata
 metadataupload = file://opt/jumpscale/var/jpackages/metatars
 bitbucketaccount = openvstorage
 bitbucketreponame = jp_openvstorage
 blobstorremote = jp_openvstorage
 blobstorlocal = jpackages_local
-"""
+"""%{'qualityLevel': quality_level}
 
 blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'a')
 blobstor_config.write(jp_openvstorage_blobstor)
