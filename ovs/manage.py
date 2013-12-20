@@ -17,7 +17,7 @@ from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouter
 
 class Configure():
     def init_exportfs(self, vpool_name):
-        
+
         # Configure nfs
         from ovs.extensions.fs.exportfs import Nfsexports
         vpool_mountpoint = j.system.fs.joinPaths(os.sep, 'mnt', vpool_name)
@@ -42,7 +42,7 @@ class Configure():
             vmachine = VMachine()
         else:
             raise ValueError('Multiple System vMachines with name %s found, check your model'%hostname)
-    
+
         # Select/Create host hypervisor node
         pmachine_selector = PMachineList()
         #@todo implement more accurate search on PMachinelist to find pmachine
@@ -55,24 +55,25 @@ class Configure():
                     break
         if not found_pmachine:
             pmachine = PMachine()
-    
+
         # Model system VMachine and Hypervisor node
         pmachine.ip = j.application.config.get('ovs.host.ip')
         pmachine.username = j.application.config.get('ovs.host.login')
         pmachine.password = j.application.config.get('ovs.host.password')
         pmachine.hvtype = j.application.config.get('ovs.host.hypervisor')
+        pmachine.name = j.application.config.get('ovs.host.name')
+        pmachine.save()
         vmachine.name = hostname
         vmachine.hvtype = j.application.config.get('ovs.host.hypervisor')
         vmachine.is_vtemplate = False
         vmachine.is_internal = True
         vmachine.ip = j.application.config.get('ovs.grid.ip')
         vmachine.pmachine = pmachine
-        pmachine.save()
         vmachine.save()
-        
+
         from ovs.extensions.migration.migration import Migration
         Migration.migrate()
-        
+
         return vmachine.guid
 
     def init_rabbitmq(self):
@@ -164,12 +165,12 @@ class Configure():
 
         readcaches = [{'path': readcache, 'size': readcache_size},]
         vsr_configuration.configure_readcache(readcaches, hrd.get('volumedriver.readcache.serialization.path'))
-        
+
         scocaches = [{'path': scocache, 'size': scocache_size},]
         vsr_configuration.configure_scocache(scocaches, "1GB", "2GB")
-        
+
         vsr_configuration.configure_failovercache(failovercache)
-        
+
         filesystem_config = {'fs_cache_path': hrd.get('volumedriver.filesystem.cache'),
                              'fs_backend_path': hrd.get('volumedriver.filesystem.distributed'),
                              'fs_volume_regex': hrd.get('volumedriver.filesystem.regex'),
@@ -191,7 +192,7 @@ class Configure():
         this_vpool.backend_password = connection_password
         this_vpool.save()
         vrouters = filter(lambda v: v.vsrid == vrouter_id, this_vpool.vsrs)
-        
+
         if vrouters:
             vrouter = vrouters[0]
         else:
@@ -320,7 +321,7 @@ class Control():
         self._startPackage('openvstorage-core')
         self._startPackage('openvstorage-webapps')
         subprocess.call(['service', 'nfs-kernel-server', 'start'])
-    
+
     def stop(self):
         """
         Start following services
