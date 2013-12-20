@@ -1,0 +1,7 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<span>
+    <span data-bind="visible: !isLoaded()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+    <span data-bind="if: isLoaded()">
+        <span data-part="lazy-entry" data-bind="text: item"></span>
+    </span>
+</span>
