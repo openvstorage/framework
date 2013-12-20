@@ -1,8 +1,18 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Branding migration module
+"""
+
 from ovs.dal.hybrids.branding import Branding
 
 
 class Brander():
+    """
+    Handles all branded related migrations
+    """
+
     def __init__(self):
+        """ Init method """
         pass
 
     @staticmethod
@@ -11,8 +21,8 @@ class Brander():
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 (0.0.1) and this script is at
         verison 3 (0.0.3) it will execute two steps:
-        - 0.0.1 > 0.0.2
-        - 0.0.2 > 0.0.3
+          - 0.0.1 > 0.0.2
+          - 0.0.2 > 0.0.3
         @param previous_version: The previous version from which to start the migration.
         """
 
@@ -35,3 +45,5 @@ class Brander():
             slate.productname = 'Open vStorage'
             slate.is_default = False
             slate.save()
+
+        return working_version

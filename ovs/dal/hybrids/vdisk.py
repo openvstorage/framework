@@ -1,59 +1,97 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+VDisk module
+"""
 from ovs.dal.dataobject import DataObject
-from ovs.dal.hybrids.vmachine import vMachine
-from ovs.dal.hybrids.vpool import vPool
+from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import pickle
 
-_vsrClient = VolumeStorageRouterClient().load()
+_vsr_client = VolumeStorageRouterClient().load()
 
 
-class vDisk(DataObject):
-    _blueprint = {'name'               : (None,                  str),
-                  'description'        : ('Test disk',           str),
-                  'size'               : (100,                   int),
-                  'type'               : ('DSSVOL',              str),
-                  'role'               : ('BOOT',                str),  # BOOT, DATA, TEMP
-                  'devicename'         : ('123456789-flat.vmdk', str),
-                  'order'              : (None,                  int),
-                  'volumeid'           : (None,                  str),
-                  'parentsnapshot'     : (None,                  str),
-                  'children'           : ([],                    list),
-                  'retentionpolicyid'  : (None,                  str),
-                  'snapshotpolicyid'   : (None,                  str),
-                  'tags'               : ([],                    list),
-                  'replicationguid'    : (None,                  str),
-                  'environmentguid'    : (None,                  str),
-                  'autobackup'         : (False,                 bool),
-                  'templatesnapshot'   : (None,                  str)}
-    _relations = {'machine': (vMachine, 'disks'),
-                  'vpool'  : (vPool,    'disks')}
-    _expiry = {'used_size': 5,  # Timeout in seconds of individual RO properties
-               'snapshots': 60,
-               'status': 30,
-               'storage_server': 30}
+class VDisk(DataObject):
+    """
+    The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
+    vDisks can be part of a vMachine or stand-alone.
+    """
+    # pylint: disable=line-too-long
+    _blueprint = {'name':              (None, str, 'Name of the vDisk.'),
+                  'description':       (None, str, 'Description of the vDisk.'),
+                  'size':              (0, int, 'Size of the vDisk in Bytes.'),
+                  'devicename':        (None, str, 'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
+                  'order':             (None, int, 'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
+                  'volumeid':          (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
+                  'parentsnapshot':    (None, str, 'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
+                  'retentionpolicyid': (None, str, 'Retention policy used by the vDisk.'),
+                  'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
+                  'tags':              (list(), list, 'Tags of the vDisk.'),
+                  'has_autobackup':    (False, bool, 'Indicates whether this vDisk has autobackup enabled.'),
+                  'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.')}
+    _relations = {'vmachine':     (VMachine, 'vdisks'),
+                  'vpool':        (VPool, 'vdisks'),
+                  'parent_vdisk': (None, 'child_vdisks')}
+    _expiry = {'snapshots':  (60, list),
+               'info':       (60, dict),
+               'statistics':  (5, dict),
+               'vsrid':      (60, str)}
+    # pylint: enable=line-too-long
 
-    @property
-    def used_size(self):
-        def get_data():
-            # Simulate fetching real data
-            from random import randint
-            return randint(0, self._data['size'])
-        return self._backend_property(get_data)
+    def _snapshots(self):
+        """
+        Fetches a list of Snapshots for the vDisk
+        """
 
-    @property
-    def snapshots(self):
-        def get_data():
-            return _vsrClient.listSnapShots(self.volumeid)
-        return self._backend_property(get_data)
+        volumeid = str(self.volumeid)
+        snapshots = []
+        for guid in _vsr_client.list_snapshots(volumeid):
+            snapshot = _vsr_client.info_snapshot(volumeid, guid)
+            # @todo: to be investigated howto handle during
+            # set as template
+            if snapshot.metadata:
+                metadata = pickle.loads(snapshot.metadata)
+                snapshots.append({'guid': guid,
+                                  'timestamp': metadata['timestamp'],
+                                  'label': metadata['label'],
+                                  'is_consistent': metadata['is_consistent']})
+        return snapshots
 
-    @property
-    def status(self):
-        def get_data():
-            return 'ATTACHED'
-        return self._backend_property(get_data)
+    def _info(self):
+        """
+        Fetches the info (see Volume Driver API) for the vDisk.
+        """
+        if self.volumeid:
+            vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
+            vdiskinfodict = dict()
 
-    @property
-    def storage_server(self):
-        def get_data():
-            return _vsrClient.info(self.volumeid)
-        return self._backend_property(get_data)
+            for infoattribute in dir(vdiskinfo):
+                if infoattribute.startswith('_'):
+                    continue
+                elif infoattribute == 'volume_type':
+                    vdiskinfodict[infoattribute] = str(getattr(vdiskinfo, infoattribute))
+                else:
+                    vdiskinfodict[infoattribute] = getattr(vdiskinfo, infoattribute)
 
+            return vdiskinfodict
+        else:
+            return dict()
+
+    def _statistics(self):
+        """
+        Fetches the Statistics for the vDisk.
+        """
+        vdiskstatsdict = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
+        if self.volumeid:
+            vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+
+            for key in VolumeStorageRouterClient.STATISTICS_KEYS:
+                    vdiskstatsdict[key] = getattr(vdiskstats, key)
+
+        return vdiskstatsdict
+
+    def _vsrid(self):
+        """
+        Returns the Volume Storage Router ID to which the vDisk is connected.
+        """
+        return self.info.get('vrouter_id', None)

@@ -1,16 +1,22 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Django settings module
+"""
 import os
 import ConfigParser
-
-parser = ConfigParser.RawConfigParser()
-parser.read(os.path.dirname(__file__) + '/config/settings.cfg')
+from JumpScale import j
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
-UI_NAME = parser.get('main', 'ui_name')
-SYSTEM_NAME = parser.get('main', 'system_name')
+UI_NAME = j.application.config.get('ovs.webapps.main.uiname')
+APP_NAME = j.application.config.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
-BASE_LOG_DIR = parser.get('main', 'log_folder') + '/' + SYSTEM_NAME
+
+BASE_FOLDER = j.system.fs.joinPaths(j.application.config.get('ovs.core.basedir'), j.application.config.get('ovs.webapps.dir'), APP_NAME)
+
+BASE_LOG_DIR = j.application.config.get('ovs.webapps.logging.dir')
+LOG_FILENAME = j.application.config.get('ovs.webapps.logging.file')
 
 FRONTEND_ROOT = '/' + UI_NAME
 STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
@@ -18,7 +24,7 @@ STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    ('Kenneth Henderick', 'kenneth.henderick@cloudfounders.com'),
+    (j.application.config.get('ovs.webapps.admin.name'), j.application.config.get('ovs.webapps.admin.email')),
 )
 
 MANAGERS = ADMINS
@@ -26,14 +32,14 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_WWW_DIR + '/' + SYSTEM_NAME + '.db.sqlite3'
+        'NAME': BASE_FOLDER + '/' + j.application.config.get('ovs.webapps.main.dbname')
     }
 }
 
 ALLOWED_HOSTS = []
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
-LOGIN_URL = SYSTEM_NAME + '.frontend.login_view'
+LOGIN_URL = APP_NAME + '.frontend.login_view'
 
 SITE_ID = 1
 USE_I18N = True
@@ -41,6 +47,10 @@ USE_L10N = True
 USE_TZ = True
 MEDIA_ROOT = ''
 MEDIA_URL = ''
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+os.environ['HTTPS'] = 'on'
 
 STATIC_ROOT = ''
 STATICFILES_DIRS = (
@@ -50,7 +60,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder'
 )
 
-SECRET_KEY = '6e-%9ce4rx125jw69vp-ar1fpu9ta5#g6w73^vvrf65+14ovpi'
+SECRET_KEY = j.application.config.get('ovs.webapps.main.secret')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
@@ -61,14 +71,14 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    SYSTEM_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
+    APP_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware'
 )
 
 AUTHENTICATION_BACKENDS = (
-    SYSTEM_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
-    SYSTEM_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
+    APP_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
+    APP_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 )
 
@@ -77,7 +87,7 @@ TEMPLATE_CONTEXT_PROCESSORS += (
     'django.core.context_processors.request',
 )
 
-ROOT_URLCONF = SYSTEM_NAME + '.urls'
+ROOT_URLCONF = APP_NAME + '.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'django.wsgi.application'
@@ -98,16 +108,20 @@ INSTALLED_APPS = (
 )
 
 REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.JSONPRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        SYSTEM_NAME + '.backend.authentication_backend.TokenAuthenticationBackend'
+        APP_NAME + '.backend.authentication_backend.TokenAuthenticationBackend'
     )
 }
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        'LOCATION': '10.100.138.253:11211',
+        'BACKEND': 'django.core.cache.backends.dummy.DummyCache',
     }
 }
 
@@ -123,30 +137,15 @@ LOGGING = {
     'handlers': {
         'logfile': {
             'class': 'logging.handlers.WatchedFileHandler',
-            'filename': BASE_LOG_DIR + '/django.log',
-            'formatter': 'simple',
-        },
-        'accessfile': {
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': BASE_LOG_DIR + '/access.log',
+            'filename': BASE_LOG_DIR + '/' + LOG_FILENAME,
             'formatter': 'simple',
         },
     },
     'loggers': {
-        'django': {
-            'handlers': ['logfile'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        SYSTEM_NAME: {
+        'default': {
             'handlers': ['logfile'],
             'level': 'INFO',
             'propogate': False
-        },
-        'access': {
-            'handlers': ['accessfile'],
-            'level': 'INFO',
-            'propagate': False,
         },
     },
 }

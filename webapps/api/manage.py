@@ -1,4 +1,8 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 #!/usr/bin/env python2
+"""
+Django manage module
+"""
 import os
 import sys
 

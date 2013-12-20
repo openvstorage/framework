@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
 define([
     'durandal/activator', 'plugins/dialog', 'knockout'
@@ -25,7 +26,7 @@ define([
             if (parent.running()) {
                 return false;
             }
-            if (parent.step() < parent.stepsLength() - 1) {
+            if (parent.step() < parent.stepsLength() - 1 && parent.stepsLength() > 1) {
                 return parent.canContinue().value;
             }
             return false;

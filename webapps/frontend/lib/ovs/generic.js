@@ -1,18 +1,104 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
 define(['jquery', 'jqp/pnotify'], function($) {
     "use strict";
     function getTimestamp() {
         return new Date().getTime();
     }
-    function getBytesHuman(value) {
+    function buildString(value, times) {
+        var i, returnvalue = '';
+        for (i = 0; i < times; i += 1) {
+            returnvalue += value.toString();
+        }
+        return returnvalue;
+    }
+    function deg2rad(deg) {
+		return deg * Math.PI / 180;
+	}
+    function setDecimals(value, decimals) {
+        decimals = decimals || 2;
+        var parts = [];
+        if (isNaN(value)) {
+            parts = ["0"];
+        } else {
+            parts = value.toString().split('.');
+        }
+
+        if (decimals <= 0) {
+            return parts[0];
+        }
+
+        if (parts.length === 1) {
+            parts.push(buildString('0', decimals));
+        }
+        while (parts[1].length < decimals) {
+            parts[1] = parts[1] + '0';
+        }
+        return parts[0] + '.' + parts[1];
+    }
+    function round(value, decimals) {
+        decimals = decimals || 0;
+        if (decimals === 0) {
+            return Math.round(value);
+        }
+        var factor = Math.pow(10, decimals);
+        return Math.round(value * factor) / factor;
+    }
+    function ceil(value, decimals) {
+        decimals = decimals || 0;
+        if (decimals === 0) {
+            return Math.ceil(value);
+        }
+        var factor = Math.pow(10, decimals);
+        return Math.ceil(value * factor) / factor;
+    }
+    function formatBytes(value) {
         var units, counter;
-        units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+        units = ['b', 'kib', 'mib', 'gib', 'tib'];
         counter = 0;
-        while (value > 2048) {
+        while (value >= 1000) {
             value = value / 1024;
             counter += 1;
         }
-        return (Math.round(value * 100) / 100).toString() + ' ' + units[counter];
+        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.' + units[counter]);
+    }
+    function formatSpeed(value) {
+        var units, counter;
+        units = ['b', 'kib', 'mib', 'gib', 'tib'];
+        counter = 0;
+        while (value >= 1000) {
+            value = value / 1024;
+            counter += 1;
+        }
+        return setDecimals(round(value, 2), 2) + ' ' + $.t('ovs:generic.' + units[counter] + 's');
+    }
+    function formatRatio(value) {
+        return setDecimals(round(value, 2), 2) + ' %';
+    }
+    function formatShort(value) {
+        var units, counter, returnValue;
+        units = ['k', 'm', 'g', 't'];
+        counter = 0;
+        while (value >= 1000) {
+            value = value / 1000;
+            counter += 1;
+        }
+        returnValue = setDecimals(round(value, 2), 2);
+        if (counter > 0) {
+            returnValue += ' ' + $.t('ovs:generic.' + units[counter - 1]);
+        }
+        return returnValue;
+    }
+    function formatNumber(value) {
+        if (value !== undefined) {
+            value = round(value).toString();
+            var regex = /(\d+)(\d{3})/;
+            while (regex.test(value)) {
+                value = value.replace(regex, '$1' + $.t('ovs:generic.thousandseparator') + '$2');
+            }
+            return value;
+        }
+        return undefined;
     }
     function padRight(value, character, length) {
         while (value.length < length) {
@@ -96,43 +182,95 @@ define(['jquery', 'jqp/pnotify'], function($) {
             array.splice(index, 1);
         }
     }
-    function smooth(observable, targetValue, steps) {
-        var startValue, diff, stepSize, decimals, execute;
-        if (steps === undefined) {
-            steps = 3;
+    function smooth(observable, initialValue, targetValue, steps, formatFunction) {
+        var diff, stepSize, decimals, execute, current = initialValue;
+        if (initialValue === undefined) {
+            if (formatFunction && formatFunction.call) {
+                observable(formatFunction(targetValue));
+            } else {
+                observable(targetValue);
+            }
+        } else {
+            diff = targetValue - initialValue;
+            if (diff !== 0) {
+                decimals = Math.max((initialValue.toString().split('.')[1] || []).length, (targetValue.toString().split('.')[1] || []).length);
+                stepSize = ceil(diff / steps, decimals);
+                stepSize = stepSize === 0 ? 1 : stepSize;
+                execute = function() {
+                    if (Math.abs(targetValue - current) > Math.abs(stepSize)) {
+                        current += stepSize;
+                        if (formatFunction && formatFunction.call) {
+                            observable(formatFunction(current));
+                        } else {
+                            observable(current);
+                        }
+                        window.setTimeout(execute, 75);
+                    } else if (formatFunction && formatFunction.call) {
+                        observable(formatFunction(targetValue));
+                    } else {
+                        observable(targetValue);
+                    }
+                };
+                window.setTimeout(execute, 75);
+            }
         }
-        startValue = observable() || 0;
-        diff = targetValue - startValue;
-        if (diff !== 0) {
-            decimals = Math.max((startValue.toString().split('.')[1] || []).length, (targetValue.toString().split('.')[1] || []).length);
-            stepSize = decimals === 0 ? Math.round(diff / steps) : Math.round(diff / steps * (10 * decimals)) / (10 * decimals);
-            execute = function() {
-                var current = observable();
-                if (Math.abs(targetValue - current) > Math.abs(stepSize)) {
-                    observable(observable() + stepSize);
-                    window.setTimeout(execute, 75);
-                } else {
-                    observable(targetValue);
-                }
-            };
-            window.setTimeout(execute, 75);
+    }
+    function crossFiller(newKeyList, currentKeyList, objectList, objectLoader) {
+        var i, getLength, getList;
+        getLength = function(list) {
+            if (list.call) {
+                return list().length;
+            }
+            return list.length;
+        };
+        getList = function(list) {
+            if (list.call) {
+                return list();
+            }
+            return list;
+        };
+        for (i = 0; i < getLength(newKeyList); i += 1) {
+            if ($.inArray(getList(newKeyList)[i], getList(currentKeyList)) === -1) {
+                // One of the new keys is not yet in our current key list. This means
+                // we'll have to load the object.
+                currentKeyList.push(getList(newKeyList)[i]);
+                objectList.push(objectLoader(getList(newKeyList)[i]));
+            }
+        }
+        for (i = 0; i < getLength(currentKeyList); i += 1) {
+            if ($.inArray(getList(currentKeyList)[i], getList(newKeyList)) === -1) {
+                // One of the existing keys is not in the new key list anymore. This means
+                // we'll have to remove the object
+                currentKeyList.splice(i, 1);
+                objectList.splice(i, 1);
+            }
         }
     }
 
     return {
-        getTimestamp : getTimestamp,
-        getBytesHuman: getBytesHuman,
-        padRight     : padRight,
-        getCookie    : getCookie,
-        setCookie    : setCookie,
-        tryGet       : tryGet,
-        alert        : alert,
-        alertInfo    : alertInfo,
-        alertSuccess : alertSuccess,
-        alertError   : alertError,
-        keys         : keys,
-        xhrAbort     : xhrAbort,
-        removeElement: removeElement,
-        smooth       : smooth
+        getTimestamp    : getTimestamp,
+        formatBytes     : formatBytes,
+        formatSpeed     : formatSpeed,
+        formatRatio     : formatRatio,
+        formatShort     : formatShort,
+        formatNumber    : formatNumber,
+        padRight        : padRight,
+        getCookie       : getCookie,
+        setCookie       : setCookie,
+        tryGet          : tryGet,
+        alert           : alert,
+        alertInfo       : alertInfo,
+        alertSuccess    : alertSuccess,
+        alertError      : alertError,
+        keys            : keys,
+        xhrAbort        : xhrAbort,
+        removeElement   : removeElement,
+        smooth          : smooth,
+        round           : round,
+        ceil            : ceil,
+        buildString     : buildString,
+        setDecimals     : setDecimals,
+        crossFiller     : crossFiller,
+        deg2rad         : deg2rad
     };
 });

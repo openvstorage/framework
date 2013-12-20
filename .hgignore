@@ -6,8 +6,8 @@
 .idea
 .pydevproject
 .metadata
+.project
 webapps/frontend/tests/coverage
 syntax: regexp
-.project
 \._.*
 .orig$

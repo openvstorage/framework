@@ -7,19 +7,19 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" href="css/bootstrap-default.min.css" />
         <link rel="stylesheet" href="lib/durandal/css/durandal.css" />
-        <link rel="stylesheet" href="lib/font-awesome/css/font-awesome.css" />
+        <link rel="stylesheet" href="lib/font-awesome/css/font-awesome.min.css" />
         <link rel="stylesheet" href="lib/jquery-plugins/css/pnotify.default.css" />
         <link rel="stylesheet" href="css/durandal.css" />
         <link rel="stylesheet" href="css/ovs.css" />
     </head>
     <body>
         <span data-bind="text: test"></span>
-        <div id="applicationHost">
+        <div id="applicationHost" class="stretch">
             <div class="splash">
               <div class="message">
                   Open vStorage
               </div>
-              <i class="icon-spinner icon-2x icon-spin active"></i>
+              <i class="fa fa-5x fa-spin" data-i18n="[html]ovs:icons.loading"></i>
           </div>
         </div>
         <script src="lib/require/require.js" data-main="app/main"></script>

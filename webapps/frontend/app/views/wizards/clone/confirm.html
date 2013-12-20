@@ -1,16 +1,11 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <div style="min-width: 600px;">
-    <h4 style="margin-top: 5px;">Verify the entered information</h4>
     <p>
-        Name of the clone: &quot;<span data-bind="text: data.name"></span>&quot;<br />
-        Amount of clones: <span data-bind="text: data.amount"></span>
+        <span data-i18n="ovs:wizards.clone.confirm.clonename"></span> &quot;<span data-bind="text: data.name"></span>&quot;<br />
+        <span data-i18n="ovs:wizards.clone.confirm.cloneamount"></span> <span data-bind="text: data.amount"></span>
     </p>
+    <p data-i18n="ovs:wizards.clone.confirm.verifysnapshots"></p>
     <p>
-        Please validate the selected snapshots below. These will be used for the clone:
+        <span data-i18n="ovs:wizards.clone.confirm.snapshot"></span> <span data-bind="text: data.snapshotDisplay"></span>
     </p>
-    <ul data-bind="foreach: data.vm().vDisks()">
-        <li>
-            Disk <b><span data-bind="text: name"></span></b>:
-            <span data-bind="text: selectedSnapshot"></span>
-        </li>
-    </ul>
 </div>

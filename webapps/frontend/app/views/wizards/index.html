@@ -1,3 +1,4 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <div data-bind="css: { 'modal-content': modal() }">
     <div class="modal-header" data-bind="visible: modal()">
         <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
@@ -12,12 +13,12 @@
     </div>
     <div data-bind="css: { 'modal-footer': modal() }">
         <button type="button" class="btn btn-default pull-left"
-                data-bind="click: function() { close(false); }">Cancel</button>
+                data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel"></button>
         <button type="button" class="btn btn-default"
-                data-bind="visible: hasPrevious(), click: previous">&laquo; Previous</button>
+                data-bind="visible: hasPrevious(), click: previous" data-i18n="[html]ovs:generic.previous"></button>
         <button type="button"  class="btn btn-primary"
-                data-bind="css: { disabled: !hasNext() }, visible: !hasFinish(), click: next">Next &raquo;</button>
+                data-bind="css: { disabled: !hasNext() }, visible: !hasFinish(), click: next" data-i18n="[html]ovs:generic.next"></button>
         <button type="button"  class="btn btn-primary"
-                data-bind="visible: hasFinish(), click: finish">Finish</button>
+                data-bind="visible: hasFinish(), click: finish" data-i18n="ovs:generic.finish"></button>
     </div>
 </div>

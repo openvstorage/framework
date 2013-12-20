@@ -1,12 +1,22 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Model migration module
+"""
+
 import hashlib
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.role import Role
-from ovs.dal.hybrids.rolegroup import RoleGroup
+from ovs.dal.hybrids.j_rolegroup import RoleGroup
 
 
 class Model():
+    """
+    Handles all model related migrations
+    """
+
     def __init__(self):
+        """ Init method """
         pass
 
     @staticmethod
@@ -15,8 +25,8 @@ class Model():
         Migrates from any version to any version, running all migrations required
         If previous_version is for example 0 (0.0.1) and this script is at
         verison 3 (0.0.3) it will execute two steps:
-        - 0.0.1 > 0.0.2
-        - 0.0.2 > 0.0.3
+          - 0.0.1 > 0.0.2
+          - 0.0.2 > 0.0.3
         @param previous_version: The previous version from which to start the migration.
         """
 
@@ -97,3 +107,5 @@ class Model():
             # Execute some code that upgrades to version 2
             # working_version = 2
             pass
+
+        return working_version

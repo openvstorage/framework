@@ -1,2 +1,0 @@
-class UserController(object):
-    pass

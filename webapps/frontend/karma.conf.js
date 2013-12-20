@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global module */
 module.exports = function(config) {
     "use strict";
@@ -15,23 +16,27 @@ module.exports = function(config) {
             'tests/coverage/**/*.js'
         ],
         preprocessors: {
-            'lib/ovs/*.js'       : ['coverage'],
-            'app/viewmodels/*.js': ['coverage'],
-            'app/widgets/**/*.js': ['coverage'],
-            'tests/**/*.js'      : ['coverage']
+            '**/lib/ovs/*.js'       : ['coverage'],
+            '**/app/viewmodels/*.js': ['coverage'],
+            '**/app/widgets/**/*.js': ['coverage'],
+            '**/tests/**/*.js'      : ['coverage']
         },
-        reporters: ['progress', 'coverage'],
+        reporters: ['progress', 'coverage', 'junit'],
         port: 9876,
         colors: true,
         logLevel: config.LOG_INFO,
         autoWatch: true,
         browsers: ['PhantomJS'],
         captureTimeout: 60000,
-        singleRun: false,
+        singleRun: true,
         coverageReporter: {
-            type: 'text',
+            type: 'cobertura',
             dir: 'tests/coverage/',
             file: 'coverage.txt'
+        },
+        junitReporter: {
+            type: 'cobertura',
+            outputFile: 'test-results.xml'
         }
     });
 };

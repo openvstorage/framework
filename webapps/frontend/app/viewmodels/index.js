@@ -1,25 +1,21 @@
-﻿/*global define */
+﻿// license see http://www.openvstorage.com/licenses/opensource/
+/*global define */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
     'ovs/shared', 'viewmodels/wizards/changepassword/index'
 ], function(router, dialog, $, shared, ChangePasswordWizard) {
     "use strict";
-    var mode = router.activeInstruction().params[0];
-    var childRouter = router.createChildRouter()
-                            .makeRelative({
-                                moduleId: 'viewmodels/site',
-                                route: ':mode',
-                                fromParent: true
-                            })
-                            .map([
-                                // Navigation routes
-                                { route: '',                moduleId: 'dashboard',   hash: '#' + mode,                  title: 'Dashboard',   nav: true  },
-                                { route: 'statistics',      moduleId: 'statistics',  hash: '#' + mode + '/statistics',  title: 'Statistics',  nav: true  },
-                                { route: 'vmachines',       moduleId: 'vmachines',   hash: '#' + mode + '/vmachines',   title: 'vMachines',   nav: true  },
-                                // Non-navigation routes
-                                { route: 'login',           moduleId: 'login',       hash: '#' + mode + '/login',       title: 'Login',       nav: false }
-                            ])
-                            .buildNavigationModel();
+    var mode, childRouter;
+    mode = router.activeInstruction().params[0];
+    shared.routing.buildSiteRoutes(mode);
+    childRouter = router.createChildRouter()
+                        .makeRelative({
+                            moduleId: 'viewmodels/site',
+                            route: ':mode',
+                            fromParent: true
+                        })
+                        .map(shared.routing.siteRoutes)
+                        .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
             if (instance.guard.authenticated === true) {

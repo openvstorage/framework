@@ -1,2 +1,3 @@
-import sys
-sys.path.append('/opt/openvStorage')
+"""
+Unit test module for the OVS Library
+"""

@@ -1,17 +1,98 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <section>
-    <h2>Statistics</h2>
-    <p>
-        This page contains various system statistics.
-    </p>
-    <h3>Memcached</h3>
+    <h2 data-i18n="ovs:statistics.title"></h2>
+    <p data-i18n="ovs:statistics.introduction"></p>
+    <h3 data-i18n="ovs:statistics.dal.title"></h3>
     <ul>
-        <li>memory usage: <span data-bind="text: memcached.bytes"></span></li>
-        <li>keys in cache: <span data-bind="text: memcached.currItems"></span> of <span data-bind="text: memcached.totalItems"></span></li>
-        <li>cache hits: <span data-bind="text: memcached.getHits"></span> of <span data-bind="text: memcached.cmdGet"></span>: <b><span data-bind="text: memcached.hitRate"></span>%</b></li>
-        <li>cache traffic: <span data-bind="text: memcached.bytesRead"></span> in, <span data-bind="text: memcached.bytesWritten"></span> out</li>
-        <li>uptime: <span data-bind="text: memcached.uptime"></span></li>
+        <li>
+            <span data-i18n="ovs:statistics.dal.objectload"></span>
+            <ul>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
+                    <span data-bind="text: memcached.ovsOLhit"></span>
+                    <span data-i18n="ovs:generic.of"></span>
+                    <span data-bind="text: memcached.ovsOLtot"></span>: <b><span data-bind="text: memcached.ovsOLrat"></span>%</b>
+                </li>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
+                    <span data-bind="lazyloader: { item: memcached.ovsOLspeed }"></span>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.dal.relations"></span>
+            <ul>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
+                    <span data-bind="text: memcached.ovsRLhit"></span>
+                    <span data-i18n="ovs:generic.of"></span>
+                    <span data-bind="text: memcached.ovsRLtot"></span>: <b><span data-bind="text: memcached.ovsRLrat"></span>%</b>
+                </li>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
+                    <span data-bind="lazyloader: { item: memcached.ovsRLspeed }"></span>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.dal.datalist"></span>
+            <ul>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
+                    <span data-bind="text: memcached.ovsDLhit"></span>
+                    <span data-i18n="ovs:generic.of"></span>
+                    <span data-bind="text: memcached.ovsDLtot"></span>: <b><span data-bind="text: memcached.ovsDLrat"></span>%</b>
+                </li>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
+                    <span data-bind="lazyloader: { item: memcached.ovsDLspeed }"></span>
+                </li>
+            </ul>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.dal.descriptor"></span>
+            <ul>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.hitsratio"></span>
+                    <span data-bind="text: memcached.ovsDRhit"></span>
+                    <span data-i18n="ovs:generic.of"></span>
+                    <span data-bind="text: memcached.ovsDRtot"></span>: <b><span data-bind="text: memcached.ovsDRrat"></span>%</b>
+                </li>
+                <li>
+                    <span data-i18n="ovs:statistics.dal.loadspeed"></span>
+                    <span data-bind="lazyloader: { item: memcached.ovsDRspeed }"></span>
+                </li>
+            </ul>
+        </li>
     </ul>
-    <p>Raw memcached information:</p>
+    <h3 data-i18n="ovs:statistics.memcache.title"></h3>
+    <ul>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.memoryusage"></span>
+            <span data-bind="text: memcached.bytes"></span>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.keysincache"></span>
+            <span data-bind="text: memcached.currItems"></span>
+            <span data-i18n="ovs:generic.of"></span>
+            <span data-bind="text: memcached.totalItems"></span>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.cachehits"></span>
+            <span data-bind="text: memcached.getHits"></span>
+            <span data-i18n="ovs:generic.of"></span>
+            <span data-bind="text: memcached.cmdGet"></span>: <b><span data-bind="text: memcached.hitRate"></span>%</b>
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.cachetraffic"></span>
+            <span data-bind="text: memcached.bytesRead"></span> in, <span data-bind="text: memcached.bytesWritten"></span> out
+        </li>
+        <li>
+            <span data-i18n="ovs:statistics.memcache.uptime"></span>
+            <span data-bind="text: memcached.uptime"></span>
+        </li>
+    </ul>
+    <p data-i18n="ovs:statistics.memcache.rawinfo"></p>
     <pre data-bind="html: memcached.raw">
     </pre>
 </section>

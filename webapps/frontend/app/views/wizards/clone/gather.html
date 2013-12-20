@@ -1,18 +1,16 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <div style="min-width: 700px;">
-    <h4 style="margin-top: 5px;">Please provide the required information</h4>
     <div data-bind="visible: canContinue().value">
         <form role="form form-horizontal" class="form-horizontal">
-            <p>
-                Enter basic information
-            </p>
+            <p data-i18n="ovs:wizards.clone.gather.basicinfo"></p>
             <div class="form-group">
-                <label class="col-lg-3 control-label" for="name">Clone name</label>
+                <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.clone.gather.name"></label>
                 <div class="col-lg-4">
                     <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
                 </div>
             </div>
             <div class="form-group">
-                <label class="col-lg-3 control-label" for="amount">Number of clones</label>
+                <label class="col-lg-3 control-label" for="amount" data-i18n="ovs:wizards.clone.gather.amount"></label>
                 <div class="col-lg-3">
                     <div class="input-group">
                         <span class="input-group-btn">
@@ -29,17 +27,22 @@
                     </div>
                 </div>
             </div>
-            <p>
-                Select the snapshots from which you want to clone:
-            </p>
-            <!-- ko foreach: data.vm().vDisks() -->
-                <div class="form-group">
-                    <label class="col-lg-3 control-label" data-bind="attr: { for: 'snapshot_' + guid }">Disk <span data-bind="text: name"></span></label>
-                    <div class="col-lg-8">
-                        <select class="form-control" data-bind="attr: { id: 'snapshot_' + guid }, options: snapshots, value: selectedSnapshot"></select>
-                    </div>
+            <p data-i18n="ovs:wizards.clone.gather.selectsnapshots"></p>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="snapshot" data-i18n="ovs:wizards.clone.gather.snapshot"></label>
+                <div class="col-lg-8">
+                    <select data-bind="options: data.vm().snapshots(),
+                                       optionsText: function(item) {
+                                           if (!!item.label) {
+                                               return item.label + (item.is_consistent ? ' (consistent)' : '');
+                                           }
+                                           var date = new Date(item.timestamp * 1000);
+                                           return date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + (item.is_consistent ? ' (consistent)' : '');
+                                       },
+                                       value: data.snapshot" class="form-control" id="snapshot">
+                    </select>
                 </div>
-            <!-- /ko -->
+            </div>
         </form>
     </div>
     <div class="alert alert-warning" data-bind="visible: !canContinue().value">

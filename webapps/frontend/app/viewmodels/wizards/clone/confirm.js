@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
 define([
     'jquery', 'knockout',
@@ -22,7 +23,14 @@ define([
                         deferred.resolve(true);
                     })
                     .fail(function(error) {
-                        generic.alertError('Error', 'Error while cloning ' + vm.name() + ': ' + error);
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.errorwhile', {
+                                context: 'error',
+                                what: $.t('ovs:wizards.clone.confirm.cloning', { what: vm.name() }),
+                                error: error
+                            })
+                        );
                         deferred.resolve(false);
                     });
             }).promise();
@@ -31,17 +39,12 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var i, clones = [],
-                    callData = {},
-                    vm = self.data.vm(),
-                    disks = vm.vDisks();
-                callData.disks = {};
-                for (i = 0; i < disks.length; i += 1) {
-                    callData.disks[disks[i].guid()] = disks[i].selectedSnapshot();
-                }
+                    callData = {snapshot: self.data.snapshot().timestamp},
+                    vm = self.data.vm();
                 for (i = 1; i <= self.data.amount(); i += 1) {
                     clones.push(self._clone(i, vm, callData));
                 }
-                generic.alertInfo('Clone started', 'Machine ' + vm.name() + ' cloning in progress...');
+                generic.alertInfo($.t('ovs:wizards.clone.confirm.clonestarted'), $.t('ovs:wizards.clone.confirm.inprogress', { what: vm.name() }));
                 deferred.resolve();
                 $.when.apply($, clones)
                     .done(function() {
@@ -51,11 +54,11 @@ define([
                             success += (args[i] ? 1 : 0);
                         }
                         if (success === args.length) {
-                            generic.alertSuccess('Clones completed', 'Machine ' + vm.name() + ' cloned successfully.');
+                            generic.alertSuccess($.t('ovs:wizards.clone.confirm.complete'), $.t('ovs:wizards.clone.confirm.success', { what: vm.name() }));
                         } else if (success > 0) {
-                            generic.alert('Clones complete', 'Machine ' + vm.name() + ' cloned. However, some of the clones could not be created.');
+                            generic.alert($.t('ovs:wizards.clone.confirm.complete'), $.t('ovs:wizards.clone.confirm.somefailed', { what: vm.name() }));
                         } else if (clones.length > 2) {
-                            generic.alertError('Error', 'All clones for machine ' + vm.name() + ' failed.');
+                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:wizards.clone.confirm.allfailed', { what: vm.name() }));
                         }
                     });
             }).promise();

@@ -1,3 +1,4 @@
+// license see http://www.openvstorage.com/licenses/opensource/
 /*global define */
 define([
     'jquery', 'knockout',
@@ -77,7 +78,8 @@ define([
                 max = Math.min(start + self.pagesize(), items.length);
             for (i = start; i < max; i += 1) {
                 if (self.enterViewport !== undefined && $.inArray(i, self.viewportIndexes) === -1) {
-                    items[i][self.enterViewport]();
+                    // If the viewport changes and an item enters the viewport, we'll request an update
+                    self.enterViewport(items[i]);
                 }
                 vIndexes.push(i);
                 vItems.push(items[i]);
@@ -101,7 +103,8 @@ define([
             var i, items = self.viewportItems();
             for (i = 0; i < items.length; i += 1) {
                 if (self.enterViewport !== undefined) {
-                    items[i][self.enterViewport]();
+                    // If there is viewport refreshing, we also request an update
+                    self.enterViewport(items[i]);
                 }
             }
         };

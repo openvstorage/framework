@@ -1,17 +1,26 @@
-﻿/*global define */
+﻿// license see http://www.openvstorage.com/licenses/opensource/
+/*global define */
 define([
-    'plugins/router', 'bootstrap',
-    'ovs/shared', 'ovs/messaging', 'ovs/generic', 'ovs/tasks', 'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader'
-], function(router, bootstrap, shared, Messaging, generic, Tasks, Authentication, api, cssLoader) {
+    'plugins/router', 'bootstrap', 'i18next',
+    'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
+    'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
+], function(router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
     "use strict";
-    router.map([
-               { route: '',              moduleId: 'viewmodels/redirect',   nav: false },
-               { route: ':mode*details', moduleId: 'viewmodels/index', nav: false }
-           ]).buildNavigationModel()
+    router.map(routing.mainRoutes)
+          .buildNavigationModel()
           .mapUnknownRoutes('viewmodels/404');
 
     return function() {
         var self = this;
+
+        self._translate = function() {
+            return $.Deferred(function(deferred) {
+                i18n.setLng(self.shared.language, function() {
+                    $('html').i18n(); // Force retranslation of complete UI
+                    deferred.resolve();
+                });
+            }).promise();
+        };
 
         self.shared = shared;
         self.router = router;
@@ -35,8 +44,23 @@ define([
             self.shared.messaging      = new Messaging();
             self.shared.authentication = new Authentication();
             self.shared.tasks          = new Tasks();
+            self.shared.routing        = routing;
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
+            self.shared.authentication.onLoggedIn.push(function() {
+                return api.get('users/' + self.shared.authentication.token)
+                    .then(function(data) {
+                        self.shared.language = data.language;
+                    })
+                    .then(self._translate);
+            });
+            self.shared.authentication.onLoggedIn.push(function() {
+                self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
+            });
+            self.shared.authentication.onLoggedOut.push(function() {
+                self.shared.language = self.shared.defaultLanguage;
+                return self._translate();
+            });
             return router.activate();
         };
     };

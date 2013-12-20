@@ -1,49 +1,91 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Basic test module
+"""
 import uuid
 import time
 import sys
 from unittest import TestCase
-from ovs.dal.storedobject import StoredObject
 from ovs.dal.datalist import DataList
-from ovs.extensions.storage.dummies import DummyPersistentStore, DummyVolatileStore
+from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.exceptions import *
 from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations.relations import RelationMapper
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
+from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 
 
 class Basic(TestCase):
+    """
+    The basic unittestsuite will test all basic functionality of the DAL framework
+    It will also try accessing all dynamic properties of all hybrids making sure
+    that code actually works. This however means that all loaded 3rd party libs
+    need to be mocked
+    """
+
+    VDisk = None
+    VolatileMutex = None
+    TestMachine = None
+    TestDisk = None
+
     @classmethod
     def setUpClass(cls):
-        # Mocking
-        sys.modules['ovs.extensions.storage.memcachefactory'] = MCF
-        sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VSR
-        from ovs.dal.hybrids.vdisk import vDisk
-        global vDisk
-        from ovs.dal.hybrids._testmachine import TestMachine
-        from ovs.dal.hybrids._testdisk import TestDisk
+        """
+        Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
+        This makes sure the unittests can be executed without those libraries installed
+        """
+        # Load dummy stores
+        PersistentFactory.store = DummyPersistentStore()
+        VolatileFactory.store = DummyVolatileStore()
+        # Replace mocked classes
+        sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VolumeStorageRouter
+        # Import required modules/classes after mocking is done
+        from ovs.dal.hybrids.vdisk import VDisk
+        from ovs.extensions.generic.volatilemutex import VolatileMutex
+        from ovs.dal.hybrids.t_testmachine import TestMachine
+        from ovs.dal.hybrids.t_testdisk import TestDisk
+        _ = VDisk(), VolatileMutex('dummy'), TestMachine(), TestDisk()
+        # Globalize mocked classes
+        global VDisk
+        global VolatileMutex
         global TestMachine
         global TestDisk
 
         # Cleaning storage
-        DummyVolatileStore.clean()
-        DummyPersistentStore.clean()
+        VolatileFactory.store.clean()
+        PersistentFactory.store.clean()
         # Test to make sure the clean doesn't raise if there is nothing to clean
-        DummyVolatileStore.clean()
-        DummyPersistentStore.clean()
+        VolatileFactory.store.clean()
+        PersistentFactory.store.clean()
 
     @classmethod
     def setUp(cls):
-        StoredObject.persistent = DummyPersistentStore()
-        StoredObject.volatile = DummyVolatileStore()
+        """
+        (Re)Sets the stores on every test
+        """
+        PersistentFactory.store = DummyPersistentStore()
+        VolatileFactory.store = DummyVolatileStore()
 
     @classmethod
     def tearDownClass(cls):
+        """
+        Clean up the unittest
+        """
         pass
 
     def test_invalidobject(self):
+        """
+        Validates the behavior when a non-existing object is loaded
+        """
         # Loading an non-existing object should raise
         self.assertRaises(ObjectNotFoundException, TestDisk, uuid.uuid4(), None)
 
     def test_newobjet_delete(self):
+        """
+        Validates the behavior on object deletions
+        """
         disk = TestDisk()
         disk.save()
         # An object should always have a guid
@@ -51,9 +93,12 @@ class Basic(TestCase):
         self.assertIsNotNone(guid, 'Guid should not be None')
         # After deleting, the object should not be retreivable
         disk.delete()
-        self.assertRaises(Exception, TestDisk,  guid, None)
+        self.assertRaises(Exception, TestDisk, guid, None)
 
     def test_discard(self):
+        """
+        Validates the behavior regarding pending changes discard
+        """
         disk = TestDisk()
         disk.name = 'one'
         disk.save()
@@ -64,6 +109,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_updateproperty(self):
+        """
+        Validates the behavior regarding updating properties
+        """
         disk = TestDisk()
         disk.name = 'test'
         disk.description = 'desc'
@@ -73,12 +121,18 @@ class Basic(TestCase):
         disk.delete()
 
     def test_preinit(self):
+        """
+        Validates whether initial data is loaded on object creation
+        """
         disk = TestDisk(data={'name': 'diskx'})
         disk.save()
         self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
         disk.delete()
 
     def test_datapersistent(self):
+        """
+        Validates whether data is persisted correctly
+        """
         disk = TestDisk()
         guid = disk.guid
         disk.name = 'test'
@@ -89,12 +143,18 @@ class Basic(TestCase):
         disk.delete()
 
     def test_readonlyproperty(self):
+        """
+        Validates whether all dynamic properties are actually read-only
+        """
         disk = TestDisk()
         # Readonly properties should return data
         self.assertIsNotNone(disk.used_size, 'RO property should return data')
         disk.delete()
 
     def test_datastorewins(self):
+        """
+        Validates the "datastore_wins" behavior in the usecase where it wins
+        """
         disk = TestDisk()
         disk.name = 'initial'
         disk.save()
@@ -108,6 +168,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_datastoreloses(self):
+        """
+        Validates the "datastore_wins" behavior in the usecase where it loses
+        """
         disk = TestDisk()
         disk.name = 'initial'
         disk.save()
@@ -120,7 +183,29 @@ class Basic(TestCase):
         self.assertEqual(disk2.name, 'two', 'Data should not be overwritten')
         disk.delete()
 
+    def test_silentdatarefresh(self):
+        """
+        Validates whether the default scenario (datastore_wins=False) will execute silent
+        data refresh
+        """
+        disk = TestDisk()
+        disk.name = 'initial'
+        disk.save()
+        disk2 = TestDisk(disk.guid, datastore_wins=False)
+        disk.name = 'one'
+        disk.save()
+        disk2.name = 'two'
+        disk2.save()
+        disk.save()  # This should not overwrite anything but instead refresh data
+        # With datastore_wins set to False, the datastore loses concurrency conflicts
+        self.assertEqual(disk2.name, 'two', 'Data should not be overwritten')
+        self.assertEqual(disk.name, 'two', 'Data should be refreshed')
+        disk.delete()
+
     def test_datastoreraises(self):
+        """
+        Validates the "datastore_wins" behavior in the usecase where it's supposed to raise
+        """
         disk = TestDisk()
         disk.name = 'initial'
         disk.save()
@@ -133,6 +218,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_volatileproperty(self):
+        """
+        Validates the volatile behavior of dynamic properties
+        """
         disk = TestDisk()
         disk.size = 1000000
         value = disk.used_size
@@ -147,22 +235,34 @@ class Basic(TestCase):
         disk.delete()
 
     def test_persistency(self):
+        """
+        Validates whether the object is fetches from the correct storage backend
+        """
         disk = TestDisk()
         disk.name = 'test'
         disk.save()
         # Right after a save, the cache is invalidated
         disk2 = TestDisk(disk.guid)
-        self.assertFalse(disk2._metadata['cache'], 'Object should be retreived from persistent backend')
+        self.assertFalse(disk2._metadata['cache'],
+                         'Object should be retreived from persistent backend')
         # Subsequent calls will retreive the object from cache
         disk3 = TestDisk(disk.guid)
-        self.assertTrue(disk3._metadata['cache'], 'Object should be retreived from cache')
+        self.assertTrue(disk3._metadata['cache'],
+                        'Object should be retreived from cache')
         # After the object expiry passed, it will be retreived from backend again
         DummyVolatileStore().delete(disk._key)  # We clear the entry
         disk4 = TestDisk(disk.guid)
-        self.assertFalse(disk4._metadata['cache'], 'Object should be retreived from persistent backend')
+        self.assertFalse(disk4._metadata['cache'],
+                         'Object should be retreived from persistent backend')
         disk.delete()
 
     def test_objectproperties(self):
+        """
+        Validates the correctness of all hybrid objects:
+        * They should contain all required properties
+        * Properties should have the correct type
+        * All dynamic properties should be implemented
+        """
         # Some stuff here to dynamically test all hybrid properties
         for cls in HybridRunner.get_hybrids():
             relation_info = RelationMapper.load_foreign_relations(cls)
@@ -171,10 +271,27 @@ class Basic(TestCase):
                 for key in relation_info.keys():
                     remote_properties.append(key)
             # Make sure certain attributes are correctly set
-            self.assertIsInstance(cls._blueprint, dict, '_blueprint is a required property on %s' % cls.__name__)
-            self.assertIsInstance(cls._relations, dict, '_relations is a required property on %s' % cls.__name__)
-            self.assertIsInstance(cls._expiry, dict, '_expiry is a required property on %s' % cls.__name__)
+            self.assertIsInstance(cls._blueprint, dict, '_blueprint required: %s' % cls.__name__)
+            self.assertIsInstance(cls._relations, dict, '_relations required: %s' % cls.__name__)
+            self.assertIsInstance(cls._expiry, dict, '_expiry required: %s' % cls.__name__)
+            # Check types
+            allowed_types = [int, float, str, bool, list, dict]
+            for key in cls._blueprint:
+                is_allowed_type = cls._blueprint[key][1] in allowed_types \
+                    or isinstance(cls._blueprint[key][1], list)
+                self.assertTrue(is_allowed_type,
+                                '_blueprint types in %s should be one of %s'
+                                % (cls.__name__, str(allowed_types)))
+            for key in cls._expiry:
+                is_allowed_type = cls._expiry[key][1] in allowed_types \
+                    or isinstance(cls._expiry[key][1], list)
+                self.assertTrue(is_allowed_type,
+                                '_expiry types in %s should be one of %s'
+                                % (cls.__name__, str(allowed_types)))
             instance = cls()
+            for key, default in cls._blueprint.iteritems():
+                self.assertEqual(getattr(instance, key), default[0],
+                                 'Default property set correctly')
             # Make sure the type can be instantiated
             self.assertIsNotNone(instance.guid)
             properties = []
@@ -187,22 +304,30 @@ class Basic(TestCase):
                 if attribute not in properties:
                     missing_props.append(attribute)
                 else:  # ... and should work
-                    data = getattr(instance, attribute)
-            self.assertEqual(len(missing_props), 0, 'Missing dynamic properties in %s: %s' % (cls.__name__, missing_props))
+                    _ = getattr(instance, attribute)
+            self.assertEqual(len(missing_props), 0,
+                             'Missing dynamic properties in %s: %s'
+                             % (cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry
             missing_metadata = []
             for prop in properties:
                 found = prop in cls._blueprint \
                     or prop in cls._relations \
+                    or prop in ['%s_guid' % key for key in cls._relations.keys()] \
                     or prop in cls._expiry \
                     or prop in remote_properties \
                     or prop == 'guid'
                 if not found:
                     missing_metadata.append(prop)
-            self.assertEqual(len(missing_metadata), 0, 'Missing metadata for properties in %s: %s' % (cls.__name__, missing_metadata))
+            self.assertEqual(len(missing_metadata), 0,
+                             'Missing metadata for properties in %s: %s'
+                             % (cls.__name__, missing_metadata))
             instance.delete()
 
     def test_queries(self):
+        """
+        Validates whether executing queries returns the expected results
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -216,88 +341,81 @@ class Basic(TestCase):
                 disk.storage = machine
             disk.save()
         self.assertEqual(len(machine.disks), 10, 'query should find added machines')
-        list_1 = DataList(key   = 'list_1',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('size', DataList.operator.EQUALS, 1)]}}).data
+        # pylint: disable=line-too-long
+        list_1 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.EQUALS, 1)]}}).data  # noqa
         self.assertEqual(list_1, 1, 'list should contain int 1')
-        list_2 = DataList(key   = 'list_2',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.DESCRIPTOR,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('size', DataList.operator.EQUALS, 1)]}}).data
+        list_2 = DataList({'object': TestDisk,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.EQUALS, 1)]}}).data  # noqa
         found_object = Descriptor().load(list_2[0]).get_object(True)
         self.assertEqual(found_object.name, 'test_1', 'list should contain corret machine')
-        list_3 = DataList(key   = 'list_3',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('size', DataList.operator.GT, 3),
-                                                        ('size', DataList.operator.LT, 6)]}}).data
+        list_3 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.GT, 3),
+                                               ('size', DataList.operator.LT, 6)]}}).data  # noqa
         self.assertEqual(list_3, 2, 'list should contain int 2')  # disk 4 and 5
-        list_4 = DataList(key   = 'list_4',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.OR,
-                                              'items': [('size', DataList.operator.LT, 3),
-                                                        ('size', DataList.operator.GT, 6)]}}).data
-        self.assertGreaterEqual(list_4, 16, 'list should contain >= 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
-        list_5 = DataList(key   = 'list_5',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),
-                                                        {'type' : DataList.where_operator.OR,
-                                                         'items': [('size', DataList.operator.LT, 3),
-                                                                   ('size', DataList.operator.GT, 6)]}]}}).data
+        list_4 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.OR,
+                                     'items': [('size', DataList.operator.LT, 3),
+                                               ('size', DataList.operator.GT, 6)]}}).data  # noqa
+        # at least disk 0, 1, 2, 7, 8, 9, 10-19
+        self.assertGreaterEqual(list_4, 16, 'list should contain >= 16')
+        list_5 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('machine.guid', DataList.operator.EQUALS, machine.guid),  # noqa
+                                               {'type': DataList.where_operator.OR,
+                                                'items': [('size', DataList.operator.LT, 3),
+                                                          ('size', DataList.operator.GT, 6)]}]}}).data  # noqa
         self.assertEqual(list_5, 6, 'list should contain int 6')  # disk 0, 1, 2, 7, 8, 9
-        list_6 = DataList(key   = 'list_6',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('size', DataList.operator.LT, 3),
-                                                        ('size', DataList.operator.GT, 6)]}}).data
+        list_6 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.LT, 3),
+                                               ('size', DataList.operator.GT, 6)]}}).data  # noqa
         self.assertEqual(list_6, 0, 'list should contain int 0')  # no disks
-        list_7 = DataList(key   = 'list_7',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.OR,
-                                              'items': [('machine.guid', DataList.operator.EQUALS, '123'),
-                                                        ('used_size', DataList.operator.EQUALS, -1),
-                                                        {'type' : DataList.where_operator.AND,
-                                                         'items': [('size', DataList.operator.GT, 3),
-                                                                   ('size', DataList.operator.LT, 6)]}]}}).data
+        list_7 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.OR,
+                                     'items': [('machine.guid', DataList.operator.EQUALS, '123'),  # noqa
+                                               ('used_size', DataList.operator.EQUALS, -1),
+                                               {'type': DataList.where_operator.AND,
+                                                'items': [('size', DataList.operator.GT, 3),
+                                                          ('size', DataList.operator.LT, 6)]}]}}).data  # noqa
         self.assertEqual(list_7, 2, 'list should contain int 2')  # disk 4 and 5
-        list_8 = DataList(key   = 'list_8',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('machine.name', DataList.operator.EQUALS, 'machine'),
-                                                        ('name', DataList.operator.EQUALS, 'test_3')]}}).data
+        list_8 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine'),  # noqa
+                                               ('name', DataList.operator.EQUALS, 'test_3')]}}).data  # noqa
         self.assertEqual(list_8, 1, 'list should contain int 1')  # disk 3
-        list_9 = DataList(key   = 'list_9',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('size', DataList.operator.GT, 3),
-                                                        {'type' : DataList.where_operator.AND,
-                                                         'items': [('size', DataList.operator.LT, 6)]}]}}).data
+        list_9 = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('size', DataList.operator.GT, 3),
+                                               {'type': DataList.where_operator.AND,
+                                                'items': [('size', DataList.operator.LT, 6)]}]}}).data  # noqa
         self.assertEqual(list_9, 2, 'list should contain int 2')  # disk 4 and 5
-        list_10 = DataList(key   = 'list_10',
-                           query = {'object': TestDisk,
-                                    'data'  : DataList.select.COUNT,
-                                    'query' : {'type': DataList.where_operator.OR,
-                                               'items': [('size', DataList.operator.LT, 3),
-                                                         {'type': DataList.where_operator.OR,
-                                                          'items': [('size', DataList.operator.GT, 6)]}]}}).data
-        self.assertGreaterEqual(list_10, 16, 'list should contain >= 16')  # at least disk 0, 1, 2, 7, 8, 9, 10-19
-        list_11 = DataList(key   = 'list_11',
-                           query = {'object': TestDisk,
-                                    'data'  : DataList.select.COUNT,
-                                    'query' : {'type': DataList.where_operator.AND,
-                                               'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data
+        list_10 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.OR,
+                                      'items': [('size', DataList.operator.LT, 3),
+                                                {'type': DataList.where_operator.OR,
+                                                 'items': [('size', DataList.operator.GT, 6)]}]}}).data  # noqa
+        # at least disk 0, 1, 2, 7, 8, 9, 10-19
+        self.assertGreaterEqual(list_10, 16, 'list should contain >= 16')
+        list_11 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
         self.assertEqual(list_11, 10, 'list should contain int 10')  # disk 10-19
+        # pylint: enable=line-too-long
         for disk in machine.stored_disks:
             disk.delete()
         for disk in machine.disks:
@@ -305,6 +423,10 @@ class Basic(TestCase):
         machine.delete()
 
     def test_invalidpropertyassignment(self):
+        """
+        Validates whether the correct exception is raised when properties are assigned with a wrong
+        type
+        """
         disk = TestDisk()
         disk.size = 100
         with self.assertRaises(TypeError):
@@ -312,6 +434,9 @@ class Basic(TestCase):
         disk.delete()
 
     def test_recursive(self):
+        """
+        Validates the recursive save
+        """
         machine = TestMachine()
         machine.name = 'original'
         machine.save()
@@ -322,6 +447,7 @@ class Basic(TestCase):
         diskx.storage = machine2
         diskx.save()
         machine2.delete()  # Creating an orphaned object
+        disks = []
         for i in xrange(0, 10):
             disk = TestDisk()
             disk.name = 'test_%d' % i
@@ -332,6 +458,7 @@ class Basic(TestCase):
                 self.assertEqual(disk.machine.name, 'original', 'child should be set')
                 disk.machine = None
                 self.assertIsNone(disk.machine, 'child should be cleared')
+                disks.append(disk)
             disk.save()
         counter = 1
         for disk in machine.disks:
@@ -348,15 +475,24 @@ class Basic(TestCase):
         for disk in machine.disks:
             disk.delete()
         machine.delete()
+        for disk in disks:
+            disk.delete()
         diskx.delete()
 
     def test_descriptors(self):
+        """
+        Validates the correct behavior of the Descriptor
+        """
         with self.assertRaises(RuntimeError):
-            descriptor = Descriptor().descriptor
+            _ = Descriptor().descriptor
         with self.assertRaises(RuntimeError):
-            value = Descriptor().get_object()
+            _ = Descriptor().get_object()
 
     def test_relationcache(self):
+        """
+        Validates whether the relational properties are cached correctly, and whether
+        they are invalidated when required
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -393,6 +529,9 @@ class Basic(TestCase):
         machine.delete()
 
     def test_datalistactions(self):
+        """
+        Validates all actions that can be executed agains DataLists
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -421,90 +560,103 @@ class Basic(TestCase):
         machine.delete()
 
     def test_listcache(self):
-        disk0 = TestDisk()
-        disk0.save()
-        list_cache = DataList(key   = 'list_cache',
-                              query = {'object': TestDisk,
-                                       'data'  : DataList.select.COUNT,
-                                       'query' : {'type': DataList.where_operator.AND,
-                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 0, 'List should find no entries')
-        machine = TestMachine()
-        machine.name = 'machine'
-        machine.save()
-        disk1 = TestDisk()
-        disk1.machine = machine
-        disk1.save()
-        list_cache = DataList(key   = 'list_cache',
-                              query = {'object': TestDisk,
-                                       'data'  : DataList.select.COUNT,
-                                       'query' : {'type': DataList.where_operator.AND,
-                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 1, 'List should find one entry')
-        list_cache = DataList(key   = 'list_cache',
-                              query = {'object': TestDisk,
-                                       'data'  : DataList.select.COUNT,
-                                       'query' : {'type': DataList.where_operator.AND,
-                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
-        self.assertTrue(list_cache.from_cache, 'List should be loaded from cache')
-        disk2 = TestDisk()
-        disk2.machine = machine
-        disk2.save()
-        list_cache = DataList(key   = 'list_cache',
-                              query = {'object': TestDisk,
-                                       'data'  : DataList.select.COUNT,
-                                       'query' : {'type': DataList.where_operator.AND,
-                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 2, 'List should find two entries')
-        machine.name = 'x'
-        machine.save()
-        list_cache = DataList(key   = 'list_cache',
-                              query = {'object': TestDisk,
-                                       'data'  : DataList.select.COUNT,
-                                       'query' : {'type': DataList.where_operator.AND,
-                                                  'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
-        self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache')
-        self.assertEqual(list_cache.data, 0, 'List should have no matches')
-        for disk in machine.disks:
-            disk.delete()
-        machine.delete()
-        disk0.delete()
+        """
+        Validates whether lists are cached and invalidated correctly
+        """
+        keys = ['list_cache', None]
+        for key in keys:
+            disk0 = TestDisk()
+            disk0.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 0, 'List should find no entries (mode: %s)' % key)
+            machine = TestMachine()
+            machine.name = 'machine'
+            machine.save()
+            disk1 = TestDisk()
+            disk1.machine = machine
+            disk1.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 1, 'List should find one entry (mode: %s)' % key)
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: %s)' % key)
+            disk2 = TestDisk()
+            disk2.machine = machine
+            disk2.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 2, 'List should find two entries (mode: %s)' % key)
+            machine.name = 'x'
+            machine.save()
+            list_cache = DataList(key=key,
+                                  query={'object': TestDisk,
+                                         'data': DataList.select.COUNT,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
+            self.assertEqual(list_cache.data, 0, 'List should have no matches (mode: %s)' % key)
+            for disk in machine.disks:
+                disk.delete()
+            machine.delete()
+            disk0.delete()
 
     def test_emptyquery(self):
-        amount = DataList(key   = 'some_list',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}}).data
+        """
+        Validates whether an certain query returns an empty set
+        """
+        amount = DataList({'object': TestDisk,
+                           'data': DataList.select.COUNT,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
         self.assertEqual(amount, 0, 'There should be no data')
 
     def test_nofilterquery(self):
+        """
+        Validates whether empty queries return the full resultset
+        """
         disk1 = TestDisk()
         disk1.save()
         disk2 = TestDisk()
         disk2.save()
-        amount = DataList(key   = 'some_list',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': []}}).data
+        amount = DataList(key='some_list',
+                          query={'object': TestDisk,
+                                 'data': DataList.select.COUNT,
+                                 'query': {'type': DataList.where_operator.AND,
+                                           'items': []}}).data
         self.assertEqual(amount, 2, 'There should be two disks')
         disk3 = TestDisk()
         disk3.save()
-        amount = DataList(key   = 'some_list',
-                          query = {'object': TestDisk,
-                                   'data'  : DataList.select.COUNT,
-                                   'query' : {'type': DataList.where_operator.AND,
-                                              'items': []}}).data
+        amount = DataList(key='some_list',
+                          query={'object': TestDisk,
+                                 'data': DataList.select.COUNT,
+                                 'query': {'type': DataList.where_operator.AND,
+                                           'items': []}}).data
         self.assertEqual(amount, 3, 'There should be three disks')
         disk1.delete()
         disk2.delete()
         disk3.delete()
 
     def test_invalidqueries(self):
+        """
+        Validates invalid queries
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -514,38 +666,41 @@ class Basic(TestCase):
         disk.save()
         setattr(DataList.select, 'SOMETHING', 'SOMETHING')
         with self.assertRaises(NotImplementedError):
-            DataList(key   = 'some_list',
-                     query = {'object': TestDisk,
-                              'data'  : DataList.select.SOMETHING,
-                              'query' : {'type': DataList.where_operator.AND,
-                                         'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+            DataList({'object': TestDisk,
+                      'data': DataList.select.SOMETHING,
+                      'query': {'type': DataList.where_operator.AND,
+                                'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
         setattr(DataList.where_operator, 'SOMETHING', 'SOMETHING')
         with self.assertRaises(NotImplementedError):
-            DataList(key   = 'some_list',
-                     query = {'object': TestDisk,
-                              'data'  : DataList.select.COUNT,
-                              'query' : {'type': DataList.where_operator.SOMETHING,
-                                         'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})
+            DataList({'object': TestDisk,
+                      'data': DataList.select.COUNT,
+                      'query': {'type': DataList.where_operator.SOMETHING,
+                                'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
         setattr(DataList.operator, 'SOMETHING', 'SOMETHING')
         with self.assertRaises(NotImplementedError):
-            DataList(key   = 'some_list',
-                     query = {'object': TestDisk,
-                              'data'  : DataList.select.COUNT,
-                              'query' : {'type': DataList.where_operator.AND,
-                                         'items': [('machine.name', DataList.operator.SOMETHING, 'machine')]}})
+            DataList({'object': TestDisk,
+                      'data': DataList.select.COUNT,
+                      'query': {'type': DataList.where_operator.AND,
+                                'items': [('machine.name', DataList.operator.SOMETHING, 'machine')]}})  # noqa
         disk.delete()
         machine.delete()
 
     def test_clearedcache(self):
+        """
+        Validates the correct behavior when the volatile cache is cleared
+        """
         disk = TestDisk()
         disk.name = 'somedisk'
         disk.save()
-        StoredObject.volatile.delete(disk._key)
+        VolatileFactory.store.delete(disk._key)
         disk2 = TestDisk(disk.guid)
         self.assertEqual(disk2.name, 'somedisk', 'Disk should be fetched from persistent store')
         disk.delete()
 
     def test_serialization(self):
+        """
+        Validates whether serialization works as expected
+        """
         machine = TestMachine()
         machine.name = 'machine'
         machine.save()
@@ -557,16 +712,21 @@ class Basic(TestCase):
         self.assertIn('name', dictionary, 'Serialized object should have correct properties')
         self.assertEqual(dictionary['name'], 'disk', 'Serialized object should have correct name')
         self.assertIn('machine_guid', dictionary, 'Serialized object should have correct depth')
-        self.assertEqual(dictionary['machine_guid'], machine.guid, 'Serialized object should have correct properties')
+        self.assertEqual(dictionary['machine_guid'], machine.guid,
+                         'Serialized object should have correct properties')
         dictionary = disk.serialize(depth=1)
         self.assertIn('machine', dictionary, 'Serialized object should have correct depth')
-        self.assertEqual(dictionary['machine']['name'], 'machine', 'Serialized object should have correct properties at all depths')
+        self.assertEqual(dictionary['machine']['name'], 'machine',
+                         'Serialized object should have correct properties at all depths')
         disk.delete()
         machine.delete()
 
     def test_primarykeys(self):
+        """
+        Validates whether the primary keys are kept in sync
+        """
         disk = TestDisk()
-        StoredObject.volatile.delete('ovs_primarykeys_%s' % disk._name)
+        VolatileFactory.store.delete('ovs_primarykeys_%s' % disk._name)
         keys = DataList.get_pks(disk._namespace, disk._name)
         self.assertEqual(len(keys), 0, 'There should be no primary keys')
         disk.save()
@@ -574,28 +734,172 @@ class Basic(TestCase):
         self.assertEqual(len(keys), 1, 'There should be one primary key')
         disk.delete()
 
+    def test_reduceddatalist(self):
+        """
+        Validates the reduced list
+        """
+        disk = TestDisk()
+        disk.name = 'test'
+        disk.save()
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist), 1, 'There should be only one item (%s)' % len(datalist))
+        item = datalist.reduced[0]
+        with self.assertRaises(AttributeError):
+            print item.name
+        self.assertEqual(item.guid, disk.guid, 'The guid should be available')
+        disk.delete()
+
+    def test_volatiemutex(self):
+        """
+        Validates the volatile mutex
+        """
+        mutex = VolatileMutex('test')
+        mutex.acquire()
+        mutex.acquire()  # Should not raise errors
+        mutex.release()
+        mutex.release()  # Should not raise errors
+        mutex._volatile.add(mutex.key(), 1, 10)
+        with self.assertRaises(RuntimeError):
+            mutex.acquire(wait=1)
+        mutex._volatile.delete(mutex.key())
+        mutex.acquire()
+        time.sleep(0.5)
+        mutex.release()
+
+    def test_typesafety(self):
+        """
+        Validates typesafety checking on object properties
+        """
+        disk = TestDisk()
+        disk.name = 'test'
+        disk.name = u'test'
+        disk.name = None
+        disk.size = 100
+        disk.size = 100.5
+        disk.order = 100
+        with self.assertRaises(TypeError):
+            disk.order = 100.5
+        with self.assertRaises(TypeError):
+            disk.__dict__['wrong_type_data'] = None
+            disk.wrong_type_data = 'string'
+            _ = disk.wrong_type
+        with self.assertRaises(TypeError):
+            disk.type = 'THREE'
+        disk.type = 'ONE'
+
+    def test_ownrelations(self):
+        """
+        Validates whether relations to the object itself are working
+        """
+        pdisk = TestDisk()
+        pdisk.name = 'parent'
+        pdisk.save()
+        cdisk1 = TestDisk()
+        cdisk1.name = 'child 1'
+        cdisk1.size = 100
+        cdisk1.parent = pdisk
+        cdisk1.save()
+        cdisk2 = TestDisk()
+        cdisk2.name = 'child 2'
+        cdisk2.size = 100
+        cdisk2.parent = pdisk
+        cdisk2.save()
+        self.assertEqual(len(pdisk.children), 2, 'There should be 2 children.')
+        self.assertEqual(cdisk1.parent.name, 'parent', 'Parent should be loaded correctly')
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('parent.name', DataList.operator.EQUALS, 'parent')]}}).data
+        datalist = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist), 2, 'There should be two items (%s)' % len(datalist))
+        cdisk2.parent = None
+        cdisk2.save()
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('parent.name', DataList.operator.EQUALS, 'parent')]}}).data
+        datalist = DataObjectList(data, TestDisk)
+        self.assertEqual(len(datalist), 1, 'There should be one item (%s)' % len(datalist))
+        cdisk1.delete()
+        cdisk2.delete()
+        pdisk.delete()
+
 
 # Mocking classes
-class SRC():
+class StorageRouterClient():
+    """
+    Mocks the StorageRouterClient
+    """
+
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
     @staticmethod
-    def listSnapShots(volumeid):
-        return ["TEST1", "TEST2"]
+    def info(volume_id):
+        """
+        Return fake info
+        """
+        return volume_id
+
+    @staticmethod
+    def list_snapshots(volume_id):
+        """
+        Return fake info
+        """
+        _ = volume_id
+        return []
 
 
-class VSRC():
+class VolumeStorageRouterClient():
+    """
+    Mocks the VolumeStorageRouterClient
+    """
+
+    STATISTICS_KEYS = ['cluster_cache_hits',
+                       'backend_write_operations',
+                       'backend_data_read',
+                       'metadata_store_hits',
+                       'data_written',
+                       'data_read',
+                       'write_time',
+                       'metadata_store_misses',
+                       'backend_data_written',
+                       'sco_cache_misses',
+                       'backend_read_operations',
+                       'sco_cache_hits',
+                       'write_operations',
+                       'cluster_cache_misses',
+                       'read_operations']
+
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
     def load(self):
-        return SRC()
+        """
+        Returns the mocked StorageRouterClient
+        """
+        _ = self
+        return StorageRouterClient()
 
 
-class VSR():
-    VolumeStorageRouterClient = VSRC
+class VolumeStorageRouter():
+    """
+    Mocks the VolumeStorageRouter
+    """
+    VolumeStorageRouterClient = VolumeStorageRouterClient
 
-
-class MF():
-    @staticmethod
-    def load():
-        return DummyVolatileStore()
-
-
-class MCF():
-    MemcacheFactory = MF
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass

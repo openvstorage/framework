@@ -1,3 +1,7 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Provices authentication backend classes
+"""
 from django.contrib.auth.models import User as DUser
 from toolbox import Toolbox
 from ovs.dal.hybrids.user import User
@@ -6,14 +10,19 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from rest_framework.authentication import BaseAuthentication
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
 import logging
-import settings
 import hashlib
 
-logger = logging.getLogger(settings.SYSTEM_NAME)
+logger = logging.getLogger('default')
 
 
 class UPAuthenticationBackend(object):
+    """
+    This class provides user/password authentication against the hybrid model
+    """
     def authenticate(self, username=None, password=None):
+        """
+        Authenticate method
+        """
         if username is None or password is None:
             return None
 
@@ -33,10 +42,10 @@ class UPAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = DUser.objects.get(username=cuser.guid)
+            user = DUser.objects.get(username=cuser.username)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.guid)
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = False
             user.is_superuser = False
@@ -45,6 +54,9 @@ class UPAuthenticationBackend(object):
         return user
 
     def get_user(self, user_id):
+        """
+        Get_user method
+        """
         try:
             return DUser.objects.get(pk=user_id)
         except DUser.DoesNotExist:
@@ -54,6 +66,7 @@ class UPAuthenticationBackend(object):
 class TokenAuthenticationBackend(BaseAuthentication):
     """
     Simple token based authentication, changed implementation from the Django REST Framework
+    The token used, is in fact the guid of the user
 
     Clients should authenticate by passing the token key in the "Authorization"
     HTTP header, prepended with the string "Token ".  For example:
@@ -61,6 +74,9 @@ class TokenAuthenticationBackend(BaseAuthentication):
         Authorization: Token 401f7ac837da42b97f613d789819ff93537bee6a
     """
     def authenticate(self, request):
+        """
+        Authenticate method
+        """
         auth = TokenAuthenticationBackend._get_authorization_header(request).split()
 
         if not auth or auth[0].lower() != b'token':
@@ -75,18 +91,8 @@ class TokenAuthenticationBackend(BaseAuthentication):
             logger.error(msg)
             raise exceptions.AuthenticationFailed(msg)
 
-        return TokenAuthenticationBackend._authenticate_credentials(auth[1])
-
-    def get_user(self, user_id):
         try:
-            return DUser.objects.get(pk=user_id)
-        except DUser.DoesNotExist:
-            return None
-
-    @staticmethod
-    def _authenticate_credentials(key):
-        try:
-            cuser = User(key)
+            cuser = User(auth[1])
         except ObjectNotFoundException:
             msg = 'Invalid token'
             logger.error(msg)
@@ -98,10 +104,10 @@ class TokenAuthenticationBackend(BaseAuthentication):
             raise exceptions.AuthenticationFailed()
 
         try:
-            user = DUser.objects.get(username=cuser.guid)
+            user = DUser.objects.get(username=cuser.username)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.guid)
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = False
             user.is_superuser = False
@@ -109,7 +115,19 @@ class TokenAuthenticationBackend(BaseAuthentication):
 
         return user, None
 
+    def get_user(self, user_id):
+        """
+        Get_user method
+        """
+        try:
+            return DUser.objects.get(pk=user_id)
+        except DUser.DoesNotExist:
+            return None
+
     def authenticate_header(self, request):
+        """
+        Defines the authenticate header
+        """
         return 'Token'
 
     @staticmethod
@@ -127,7 +145,13 @@ class TokenAuthenticationBackend(BaseAuthentication):
 
 
 class HashAuthenticationBackend(object):
+    """
+    Provides authentication with a given URL hash, being the hybrid user guid
+    """
     def authenticate(self, user_guid=None):
+        """
+        Authenitcate method
+        """
         if user_guid is None:
             logger.error('No guid was passed')
             return None
@@ -149,10 +173,10 @@ class HashAuthenticationBackend(object):
 
         # We have authenticated the user. Let's make sure there is a corresponding User object and return it
         try:
-            user = DUser.objects.get(username=cuser.guid)
+            user = DUser.objects.get(username=cuser.username)
         except DUser.DoesNotExist:
-            user = DUser.objects.create_user(cuser.guid, 'nobody@example.com')
-            logger.info('Created user %s' % cuser.guid)
+            user = DUser.objects.create_user(cuser.username, 'nobody@example.com')
+            logger.info('Created user %s' % cuser.username)
             user.is_active = cuser.is_active
             user.is_staff = True
             user.is_superuser = True
@@ -161,6 +185,9 @@ class HashAuthenticationBackend(object):
         return user
 
     def get_user(self, user_id):
+        """
+        Get_user method
+        """
         try:
             return DUser.objects.get(pk=user_id)
         except DUser.DoesNotExist:

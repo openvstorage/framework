@@ -1,25 +1,36 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Volatile mutex module
+"""
 import time
-from ovs.extensions.storage.memcachefactory import MemcacheFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 class VolatileMutex(object):
     """
-    This is a volatile, distributed mutex to provide cross thread, cross process and cross node locking.
-    However, this mutex is volatile and thus can fail. You want to make sure you don't lock for longer than
-    a few hundred milliseconds to prevent this.
+    This is a volatile, distributed mutex to provide cross thread, cross process and cross node
+    locking. However, this mutex is volatile and thus can fail. You want to make sure you don't
+    lock for longer than a few hundred milliseconds to prevent this.
     """
 
     def __init__(self, name):
-        self._volatile = MemcacheFactory.load()
+        """
+        Creates a volatile mutex object
+        """
+        self._volatile = VolatileFactory.get_client()
         self.name = name
         self._has_lock = False
         self._start = 0
 
     def acquire(self, wait=None):
+        """
+        Aquire a lock on the mutex, optionally given a maximum wait timeout
+        """
         if self._has_lock:
             return True
         self._start = time.time()
         while not self._volatile.add(self.key(), 1, 60):
+            time.sleep(0.005)
             passed = time.time() - self._start
             if wait is not None and passed > wait:
                 raise RuntimeError('Could not aquire lock %s' % self.key())
@@ -30,6 +41,9 @@ class VolatileMutex(object):
         return True
 
     def release(self):
+        """
+        Releases the lock
+        """
         if self._has_lock:
             self._volatile.delete(self.key())
             passed = time.time() - self._start
@@ -38,7 +52,13 @@ class VolatileMutex(object):
             self._has_lock = False
 
     def key(self):
+        """
+        Lock key
+        """
         return 'ovs_lock_%s' % self.name
 
     def __del__(self):
+        """
+        __del__ hook, releasing the lock
+        """
         self.release()
