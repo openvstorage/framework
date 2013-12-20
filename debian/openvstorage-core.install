@@ -1,4 +1,0 @@
-ovs opt/OpenvStorage
-config/main.cfg opt/OpenvStorage/config
-config/specs opt/OpenvStorage/config
-config/supervisor/ovscore.conf etc/supervisor/conf.d
