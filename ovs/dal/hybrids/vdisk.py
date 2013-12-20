@@ -17,21 +17,21 @@ class VDisk(DataObject):
     vDisks can be part of a vMachine or stand-alone.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':              (None,   str,  'Name of the vDisk.'),
-                  'description':       (None,   str,  'Description of the vDisk.'),
-                  'size':              (0,      int,  'Size of the vDisk in Bytes.'),
-                  'devicename':        (None,   str,  'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
-                  'order':             (None,   int,  'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
-                  'volumeid':          (None,   str,  'ID of the vDisk in the Open vStorage Volume Driver.'),
-                  'parentsnapshot':    (None,   str,  'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
-                  'retentionpolicyid': (None,   str,  'Retention policy used by the vDisk.'),
-                  'snapshotpolicyid':  (None,   str,  'Snapshot policy used by the vDisk.'),
+    _blueprint = {'name':              (None, str, 'Name of the vDisk.'),
+                  'description':       (None, str, 'Description of the vDisk.'),
+                  'size':              (0, int, 'Size of the vDisk in Bytes.'),
+                  'devicename':        (None, str, 'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
+                  'order':             (None, int, 'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
+                  'volumeid':          (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
+                  'parentsnapshot':    (None, str, 'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
+                  'retentionpolicyid': (None, str, 'Retention policy used by the vDisk.'),
+                  'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
                   'tags':              (list(), list, 'Tags of the vDisk.'),
-                  'has_autobackup':    (False,  bool, 'Indicates whether this vDisk has autobackup enabled.'),
+                  'has_autobackup':    (False, bool, 'Indicates whether this vDisk has autobackup enabled.'),
                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.')}
     _relations = {'vmachine':     (VMachine, 'vdisks'),
-                  'vpool':        (VPool,    'vdisks'),
-                  'parent_vdisk': (None,     'child_vdisks')}
+                  'vpool':        (VPool, 'vdisks'),
+                  'parent_vdisk': (None, 'child_vdisks')}
     _expiry = {'snapshots':  (60, list),
                'info':       (60, dict),
                'statistics':  (5, dict),
@@ -47,6 +47,8 @@ class VDisk(DataObject):
         snapshots = []
         for guid in _vsr_client.list_snapshots(volumeid):
             snapshot = _vsr_client.info_snapshot(volumeid, guid)
+            # @todo: to be investigated howto handle during
+            # set as template
             if snapshot.metadata:
                 metadata = pickle.loads(snapshot.metadata)
                 snapshots.append({'guid': guid,

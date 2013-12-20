@@ -20,7 +20,7 @@ class VolumeStorageRouter(DataObject):
                   'ip':          (None, str, 'IP address on which the VSR is listening.'),
                   'vsrid':       (None, str, 'ID of the VSR in the Open vStorage Volume Driver.'),
                   'mountpoint':  (None, str, 'Mountpoint from which the VSR serves data')}
-    _relations = {'vpool':            (VPool,    'vsrs'),
+    _relations = {'vpool':            (VPool, 'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':        (30, str),
                'statistics':     (5, dict),
@@ -49,7 +49,7 @@ class VolumeStorageRouter(DataObject):
 
     def _stored_data(self):
         """
-        Agregates the Stored Data in Bytes of the vDisks connected to the VSR.
+        Aggregates the Stored Data in Bytes of the vDisks connected to the VSR.
         """
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
