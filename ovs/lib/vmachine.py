@@ -63,6 +63,11 @@ class VMachineController(object):
         if not target_hv.is_datastore_available(vsr.ip, vsr.mountpoint):
             raise RuntimeError('Datastore unavailable on target hypervisor')
 
+        source_vm = source_hv.get_vm_object(template_vm.hypervisorid)
+        if not source_vm:
+            raise RuntimeError(
+                'VM with key reference %s not found' % template_vm.hypervisorid)
+
         # @todo verify all disks can be cloned on target
         # @todo ie vpool is available on both hypervisors
         # @todo if so, continue
@@ -75,36 +80,19 @@ class VMachineController(object):
         new_vm.devicename = '{}/{}.vmx'.format(name.replace(' ', '_'), name.replace(' ', '_'))
         new_vm.save()
 
-        disk_tasks = []
+        disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
         for disk in disks_by_order:
             prefix = '%s-clone' % disk.name
-            clone_task = VDiskController.create_from_template.s(
+            result = VDiskController.create_from_template(
                 diskguid=disk.guid,
                 devicename=prefix,
                 location=new_vm.name,
                 machineguid=new_vm.guid)
-            disk_tasks.append(clone_task)
-        clone_disk_tasks = group(t for t in disk_tasks)
-        group_result = clone_disk_tasks()
-        while not group_result.ready():
-            time.sleep(1)
-        if group_result.successful():
-            disks = group_result.join()
-        else:
-            for task_result in group_result:
-                if task_result.successfull():
-                    VDiskController.delete(
-                        diskguid=task_result.get()['diskguid'])
-            new_vm.delete()
-            return group_result.successful()
+            disks.append(result)
 
-        # @todo: temporary fix to provide vmdsk descriptor file
-
-        source_vm = source_hv.get_vm_object(template_vm.hypervisorid)
-        if not source_vm:
-            raise RuntimeError(
-                'VM with key reference %s not found' % template_vm.hypervisorid)
+        # @todo: cleanup when not all disks could be successfully created
+        # @todo: skip vm creation on hypervisor in that case
 
         provision_machine_task = target_hv.create_vm_from_template.s(target_hv,
             name, source_vm, disks, esxhost=None, wait=True)
