@@ -37,3 +37,31 @@ class VDiskList(object):
         if vdisks:
             return DataObjectList(vdisks, VDisk)[0]
         return None
+
+    @staticmethod
+    def get_by_devicename(devicename):
+        """
+        Returns a list of all VDisks based on a given volumeid
+        """
+        # pylint: disable=line-too-long
+        vds = DataList({'object': VDisk,
+                        'data': DataList.select.DESCRIPTOR,
+                        'query': {'type': DataList.where_operator.AND,
+                                  'items': [('devicename', DataList.operator.EQUALS, devicename)]}}).data  # noqa
+        # pylint: enable=line-too-long
+        if vds:
+            return DataObjectList(vds, VDisk)[0]
+        return None
+
+    @staticmethod
+    def get_without_vmachine():
+        """
+        Gets all vDisks without a vMachine
+        """
+        # pylint: disable=line-too-long
+        vdisks = DataList({'object': VDisk,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('vmachine_guid', DataList.operator.EQUALS, None)]}}).data
+        # pylint: enable=line-too-long
+        return DataObjectList(vdisks, VDisk)

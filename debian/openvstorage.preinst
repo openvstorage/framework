@@ -1,8 +1,0 @@
-#!/bin/bash
-
-id -a ovs
-if [ $? -eq 1 ];
-then
-    useradd ovs -d /opt/OpenvStorage
-fi
-

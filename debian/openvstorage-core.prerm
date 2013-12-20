@@ -1,3 +1,0 @@
-#!/bin/bash
-
-find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;

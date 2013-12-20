@@ -56,7 +56,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         var units, counter;
         units = ['b', 'kib', 'mib', 'gib', 'tib'];
         counter = 0;
-        while (value > 2048) {
+        while (value >= 1000) {
             value = value / 1024;
             counter += 1;
         }
@@ -66,7 +66,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         var units, counter;
         units = ['b', 'kib', 'mib', 'gib', 'tib'];
         counter = 0;
-        while (value > 2048) {
+        while (value >= 1000) {
             value = value / 1024;
             counter += 1;
         }
@@ -79,7 +79,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         var units, counter, returnValue;
         units = ['k', 'm', 'g', 't'];
         counter = 0;
-        while (value > 2000) {
+        while (value >= 1000) {
             value = value / 1000;
             counter += 1;
         }

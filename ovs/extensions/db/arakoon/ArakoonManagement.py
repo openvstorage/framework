@@ -1,11 +1,38 @@
+"""
+This file is part of Arakoon, a distributed key-value store. Copyright
+(C) 2010 Incubaid BVBA
+
+Licensees holding a valid Incubaid license may use this file in
+accordance with Incubaid's Arakoon commercial license agreement. For
+more information on how to enter into this agreement, please contact
+Incubaid (contact details can be found on www.arakoon.org/licensing).
+
+Alternatively, this file may be redistributed and/or modified under
+the terms of the GNU Affero General Public License version 3, as
+published by the Free Software Foundation. Under this license, this
+file is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.
+
+See the GNU Affero General Public License for more details.
+You should have received a copy of the
+GNU Affero General Public License along with this program (file "COPYING").
+If not, see <http://www.gnu.org/licenses/>.
+
+Changes applied by CloudFounders NV:
+- Remove dependencies on pymonkey and/or pylabs
+- Various changes to make this library work with the OpenvStorage product
+"""
+
 import os
 import subprocess
 import signal
+import types
 import string
 import logging
 
 import Arakoon
-from ArakoonExceptions import ArakoonNodeNotLocal
+from ovs.extensions.db.arakoon import ArakoonRemoteControl
 from configobj import ConfigObj
 
 cfgDir = '/opt/OpenvStorage/config'
@@ -87,6 +114,7 @@ class ArakoonCluster:
         try:
             config = self._getConfigFile()
             clusterId = config["global"]["cluster_id"]
+            return clusterId
         except:
             logging.info("setting cluster_id to %s", clusterId)
             config["global"]["cluster_id"] = clusterId
@@ -322,6 +350,17 @@ class ArakoonCluster:
         logging.debug('calling: %s', str(cmd))
         return subprocess.call(cmd, close_fds = True)
 
+    def _getIp(self, ip_mess):
+        t_mess = type(ip_mess)
+        if t_mess == types.StringType:
+            parts = ip_mess.split(',')
+            ip = string.strip(parts[0])
+            return ip
+        elif t_mess == types.ListType:
+            return ip_mess[0]
+        else:
+            raise Exception("should '%s' be a string or string list")
+
     def _stopOne(self, name):
         line = self._cmdLine(name)
         cmd = ['pkill', '-f',  line]
@@ -358,6 +397,19 @@ class ArakoonCluster:
         if rc < 9:
             rc = 0 # might be we looped one time too many.
         return rc
+
+    def remoteCollapse(self, nodeName, n):
+        """
+        Tell the targetted node to collapse all but n tlog files
+        @type nodeName: string
+        @type n: int
+        """
+        config = self.getNodeConfig(nodeName)
+        ip_mess = config['ip']
+        ip = self._getIp(ip_mess)
+        port = int(config['client_port'])
+        clusterId = self._getClusterId()
+        ArakoonRemoteControl.collapse(ip,port,clusterId, n)
 
     def createDirs(self, name):
         """

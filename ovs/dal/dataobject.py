@@ -401,7 +401,7 @@ class DataObject(object):
                 else:
                     # Normal scenario, saving data
                     data[attribute] = self._data[attribute]
-            else:
+            elif attribute not in data:
                 data[attribute] = self._data[attribute]
         if data_conflicts:
             raise ConcurrencyException('Got field conflicts while saving %s. Conflicts: %s'

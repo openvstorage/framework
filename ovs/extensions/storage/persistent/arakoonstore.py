@@ -5,7 +5,7 @@ Arakoon store module
 
 import json
 
-from ovs.extensions.db.arakoon import Arakoon
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonNotFound
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 
@@ -17,14 +17,12 @@ class ArakoonStore(object):
     * Raises generic exception
     """
 
-    def __init__(self, cluster, node_config):
+    def __init__(self, cluster):
         """
         Initializes the client
         """
-        self._cluster = cluster
-        self._node_config = node_config
-        self._config = Arakoon.ArakoonClientConfig(self._cluster, self._node_config)
-        self._client = Arakoon.ArakoonClient(config=self._config)
+        self._cluster = ArakoonManagement().getCluster(cluster)
+        self._client = self._cluster.getClient()
 
     def get(self, key):
         """

@@ -50,22 +50,6 @@ class VMachineViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(FullSerializer(VMachine, instance=vmachine).data, status=status.HTTP_200_OK)
 
-    @expose(internal=True, customer=True)
-    @required_roles(['view', 'delete'])
-    def destroy(self, request, pk=None):
-        """
-        Deletes a machine
-        """
-        _ = request
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vmachine = VMachine(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.delete.s(machineguid=vmachine.guid).apply_async()
-        return Response(task.id, status=status.HTTP_200_OK)
-
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
@@ -80,8 +64,8 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.rollback.s(machineguid=vmachine.guid,
-                                             timestamp=request.DATA['timestamp']).apply_async()
+        task = VMachineController.rollback.delay(machineguid=vmachine.guid,
+                                                 timestamp=request.DATA['timestamp'])
         return Response(task.id, status=status.HTTP_200_OK)
 
     @action()
@@ -100,9 +84,9 @@ class VMachineViewSet(viewsets.ViewSet):
             return Response(status=status.HTTP_404_NOT_FOUND)
         label = str(request.DATA['name'])
         is_consistent = True if request.DATA['consistent'] else False  # Assure boolean type
-        task = VMachineController.snapshot.s(machineguid=vmachine.guid,
-                                             label=label,
-                                             is_consistent=is_consistent).apply_async()
+        task = VMachineController.snapshot.delay(machineguid=vmachine.guid,
+                                                 label=label,
+                                                 is_consistent=is_consistent)
         return Response(task.id, status=status.HTTP_200_OK)
 
     @link()
@@ -122,7 +106,7 @@ class VMachineViewSet(viewsets.ViewSet):
         vsa_vmachine_guids = []
         for vdisk in vmachine.vdisks:
             if vdisk.vsrid:
-                vsr = VolumeStorageRouterList.get_volumestoragerouter_by_vsrid(vdisk.vsrid)
+                vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
                 vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
         return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
 
@@ -194,7 +178,7 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachine = VMachine(pk)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.set_as_template.s(machineguid=vmachine.guid).apply_async()
+        task = VMachineController.set_as_template.delay(machineguid=vmachine.guid)
         return Response(task.id, status=status.HTTP_200_OK)
 
     @action()
@@ -214,8 +198,8 @@ class VMachineViewSet(viewsets.ViewSet):
                 return Response(status=status.HTTP_403_FORBIDDEN)
         except ObjectNotFoundException:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VMachineController.create_from_template.s(machineguid=vtemplate.guid,
-                                                         pmachineguid=pmachine.guid,
-                                                         name=str(request.DATA['name']),
-                                                         description=str(request.DATA['description'])).apply_async()
+        task = VMachineController.create_from_template.delay(machineguid=vtemplate.guid,
+                                                             pmachineguid=pmachine.guid,
+                                                             name=str(request.DATA['name']),
+                                                             description=str(request.DATA['description']))
         return Response(task.id, status=status.HTTP_200_OK)

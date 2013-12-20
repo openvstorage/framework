@@ -18,7 +18,7 @@ class VPool(DataObject):
                   'backend_login':      (None, str, 'Login/Username for the Storage Backend.'),
                   'backend_password':   (None, str, 'Password for the Storage Backend.'),
                   'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
-                  'backend_type':       (None, ['S3', 'FILESYSTEM'], 'Type of the Storage Backend.')}
+                  'backend_type':       (None, ['S3', 'LOCAL', 'REST'], 'Type of the Storage Backend.')}
     _relations = {}
     _expiry = {'status':        (10, str),
                'statistics':     (5, dict),

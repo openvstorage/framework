@@ -37,6 +37,7 @@ class DataList(object):
         # In case more operators are required, add them here, and implement them in
         # the _evaluate method below
         EQUALS = 'EQUALS'
+        NOT_EQUALS = 'NOT_EQUALS'
         LT = 'LT'
         GT = 'GT'
 
@@ -147,13 +148,15 @@ class DataList(object):
                 return False  # Fail the filter
 
         # Apply operators
+        if item[1] == DataList.operator.NOT_EQUALS:
+            return value != item[2]
         if item[1] == DataList.operator.EQUALS:
             return value == item[2]
         if item[1] == DataList.operator.GT:
             return value > item[2]
         if item[1] == DataList.operator.LT:
             return value < item[2]
-        raise NotImplementedError('The given where_operator is not yet implemented.')
+        raise NotImplementedError('The given operator {} is not yet implemented.'.format(item[1]))
 
     def _load(self):
         """

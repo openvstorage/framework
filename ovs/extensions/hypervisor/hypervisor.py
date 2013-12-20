@@ -43,14 +43,56 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def start(self, vmid):
+    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
         """
         Abstract method
         """
         pass
 
     @abc.abstractmethod
-    def stop(self, vmid):
+    def clone_vm(self, vmid, name, disks, esxhost=None, wait=False):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def delete_vm(self, vmid, wait=False):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vm_object(self, vmid):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vm_agnostic_object(self, vmid):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def is_datastore_available(self, ip, mountpoint, esxhost=None):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def set_as_template(self, vmid, disks, esxhost=None, wait=False):
         """
         Abstract method
         """

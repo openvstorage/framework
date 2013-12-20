@@ -11,6 +11,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from JumpScale import j
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -22,12 +23,10 @@ class MemcacheViewSet(viewsets.ViewSet):
     @staticmethod
     def _get_memcachelocation():
         """
-        Reads the memcache location out of the configuration files
+        Get the memcache location from hrd
         """
-        parser = ConfigParser.RawConfigParser()
-        parser.read('/opt/OpenvStorage/config/memcacheclient.cfg')
-        local_node = parser.get('main', 'local_node')
-        return parser.get(local_node, 'location')
+        return '{}:{}'.format(j.application.config.get('ovs.grid.ip'),
+                              j.application.config.get('ovs.core.memcache.localnode.port'))
 
     @staticmethod
     def _get_instance(host):
@@ -75,7 +74,6 @@ class MemcacheViewSet(viewsets.ViewSet):
             for hittype in ['hit', 'miss']:
                 cachekey = 'ovs_stats_cache_%s_%s' % (key, hittype)
                 stats.ovs_dal['%s_%s' % (key, hittype)] = volatile.get(cachekey) or 0
-
     @expose(internal=True)
     @required_roles(['view'])
     def list(self, request, format=None):

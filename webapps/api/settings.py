@@ -4,21 +4,19 @@ Django settings module
 """
 import os
 import ConfigParser
-
-parser = ConfigParser.RawConfigParser()
-parser.read('/opt/OpenvStorage/config/api.cfg')
+from JumpScale import j
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
-UI_NAME = parser.get('main', 'ui_name')
-APP_NAME = parser.get('main', 'app_name')
+UI_NAME = j.application.config.get('ovs.webapps.main.uiname')
+APP_NAME = j.application.config.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-BASE_FOLDER = parser.get('main', 'base_folder') + '/' + APP_NAME
+BASE_FOLDER = j.system.fs.joinPaths(j.application.config.get('ovs.core.basedir'), j.application.config.get('ovs.webapps.dir'), APP_NAME)
 
-BASE_LOG_DIR = parser.get('logging', 'base_folder')
-LOG_FILENAME = parser.get('logging', 'filename')
+BASE_LOG_DIR = j.application.config.get('ovs.webapps.logging.dir')
+LOG_FILENAME = j.application.config.get('ovs.webapps.logging.file')
 
 FRONTEND_ROOT = '/' + UI_NAME
 STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
@@ -26,7 +24,7 @@ STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    (parser.get('id', 'admin_name'), parser.get('id', 'admin_email')),
+    (j.application.config.get('ovs.webapps.admin.name'), j.application.config.get('ovs.webapps.admin.email')),
 )
 
 MANAGERS = ADMINS
@@ -34,7 +32,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_FOLDER + '/' + parser.get('main', 'db_name')
+        'NAME': BASE_FOLDER + '/' + j.application.config.get('ovs.webapps.main.dbname')
     }
 }
 
@@ -62,7 +60,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder'
 )
 
-SECRET_KEY = parser.get('main', 'secret_key')
+SECRET_KEY = j.application.config.get('ovs.webapps.main.secret')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',

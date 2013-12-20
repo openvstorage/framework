@@ -22,3 +22,16 @@ class VPoolList(object):
                            'query': {'type': DataList.where_operator.AND,
                                      'items': []}}).data
         return DataObjectList(vpools, VPool)
+
+    @staticmethod
+    def get_vpool_by_name(vpool_name):
+        """
+        Returns all VPools which have a given name
+        """
+        vpools = DataList({'object': VPool,
+                           'data': DataList.select.DESCRIPTOR,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('name', DataList.operator.EQUALS, vpool_name)]}}).data
+        if vpools:
+            return DataObjectList(vpools, VPool)
+        return None

@@ -24,7 +24,7 @@ class VolumeStorageRouterList(object):
         return DataObjectList(volumestoragerouters, VolumeStorageRouter)
 
     @staticmethod
-    def get_volumestoragerouter_by_vsrid(vsrid):
+    def get_by_vsrid(vsrid):
         """
         Returns a list of all VolumeStorageRouters based on a given vsrid
         """

@@ -46,10 +46,10 @@ define([
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
         self.freeSpace = ko.computed(function() {
-            if (self.size.raw() === 0 || self.storedData.raw() === 0) {
-                return 0;
+            if ((self.size.raw() || 0) === 0) {
+                return generic.formatRatio(0);
             }
-            return generic.formatRatio((self.size.raw() - self.storedData.raw()) / self.size.raw() * 100);
+            return generic.formatRatio((self.size.raw() - (self.storedData.raw() || 0)) / self.size.raw() * 100);
         });
 
         self._bandwidth = ko.computed(function() {
