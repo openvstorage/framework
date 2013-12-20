@@ -315,11 +315,36 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.rollback')
-    def rollback(machineguid, timestamp, **kwargs):
+    def rollback(machineguid, timestamp):
         """
         Rolls back a VM based on a given disk snapshot timestamp
         """
-        _ = machineguid, timestamp, kwargs
+        vmachine = VMachine(machineguid)
+        snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == timestamp]
+        if not snapshots:
+            raise ValueError('No vmachine snapshots found for timestamp {}'.format(timestamp))
+        tasks = []
+
+        for disk in vmachine.vdisks:
+            t = VDiskController.rollback.s(diskguid=disk.guid,
+                                           timestamp=timestamp,
+                                           **kwargs)
+            tasks.append(t)
+
+        rollback_disk_tasks = group(t for t in tasks)
+        group_result = rollback_disk_tasks()
+        while not group_result.ready():
+            time.sleep(1)
+        failed_rollback = []
+        if group_result.successful():
+            disks = group_result.join()
+            return disks
+        else:
+            for task_result in group_result:
+                if not task_result.successful():
+                    failed_rollback.append(task_result)
+            return failed_rollback
+
 
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')

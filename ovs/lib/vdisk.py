@@ -248,11 +248,17 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.rollback')
-    def rollback(diskguid, timestamp, **kwargs):
+    def rollback(diskguid, timestamp):
         """
         Rolls back a disk based on a given disk snapshot timestamp
         """
-        _ = diskguid, timestamp, kwargs
+        disk = VDisk(diskguid)
+        snapshots = [snap for snap in disk.snapshots if snap['timestamp'] == timestamp]
+        if not snapshots:
+            raise ValueError('No snapshot found for timestamp {}'.format(timestamp))
+        snapshotguid = snapshots[0]['guid']
+        vsr_client.rollback_volume(str(disk.volumeid), snapshotguid)
+        return True
 
     @staticmethod
     @celery.task(name='ovs.disk.patchvmdk')
