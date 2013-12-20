@@ -621,7 +621,6 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-
     @validate_session
     def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
         """
@@ -860,39 +859,6 @@ class Sdk(object):
         if wait:
             self.wait_for_task(task)
         return task
-
-    def make_agnostic_config(self, vm_object, esxhost=None):
-        regex = '\[([^\]]+)\]\s(.+)'
-        match = re.search(regex, vm_object.config.files.vmPathName)
-        esxhost = self._validate_host(esxhost)
-
-        config = {'name': vm_object.config.name,
-                  'id': vm_object.obj_identifier.value,
-                  'backing': {'filename': match.group(2),
-                              'datastore': match.group(1)},
-                  'disks': [],
-                  'datastores': {}}
-
-        for device in vm_object.config.hardware.device:
-            if device.__class__.__name__ == 'VirtualDisk':
-                if device.backing is not None and \
-                        device.backing.fileName is not None:
-                    backingfile = device.backing.fileName
-                    match = re.search(regex, backingfile)
-                    if match:
-                        config['disks'].append({'filename': match.group(2),
-                                                'datastore': match.group(1),
-                                                'name': device.deviceInfo.label,
-                                                'order': device.unitNumber})
-
-        host_system = self._get_object(esxhost, properties=['datastore'])
-        for store in host_system.datastore[0]:
-            store = self._get_object(store)
-            if hasattr(store.info, 'nas'):
-                config['datastores'][store.info.name] = '{}:{}'.format(store.info.nas.remoteHost,
-                                                                       store.info.nas.remotePath)
-
-        return config
 
     @validate_session
     def get_vm_guest_info(self, vmid):
