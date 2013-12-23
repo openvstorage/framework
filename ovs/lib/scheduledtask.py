@@ -12,7 +12,7 @@ import os
 import traceback
 from time import mktime
 from datetime import datetime
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
 from ovs.celery import celery
 from ovs.celery import loghandler
 from ovs.lib.vmachine import VMachineController
@@ -258,7 +258,7 @@ class ScheduledTaskController(object):
     @ensure_single(['ovs.scheduled.collapse_arakoon'])
     def collapse_arakoon():
         loghandler.logger.info('Starting arakoon collapse')
-        arakoon_dir = os.path.join(j.application.config.get('ovs.core.cfgdir'), 'arakoon')
+        arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
         arakoon_clusters = map(lambda directory: os.path.basename(directory.rstrip(os.path.sep)),
                                os.walk(arakoon_dir).next()[1])
         for cluster in arakoon_clusters:

@@ -7,13 +7,14 @@ from celery.task.control import revoke
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
+
 
 def process(queue, body):
     """
     Processes the actual received body
     """
-    if queue == j.application.config.get('ovs.core.broker.volumerouter.queue'):
+    if queue == Configuration.get('ovs.core.broker.volumerouter.queue'):
         import json
         import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
         cache = VolatileFactory.get_client()

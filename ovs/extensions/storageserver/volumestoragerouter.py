@@ -4,8 +4,9 @@ Wrapper class for the storagerouterclient of the voldrv team
 """
 
 from volumedriver.storagerouter import storagerouterclient
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
 import json
+import os
 
 
 class VolumeStorageRouterClient(object):
@@ -37,8 +38,8 @@ class VolumeStorageRouterClient(object):
         """
         Initializes the wrapper given a configfile for the RPC communication
         """
-        self._host = j.application.config.get('ovs.grid.ip')
-        self._port = int(j.application.config.get('volumedriver.filesystem.xmlrpc.port'))
+        self._host = Configuration.get('ovs.grid.ip')
+        self._port = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
 
     def load(self):
         """
@@ -51,12 +52,12 @@ class VolumeStorageRouterConfiguration(object):
     VolumeStorageRouter configuration class
     """
     def __init__(self, storagerouter):
-        self._config_specfile = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'),'specs', 'volumedriverfs.json')
-        self._config_file = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), '{}.json'.format(storagerouter))
-        self._config_tmpfile = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), '{}.json.tmp'.format(storagerouter))
+        self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'),'specs', 'volumedriverfs.json')
+        self._config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json'.format(storagerouter))
+        self._config_tmpfile = os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json.tmp'.format(storagerouter))
 
     def load_config(self):
-        if j.system.fs.exists(self._config_file) and not j.system.fs.fileSize(self._config_file) == 0:
+        if os.path.exists(self._config_file) and not os.path.getsize(self._config_file) == 0:
             self._config_readfile_handler = open(self._config_file, 'r')
             self._config_file_handler = open(self._config_tmpfile, 'w')
             self._config_file_content = json.load(self._config_readfile_handler)
@@ -70,8 +71,8 @@ class VolumeStorageRouterConfiguration(object):
     def write_config(self):
         json.dump(self._config_file_content, self._config_file_handler, indent=2)
         self._config_file_handler.close()
-        if j.system.fs.exists(self._config_tmpfile):
-            j.system.fs.moveFile(self._config_tmpfile, self._config_file)
+        if os.path.exists(self._config_tmpfile):
+            os.rename(self._config_tmpfile, self._config_file)
 
     def add_cache(self):
         pass
@@ -171,7 +172,7 @@ class VolumeStorageRouterConfiguration(object):
         """
         Configures volume storage router arakoon cluster
         @param arakoon_cluster_id: name of the arakoon cluster
-        @param arakoon_nodes: dictionary of arakoon nodes in this cluster 
+        @param arakoon_nodes: dictionary of arakoon nodes in this cluster
         """
         self.load_config()
         if not 'volume_registry' in self._config_file_content:
