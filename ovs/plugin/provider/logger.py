@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 This module contains logger logic
 """
@@ -15,3 +16,6 @@ class Logger(object):
         raise RuntimeError('This class should not be instantiated.')
 
     log = None
+
+from ovs.plugin.injection.injector import Injector
+Logger = Injector.inject(Logger)

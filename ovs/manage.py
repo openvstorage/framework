@@ -7,7 +7,6 @@ import subprocess
 import uuid
 import os
 import re
-import shutil
 import platform
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.console import Console
@@ -124,7 +123,7 @@ class Configure():
         nginx_file_handle.close()
         # Remove nginx default config
         if os.path.exists('/etc/nginx/sites-enabled/default'):
-            shutil.rmtree('/etc/nginx/sites-enabled/default')
+            os.remove('/etc/nginx/sites-enabled/default')
 
     @staticmethod
     def init_storagerouter(vmachineguid, vpool_name):

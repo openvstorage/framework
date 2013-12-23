@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 This module contains configuration logic
 """
@@ -15,3 +16,6 @@ class Configuration(object):
         raise RuntimeError('This class should not be instantiated.')
 
     get = None
+
+from ovs.plugin.injection.injector import Injector
+Configuration = Injector.inject(Configuration)

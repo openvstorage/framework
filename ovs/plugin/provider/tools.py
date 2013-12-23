@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 This module contains tools logic
 """
@@ -15,3 +16,6 @@ class Tools(object):
         raise RuntimeError('This class should not be instantiated.')
 
     inifile = None
+
+from ovs.plugin.injection.injector import Injector
+Tools = Injector.inject(Tools)

@@ -1,3 +1,4 @@
+# license see http://www.openvstorage.com/licenses/opensource/
 """
 This module contains process logic
 """
@@ -15,3 +16,6 @@ class Process(object):
         raise RuntimeError('This class should not be instantiated.')
 
     checkProcess = None
+
+from ovs.plugin.injection.injector import Injector
+Process = Injector.inject(Process)
