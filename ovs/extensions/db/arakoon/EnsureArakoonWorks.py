@@ -2,8 +2,11 @@
 
 import sys
 import time
+import uuid
+import os
+import shutil
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from JumpScale import j
+from ovs.plugin.provider.logger import Logger
 
 
 class EnsureArakoonError(Exception):
@@ -12,6 +15,7 @@ class EnsureArakoonError(Exception):
 
     def __speak__(self):
         print "{0}".format(self.message)
+
 
 class EnsureArakoonWorks():
     """
@@ -23,12 +27,12 @@ class EnsureArakoonWorks():
 
     def __init__(self):
         self._works = False
-        self._getepoch = j.base.time.getTimeEpoch
+        self._getepoch = lambda: int(time.time())
         self._begintime = self._getepoch()
         self._waitlimit = 1800
         self._client = PersistentFactory.get_client('arakoon')
         self._key = 'ensureworks'
-        self._valueguid = j.base.idgenerator.generateGUID()
+        self._valueguid = str(uuid.uuid4())
         self._value = "{0}{1}"
 
     def _speak(self, message):
@@ -36,7 +40,7 @@ class EnsureArakoonWorks():
 
         leader = "[arakoon_check]:"
         logmessage = "{0} {1}".format(leader, message)
-        j.logger.log(logmessage, 1)
+        Logger.log(logmessage, 1)
         sys.stdout.flush()
 
     def _set(self):
@@ -87,9 +91,8 @@ class EnsureArakoonWorks():
     def _setlockfile(self):
         """ set a lock file to indicate arakoon is not running """
 
-        jp = j.system.fs.joinPaths
-        lockfilename = jp(j.dirs.varDir, "startupfailurelock")
-        j.system.fs.createEmptyFile(lockfilename)
+        lockfilename = '/var/startupfailurelock'
+        open(lockfilename, 'a').close()
 
     def checktestresults(self):
         """ loop and wait for arakoon to work """
@@ -98,7 +101,7 @@ class EnsureArakoonWorks():
         runstart = self._getepoch()
         while True:
             works = self._works
-            if works != True:
+            if works is not True:
                 try:
                     self.runtest()
                 except:
@@ -121,7 +124,7 @@ class EnsureArakoonWorks():
                 self._speak("Arakoon is now ready")
 
                 arakoonbudirs = list()
-                for arakoonbudir in j.system.fs.listDirsInDir(j.dirs.tmpDir):
+                for arakoonbudir in os.walk('/tmp').next()[1]:
                     if 'arakoonbu_' in arakoonbudir:
                         arakoonbudirs.append(arakoonbudir)
 
@@ -131,7 +134,7 @@ class EnsureArakoonWorks():
                     self._speak("Waiting {0} seconds and then removing any extraneous backup directories".format(waitseconds))
                     time.sleep(waitseconds)
                     for arakoonbudir in arakoonbudirs:
-                        j.system.fs.removeDirTree(arakoonbudir)
+                        shutil.rmtree(arakoonbudir)
                         self._speak("Arakoon startup backup dir removed: {0}".format(arakoonbudir))
                     self._speak("Kept last backup of {0}".format(latesttokeep))
                 break

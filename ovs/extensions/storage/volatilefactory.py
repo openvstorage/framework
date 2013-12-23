@@ -3,7 +3,8 @@
 Generic volatile factory.
 """
 import ConfigParser
-from JumpScale import j
+import os
+from ovs.plugin.provider.configuration import Configuration
 
 
 class VolatileFactory(object):
@@ -20,13 +21,13 @@ class VolatileFactory(object):
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
             parser = ConfigParser.RawConfigParser()
             if client_type is None:
-                client_type = j.application.config.get('ovs.core.storage.volatile')
+                client_type = Configuration.get('ovs.core.storage.volatile')
 
             VolatileFactory.store = None
             if client_type == 'memcache':
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 memcache_servers = list()
-                parser.read(j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'),'memcacheclient.cfg'))
+                parser.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
                 nodes = parser.get('main', 'nodes').split(',')
                 for node in nodes:
                     location = parser.get(node, 'location')

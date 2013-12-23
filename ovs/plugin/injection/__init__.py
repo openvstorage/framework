@@ -1,0 +1,3 @@
+"""
+DI injection module
+"""
