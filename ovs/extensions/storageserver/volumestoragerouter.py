@@ -179,7 +179,6 @@ class VolumeStorageRouterConfiguration(object):
             self._config_file_content['volume_registry'] = {}
         self._config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
         self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
-        self._config_file_content['filesystem']['fs_arakoon_cluster_id'] = arakoon_cluster_id
         for node_id,node_config in arakoon_nodes.iteritems():
             node_dict = {'node_id' : node_id, 'host' : node_config[0][0], 'port' : node_config[1]}
             self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'].append(node_dict)

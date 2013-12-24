@@ -33,7 +33,6 @@
     },
     "filesystem": {
         "fs_backend_path" : "/mnt/dfs",
-        "fs_xmlrpc_port" : "12323",
         "fs_ignore_sync": "false",
         "fs_virtual_disk_format": "vmdk",
         "fs_file_event_rules": [{"fs_file_event_rule_calls": ["Mknod", "Unlink", "Rename"],
