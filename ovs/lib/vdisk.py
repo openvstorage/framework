@@ -33,38 +33,6 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    @celery.task(name='ovs.disk.new_volume')
-    def new_volume(location, devicename, size, name=None, machineguid=None, **kwargs):
-        """
-        Create a new disk
-
-        @param vpool: name of the vpool
-                      vpool is served by one or more storagerouter APPLICATION,
-                      this application contains the information where
-                      the storagerouterclient should connect to
-        @param name: name of the disk
-        @param location: location where virtual device should be created (eg: myVM)
-        @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
-        @param size: Size of the disk in MiB
-        @param maxSize: Maximum size of allowed non disposable SCO's
-        @param machineguid: guid of the machine to assign the disk to
-        """
-        name = name if name else devicename
-        description = '{} {}'.format(location, name)
-        volumeid = vsr_client.create_volume(
-            targetPath='{}/{}'.format(location, devicename),
-            volumeSize='{}MiB'.format(size),
-            scoMultiplier=1024)
-        disk = VDisk()
-        disk.name = name
-        disk.description = description
-        disk.devicename = devicename
-        disk.volumeid = volumeid
-        disk.machine = VMachine(machineguid) if machineguid else None
-        disk.save()
-        return kwargs
-
-    @staticmethod
     @celery.task(name='ovs.disk.create_from_voldrv')
     def create_from_voldrv(volumepath, volumename, volumesize, vsrid, **kwargs):
         """
@@ -163,9 +131,8 @@ class VDiskController(object):
         """
         _ = kwargs
         description = '{} {}'.format(location, devicename)
-        properties_to_clone = [
-            'description', 'size', 'type', 'retentionpolicyguid',
-            'snapshotpolicyguid', 'autobackup', 'machine']
+        properties_to_clone = ['description', 'size', 'type', 'retentionpolicyguid',
+                               'snapshotpolicyguid', 'autobackup']
 
         new_disk = VDisk()
         disk = VDisk(diskguid)
@@ -175,23 +142,21 @@ class VDiskController(object):
         _snap = '{}'.format(snapshotid)
         logging.info(_log.format(_snap, disk.name, _location))
         volumeid = vsr_client.create_clone(_location, _id, _snap)
-        for item in properties_to_clone:
-            setattr(new_disk, item, getattr(disk, item))
+        new_disk.copy_blueprint(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
         new_disk.volumeid = volumeid
         new_disk.devicename = '{}.vmdk'.format(devicename)
         new_disk.parentsnapshot = snapshotid
-        new_disk.machine = VMachine(
-            machineguid) if machineguid else disk.machine
+        new_disk.machine = VMachine(machineguid) if machineguid else disk.machine
         new_disk.save()
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': '{}/{}.vmdk'.format(location, devicename)}
 
     @staticmethod
     @celery.task(name='ovs.disk.create_snapshot')
-    def create_snapshot(diskguid, metadata, **kwargs):
+    def create_snapshot(diskguid, metadata, snapshotid=None):
         """
         Create a disk snapshot
 
@@ -200,16 +165,14 @@ class VDiskController(object):
         """
         disk = VDisk(diskguid)
         logging.info('Create snapshot for disk {}'.format(disk.name))
-        # if not srClient.canTakeSnapshot(diskguid):
-        #    raise ValueError('Volume {} not found'.format(diskguid))
+        if snapshotid is None:
+            snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
-        snapshotguid = vsr_client.create_snapshot(
+        vsr_client.create_snapshot(
             str(disk.volumeid),
-            snapshot_id=str(uuid.uuid4()),
+            snapshot_id=snapshotid,
             metadata=metadata
         )
-        kwargs['result'] = snapshotguid
-        return kwargs
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_snapshot')
@@ -240,7 +203,6 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
 
-        # @todo: enable when method is exposed on vsr client
         disk = VDisk(diskguid)
         vsr_client.set_volume_as_template(str(disk.volumeid))
 
@@ -261,51 +223,8 @@ class VDiskController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.disk.patchvmdk')
-    def patchvmdk(source_base_name, target_base_name):
-        """
-        THIS IS A TEMPORARY SOLUTION
-        Clones/patches a vmdk from a source to a target.
-        @param source_base_name: The source base name of the vmdk, including folder
-        @param target_base_name: The target base name of the vmdk, including folder
-
-        Example:
-          source_base_name = 'test01/test01'
-          target_base_name = 'test03/test03'
-        What will be executed:
-          1. /mnt/dfs/<source_base_name>.vmdk will be opened into string
-          2. The in memory string will be updated:
-             <source_base_name>-flat.vmdk will be updated to <target_base_name>-flat.vmdk
-          3. String will be written to /mnt/dfs/target_base_name>.vmdk
-
-        How to use:
-          1. Make sure the clone is executed towards a -flat.vmdk file
-          2. Pass in the source and target (target is the above string, without the -flat.vmdk)
-          3. Since (1) will result in a vdisk being created automatically with the correct vmdk ref,
-             nothing has to be updated anymore.
-          4. Attach disk to the vm (or create the vm), which will trigger a sync of the vm,
-             which will result in the vdisk being updated and linked to the vm
-        """
-
-        if source_base_name.endswith('.vmdk'):
-            source_base_name = source_base_name[:-5]
-
-        if target_base_name.endswith('.vmdk'):
-            target_base_name = target_base_name[:-5]
-
-        with open('/mnt/dfs/{}.vmdk'.format(source_base_name), 'r') as sourcefile:
-            contents = sourcefile.read()
-
-        if contents is not None:
-            contents.replace('{}-flat.vmdk'.format(source_base_name),
-                             '{}-flat.vmdk'.format(target_base_name))
-
-        with open('/mnt/dfs/{}.vmdk'.format(target_base_name), 'w') as targetfile:
-            targetfile.write(contents)
-
-    @staticmethod
     @celery.task(name='ovs.disk.create_from_template')
-    def create_from_template(diskguid, location, devicename, machineguid=None, **kwargs):
+    def create_from_template(diskguid, location, devicename, machineguid=None):
         """
         Create a disk from a template
 
@@ -316,36 +235,33 @@ class VDiskController(object):
         @return diskguid: guid of new disk
         """
 
-        # @todo verify diskguid specified is actually a template
-
-        _ = kwargs
         description = '{} {}'.format(location, devicename)
         properties_to_clone = [
             'description', 'size', 'type', 'retentionpolicyid',
             'snapshotpolicyid', 'has_autobackup', 'vmachine', 'vpool']
 
-        new_disk = VDisk()
         disk = VDisk(diskguid)
-        _log = 'Create disk from template {} to new disk {} to location {}'
-        # @todo volume driver does not support space in filenames
-        _location = '{}/{}-flat.vmdk'.format(location, devicename).replace(' ', '')
-        _id = '{}'.format(disk.volumeid)
-        logging.info(_log.format(disk.name, new_disk.name, '/' + _location))
-        volumeid = vsr_client.create_clone_from_template('/' + _location, _id)
-        for item in properties_to_clone:
-            setattr(new_disk, item, getattr(disk, item))
-        new_devicename = '{}.vmdk'.format(devicename).replace(' ', '')
+        if not disk.vmachine.is_vtemplate:
+            raise RuntimeError('The given disk does not belong to a template')
+
+        device_location = '/{}/{}.vmdk'.format(location, devicename)
+
+        new_disk = VDisk()
+        new_disk.copy_blueprint(disk, include=properties_to_clone)
+        new_disk.vpool = disk.vpool
+        new_disk.devicename = device_location
         new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
-        new_disk.volumeid = volumeid
-        new_disk.devicename = new_devicename
-        new_disk.vmachine = VMachine(
-            machineguid) if machineguid else disk.vmachine
+        new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
         new_disk.save()
-        VDiskController.patchvmdk(disk.devicename,
-                                  '{}/{}'.format(new_disk.vmachine.name,
-                                                 new_disk.devicename))
-        return {'diskguid': new_disk.guid, 'name': new_disk.name,
-                'backingdevice': _location.replace('-flat', '')}
 
+        logging.info('Create disk from template {} to new disk {} to location {}'.format(
+            disk.name, new_disk.name, device_location
+        ))
+        volumeid = vsr_client.create_clone_from_template(device_location, str(disk.volumeid))
+        new_disk.volumeid = volumeid
+        new_disk.save()
+
+        return {'diskguid': new_disk.guid, 'name': new_disk.name,
+                'backingdevice': device_location.strip('/')}

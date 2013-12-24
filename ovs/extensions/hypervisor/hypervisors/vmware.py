@@ -46,7 +46,7 @@ class VMware(Hypervisor):
         @return: celery task
         """
         task = self.sdk.create_vm_from_template(name, source_vm, disks, esxhost, wait)
-        if wait == True:
+        if wait is True:
             if self.sdk.validate_result(task):
                 task_info = self.sdk.get_task_info(task)
                 return task_info.info.result.value

@@ -241,7 +241,10 @@ class ScheduledTaskController(object):
             for work_unit in work_units:
                 try:
                     total += 1
-                    scrubbing_result = _vsr_scrubber.scrub(work_unit)
+                    scrubbing_result = _vsr_scrubber.scrub(
+                        work_unit,
+                        Configuration.get('ovs.core.tempfs.mountpoint')
+                    )
                     _vsr_client.apply_scrubbing_result(scrubbing_result)
                 except:
                     failed += 1

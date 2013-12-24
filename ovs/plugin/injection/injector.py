@@ -2,7 +2,7 @@
 """
 Injector module
 """
-import ConfigParser
+from ovs.plugin.injection.loader import Loader
 
 
 class Injector(object):
@@ -19,12 +19,7 @@ class Injector(object):
     @staticmethod
     def inject(module):
         """ Inject module logic and return updated module """
-        config = ConfigParser.RawConfigParser()
-        config.read('/opt/OpenvStorage/ovs/plugin/injection/settings.cfg')
-        if config.has_option('main', 'framework_{0}'.format(module.__name__.lower())):
-            framework = config.get('main', 'framework_{0}'.format(module.__name__.lower()))
-        else:
-            framework = config.get('main', 'framework')
+        framework = Loader.load(module)
         injector_module = __import__(name='ovs.plugin.injection.injectors.{0}'.format(framework),
                                      globals=globals(),
                                      locals=locals(),

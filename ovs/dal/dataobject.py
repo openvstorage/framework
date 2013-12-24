@@ -510,6 +510,35 @@ class DataObject(object):
             data[key] = getattr(self, key)
         return data
 
+    def copy_blueprint(self, other_object, include=None, exclude=None, include_relations=False):
+        """
+        Copies all _blueprint (and optionally _relation) properties over from a given hybrid to
+        self. One can pass in a list of properties that should be copied, or a list of properties
+        that should not be copied. Exclude > Include
+        """
+        if include is not None and not isinstance(include, list):
+            raise TypeError('Argument include should be None or a list of strings')
+        if exclude is not None and not isinstance(exclude, list):
+            raise TypeError('Argument exclude should be None or a list of strings')
+        if self.__class__.__name__ != other_object.__class__.__name__:
+            raise TypeError('Properties can only be loaded from hybrids of the same type')
+
+        if include:
+            properties_to_copy = include
+        else:
+            properties_to_copy = self._blueprint.keys()
+            if include_relations:
+                properties_to_copy += self._relations.keys()
+
+        if exclude:
+            properties_to_copy = [p for p in properties_to_copy if p not in exclude]
+
+        possible_options = self._blueprint.keys() + (self._relations.keys() if include_relations else [])
+        properties_to_copy = [p for p in properties_to_copy if p in possible_options]
+
+        for key in properties_to_copy:
+            setattr(self, key, getattr(other_object, key))
+
     #######################
     ## Properties
     #######################

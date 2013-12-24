@@ -60,6 +60,7 @@ class Sdk(object):
         self._username = login
         self._password = passwd
         self._sessionID = None
+        self._check_session = True
 
         self._cache = ObjectCache()
         self._cache.setduration(weeks=1)
@@ -369,6 +370,7 @@ class Sdk(object):
         backing = factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
         backing.diskMode = 'persistent'
         backing.fileName = '[%s] %s' % (datastore.name, disk['backingdevice'])
+        backing.thinProvisioned = True
         device = factory.create('ns0:VirtualDisk')
         device.controllerKey = key
         device.key = -200 - unit
@@ -652,10 +654,6 @@ class Sdk(object):
             config.deviceChange.append(
                 self._create_disk(self._client.factory, disk_controller_key,
                                   disk, disks.index(disk), datastore))
-            self.copy_file(
-                '[{0}] {1}'.format(datastore.name, '%s.vmdk'
-                                   % disk['name'].split('_')[-1].replace('-clone', '')),
-                '[{0}] {1}'.format(datastore.name, disk['backingdevice']))
 
         # Add network
         nw_type = type(self._client.factory.create(
@@ -688,7 +686,6 @@ class Sdk(object):
             self.wait_for_task(task)
 
         return task
-
 
     @validate_session
     def clone_vm(self, vmid, name, disks, esxhost=None, wait=True):
@@ -1250,22 +1247,29 @@ class Sdk(object):
             self._sessionID = self._client.service.Login(
                 self._serviceContent.sessionManager,
                 self._username,
-                self._password, None).key
+                self._password,
+                None
+            ).key
         else:
             active = False
-            try:
-                active = self._client.service.SessionIsActive(
-                    self._serviceContent.sessionManager,
-                    sessionID=self._sessionID,
-                    userName=self._username)
-            except:
-                pass
+            if self._check_session:
+                try:
+                    active = self._client.service.SessionIsActive(
+                        self._serviceContent.sessionManager,
+                        sessionID=self._sessionID,
+                        userName=self._username
+                    )
+                except Exception as e:
+                    if 'The requested operation is not implemented by the server.' in str(e):
+                        self._check_session = False
             if not active:
                 self._logout()
                 self._sessionID = self._client.service.Login(
                     self._serviceContent.sessionManager,
                     self._username,
-                    self._password, None).key
+                    self._password,
+                    None
+                ).key
 
     def _logout(self):
         """

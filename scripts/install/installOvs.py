@@ -15,10 +15,15 @@ parser.add_option('--no-filesystems', dest='filesystems', action="store_false", 
 if options.filesystems:
     # Create partitions on HDD
     os.system('parted /dev/sdb -s mklabel gpt')
-    os.system('parted /dev/sdb -s mkpart backendfs 2MB 90%')
-    os.system('parted /dev/sdb -s mkpart distribfs 90% 100%')
+    os.system('parted /dev/sdb -s mkpart backendfs 2MB 80%')
+    os.system('parted /dev/sdb -s mkpart distribfs 80% 90%')
+    os.system('parted /dev/sdb -s mkpart tempfs 90% 100%')
     os.system('mkfs.ext4 /dev/sdb1 -L backendfs')
     os.system('mkfs.ext4 /dev/sdb2 -L distribfs')
+    os.system('mkfs.ext4 /dev/sdb3 -L tempfs')
+    os.system('mkdir /mnt/bfs')
+    os.system('mkdir /mnt/dfs')
+    os.system('mkdir /var/tmp')
 
     #Create partitions on SSD
     os.system('parted /dev/sdc -s mklabel gpt')
@@ -31,8 +36,6 @@ if options.filesystems:
     os.system('mkdir /mnt/db')
     os.system('mkdir /mnt/cache')
     os.system('mkdir /mnt/md')
-    os.system('mkdir /mnt/bfs')
-    os.system('mkdir /mnt/dfs')
 
     # Add content to fstab
     fstab_content = """
@@ -42,6 +45,7 @@ LABEL=cache     /mnt/cache ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
 # END Open vStorage
 """
     must_update = False
@@ -58,10 +62,10 @@ LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
 # Mount all filesystems
 os.system('mountall')
 
-supported_quality_levels = ['unstable','test','stable']
-quality_level = raw_input('Enter qualitylevel to install from %s: '%supported_quality_levels)
+supported_quality_levels = ['unstable', 'test', 'stable']
+quality_level = raw_input('Enter qualitylevel to install from {0}: '.format(supported_quality_levels))
 if not quality_level in supported_quality_levels:
-    raise ValueError('Please specify correct qualitylevel, one of %s'%supported_quality_levels)
+    raise ValueError('Please specify correct qualitylevel, one of {0}'.format(supported_quality_levels))
 
 # Install all software components
 os.system('apt-get -y install python-pip')
@@ -87,7 +91,7 @@ bitbucketaccount = openvstorage
 bitbucketreponame = jp_openvstorage
 blobstorremote = jp_openvstorage
 blobstorlocal = jpackages_local
-"""%{'qualityLevel': quality_level}
+""" % {'qualityLevel': quality_level}
 
 blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'a')
 blobstor_config.write(jp_openvstorage_blobstor)
@@ -100,4 +104,3 @@ jp_sources_config.close()
 os.system('jpackage_update')
 os.system('jpackage_install -n core')
 os.system('jpackage_install -n openvstorage')
-

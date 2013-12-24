@@ -490,8 +490,8 @@ if __name__ == '__main__':
         sys.exit(1)
     disk_config = ''
     disk_config = vm_sys.create_vdisk(vm_name, 0, '100G', disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssds[0], disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, hdds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, ssds[0], disk_config)
 
     # Add CD drive
     datastore, vmfs_devices = vm_sys.get_vmfs_devices()

@@ -202,8 +202,7 @@ class Configure():
 
         vsr_configuration.configure_failovercache(failovercache)
 
-        filesystem_config = {'fs_cache_path': Configuration.get('volumedriver.filesystem.cache'),
-                             'fs_backend_path': Configuration.get('volumedriver.filesystem.distributed'),
+        filesystem_config = {'fs_backend_path': Configuration.get('volumedriver.filesystem.distributed'),
                              'fs_volume_regex': Configuration.get('volumedriver.filesystem.regex'),
                              'fs_xmlrpc_port': Configuration.get('volumedriver.filesystem.xmlrpc.port')}
         vsr_configuration.configure_filesystem(filesystem_config)
