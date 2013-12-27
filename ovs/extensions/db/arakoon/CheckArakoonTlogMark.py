@@ -202,9 +202,9 @@ class CheckArakoonTlogMark():
         """ mark tlog file for a local localnode """
         tlogfile = self._localnodesfiles[localnode]['tlogfile']
         self._speak("Marking tlog file {0} for localnode {1}".format(tlogfile, localnode))
-        markcommand = ['arakoon', '--mark-tlog', tlogfile, "'closed:{1}'".format(localnode)]
+        markcommand = "arakoon --mark-tlog {0} 'closed:{1}'".format(tlogfile, localnode)
         try:
-            subprocess.check_call(markcommand)
+            subprocess.call(markcommand, shell=True)
         except subprocess.CalledProcessError as e:
             # debugging errors
             self._dumptlog(localnode, cluster)
@@ -212,7 +212,7 @@ class CheckArakoonTlogMark():
             self._speak(markmessage.format(e.returncode))
             return False
 
-        self._speak("Marked tlog file with status 0")
+        self._speak("Marked tlog file with status 0, {0}".format(markcommand))
         return True
 
     def _checkmark(self, localnode, cluster):
@@ -295,7 +295,7 @@ class CheckArakoonTlogMark():
         """ failover arakoon """
 
         if not self._isgrid:
-            self._speak("Failover cannot be accmplished without grid env")
+            self._speak("Failover cannot be accmoplished without grid env")
             return False
 
         self._movearakoondb(localnode, cluster, failover=True)
@@ -420,10 +420,10 @@ class CheckArakoonTlogMark():
                 self._gettlogdir(localnode, cluster)
                 self._getdbdir(localnode, cluster)
                 tlogdir = self._localnodesfiles[localnode]['tlogdir']
-
+                self._speak("Localnode {1}, Tlogdir: {0}".format(tlogdir, localnode))
                 # there can be many .tlog files for each localnode
                 # but only the last one is relevant for checking
-                tlogfilelist = [f for f in os.listdir(tlogdir) if os.path.isfile(f) and f.endswith('.tlog')]
+                tlogfilelist = [os.path.join(tlogdir, f) for f in os.listdir(tlogdir) if os.path.isfile(os.path.join(tlogdir,f)) and f.endswith('.tlog')]
                 if not tlogfilelist:
                     failmessage = "Tlogs are missing - now attempting failover"
                     self._speak(failmessage)
