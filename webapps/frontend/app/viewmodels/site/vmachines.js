@@ -100,11 +100,19 @@ define([
                 });
         };
         self.rollback = function(guid) {
-            dialog.show(new RollbackWizard({
-                modal: true,
-                type: 'vmachine',
-                guid: guid
-            }));
+            var i, vms = self.vMachines(), vm;
+            for (i = 0; i < vms.length; i += 1) {
+                if (vms[i].guid() === guid) {
+                    vm = vms[i];
+                }
+            }
+            if (vm !== undefined && !vm.isRunning()) {
+                dialog.show(new RollbackWizard({
+                    modal: true,
+                    type: 'vmachine',
+                    guid: guid
+                }));
+            }
         };
         self.snapshot = function(guid) {
             dialog.show(new SnapshotWizard({
@@ -119,7 +127,7 @@ define([
                     vm = vms[i];
                 }
             }
-            if (vm !== undefined) {
+            if (vm !== undefined && !vm.isRunning()) {
                 app.showMessage(
                         $.t('ovs:vmachines.setastemplate.warning'),
                         $.t('ovs:vmachines.setastemplate.title', { what: vm.name() }),
@@ -143,7 +151,7 @@ define([
                                 .fail(function(error) {
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.errorwhile', {
+                                        $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
                                             what: $.t('ovs:vmachines.setastemplate.errormsg', { what: vm.name() }),
                                             error: error

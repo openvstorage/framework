@@ -17,40 +17,44 @@ define([
         self.loadChildrenGuid = undefined;
 
         // External dependencies
-        self.vsas           = ko.observableArray([]);
-        self.vpools         = ko.observableArray([]);
+        self.vsas             = ko.observableArray([]);
+        self.vpools           = ko.observableArray([]);
 
         // Observables
-        self.loading        = ko.observable(false);
-        self.loaded         = ko.observable(false);
+        self.loading          = ko.observable(false);
+        self.loaded           = ko.observable(false);
 
-        self.guid           = ko.observable(guid);
-        self.vpool          = ko.observable();
-        self.vsaGuids       = ko.observableArray([]);
-        self.vPoolGuids     = ko.observableArray([]);
-        self.name           = ko.observable();
-        self.ipAddress      = ko.observable();
-        self.isInternal     = ko.observable();
-        self.isVTemplate    = ko.observable();
-        self.snapshots      = ko.observableArray([]);
-        self.status         = ko.observable();
-        self.iops           = ko.smoothDeltaObservable(generic.formatNumber);
-        self.storedData     = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits      = ko.smoothDeltaObservable();
-        self.cacheMisses    = ko.smoothDeltaObservable();
-        self.readSpeed      = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.writeSpeed     = ko.smoothDeltaObservable(generic.formatSpeed);
-        self.backendReads   = ko.smoothObservable(undefined, generic.formatNumber);
-        self.backendWritten = ko.smoothObservable(undefined, generic.formatBytes);
-        self.backendRead    = ko.smoothObservable(undefined, generic.formatBytes);
-        self.bandwidthSaved = ko.smoothObservable(undefined, generic.formatBytes);
-        self.failoverMode   = ko.observable();
-        self.cacheRatio     = ko.computed(function() {
+        self.guid             = ko.observable(guid);
+        self.vpool            = ko.observable();
+        self.vsaGuids         = ko.observableArray([]);
+        self.vPoolGuids       = ko.observableArray([]);
+        self.name             = ko.observable();
+        self.hypervisorStatus = ko.observable();
+        self.ipAddress        = ko.observable();
+        self.isInternal       = ko.observable();
+        self.isVTemplate      = ko.observable();
+        self.snapshots        = ko.observableArray([]);
+        self.status           = ko.observable();
+        self.iops             = ko.smoothDeltaObservable(generic.formatNumber);
+        self.storedData       = ko.smoothObservable(undefined, generic.formatBytes);
+        self.cacheHits        = ko.smoothDeltaObservable();
+        self.cacheMisses      = ko.smoothDeltaObservable();
+        self.readSpeed        = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.writeSpeed       = ko.smoothDeltaObservable(generic.formatSpeed);
+        self.backendReads     = ko.smoothObservable(undefined, generic.formatNumber);
+        self.backendWritten   = ko.smoothObservable(undefined, generic.formatBytes);
+        self.backendRead      = ko.smoothObservable(undefined, generic.formatBytes);
+        self.bandwidthSaved   = ko.smoothObservable(undefined, generic.formatBytes);
+        self.failoverMode     = ko.observable();
+        self.cacheRatio       = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
+        });
+        self.isRunning        = ko.computed(function() {
+            return self.hypervisorStatus() === 'RUNNING';
         });
 
         self.vDisks                = ko.observableArray([]);
@@ -137,6 +141,7 @@ define([
                                 .done(function(data) {
                                     var stats = data.statistics;
                                     self.name(data.name);
+                                    self.hypervisorStatus(data.hypervisor_status);
                                     self.iops(stats.write_operations + stats.read_operations);
                                     self.storedData(data.stored_data);
                                     self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);

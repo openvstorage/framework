@@ -277,6 +277,11 @@ class VMachineController(object):
         # when clones were made from it.
 
         vmachine = VMachine(machineguid)
+        vmachine.invalidate_dynamics()
+        if vmachine.hypervisor_status == 'RUNNING':
+            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
+                vmachine.name
+            ))
         tasks = []
 
         for disk in vmachine.vdisks:
@@ -308,6 +313,12 @@ class VMachineController(object):
         Rolls back a VM based on a given disk snapshot timestamp
         """
         vmachine = VMachine(machineguid)
+        vmachine.invalidate_dynamics()
+        if vmachine.hypervisor_status == 'RUNNING':
+            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
+                vmachine.name
+            ))
+
         snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:
             raise ValueError('No vmachine snapshots found for timestamp {}'.format(timestamp))

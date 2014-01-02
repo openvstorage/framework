@@ -92,7 +92,7 @@ define([
                                 .fail(function(error) {
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.errorwhile', {
+                                        $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
                                             what: $.t('ovs:vmachines.delete.errormsg', { what: vm.name() }),
                                             error: error

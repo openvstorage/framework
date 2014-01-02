@@ -14,6 +14,12 @@
                 "undefined": "Unknown"
             }
         },
+        "messages": {
+            "savesuccessfully": "__what__ saved successfully.",
+            "errorwhile": "An error occurred while __what__.",
+            "errorwhile_error": "An error occurred while __what__: __error__",
+            "notrunningrequired": "vMachine should be halted."
+        },
         "username": "Username",
         "password": "Password",
         "logout": "Log out",
@@ -48,9 +54,6 @@
         "gib": "GiB",
         "tibs": "TiB/s",
         "tib": "TiB",
-        "savesuccessfully": "__what__ saved successfully.",
-        "errorwhile": "An error occurred while __what__.",
-        "errorwhile_error": "An error occurred while __what__: __error__",
         "saved": "Saved",
         "error": "Error",
         "vdisk": "vDisk",

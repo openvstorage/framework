@@ -62,7 +62,7 @@ define([
                     .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.errorwhile', {
+                            $.t('ovs:generic.messages.errorwhile', {
                                 context: 'error',
                                 what: $.t('ovs:wizards.createft.gather.creating', { what: self.data.vm().name() }),
                                 error: error

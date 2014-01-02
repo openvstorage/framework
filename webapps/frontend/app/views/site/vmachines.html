@@ -36,8 +36,12 @@
                 </td>
                 <td>
                     <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.snapshot"></i>
-                    <i data-bind="click: function() { $root.setAsTemplate($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.setastemplate"></i>
-                    <i data-bind="click: function() { $root.rollback($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.rollback"></i>
+                    <i data-bind="click: function() { $root.setAsTemplate($data.guid()); }, style: { color: isRunning() ? 'lightgrey' : 'black' },
+                                  tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : '', css: { hand: !isRunning(), forbidden: isRunning() }"
+                       class="fa fa-fw" data-i18n="[html]ovs:icons.setastemplate"></i>
+                    <i data-bind="click: function() { $root.rollback($data.guid()); }, style: { color: isRunning() ? 'lightgrey' : 'black' },
+                                  tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : '', css: { hand: !isRunning(), forbidden: isRunning() }"
+                       class="fa fa-fw" data-i18n="[html]ovs:icons.rollback"></i>
                 </td>
             </tr>
         </table>
