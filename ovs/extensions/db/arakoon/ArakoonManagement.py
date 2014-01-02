@@ -634,12 +634,12 @@ if __name__ == '__main__':
     
     if not options.cluster:
         parser.error("No arakoon cluster specified")
-    if not options.start_stop:
+    if options.start_stop == None:
         parser.error("No action specified")
     
     ArakoonManagement = ArakoonManagement()
     arakoon_cluster = ArakoonManagement.getCluster(options.cluster)
-    if option.start_stop:
+    if options.start_stop:
         arakoon_cluster.start()
     else:
         arakoon_cluster.stop()
