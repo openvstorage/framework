@@ -173,6 +173,7 @@ class VDiskController(object):
             snapshot_id=snapshotid,
             metadata=metadata
         )
+        disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_snapshot')
@@ -192,6 +193,7 @@ class VDiskController(object):
         logging.info(
             'Deleting snapshot {} from disk {}'.format(_snap, diskguid))
         vsr_client.delete_snapshot(disk.volumeid, _snap)
+        disk.invalidate_dynamics(['snapshots'])
         return kwargs
 
     @staticmethod
@@ -220,6 +222,7 @@ class VDiskController(object):
             raise ValueError('No snapshot found for timestamp {}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
         vsr_client.rollback_volume(str(disk.volumeid), snapshotguid)
+        disk.invalidate_dynamics(['snapshots'])
         return True
 
     @staticmethod
