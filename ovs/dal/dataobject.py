@@ -2,7 +2,6 @@
 """
 DataObject module
 """
-import inspect
 import uuid
 import copy
 from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
@@ -449,8 +448,7 @@ class DataObject(object):
                     self._volatile.delete(list_key)
 
         # Invalidate the cache
-        for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
+        self.invalidate_dynamics()
         self._volatile.delete(self._key)
 
         self._original = copy.deepcopy(self._data)
@@ -477,8 +475,7 @@ class DataObject(object):
             pass
 
         # Delete the object and its properties out of the volatile store
-        for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
+        self.invalidate_dynamics()
         self._volatile.delete(self._key)
         self._delete_pk(self._key)
 
@@ -489,6 +486,14 @@ class DataObject(object):
         """
         self.__init__(guid           = self._guid,
                       datastore_wins = self._datastore_wins)
+
+    def invalidate_dynamics(self):
+        """
+        Invalidates all dynamic property caches. Use with caution, as this action can introduce
+        a short performance hit.
+        """
+        for key in self._expiry.keys():
+            self._volatile.delete('%s_%s' % (self._key, key))
 
     def serialize(self, depth=0):
         """
