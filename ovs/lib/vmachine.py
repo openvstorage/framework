@@ -277,7 +277,7 @@ class VMachineController(object):
         # when clones were made from it.
 
         vmachine = VMachine(machineguid)
-        vmachine.invalidate_dynamics()
+        vmachine.invalidate_dynamics(['snapshots'])
         if vmachine.hypervisor_status == 'RUNNING':
             raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
                 vmachine.name
@@ -313,7 +313,7 @@ class VMachineController(object):
         Rolls back a VM based on a given disk snapshot timestamp
         """
         vmachine = VMachine(machineguid)
-        vmachine.invalidate_dynamics()
+        vmachine.invalidate_dynamics(['snapshots'])
         if vmachine.hypervisor_status == 'RUNNING':
             raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
                 vmachine.name
@@ -333,6 +333,7 @@ class VMachineController(object):
         group_result = rollback_disk_tasks()
         while not group_result.ready():
             time.sleep(1)
+        vmachine.invalidate_dynamics(['snapshots'])
         failed_rollback = []
         if group_result.successful():
             disks = group_result.join()
@@ -380,6 +381,7 @@ class VMachineController(object):
             for disk in machine.vdisks:
                 VDiskController.create_snapshot(diskguid=disk.guid,
                                                 metadata=metadata)
+        machine.invalidate_dynamics(['snapshots'])
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')

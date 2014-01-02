@@ -7,7 +7,7 @@
                 <label class="col-lg-3 control-label" for="snapshot" data-i18n="ovs:wizards.rollback.gather.snapshot"></label>
                 <div class="col-lg-8">
                     <span data-bind="dropdown: {
-                                         key: 'guid', keyisfunction: false,
+                                         key: 'timestamp', keyisfunction: false,
                                          items: data.velement().snapshots, target: data.snapshot,
                                          text: function(item) {
                                              var text = '', date = new Date(item.timestamp * 1000);

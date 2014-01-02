@@ -487,13 +487,14 @@ class DataObject(object):
         self.__init__(guid           = self._guid,
                       datastore_wins = self._datastore_wins)
 
-    def invalidate_dynamics(self):
+    def invalidate_dynamics(self, properties=None):
         """
         Invalidates all dynamic property caches. Use with caution, as this action can introduce
         a short performance hit.
         """
         for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
+            if properties is None or key in properties:
+                self._volatile.delete('%s_%s' % (self._key, key))
 
     def serialize(self, depth=0):
         """

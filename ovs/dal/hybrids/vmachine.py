@@ -23,11 +23,11 @@ class VMachine(DataObject):
                   'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.'),
                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
     _relations = {'pmachine': (PMachine, 'vmachines')}
-    _expiry = {'snapshots':         (60, list),
-               'hypervisor_status': (30, str),
-               'statistics':         (5, dict),
-               'stored_data':       (60, int),
-               'failover_mode':     (60, str)}
+    _expiry = {'snapshots':          (60, list),
+               'hypervisor_status': (300, str, True),  # The cache is invalidated on start/stop
+               'statistics':          (5, dict),
+               'stored_data':        (60, int),
+               'failover_mode':      (60, str)}
     # pylint: enable=line-too-long
 
     def _snapshots(self):
@@ -58,8 +58,8 @@ class VMachine(DataObject):
         """
         Fetches the Status of the vMachine.
         """
-        if self.hypervisorid == None:
-            return 'Unknown'
+        if self.hypervisorid is None:
+            return 'UNKNOWN'
         hv = hvFactory.get(self.pmachine)
         return hv.get_state(self.hypervisorid)
 
