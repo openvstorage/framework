@@ -1,0 +1,55 @@
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section>
+    <h2 data-i18n="ovs:vdisks.title"></h2>
+    <div data-bind="pager: { items: vDisks, headers: vDiskHeaders, pagesize: 10,
+                             enterViewport: loadVDisk, viewportRefresh: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <span data-bind="html: name() ? name() : '<i>name not set</i>'"></span>
+                </td>
+                <td>
+                    <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded' }">
+                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded' }">
+                        <a data-part="lazy-entry"
+                           data-bind="text: item().name,
+                                      attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
+                    </span>
+                </td>
+                <td>
+                    <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded' }">
+                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
+                    </span>
+                </td>
+                <td><span data-bind="text: size"></span></td>
+                <td><span data-bind="text: storedData"></span></td>
+                <td><span data-bind="text: cacheRatio"></span></td>
+                <td data-bind="lazyloader: { item: iops }"></td>
+                <td data-bind="lazyloader: { item: readSpeed }"></td>
+                <td data-bind="lazyloader: { item: writeSpeed }"></td>
+                <td>
+                    <span data-bind="status: {
+                                         colors: {
+                                             green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                             yellow: failoverMode() == 'catch_up',
+                                             red: failoverMode() == 'degraded'
+                                         },
+                                         defaultColor: 'lightgrey'
+                                     }, tooltip: 'ovs:generic.status.foc.' + failoverMode()"></span>
+                </td>
+                <td>
+                    <i data-bind="click: function() { $root.rollback($data.guid()); }, style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : 'black' },
+                                  tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : '',
+                                  css: { hand: !(vMachine() !== undefined && vMachine().isRunning()), forbidden: vMachine() !== undefined && vMachine().isRunning() }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.rollback"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>
