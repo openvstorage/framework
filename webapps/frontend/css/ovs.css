@@ -1,0 +1,45 @@
+* {
+    margin: 0;
+}
+
+html, body {
+    height: 100%;
+}
+.stretch {
+    height: 100%;
+}
+div[data-view] {
+    height: 100%;
+}
+
+.wrapper {
+    min-height: 100%;
+    height: auto !important; /* Required for semi-sticking footer */
+    height: 100%;
+    margin: 0 auto -60px;
+}
+
+.footer {
+    height: 50px;
+}
+
+.hand {
+    cursor: pointer;
+}
+.forbidden {
+    cursor: no-drop;
+}
+.pointer {
+    cursor: default;
+}
+
+.quote {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    border-left: 5px solid #eeeeee;
+}
+
+.popover {
+    max-width: 600px !important;
+    width: auto !important;
+}
