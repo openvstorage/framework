@@ -5,7 +5,7 @@ VMachine module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
-
+from ovs.extensions.hypervisor.factory import Factory as hvFactory
 
 class VMachine(DataObject):
     """
@@ -58,9 +58,10 @@ class VMachine(DataObject):
         """
         Fetches the Status of the vMachine.
         """
-        _ = self
-        # @TODO: Implement actual code to load the hypervisor status
-        return 'RUNNING'
+        if self.hypervisorid == None:
+            return 'Unknown'
+        hv = hvFactory.get(self.pmachine)
+        return hv.get_state(self.hypervisorid)
 
     def _statistics(self):
         """

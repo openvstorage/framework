@@ -20,12 +20,24 @@ class VMware(Hypervisor):
         """
         super(VMware, self).__init__(ip, username, password)
         self.sdk = Sdk(self._ip, self._username, self._password)
+        self.STATE_MAPPING = {'poweredOn' : 'RUNNING',
+                              'poweredOff': 'HALTED',
+                              'suspended' : 'PAUSED'}
 
     def _connect(self):
         """
         Dummy connect implementation, SDK handles connection internally
         """
         return True
+
+    @Hypervisor.connected
+    @celery.task(name='ovs.hypervisor.vmware.get_state')
+    def get_state(self, vmid):
+        """
+        Get the current power state of a virtual machine
+        @param vmid: hypervisor id of the virtual machine
+        """
+        return self.STATE_MAPPING[self.sdk.get_power_state(vmid)]
 
     @celery.task(name='ovs.hypervisor.vmware.create_vm')
     @Hypervisor.connected

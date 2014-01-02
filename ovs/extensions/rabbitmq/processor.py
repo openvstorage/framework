@@ -57,7 +57,7 @@ def process(queue, body):
                         'arguments': {'old_path': 'old_name',
                                       'new_path': 'new_name',
                                       '[NODE_ID]': 'vsrid'},
-                        'options': {'delay': 5,
+                        'options': {'delay': 3,
                                     'dedupe': True,
                                     'dedupe_key': 'new_name'}}}
 
