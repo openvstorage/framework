@@ -7,23 +7,37 @@ from time import sleep
 import datetime
 import re
 
-from suds.client import Client
+from suds.client import Client, WebFault
 from suds.cache import ObjectCache
 from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
 
 
-def validate_session(function):
+class NotAuthenticatedException(BaseException):
+    pass
+
+
+def authenticated(function):
     """
-    Decorator to make sure the SDK session is validated on each request
+    Decorator to make that a login is executed in case the current session isn't valid anymore
     """
 
     def new_function(self, *args, **kwargs):
         """
         Executes the functions
         """
-        self._validate_session()
-        return function(self, *args, **kwargs)
+        try:
+            return function(self, *args, **kwargs)
+        except WebFault as fault:
+            if 'The session is not authenticated' in str(fault):
+                print 'Received WebFault authentication failure, logging in...'
+                self._login()
+                return function(self, *args, **kwargs)
+            raise
+        except NotAuthenticatedException:
+            print 'Received NotAuthenticatedException, logging in...'
+            self._login()
+            return function(self, *args, **kwargs)
 
     return new_function
 
@@ -78,23 +92,25 @@ class Sdk(object):
         # In case of an ESXi host, this would be 'HostAgent'
         self._is_vcenter = self._serviceContent.about.apiType == 'VirtualCenter'
         if not self._is_vcenter:
-            self._validate_session()
             # pylint: disable=line-too-long
-            self._esxHost = self._get_object(self._serviceContent.rootFolder,
-                                            prop_type='HostSystem',
-                                            traversal={'name': 'FolderTraversalSpec',
+            self._login()
+            self._esxHost = self._get_object(
+                self._serviceContent.rootFolder,
+                prop_type='HostSystem',
+                traversal={'name': 'FolderTraversalSpec',
+                           'type': 'Folder',
+                           'path': 'childEntity',
+                           'traversal': {'name': 'DatacenterTraversalSpec',
+                                         'type': 'Datacenter',
+                                         'path': 'hostFolder',
+                                         'traversal': {'name': 'DFolderTraversalSpec',
                                                        'type': 'Folder',
                                                        'path': 'childEntity',
-                                                       'traversal': {'name': 'DatacenterTraversalSpec',  # noqa
-                                                                     'type': 'Datacenter',
-                                                                     'path': 'hostFolder',
-                                                                     'traversal': {'name': 'DFolderTraversalSpec',  # noqa
-                                                                                   'type': 'Folder',
-                                                                                   'path': 'childEntity',  # noqa
-                                                                                   'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
-                                                                                                 'type': 'ComputeResource',  # noqa
-                                                                                                 'path': 'host'}}}},  # noqa
-                                            properties=['name']).obj_identifier
+                                                       'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                     'type': 'ComputeResource',
+                                                                     'path': 'host'}}}},
+                properties=['name']
+            ).obj_identifier
             # pylint: enable=line-too-long
         else:
             self._esxHost = None
@@ -115,14 +131,14 @@ class Sdk(object):
         raise Exception(('%s: %s' % (message, 'Unexpected result'))
                         if message else 'Unexpected result')
 
-    @validate_session
+    @authenticated
     def get_task_info(self, task):
         """
         Loads the task details
         """
         return self._get_object(task)
 
-    @validate_session
+    @authenticated
     def get_vm_ip_information(self, esxhost=None):
         """
         Get the IP information for all vms on a given esxi host
@@ -148,7 +164,7 @@ class Sdk(object):
             configuration.append(vmi)
         return configuration
 
-    @validate_session
+    @authenticated
     def exists(self, esxhost=None, name=None, key=None):
         """
         Checks whether a vm with a given name or key exists on a given esxi host
@@ -160,10 +176,9 @@ class Sdk(object):
                     vms = [vm for vm in
                            self._get_object(esxhost,
                                             prop_type='VirtualMachine',
-                                            traversal={
-                                                'name': 'HostSystemTraversalSpec',
-                                                'type': 'HostSystem',
-                                                'path': 'vm'},
+                                            traversal={'name': 'HostSystemTraversalSpec',
+                                                       'type': 'HostSystem',
+                                                       'path': 'vm'},
                                             properties=['name']) if vm.name == name]
                     if len(vms) == 0:
                         return None
@@ -178,7 +193,7 @@ class Sdk(object):
         else:
             raise Exception('A name or key should be passed.')
 
-    @validate_session
+    @authenticated
     def get_vm(self, key, esxhost=None):
         vmid = self.exists(esxhost=esxhost, key=key)
         if vmid is None:
@@ -186,7 +201,7 @@ class Sdk(object):
         vm = self._get_object(vmid)
         return vm
 
-    @validate_session
+    @authenticated
     def add_physical_disk(self, vmname, devicename, disklabel, filename, esxhost=None, wait=False):
         """
         Adds a physical disk to a vm on a given esxi host. It tries to place the disk in the
@@ -287,7 +302,7 @@ class Sdk(object):
         raise Exception(
             'Could not find a virtual machine with name %s' % vmname)
 
-    @validate_session
+    @authenticated
     def set_disk_mode(self, vmid, disks, mode, wait=True):
         """
         Sets the disk mode for a set of disks
@@ -320,7 +335,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def remove_disk(self, vm, disk, esxhost=None, wait=True):
         """
         Removes a disk from a given vm
@@ -441,7 +456,7 @@ class Sdk(object):
         option.value = value
         return option
 
-    @validate_session
+    @authenticated
     def copy_file(self, source, destination, wait=True):
         """
         Copies a file on the datastore
@@ -455,7 +470,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def update_vm(self, vm, name, os, disks, kvmport, esxhost=None, wait=True):
         """
         Update a existing vm
@@ -544,7 +559,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def create_vm(self, name, cpus, memory, os, disks, nics,
                   kvmport, datastore, esxhost=None, wait=False):
         """
@@ -623,7 +638,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
@@ -687,7 +702,7 @@ class Sdk(object):
 
         return task
 
-    @validate_session
+    @authenticated
     def clone_vm(self, vmid, name, disks, esxhost=None, wait=True):
         """
         Clone a existing VM configuration
@@ -765,7 +780,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def get_vm(self, key, esxhost=None):
         vmid = self.exists(esxhost=esxhost, key=key)
         if vmid is None:
@@ -773,7 +788,7 @@ class Sdk(object):
         vm = self._get_object(vmid)
         return vm
 
-    @validate_session
+    @authenticated
     def get_datastore(self, ip, mountpoint, esxhost=None):
         """
         @param ip : hypervisor ip to query for datastore presence
@@ -794,7 +809,7 @@ class Sdk(object):
 
         return datastore
 
-    @validate_session
+    @authenticated
     def is_datastore_available(self, ip, mountpoint, esxhost=None):
         """
         @param ip : hypervisor ip to query for datastore presence
@@ -841,7 +856,7 @@ class Sdk(object):
 
         return config
 
-    @validate_session
+    @authenticated
     def register_vm(self, vmxpath, esxhost=None, wait=False):
         """
         Register a vm with a given esxhost
@@ -857,7 +872,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def get_vm_guest_info(self, vmid):
         """
         Get guest information about a given vm
@@ -867,7 +882,7 @@ class Sdk(object):
         setattr(info.guest, 'guestHeartbeatStatus', info.guestHeartbeatStatus)
         return info.guest
 
-    @validate_session
+    @authenticated
     def delete_vm(self, vmid, wait=False):
         """
         Delete a given vm
@@ -879,7 +894,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def unregister_vm(self, vmid):
         """
         Unregister a given vm
@@ -887,7 +902,7 @@ class Sdk(object):
         machine = self._build_property('VirtualMachine', vmid)
         self._client.service.UnregisterVM(machine)
 
-    @validate_session
+    @authenticated
     def power_on(self, vmid, wait=False):
         """
         Power on a given vm
@@ -899,7 +914,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def power_off(self, vmid, wait=False):
         """
         Power off a given vm
@@ -911,7 +926,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def shutdown(self, vmid):
         """
         Shut down a given vm
@@ -919,7 +934,7 @@ class Sdk(object):
         machine = self._build_property('VirtualMachine', vmid)
         self._client.service.ShutdownGuest(machine)
 
-    @validate_session
+    @authenticated
     def suspend(self, vmid, wait=False):
         """
         Suspend a given vm
@@ -931,7 +946,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @validate_session
+    @authenticated
     def get_power_state(self, vmid):
         """
         Get the power state of a given vm
@@ -939,15 +954,14 @@ class Sdk(object):
         return self._get_object(self._build_property('VirtualMachine', vmid),
                                 properties=['runtime.powerState']).runtime.powerState
 
-    @validate_session
+    @authenticated
     def register_extension(self, description, xmlurl, company, company_email, key, version):
         """
         Register an extension to the vcenter host we're talking to. In case the extension
         already exists, it will be updated with the given information
         """
         if not self._is_vcenter:
-            raise Exception(
-                'An extension can only be registered to a vCenter Server')
+            raise Exception('An extension can only be registered to a vCenter Server')
 
         extension = self.find_extension(key)
         if extension:
@@ -1002,16 +1016,19 @@ class Sdk(object):
 
             return self._client.service.RegisterExtension(
                 self._serviceContent.extensionManager,
-                extension)
+                extension
+            )
 
-    @validate_session
+    @authenticated
     def find_extension(self, key):
         """
         Finds/checks for a extension with a given key
         """
+        if not self._is_vcenter:
+            raise Exception('An extension can only be registered to a vCenter Server')
         return self._client.service.FindExtension(self._serviceContent.extensionManager, key)
 
-    @validate_session
+    @authenticated
     def wait_for_task(self, task):
         """
         Wait for a task to be completed
@@ -1021,7 +1038,7 @@ class Sdk(object):
             sleep(1)
             state = self.get_task_info(task).info.state
 
-    @validate_session
+    @authenticated
     def get_nfs_datastore_object(self, ip, mountpoint, filename, esxhost=None):
         """
         ip : "10.130.12.200", string
@@ -1183,10 +1200,18 @@ class Sdk(object):
             [property_filter_spec]
         )
 
+        print found_objects
+
         if len(found_objects) > 0:
             for item in found_objects:
                 item.obj_identifier = item.obj
                 del item.obj
+
+                if hasattr(item, 'missingSet'):
+                    for missing_item in item.missingSet:
+                        if missing_item.fault.fault.__class__.__name__ == 'NotAuthenticated':
+                            raise NotAuthenticatedException()
+
                 for propSet in item.propSet:
                     if '.' in propSet.name:
                         working_item = item
@@ -1238,38 +1263,17 @@ class Sdk(object):
                     self._build_property('HostSystem', host),
                     properties=['name']).obj_identifier
 
-    def _validate_session(self):
+    def _login(self):
         """
-        Validates wheteher the current session is logged in. If not, it will get logged in
+        Executes a logout (to make sure we're logged out), and logs in again
         """
-        if self._sessionID is None:
-            self._logout()
-            self._sessionID = self._client.service.Login(
-                self._serviceContent.sessionManager,
-                self._username,
-                self._password,
-                None
-            ).key
-        else:
-            active = False
-            if self._check_session:
-                try:
-                    active = self._client.service.SessionIsActive(
-                        self._serviceContent.sessionManager,
-                        sessionID=self._sessionID,
-                        userName=self._username
-                    )
-                except Exception as e:
-                    if 'The requested operation is not implemented by the server.' in str(e):
-                        self._check_session = False
-            if not active:
-                self._logout()
-                self._sessionID = self._client.service.Login(
-                    self._serviceContent.sessionManager,
-                    self._username,
-                    self._password,
-                    None
-                ).key
+        self._logout()
+        self._sessionID = self._client.service.Login(
+            self._serviceContent.sessionManager,
+            self._username,
+            self._password,
+            None
+        ).key
 
     def _logout(self):
         """
