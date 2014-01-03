@@ -8,7 +8,7 @@
                 <td>
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                    <span data-bind="html: name() ? name() : '<i>name not set</i>'"></span>
+                    <span data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : ''"></span>
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded' }">

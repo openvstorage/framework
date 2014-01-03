@@ -23,8 +23,7 @@ define([
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80,        colspan: undefined }
         ];
         self.vTemplates = ko.observableArray([]);
-        self.vTemplateGuids         =  [];
-        self.vTemplateChildrenGuids =  [];
+        self.vTemplateGuids = [];
 
         // Variables
         self.loadVTemplatesHandle = undefined;
@@ -50,7 +49,7 @@ define([
                             guids, self.vTemplateGuids, self.vTemplates,
                             function(guid) {
                                 return new VMachine(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
@@ -58,7 +57,11 @@ define([
             }).promise();
         };
         self.loadVTemplate = function(vt) {
-            vt.load();
+            vt.load()
+                .done(function() {
+                    // (Re)sort vTemplates
+                    generic.advancedSort(self.vTemplates, ['name', 'guid']);
+                });
             vt.fetchTemplateChildrenGuids();
         };
         self.deleteVT = function(guid) {

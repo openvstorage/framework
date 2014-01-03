@@ -12,7 +12,7 @@ define(['knockout'], function(ko){
             description:       ko.observable(''),
             selectedPMachines: ko.observableArray([]),
             pMachines:         ko.observableArray([]),
-            pMachineGuids:     ko.observableArray([])
+            pMachineGuids:     []
         };
     };
     return singleton();

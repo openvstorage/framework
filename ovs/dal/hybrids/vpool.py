@@ -21,7 +21,7 @@ class VPool(DataObject):
                   'backend_type':       (None, ['S3', 'LOCAL', 'REST'], 'Type of the Storage Backend.')}
     _relations = {}
     _expiry = {'status':        (10, str),
-               'statistics':     (5, dict),
+               'statistics':     (4, dict),
                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 

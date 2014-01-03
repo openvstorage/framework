@@ -30,7 +30,7 @@ define([
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 100,       colspan: undefined }
         ];
         self.vMachines = ko.observableArray([]);
-        self.vMachineGuids =  [];
+        self.vMachineGuids = [];
 
         // Variables
         self.loadVMachinesHandle = undefined;
@@ -57,7 +57,7 @@ define([
                             guids, self.vMachineGuids, self.vMachines,
                             function(guid) {
                                 return new VMachine(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
@@ -82,7 +82,7 @@ define([
                             var vm = new VMachine(guid);
                             vm.load();
                             return vm;
-                        }
+                        }, 'guid'
                     );
                     // Merge in the vPools
                     currentGuids = [];
@@ -95,8 +95,10 @@ define([
                             var vm = new VPool(guid);
                             vm.load();
                             return vm;
-                        }
+                        }, 'guid'
                     );
+                    // (Re)sort vMachines
+                    generic.advancedSort(self.vMachines, ['name', 'guid']);
                 });
         };
         self.rollback = function(guid) {

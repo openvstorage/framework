@@ -31,7 +31,7 @@ define([
             { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80,        colspan: undefined }
         ];
         self.vDisks = ko.observableArray([]);
-        self.vDiskGuids =  [];
+        self.vDiskGuids = [];
 
         // Variables
         self.loadVDisksHandle = undefined;
@@ -50,7 +50,7 @@ define([
                             guids, self.vDiskGuids, self.vDisks,
                             function(guid) {
                                 return new VDisk(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
@@ -79,6 +79,8 @@ define([
                         pool.load();
                         vdisk.vpool(pool);
                     }
+                    // (Re)sort vDisks
+                    generic.advancedSort(self.vDisks, ['name', 'guid']);
                 });
         };
 
