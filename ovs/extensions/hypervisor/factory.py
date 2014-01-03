@@ -11,6 +11,9 @@ class Factory(object):
     """
     Factory class provides functionality to get abstracted hypervisor
     """
+
+    hypervisors = {}
+
     @staticmethod
     def get(node):
         """
@@ -20,10 +23,15 @@ class Factory(object):
         ip       = node.ip
         username = node.username
         password = node.password
-        if hvtype == 'HYPERV':
-            return HyperV(ip, username, password)
-        if hvtype == 'VMWARE':
-            return VMware(ip, username, password)
-        if hvtype == 'XEN':
-            return Xen(ip, username, password)
-        raise Exception('Invalid hypervisor')
+        key = '{0}_{1}_{2}'.format(ip, username, password)
+        if key not in Factory.hypervisors:
+            if hvtype == 'HYPERV':
+                hypervisor = HyperV(ip, username, password)
+            elif hvtype == 'VMWARE':
+                hypervisor = VMware(ip, username, password)
+            elif hvtype == 'XEN':
+                hypervisor = Xen(ip, username, password)
+            else:
+                raise Exception('Invalid hypervisor')
+            Factory.hypervisors[key] = hypervisor
+        return Factory.hypervisors[key]
