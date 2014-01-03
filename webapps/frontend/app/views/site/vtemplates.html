@@ -1,0 +1,22 @@
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<section>
+    <h2 data-i18n="ovs:vtemplates.title"></h2>
+    <div data-bind="pager: { items: vTemplates, headers: vTemplateHeaders, pagesize: 10,
+                             enterViewport: loadVTemplate, viewportRefresh: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td><span data-bind="text: vDisks().length"></span></td>
+                <td><span data-bind="text: templateChildrenGuids().length"></span></td>
+                <td>
+                    <i data-bind="click: function() { $root.deleteVT($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                    <i data-bind="click: function() { $root.createFromTemplate($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>
