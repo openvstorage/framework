@@ -116,11 +116,11 @@ define([
             var vpools = [], i;
             self.vpools.sort(function(a, b) {
                 if (self.topVPoolMode() === 'topstoreddata') {
-                    return ((a.storedData.raw() || 0) - (b.storedData.raw() || 0));
+                    return ((b.storedData.raw() || 0) - (a.storedData.raw() || 0));
                 }
                 return (
-                    ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0)) -
-                    ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0))
+                    ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0)) -
+                    ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0))
                 );
             });
             for (i = 0; i < Math.min(self.topItems, self.vpools().length); i += 1) {
@@ -135,11 +135,11 @@ define([
             var vmachines = [], i;
             self.vmachines.sort(function(a, b) {
                 if (self.topVmachineMode() === 'topstoreddata') {
-                    return ((a.storedData.raw() || 0) - (b.storedData.raw() || 0));
+                    return ((b.storedData.raw() || 0) - (a.storedData.raw() || 0) );
                 }
                 return (
-                    ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0)) -
-                    ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0))
+                    ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0)) -
+                    ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0))
                 );
             });
             for (i = 0; i < Math.min(self.topItems, self.vmachines().length); i += 1) {
