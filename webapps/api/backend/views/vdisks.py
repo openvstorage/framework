@@ -11,9 +11,8 @@ from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.lib.vdisk import VDiskController
-from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
-from backend.decorators import required_roles, expose
+from backend.decorators import required_roles, expose, validate
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -45,54 +44,39 @@ class VDiskViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @validate(VDisk)
+    def retrieve(self, request, obj):
         """
         Load information about a given task
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vdisk = VDisk(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(FullSerializer(VDisk, instance=vdisk).data, status=status.HTTP_200_OK)
+        _ = request
+        return Response(FullSerializer(VDisk, instance=obj).data, status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def get_vsa(self, request, pk=None, format=None):
+    @validate(VDisk)
+    def get_vsa(self, request, obj):
         """
         Returns the guid of VSA machine
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vdisk = VDisk(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        _ = request
         vsa_vmachine_guid = None
-        if vdisk.vsrid:
-            vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
+        if obj.vsrid:
+            vsr = VolumeStorageRouterList.get_by_vsrid(obj.vsrid)
             vsa_vmachine_guid = vsr.serving_vmachine.guid
         return Response(vsa_vmachine_guid, status=status.HTTP_200_OK)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    def rollback(self, request, pk=None, format=None):
+    @validate(VDisk)
+    def rollback(self, request, obj):
         """
         Clones a machine
         """
         _ = format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vdisk = VDisk(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        task = VDiskController.rollback.delay(diskguid=vdisk.guid,
+        task = VDiskController.rollback.delay(diskguid=obj.guid,
                                               timestamp=request.DATA['timestamp'])
         return Response(task.id, status=status.HTTP_200_OK)
 

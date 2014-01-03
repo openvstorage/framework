@@ -6,9 +6,8 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from ovs.dal.lists.brandinglist import BrandingList
 from ovs.dal.hybrids.branding import Branding
-from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import expose
+from backend.decorators import expose, validate
 
 
 class BrandingViewSet(viewsets.ViewSet):
@@ -27,15 +26,10 @@ class BrandingViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @expose(internal=True)
-    def retrieve(self, request, pk=None, format=None):
+    @validate(Branding)
+    def retrieve(self, request, obj):
         """
         Load information about a given task
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            branding = Branding(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(FullSerializer(Branding, instance=branding).data, status=status.HTTP_200_OK)
+        _ = request
+        return Response(FullSerializer(Branding, instance=obj).data, status=status.HTTP_200_OK)
