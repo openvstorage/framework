@@ -25,8 +25,23 @@ class VMachineController(object):
     """
 
     @staticmethod
+    @celery.task(name='ovs.machine.create_multiple_from_template')
+    def create_multiple_from_template(name, machineguid, pmachineguids, start, amount, description=None):
+        pmachine_pointer = 0
+        for i in xrange(start, start + amount):
+            new_name = name if amount == 1 else '{0}-{1}'.format(name, i)
+            pmachineguid = pmachineguids[pmachine_pointer]
+            pmachine_pointer += 1
+            if pmachine_pointer >= len(pmachineguids):
+                pmachine_pointer = 0
+            VMachineController.create_from_template(name=new_name,
+                                                    machineguid=machineguid,
+                                                    pmachineguid=pmachineguid,
+                                                    description=description)
+
+    @staticmethod
     @celery.task(name='ovs.machine.create_from_template')
-    def create_from_template(name, machineguid, pmachineguid, **kwargs):
+    def create_from_template(name, machineguid, pmachineguid, description=None):
         """
         Create a new vmachine using an existing vmachine template
 
@@ -76,6 +91,7 @@ class VMachineController(object):
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
         new_vm.name = name
+        new_vm.description = description
         new_vm.is_vtemplate = False
         new_vm.devicename = '{}/{}.vmx'.format(name.replace(' ', '_'), name.replace(' ', '_'))
         new_vm.status = 'CREATED'

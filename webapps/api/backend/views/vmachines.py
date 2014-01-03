@@ -186,7 +186,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @required_roles(['view', 'create'])
     def create_from_template(self, request, pk=None, format=None):
         """
-        Creates a certain amount of vMachines based on a vTemplate
+        Creates a vMachine based on a vTemplate
         """
         _ = format
         if pk is None:
@@ -202,4 +202,39 @@ class VMachineViewSet(viewsets.ViewSet):
                                                              pmachineguid=pmachine.guid,
                                                              name=str(request.DATA['name']),
                                                              description=str(request.DATA['description']))
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'create'])
+    def create_multiple_from_template(self, request, pk=None, format=None):
+        """
+        Creates a certain amount of vMachines based on a vTemplate
+        """
+        _ = format
+        if pk is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        pmachineguids = request.DATA['pmachineguids']
+        if len(pmachineguids) == 0:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        try:
+            vtemplate = VMachine(pk)
+            for pmachienguid in pmachineguids:
+                _ = PMachine(pmachienguid)
+            if vtemplate.is_vtemplate is False:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+        except ObjectNotFoundException:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        amount = request.DATA['amount']
+        start = request.DATA['start']
+        if not isinstance(amount, int) or not isinstance(start, int):
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        amount = max(1, amount)
+        start = max(0, start)
+        task = VMachineController.create_multiple_from_template.delay(machineguid=vtemplate.guid,
+                                                                      pmachineguids=pmachineguids,
+                                                                      amount=amount,
+                                                                      start=start,
+                                                                      name=str(request.DATA['name']),
+                                                                      description=str(request.DATA['description']))
         return Response(task.id, status=status.HTTP_200_OK)
