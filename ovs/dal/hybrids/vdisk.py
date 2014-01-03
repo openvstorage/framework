@@ -34,7 +34,7 @@ class VDisk(DataObject):
                   'parent_vdisk': (None, 'child_vdisks')}
     _expiry = {'snapshots':  (60, list),
                'info':       (60, dict),
-               'statistics':  (5, dict),
+               'statistics':  (4, dict),
                'vsrid':      (60, str)}
     # pylint: enable=line-too-long
 

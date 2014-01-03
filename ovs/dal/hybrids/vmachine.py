@@ -25,7 +25,7 @@ class VMachine(DataObject):
     _relations = {'pmachine': (PMachine, 'vmachines')}
     _expiry = {'snapshots':          (60, list),
                'hypervisor_status': (300, str, True),  # The cache is invalidated on start/stop
-               'statistics':          (5, dict),
+               'statistics':          (4, dict),
                'stored_data':        (60, int),
                'failover_mode':      (60, str)}
     # pylint: enable=line-too-long

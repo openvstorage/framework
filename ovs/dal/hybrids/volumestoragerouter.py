@@ -23,7 +23,7 @@ class VolumeStorageRouter(DataObject):
     _relations = {'vpool':            (VPool, 'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':        (30, str),
-               'statistics':     (5, dict),
+               'statistics':     (4, dict),
                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
