@@ -23,11 +23,11 @@ define([
         self.vPoolsLoading     = ko.observable(false);
         self.vMachinesLoading  = ko.observable(false);
 
-        self.vsaGuids      = ko.observableArray([]);
+        self.vsaGuids      = [];
         self.vsas          = ko.observableArray([]);
-        self.vpoolGuids    = ko.observableArray([]);
+        self.vpoolGuids    = [];
         self.vpools        = ko.observableArray([]);
-        self.vmachineGuids = ko.observableArray([]);
+        self.vmachineGuids = [];
         self.vmachines     = ko.observableArray([]);
 
         self._cacheRatio = ko.computed(function() {
@@ -182,7 +182,7 @@ define([
                             guids, self.vmachineGuids, self.vmachines,
                             function(guid) {
                                 return new VMachine(guid);
-                            }
+                            }, 'guid'
                         );
                         for (i = 0; i < self.vmachines().length; i += 1) {
                             self.vmachines()[i].load();
@@ -209,7 +209,7 @@ define([
                             guids, self.vpoolGuids, self.vpools,
                             function(guid) {
                                 return new VPool(guid);
-                            }
+                            }, 'guid'
                         );
                         for (i = 0; i < self.vpools().length; i += 1) {
                             self.vpools()[i].load();
@@ -242,7 +242,7 @@ define([
                             guids, self.vsaGuids, self.vsas,
                             function(guid) {
                                 return new VMachine(guid);
-                            }
+                            }, 'guid'
                         );
                         for (i = 0; i < self.vsas().length; i += 1) {
                             self.vsas()[i].load();

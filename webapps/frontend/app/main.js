@@ -37,8 +37,6 @@ define([
     'bootstrap'
 ],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";
-    system.debug(true);
-
     shared.defaultLanguage = shared.language = window.navigator.userLanguage || window.navigator.language || 'en-US';
     var i18nOptions = {
         detectFromHeaders: false,

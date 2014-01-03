@@ -215,36 +215,43 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
-    function crossFiller(newKeyList, currentKeyList, objectList, objectLoader) {
-        var i, getLength, getList;
-        getLength = function(list) {
-            if (list.call) {
-                return list().length;
-            }
-            return list.length;
-        };
-        getList = function(list) {
-            if (list.call) {
-                return list();
-            }
-            return list;
-        };
-        for (i = 0; i < getLength(newKeyList); i += 1) {
-            if ($.inArray(getList(newKeyList)[i], getList(currentKeyList)) === -1) {
+    function crossFiller(newKeyList, currentKeyList, objectList, objectLoader, key) {
+        //               Arr.        Arr             Obs. Arr    Function      Obs.
+        var i, j;
+        for (i = 0; i < newKeyList.length; i += 1) {
+            if ($.inArray(newKeyList[i], currentKeyList) === -1) {
                 // One of the new keys is not yet in our current key list. This means
                 // we'll have to load the object.
-                currentKeyList.push(getList(newKeyList)[i]);
-                objectList.push(objectLoader(getList(newKeyList)[i]));
+                currentKeyList.push(newKeyList[i]);
+                objectList.push(objectLoader(newKeyList[i]));
             }
         }
-        for (i = 0; i < getLength(currentKeyList); i += 1) {
-            if ($.inArray(getList(currentKeyList)[i], getList(newKeyList)) === -1) {
+        for (i = 0; i < currentKeyList.length; i += 1) {
+            if ($.inArray(currentKeyList[i], newKeyList) === -1) {
                 // One of the existing keys is not in the new key list anymore. This means
                 // we'll have to remove the object
+                for (j = 0; j < objectList().length; j += 1) {
+                    if (objectList()[j][key]() === currentKeyList[i]) {
+                        objectList.splice(j, 1);
+                    }
+                }
                 currentKeyList.splice(i, 1);
-                objectList.splice(i, 1);
             }
         }
+    }
+    function advancedSort(list, properties) {
+        list.sort(function(a, b) {
+            var i;
+            for (i = 0; i < properties.length; i += 1) {
+                if (a[properties[i]]() < b[properties[i]]()) {
+                    return -1;
+                }
+                if (a[properties[i]]() > b[properties[i]]()) {
+                    return 1;
+                }
+            }
+            return 0;
+        });
     }
 
     return {
@@ -271,6 +278,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         buildString     : buildString,
         setDecimals     : setDecimals,
         crossFiller     : crossFiller,
-        deg2rad         : deg2rad
+        deg2rad         : deg2rad,
+        advancedSort    : advancedSort
     };
 });

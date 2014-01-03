@@ -27,7 +27,7 @@ define([
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined, colspan: undefined }
         ];
         self.vPools = ko.observableArray([]);
-        self.vPoolGuids =  [];
+        self.vPoolGuids = [];
 
         // Variables
         self.loadVPoolsHandle = undefined;
@@ -42,25 +42,23 @@ define([
                         for (i = 0; i < data.length; i += 1) {
                             guids.push(data[i].guid);
                         }
-                        for (i = 0; i < guids.length; i += 1) {
-                            if ($.inArray(guids[i], self.vPoolGuids) === -1) {
-                                self.vPoolGuids.push(guids[i]);
-                                self.vPools.push(new VPool(guids[i]));
-                            }
-                        }
-                        for (i = 0; i < self.vPoolGuids.length; i += 1) {
-                            if ($.inArray(self.vPoolGuids[i], guids) === -1) {
-                                self.vPoolGuids.splice(i, 1);
-                                self.vPools.splice(i, 1);
-                            }
-                        }
+                        generic.crossFiller(
+                            guids, self.vPoolGuids, self.vPools,
+                            function(guid) {
+                                return new VPool(guid);
+                            }, 'guid'
+                        );
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
             }).promise();
         };
         self.loadVPool = function(vpool) {
-            vpool.load();
+            vpool.load()
+                .done(function() {
+                    // (Re)sort vPools
+                    generic.advancedSort(self.vPools, ['name', 'guid']);
+                });
         };
 
         // Durandal

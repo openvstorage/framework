@@ -26,8 +26,8 @@ define([
 
         self.guid             = ko.observable(guid);
         self.vpool            = ko.observable();
-        self.vsaGuids         = ko.observableArray([]);
-        self.vPoolGuids       = ko.observableArray([]);
+        self.vsaGuids         = [];
+        self.vPoolGuids       = [];
         self.name             = ko.observable();
         self.hypervisorStatus = ko.observable();
         self.ipAddress        = ko.observable();
@@ -82,7 +82,7 @@ define([
                 generic.xhrAbort(self.loadVSAGuid);
                 self.loadVSAGuid = api.get('vmachines/' + self.guid() + '/get_vsas')
                     .done(function(data) {
-                        self.vsaGuids(data);
+                        self.vsaGuids = data;
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -93,7 +93,7 @@ define([
                 generic.xhrAbort(self.loadVpoolGuid);
                 self.loadVpoolGuid = api.get('vmachines/' + self.guid() + '/get_vpools')
                     .done(function(data) {
-                        self.vPoolGuids(data);
+                        self.vPoolGuids = data;
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -123,7 +123,7 @@ define([
                             guids, self.vDiskGuids, self.vDisks,
                             function(guid) {
                                 return new VDisk(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
