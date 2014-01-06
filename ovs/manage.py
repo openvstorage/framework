@@ -166,7 +166,10 @@ class Configure():
         # 60% = readcache
         scocache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
         readcache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
-        volumedriver_backend_type = Console.askChoice(Configuration.get('volumedriver.supported.backends').split(','), 'Select type of storage backend')
+        supported_backends = Configuration.get('volumedriver.supported.backends').split(',')
+        if 'REST' in supported_backends:
+            supported_backends.remove('REST')  # REST is not supported for now
+        volumedriver_backend_type = Console.askChoice(supported_backends, 'Select type of storage backend')
         vrouter_id = '{}{}'.format(vpool_name, '%x' % uuid.getnode())
         connection_host, connection_port, connection_username, connection_password = None, None, None, None
         backend_config = {}
@@ -296,6 +299,15 @@ class Control():
         * Load default data into model
         * Configure volume storage router
         """
+        while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
+            print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
+            suggestion = re.sub(
+                '^([\-_]*)(?P<correct>[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*)([\-_]*)$',
+                '\g<correct>',
+                re.sub('[^0-9a-zA-Z\-_]', '_', vpool_name)
+            )
+            vpool_name = Console.askString('Provide new vPool name', defaultparam=suggestion)
+
         if not self._package_is_running('openvstorage-core'):
             arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
             arakoon_clusters = map(lambda d: os.path.basename(d), os.walk(arakoon_dir).next()[1])
@@ -322,30 +334,48 @@ class Control():
         Configure.init_exportfs(vpool_name)
 
     def _package_is_running(self, package):
+        """
+        Checks whether a package is running
+        """
         _ = self
         return Package.is_running(namespace='openvstorage', name=package)
 
     def _start_package(self, package):
+        """
+        Starts a package
+        """
         _ = self
         return Package.start(namespace='openvstorage', name=package)
 
     def _stop_package(self, package):
+        """
+        Stops a package
+        """
         _ = self
         return Package.stop(namespace='openvstorage', name=package)
 
     def start(self):
+        """
+        Starts all packages
+        """
         self._start_package('volumedriver')
         self._start_package('openvstorage-core')
         self._start_package('openvstorage-webapps')
         subprocess.call(['service', 'nfs-kernel-server', 'start'])
 
     def stop(self):
+        """
+        Stops all packages
+        """
         subprocess.call(['service', 'nfs-kernel-server', 'stop'])
         self._stop_package('openvstorage-webapps')
         self._stop_package('openvstorage-core')
         self._stop_package('volumedriver')
 
     def status(self):
+        """
+        Gets the status from all packages
+        """
         _ = self
         subprocess.call(['service', 'nfs-kernel-server', 'status'])
         Package.get_status(namespace='openvstorage', name='openvstorage-core')
