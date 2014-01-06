@@ -83,7 +83,22 @@ if not quality_level in supported_quality_levels:
 os.system('apt-get -y update')
 os.system('apt-get -y install python-pip')
 os.system('pip install https://bitbucket.org/jumpscale/jumpscale_core/get/default.zip')
-os.system('jpackage_update')
+
+jp_jumpscale_blobstor = """
+[jpackages_local]
+ftp = 
+type = local
+http = 
+localpath = /opt/jpackagesftp
+namespace = jpackages
+
+[jpackages_remote]
+ftp = ftp://publicrepo.incubaid.com
+type = httpftp
+http = http://publicrepo.incubaid.com
+localpath = 
+namespace = jpackages
+"""
 
 jp_openvstorage_blobstor = """
 [jp_openvstorage]
@@ -92,6 +107,18 @@ http = http://10.100.129.101/ovs-blobstore
 namespace = jpackages
 localpath =
 type = httpftp
+"""
+
+jp_jumpscale_repo = """
+[jumpscale]
+metadatafromtgz = 0
+qualitylevel = test
+metadatadownload = 
+metadataupload = 
+bitbucketaccount = jumpscale
+bitbucketreponame = jp_jumpscale
+blobstorremote = jpackages_remote
+blobstorlocal = jpackages_local
 """
 
 jp_openvstorage_repo = """
@@ -106,11 +133,21 @@ blobstorremote = jp_openvstorage
 blobstorlocal = jpackages_local
 """ % {'qualityLevel': quality_level}
 
-blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'a')
+os.makedirs('/opt/jumpscale/cfg/jsconfig')
+if not os.path.exists('/opt/jumpscale/cfg/jsconfig/blobstor.cfg'):
+    blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'w')
+else:
+    blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'a')
+blobstor_config.write(jp_jumpscale_blobstor)
 blobstor_config.write(jp_openvstorage_blobstor)
 blobstor_config.close()
 
-jp_sources_config = open('/opt/jumpscale/cfg/jpackages/sources.cfg', 'a')
+os.makedirs('/opt/jumpscale/cfg/jpackages')
+if not os.path.exists('/opt/jumpscale/cfg/jpackages/sources.cfg'):
+    jp_sources_config = open('/opt/jumpscale/cfg/jpackages/sources.cfg', 'w')
+else:
+    jp_sources_config = open('/opt/jumpscale/cfg/jpackages/sources.cfg', 'a')
+jp_sources_config.write(jp_jumpscale_repo)
 jp_sources_config.write(jp_openvstorage_repo)
 jp_sources_config.close()
 
