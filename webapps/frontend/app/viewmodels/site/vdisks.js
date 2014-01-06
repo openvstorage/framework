@@ -32,6 +32,9 @@ define([
         ];
         self.vDisks = ko.observableArray([]);
         self.vDiskGuids = [];
+        self.vMachineCache = {};
+        self.vPoolCache = {};
+        self.vsaCache = {};
 
         // Variables
         self.loadVDisksHandle = undefined;
@@ -58,30 +61,45 @@ define([
             }).promise();
         };
         self.loadVDisk = function(vdisk) {
-            $.when.apply($, [
-                    vdisk.load(),
-                    vdisk.fetchVSAGuid()
-                ])
-                .done(function() {
-                    var vm, pool;
-                    if ((vdisk.vsa() === undefined || vdisk.vsa().guid() !== vdisk.vsaGuid()) && vdisk.vsaGuid()) {
-                        vm = new VMachine(vdisk.vsaGuid());
-                        vm.load();
-                        vdisk.vsa(vm);
-                    }
-                    if ((vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vdisk.vMachineGuid()) && vdisk.vMachineGuid()) {
-                        vm = new VMachine(vdisk.vMachineGuid());
-                        vm.load();
-                        vdisk.vMachine(vm);
-                    }
-                    if ((vdisk.vpool() === undefined || vdisk.vpool().guid() !== vdisk.vpoolGuid()) && vdisk.vpoolGuid()) {
-                        pool = new VPool(vdisk.vpoolGuid());
-                        pool.load();
-                        vdisk.vpool(pool);
-                    }
-                    // (Re)sort vDisks
-                    generic.advancedSort(self.vDisks, ['name', 'guid']);
-                });
+            return $.Deferred(function(deferred) {
+                $.when.apply($, [
+                        vdisk.load(),
+                        vdisk.fetchVSAGuid()
+                    ])
+                    .done(function() {
+                        var vm, pool,
+                            vsaGuid = vdisk.vsaGuid(),
+                            vMachineGuid = vdisk.vMachineGuid(),
+                            vPoolGuid = vdisk.vpoolGuid();
+                        if ((vdisk.vsa() === undefined || vdisk.vsa().guid() !== vsaGuid) && vsaGuid) {
+                            if (!self.vsaCache.hasOwnProperty(vsaGuid)) {
+                                vm = new VMachine(vsaGuid);
+                                vm.load();
+                                self.vsaCache[vsaGuid] = vm;
+                            }
+                            vdisk.vsa(self.vsaCache[vsaGuid]);
+                        }
+                        if ((vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid) && vMachineGuid) {
+                            if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
+                                vm = new VMachine(vMachineGuid);
+                                vm.load();
+                                self.vMachineCache[vMachineGuid] = vm;
+                            }
+                            vdisk.vMachine(self.vMachineCache[vMachineGuid]);
+                        }
+                        if ((vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid) && vPoolGuid) {
+                            if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
+                                pool = new VPool(vPoolGuid);
+                                pool.load();
+                                self.vPoolCache[vPoolGuid] = pool;
+                            }
+                            vdisk.vpool(self.vPoolCache[vPoolGuid]);
+                        }
+                        // (Re)sort vDisks
+                        generic.advancedSort(self.vDisks, ['name', 'guid']);
+                    })
+                    .always(deferred.resolve);
+            }).promise();
         };
 
         self.rollback = function(guid) {

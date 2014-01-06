@@ -31,6 +31,8 @@ define([
         ];
         self.vMachines = ko.observableArray([]);
         self.vMachineGuids = [];
+        self.vPoolCache = {};
+        self.vsaCache = {};
 
         // Variables
         self.loadVMachinesHandle = undefined;
@@ -65,41 +67,50 @@ define([
             }).promise();
         };
         self.loadVMachine = function(vm) {
-            $.when.apply($, [
-                    vm.load(),
-                    vm.fetchVSAGuids(),
-                    vm.fetchVPoolGuids()
-                ])
-                .done(function() {
-                    // Merge in the VSAs
-                    var i, currentGuids = [];
-                    for (i = 0; i < vm.vsas().length; i += 1) {
-                        currentGuids.push(vm.vsas()[i].guid());
-                    }
-                    generic.crossFiller(
-                        vm.vsaGuids, currentGuids, vm.vsas,
-                        function(guid) {
-                            var vm = new VMachine(guid);
-                            vm.load();
-                            return vm;
-                        }, 'guid'
-                    );
-                    // Merge in the vPools
-                    currentGuids = [];
-                    for (i = 0; i < vm.vpools().length; i += 1) {
-                        currentGuids.push(vm.vpools()[i].guid());
-                    }
-                    generic.crossFiller(
-                        vm.vPoolGuids, currentGuids, vm.vpools,
-                        function(guid) {
-                            var vm = new VPool(guid);
-                            vm.load();
-                            return vm;
-                        }, 'guid'
-                    );
-                    // (Re)sort vMachines
-                    generic.advancedSort(self.vMachines, ['name', 'guid']);
-                });
+            return $.Deferred(function(deferred) {
+                $.when.apply($, [
+                        vm.load(),
+                        vm.fetchVSAGuids(),
+                        vm.fetchVPoolGuids()
+                    ])
+                    .done(function() {
+                        // Merge in the VSAs
+                        var i, currentGuids = [];
+                        for (i = 0; i < vm.vsas().length; i += 1) {
+                            currentGuids.push(vm.vsas()[i].guid());
+                        }
+                        generic.crossFiller(
+                            vm.vsaGuids, currentGuids, vm.vsas,
+                            function(guid) {
+                                if (!self.vsaCache.hasOwnProperty(guid)) {
+                                    var vm = new VMachine(guid);
+                                    vm.load();
+                                    self.vsaCache[guid] = vm;
+                                }
+                                return self.vsaCache[guid];
+                            }, 'guid'
+                        );
+                        // Merge in the vPools
+                        currentGuids = [];
+                        for (i = 0; i < vm.vpools().length; i += 1) {
+                            currentGuids.push(vm.vpools()[i].guid());
+                        }
+                        generic.crossFiller(
+                            vm.vPoolGuids, currentGuids, vm.vpools,
+                            function(guid) {
+                                if (!self.vPoolCache.hasOwnProperty(guid)) {
+                                    var vp = new VPool(guid);
+                                    vp.load();
+                                    self.vPoolCache[guid] = vp;
+                                }
+                                return self.vPoolCache[guid];
+                            }, 'guid'
+                        );
+                        // (Re)sort vMachines
+                        generic.advancedSort(self.vMachines, ['name', 'guid']);
+                    })
+                    .always(deferred.resolve);
+            }).promise();
         };
         self.rollback = function(guid) {
             var i, vms = self.vMachines(), vm;

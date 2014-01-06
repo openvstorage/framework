@@ -54,11 +54,14 @@ define([
             }).promise();
         };
         self.loadVPool = function(vpool) {
-            vpool.load()
-                .done(function() {
-                    // (Re)sort vPools
-                    generic.advancedSort(self.vPools, ['name', 'guid']);
-                });
+            return $.Deferred(function(deferred) {
+                vpool.load()
+                    .done(function() {
+                        // (Re)sort vPools
+                        generic.advancedSort(self.vPools, ['name', 'guid']);
+                    })
+                    .always(deferred.resolve);
+            }).promise();
         };
 
         // Durandal

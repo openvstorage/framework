@@ -57,12 +57,15 @@ define([
             }).promise();
         };
         self.loadVTemplate = function(vt) {
-            vt.load()
-                .done(function() {
-                    // (Re)sort vTemplates
-                    generic.advancedSort(self.vTemplates, ['name', 'guid']);
-                });
-            vt.fetchTemplateChildrenGuids();
+            return $.Deferred(function(deferred) {
+                vt.load()
+                    .then(vt.fetchTemplateChildrenGuids)
+                    .done(function() {
+                        // (Re)sort vTemplates
+                        generic.advancedSort(self.vTemplates, ['name', 'guid']);
+                    })
+                    .always(deferred.resolve);
+            }).promise();
         };
         self.deleteVT = function(guid) {
             var i, vts = self.vTemplates(), vm;
