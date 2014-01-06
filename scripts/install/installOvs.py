@@ -1,55 +1,70 @@
 #!/usr/bin/env python
 import os
 import sys
+from subprocess import call
 from optparse import OptionParser
+
+
+def run_command(command, fail=True):
+    rcode = call(command.split(' '))
+    if rcode != 0 and fail:
+        raise Exception('{0} failed with return value {1}'.format(command, rcode))
+
 
 if os.getegid() != 0:
     print 'This script should be executed as a user in the root group.'
     sys.exit(1)
 
-parser = OptionParser(description='CloudFrames vRun Setup')
-parser.add_option('--no-filesystems', dest='filesystems', action="store_false", default=True,
+parser = OptionParser(description='Open vStorage Setup')
+parser.add_option('-n', '--no-filesystems', dest='filesystems', action="store_false", default=True,
                   help="Don't create partitions and filesystems")
 parser.add_option('-c', '--clean', dest='clean', action="store_true", default=False,
                   help="Try to clean environment before reinstalling")
 (options, args) = parser.parse_args()
 
 if options.clean:
-    #Stop NFS
-    os.system('service nfs-kernel-server stop')
-    #Kill procs
-    #Remove config
-    #Remove dirs
-    os.system('rm -rf /usr/local/lib/python2.7/*-packages/JumpScale*')
-    os.system('rm -rf /opt/jumpscale')
-    os.system('rm -rf /opt/OpenvStorage')
+    print 'Trying to clean previous install...'
+    run_command('service nfs-kernel-server stop', fail=False)
+    run_command('rm -rf /usr/local/lib/python2.7/*-packages/JumpScale*', fail=False)
+    run_command('rm -rf /opt/jumpscale', fail=False)
+    run_command('rm -rf /opt/OpenvStorage', fail=False)
 
 if options.filesystems:
+    print 'Creating filesystems...'
     # Create partitions on HDD
-    os.system('parted /dev/sdb -s mklabel gpt')
-    os.system('parted /dev/sdb -s mkpart backendfs 2MB 80%')
-    os.system('parted /dev/sdb -s mkpart distribfs 80% 90%')
-    os.system('parted /dev/sdb -s mkpart tempfs 90% 100%')
-    os.system('mkfs.ext4 /dev/sdb1 -L backendfs')
-    os.system('mkfs.ext4 /dev/sdb2 -L distribfs')
-    os.system('mkfs.ext4 /dev/sdb3 -L tempfs')
-    os.system('mkdir /mnt/bfs')
-    os.system('mkdir /mnt/dfs')
-    os.system('mkdir /var/tmp')
+    print '  On HDD...'
+    run_command('umount /dev/sdb1', fail=False)
+    run_command('umount /dev/sdb2', fail=False)
+    run_command('umount /dev/sdb3', fail=False)
+    run_command('parted /dev/sdb -s mklabel gpt')
+    run_command('parted /dev/sdb -s mkpart backendfs 2MB 80%')
+    run_command('parted /dev/sdb -s mkpart distribfs 80% 90%')
+    run_command('parted /dev/sdb -s mkpart tempfs 90% 100%')
+    run_command('mkfs.ext4 -q /dev/sdb1 -L backendfs')
+    run_command('mkfs.ext4 -q /dev/sdb2 -L distribfs')
+    run_command('mkfs.ext4 -q /dev/sdb3 -L tempfs')
+    run_command('mkdir -p /mnt/bfs')
+    run_command('mkdir -p /mnt/dfs')
+    run_command('mkdir -p /var/tmp')
 
-    #Create partitions on SSD
-    os.system('parted /dev/sdc -s mklabel gpt')
-    os.system('parted /dev/sdc -s mkpart cache 2MB 50%')
-    os.system('parted /dev/sdc -s mkpart db 50% 75%')
-    os.system('parted /dev/sdc -s mkpart mdpath 75% 100%')
-    os.system('mkfs.ext4 /dev/sdc1 -L cache')
-    os.system('mkfs.ext4 /dev/sdc2 -L db')
-    os.system('mkfs.ext4 /dev/sdc3 -L mdpath')
-    os.system('mkdir /mnt/db')
-    os.system('mkdir /mnt/cache')
-    os.system('mkdir /mnt/md')
+    # Create partitions on SSD
+    print '  On SSD...'
+    run_command('umount /dev/sdc1', fail=False)
+    run_command('umount /dev/sdc2', fail=False)
+    run_command('umount /dev/sdc3', fail=False)
+    run_command('parted /dev/sdc -s mklabel gpt')
+    run_command('parted /dev/sdc -s mkpart cache 2MB 50%')
+    run_command('parted /dev/sdc -s mkpart db 50% 75%')
+    run_command('parted /dev/sdc -s mkpart mdpath 75% 100%')
+    run_command('mkfs.ext4 -q /dev/sdc1 -L cache')
+    run_command('mkfs.ext4 -q /dev/sdc2 -L db')
+    run_command('mkfs.ext4 -q /dev/sdc3 -L mdpath')
+    run_command('mkdir -p /mnt/db')
+    run_command('mkdir -p /mnt/cache')
+    run_command('mkdir -p /mnt/md')
 
     # Add content to fstab
+    print '  Updating /etc/fstab...'
     fstab_content = """
 # BEGIN Open vStorage
 LABEL=db        /mnt/db    ext4    defaults,nobootwait,noatime,discard    0    2
@@ -72,7 +87,9 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
             fstab.write(contents)
 
 # Mount all filesystems
-os.system('mountall')
+print 'Mounting filesystem...'
+run_command('swapoff --all')
+run_command('mountall -q')
 
 supported_quality_levels = ['unstable', 'test', 'stable']
 quality_level = raw_input('Enter qualitylevel to install from {0}: '.format(supported_quality_levels))
@@ -80,9 +97,10 @@ if not quality_level in supported_quality_levels:
     raise ValueError('Please specify correct qualitylevel, one of {0}'.format(supported_quality_levels))
 
 # Install all software components
-os.system('apt-get -y update')
-os.system('apt-get -y install python-pip')
-os.system('pip install https://bitbucket.org/jumpscale/jumpscale_core/get/default.zip')
+print 'Updating software...'
+run_command('apt-get -y -qq update')
+run_command('apt-get -y -qq install python-pip')
+run_command('pip -q install -I https://bitbucket.org/jumpscale/jumpscale_core/get/default.zip')
 
 jp_jumpscale_blobstor = """
 [jpackages_local]
@@ -133,6 +151,7 @@ blobstorremote = jp_openvstorage
 blobstorlocal = jpackages_local
 """ % {'qualityLevel': quality_level}
 
+print 'Creating JumpScale configuration files...'
 os.makedirs('/opt/jumpscale/cfg/jsconfig')
 if not os.path.exists('/opt/jumpscale/cfg/jsconfig/blobstor.cfg'):
     blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'w')
@@ -151,6 +170,9 @@ jp_sources_config.write(jp_jumpscale_repo)
 jp_sources_config.write(jp_openvstorage_repo)
 jp_sources_config.close()
 
-os.system('jpackage_update')
-os.system('jpackage_install -n core')
-os.system('jpackage_install -n openvstorage')
+run_command('jpackage_update')
+run_command('jpackage_install -n core')
+print 'Starting Open vStorage installation...'
+run_command('jpackage_install -n openvstorage')
+
+print 'Installation complete.'
