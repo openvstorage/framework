@@ -507,7 +507,7 @@ ide1:0.startConnected = "FALSE"
 """
 
     # Creating config
-    print 'Creating CloudFrames vRun virtual machine config'
+    print 'Creating Open vStorage virtual machine config'
     cpu = 4
     memory = 16 * 1024
     guestos = 'ubuntu'
