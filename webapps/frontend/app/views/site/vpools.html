@@ -1,0 +1,23 @@
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<section>
+    <h2 data-i18n="ovs:vpools.title"></h2>
+    <div data-bind="pager: { items: vPools, headers: vPoolHeaders, pagesize: 10, key: 'guid',
+                             enterViewport: loadVPool, viewportRefresh: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
+                </td>
+                <td><span data-bind="text: storedData"></span></td>
+                <td><span data-bind="text: freeSpace"></span></td>
+                <td><span data-bind="text: cacheRatio"></span></td>
+                <td data-bind="lazyloader: { item: iops }"></td>
+                <td><span data-bind="text: backendType"></span></td>
+                <td><span data-bind="text: backendConnection"></span></td>
+                <td><span data-bind="text: backendLogin"></span></td>
+            </tr>
+        </table>
+    </div>
+</section>
