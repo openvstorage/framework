@@ -25,10 +25,10 @@ Changes applied by CloudFounders NV:
 """
 
 import os
+import time
 import subprocess
 import types
 import signal
-import types
 import string
 import logging
 
