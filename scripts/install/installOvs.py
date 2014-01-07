@@ -27,9 +27,10 @@ if options.clean:
     run_command('service nfs-kernel-server stop', fail=False)
     run_command('pkill arakoon', fail=False)
     run_command('rm -rf /usr/local/lib/python2.7/*-packages/JumpScale*', fail=False)
+    run_command('rm -rf /usr/local/lib/python2.7/dist-packages/jumpscale.pth', fail=False)
     run_command('rm -rf /opt/jumpscale', fail=False)
     run_command('rm -rf /opt/OpenvStorage', fail=False)
-    run_command('rm -rf /mnt/db/arakoon /mnt/db/tlogs')
+    run_command('rm -rf /mnt/db/arakoon /mnt/db/tlogs /mnt/cache/foc /mnt/cache/sco /mnt/cache/read', fail=False)
 
 if options.filesystems:
     print 'Creating filesystems...'
