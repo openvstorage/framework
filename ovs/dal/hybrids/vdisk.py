@@ -46,10 +46,13 @@ class VDisk(DataObject):
         snapshots = []
         if self.volumeid:
             volumeid = str(self.volumeid)
-            for guid in _vsr_client.list_snapshots(volumeid):
+            try:
+                voldrv_snapshots = _vsr_client.list_snapshots(volumeid)
+            except:
+                voldrv_snapshots = []
+            for guid in voldrv_snapshots:
                 snapshot = _vsr_client.info_snapshot(volumeid, guid)
-                # @todo: to be investigated howto handle during
-                # set as template
+                # @todo: to be investigated howto handle during set as template
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     snapshots.append({'guid': guid,
@@ -63,7 +66,10 @@ class VDisk(DataObject):
         Fetches the info (see Volume Driver API) for the vDisk.
         """
         if self.volumeid:
-            vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
+            try:
+                vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
+            except:
+                vdiskinfo = _vsr_client.empty_info()
         else:
             vdiskinfo = _vsr_client.empty_info()
 
@@ -80,7 +86,10 @@ class VDisk(DataObject):
         Fetches the Statistics for the vDisk.
         """
         if self.volumeid:
-            vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+            try:
+                vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+            except:
+                vdiskstats = _vsr_client.empty_statistcs()
         else:
             vdiskstats = _vsr_client.empty_statistcs()
 
