@@ -1,0 +1,22 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<div style="min-width: 700px;">
+    <form role="form form-horizontal" class="form-horizontal">
+        <p data-i18n="ovs:wizards.snapshot.gather.basicinfo"></p>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.snapshot.gather.name"></label>
+            <div class="col-lg-4">
+                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label">&nbsp;</label>
+             <div class="col-lg-5">
+                 <input type="checkbox" id="consistent" data-bind="checked: data.isConsistent">
+                 <label for="consistent" data-i18n="ovs:wizards.snapshot.gather.consistent"></label>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
+        <p data-bind="text: canContinue().reason"></p>
+    </div>
+</div>
