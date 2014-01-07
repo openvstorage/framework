@@ -1200,8 +1200,6 @@ class Sdk(object):
             [property_filter_spec]
         )
 
-        print found_objects
-
         if len(found_objects) > 0:
             for item in found_objects:
                 item.obj_identifier = item.obj
