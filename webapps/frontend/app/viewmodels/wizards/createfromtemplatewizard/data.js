@@ -6,8 +6,8 @@ define(['knockout'], function(ko){
         return {
             guid:              ko.observable(),
             vm:                ko.observable(),
-            amount:            ko.observable(1),
-            startnr:           ko.observable(1),
+            amount:            ko.observable(1).extend({ numeric: { min: 1 } }),
+            startnr:           ko.observable(1).extend({ numeric: { min: 0 } }),
             name:              ko.observable(),
             description:       ko.observable(''),
             selectedPMachines: ko.observableArray([]),
