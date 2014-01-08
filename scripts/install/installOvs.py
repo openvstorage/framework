@@ -102,7 +102,6 @@ if not quality_level in supported_quality_levels:
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')
-run_command('apt-get -y -qq install python-dev')
 run_command('apt-get -y -qq install python-pip')
 run_command('pip -q install -I https://bitbucket.org/jumpscale/jumpscale_core/get/default.zip')
 

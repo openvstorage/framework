@@ -269,7 +269,8 @@ class ArakoonCluster:
         start all nodes in the cluster
         """
         rcs = {}
-
+        from ovs.extensions.db.arakoon.CheckArakoonTlogMark import CheckArakoonTlogMark
+        CheckArakoonTlogMark().fixtlogs(self._clusterName)
         for name in self.listLocalNodes():
             rcs[name] = self._startOne(name, daemon)
 
@@ -588,13 +589,13 @@ class ArakoonCluster:
             nodesconfig.write()
 
             return
-        
+
         raise Exception("No node %s" % name)
 
     def writeClientConfig(self, config=None, configFilename=None):
         """
         Write Arakoon Cluster client config to file
-        
+
         @param config: arakoon client config for this cluster (if none, will be retrieved from current cluster config)
         @param configFilename: the filename to store the config to (if none, the existing one is updated)
         """
@@ -622,7 +623,7 @@ class ArakoonCluster:
 
 if __name__ == '__main__':
     from optparse import OptionParser
-    
+
     parser = OptionParser(description='Arakoon Management')
     parser.add_option('--stop', dest='start_stop', action="store_false", default=None,
                       help="Stop arakoon")
@@ -631,15 +632,15 @@ if __name__ == '__main__':
     parser.add_option('-c', '--cluster', dest="cluster",
                       help="Name of arakoon cluster")
     (options, args) = parser.parse_args()
-    
+
     if not options.cluster:
         parser.error("No arakoon cluster specified")
     if options.start_stop == None:
         parser.error("No action specified")
-    
+
     ArakoonManagement = ArakoonManagement()
     arakoon_cluster = ArakoonManagement.getCluster(options.cluster)
     if options.start_stop:
-        arakoon_cluster.start()
+        arakoon_cluster.start(False)
     else:
         arakoon_cluster.stop()
