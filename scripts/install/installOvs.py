@@ -178,5 +178,4 @@ run_command('jpackage_install -n core')
 print 'Starting Open vStorage installation...'
 run_command('jpackage_install -n openvstorage')
 
-run_command('source /etc/profile.d/OpenvStorage.sh')
 print 'Installation complete.'
