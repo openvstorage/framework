@@ -107,9 +107,10 @@ class ScheduledTaskController(object):
         tasks = []
         machines = VMachineList.get_vmachines()
         for machine in machines:
-            tasks.append(VMachineController.snapshot.s(machineguid=machine.guid,
-                                                       label='',
-                                                       is_consistent=False))
+            if not machine.is_vtemplate:
+                tasks.append(VMachineController.snapshot.s(machineguid=machine.guid,
+                                                           label='',
+                                                           is_consistent=False))
         workflow = group(task for task in tasks)
         loghandler.logger.info('[SSA] %d disk snapshots launched' % len(tasks))
         return workflow()

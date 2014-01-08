@@ -381,6 +381,17 @@ class VMachineController(object):
                     'timestamp': timestamp,
                     'machineguid': machineguid}
         machine = VMachine(machineguid)
+
+        #@todo: we now skip creating a snapshot when a vmachine's disks
+        #       is missing a mandatory property: volumeid
+        #       subtask will now raise an exception earlier in the workflow
+        for disk in machine.vdisks:
+            if not disk.volumeid:
+                message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}' \
+                    .format(disk.guid, machine.guid)
+                logging.info('Error: {0}'.format(message))
+                raise RuntimeError(message)
+
         if subtasks:
             tasks = []
             for disk in machine.vdisks:
