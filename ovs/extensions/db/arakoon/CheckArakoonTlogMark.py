@@ -410,40 +410,40 @@ class CheckArakoonTlogMark():
                 gridmessage = "Grid environment detected for cluster {0} with nodes {1}"
                 self._speak(gridmessage.format(clustername, allnodes))
 
-        for localnode in self._localnodesfiles.iterkeys():
-            cluster = self._localnodesfiles[localnode]['cluster']
-            initstatus = self._checkarakoonstatus(localnode, cluster)
-            if initstatus:
-                self._speak("{0} already running, not checking for marked tlog".format(localnode))
-                continue
-            else:
-                self._gettlogdir(localnode, cluster)
-                self._getdbdir(localnode, cluster)
-                tlogdir = self._localnodesfiles[localnode]['tlogdir']
-                self._speak("Localnode {1}, Tlogdir: {0}".format(tlogdir, localnode))
-                # there can be many .tlog files for each localnode
-                # but only the last one is relevant for checking
-                tlogfilelist = [os.path.join(tlogdir, f) for f in os.listdir(tlogdir) if os.path.isfile(os.path.join(tlogdir,f)) and f.endswith('.tlog')]
-                if not tlogfilelist:
-                    failmessage = "Tlogs are missing - now attempting failover"
-                    self._speak(failmessage)
-                    if self._failover(localnode, cluster):
-                        continue
-
+            for localnode in self._localnodesfiles.iterkeys():
+                cluster = self._localnodesfiles[localnode]['cluster']
+                initstatus = self._checkarakoonstatus(localnode, cluster)
+                if initstatus:
+                    self._speak("{0} already running, not checking for marked tlog".format(localnode))
+                    continue
                 else:
-                    self._gettlogfile(tlogfilelist, localnode)
-                    failednodes.extend(self._managetlog(localnode, cluster))
-                    nodestart = self._startcheckmove(localnode, cluster)
-                    if nodestart:
-                        failednodes.extend(nodestart)
+                    self._gettlogdir(localnode, cluster)
+                    self._getdbdir(localnode, cluster)
+                    tlogdir = self._localnodesfiles[localnode]['tlogdir']
+                    self._speak("Localnode {1}, Tlogdir: {0}".format(tlogdir, localnode))
+                    # there can be many .tlog files for each localnode
+                    # but only the last one is relevant for checking
+                    tlogfilelist = [os.path.join(tlogdir, f) for f in os.listdir(tlogdir) if os.path.isfile(os.path.join(tlogdir,f)) and f.endswith('.tlog')]
+                    if not tlogfilelist:
+                        failmessage = "Tlogs are missing - now attempting failover"
+                        self._speak(failmessage)
+                        if self._failover(localnode, cluster):
+                            continue
 
-            if failednodes:
-                for listiterator, node in enumerate(failednodes):
-                    for _cluster in self._clusters:
-                        acluster = manager.getCluster(_cluster)
-                        status = acluster.getStatus()
-                        if node in status and status[node]:
-                            del failednodes[listiterator]
+                    else:
+                        self._gettlogfile(tlogfilelist, localnode)
+                        failednodes.extend(self._managetlog(localnode, cluster))
+                        nodestart = self._startcheckmove(localnode, cluster)
+                        if nodestart:
+                            failednodes.extend(nodestart)
+
+                if failednodes:
+                    for listiterator, node in enumerate(failednodes):
+                        for _cluster in self._clusters:
+                            acluster = manager.getCluster(_cluster)
+                            status = acluster.getStatus()
+                            if node in status and status[node]:
+                                del failednodes[listiterator]
 
         failednodesset = set(failednodes)
         if failednodesset:
