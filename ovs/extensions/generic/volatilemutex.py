@@ -37,6 +37,7 @@ class VolatileMutex(object):
         passed = time.time() - self._start
         if passed > 0.025:  # More than 25 ms is a long time to wait!
             print 'Waited %s seconds for lock %s' % (passed, self.key())
+        self._start = time.time()
         self._has_lock = True
         return True
 

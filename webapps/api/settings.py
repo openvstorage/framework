@@ -5,7 +5,7 @@ Django settings module
 import os
 from ovs.plugin.provider.configuration import Configuration
 
-DEBUG = True
+DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 UI_NAME = Configuration.get('ovs.webapps.main.uiname')
@@ -35,7 +35,7 @@ DATABASES = {
     }
 }
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [Configuration.get('ovs.grid.ip')]
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
 LOGIN_URL = APP_NAME + '.frontend.login_view'

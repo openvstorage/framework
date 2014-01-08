@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
@@ -10,10 +10,11 @@ define([
         var self = this;
 
         // System
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
-        self.refresher = new Refresher();
-        self.widgets   = [];
+        self.shared      = shared;
+        self.guard       = { authenticated: true };
+        self.refresher   = new Refresher();
+        self.widgets     = [];
+        self.sortTimeout = undefined;
 
         // Data
         self.vDiskHeaders = [
@@ -96,7 +97,10 @@ define([
                             vdisk.vpool(self.vPoolCache[vPoolGuid]);
                         }
                         // (Re)sort vDisks
-                        generic.advancedSort(self.vDisks, ['name', 'guid']);
+                        if (self.sortTimeout) {
+                            window.clearTimeout(self.sortTimeout);
+                        }
+                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vDisks, ['name', 'guid']); }, 250);
                     })
                     .always(deferred.resolve);
             }).promise();

@@ -27,7 +27,8 @@ requirejs.config({
             exports: 'd3'
         }
     },
-    urlArgs: "bust=0.1.0.0b"
+    urlArgs: "bust=0.1.0.0b",
+    waitSeconds: 300
 });
 
 define([
