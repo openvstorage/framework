@@ -36,7 +36,7 @@
             <!-- /ko -->
             <!-- ko if: hasNext() -->
                 <li><a data-bind="click: function() { step(true); }" class="hand">&raquo;</a></li>
-                <li><a data-bind="click: function() { current(last_page()); }" class="hand">&raquo;&raquo;</a></li>
+                <li><a data-bind="click: function() { current(lastPage()); }" class="hand">&raquo;&raquo;</a></li>
             <!-- /ko -->
             <!-- ko if: !hasNext() -->
                 <li class="disabled"><span>&raquo;</span></li>
