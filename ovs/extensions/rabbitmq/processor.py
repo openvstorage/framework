@@ -6,6 +6,7 @@ Contains the process method for processing rabbitmq messages
 from celery.task.control import revoke
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
+from ovs.lib.vpool import VPoolController
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
 
@@ -59,7 +60,12 @@ def process(queue, body):
                                       '[NODE_ID]': 'vsrid'},
                         'options': {'delay': 3,
                                     'dedupe': True,
-                                    'dedupe_key': 'new_name'}}}
+                                    'dedupe_key': 'new_name'}},
+                   EventMessages.EventMessage.UpAndRunning:
+                       {'property': 'up_and_running',
+                        'task': VPoolController.mountpoint_available_from_voldrv,
+                        'arguments': {'mountpoint': 'mountpoint',
+                                      '[NODE_ID]': 'vsrid'}}}
 
         if data.type in mapping:
             task = mapping[data.type]['task']
