@@ -21,6 +21,7 @@ memcache_servers = map(lambda m: memcache_ini.getValue(m, 'location'), nodes)
 celery = Celery('ovs',
                 include=['ovs.lib.vdisk',
                          'ovs.lib.vmachine',
+                         'ovs.lib.vpool',
                          'ovs.lib.messaging',
                          'ovs.lib.scheduledtask',
                          'ovs.extensions.hypervisor.hypervisors.vmware'])

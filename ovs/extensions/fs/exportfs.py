@@ -1,12 +1,14 @@
 # license see http://www.openvstorage.com/licenses/opensource/
 import re
+import subprocess
 
 class Nfsexports(object):
     """
     Basic management for /etc/exports
     """
     def __init__(self):
-        self._exportsFile     = '/etc/exports'
+        self._exportsFile = '/etc/exports'
+        self._cmd = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs']
 
     def _slurp(self):
         """
@@ -55,3 +57,39 @@ class Nfsexports(object):
                     f.write("%s %s(%s) \n" % ( i['dir'], i['network'], i['params']))
                 f.close()
                 return
+
+    def list_exported(self):
+        """
+        List the current exported filesystems
+        """
+        exports = {}
+        for export in subprocess.check_output(self._cmd).splitlines():
+            dir, network = export.split('\t')
+            exports[dir.strip()] = network.strip()
+        return exports
+
+    def unexport(self, dir):
+        """
+        Unexport a filesystem
+        """
+        cmd = list(self._cmd)
+        exports = self.list_exported()
+        if not dir in exports.keys():
+            print 'Directory %s currently not exported'%dir
+            return
+        print 'Unexporting {}:{}'.format(exports[dir] if exports[dir] != '<world>' else '*',dir)
+        cmd.extend(['-u', '{}:{}'.format(exports[dir] if exports[dir] != '<world>' else '*',dir)])
+        subprocess.call(cmd)
+    
+    def export(self, dir, network='*'):
+        """
+        Export a filesystem
+        """
+        cmd = list(self._cmd)
+        exports = self.list_exported()
+        if dir in exports.keys():
+            print 'Directory already exported with options %s'%exports[dir]
+            return
+        print 'Exporting {}:{}'.format(network, dir)
+        cmd.extend(['-v', '{}:{}'.format(network, dir)])
+        subprocess.call(cmd)
