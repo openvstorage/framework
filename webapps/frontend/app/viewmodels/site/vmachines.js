@@ -14,6 +14,7 @@ define([
         self.guard       = { authenticated: true };
         self.refresher   = new Refresher();
         self.widgets     = [];
+        self.updateSort  = false;
         self.sortTimeout = undefined;
 
         // Data
@@ -67,13 +68,15 @@ define([
                     .fail(deferred.reject);
             }).promise();
         };
-        self.loadVMachine = function(vm) {
+        self.loadVMachine = function(vm, reduced) {
+            reduced = reduced || false;
             return $.Deferred(function(deferred) {
-                $.when.apply($, [
-                        vm.load(),
-                        vm.fetchVSAGuids(),
-                        vm.fetchVPoolGuids()
-                    ])
+                var calls = [vm.load(reduced)];
+                if (!reduced) {
+                    calls.push(vm.fetchVSAGuids());
+                    calls.push(vm.fetchVPoolGuids());
+                }
+                $.when.apply($, calls)
                     .done(function() {
                         // Merge in the VSAs
                         var i, currentGuids = [];
@@ -108,13 +111,18 @@ define([
                             }, 'guid'
                         );
                         // (Re)sort vMachines
-                        if (self.sortTimeout) {
-                            window.clearTimeout(self.sortTimeout);
+                        if (self.updateSort) {
+                            self.sort();
                         }
-                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vMachines, ['name', 'guid']); }, 250);
                     })
                     .always(deferred.resolve);
             }).promise();
+        };
+        self.sort = function() {
+            if (self.sortTimeout) {
+                window.clearTimeout(self.sortTimeout);
+            }
+            self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vMachines, ['name', 'guid']); }, 250);
         };
         self.rollback = function(guid) {
             var i, vms = self.vMachines(), vm;
@@ -186,12 +194,18 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vMachines);
 
+            var loads = [];
             self.fetchVMachines()
                 .done(function() {
                     var i, vmachines = self.vMachines();
                     for (i = 0; i < vmachines.length; i += 1) {
-                        self.loadVMachine(vmachines[i]);
+                        loads.push(self.loadVMachine(vmachines[i], true));
                     }
+                });
+            $.when.apply($, loads)
+                .done(function() {
+                    self.sort();
+                    self.updateSort = true;
                 });
         };
         self.deactivate = function() {

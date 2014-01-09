@@ -14,6 +14,7 @@ define([
         self.guard       = { authenticated: true };
         self.refresher   = new Refresher();
         self.widgets     = [];
+        self.updateSort  = false;
         self.sortTimeout = undefined;
 
         // Data
@@ -61,12 +62,14 @@ define([
                     .fail(deferred.reject);
             }).promise();
         };
-        self.loadVDisk = function(vdisk) {
+        self.loadVDisk = function(vdisk, reduced) {
+            reduced = reduced || false;
             return $.Deferred(function(deferred) {
-                $.when.apply($, [
-                        vdisk.load(),
-                        vdisk.fetchVSAGuid()
-                    ])
+                var calls = [vdisk.load()];
+                if (!reduced) {
+                    calls.push(vdisk.fetchVSAGuid());
+                }
+                $.when.apply($, calls)
                     .done(function() {
                         var vm, pool,
                             vsaGuid = vdisk.vsaGuid(),
@@ -97,13 +100,18 @@ define([
                             vdisk.vpool(self.vPoolCache[vPoolGuid]);
                         }
                         // (Re)sort vDisks
-                        if (self.sortTimeout) {
-                            window.clearTimeout(self.sortTimeout);
+                        if (self.updateSort) {
+                            self.sort();
                         }
-                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vDisks, ['name', 'guid']); }, 250);
                     })
                     .always(deferred.resolve);
             }).promise();
+        };
+        self.sort = function() {
+            if (self.sortTimeout) {
+                window.clearTimeout(self.sortTimeout);
+            }
+            self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vDisks, ['name', 'guid']); }, 250);
         };
 
         self.rollback = function(guid) {
@@ -128,12 +136,18 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vDisks);
 
+            var loads = [];
             self.load()
                 .done(function() {
                     var i, vdisks = self.vDisks();
                     for (i = 0; i < vdisks.length; i += 1) {
-                        self.loadVDisk(vdisks[i]);
+                        loads.push(self.loadVDisk(vdisks[i], true));
                     }
+                });
+            $.when.apply($, loads)
+                .done(function() {
+                    self.sort();
+                    self.updateSort = true;
                 });
         };
         self.deactivate = function() {

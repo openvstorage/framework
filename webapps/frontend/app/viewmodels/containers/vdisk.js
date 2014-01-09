@@ -64,41 +64,33 @@ define([
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
-                $.when.apply($, [
-                        $.Deferred(function(deferred) {
-                            generic.xhrAbort(self.loadHandle);
-                            self.loadHandle = api.get('vdisks/' + self.guid())
-                                .done(function(data) {
-                                    var stats = data.statistics;
-                                    self.name(data.name);
-                                    self.iops(stats.write_operations + stats.read_operations);
-                                    self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
-                                    self.cacheMisses(stats.sco_cache_misses);
-                                    self.readSpeed(stats.data_read);
-                                    self.writeSpeed(stats.data_written);
-                                    self.backendWritten(stats.data_written);
-                                    self.backendRead(stats.data_read);
-                                    self.backendReads(stats.backend_read_operations);
-                                    self.bandwidthSaved(stats.data_read - stats.backend_data_read);
-                                    self.order(data.order);
-                                    self.snapshots(data.snapshots);
-                                    self.size(data.size);
-                                    self.storedData(data.info.stored);
-                                    self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
-                                    self.vpoolGuid(data.vpool_guid);
-                                    self.vMachineGuid(data.vmachine_guid);
+                generic.xhrAbort(self.loadHandle);
+                self.loadHandle = api.get('vdisks/' + self.guid())
+                    .done(function(data) {
+                        var stats = data.statistics;
+                        self.name(data.name);
+                        self.iops(stats.write_operations + stats.read_operations);
+                        self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
+                        self.cacheMisses(stats.sco_cache_misses);
+                        self.readSpeed(stats.data_read);
+                        self.writeSpeed(stats.data_written);
+                        self.backendWritten(stats.data_written);
+                        self.backendRead(stats.data_read);
+                        self.backendReads(stats.backend_read_operations);
+                        self.bandwidthSaved(stats.data_read - stats.backend_data_read);
+                        self.order(data.order);
+                        self.snapshots(data.snapshots);
+                        self.size(data.size);
+                        self.storedData(data.info.stored);
+                        self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
+                        self.vpoolGuid(data.vpool_guid);
+                        self.vMachineGuid(data.vmachine_guid);
 
-                                    self.snapshots.sort(function(a, b) {
-                                        // Sorting based on newest first
-                                        return b.timestamp - a.timestamp;
-                                    });
+                        self.snapshots.sort(function(a, b) {
+                            // Sorting based on newest first
+                            return b.timestamp - a.timestamp;
+                        });
 
-                                    deferred.resolve();
-                                })
-                                .fail(deferred.reject);
-                        }).promise()
-                    ])
-                    .done(function() {
                         self.loaded(true);
                         deferred.resolve();
                     })
