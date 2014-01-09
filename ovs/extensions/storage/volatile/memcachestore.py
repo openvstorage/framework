@@ -17,7 +17,7 @@ class MemcacheStore(object):
         Initializes the client
         """
         self._nodes = nodes
-        self._client = memcache.Client(self._nodes)
+        self._client = memcache.Client(self._nodes, dead_retry=1)
 
     def get(self, key, default=None):
         """
