@@ -247,7 +247,7 @@ class VDiskController(object):
         if not disk.vmachine.is_vtemplate:
             raise RuntimeError('The given disk does not belong to a template')
 
-        device_location = '/{}/{}.vmdk'.format(location, devicename)
+        device_location = '{}/{}.vmdk'.format(location, devicename)
 
         new_disk = VDisk()
         new_disk.copy_blueprint(disk, include=properties_to_clone)
@@ -262,7 +262,7 @@ class VDiskController(object):
         logging.info('Create disk from template {} to new disk {} to location {}'.format(
             disk.name, new_disk.name, device_location
         ))
-        volumeid = vsr_client.create_clone_from_template(device_location, str(disk.volumeid))
+        volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
         new_disk.volumeid = volumeid
         new_disk.save()
 
