@@ -28,7 +28,7 @@ class Factory(object):
         if key not in Factory.hypervisors:
             mutex = FileMutex('hypervisor_{0}'.format(key))
             try:
-                mutex.acquire()
+                mutex.acquire(30)
                 if key not in Factory.hypervisors:
                     if hvtype == 'HYPERV':
                         hypervisor = HyperV(ip, username, password)
