@@ -89,9 +89,9 @@ class VDisk(DataObject):
             try:
                 vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
             except:
-                vdiskstats = _vsr_client.empty_statistcs()
+                vdiskstats = _vsr_client.empty_statistics()
         else:
-            vdiskstats = _vsr_client.empty_statistcs()
+            vdiskstats = _vsr_client.empty_statistics()
 
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():

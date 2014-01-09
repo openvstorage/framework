@@ -70,7 +70,7 @@ class VMachine(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        vdiskstats = _vsr_client.empty_statistcs()
+        vdiskstats = _vsr_client.empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:

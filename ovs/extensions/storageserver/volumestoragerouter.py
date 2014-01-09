@@ -32,7 +32,7 @@ class VolumeStorageRouterClient(object):
         Loads and returns the client
         """
         client = storagerouterclient.StorageRouterClient(self._host, self._port)
-        client.empty_statistcs = lambda: storagerouterclient.Statistics()
+        client.empty_statistics = lambda: storagerouterclient.Statistics()
         client.empty_info = lambda: storagerouterclient.VolumeInfo()
         return client
 

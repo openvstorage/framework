@@ -122,7 +122,8 @@ class DataObject(object):
         # Worker fields/objects
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex = VolatileMutex('primarykeys_%s' % self._name)
+        self._mutex_pk = VolatileMutex('primarykeys_%s' % self._name)
+        self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
         # Init guid
         new = False
@@ -430,22 +431,30 @@ class DataObject(object):
                                                        self._data[key]['guid'],
                                                        default[1]))
         # Second, invalidate property lists
-        cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
-        for field in cache_list.keys():
-            clear = False
-            if field == '__all' and new:  # This is a no-filter query hook, which can be ignored
-                clear = True
-            if field in self._blueprint:
-                if self._original[field] != self._data[field]:
+        try:
+            self._mutex_listcache.acquire(10)
+            cache_key = '%s_%s' % (DataList.cachelink, self._name)
+            cache_list = Toolbox.try_get(cache_key, {})
+            for field in cache_list.keys():
+                clear = False
+                if field == '__all' and new:  # This is a no-filter query hook, which can be ignored
                     clear = True
-            if field in self._relations:
-                if self._original[field]['guid'] != self._data[field]['guid']:
+                if field in self._blueprint:
+                    if self._original[field] != self._data[field]:
+                        clear = True
+                if field in self._relations:
+                    if self._original[field]['guid'] != self._data[field]['guid']:
+                        clear = True
+                if field in self._expiry:
                     clear = True
-            if field in self._expiry:
-                clear = True
-            if clear:
-                for list_key in cache_list[field]:
-                    self._volatile.delete(list_key)
+                if clear:
+                    for list_key in cache_list[field]:
+                        self._volatile.delete(list_key)
+                    del cache_list[field]
+            self._volatile.set(cache_key, cache_list)
+            self._persistent.set(cache_key, cache_list)
+        finally:
+            self._mutex_listcache.release()
 
         # Invalidate the cache
         self.invalidate_dynamics()
@@ -582,16 +591,15 @@ class DataObject(object):
         """
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
-            self._mutex.acquire(10)
+            self._mutex_pk.acquire(10)
             keys = self._volatile.get(internal_key)
             if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_'
-                                                   % (self._namespace, self._name)))
+                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
             else:
                 keys.add(key)
             self._volatile.set(internal_key, keys)
         finally:
-            self._mutex.release()
+            self._mutex_pk.release()
 
     def _delete_pk(self, key):
         """
@@ -599,11 +607,10 @@ class DataObject(object):
         """
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
-            self._mutex.acquire(10)
+            self._mutex_pk.acquire(10)
             keys = self._volatile.get(internal_key)
             if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_'
-                                                   % (self._namespace, self._name)))
+                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
             else:
                 try:
                     keys.remove(key)
@@ -611,7 +618,7 @@ class DataObject(object):
                     pass
             self._volatile.set(internal_key, keys)
         finally:
-            self._mutex.release()
+            self._mutex_pk.release()
 
     def __str__(self):
         """

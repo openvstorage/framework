@@ -10,6 +10,7 @@ from ovs.dal.exceptions import *
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
+from ovs.dal.tests.mockups import VolumeStorageRouter, LoaderModule, FactoryModule
 
 
 class Basic(TestCase):
@@ -40,6 +41,7 @@ class Basic(TestCase):
         # Replace mocked classes
         sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VolumeStorageRouter
         sys.modules['ovs.plugin.injection.loader'] = LoaderModule
+        sys.modules['ovs.extensions.hypervisor.factory'] = FactoryModule
 
         # Importing, preparing, mocking, ...
         from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -878,113 +880,3 @@ class Basic(TestCase):
 
         disk1.delete()
         machine.delete()
-
-
-# Mocking classes
-class StorageRouterClient():
-    """
-    Mocks the StorageRouterClient
-    """
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-    @staticmethod
-    def info(volume_id):
-        """
-        Return fake info
-        """
-        return volume_id
-
-    @staticmethod
-    def list_snapshots(volume_id):
-        """
-        Return fake info
-        """
-        _ = volume_id
-        return []
-
-
-class VolumeStorageRouterClient():
-    """
-    Mocks the VolumeStorageRouterClient
-    """
-
-    STATISTICS_KEYS = ['cluster_cache_hits',
-                       'backend_write_operations',
-                       'backend_data_read',
-                       'metadata_store_hits',
-                       'data_written',
-                       'data_read',
-                       'write_time',
-                       'metadata_store_misses',
-                       'backend_data_written',
-                       'sco_cache_misses',
-                       'backend_read_operations',
-                       'sco_cache_hits',
-                       'write_operations',
-                       'cluster_cache_misses',
-                       'read_operations']
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-    def load(self):
-        """
-        Returns the mocked StorageRouterClient
-        """
-        _ = self
-        return StorageRouterClient()
-
-
-class VolumeStorageRouter():
-    """
-    Mocks the VolumeStorageRouter
-    """
-    VolumeStorageRouterClient = VolumeStorageRouterClient
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-
-class Loader():
-    """
-    Mocks loader class
-    """
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-    @staticmethod
-    def load(module):
-        """
-        Always returns 'unittest'
-        """
-        _ = module
-        return 'unittest'
-
-
-class LoaderModule():
-    """
-    Mocks dependency loader module
-    """
-
-    Loader = Loader
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
