@@ -1,0 +1,55 @@
+# license see http://www.openvstorage.com/licenses/opensource/
+"""
+Memcache store module
+"""
+import memcache
+import re
+
+
+class MemcacheStore(object):
+    """
+    Memcache client wrapper:
+    * stringifies the keys
+    """
+
+    def __init__(self, nodes):
+        """
+        Initializes the client
+        """
+        self._nodes = nodes
+        self._client = memcache.Client(self._nodes, dead_retry=1)
+
+    def get(self, key, default=None):
+        """
+        Retrieves a certain value for a given key
+        """
+        value = self._client.get(MemcacheStore._clean_key(key))
+        return value if value is not None else default
+
+    def set(self, key, value, time=0):
+        """
+        Sets the value for a key to a given value
+        """
+        return self._client.set(MemcacheStore._clean_key(key), value, time)
+
+    def add(self, key, value, time=0):
+        """
+        Adds a given key to the store, expecting the key does not exists yet
+        """
+        return self._client.add(MemcacheStore._clean_key(key), value, time)
+
+    def incr(self, key, delta=1):
+        """
+        Increments the value of the key, expecting it exists
+        """
+        return self._client.incr(MemcacheStore._clean_key(key), delta)
+
+    def delete(self, key):
+        """
+        Deletes a given key from the store
+        """
+        return self._client.delete(MemcacheStore._clean_key(key))
+
+    @staticmethod
+    def _clean_key(key):
+        return re.sub('[^\x21-\x7e\x80-\xff]', '', str(key))
