@@ -1,0 +1,37 @@
+<!-- license see http://www.openvstorage.com/licenses/opensource///-->
+<section>
+    <div class="btn-group">
+        <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown">
+            <!-- ko if: multi() -->
+                <span data-bind="visible: target().length === 0"><i>Nothing selected</i></span>
+                <span data-bind="foreach: target">
+                    <span data-part="selected-items"></span>&nbsp;
+                    <span data-bind="shortText: $parent.text($data), maxLength: 25"></span><span data-bind="visible: $index() < $parent.target().length - 1">,</span>
+                </span>
+            <!-- /ko -->
+            <!-- ko if: !multi() -->
+                <span data-bind="with: target">
+                    <span data-part="selected-item"></span>&nbsp;
+                    <span data-bind="text: $parent.text($data)"></span>
+                </span>
+            <!-- /ko -->
+            &nbsp; <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu" role="menu" style="max-height: 250px; overflow: auto;" data-bind="visible: items().length > 0, foreach: items">
+            <li data-bind="css: { active: $parent.multi() ? false : ($parent.keyIsFunction() ? $parent.target()[$parent.key()]() === $data[$parent.key()]() :
+                                                                                               $parent.target()[$parent.key()] === $data[$parent.key()]) },
+                           click: function() { $parent.set($data); }" class="hand">
+                <a style="white-space: nowrap;">
+                    <span data-bind="visible: $parent.multi()">
+                        <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>
+                        <span data-bind="visible: !$parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.notchecked"></span>
+                        &nbsp;
+                    </span>
+                    <span data-part="list-item"></span>
+                    <span data-bind="text: $parent.text($data)"></span>
+                </a>
+            </li>
+        </ul>
+        <span data-bind="visible: items().length === 0" class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+    </div>
+</section>
