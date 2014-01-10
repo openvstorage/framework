@@ -18,7 +18,9 @@
             &nbsp; <span class="caret"></span>
         </button>
         <ul class="dropdown-menu" role="menu" style="max-height: 250px; overflow: auto;" data-bind="visible: items().length > 0, foreach: items">
-            <li class="hand" data-bind="css: { active: $parent.target() == $data }, click: function() { $parent.set($data); }">
+            <li data-bind="css: { active: $parent.multi() ? false : ($parent.keyIsFunction() ? $parent.target()[$parent.key()]() === $data[$parent.key()]() :
+                                                                                               $parent.target()[$parent.key()] === $data[$parent.key()]) },
+                           click: function() { $parent.set($data); }" class="hand">
                 <a style="white-space: nowrap;">
                     <span data-bind="visible: $parent.multi()">
                         <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>

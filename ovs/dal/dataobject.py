@@ -2,7 +2,6 @@
 """
 DataObject module
 """
-import inspect
 import uuid
 import copy
 from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
@@ -123,7 +122,8 @@ class DataObject(object):
         # Worker fields/objects
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex = VolatileMutex('primarykeys_%s' % self._name)
+        self._mutex_pk = VolatileMutex('primarykeys_%s' % self._name)
+        self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
         # Init guid
         new = False
@@ -431,26 +431,33 @@ class DataObject(object):
                                                        self._data[key]['guid'],
                                                        default[1]))
         # Second, invalidate property lists
-        cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
-        for field in cache_list.keys():
-            clear = False
-            if field == '__all' and new:  # This is a no-filter query hook, which can be ignored
-                clear = True
-            if field in self._blueprint:
-                if self._original[field] != self._data[field]:
+        try:
+            self._mutex_listcache.acquire(10)
+            cache_key = '%s_%s' % (DataList.cachelink, self._name)
+            cache_list = Toolbox.try_get(cache_key, {})
+            for field in cache_list.keys():
+                clear = False
+                if field == '__all' and new:  # This is a no-filter query hook, which can be ignored
                     clear = True
-            if field in self._relations:
-                if self._original[field]['guid'] != self._data[field]['guid']:
+                if field in self._blueprint:
+                    if self._original[field] != self._data[field]:
+                        clear = True
+                if field in self._relations:
+                    if self._original[field]['guid'] != self._data[field]['guid']:
+                        clear = True
+                if field in self._expiry:
                     clear = True
-            if field in self._expiry:
-                clear = True
-            if clear:
-                for list_key in cache_list[field]:
-                    self._volatile.delete(list_key)
+                if clear:
+                    for list_key in cache_list[field]:
+                        self._volatile.delete(list_key)
+                    del cache_list[field]
+            self._volatile.set(cache_key, cache_list)
+            self._persistent.set(cache_key, cache_list)
+        finally:
+            self._mutex_listcache.release()
 
         # Invalidate the cache
-        for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
+        self.invalidate_dynamics()
         self._volatile.delete(self._key)
 
         self._original = copy.deepcopy(self._data)
@@ -477,8 +484,7 @@ class DataObject(object):
             pass
 
         # Delete the object and its properties out of the volatile store
-        for key in self._expiry.keys():
-            self._volatile.delete('%s_%s' % (self._key, key))
+        self.invalidate_dynamics()
         self._volatile.delete(self._key)
         self._delete_pk(self._key)
 
@@ -489,6 +495,15 @@ class DataObject(object):
         """
         self.__init__(guid           = self._guid,
                       datastore_wins = self._datastore_wins)
+
+    def invalidate_dynamics(self, properties=None):
+        """
+        Invalidates all dynamic property caches. Use with caution, as this action can introduce
+        a short performance hit.
+        """
+        for key in self._expiry.keys():
+            if properties is None or key in properties:
+                self._volatile.delete('%s_%s' % (self._key, key))
 
     def serialize(self, depth=0):
         """
@@ -509,6 +524,35 @@ class DataObject(object):
         for key in self._expiry.keys():
             data[key] = getattr(self, key)
         return data
+
+    def copy_blueprint(self, other_object, include=None, exclude=None, include_relations=False):
+        """
+        Copies all _blueprint (and optionally _relation) properties over from a given hybrid to
+        self. One can pass in a list of properties that should be copied, or a list of properties
+        that should not be copied. Exclude > Include
+        """
+        if include is not None and not isinstance(include, list):
+            raise TypeError('Argument include should be None or a list of strings')
+        if exclude is not None and not isinstance(exclude, list):
+            raise TypeError('Argument exclude should be None or a list of strings')
+        if self.__class__.__name__ != other_object.__class__.__name__:
+            raise TypeError('Properties can only be loaded from hybrids of the same type')
+
+        if include:
+            properties_to_copy = include
+        else:
+            properties_to_copy = self._blueprint.keys()
+            if include_relations:
+                properties_to_copy += self._relations.keys()
+
+        if exclude:
+            properties_to_copy = [p for p in properties_to_copy if p not in exclude]
+
+        possible_options = self._blueprint.keys() + (self._relations.keys() if include_relations else [])
+        properties_to_copy = [p for p in properties_to_copy if p in possible_options]
+
+        for key in properties_to_copy:
+            setattr(self, key, getattr(other_object, key))
 
     #######################
     ## Properties
@@ -547,16 +591,15 @@ class DataObject(object):
         """
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
-            self._mutex.acquire(10)
+            self._mutex_pk.acquire(10)
             keys = self._volatile.get(internal_key)
             if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_'
-                                                   % (self._namespace, self._name)))
+                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
             else:
                 keys.add(key)
             self._volatile.set(internal_key, keys)
         finally:
-            self._mutex.release()
+            self._mutex_pk.release()
 
     def _delete_pk(self, key):
         """
@@ -564,11 +607,10 @@ class DataObject(object):
         """
         internal_key = 'ovs_primarykeys_%s' % self._name
         try:
-            self._mutex.acquire(10)
+            self._mutex_pk.acquire(10)
             keys = self._volatile.get(internal_key)
             if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_'
-                                                   % (self._namespace, self._name)))
+                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
             else:
                 try:
                     keys.remove(key)
@@ -576,7 +618,7 @@ class DataObject(object):
                     pass
             self._volatile.set(internal_key, keys)
         finally:
-            self._mutex.release()
+            self._mutex_pk.release()
 
     def __str__(self):
         """

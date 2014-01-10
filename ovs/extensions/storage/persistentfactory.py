@@ -2,7 +2,7 @@
 """
 Generic persistent factory.
 """
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
 
 
 class PersistentFactory(object):
@@ -18,12 +18,12 @@ class PersistentFactory(object):
 
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
             if client_type is None:
-                client_type = j.application.config.get('ovs.core.storage.persistent')
+                client_type = Configuration.get('ovs.core.storage.persistent')
 
             PersistentFactory.store = None
             if client_type == 'arakoon':
                 from ovs.extensions.storage.persistent.arakoonstore import ArakoonStore
-                cluster = j.application.config.get('ovs.core.db.arakoon.clusterid')
+                cluster = Configuration.get('ovs.core.db.arakoon.clusterid')
                 PersistentFactory.store = ArakoonStore(cluster)
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore

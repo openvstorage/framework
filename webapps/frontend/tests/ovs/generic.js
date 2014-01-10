@@ -1,6 +1,9 @@
 // license see http://www.openvstorage.com/licenses/opensource/
 /*global define, describe, spyOn, it, expect, jasmine */
-define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
+define([
+    'ovs/generic', 'knockout', 'jquery',
+    'ovs/extensions/knockout-helpers'
+], function(generic, ko, $) {
     'use strict';
     describe('Generic', function() {
         beforeEach(function() {
@@ -63,7 +66,7 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
             // Steps at: 75, 150, 225, 300
             jasmine.Clock.useMock();
             var testModel = {
-                value: ko.observable(undefined)
+                    value: ko.observable(undefined)
                 },
                 smoother = function(value) { return value; };
             // Smooth undefined > 100
@@ -101,6 +104,30 @@ define(['ovs/generic', 'knockout', 'jquery'], function(generic, ko, $) {
             expect(testModel.value()).toBe(102);
             jasmine.Clock.tick(80);  // 160
             expect(testModel.value()).toBe(103.5);
+        });
+
+        it('delta observables behave correctly', function() {
+            var time = 0, formatter = function(value) { return value; },
+                testModel = {
+                    value: ko.deltaObservable(formatter)
+                };
+            spyOn(Date.prototype, 'getTime').andCallFake(function() { return time; });
+            expect(testModel.value.initialized()).toBe(false);
+            testModel.value(0);
+            expect(testModel.value.initialized()).toBe(false);
+            time += 1000;
+            testModel.value(0);
+            expect(testModel.value.initialized()).toBe(true);
+            time += 2000;
+            testModel.value(10);
+            expect(testModel.value()).toBe(5);
+            time += 1000;
+            testModel.value(10);
+            expect(testModel.value()).toBe(0);
+            testModel.value({ value: 10, timestamp: 5000 });
+            testModel.value({ value: 20, timestamp: 7000 });
+            expect(testModel.value()).toBe(5);
+            expect(time).toBe(4000);
         });
 
         it('alerting should work correctly', function() {

@@ -4,8 +4,9 @@ Wrapper class for the storagerouterclient of the voldrv team
 """
 
 from volumedriver.storagerouter import storagerouterclient
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
 import json
+import os
 
 
 class VolumeStorageRouterClient(object):
@@ -13,22 +14,8 @@ class VolumeStorageRouterClient(object):
     Client to access storagerouterclient
     """
 
-    STATISTICS_KEYS = ['cluster_cache_hits',
-                       'backend_write_operations',
-                       'backend_data_read',
-                       'metadata_store_hits',
-                       'data_written',
-                       'data_read',
-                       'write_time',
-                       'metadata_store_misses',
-                       'backend_data_written',
-                       'sco_cache_misses',
-                       'backend_read_operations',
-                       'sco_cache_hits',
-                       'write_operations',
-                       'cluster_cache_misses',
-                       'read_operations']
-    FOC_STATUS = {'ok_standalone': 10,
+    FOC_STATUS = {'': 0,
+                  'ok_standalone': 10,
                   'ok_sync': 10,
                   'catch_up': 20,
                   'degraded': 30}
@@ -37,26 +24,34 @@ class VolumeStorageRouterClient(object):
         """
         Initializes the wrapper given a configfile for the RPC communication
         """
-        self._host = j.application.config.get('ovs.grid.ip')
-        self._port = int(j.application.config.get('volumedriver.filesystem.xmlrpc.port'))
+        self._host = Configuration.get('ovs.grid.ip')
+        self._port = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
 
     def load(self):
         """
         Loads and returns the client
         """
-        return storagerouterclient.StorageRouterClient(self._host, self._port)
+        client = storagerouterclient.StorageRouterClient(self._host, self._port)
+        client.empty_statistics = lambda: storagerouterclient.Statistics()
+        client.empty_info = lambda: storagerouterclient.VolumeInfo()
+        return client
+
 
 class VolumeStorageRouterConfiguration(object):
     """
     VolumeStorageRouter configuration class
     """
     def __init__(self, storagerouter):
-        self._config_specfile = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'),'specs', 'volumedriverfs.json')
-        self._config_file = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), '{}.json'.format(storagerouter))
-        self._config_tmpfile = j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), '{}.json.tmp'.format(storagerouter))
+        self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'specs', 'volumedriverfs.json')
+        self._config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json'.format(storagerouter))
+        self._config_tmpfile = os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json.tmp'.format(storagerouter))
+        self._config_readfile_handler = None
+        self._config_file_handler = None
+        self._config_specfile_handler = None
+        self._config_file_content = None
 
     def load_config(self):
-        if j.system.fs.exists(self._config_file) and not j.system.fs.fileSize(self._config_file) == 0:
+        if os.path.exists(self._config_file) and not os.path.getsize(self._config_file) == 0:
             self._config_readfile_handler = open(self._config_file, 'r')
             self._config_file_handler = open(self._config_tmpfile, 'w')
             self._config_file_content = json.load(self._config_readfile_handler)
@@ -70,8 +65,8 @@ class VolumeStorageRouterConfiguration(object):
     def write_config(self):
         json.dump(self._config_file_content, self._config_file_handler, indent=2)
         self._config_file_handler.close()
-        if j.system.fs.exists(self._config_tmpfile):
-            j.system.fs.moveFile(self._config_tmpfile, self._config_file)
+        if os.path.exists(self._config_tmpfile):
+            os.rename(self._config_tmpfile, self._config_file)
 
     def add_cache(self):
         pass
@@ -80,18 +75,18 @@ class VolumeStorageRouterConfiguration(object):
         self.load_config()
         if not backend_config:
             raise ValueError('No backend config specified, unable to configure volumestoragerouter')
-        for key,value in backend_config.iteritems():
+        for key, value in backend_config.iteritems():
             self._config_file_content['backend_connection_manager'][key] = value
         self.write_config()
 
     def configure_readcache(self, readcaches, rspath):
         """
         Configures volume storage router content address cache
-        @param readcache_config: list of readcache configuration dictionaries
+        @param readcaches: list of readcache configuration dictionaries
         """
         self.load_config()
         self._config_file_content['content_addressed_cache']['clustercache_mount_points'] = readcaches
-        self._config_file_content['content_addressed_cache']['readcache_serialization_path'] = rspath
+        self._config_file_content['content_addressed_cache']['read_cache_serialization_path'] = rspath
         self.write_config()
 
     def configure_volumemanager(self, volumemanager_config):
@@ -100,7 +95,7 @@ class VolumeStorageRouterConfiguration(object):
         @param volumemanager_config: dictionary with key/value pairs
         """
         self.load_config()
-        for key,value in volumemanager_config.iteritems():
+        for key, value in volumemanager_config.iteritems():
             self._config_file_content['volume_manager'][key] = value
         self.write_config()
 
@@ -123,7 +118,7 @@ class VolumeStorageRouterConfiguration(object):
         @param failovercache: path to the failover cache directory
         """
         self.load_config()
-        self._config_file_content.update({'failovercache': {'failovercache_path': failovercache }})
+        self._config_file_content.update({'failovercache': {'failovercache_path': failovercache}})
         self.write_config()
 
     def configure_filesystem(self, filesystem_config):
@@ -132,7 +127,7 @@ class VolumeStorageRouterConfiguration(object):
         @param filesystem_config: dictionary with key/value pairs
         """
         self.load_config()
-        for key,value in filesystem_config.iteritems():
+        for key, value in filesystem_config.iteritems():
             self._config_file_content['filesystem'][key] = value
         self.write_config()
 
@@ -142,7 +137,7 @@ class VolumeStorageRouterConfiguration(object):
         @param vrouter_config: dictionary of key/value pairs
         """
         self.load_config()
-        for key,value in vrouter_config.iteritems():
+        for key, value in vrouter_config.iteritems():
             if not key in ('host', 'xmlrpc_port'):
                 self._config_file_content['volume_router'][key] = value
         # Configure the vrouter arakoon with empty values in order to use tokyo cabinet
@@ -154,16 +149,16 @@ class VolumeStorageRouterConfiguration(object):
         if 'vrouter_cluster_nodes' in self._config_file_content['volume_router_cluster']:
             for node in self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes']:
                 if node['vrouter_id'] == vrouter_config['vrouter_id'] or \
-                node['host'] == '127.0.0.1':
+                        node['host'] == '127.0.0.1':
                     self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'].remove(node)
                     break
         else:
             self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'] = []
         new_node = {'vrouter_id': vrouter_config['vrouter_id'],
                     'host': vrouter_config['host'],
-                    'message_port': int(vrouter_config['xmlrpc_port'])-1,
+                    'message_port': int(vrouter_config['xmlrpc_port']) - 1,
                     'xmlrpc_port': vrouter_config['xmlrpc_port'],
-                    'failovercache_port': int(vrouter_config['xmlrpc_port'])+1}
+                    'failovercache_port': int(vrouter_config['xmlrpc_port']) + 1}
         self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'].append(new_node)
         self.write_config()
 
@@ -171,18 +166,15 @@ class VolumeStorageRouterConfiguration(object):
         """
         Configures volume storage router arakoon cluster
         @param arakoon_cluster_id: name of the arakoon cluster
-        @param arakoon_nodes: dictionary of arakoon nodes in this cluster 
+        @param arakoon_nodes: dictionary of arakoon nodes in this cluster
         """
         self.load_config()
         if not 'volume_registry' in self._config_file_content:
             self._config_file_content['volume_registry'] = {}
         self._config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
         self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
-        self._config_file_content['filesystem']['fs_arakoon_cluster_id'] = arakoon_cluster_id
-        self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'] = []
-        for node_id,node_config in arakoon_nodes.iteritems():
+        for node_id, node_config in arakoon_nodes.iteritems():
             node_dict = {'node_id' : node_id, 'host' : node_config[0][0], 'port' : node_config[1]}
-            self._config_file_content['filesystem']['fs_arakoon_cluster_nodes'].append(node_dict)
             self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'].append(node_dict)
         self.write_config()
 
@@ -194,6 +186,6 @@ class VolumeStorageRouterConfiguration(object):
         self.load_config()
         if not "event_publisher" in self._config_file_content:
             self._config_file_content["event_publisher"] = {}
-        for key,value in queue_config.iteritems():
+        for key, value in queue_config.iteritems():
             self._config_file_content["event_publisher"][key] = value
         self.write_config()

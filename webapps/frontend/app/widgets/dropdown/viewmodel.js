@@ -8,11 +8,13 @@ define([
     return function() {
         var self = this;
 
-        self.text     = undefined;
-        self.items    = ko.observableArray([]);
-        self.target   = ko.observableArray([]);
-        self.multi    = ko.observable(false);
-        self.selected = ko.computed(function() {
+        self.text          = undefined;
+        self.key           = ko.observable();
+        self.keyIsFunction = ko.observable(false);
+        self.items         = ko.observableArray([]);
+        self.target        = ko.observableArray([]);
+        self.multi         = ko.observable(false);
+        self.selected      = ko.computed(function() {
             var items = [], i;
             for (i = 0; i < self.items().length; i += 1) {
                 if (self.contains(self.items()[i])) {
@@ -43,6 +45,14 @@ define([
             if (!settings.hasOwnProperty('target')) {
                 throw 'Target should be specified';
             }
+            if (!settings.hasOwnProperty('key')) {
+                throw 'Key should be specified';
+            }
+            if (!settings.hasOwnProperty('keyisfunction')) {
+                throw 'Keyisfunction should be specified';
+            }
+            self.key(settings.key);
+            self.keyIsFunction(settings.keyisfunction);
             self.items = settings.items;
             self.target = settings.target;
 

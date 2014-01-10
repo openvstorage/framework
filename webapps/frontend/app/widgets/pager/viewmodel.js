@@ -12,7 +12,8 @@ define([
         self.refresher       = new Refresher();
 
         // Fields
-        self.viewportIndexes = [];
+        self.viewportkeys    = [];
+        self.key             = ko.observable();
         self.internalCurrent = ko.observable(1);
         self.headers         = ko.observableArray([]);
         self.settings        = ko.observable({});
@@ -76,15 +77,17 @@ define([
                 vIndexes = [],
                 start = (self.current() - 1) * self.pagesize(),
                 max = Math.min(start + self.pagesize(), items.length);
-            for (i = start; i < max; i += 1) {
-                if (self.enterViewport !== undefined && $.inArray(i, self.viewportIndexes) === -1) {
-                    // If the viewport changes and an item enters the viewport, we'll request an update
-                    self.enterViewport(items[i]);
+            if (self.key() !== undefined) {
+                for (i = start; i < max; i += 1) {
+                    if (self.enterViewport !== undefined && $.inArray(items[i][self.key()](), self.viewportkeys) === -1) {
+                        // If the viewport changes and an item enters the viewport, we'll request an update
+                        self.enterViewport(items[i]);
+                    }
+                    vIndexes.push(items[i][self.key()]());
+                    vItems.push(items[i]);
                 }
-                vIndexes.push(i);
-                vItems.push(items[i]);
             }
-            self.viewportIndexes = vIndexes.slice();
+            self.viewportkeys = vIndexes.slice();
             return vItems;
         });
 
@@ -116,6 +119,9 @@ define([
             if (!settings.hasOwnProperty('headers')) {
                 throw 'Headers should be specified';
             }
+            if (!settings.hasOwnProperty('key')) {
+                throw 'Key should be specified';
+            }
 
             self.enterViewport = generic.tryGet(settings, 'enterViewport');
             self.refresh = generic.tryGet(settings, 'viewportRefresh');
@@ -123,6 +129,7 @@ define([
             self.headers(settings.headers);
             self.pagesize(settings.pagesize);
             self.controls(generic.tryGet(settings, 'controls', true));
+            self.key(settings.key);
 
             if (self.refresh !== undefined) {
                 self.refresher.init(self.viewportRefresh, self.refresh);

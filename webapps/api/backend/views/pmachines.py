@@ -7,9 +7,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.hybrids.pmachine import PMachine
-from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
-from backend.decorators import required_roles, expose
+from backend.decorators import required_roles, expose, validate
 
 
 class PMachineViewSet(viewsets.ViewSet):
@@ -31,15 +30,10 @@ class PMachineViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @validate(PMachine)
+    def retrieve(self, request, obj):
         """
         Load information about a given pMachine
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            pmachine = PMachine(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(FullSerializer(PMachine, instance=pmachine).data, status=status.HTTP_200_OK)
+        _ = request
+        return Response(FullSerializer(PMachine, instance=obj).data, status=status.HTTP_200_OK)

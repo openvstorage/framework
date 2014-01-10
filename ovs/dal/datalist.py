@@ -9,6 +9,7 @@ from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 
 class DataList(object):
@@ -220,7 +221,7 @@ class DataList(object):
 
             if self._key is not None and len(keys) > 0:
                 self._volatile.set(self._key, self.data)
-            self._update_listinvalidation()
+                self._update_listinvalidation()
         else:
             Toolbox.log_cache_hit('datalist', True)
             self.from_cache = True
@@ -242,11 +243,16 @@ class DataList(object):
         if self._key is not None:
             for object_name, field_list in self._invalidation.iteritems():
                 key = '%s_%s' % (DataList.cachelink, object_name)
-                cache_list = Toolbox.try_get(key, {})
-                for field in field_list:
-                    list_list = cache_list.get(field, [])
-                    if self._key not in list_list:
-                        list_list.append(self._key)
-                    cache_list[field] = list_list
-                self._volatile.set(key, cache_list)
-                self._persistent.set(key, cache_list)
+                mutex = VolatileMutex('listcache_%s' % object_name)
+                try:
+                    mutex.acquire(10)
+                    cache_list = Toolbox.try_get(key, {})
+                    for field in field_list:
+                        list_list = cache_list.get(field, [])
+                        if self._key not in list_list:
+                            list_list.append(self._key)
+                        cache_list[field] = list_list
+                    self._volatile.set(key, cache_list)
+                    self._persistent.set(key, cache_list)
+                finally:
+                    mutex.release()

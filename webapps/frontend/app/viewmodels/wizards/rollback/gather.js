@@ -57,11 +57,13 @@ define([
             if (self.data.velement() === undefined || self.data.velement().guid() !== self.data.guid()) {
                 if (self.data.type === 'vmachine') {
                     self.data.velement(new VMachine(self.data.guid()));
+                    self.data.snapshot(undefined);
                 } else {
                     self.data.velement(new VDisk(self.data.guid()));
+                    self.data.snapshot(undefined);
                 }
-                self.data.velement().load();
             }
+            self.data.velement().load();
         };
     };
 });

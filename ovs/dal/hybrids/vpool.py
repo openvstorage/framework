@@ -4,6 +4,9 @@ VPool module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import time
+
+_vsr_client = VolumeStorageRouterClient().load()
 
 
 class VPool(DataObject):
@@ -21,7 +24,7 @@ class VPool(DataObject):
                   'backend_type':       (None, ['S3', 'LOCAL', 'REST'], 'Type of the Storage Backend.')}
     _relations = {}
     _expiry = {'status':        (10, str),
-               'statistics':     (5, dict),
+               'statistics':     (4, dict),
                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
@@ -36,12 +39,17 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
+        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstatsdict = {}
+        for key, value in vdiskstats.__class__.__dict__.items():
+            if type(value) is property:
+                vdiskstatsdict[key] = getattr(vdiskstats, key)
         for disk in self.vdisks:
-            statistics = disk.statistics
-            for key, value in statistics.iteritems():
-                data[key] = data.get(key, 0) + value
-        return data
+            statistics = disk._statistics()  # Prevent double caching
+            for key in vdiskstatsdict.iterkeys():
+                vdiskstatsdict[key] += statistics[key]
+        vdiskstatsdict['timestamp'] = time.time()
+        return vdiskstatsdict
 
     def _stored_data(self):
         """

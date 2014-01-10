@@ -7,29 +7,32 @@ from __future__ import absolute_import
 import sys
 sys.path.append('/opt/OpenvStorage')
 
+import os
 from celery import Celery
 from celery.schedules import crontab
 from ovs.logging.logHandler import LogHandler
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
+from ovs.plugin.provider.tools import Tools
 
-memcache_ini = j.tools.inifile.open(j.system.fs.joinPaths(j.application.config.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
 nodes = memcache_ini.getValue('main', 'nodes').split(',')
 memcache_servers = map(lambda m: memcache_ini.getValue(m, 'location'), nodes)
 
 celery = Celery('ovs',
                 include=['ovs.lib.vdisk',
                          'ovs.lib.vmachine',
+                         'ovs.lib.vpool',
                          'ovs.lib.messaging',
                          'ovs.lib.scheduledtask',
                          'ovs.extensions.hypervisor.hypervisors.vmware'])
 
 celery.conf.CELERY_RESULT_BACKEND = "cache"
 celery.conf.CELERY_CACHE_BACKEND = 'memcached://{}/'.format(';'.join(memcache_servers))
-celery.conf.BROKER_URL = '{}://{}:{}@{}:{}//'.format(j.application.config.get('ovs.core.broker.protocol'),
-                                                     j.application.config.get('ovs.core.broker.login'),
-                                                     j.application.config.get('ovs.core.broker.password'),
-                                                     j.application.config.get('ovs.grid.ip'),
-                                                     j.application.config.get('ovs.core.broker.port'))
+celery.conf.BROKER_URL = '{}://{}:{}@{}:{}//'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                     Configuration.get('ovs.core.broker.login'),
+                                                     Configuration.get('ovs.core.broker.password'),
+                                                     Configuration.get('ovs.grid.ip'),
+                                                     Configuration.get('ovs.core.broker.port'))
 celery.conf.CELERYBEAT_SCHEDULE = {
     # Snapshot policy
     # > Executes every day, hourly between 02:00 and 22:00 hour

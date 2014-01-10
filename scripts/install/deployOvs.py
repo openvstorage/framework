@@ -26,22 +26,26 @@ class InstallHelper():
         pass
 
     @staticmethod
-    def ask_integer(question, min_value, max_value, invalid_message=None):
+    def ask_integer(question, min_value, max_value, default_value=None, invalid_message=None):
         """
         Asks an integer to the user
         """
         if invalid_message is None:
             invalid_message = 'Invalid input please try again.'
-            while True:
-                i = raw_input(question).rstrip()
-                if not i.isdigit():
-                    print invalid_message
+        if default_value is not None:
+            question = '{0} [{1}]: '.format(question, default_value)
+        while True:
+            i = raw_input(question).rstrip()
+            if i == '' and default_value is not None:
+                i = str(default_value)
+            if not i.isdigit():
+                print invalid_message
+            else:
+                i = int(i)
+                if min_value <= i <= max_value:
+                    return i
                 else:
-                    i = int(i)
-                    if min_value <= i <= max_value:
-                        return i
-                    else:
-                        print invalid_message
+                    print invalid_message
 
     @staticmethod
     def ask_choice(choice_options):
@@ -444,29 +448,20 @@ if __name__ == '__main__':
     print 'Determine ESX host networking to use'
     vswitches = vm_sys.list_switches()
     if not vswitches:
-        print InstallHelper.boxed_message(['No virtual switches found in your ESXi network configuration'])
+        print InstallHelper.boxed_message(['No portgroups found in your ESXi network configuration'])
         sys.exit(1)
-    vlan_id = 4095
     available_pgs = VMwareSystem.list_vm_portgroups()
     pg_names = available_pgs.keys()
     if len(pg_names) < 2:
         print InstallHelper.boxed_message(['There should be at least two portgroups configured'])
         sys.exit(1)
-    print 'Please select your public portgroup:'
-    pg_vlan_id = 0
-    public_pg = pg_names[0]
-    while pg_vlan_id != vlan_id:
-        print '- The public porgroup should be configured with vlanID {0}'.format(vlan_id)
-        public_pg = InstallHelper.ask_choice(pg_names)
-        pg_vlan_id = available_pgs[public_pg]
-    print 'Please select your private portgroup:'
+    print 'Please select your public network:'
+    public_pg = InstallHelper.ask_choice(pg_names)
+    print 'Please select your private network:'
     uplinks = []
-    private_pg = public_pg
-    while private_pg == public_pg or len(uplinks) == 0:
-        if private_pg == public_pg:
-            print '- The private portgroup should be different from the public'
-        if len(uplinks) == 0:
-            print '- The private portgroup should have a required vmnic'
+    private_pg = ''
+    while len(uplinks) == 0:
+        print '- The private virtual switch should have a required vmnic'
         private_pg = InstallHelper.ask_choice(pg_names)
         uplinks = [s for s in vswitches if private_pg in s['Portgroups'] and len(s['Uplinks']) > 0]
 
@@ -488,10 +483,11 @@ if __name__ == '__main__':
     if not hdds:
         print InstallHelper.boxed_message(['Not enough HDD devices available to continue the install. Min: 1'])
         sys.exit(1)
+    size = InstallHelper.ask_integer('Specify the size in GB (min: 50)', 50, 9999, default_value=100)
     disk_config = ''
-    disk_config = vm_sys.create_vdisk(vm_name, 0, '100G', disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssds[0], disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdds[0], disk_config)
+    disk_config = vm_sys.create_vdisk(vm_name, 0, '{0}G'.format(size), disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, hdds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, ssds[0], disk_config)
 
     # Add CD drive
     datastore, vmfs_devices = vm_sys.get_vmfs_devices()
@@ -511,7 +507,7 @@ ide1:0.startConnected = "FALSE"
 """
 
     # Creating config
-    print 'Creating CloudFrames vRun virtual machine config'
+    print 'Creating Open vStorage virtual machine config'
     cpu = 4
     memory = 16 * 1024
     guestos = 'ubuntu'
@@ -539,4 +535,4 @@ ide1:0.startConnected = "FALSE"
                                        '* Open the vSphere Client',
                                        '* Connect to the %s Virtual Machine\'s console' % vm_name,
                                        '* Make sure the VM boots from CD',
-                                       '* Follow the on-screen install instructions'])
+                                       '* Install the Operating System'])

@@ -1,5 +1,5 @@
 // license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'durandal/activator', 'plugins/dialog', 'knockout'
 ], function(activator, dialog, ko) {
@@ -86,7 +86,7 @@ define([
                     });
                 })
                 .always(function() {
-                    parent.running(false);
+                    window.setTimeout(function() { parent.running(false); }, 500);
                 });
         };
 

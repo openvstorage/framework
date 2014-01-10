@@ -25,9 +25,10 @@ Changes applied by CloudFounders NV:
 """
 
 import os
+import time
 import subprocess
-import signal
 import types
+import signal
 import string
 import logging
 
@@ -108,6 +109,10 @@ class ArakoonCluster:
     def _getConfigFile(self):
         path = self._getConfigFilePath()
         return ConfigObj('{0}/{1}.cfg'.format(self._getConfigFilePath(),self._clusterName))
+
+    def _getClientConfigFile(self):
+        path = self._getConfigFilePath()
+        return ConfigObj('{0}/{1}_client.cfg'.format(self._getConfigFilePath(),self._clusterName))
 
     def _getClusterId(self):
         clusterId = self._clusterName
@@ -235,13 +240,10 @@ class ArakoonCluster:
             return []
         nodes = []
         try:
-            line = config["global"]["cluster"].strip()
-            # "".split(",") -> ['']
-            if line == "":
-                nodes =  []
+            if type(config['global']['cluster']) == list:
+                nodes = map(lambda x: x.strip(), config['global']['cluster'])
             else:
-                nodes = line.split(",")
-                nodes = map(lambda x: x.strip(), nodes)
+                nodes = [config['global']['cluster'].strip(),]
         except LookupError:
             pass
         return nodes
@@ -267,7 +269,8 @@ class ArakoonCluster:
         start all nodes in the cluster
         """
         rcs = {}
-
+        from ovs.extensions.db.arakoon.CheckArakoonTlogMark import CheckArakoonTlogMark
+        CheckArakoonTlogMark().fixtlogs(self._clusterName)
         for name in self.listLocalNodes():
             rcs[name] = self._startOne(name, daemon)
 
@@ -444,3 +447,200 @@ class ArakoonCluster:
 
         msg = "No node %s configured" % name
         raise Exception(msg)
+
+    def addNode(self,
+                name,
+                ip = "127.0.0.1",
+                clientPort = 7080,
+                messagingPort = 10000,
+                logLevel = "info",
+                logDir = None,
+                home = None,
+                tlogDir = None,
+                wrapper = None,
+                isLearner = False,
+                targets = None,
+                isLocal = False,
+                logConfig = None,
+                batchedTransactionConfig = None,
+                tlfDir = None,
+                headDir = None,
+                configFilename = None):
+        """
+        Add a node to the configuration of the supplied cluster
+
+        @param name : the name of the node, should be unique across the environment
+        @param ip : the ip(s) this node should be contacted on (string or string list)
+        @param clientPort : the port the clients should use to contact this node
+        @param messagingPort : the port the other nodes should use to contact this node
+        @param logLevel : the loglevel (debug info notice warning error fatal)
+        @param logDir : the directory used for logging
+        @param home : the directory used for the nodes data
+        @param tlogDir : the directory used for tlogs (if none, home will be used)
+        @param wrapper : wrapper line for the executable (for example 'softlimit -o 8192')
+        @param isLearner : whether this node is a learner node or not
+        @param targets : for a learner node the targets (string list) it learns from
+        @param isLocal : whether this node is a local node and should be added to the local nodes list
+        @param logConfig : specifies the log config to be used for this node
+        @param batchedTransactionConfig : specifies the batched transaction config to be used for this node
+        @param tlfDir : the directory used for tlfs (if none, tlogDir will be used)
+        @param headDir : the directory used for head.db (if none, tlfDir will be used)
+        @param configFilename: the filename to store the new config to (if none, the existing one is updated)
+        """
+        self.__validateName(name)
+
+        config = self._getConfigFile()
+        nodes = self.__getNodes(config)
+
+        if name in nodes:
+            raise Exception("node %s already present" % name )
+        if not isLearner:
+            nodes.append(name)
+
+        config[name] = {"name" : name}
+
+        if type(ip) == types.StringType:
+            config[name].update({"ip": ip})
+        elif type(ip) == types.ListType:
+            line = string.join(ip,',')
+            config[name].update({"ip": line})
+        else:
+            raise Exception("ip parameter needs string or string list type")
+
+        self.__validateInt("clientPort", clientPort)
+        config[name].update({"client_port": clientPort})
+        self.__validateInt("messagingPort", messagingPort)
+        config[name].update({"messaging_port": messagingPort})
+        config[name].update({"log_level": logLevel})
+
+        if logConfig is not None:
+            config[name].update({"log_config": logConfig})
+
+        if batchedTransactionConfig is not None:
+            config[name].update({"batched_transaction_config": batchedTransactionConfig})
+
+        if wrapper is not None:
+            config[name].update({"wrapper": wrapper})
+
+        if logDir is None:
+            logDir = os.path.join(os.sep, 'var', 'log', 'arakoon', self._clusterName, name)
+        config[name].update({"log_dir": logDir})
+
+        if home is None:
+            home = os.path.join(os.sep, 'var', "db", self._clusterName, name)
+        config[name].update({"home": home})
+
+        if tlogDir:
+            config[name].update({"tlog_dir": tlogDir})
+
+        if tlfDir:
+            config[name].update({"tlf_dir": tlfDir})
+
+        if headDir:
+            config[name].update({"head_dir": headDir})
+
+        if isLearner:
+            config[name].update({"learner": "true"})
+            if targets is None:
+                targets = self.listNodes()
+            config[name].update({"targets": targets})
+
+        if not config.has_key("global") :
+            config["global"] = dict()
+            config["global"].update({"cluster_id": self._clusterName})
+        config["global"].update({"cluster": nodes})
+
+        if configFilename:
+            config.filename = configFilename
+        config.write()
+
+        if isLocal:
+            self.addLocalNode(name)
+
+    def addLocalNode(self, name, configFilename=None):
+        """
+        Add a node to the list of nodes that have to be started locally
+        from the supplied cluster
+
+        @param name: the name of the node as configured in the config file
+        @param configFilename: the filename to store the new config to (if none, the existing one is updated)
+        """
+        self.__validateName(name)
+
+        config = self._getConfigFile()
+        nodes = self.__getNodes(config)
+        config_name = self._servernodes()
+        if config.has_key(name):
+            config_name_path = os.path.join(self._clusterPath, config_name)
+            nodesconfig = ConfigObj(config_name_path)
+
+            if not nodesconfig.has_key("global"):
+                nodesconfig["global"] = dict()
+                nodesconfig["global"].update({"cluster": ""})
+
+            nodes = self.__getNodes(nodesconfig)
+            if name in nodes:
+                raise Exception("node %s already present" % name)
+            nodes.append(name)
+            nodesconfig["global"].update({"cluster": nodes})
+
+            if configFilename:
+                nodesconfig.filename = configFilename
+            nodesconfig.write()
+
+            return
+
+        raise Exception("No node %s" % name)
+
+    def writeClientConfig(self, config=None, configFilename=None):
+        """
+        Write Arakoon Cluster client config to file
+
+        @param config: arakoon client config for this cluster (if none, will be retrieved from current cluster config)
+        @param configFilename: the filename to store the config to (if none, the existing one is updated)
+        """
+        if not configFilename:
+            clientConfig = self._getClientConfigFile()
+        else:
+            clientConfig = ConfigObj(configFilename)
+
+        if not config:
+            config = self.getClientConfig()
+
+        if not clientConfig.has_key('global'):
+            clientConfig['global'] = dict()
+            clientConfig['global'].update({'cluster_id': self._clusterName,
+                                           'cluster': config.keys()})
+
+        for node,node_config in config.iteritems():
+            if not clientConfig.has_key(node):
+                clientConfig[node] = dict()
+            clientConfig[node].update({'name': node,
+                                       'ip': node_config[0][0],
+                                       'client_port': node_config[1]})
+
+        clientConfig.write()
+
+if __name__ == '__main__':
+    from optparse import OptionParser
+
+    parser = OptionParser(description='Arakoon Management')
+    parser.add_option('--stop', dest='start_stop', action="store_false", default=None,
+                      help="Stop arakoon")
+    parser.add_option('--start', dest='start_stop', action="store_true", default=None,
+                      help="Start arakoon")
+    parser.add_option('-c', '--cluster', dest="cluster",
+                      help="Name of arakoon cluster")
+    (options, args) = parser.parse_args()
+
+    if not options.cluster:
+        parser.error("No arakoon cluster specified")
+    if options.start_stop == None:
+        parser.error("No action specified")
+
+    ArakoonManagement = ArakoonManagement()
+    arakoon_cluster = ArakoonManagement.getCluster(options.cluster)
+    if options.start_stop:
+        arakoon_cluster.start(False)
+    else:
+        arakoon_cluster.stop()

@@ -139,19 +139,17 @@ class DeleteSnapshots(TestCase):
             print '- Creating snapshots'
             for h in xrange(2, 23):
                 timestamp = base_timestamp + (hour * h)
-                #for vm in [vmachine_1, vmachine_2]:
-                #    VMachineController.snapshot(machineguid=vm.guid,
-                #                                label='ss_i_{}:00'.format(str(h)),
-                #                                is_consistent=False,
-                #                                timestamp=timestamp,
-                #                                subtasks=False)
-                #    if h in [6, 12, 18]:
-                #        ts = (timestamp + (minute * 30))
-                #        VMachineController.snapshot(machineguid=vm.guid,
-                #                                    label='ss_c_{}:30'.format(str(h)),
-                #                                    is_consistent=True,
-                #                                    timestamp=ts,
-                #                                    subtasks=False)
+                for vm in [vmachine_1, vmachine_2]:
+                    VMachineController.snapshot(machineguid=vm.guid,
+                                                label='ss_i_{}:00'.format(str(h)),
+                                                is_consistent=False,
+                                                timestamp=timestamp)
+                    if h in [6, 12, 18]:
+                        ts = (timestamp + (minute * 30))
+                        VMachineController.snapshot(machineguid=vm.guid,
+                                                    label='ss_c_{}:30'.format(str(h)),
+                                                    is_consistent=True,
+                                                    timestamp=ts)
 
                 VDiskController.create_snapshot(diskguid=vdisk_3.guid,
                                                 metadata={'label': 'ss_i_{}:00'.format(str(h)),

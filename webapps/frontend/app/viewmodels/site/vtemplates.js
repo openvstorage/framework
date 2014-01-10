@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
@@ -10,10 +10,11 @@ define([
         var self = this;
 
         // System
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
-        self.refresher = new Refresher();
-        self.widgets   = [];
+        self.shared      = shared;
+        self.guard       = { authenticated: true };
+        self.refresher   = new Refresher();
+        self.widgets     = [];
+        self.sortTimeout = undefined;
 
         // Data
         self.vTemplateHeaders = [
@@ -23,8 +24,7 @@ define([
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80,        colspan: undefined }
         ];
         self.vTemplates = ko.observableArray([]);
-        self.vTemplateGuids         =  [];
-        self.vTemplateChildrenGuids =  [];
+        self.vTemplateGuids = [];
 
         // Variables
         self.loadVTemplatesHandle = undefined;
@@ -50,7 +50,7 @@ define([
                             guids, self.vTemplateGuids, self.vTemplates,
                             function(guid) {
                                 return new VMachine(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
@@ -58,8 +58,18 @@ define([
             }).promise();
         };
         self.loadVTemplate = function(vt) {
-            vt.load();
-            vt.fetchTemplateChildrenGuids();
+            return $.Deferred(function(deferred) {
+                vt.load()
+                    .then(vt.fetchTemplateChildrenGuids)
+                    .done(function() {
+                        // (Re)sort vTemplates
+                        if (self.sortTimeout) {
+                            window.clearTimeout(self.sortTimeout);
+                        }
+                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vTemplates, ['name', 'guid']); }, 250);
+                    })
+                    .always(deferred.resolve);
+            }).promise();
         };
         self.deleteVT = function(guid) {
             var i, vts = self.vTemplates(), vm;
@@ -92,7 +102,7 @@ define([
                                 .fail(function(error) {
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.errorwhile', {
+                                        $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
                                             what: $.t('ovs:vmachines.delete.errormsg', { what: vm.name() }),
                                             error: error
@@ -113,9 +123,16 @@ define([
         // Durandal
         self.activate = function() {
             self.refresher.init(self.load, 5000);
-            self.refresher.run();
             self.refresher.start();
             self.shared.footerData(self.vTemplates);
+
+            self.load()
+                .done(function() {
+                    var i, vtemplates = self.vTemplates();
+                    for (i = 0; i < vtemplates.length; i += 1) {
+                        self.loadVTemplate(vtemplates[i]);
+                    }
+                });
         };
         self.deactivate = function() {
             var i;

@@ -23,13 +23,15 @@ def synchronized():
             Executes the decorated function in a locked context
             """
             filemutex = FileMutex('messaging')
-            filemutex.acquire(wait=5)
-            mutex = VolatileMutex('messaging')
-            mutex.acquire(wait=5)
             try:
-                return f(*args, **kw)
+                filemutex.acquire(wait=5)
+                mutex = VolatileMutex('messaging')
+                try:
+                    mutex.acquire(wait=5)
+                    return f(*args, **kw)
+                finally:
+                    mutex.release()
             finally:
-                mutex.release()
                 filemutex.release()
         return new_function
     return wrap
