@@ -6,6 +6,9 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import time
+
+_vsr_client = VolumeStorageRouterClient().load()
 
 
 class VolumeStorageRouter(DataObject):
@@ -23,7 +26,7 @@ class VolumeStorageRouter(DataObject):
     _relations = {'vpool':            (VPool, 'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':        (30, str),
-               'statistics':     (5, dict),
+               'statistics':     (4, dict),
                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
@@ -38,14 +41,19 @@ class VolumeStorageRouter(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
         """
-        data = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
+        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstatsdict = {}
+        for key, value in vdiskstats.__class__.__dict__.items():
+            if type(value) is property:
+                vdiskstatsdict[key] = getattr(vdiskstats, key)
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.vsrid == self.vsrid:
-                    statistics = disk.statistics
-                    for key, value in statistics.iteritems():
-                        data[key] = data.get(key, 0) + value
-        return data
+                    statistics = disk._statistics()  # Prevent double caching
+                    for key in vdiskstatsdict.iterkeys():
+                        vdiskstatsdict[key] += statistics[key]
+        vdiskstatsdict['timestamp'] = time.time()
+        return vdiskstatsdict
 
     def _stored_data(self):
         """

@@ -1,7 +1,7 @@
 ﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
 <section>
     <h2 data-i18n="ovs:vtemplates.title"></h2>
-    <div data-bind="pager: { items: vTemplates, headers: vTemplateHeaders, pagesize: 10,
+    <div data-bind="pager: { items: vTemplates, headers: vTemplateHeaders, pagesize: 10, key: 'guid',
                              enterViewport: loadVTemplate, viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">

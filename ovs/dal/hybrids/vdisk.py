@@ -7,6 +7,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import pickle
+import time
 
 _vsr_client = VolumeStorageRouterClient().load()
 
@@ -34,7 +35,7 @@ class VDisk(DataObject):
                   'parent_vdisk': (None, 'child_vdisks')}
     _expiry = {'snapshots':  (60, list),
                'info':       (60, dict),
-               'statistics':  (5, dict),
+               'statistics':  (4, dict),
                'vsrid':      (60, str)}
     # pylint: enable=line-too-long
 
@@ -43,18 +44,22 @@ class VDisk(DataObject):
         Fetches a list of Snapshots for the vDisk
         """
 
-        volumeid = str(self.volumeid)
         snapshots = []
-        for guid in _vsr_client.list_snapshots(volumeid):
-            snapshot = _vsr_client.info_snapshot(volumeid, guid)
-            # @todo: to be investigated howto handle during
-            # set as template
-            if snapshot.metadata:
-                metadata = pickle.loads(snapshot.metadata)
-                snapshots.append({'guid': guid,
-                                  'timestamp': metadata['timestamp'],
-                                  'label': metadata['label'],
-                                  'is_consistent': metadata['is_consistent']})
+        if self.volumeid:
+            volumeid = str(self.volumeid)
+            try:
+                voldrv_snapshots = _vsr_client.list_snapshots(volumeid)
+            except:
+                voldrv_snapshots = []
+            for guid in voldrv_snapshots:
+                snapshot = _vsr_client.info_snapshot(volumeid, guid)
+                # @todo: to be investigated howto handle during set as template
+                if snapshot.metadata:
+                    metadata = pickle.loads(snapshot.metadata)
+                    snapshots.append({'guid': guid,
+                                      'timestamp': metadata['timestamp'],
+                                      'label': metadata['label'],
+                                      'is_consistent': metadata['is_consistent']})
         return snapshots
 
     def _info(self):
@@ -62,32 +67,39 @@ class VDisk(DataObject):
         Fetches the info (see Volume Driver API) for the vDisk.
         """
         if self.volumeid:
-            vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
-            vdiskinfodict = dict()
-
-            for infoattribute in dir(vdiskinfo):
-                if infoattribute.startswith('_'):
-                    continue
-                elif infoattribute == 'volume_type':
-                    vdiskinfodict[infoattribute] = str(getattr(vdiskinfo, infoattribute))
-                else:
-                    vdiskinfodict[infoattribute] = getattr(vdiskinfo, infoattribute)
-
-            return vdiskinfodict
+            try:
+                vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
+            except:
+                vdiskinfo = _vsr_client.empty_info()
         else:
-            return dict()
+            vdiskinfo = _vsr_client.empty_info()
+
+        vdiskinfodict = {}
+        for key, value in vdiskinfo.__class__.__dict__.items():
+            if type(value) is property:
+                vdiskinfodict[key] = getattr(vdiskinfo, key)
+                if key == 'volume_type':
+                    vdiskinfodict[key] = str(vdiskinfodict[key])
+        return vdiskinfodict
 
     def _statistics(self):
         """
         Fetches the Statistics for the vDisk.
         """
-        vdiskstatsdict = dict([(key, 0) for key in VolumeStorageRouterClient.STATISTICS_KEYS])
         if self.volumeid:
-            vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+            try:
+                vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+            except:
+                vdiskstats = _vsr_client.empty_statistics()
+        else:
+            vdiskstats = _vsr_client.empty_statistics()
 
-            for key in VolumeStorageRouterClient.STATISTICS_KEYS:
-                    vdiskstatsdict[key] = getattr(vdiskstats, key)
+        vdiskstatsdict = {}
+        for key, value in vdiskstats.__class__.__dict__.items():
+            if type(value) is property:
+                vdiskstatsdict[key] = getattr(vdiskstats, key)
 
+        vdiskstatsdict['timestamp'] = time.time()
         return vdiskstatsdict
 
     def _vsrid(self):

@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
@@ -10,10 +10,12 @@ define([
         var self = this;
 
         // System
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
-        self.refresher = new Refresher();
-        self.widgets   = [];
+        self.shared      = shared;
+        self.guard       = { authenticated: true };
+        self.refresher   = new Refresher();
+        self.widgets     = [];
+        self.updateSort  = false;
+        self.sortTimeout = undefined;
 
         // Data
         self.vDiskHeaders = [
@@ -31,7 +33,10 @@ define([
             { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80,        colspan: undefined }
         ];
         self.vDisks = ko.observableArray([]);
-        self.vDiskGuids =  [];
+        self.vDiskGuids = [];
+        self.vMachineCache = {};
+        self.vPoolCache = {};
+        self.vsaCache = {};
 
         // Variables
         self.loadVDisksHandle = undefined;
@@ -50,52 +55,100 @@ define([
                             guids, self.vDiskGuids, self.vDisks,
                             function(guid) {
                                 return new VDisk(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
             }).promise();
         };
-        self.loadVDisk = function(vdisk) {
-            $.when.apply($, [
-                    vdisk.load(),
-                    vdisk.fetchVSAGuid()
-                ])
-                .done(function() {
-                    var vm, pool;
-                    if ((vdisk.vsa() === undefined || vdisk.vsa().guid() !== vdisk.vsaGuid()) && vdisk.vsaGuid()) {
-                        vm = new VMachine(vdisk.vsaGuid());
-                        vm.load();
-                        vdisk.vsa(vm);
-                    }
-                    if ((vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vdisk.vMachineGuid()) && vdisk.vMachineGuid()) {
-                        vm = new VMachine(vdisk.vMachineGuid());
-                        vm.load();
-                        vdisk.vMachine(vm);
-                    }
-                    if ((vdisk.vpool() === undefined || vdisk.vpool().guid() !== vdisk.vpoolGuid()) && vdisk.vpoolGuid()) {
-                        pool = new VPool(vdisk.vpoolGuid());
-                        pool.load();
-                        vdisk.vpool(pool);
-                    }
-                });
+        self.loadVDisk = function(vdisk, reduced) {
+            reduced = reduced || false;
+            return $.Deferred(function(deferred) {
+                var calls = [vdisk.load()];
+                if (!reduced) {
+                    calls.push(vdisk.fetchVSAGuid());
+                }
+                $.when.apply($, calls)
+                    .done(function() {
+                        var vm, pool,
+                            vsaGuid = vdisk.vsaGuid(),
+                            vMachineGuid = vdisk.vMachineGuid(),
+                            vPoolGuid = vdisk.vpoolGuid();
+                        if (vsaGuid && (vdisk.vsa() === undefined || vdisk.vsa().guid() !== vsaGuid)) {
+                            if (!self.vsaCache.hasOwnProperty(vsaGuid)) {
+                                vm = new VMachine(vsaGuid);
+                                vm.load();
+                                self.vsaCache[vsaGuid] = vm;
+                            }
+                            vdisk.vsa(self.vsaCache[vsaGuid]);
+                        }
+                        if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
+                            if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
+                                vm = new VMachine(vMachineGuid);
+                                vm.load();
+                                self.vMachineCache[vMachineGuid] = vm;
+                            }
+                            vdisk.vMachine(self.vMachineCache[vMachineGuid]);
+                        }
+                        if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
+                            if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
+                                pool = new VPool(vPoolGuid);
+                                pool.load();
+                                self.vPoolCache[vPoolGuid] = pool;
+                            }
+                            vdisk.vpool(self.vPoolCache[vPoolGuid]);
+                        }
+                        // (Re)sort vDisks
+                        if (self.updateSort) {
+                            self.sort();
+                        }
+                    })
+                    .always(deferred.resolve);
+            }).promise();
+        };
+        self.sort = function() {
+            if (self.sortTimeout) {
+                window.clearTimeout(self.sortTimeout);
+            }
+            self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vDisks, ['name', 'guid']); }, 250);
         };
 
         self.rollback = function(guid) {
-            dialog.show(new RollbackWizard({
-                modal: true,
-                type: 'vdisk',
-                guid: guid
-            }));
+            var i, vds = self.vDisks(), vd;
+            for (i = 0; i < vds.length; i += 1) {
+                if (vds[i].guid() === guid) {
+                    vd = vds[i];
+                }
+            }
+            if (vd.vMachine() === undefined || !vd.vMachine().isRunning()) {
+                dialog.show(new RollbackWizard({
+                    modal: true,
+                    type: 'vdisk',
+                    guid: guid
+                }));
+            }
         };
 
         // Durandal
         self.activate = function() {
             self.refresher.init(self.load, 5000);
-            self.refresher.run();
             self.refresher.start();
             self.shared.footerData(self.vDisks);
+
+            var loads = [];
+            self.load()
+                .done(function() {
+                    var i, vdisks = self.vDisks();
+                    for (i = 0; i < vdisks.length; i += 1) {
+                        loads.push(self.loadVDisk(vdisks[i], true));
+                    }
+                });
+            $.when.apply($, loads)
+                .done(function() {
+                    self.sort();
+                    self.updateSort = true;
+                });
         };
         self.deactivate = function() {
             var i;

@@ -25,23 +25,29 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 return formattedValue();
             },
             write: function(newCounter) {
+                newTimestamp = (new Date()).getTime();
+                if (typeof newCounter === 'object') {
+                    newTimestamp = newCounter.timestamp;
+                    newCounter = newCounter.value;
+                }
                 if ((typeof previousCounter) === 'undefined') {
                     previousCounter = newCounter;
-                    timestamp = (new Date()).getTime();
+                    timestamp = newTimestamp;
                 } else {
                     delta = newCounter - previousCounter;
-                    newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    newRaw = Math.max(0, delta / timeDelta);
-                    rawValue(newRaw);
-                    if (formatFunction.call) {
-                        formattedValue(formatFunction(newRaw));
-                    } else {
-                        formattedValue(newRaw);
+                    if (timeDelta > 0) {
+                        newRaw = Math.max(0, delta / timeDelta);
+                        rawValue(newRaw);
+                        if (formatFunction.call) {
+                            formattedValue(formatFunction(newRaw));
+                        } else {
+                            formattedValue(newRaw);
+                        }
+                        timestamp = newTimestamp;
+                        previousCounter = newCounter;
+                        initialized(true);
                     }
-                    timestamp = newTimestamp;
-                    previousCounter = newCounter;
-                    initialized(true);
                 }
             }
         });
@@ -57,19 +63,25 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 return formattedValue();
             },
             write: function(newCounter) {
+                newTimestamp = (new Date()).getTime();
+                if (typeof newCounter === 'object') {
+                    newTimestamp = newCounter.timestamp;
+                    newCounter = newCounter.value;
+                }
                 if ((typeof previousCounter) === 'undefined') {
                     previousCounter = newCounter;
-                    timestamp = (new Date()).getTime();
+                    timestamp = newTimestamp;
                 } else {
                     delta = newCounter - previousCounter;
-                    newTimestamp = (new Date()).getTime();
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    newValue = Math.max(0, delta / timeDelta);
-                    generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
-                    rawValue(newValue);
-                    timestamp = newTimestamp;
-                    previousCounter = newCounter;
-                    initialized(true);
+                    if (timeDelta > 0) {
+                        newValue = Math.max(0, delta / timeDelta);
+                        generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
+                        rawValue(newValue);
+                        timestamp = newTimestamp;
+                        previousCounter = newCounter;
+                        initialized(true);
+                    }
                 }
             }
         });

@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
@@ -10,10 +10,12 @@ define([
         var self = this;
 
         // System
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
-        self.refresher = new Refresher();
-        self.widgets   = [];
+        self.shared      = shared;
+        self.guard       = { authenticated: true };
+        self.refresher   = new Refresher();
+        self.widgets     = [];
+        self.updateSort  = false;
+        self.sortTimeout = undefined;
 
         // Data
         self.vMachineHeaders = [
@@ -30,7 +32,9 @@ define([
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 100,       colspan: undefined }
         ];
         self.vMachines = ko.observableArray([]);
-        self.vMachineGuids =  [];
+        self.vMachineGuids = [];
+        self.vPoolCache = {};
+        self.vsaCache = {};
 
         // Variables
         self.loadVMachinesHandle = undefined;
@@ -57,54 +61,83 @@ define([
                             guids, self.vMachineGuids, self.vMachines,
                             function(guid) {
                                 return new VMachine(guid);
-                            }
+                            }, 'guid'
                         );
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
             }).promise();
         };
-        self.loadVMachine = function(vm) {
-            $.when.apply($, [
-                    vm.load(),
-                    vm.fetchVSAGuids(),
-                    vm.fetchVPoolGuids()
-                ])
-                .done(function() {
-                    // Merge in the VSAs
-                    var i, currentGuids = [];
-                    for (i = 0; i < vm.vsas().length; i += 1) {
-                        currentGuids.push(vm.vsas()[i].guid());
-                    }
-                    generic.crossFiller(
-                        vm.vsaGuids, currentGuids, vm.vsas,
-                        function(guid) {
-                            var vm = new VMachine(guid);
-                            vm.load();
-                            return vm;
+        self.loadVMachine = function(vm, reduced) {
+            reduced = reduced || false;
+            return $.Deferred(function(deferred) {
+                var calls = [vm.load(reduced)];
+                if (!reduced) {
+                    calls.push(vm.fetchVSAGuids());
+                    calls.push(vm.fetchVPoolGuids());
+                }
+                $.when.apply($, calls)
+                    .done(function() {
+                        // Merge in the VSAs
+                        var i, currentGuids = [];
+                        for (i = 0; i < vm.vsas().length; i += 1) {
+                            currentGuids.push(vm.vsas()[i].guid());
                         }
-                    );
-                    // Merge in the vPools
-                    currentGuids = [];
-                    for (i = 0; i < vm.vpools().length; i += 1) {
-                        currentGuids.push(vm.vpools()[i].guid());
-                    }
-                    generic.crossFiller(
-                        vm.vPoolGuids, currentGuids, vm.vpools,
-                        function(guid) {
-                            var vm = new VPool(guid);
-                            vm.load();
-                            return vm;
+                        generic.crossFiller(
+                            vm.vsaGuids, currentGuids, vm.vsas,
+                            function(guid) {
+                                if (!self.vsaCache.hasOwnProperty(guid)) {
+                                    var vm = new VMachine(guid);
+                                    vm.load();
+                                    self.vsaCache[guid] = vm;
+                                }
+                                return self.vsaCache[guid];
+                            }, 'guid'
+                        );
+                        // Merge in the vPools
+                        currentGuids = [];
+                        for (i = 0; i < vm.vpools().length; i += 1) {
+                            currentGuids.push(vm.vpools()[i].guid());
                         }
-                    );
-                });
+                        generic.crossFiller(
+                            vm.vPoolGuids, currentGuids, vm.vpools,
+                            function(guid) {
+                                if (!self.vPoolCache.hasOwnProperty(guid)) {
+                                    var vp = new VPool(guid);
+                                    vp.load();
+                                    self.vPoolCache[guid] = vp;
+                                }
+                                return self.vPoolCache[guid];
+                            }, 'guid'
+                        );
+                        // (Re)sort vMachines
+                        if (self.updateSort) {
+                            self.sort();
+                        }
+                    })
+                    .always(deferred.resolve);
+            }).promise();
+        };
+        self.sort = function() {
+            if (self.sortTimeout) {
+                window.clearTimeout(self.sortTimeout);
+            }
+            self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vMachines, ['name', 'guid']); }, 250);
         };
         self.rollback = function(guid) {
-            dialog.show(new RollbackWizard({
-                modal: true,
-                type: 'vmachine',
-                guid: guid
-            }));
+            var i, vms = self.vMachines(), vm;
+            for (i = 0; i < vms.length; i += 1) {
+                if (vms[i].guid() === guid) {
+                    vm = vms[i];
+                }
+            }
+            if (vm !== undefined && !vm.isRunning()) {
+                dialog.show(new RollbackWizard({
+                    modal: true,
+                    type: 'vmachine',
+                    guid: guid
+                }));
+            }
         };
         self.snapshot = function(guid) {
             dialog.show(new SnapshotWizard({
@@ -119,7 +152,7 @@ define([
                     vm = vms[i];
                 }
             }
-            if (vm !== undefined) {
+            if (vm !== undefined && !vm.isRunning()) {
                 app.showMessage(
                         $.t('ovs:vmachines.setastemplate.warning'),
                         $.t('ovs:vmachines.setastemplate.title', { what: vm.name() }),
@@ -143,7 +176,7 @@ define([
                                 .fail(function(error) {
                                     generic.alertError(
                                         $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.errorwhile', {
+                                        $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
                                             what: $.t('ovs:vmachines.setastemplate.errormsg', { what: vm.name() }),
                                             error: error
@@ -158,9 +191,22 @@ define([
         // Durandal
         self.activate = function() {
             self.refresher.init(self.fetchVMachines, 5000);
-            self.refresher.run();
             self.refresher.start();
             self.shared.footerData(self.vMachines);
+
+            var loads = [];
+            self.fetchVMachines()
+                .done(function() {
+                    var i, vmachines = self.vMachines();
+                    for (i = 0; i < vmachines.length; i += 1) {
+                        loads.push(self.loadVMachine(vmachines[i], true));
+                    }
+                });
+            $.when.apply($, loads)
+                .done(function() {
+                    self.sort();
+                    self.updateSort = true;
+                });
         };
         self.deactivate = function() {
             var i;

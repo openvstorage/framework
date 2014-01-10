@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
@@ -10,10 +10,11 @@ define([
         var self = this;
 
         // System
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
-        self.refresher = new Refresher();
-        self.widgets   = [];
+        self.shared      = shared;
+        self.guard       = { authenticated: true };
+        self.refresher   = new Refresher();
+        self.widgets     = [];
+        self.sortTimeout = undefined;
 
         // Data
         self.vPoolHeaders = [
@@ -27,7 +28,7 @@ define([
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined, colspan: undefined }
         ];
         self.vPools = ko.observableArray([]);
-        self.vPoolGuids =  [];
+        self.vPoolGuids = [];
 
         // Variables
         self.loadVPoolsHandle = undefined;
@@ -42,33 +43,44 @@ define([
                         for (i = 0; i < data.length; i += 1) {
                             guids.push(data[i].guid);
                         }
-                        for (i = 0; i < guids.length; i += 1) {
-                            if ($.inArray(guids[i], self.vPoolGuids) === -1) {
-                                self.vPoolGuids.push(guids[i]);
-                                self.vPools.push(new VPool(guids[i]));
-                            }
-                        }
-                        for (i = 0; i < self.vPoolGuids.length; i += 1) {
-                            if ($.inArray(self.vPoolGuids[i], guids) === -1) {
-                                self.vPoolGuids.splice(i, 1);
-                                self.vPools.splice(i, 1);
-                            }
-                        }
+                        generic.crossFiller(
+                            guids, self.vPoolGuids, self.vPools,
+                            function(guid) {
+                                return new VPool(guid);
+                            }, 'guid'
+                        );
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
             }).promise();
         };
         self.loadVPool = function(vpool) {
-            vpool.load();
+            return $.Deferred(function(deferred) {
+                vpool.load()
+                    .done(function() {
+                        // (Re)sort vPools
+                        if (self.sortTimeout) {
+                            window.clearTimeout(self.sortTimeout);
+                        }
+                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vPools, ['name', 'guid']); }, 250);
+                    })
+                    .always(deferred.resolve);
+            }).promise();
         };
 
         // Durandal
         self.activate = function() {
             self.refresher.init(self.load, 5000);
-            self.refresher.run();
             self.refresher.start();
             self.shared.footerData(self.vPools);
+
+            self.load()
+                .done(function() {
+                    var i, vpools = self.vPools();
+                    for (i = 0; i < vpools.length; i += 1) {
+                        self.loadVPool(vpools[i]);
+                    }
+                });
         };
         self.deactivate = function() {
             var i;

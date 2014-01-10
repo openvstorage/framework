@@ -8,9 +8,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
-from backend.decorators import required_roles, expose
+from backend.decorators import required_roles, expose, validate
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -32,51 +31,36 @@ class VPoolViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @validate(VPool)
+    def retrieve(self, request, obj):
         """
         Load information about a given vPool
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vpool = VPool(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(FullSerializer(VPool, instance=vpool).data, status=status.HTTP_200_OK)
+        _ = request
+        return Response(FullSerializer(VPool, instance=obj).data, status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def count_disks(self, request, pk=None, format=None):
+    @validate(VPool)
+    def count_disks(self, request, obj):
         """
         Returns the amount of disks
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vpool = VPool(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(len(vpool.vdisks), status=status.HTTP_200_OK)
+        _ = request
+        return Response(len(obj.vdisks), status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def count_machines(self, request, pk=None, format=None):
+    @validate(VPool)
+    def count_machines(self, request, obj):
         """
         Returns the amount of machines
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        try:
-            vpool = VPool(pk)
-        except ObjectNotFoundException:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        _ = request
         vmachine_guids = []
-        for disk in vpool.vdisks:
+        for disk in obj.vdisks:
             if disk.vmachine is not None and disk.vmachine.guid not in vmachine_guids:
                 vmachine_guids.append(disk.vmachine.guid)
         return Response(len(vmachine_guids), status=status.HTTP_200_OK)

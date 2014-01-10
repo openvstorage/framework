@@ -27,13 +27,14 @@ requirejs.config({
             exports: 'd3'
         }
     },
-    urlArgs: "bust=0.1.0.0b"
+    urlArgs: "bust=0.1.0.0b",
+    waitSeconds: 300
 });
 
 define([
     'durandal/system', 'durandal/app', 'durandal/viewLocator', 'durandal/binder', 'jquery', 'i18next',
     'ovs/shared',
-    'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions',
+    'ovs/extensions/knockout-helpers', 'ovs/extensions/knockout-bindinghandlers', 'ovs/extensions/knockout-extensions', 'ovs/extensions/knockout-extenders',
     'bootstrap'
 ],  function(system, app, viewLocator, binder, $, i18n, shared) {
     "use strict";

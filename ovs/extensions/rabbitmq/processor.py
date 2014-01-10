@@ -6,14 +6,16 @@ Contains the process method for processing rabbitmq messages
 from celery.task.control import revoke
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
+from ovs.lib.vpool import VPoolController
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
+
 
 def process(queue, body):
     """
     Processes the actual received body
     """
-    if queue == j.application.config.get('ovs.core.broker.volumerouter.queue'):
+    if queue == Configuration.get('ovs.core.broker.volumerouter.queue'):
         import json
         import volumedriver.storagerouter.EventMessages_pb2 as EventMessages
         cache = VolatileFactory.get_client()
@@ -56,9 +58,14 @@ def process(queue, body):
                         'arguments': {'old_path': 'old_name',
                                       'new_path': 'new_name',
                                       '[NODE_ID]': 'vsrid'},
-                        'options': {'delay': 5,
+                        'options': {'delay': 3,
                                     'dedupe': True,
-                                    'dedupe_key': 'new_name'}}}
+                                    'dedupe_key': 'new_name'}},
+                   EventMessages.EventMessage.UpAndRunning:
+                       {'property': 'up_and_running',
+                        'task': VPoolController.mountpoint_available_from_voldrv,
+                        'arguments': {'mountpoint': 'mountpoint',
+                                      '[NODE_ID]': 'vsrid'}}}
 
         if data.type in mapping:
             task = mapping[data.type]['task']

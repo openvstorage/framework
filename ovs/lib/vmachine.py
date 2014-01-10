@@ -4,6 +4,7 @@ VMachine module
 """
 import time
 import logging
+import uuid
 
 from celery import group
 from ovs.celery import celery
@@ -24,8 +25,23 @@ class VMachineController(object):
     """
 
     @staticmethod
+    @celery.task(name='ovs.machine.create_multiple_from_template')
+    def create_multiple_from_template(name, machineguid, pmachineguids, start, amount, description=None):
+        pmachine_pointer = 0
+        for i in xrange(start, start + amount):
+            new_name = name if amount == 1 else '{0}-{1}'.format(name, i)
+            pmachineguid = pmachineguids[pmachine_pointer]
+            pmachine_pointer += 1
+            if pmachine_pointer >= len(pmachineguids):
+                pmachine_pointer = 0
+            VMachineController.create_from_template(name=new_name,
+                                                    machineguid=machineguid,
+                                                    pmachineguid=pmachineguid,
+                                                    description=description)
+
+    @staticmethod
     @celery.task(name='ovs.machine.create_from_template')
-    def create_from_template(name, machineguid, pmachineguid, **kwargs):
+    def create_from_template(name, machineguid, pmachineguid, description=None):
         """
         Create a new vmachine using an existing vmachine template
 
@@ -45,7 +61,7 @@ class VMachineController(object):
         for disk in template_vm.vdisks:
             vpool = disk.vpool
             nr_of_vpools += 1
-        if nr_of_vpools <> 1:
+        if nr_of_vpools != 1:
             raise RuntimeError('Only 1 vpool supported on template disk(s) - {0} found!'.format(nr_of_vpools))
 
         if not template_vm.pmachine.hvtype == target_pm.hvtype:
@@ -73,34 +89,36 @@ class VMachineController(object):
         # @todo if so, continue
 
         new_vm = VMachine()
-        for item in template_vm._blueprint.keys():
-            setattr(new_vm, item, getattr(template_vm, item))
+        new_vm.copy_blueprint(template_vm)
         new_vm.name = name
+        new_vm.description = description
         new_vm.is_vtemplate = False
         new_vm.devicename = '{}/{}.vmx'.format(name.replace(' ', '_'), name.replace(' ', '_'))
+        new_vm.status = 'CREATED'
         new_vm.save()
 
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
         for disk in disks_by_order:
-            prefix = '%s-clone' % disk.name
+            prefix = '{0}-clone'.format(disk.name)
             result = VDiskController.create_from_template(
                 diskguid=disk.guid,
                 devicename=prefix,
-                location=new_vm.name,
+                location=new_vm.name.replace(' ', '_'),
                 machineguid=new_vm.guid)
             disks.append(result)
 
         # @todo: cleanup when not all disks could be successfully created
         # @todo: skip vm creation on hypervisor in that case
 
-        provision_machine_task = target_hv.create_vm_from_template.s(target_hv,
-            name, source_vm, disks, esxhost=None, wait=True)
-        provision_machine_task.link_error(
-           VMachineController.delete.s(machineguid=new_vm.guid))
+        provision_machine_task = target_hv.create_vm_from_template.s(
+            target_hv, name, source_vm, disks, esxhost=None, wait=True
+        )
+        provision_machine_task.link_error(VMachineController.delete.s(machineguid=new_vm.guid))
         result = provision_machine_task()
 
         new_vm.hypervisorid = result
+        new_vm.status = 'SYNC'
         new_vm.save()
         return new_vm.guid
 
@@ -115,8 +133,8 @@ class VMachineController(object):
             vmachine = VMachineList.get_by_devicename(name)
             if not vmachine:
                 vmachine = VMachine()
+                vmachine.status = 'CREATED'
             vmachine.devicename = name
-            vmachine.status = 'CREATED'
             vmachine.save()
 
     @staticmethod
@@ -140,8 +158,7 @@ class VMachineController(object):
                     disks[diskguid] = snapshotguid
 
         new_machine = VMachine()
-        for item in machine._blueprint.keys():
-            setattr(new_machine, item, getattr(machine, item))
+        new_machine.copy_blueprint(machine)
         new_machine.name = name
         new_machine.save()
 
@@ -277,6 +294,11 @@ class VMachineController(object):
         # when clones were made from it.
 
         vmachine = VMachine(machineguid)
+        vmachine.invalidate_dynamics(['snapshots'])
+        if vmachine.hypervisor_status == 'RUNNING':
+            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
+                vmachine.name
+            ))
         tasks = []
 
         for disk in vmachine.vdisks:
@@ -308,6 +330,12 @@ class VMachineController(object):
         Rolls back a VM based on a given disk snapshot timestamp
         """
         vmachine = VMachine(machineguid)
+        vmachine.invalidate_dynamics(['snapshots'])
+        if vmachine.hypervisor_status == 'RUNNING':
+            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
+                vmachine.name
+            ))
+
         snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:
             raise ValueError('No vmachine snapshots found for timestamp {}'.format(timestamp))
@@ -315,14 +343,14 @@ class VMachineController(object):
 
         for disk in vmachine.vdisks:
             t = VDiskController.rollback.s(diskguid=disk.guid,
-                                           timestamp=timestamp,
-                                           **kwargs)
+                                           timestamp=timestamp)
             tasks.append(t)
 
         rollback_disk_tasks = group(t for t in tasks)
         group_result = rollback_disk_tasks()
         while not group_result.ready():
             time.sleep(1)
+        vmachine.invalidate_dynamics(['snapshots'])
         failed_rollback = []
         if group_result.successful():
             disks = group_result.join()
@@ -354,12 +382,26 @@ class VMachineController(object):
                     'timestamp': timestamp,
                     'machineguid': machineguid}
         machine = VMachine(machineguid)
+
+        #@todo: we now skip creating a snapshot when a vmachine's disks
+        #       is missing a mandatory property: volumeid
+        #       subtask will now raise an exception earlier in the workflow
+        for disk in machine.vdisks:
+            if not disk.volumeid:
+                message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}' \
+                    .format(disk.guid, machine.guid)
+                logging.info('Error: {0}'.format(message))
+                raise RuntimeError(message)
+
         if subtasks:
             tasks = []
             for disk in machine.vdisks:
+                snapshotid = str(uuid.uuid4())
                 t = VDiskController.create_snapshot.s(diskguid=disk.guid,
-                                                      metadata=metadata)
-                t.link_error(VDiskController.delete_snapshot.s())
+                                                      metadata=metadata,
+                                                      snapshotid=snapshotid)
+                t.link_error(VDiskController.delete_snapshot.s(diskguid=disk.guid,
+                                                               snapshotid=snapshotid))
                 tasks.append(t)
             snapshot_vmachine_wf = group(t for t in tasks)
             snapshot_vmachine_wf()
@@ -367,6 +409,7 @@ class VMachineController(object):
             for disk in machine.vdisks:
                 VDiskController.create_snapshot(diskguid=disk.guid,
                                                 metadata=metadata)
+        machine.invalidate_dynamics(['snapshots'])
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
@@ -403,55 +446,63 @@ class VMachineController(object):
                                                                ip=vsr.ip,
                                                                mountpoint=vsr.mountpoint)
         else:
-            raise RuntimeError('Not enough information to sync vmachine')
+            message = 'Not enough information to sync vmachine'
+            logging.info('Error: {0}'.format(message))
+            raise RuntimeError(message)
 
         vdisks_synced = 0
         if vm_object is None:
-            raise RuntimeError('Could not retreive hypervisor vmachine object')
+            message = 'Could not retreive hypervisor vmachine object'
+            logging.info('Error: {0}'.format(message))
+            raise RuntimeError(message)
         else:
-            if vmachine.name is None:
-                MessageController.fire(MessageController.Type.EVENT,
-                                       {'type': 'vmachine_created',
-                                        'metadata': {'name': vm_object['name']}})
-            elif vmachine.name != vm_object['name']:
-                MessageController.fire(MessageController.Type.EVENT,
-                                       {'type': 'vmachine_renamed',
-                                        'metadata': {'old_name': vmachine.name,
-                                                     'new_name': vm_object['name']}})
-            vmachine.name = vm_object['name']
-            vmachine.hypervisorid = vm_object['id']
-            vmachine.devicename = vm_object['backing']['filename']
-            vmachine.save()
-            # Updating and linking disks
-            vdisk_guids = []
-            for disk in vm_object['disks']:
-                vdisk = VDiskList.get_by_devicename(disk['filename'])
-                if vdisk is not None:
-                    vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
-                    if vsr is None:
-                        raise RuntimeError('vDisk without VSR found')
-                    datastore = vm_object['datastores'][disk['datastore']]
-                    if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
-                        if vdisk.vmachine is None:
-                            MessageController.fire(MessageController.Type.EVENT,
-                                                   {'type': 'vdisk_attached',
-                                                    'metadata': {'vmachine_name': vmachine.name,
-                                                                 'vdisk_name': disk['name']}})
-                        vdisk.vmachine = vmachine
-                        vdisk.name = disk['name']
-                        vdisk.order = disk['order']
-                        vdisk.save()
-                        vdisk_guids.append(vdisk.guid)
-                        vdisks_synced += 1
-            for vdisk in vmachine.vdisks:
-                if vdisk.guid not in vdisk_guids:
+            try:
+                if vmachine.name is None:
                     MessageController.fire(MessageController.Type.EVENT,
-                                           {'type': 'vdisk_detached',
-                                            'metadata': {'vmachine_name': vmachine.name,
-                                                         'vdisk_name': vdisk.name}})
-                    vdisk.vmachine = None
-                    vdisk.save()
+                                           {'type': 'vmachine_created',
+                                            'metadata': {'name': vm_object['name']}})
+                elif vmachine.name != vm_object['name']:
+                    MessageController.fire(MessageController.Type.EVENT,
+                                           {'type': 'vmachine_renamed',
+                                            'metadata': {'old_name': vmachine.name,
+                                                         'new_name': vm_object['name']}})
+                vmachine.name = vm_object['name']
+                vmachine.hypervisorid = vm_object['id']
+                vmachine.devicename = vm_object['backing']['filename']
+                vmachine.save()
+                # Updating and linking disks
+                vdisk_guids = []
+                for disk in vm_object['disks']:
+                    vdisk = VDiskList.get_by_devicename(disk['filename'])
+                    if vdisk is not None:
+                        vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
+                        if vsr is None:
+                            raise RuntimeError('vDisk without VSR found')
+                        datastore = vm_object['datastores'][disk['datastore']]
+                        if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
+                            if vdisk.vmachine is None:
+                                MessageController.fire(MessageController.Type.EVENT,
+                                                       {'type': 'vdisk_attached',
+                                                        'metadata': {'vmachine_name': vmachine.name,
+                                                                     'vdisk_name': disk['name']}})
+                            vdisk.vmachine = vmachine
+                            vdisk.name = disk['name']
+                            vdisk.order = disk['order']
+                            vdisk.save()
+                            vdisk_guids.append(vdisk.guid)
+                            vdisks_synced += 1
+                for vdisk in vmachine.vdisks:
+                    if vdisk.guid not in vdisk_guids:
+                        MessageController.fire(MessageController.Type.EVENT,
+                                               {'type': 'vdisk_detached',
+                                                'metadata': {'vmachine_name': vmachine.name,
+                                                             'vdisk_name': vdisk.name}})
+                        vdisk.vmachine = None
+                        vdisk.save()
 
-        logging.info('Syncing vMachine finished (name {}, {} vdisks (re)linked)'.format(
-            vmachine.name, vdisks_synced
-        ))
+                logging.info('Syncing vMachine finished (name {}, {} vdisks (re)linked)'.format(
+                    vmachine.name, vdisks_synced
+                ))
+            except Exception as ex:
+                logging.info('Error during sync: {0}'.format(str(ex)))
+                raise

@@ -36,11 +36,11 @@ define([
                         new_password: self.newPassword()
                     })
                     .done(function() {
-                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:generic.savesuccessfully', { what: $.t('ovs:generic.password') }));
+                        generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:generic.messages.savesuccessfully', { what: $.t('ovs:generic.password') }));
                         deferred.resolve();
                     })
                     .fail(function(error) {
-                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.errorwhile', { what: $.t('ovs:wizards.changepassword.confirm.updatingpassword') }));
+                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.changepassword.confirm.updatingpassword') }));
                         deferred.reject(error);
                     });
             }).promise();

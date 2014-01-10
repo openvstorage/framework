@@ -43,6 +43,13 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
+    def get_state(self, vmid):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
     def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
         """
         Abstract method

@@ -55,6 +55,7 @@ class FileMutex(object):
                     time.sleep(0.005)
         if passed > 1:  # More than 1 s is a long time to wait!
             print 'Waited %s seconds for lock %s' % (passed, self.key())
+        self._start = time.time()
         self._has_lock = True
         return True
 

@@ -6,15 +6,11 @@ import uuid
 import time
 import sys
 from unittest import TestCase
-from ovs.dal.datalist import DataList
-from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.exceptions import *
-from ovs.dal.helpers import HybridRunner, Descriptor
-from ovs.dal.relations.relations import RelationMapper
-from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.dal.dataobjectlist import DataObjectList
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
+from ovs.dal.tests.mockups import VolumeStorageRouter, LoaderModule, FactoryModule
 
 
 class Basic(TestCase):
@@ -29,6 +25,12 @@ class Basic(TestCase):
     VolatileMutex = None
     TestMachine = None
     TestDisk = None
+    DataList = None
+    HybridRunner = None
+    Descriptor = None
+    RelationMapper = None,
+    VolatileFactory = None,
+    PersistentFactory = None
 
     @classmethod
     def setUpClass(cls):
@@ -36,22 +38,35 @@ class Basic(TestCase):
         Sets up the unittest, mocking a certain set of 3rd party libraries and extensions.
         This makes sure the unittests can be executed without those libraries installed
         """
-        # Load dummy stores
-        PersistentFactory.store = DummyPersistentStore()
-        VolatileFactory.store = DummyVolatileStore()
         # Replace mocked classes
         sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VolumeStorageRouter
-        # Import required modules/classes after mocking is done
+        sys.modules['ovs.plugin.injection.loader'] = LoaderModule
+        sys.modules['ovs.extensions.hypervisor.factory'] = FactoryModule
+
+        # Importing, preparing, mocking, ...
+        from ovs.extensions.storage.persistentfactory import PersistentFactory
+        from ovs.extensions.storage.volatilefactory import VolatileFactory
+        global VolatileFactory
+        global PersistentFactory
+        _ = PersistentFactory, VolatileFactory
+        PersistentFactory.store = DummyPersistentStore()
+        VolatileFactory.store = DummyVolatileStore()
+        from ovs.dal.relations.relations import RelationMapper
+        from ovs.dal.helpers import HybridRunner, Descriptor
+        from ovs.dal.datalist import DataList
         from ovs.dal.hybrids.vdisk import VDisk
         from ovs.extensions.generic.volatilemutex import VolatileMutex
         from ovs.dal.hybrids.t_testmachine import TestMachine
         from ovs.dal.hybrids.t_testdisk import TestDisk
-        _ = VDisk(), VolatileMutex('dummy'), TestMachine(), TestDisk()
-        # Globalize mocked classes
+        global RelationMapper
+        global HybridRunner
+        global Descriptor
+        global DataList
         global VDisk
         global VolatileMutex
         global TestMachine
         global TestDisk
+        _ = VDisk, VolatileMutex, TestMachine, TestDisk, DataList, HybridRunner, Descriptor, RelationMapper
 
         # Cleaning storage
         VolatileFactory.store.clean()
@@ -828,78 +843,40 @@ class Basic(TestCase):
         cdisk2.delete()
         pdisk.delete()
 
-
-# Mocking classes
-class StorageRouterClient():
-    """
-    Mocks the StorageRouterClient
-    """
-
-    def __init__(self):
+    def test_copy_blueprint(self):
         """
-        Dummy init method
+        Validates whether the copy_blueprint function works correct
         """
-        pass
+        machine = TestMachine()
+        machine.name = 'testmachine1'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'test1'
+        disk1.size = 100
+        disk1.order = 1
+        disk1.type = 'ONE'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.copy_blueprint(disk1)
+        self.assertEqual(disk2.name, 'test1', 'Properties should be copied')
+        self.assertEqual(disk2.size, 100, 'Properties should be copied')
+        self.assertEqual(disk2.order, 1, 'Properties should be copied')
+        self.assertEqual(disk2.type, 'ONE', 'Properties should be copied')
+        self.assertEqual(disk2.machine, None, 'Relations should not be copied')
+        disk3 = TestDisk()
+        disk3.copy_blueprint(disk1, include_relations=True)
+        self.assertEqual(disk3.machine.name, 'testmachine1', 'Relations should be copied')
+        disk4 = TestDisk()
+        disk4.copy_blueprint(disk1, include=['name'])
+        self.assertEqual(disk4.name, 'test1', 'Name should be copied')
+        self.assertEqual(disk4.size, 0, 'Size should not be copied')
+        self.assertEqual(disk4.machine, None, 'Relations should not be copied')
+        disk5 = TestDisk()
+        disk5.copy_blueprint(disk1, exclude=['name'])
+        self.assertEqual(disk5.name, None, 'Name should not be copied')
+        self.assertEqual(disk5.size, 100, 'Size should be copied')
+        self.assertEqual(disk5.machine, None, 'Relations should not be copied')
 
-    @staticmethod
-    def info(volume_id):
-        """
-        Return fake info
-        """
-        return volume_id
-
-    @staticmethod
-    def list_snapshots(volume_id):
-        """
-        Return fake info
-        """
-        _ = volume_id
-        return []
-
-
-class VolumeStorageRouterClient():
-    """
-    Mocks the VolumeStorageRouterClient
-    """
-
-    STATISTICS_KEYS = ['cluster_cache_hits',
-                       'backend_write_operations',
-                       'backend_data_read',
-                       'metadata_store_hits',
-                       'data_written',
-                       'data_read',
-                       'write_time',
-                       'metadata_store_misses',
-                       'backend_data_written',
-                       'sco_cache_misses',
-                       'backend_read_operations',
-                       'sco_cache_hits',
-                       'write_operations',
-                       'cluster_cache_misses',
-                       'read_operations']
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-    def load(self):
-        """
-        Returns the mocked StorageRouterClient
-        """
-        _ = self
-        return StorageRouterClient()
-
-
-class VolumeStorageRouter():
-    """
-    Mocks the VolumeStorageRouter
-    """
-    VolumeStorageRouterClient = VolumeStorageRouterClient
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
+        disk1.delete()
+        machine.delete()

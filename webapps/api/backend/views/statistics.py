@@ -4,14 +4,13 @@ Statistics module
 """
 import re
 import datetime
-import ConfigParser
 from backend.serializers.memcached import MemcacheSerializer
 from backend.decorators import required_roles, expose
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from JumpScale import j
+from ovs.plugin.provider.configuration import Configuration
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -25,8 +24,8 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         Get the memcache location from hrd
         """
-        return '{}:{}'.format(j.application.config.get('ovs.grid.ip'),
-                              j.application.config.get('ovs.core.memcache.localnode.port'))
+        return '{}:{}'.format(Configuration.get('ovs.grid.ip'),
+                              Configuration.get('ovs.core.memcache.localnode.port'))
 
     @staticmethod
     def _get_instance(host):
