@@ -127,7 +127,7 @@ define([
                 vpools.push(self.vpools()[i]);
             }
             return vpools;
-        });
+        }).extend({ delay: 250 });
 
         self.topVmachineModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
         self.topVmachineMode  = ko.observable('topstoreddata');
@@ -146,7 +146,7 @@ define([
                 vmachines.push(self.vmachines()[i]);
             }
             return vmachines;
-        });
+        }).extend({ delay: 250 });
 
         // Functions
         self.load = function() {
