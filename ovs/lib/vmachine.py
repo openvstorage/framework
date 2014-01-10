@@ -118,6 +118,7 @@ class VMachineController(object):
         result = provision_machine_task()
 
         new_vm.hypervisorid = result
+        new_vm.status = 'SYNC'
         new_vm.save()
         return new_vm.guid
 
