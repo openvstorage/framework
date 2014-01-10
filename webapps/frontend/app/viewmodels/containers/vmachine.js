@@ -138,15 +138,16 @@ define([
                     generic.xhrAbort(self.loadHandle);
                     self.loadHandle = api.get('vmachines/' + self.guid())
                         .done(function(data) {
-                            var stats = data.statistics;
+                            var stats = data.statistics,
+                                statsTime = Math.round(stats.timestamp * 1000);
                             self.name(data.name);
                             self.hypervisorStatus(data.hypervisor_status);
-                            self.iops(stats.write_operations + stats.read_operations);
+                            self.iops({ value: stats.write_operations + stats.read_operations, timestamp: statsTime });
                             self.storedData(data.stored_data);
-                            self.cacheHits(stats.sco_cache_hits + stats.cluster_cache_hits);
-                            self.cacheMisses(stats.sco_cache_misses);
-                            self.readSpeed(stats.data_read);
-                            self.writeSpeed(stats.data_written);
+                            self.cacheHits({ value: stats.sco_cache_hits + stats.cluster_cache_hits, timestamp: statsTime });
+                            self.cacheMisses({ value: stats.sco_cache_misses, timestamp: statsTime });
+                            self.readSpeed({ value: stats.data_read, timestamp: statsTime });
+                            self.writeSpeed({ value: stats.data_written, timestamp: statsTime });
                             self.backendWritten(stats.data_written);
                             self.backendRead(stats.data_read);
                             self.backendReads(stats.backend_read_operations);

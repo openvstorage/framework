@@ -7,6 +7,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import pickle
+import time
 
 _vsr_client = VolumeStorageRouterClient().load()
 
@@ -98,6 +99,7 @@ class VDisk(DataObject):
             if type(value) is property:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
 
+        vdiskstatsdict['timestamp'] = time.time()
         return vdiskstatsdict
 
     def _vsrid(self):

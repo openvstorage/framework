@@ -6,6 +6,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import time
 
 _vsr_client = VolumeStorageRouterClient().load()
 
@@ -48,9 +49,10 @@ class VolumeStorageRouter(DataObject):
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.vsrid == self.vsrid:
-                    statistics = disk.statistics
+                    statistics = disk._statistics()  # Prevent double caching
                     for key in vdiskstatsdict.iterkeys():
                         vdiskstatsdict[key] += statistics[key]
+        vdiskstatsdict['timestamp'] = time.time()
         return vdiskstatsdict
 
     def _stored_data(self):

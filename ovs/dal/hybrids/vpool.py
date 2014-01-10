@@ -4,6 +4,7 @@ VPool module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import time
 
 _vsr_client = VolumeStorageRouterClient().load()
 
@@ -44,9 +45,10 @@ class VPool(DataObject):
             if type(value) is property:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
         for disk in self.vdisks:
-            statistics = disk.statistics
+            statistics = disk._statistics()  # Prevent double caching
             for key in vdiskstatsdict.iterkeys():
                 vdiskstatsdict[key] += statistics[key]
+        vdiskstatsdict['timestamp'] = time.time()
         return vdiskstatsdict
 
     def _stored_data(self):
