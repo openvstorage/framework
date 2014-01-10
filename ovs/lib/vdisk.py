@@ -198,7 +198,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.set_as_template')
-    def set_as_template(diskguid, **kwargs):
+    def set_as_template(diskguid):
         """
         Set a disk as template
 
@@ -207,8 +207,6 @@ class VDiskController(object):
 
         disk = VDisk(diskguid)
         vsr_client.set_volume_as_template(str(disk.volumeid))
-
-        return kwargs
 
     @staticmethod
     @celery.task(name='ovs.disk.rollback')

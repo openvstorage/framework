@@ -57,20 +57,24 @@ class VMachineController(object):
 
         target_pm = PMachine(pmachineguid)
 
-        nr_of_vpools = 0
+        vpool = None
+        vpool_guids = set()
         for disk in template_vm.vdisks:
             vpool = disk.vpool
-            nr_of_vpools += 1
-        if nr_of_vpools != 1:
-            raise RuntimeError('Only 1 vpool supported on template disk(s) - {0} found!'.format(nr_of_vpools))
+            vpool_guids.add(vpool.guid)
+        if len(vpool_guids) != 1:
+            raise RuntimeError('Only 1 vpool supported on template disk(s) - {0} found!'.format(len(vpool_guids)))
 
         if not template_vm.pmachine.hvtype == target_pm.hvtype:
             raise RuntimeError('Source and target hypervisor not identical')
 
+        vsr = None
         for vsr in vpool.vsrs:
             if vsr.serving_vmachine.pmachine.guid == target_pm.guid:
                 break
             raise RuntimeError('Volume not served on target hypervisor')
+        if vsr is None:
+            raise RuntimeError('No VSR found')
 
         source_hv = Factory.get(template_vm.pmachine)
         target_hv = Factory.get(target_pm)
@@ -81,8 +85,7 @@ class VMachineController(object):
 
         source_vm = source_hv.get_vm_object(template_vm.hypervisorid)
         if not source_vm:
-            raise RuntimeError(
-                'VM with key reference %s not found' % template_vm.hypervisorid)
+            raise RuntimeError('VM with key reference {0} not found'.format(template_vm.hypervisorid))
 
         # @todo verify all disks can be cloned on target
         # @todo ie vpool is available on both hypervisors
@@ -105,7 +108,8 @@ class VMachineController(object):
                 diskguid=disk.guid,
                 devicename=prefix,
                 location=new_vm.name.replace(' ', '_'),
-                machineguid=new_vm.guid)
+                machineguid=new_vm.guid
+            )
             disks.append(result)
 
         # @todo: cleanup when not all disks could be successfully created
@@ -162,39 +166,29 @@ class VMachineController(object):
         new_machine.name = name
         new_machine.save()
 
-        disk_tasks = []
+        new_disk_guids = []
         disks_by_order = sorted(machine.vdisks, key=lambda x: x.order)
         for currentDisk in disks_by_order:
-            if machine.template and currentDisk.templatesnapshot:
+            if machine.is_vtemplate and currentDisk.templatesnapshot:
                 snapshotid = currentDisk.templatesnapshot
             else:
                 snapshotid = disks[currentDisk.guid]
             prefix = '%s-clone' % currentDisk.name
-            clone_task = VDiskController.clone.s(diskguid=currentDisk.guid,
-                                                 snapshotid=snapshotid,
-                                                 devicename=prefix,
-                                                 location=new_machine.name,
-                                                 machineguid=new_machine.guid)
-            disk_tasks.append(clone_task)
-        clone_disk_tasks = group(t for t in disk_tasks)
-        group_result = clone_disk_tasks()
-        while not group_result.ready():
-            time.sleep(1)
-        if group_result.successful():
-            disks = group_result.join()
-        else:
-            for task_result in group_result:
-                if task_result.successfull():
-                    VDiskController.delete(
-                        diskguid=task_result.get()['diskguid'])
-            new_machine.delete()
-            return group_result.successful()
+
+            result = VDiskController.clone(diskguid=currentDisk.guid,
+                                           snapshotid=snapshotid,
+                                           devicename=prefix,
+                                           location=new_machine.name,
+                                           machineguid=new_machine.guid)
+            new_disk_guids.append(result['diskguid'])
 
         hv = Factory.get(machine.pmachine)
         provision_machine_task = hv.clone_vm.s(
-            hv, machine.hypervisorid, name, disks, None, True)
+            hv, machine.hypervisorid, name, disks, None, True
+        )
         provision_machine_task.link_error(
-            VMachineController.delete.s(machineguid=new_machine.guid))
+            VMachineController.delete.s(machineguid=new_machine.guid)
+        )
         result = provision_machine_task()
 
         new_machine.hypervisorid = result.get()
@@ -212,22 +206,15 @@ class VMachineController(object):
         _ = kwargs
         machine = VMachine(machineguid)
 
-        clean_dal = False
         if machine.pmachine:
             hv = Factory.get(machine.pmachine)
             delete_vmachine_task = hv.delete_vm.s(
                 hv, machine.hypervisorid, None, True)
             delete_vmachine_task()
-            clean_dal = True
-        else:
-            clean_dal = True
 
-        if clean_dal:
-            for disk in machine.vdisks:
-                disk.delete()
-            machine.delete()
-
-        return True
+        for disk in machine.vdisks:
+            disk.delete()
+        machine.delete()
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -278,7 +265,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.set_as_template')
-    def set_as_template(machineguid, **kwargs):
+    def set_as_template(machineguid):
         """
         Set a vmachine as template
 
@@ -294,34 +281,17 @@ class VMachineController(object):
         # when clones were made from it.
 
         vmachine = VMachine(machineguid)
-        vmachine.invalidate_dynamics(['snapshots'])
         if vmachine.hypervisor_status == 'RUNNING':
             raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
                 vmachine.name
             ))
-        tasks = []
 
         for disk in vmachine.vdisks:
-            t = VDiskController.set_as_template.s(diskguid=disk.guid)
-            tasks.append(t)
-        set_as_template_vmachine_wf = group(t for t in tasks)
-        group_result = set_as_template_vmachine_wf()
-        while not group_result.ready():
-            time.sleep(1)
+            VDiskController.set_as_template(diskguid=disk.guid)
 
-        if group_result.successful():
-            group_result.join()
-            for task_result in group_result:
-                if not task_result.successful():
-                    vmachine.is_vtemplate = False
-                    break
-            vmachine.is_vtemplate = True
-        else:
-            vmachine.is_vtemplate = False
-
+        vmachine.is_vtemplate = True
+        vmachine.invalidate_dynamics(['snapshots'])
         vmachine.save()
-
-        return group_result.successful()
 
     @staticmethod
     @celery.task(name='ovs.machine.rollback')
@@ -330,7 +300,6 @@ class VMachineController(object):
         Rolls back a VM based on a given disk snapshot timestamp
         """
         vmachine = VMachine(machineguid)
-        vmachine.invalidate_dynamics(['snapshots'])
         if vmachine.hypervisor_status == 'RUNNING':
             raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
                 vmachine.name
@@ -339,28 +308,12 @@ class VMachineController(object):
         snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:
             raise ValueError('No vmachine snapshots found for timestamp {}'.format(timestamp))
-        tasks = []
 
         for disk in vmachine.vdisks:
-            t = VDiskController.rollback.s(diskguid=disk.guid,
-                                           timestamp=timestamp)
-            tasks.append(t)
+            VDiskController.rollback(diskguid=disk.guid,
+                                     timestamp=timestamp)
 
-        rollback_disk_tasks = group(t for t in tasks)
-        group_result = rollback_disk_tasks()
-        while not group_result.ready():
-            time.sleep(1)
         vmachine.invalidate_dynamics(['snapshots'])
-        failed_rollback = []
-        if group_result.successful():
-            disks = group_result.join()
-            return disks
-        else:
-            for task_result in group_result:
-                if not task_result.successful():
-                    failed_rollback.append(task_result)
-            return failed_rollback
-
 
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
@@ -383,9 +336,9 @@ class VMachineController(object):
                     'machineguid': machineguid}
         machine = VMachine(machineguid)
 
-        #@todo: we now skip creating a snapshot when a vmachine's disks
-        #       is missing a mandatory property: volumeid
-        #       subtask will now raise an exception earlier in the workflow
+        # @todo: we now skip creating a snapshot when a vmachine's disks
+        #        is missing a mandatory property: volumeid
+        #        subtask will now raise an exception earlier in the workflow
         for disk in machine.vdisks:
             if not disk.volumeid:
                 message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}' \
