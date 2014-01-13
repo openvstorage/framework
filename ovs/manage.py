@@ -332,6 +332,7 @@ class Control():
         this_vpool.size = vpool_size_bytes
         this_vpool.save()
         Configure.init_exportfs(vpool_name)
+        subprocess.call(['service', 'processmanager', 'start'])
 
     def _package_is_running(self, package):
         """
