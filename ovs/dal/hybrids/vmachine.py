@@ -65,7 +65,10 @@ class VMachine(DataObject):
         if self.hypervisorid is None or self.pmachine is None:
             return 'UNKNOWN'
         hv = hvFactory.get(self.pmachine)
-        return hv.get_state(self.hypervisorid)
+        try:
+            return hv.get_state(self.hypervisorid)
+        except:
+            return 'UNKNOWN'
 
     def _statistics(self):
         """

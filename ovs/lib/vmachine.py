@@ -359,14 +359,14 @@ class VMachineController(object):
         Updates a given vmachine with data retreived from a given pmachine
         """
         vmachine = VMachine(vmachineguid)
-        if vmachine.hypervisorid is not None and vmachine.pmachine is not None:
-            # We have received a vmachine which is linked to a pmachine and has a hypervisorid.
+        if vsrid is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
+            # Only the vmachine was received, so base the sync on hypervisorid and pmachine
             hypervisor = Factory.get(vmachine.pmachine)
             logging.info('Syncing vMachine (name {})'.format(vmachine.name))
             vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
-        elif vmachine.devicename is not None and vsrid is not None:
-            # We don't have a pmachine or hypervisorid, we need to load the data via the
-            # devicename and vsr.
+        elif vsrid is not None and vmachine.devicename is not None:
+            # VSR id was given, using the devicename instead (to allow hypervisorid updates
+            # which can be caused by re-adding a vm to the inventory
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
             if vsr is None:
                 raise RuntimeError('VolumeStorageRouter could not be found')
