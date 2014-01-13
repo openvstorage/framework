@@ -955,6 +955,22 @@ class Sdk(object):
                                 properties=['runtime.powerState']).runtime.powerState
 
     @authenticated
+    def mount_nfs_datastore(self, name, remote_host, remote_path, esxhost=None):
+        """
+        Mounts a given NFS export as a datastore
+        """
+        esxhost = self._validate_host(esxhost)
+        host = self._get_object(esxhost, properties=['name', 'configManager', 'configManager.datastoreSystem'])
+
+        spec = self._client.factory.create('ns0:HostNasVolumeSpec')
+        spec.accessMode = 'readWrite'
+        spec.localPath = name
+        spec.remoteHost = remote_host
+        spec.remotePath = remote_path
+        spec.type = 'nfs'
+        return self._client.service.CreateNasDatastore(host.configManager.datastoreSystem, spec)
+
+    @authenticated
     def register_extension(self, description, xmlurl, company, company_email, key, version):
         """
         Register an extension to the vcenter host we're talking to. In case the extension

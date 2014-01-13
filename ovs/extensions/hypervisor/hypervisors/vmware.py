@@ -143,3 +143,11 @@ class VMware(Hypervisor):
         """
         task = self.sdk.set_disk_mode(
             vmid, disks, 'independent_nonpersistent', esxhost, wait)
+
+    @Hypervisor.connected
+    def mount_nfs_datastore(self, name, remote_host, remote_path):
+        """
+        Mounts a given NFS export as a datastore
+        """
+        return self.sdk.mount_nfs_datastore(name, remote_host, remote_path)
+

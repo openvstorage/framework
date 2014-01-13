@@ -48,7 +48,7 @@ class InstallHelper():
                     print invalid_message
 
     @staticmethod
-    def ask_choice(choice_options):
+    def ask_choice(choice_options, default_value=None):
         """
         Lets the user chose one of a set of options
         """
@@ -60,14 +60,18 @@ class InstallHelper():
         choice_options.sort()
         print 'Make a selection please: '
         nr = 0
+        default_nr = None
         for section in choice_options:
             nr += 1
             print '   {0}: {1}'.format(nr, section)
+            if section == default_value:
+                default_nr = nr
 
         result = InstallHelper.ask_integer(
             question='   Select Nr: ',
-            min_value=0,
-            max_value=len(choice_options)
+            min_value=1,
+            max_value=len(choice_options),
+            default_value=default_nr
         )
         return choice_options[result - 1]
 
@@ -444,6 +448,18 @@ if __name__ == '__main__':
         print InstallHelper.boxed_message(['Unable to find ISO', imagefile])
         sys.exit(1)
 
+    # Warning
+    print InstallHelper.boxed_message(['WARNING. Use with caution.',
+                                       'This script assumes it is executed on an ESXi hypervisor',
+                                       'dedicated to Open vStorage. It will create raw device',
+                                       'mappings and configure virtual machines without further',
+                                       'interaction. If you want to install Open vStorage on an',
+                                       'existing server, please refer to the Open vStorage',
+                                       'documentation on how to do so.'])
+    proceed = InstallHelper.ask_yesno('Continue with the install?', True)
+    if not proceed:
+        sys.exit(1)
+
     # Networking
     print 'Determine ESX host networking to use'
     vswitches = vm_sys.list_switches()
@@ -457,7 +473,7 @@ if __name__ == '__main__':
         sys.exit(1)
     print 'Please select your public network:'
     public_pg = InstallHelper.ask_choice(pg_names)
-    print 'Please select your private network:'
+    print 'Please select your storage network:'
     uplinks = []
     private_pg = ''
     while len(uplinks) == 0:

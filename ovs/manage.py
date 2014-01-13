@@ -19,6 +19,7 @@ from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
 
@@ -332,6 +333,14 @@ class Control():
         this_vpool.size = vpool_size_bytes
         this_vpool.save()
         Configure.init_exportfs(vpool_name)
+        install = Console.askYesNo('Do you want to mount the vPool?')
+        if install is True:
+            print '  Please wait while the vPool is mounted...'
+            vmachine = VMachine(vmachineguid)
+            vrouter = [vsr for vsr in this_vpool.vsrs if vsr.serving_vmachine_guid == vmachineguid][0]
+            hypervisor = Factory.get(vmachine.pmachine)
+            hypervisor.mount_nfs_datastore(vpool_name, vrouter.ip, vrouter.mountpoint)
+            print '  Success'
         subprocess.call(['service', 'processmanager', 'start'])
 
     def _package_is_running(self, package):

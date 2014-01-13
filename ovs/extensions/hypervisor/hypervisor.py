@@ -104,3 +104,10 @@ class Hypervisor(object):
         Abstract method
         """
         pass
+
+    @abc.abstractmethod
+    def mount_nfs_datastore(self, name, remote_host, remote_path):
+        """
+        Mounts a given NFS export as a datastore
+        """
+        pass

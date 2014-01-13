@@ -51,3 +51,11 @@ class Xen(Hypervisor):
         Dummy method
         """
         raise NotImplementedError()
+
+    @Hypervisor.connected
+    def mount_nfs_datastore(self, name, remote_host, remote_path):
+        """
+        Dummy method
+        """
+        raise NotImplementedError()
+

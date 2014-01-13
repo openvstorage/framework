@@ -18,6 +18,7 @@ class Console(object):
     askChoice = None
     askString = None
     askInteger = None
+    askYesNo = None
 
 from ovs.plugin.injection.injector import Injector
 Console = Injector.inject(Console)
