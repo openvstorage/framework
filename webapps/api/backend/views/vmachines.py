@@ -76,17 +76,6 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  is_consistent=is_consistent)
         return Response(task.id, status=status.HTTP_200_OK)
 
-    def _get_vsas(self, obj):
-        """
-        Returns list of VSA machine guids
-        """
-        vsa_vmachine_guids = []
-        for vdisk in obj.vdisks:
-            if vdisk.vsrid:
-                vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
-                vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
-        return vsa_vmachine_guids
-
     @link()
     @expose(internal=True)
     @required_roles(['view'])
@@ -96,17 +85,12 @@ class VMachineViewSet(viewsets.ViewSet):
         Returns list of VSA machine guids
         """
         _ = request
-        vsa_vmachine_guids = self._get_vsas(obj)
-        return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
-
-    def _get_vpools(self, obj):
-        """
-        Returns the vpool guids associated with the given VM
-        """
-        vpool_guids = []
+        vsa_vmachine_guids = []
         for vdisk in obj.vdisks:
-            vpool_guids.append(vdisk.vpool.guid)
-        return vpool_guids
+            if vdisk.vsrid:
+                vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
+                vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
+        return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True)
@@ -117,18 +101,10 @@ class VMachineViewSet(viewsets.ViewSet):
         Returns the vpool guids associated with the given VM
         """
         _ = request
-        vpool_guids = self._get_vpools(obj)
-        return Response(vpool_guids, status=status.HTTP_200_OK)
-
-    def _get_children(self, obj):
-        """
-        Returns list of children vmachines guids
-        """
-        children_vmachine_guids = set()
+        vpool_guids = []
         for vdisk in obj.vdisks:
-            for cdisk in vdisk.child_vdisks:
-                children_vmachine_guids.add(cdisk.vmachine_guid)
-        return children_vmachine_guids
+            vpool_guids.append(vdisk.vpool.guid)
+        return Response(vpool_guids, status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True)
@@ -139,7 +115,10 @@ class VMachineViewSet(viewsets.ViewSet):
         Returns list of children vmachines guids
         """
         _ = request
-        children_vmachine_guids = self._get_children(obj)
+        children_vmachine_guids = set()
+        for vdisk in obj.vdisks:
+            for cdisk in vdisk.child_vdisks:
+                children_vmachine_guids.add(cdisk.vmachine_guid)
         return Response(children_vmachine_guids, status=status.HTTP_200_OK)
 
     @expose(internal=True)

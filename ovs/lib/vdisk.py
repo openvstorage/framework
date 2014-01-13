@@ -174,10 +174,11 @@ class VDiskController(object):
             metadata=metadata
         )
         disk.invalidate_dynamics(['snapshots'])
+        return snapshotid
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_snapshot')
-    def delete_snapshot(diskguid, snapshotid, **kwargs):
+    def delete_snapshot(diskguid, snapshotid):
         """
         Delete a disk snapshot
 
@@ -189,12 +190,9 @@ class VDiskController(object):
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
-        _snap = '{}'.format(snapshotid)
-        logging.info(
-            'Deleting snapshot {} from disk {}'.format(_snap, diskguid))
-        vsr_client.delete_snapshot(disk.volumeid, _snap)
+        logging.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
+        vsr_client.delete_snapshot(str(disk.volumeid), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])
-        return kwargs
 
     @staticmethod
     @celery.task(name='ovs.disk.set_as_template')

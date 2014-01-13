@@ -346,11 +346,23 @@ class VMachineController(object):
                 logging.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
 
-        logging.info('Create snapshot for vMachine {0}'.format(machine.name))
-        for disk in machine.vdisks:
-            VDiskController.create_snapshot(diskguid=disk.guid,
-                                            metadata=metadata)
+        snapshots = {}
+        success = True
+        try:
+            for disk in machine.vdisks:
+                snapshots[disk.guid] = VDiskController.create_snapshot(diskguid=disk.guid,
+                                                                       metadata=metadata)
+        except:
+            success = False
+            for diskguid, snapshotid in snapshots.iteritems():
+                VDiskController.delete_snapshot(diskguid=diskguid,
+                                                snapshotid=snapshotid)
+        logging.info('Create snapshot for vMachine {0}: {1}'.format(
+            machine.name, 'Success' if success else 'Failure'
+        ))
         machine.invalidate_dynamics(['snapshots'])
+        if not success:
+            raise RuntimeError('Failed to snapshot vMachine {0}'.format(machine.name))
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
