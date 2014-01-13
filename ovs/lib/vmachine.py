@@ -317,7 +317,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, subtasks=True):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None):
         """
         Snapshot VMachine disks
 
@@ -346,22 +346,10 @@ class VMachineController(object):
                 logging.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
 
-        if subtasks:
-            tasks = []
-            for disk in machine.vdisks:
-                snapshotid = str(uuid.uuid4())
-                t = VDiskController.create_snapshot.s(diskguid=disk.guid,
-                                                      metadata=metadata,
-                                                      snapshotid=snapshotid)
-                t.link_error(VDiskController.delete_snapshot.s(diskguid=disk.guid,
-                                                               snapshotid=snapshotid))
-                tasks.append(t)
-            snapshot_vmachine_wf = group(t for t in tasks)
-            snapshot_vmachine_wf()
-        else:
-            for disk in machine.vdisks:
-                VDiskController.create_snapshot(diskguid=disk.guid,
-                                                metadata=metadata)
+        logging.info('Create snapshot for vMachine {0}'.format(machine.name))
+        for disk in machine.vdisks:
+            VDiskController.create_snapshot(diskguid=disk.guid,
+                                            metadata=metadata)
         machine.invalidate_dynamics(['snapshots'])
 
     @staticmethod
