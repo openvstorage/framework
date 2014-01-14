@@ -87,6 +87,10 @@ class VMachineController(object):
         if not source_vm:
             raise RuntimeError('VM with key reference {0} not found'.format(template_vm.hypervisorid))
 
+        name_duplicates = VMachineList.get_vmachine_by_name(name)
+        if len(name_duplicates) > 0:
+            raise RuntimeError('A vMachine with name {0} already exists'.format(name))
+
         # @todo verify all disks can be cloned on target
         # @todo ie vpool is available on both hypervisors
         # @todo if so, continue
