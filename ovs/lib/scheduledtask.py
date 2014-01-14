@@ -69,7 +69,8 @@ def ensure_single(tasknames):
                     for taskname in tasknames:
                         for worker in scheduled.values():
                             for task in worker:
-                                if task['id'] != task_id and taskname == task['name']:
+                                request = task['request']
+                                if request['id'] != task_id and taskname == request['name']:
                                     return False
                     reserved = inspector.reserved()
                     for taskname in tasknames:
@@ -82,6 +83,9 @@ def ensure_single(tasknames):
             if can_run():
                 return function(*args, **kwargs)
             else:
+                print 'Execution of task {0}[{1}] discarded'.format(
+                    self.name, self.request.id
+                )
                 return None
 
         return wrapped
