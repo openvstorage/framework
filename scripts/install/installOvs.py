@@ -4,6 +4,8 @@ import sys
 import urllib2
 import base64
 import getpass
+from random import choice
+from string import lowercase
 from subprocess import call, check_output
 from optparse import OptionParser
 
@@ -303,26 +305,22 @@ configuration['elasticsearch'] = {}
 configuration['elasticsearch']['elasticsearch.cluster.name'] = ask_string('Enter elastic search cluster name', default_value='ovs_elastic_search')
 
 configuration['grid'] = {}
-configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=1, max_value=256)
+configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=-32768, max_value=32767)
 configuration['grid']['grid.node.roles'] = 'node'
 
 configuration['grid_master'] = {}
 configuration['grid_master']['gridmaster.grid.id'] = configuration['grid']['grid.id']
+configuration['grid_master']['gridmaster.useavahi'] = 1
+configuration['grid_master']['gridmaster.superadminpasswd'] = ''.join(choice(lowercase) for i in range(25))
+
+configuration['osis'] = {}
+configuration['osis']['osis.key'] = ''.join(choice(lowercase) for i in range(25))
 
 if not os.path.exists('/opt/jumpscale/cfg/hrd'):
     os.makedirs('/opt/jumpscale/cfg/hrd')
 for filename in configuration:
     with open('/opt/jumpscale/cfg/hrd/{0}.hrd'.format(filename), 'w') as hrd:
         hrd.write('\n'.join(['%s=%s' % i for i in configuration[filename].iteritems()]))
-
-bitbucket_username = ask_string('Provide your bitbucket username')
-bitbucket_password = getpass.getpass()
-if not os.path.exists('/opt/jumpscale/cfg/jsconfig'):
-    os.makedirs('/opt/jumpscale/cfg/jsconfig')
-with open('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg', 'w') as bitbucket:
-    bitbucket.write('[jumpscale]\nlogin = {0}\npasswd = {1}\n\n[openvstorage]\nlogin = {0}\npasswd = {1}\n'.format(
-        bitbucket_username, bitbucket_password
-    ))
 
 bootstrap_mapping = {'unstable': 'unstable', 'test': 'default', }
 
@@ -383,6 +381,8 @@ blobstorlocal = jpackages_local
 """ % {'qualityLevel': quality_level}
 
 print 'Creating JumpScale configuration files...'
+if not os.path.exists('/opt/jumpscale/cfg/jsconfig'):
+    os.makedirs('/opt/jumpscale/cfg/jsconfig')
 if not os.path.exists('/opt/jumpscale/cfg/jsconfig/blobstor.cfg'):
     blobstor_config = open('/opt/jumpscale/cfg/jsconfig/blobstor.cfg', 'w')
 else:
