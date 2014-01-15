@@ -305,7 +305,7 @@ configuration['elasticsearch'] = {}
 configuration['elasticsearch']['elasticsearch.cluster.name'] = ask_string('Enter elastic search cluster name', default_value='ovs_elastic_search')
 
 configuration['grid'] = {}
-configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=-32768, max_value=32767)
+configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=1, max_value=32767)
 configuration['grid']['grid.node.roles'] = 'node'
 
 configuration['grid_master'] = {}
