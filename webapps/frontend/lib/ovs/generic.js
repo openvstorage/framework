@@ -239,15 +239,34 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
+    function numberSort(itemA, itemB) {
+        if (itemA === undefined && itemB !== undefined) {
+            return -1;
+        }
+        if (itemA === undefined && itemB === undefined) {
+            return 0;
+        }
+        if (itemA !== undefined && itemB === undefined) {
+            return 1;
+        }
+        var regexAlpha = /[^a-zA-Z]/g,
+            regexNumber = /[^0-9]/g,
+            partA = itemA.replace(regexAlpha, ''),
+            partB = itemB.replace(regexAlpha, '');
+        if (partA === partB) {
+            partA = parseInt(itemA.replace(regexNumber, ''), 10);
+            partB = parseInt(itemB.replace(regexNumber, ''), 10);
+            return partA === partB ? 0 : (partA > partB ? 1 : -1);
+        }
+        return partA > partB ? 1 : -1;
+    }
     function advancedSort(list, properties) {
         list.sort(function(a, b) {
-            var i;
+            var i, result;
             for (i = 0; i < properties.length; i += 1) {
-                if (a[properties[i]]() < b[properties[i]]()) {
-                    return -1;
-                }
-                if (a[properties[i]]() > b[properties[i]]()) {
-                    return 1;
+                result = numberSort(a[properties[i]](), b[properties[i]]());
+                if (result !== 0) {
+                    return result;
                 }
             }
             return 0;
