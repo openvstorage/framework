@@ -249,7 +249,7 @@ print 'Mounting filesystem...'
 run_command('swapoff --all')
 run_command('mountall -q &> /dev/null')
 
-supported_quality_levels = ['unstable', 'test', 'stable']
+supported_quality_levels = ['unstable', 'test']
 quality_level = ask_choice(supported_quality_levels, question='Select qualitylevel', default_value='unstable')
 
 # Requesting information
@@ -324,12 +324,14 @@ with open('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg', 'w') as bitbucket:
         bitbucket_username, bitbucket_password
     ))
 
+bootstrap_mapping = {'unstable': 'unstable', 'test': 'default', }
+
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')
 run_command('apt-get -y -qq install python-dev')
 run_command('apt-get -y -qq install python-pip')
-run_command('pip -q install -I https://bitbucket.org/jumpscale/jumpscale_core/get/default.zip')
+run_command('pip -q install -I https://bitbucket.org/jumpscale/jumpscale_core/get/{}.zip'.format(bootstrap_mapping[quality_level]))
 
 jp_jumpscale_blobstor = """
 [jpackages_local]
@@ -359,14 +361,14 @@ type = httpftp
 jp_jumpscale_repo = """
 [jumpscale]
 metadatafromtgz = 0
-qualitylevel = test
+qualitylevel = %(qualityLevel)s
 metadatadownload =
 metadataupload =
 bitbucketaccount = jumpscale
 bitbucketreponame = jp_jumpscale
 blobstorremote = jpackages_remote
 blobstorlocal = jpackages_local
-"""
+""" % {'qualityLevel': quality_level}
 
 jp_openvstorage_repo = """
 [openvstorage]
@@ -401,9 +403,9 @@ jp_sources_config.close()
 
 # Starting installation
 print 'Installing prerequisites...'
-run_command('jpackage_update')
-run_command('jpackage_install -n core')
+run_command('jpackage mdupdate')
+run_command('jpackage install -n core')
 print 'Starting Open vStorage installation...'
-run_command('jpackage_install -n openvstorage')
+run_command('jpackage install -n openvstorage')
 
 print 'Installation complete.'
