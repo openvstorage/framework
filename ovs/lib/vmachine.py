@@ -374,38 +374,42 @@ class VMachineController(object):
         """
         Updates a given vmachine with data retreived from a given pmachine
         """
-        vmachine = VMachine(vmachineguid)
-        if vsrid is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
-            # Only the vmachine was received, so base the sync on hypervisorid and pmachine
-            hypervisor = Factory.get(vmachine.pmachine)
-            logging.info('Syncing vMachine (name {})'.format(vmachine.name))
-            vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
-        elif vsrid is not None and vmachine.devicename is not None:
-            # VSR id was given, using the devicename instead (to allow hypervisorid updates
-            # which can be caused by re-adding a vm to the inventory
-            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            if vsr is None:
-                raise RuntimeError('VolumeStorageRouter could not be found')
-            vsa = vsr.serving_vmachine
-            if vsa is None:
-                raise RuntimeError('VolumeStorageRouter {} not linked to a VSA'.format(vsr.name))
-            pmachine = vsa.pmachine
-            if pmachine is None:
-                raise RuntimeError('VSA {} not linked to a pMachine'.format(vsa.name))
-            hypervisor = Factory.get(pmachine)
-            vmachine.pmachine = pmachine
-            vmachine.save()
+        try:
+            vmachine = VMachine(vmachineguid)
+            if vsrid is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
+                # Only the vmachine was received, so base the sync on hypervisorid and pmachine
+                hypervisor = Factory.get(vmachine.pmachine)
+                logging.info('Syncing vMachine (name {})'.format(vmachine.name))
+                vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
+            elif vsrid is not None and vmachine.devicename is not None:
+                # VSR id was given, using the devicename instead (to allow hypervisorid updates
+                # which can be caused by re-adding a vm to the inventory
+                vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+                if vsr is None:
+                    raise RuntimeError('VolumeStorageRouter could not be found')
+                vsa = vsr.serving_vmachine
+                if vsa is None:
+                    raise RuntimeError('VolumeStorageRouter {} not linked to a VSA'.format(vsr.name))
+                pmachine = vsa.pmachine
+                if pmachine is None:
+                    raise RuntimeError('VSA {} not linked to a pMachine'.format(vsa.name))
+                hypervisor = Factory.get(pmachine)
+                vmachine.pmachine = pmachine
+                vmachine.save()
 
-            logging.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
-                                                                               vsr.ip,
-                                                                               vsr.mountpoint))
-            vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
-                                                               ip=vsr.ip,
-                                                               mountpoint=vsr.mountpoint)
-        else:
-            message = 'Not enough information to sync vmachine'
-            logging.info('Error: {0}'.format(message))
-            raise RuntimeError(message)
+                logging.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
+                                                                                   vsr.ip,
+                                                                                   vsr.mountpoint))
+                vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
+                                                                   ip=vsr.ip,
+                                                                   mountpoint=vsr.mountpoint)
+            else:
+                message = 'Not enough information to sync vmachine'
+                logging.info('Error: {0}'.format(message))
+                raise RuntimeError(message)
+        except Exception as ex:
+            logging.info('Error while fetching vMachine info: {0}'.format(str(ex)))
+            raise
 
         vdisks_synced = 0
         if vm_object is None:
