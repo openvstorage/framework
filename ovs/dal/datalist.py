@@ -70,20 +70,6 @@ class DataList(object):
         self.from_cache = False
         self._load()
 
-    @staticmethod
-    def get_pks(namespace, name):
-        """
-        This method will load the primary keys for a given namespace and name
-        (typically, for ovs_data_*)
-        """
-        volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
-        key = 'ovs_primarykeys_%s' % name
-        keys = volatile.get(key)
-        if keys is None:
-            keys = persistent.prefix('%s_%s_' % (namespace, name))
-        return keys
-
     def _exec_and(self, instance, items):
         """
         Executes a given set of query items against the instance in an "AND" scope
@@ -256,3 +242,81 @@ class DataList(object):
                     self._persistent.set(key, cache_list)
                 finally:
                     mutex.release()
+
+    @staticmethod
+    def get_pks(namespace, name):
+        """
+        This method will load the primary keys for a given namespace and name
+        (typically, for ovs_data_*)
+        """
+        return DataList._get_pks(namespace, name)
+
+    @staticmethod
+    def add_pk(namespace, name, key):
+        """
+        This adds the current primary key to the primary key index
+        """
+        mutex = VolatileMutex('primarykeys_%s' % name)
+        try:
+            mutex.acquire(10)
+            keys = DataList._get_pks(namespace, name)
+            keys.add(key)
+            DataList._save_pks(name, keys)
+        finally:
+            mutex.release()
+
+    @staticmethod
+    def delete_pk(namespace, name, key):
+        """
+        This deletes the current primary key from the primary key index
+        """
+        mutex = VolatileMutex('primarykeys_%s' % name)
+        try:
+            mutex.acquire(10)
+            keys = DataList._get_pks(namespace, name)
+            try:
+                keys.remove(key)
+            except KeyError:
+                pass
+            DataList._save_pks(name, keys)
+        finally:
+            mutex.release()
+
+    @staticmethod
+    def _get_pks(namespace, name):
+        """
+        Loads the primary key set information and pages, merges them to a single set
+        and returns it
+        """
+        internal_key = 'ovs_primarykeys_%s' % name
+        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
+        keys = set()
+        key_sets = volatile.get(internal_key)
+        if key_sets is None:
+            return set(persistent.prefix('%s_%s_' % (namespace, name)))
+        for key_set in key_sets:
+            subset = volatile.get('%s_%d' % (internal_key, key_set))
+            if subset is None:
+                return set(persistent.prefix('%s_%s_' % (namespace, name)))
+            else:
+                keys = keys.union(subset)
+        return keys
+
+    @staticmethod
+    def _save_pks(name, keys):
+        """
+        Pages and saves a set
+        """
+        internal_key = 'ovs_primarykeys_%s' % name
+        volatile = VolatileFactory.get_client()
+        keys = list(keys)
+        old_key_sets = volatile.get(internal_key) or []
+        key_sets = []
+        for i in range(0, len(keys), 5000):
+            volatile.set('%s_%d' % (internal_key, i), keys[i:i + 5000])
+            key_sets.append(i)
+        for key_set in old_key_sets:
+            if key_set not in key_sets:
+                volatile.delete('%s_%d' % (internal_key, key_set))
+        volatile.set(internal_key, key_sets)

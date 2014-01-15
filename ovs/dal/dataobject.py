@@ -75,9 +75,6 @@ class DataObject(object):
         - 1-n relations with automatic property propagation
         - Recursive save
     """
-    # @TODO: Deleting is not recursive
-    # @TODO: There is a soft limit to the amount of objects per type that is situated around 10k
-
     __metaclass__ = MetaClass
 
     #######################
@@ -122,7 +119,6 @@ class DataObject(object):
         # Worker fields/objects
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex_pk = VolatileMutex('primarykeys_%s' % self._name)
         self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
         # Init guid
@@ -410,7 +406,7 @@ class DataObject(object):
         # Save the data
         self._data = copy.deepcopy(data)
         self._persistent.set(self._key, self._data)
-        self._add_pk(self._key)
+        DataList.add_pk(self._namespace, self._name, self._key)
 
         # Invalidate lists/queries
         # First, invalidate reverse lists (where we point to a remote object,
@@ -486,7 +482,7 @@ class DataObject(object):
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-        self._delete_pk(self._key)
+        DataList.delete_pk(self._namespace, self._name, self._key)
 
     # Discard all pending changes
     def discard(self):
@@ -584,41 +580,6 @@ class DataObject(object):
                                     % (caller_name, str(allowed_types), given_type))
             self._volatile.set(cache_key, cached_data, self._expiry[caller_name][0])
         return cached_data
-
-    def _add_pk(self, key):
-        """
-        This adds the current primary key to the primary key index
-        """
-        internal_key = 'ovs_primarykeys_%s' % self._name
-        try:
-            self._mutex_pk.acquire(10)
-            keys = self._volatile.get(internal_key)
-            if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
-            else:
-                keys.add(key)
-            self._volatile.set(internal_key, keys)
-        finally:
-            self._mutex_pk.release()
-
-    def _delete_pk(self, key):
-        """
-        This deletes the current primary key from the primary key index
-        """
-        internal_key = 'ovs_primarykeys_%s' % self._name
-        try:
-            self._mutex_pk.acquire(10)
-            keys = self._volatile.get(internal_key)
-            if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
-            else:
-                try:
-                    keys.remove(key)
-                except KeyError:
-                    pass
-            self._volatile.set(internal_key, keys)
-        finally:
-            self._mutex_pk.release()
 
     def __str__(self):
         """
