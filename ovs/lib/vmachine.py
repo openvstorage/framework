@@ -106,18 +106,23 @@ class VMachineController(object):
 
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
-        for disk in disks_by_order:
-            prefix = '{0}-clone'.format(disk.name)
-            result = VDiskController.create_from_template(
-                diskguid=disk.guid,
-                devicename=prefix,
-                location=new_vm.name.replace(' ', '_'),
-                machineguid=new_vm.guid
-            )
-            disks.append(result)
-
-        # @todo: cleanup when not all disks could be successfully created
-        # @todo: skip vm creation on hypervisor in that case
+        try:
+            for disk in disks_by_order:
+                prefix = '{0}-clone'.format(disk.name)
+                result = VDiskController.create_from_template(
+                    diskguid=disk.guid,
+                    devicename=prefix,
+                    location=new_vm.name.replace(' ', '_'),
+                    machineguid=new_vm.guid
+                )
+                disks.append(result)
+                print 'disk appended: {0}'.format(result)
+        except Exception as ex:
+            for disk in disks:
+                # @todo cleantup strategy to be defined
+                pass
+            new_vm.delete()
+            raise ex
 
         provision_machine_task = target_hv.create_vm_from_template.s(
             target_hv, name, source_vm, disks, esxhost=None, wait=True
