@@ -322,6 +322,12 @@ for filename in configuration:
     with open('/opt/jumpscale/cfg/hrd/{0}.hrd'.format(filename), 'w') as hrd:
         hrd.write('\n'.join(['%s=%s' % i for i in configuration[filename].iteritems()]))
 
+if not os.path.exists('/opt/jumpscale/cfg/jsconfig'):
+    os.makedirs('/opt/jumpscale/cfg/jsconfig')
+if not os.path.exists('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg'):
+    with open('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg', 'w') as bitbucket:
+        bitbucket.write('[jumpscale]\nlogin =\npasswd =\n\n[openvstorage]\nlogin =\npasswd =\n')
+
 bootstrap_mapping = {'unstable': 'unstable', 'test': 'default', }
 
 # Install all software components
