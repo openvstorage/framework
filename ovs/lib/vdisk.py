@@ -245,8 +245,6 @@ class VDiskController(object):
 
         device_location = '{}/{}.vmdk'.format(location, devicename)
 
-        volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
-
         new_disk = VDisk()
         new_disk.copy_blueprint(disk, include=properties_to_clone)
         new_disk.vpool = disk.vpool
@@ -255,12 +253,19 @@ class VDiskController(object):
         new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
         new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
-        new_disk.volumeid = volumeid
         new_disk.save()
 
-        logging.info('Created disk from template {} to new disk {} to location {}'.format(
+        logging.info('Create disk from template {} to new disk {} to location {}'.format(
             disk.name, new_disk.name, device_location
         ))
+        try:
+            volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
+            new_disk.volumeid = volumeid
+            new_disk.save()
+        except Exception as ex:
+            logging.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
+            new_disk.delete()
+            raise ex
 
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': device_location.strip('/')}
