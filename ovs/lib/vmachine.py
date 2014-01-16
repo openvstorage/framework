@@ -271,7 +271,6 @@ class VMachineController(object):
                     vm.status = 'SYNC_NOK'
                 vm.save()
 
-
     @staticmethod
     @celery.task(name='ovs.machine.set_as_template')
     def set_as_template(machineguid):

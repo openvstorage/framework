@@ -339,8 +339,11 @@ class Control():
             vmachine = VMachine(vmachineguid)
             vrouter = [vsr for vsr in this_vpool.vsrs if vsr.serving_vmachine_guid == vmachineguid][0]
             hypervisor = Factory.get(vmachine.pmachine)
-            hypervisor.mount_nfs_datastore(vpool_name, vrouter.ip, vrouter.mountpoint)
-            print '  Success'
+            try:
+                hypervisor.mount_nfs_datastore(vpool_name, vrouter.ip, vrouter.mountpoint)
+                print '    Success'
+            except Exception as ex:
+                print '    Error, please mount the vPool manually. {0}'.format(str(ex))
         subprocess.call(['service', 'processmanager', 'start'])
 
     def _package_is_running(self, package):

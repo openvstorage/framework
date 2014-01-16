@@ -803,8 +803,7 @@ class Sdk(object):
         for store in host_system.datastore[0]:
             store = self._get_object(store)
             if hasattr(store.info, 'nas'):
-                if store.info.nas.remoteHost == ip and \
-                        store.info.nas.remotePath == mountpoint:
+                if store.info.nas.remoteHost == ip and store.info.nas.remotePath == mountpoint:
                     datastore = store
 
         return datastore
@@ -960,8 +959,25 @@ class Sdk(object):
         Mounts a given NFS export as a datastore
         """
         esxhost = self._validate_host(esxhost)
-        host = self._get_object(esxhost, properties=['name', 'configManager', 'configManager.datastoreSystem'])
-
+        host = self._get_object(esxhost, properties=['datastore',
+                                                     'name',
+                                                     'configManager',
+                                                     'configManager.datastoreSystem'])
+        for store in host.datastore[0]:
+            store = self._get_object(store)
+            if hasattr(store.info, 'nas'):
+                if store.info.name == name:
+                    if store.info.nas.remoteHost == remote_host and \
+                            store.info.nas.remotePath == remote_path:
+                        # We'll remove this store, as it's identical to the once we'll add,
+                        # forcing a refresh
+                        self._client.service.RemoveDatastore(host.configManager.datastoreSystem,
+                                                             store.obj_identifier)
+                        break
+                    else:
+                        raise RuntimeError('A datastore {0} already exists, pointing to {1}:{2}'.format(
+                            name, store.info.nas.remoteHost, store.info.nas.remotePath
+                        ))
         spec = self._client.factory.create('ns0:HostNasVolumeSpec')
         spec.accessMode = 'readWrite'
         spec.localPath = name
