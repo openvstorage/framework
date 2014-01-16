@@ -265,7 +265,7 @@ class VDiskController(object):
         except Exception as ex:
             logging.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
             new_disk.delete()
-            raise ex
+            raise
 
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': device_location.strip('/')}

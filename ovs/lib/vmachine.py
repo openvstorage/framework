@@ -119,10 +119,10 @@ class VMachineController(object):
                 print 'disk appended: {0}'.format(result)
         except Exception as ex:
             for disk in disks:
-                # @todo cleantup strategy to be defined
+                # @todo cleanup strategy to be defined
                 pass
             new_vm.delete()
-            raise ex
+            raise
 
         provision_machine_task = target_hv.create_vm_from_template.s(
             target_hv, name, source_vm, disks, esxhost=None, wait=True
