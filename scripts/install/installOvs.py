@@ -4,6 +4,7 @@ import sys
 import urllib2
 import base64
 import getpass
+import hashlib
 from random import choice
 from string import lowercase
 from subprocess import call, check_output
@@ -302,7 +303,7 @@ configuration['openvstorage-webapps'] = {}
 configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_integer('GUI certificate lifetime', min_value=1, max_value=365 * 10, default_value=365)
 
 configuration['elasticsearch'] = {}
-configuration['elasticsearch']['elasticsearch.cluster.name'] = ask_string('Enter elastic search cluster name', default_value='ovs_elastic_search')
+configuration['elasticsearch']['elasticsearch.cluster.name'] = ask_string('Enter elastic search cluster name', default_value='ovses')
 
 configuration['grid'] = {}
 configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=1, max_value=32767)
@@ -311,7 +312,7 @@ configuration['grid']['grid.node.roles'] = 'node'
 configuration['grid_master'] = {}
 configuration['grid_master']['gridmaster.grid.id'] = configuration['grid']['grid.id']
 configuration['grid_master']['gridmaster.useavahi'] = 1
-configuration['grid_master']['gridmaster.superadminpasswd'] = ''.join(choice(lowercase) for i in range(25))
+configuration['grid_master']['gridmaster.superadminpasswd'] = hashlib.sha256(''.join(choice(lowercase) for i in range(25))).hexdigest()
 
 configuration['osis'] = {}
 configuration['osis']['osis.key'] = ''.join(choice(lowercase) for i in range(25))
@@ -322,20 +323,30 @@ for filename in configuration:
     with open('/opt/jumpscale/cfg/hrd/{0}.hrd'.format(filename), 'w') as hrd:
         hrd.write('\n'.join(['%s=%s' % i for i in configuration[filename].iteritems()]))
 
+bitbucket_username = ask_string('Provide your bitbucket username')
+bitbucket_password = getpass.getpass()
 if not os.path.exists('/opt/jumpscale/cfg/jsconfig'):
     os.makedirs('/opt/jumpscale/cfg/jsconfig')
 if not os.path.exists('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg'):
     with open('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg', 'w') as bitbucket:
-        bitbucket.write('[jumpscale]\nlogin =\npasswd =\n\n[openvstorage]\nlogin =\npasswd =\n')
+        bitbucket.write(
+            '[jumpscale]\nlogin = {0}\npasswd = {1}\n\n[openvstorage]\nlogin = {0}\npasswd = {1}\n'.format(
+                bitbucket_username, bitbucket_password
+            ))
 
-bootstrap_mapping = {'unstable': 'unstable', 'test': 'default', }
+# Branch mapping: key = our qualitylevel, value = jumpscale branch
+branch_mapping = {'unstable': 'default',
+                  'test': 'default'}
+# Quality level mapping: key = our qualitylevel, value = jumpscale quality level
+quality_mapping = {'unstable': 'test',
+                   'test': 'test'}
 
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')
 run_command('apt-get -y -qq install python-dev')
 run_command('apt-get -y -qq install python-pip')
-run_command('pip -q install -I https://bitbucket.org/jumpscale/jumpscale_core/get/{}.zip'.format(bootstrap_mapping[quality_level]))
+run_command('pip -q install -I https://bitbucket.org/jumpscale/jumpscale_core/get/{0}.zip'.format(branch_mapping[quality_level]))
 
 jp_jumpscale_blobstor = """
 [jpackages_local]
@@ -372,7 +383,7 @@ bitbucketaccount = jumpscale
 bitbucketreponame = jp_jumpscale
 blobstorremote = jpackages_remote
 blobstorlocal = jpackages_local
-""" % {'qualityLevel': quality_level}
+""" % {'qualityLevel': quality_mapping[quality_level]}
 
 jp_openvstorage_repo = """
 [openvstorage]
@@ -409,9 +420,9 @@ jp_sources_config.close()
 
 # Starting installation
 print 'Installing prerequisites...'
-run_command('jpackage mdupdate')
-run_command('jpackage install -n core')
+run_command('jpackage_update')
+run_command('jpackage_install -n core')
 print 'Starting Open vStorage installation...'
-run_command('jpackage install -n openvstorage')
+run_command('jpackage_install -n openvstorage')
 
 print 'Installation complete.'
