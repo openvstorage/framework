@@ -179,7 +179,7 @@ class ArakoonCluster:
         Get an object that contains all node information in the supplied cluster
         @return dict the dict can be used as param for the ArakoonConfig object
         """
-        config = self._getConfigFile()
+        config = self._getClientConfigFile()
         clientconfig = dict()
 
         nodes = self.__getNodes(config)
