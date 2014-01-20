@@ -298,6 +298,7 @@ mountpoint = ask_choice(mountpoints, question='Select metadata mountpoint', defa
 mountpoints.remove(mountpoint)
 configuration['openvstorage-core']['volumedriver.metadata'] = mountpoint
 configuration['openvstorage-core']['volumedriver.arakoon.node.name'] = unique_id
+configuration['openvstorage-core']['ovs.core.rabbitmq.localnode.name'] = unique_id
 
 configuration['openvstorage-webapps'] = {}
 configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_integer('GUI certificate lifetime', min_value=1, max_value=365 * 10, default_value=365)
