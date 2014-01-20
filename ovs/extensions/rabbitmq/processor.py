@@ -4,6 +4,7 @@ Contains the process method for processing rabbitmq messages
 """
 
 from celery.task.control import revoke
+from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vpool import VPoolController
@@ -60,18 +61,21 @@ def process(queue, body):
                                       '[NODE_ID]': 'vsrid'},
                         'options': {'delay': 3,
                                     'dedupe': True,
-                                    'dedupe_key': 'new_name'}},
+                                    'dedupe_key': 'new_name',
+                                    'execonvsa': True}},
                    EventMessages.EventMessage.UpAndRunning:
                        {'property': 'up_and_running',
                         'task': VPoolController.mountpoint_available_from_voldrv,
                         'arguments': {'mountpoint': 'mountpoint',
-                                      '[NODE_ID]': 'vsrid'}}}
+                                      '[NODE_ID]': 'vsrid'},
+                        'options': {'execonvsa': True}}}
 
         if data.type in mapping:
             task = mapping[data.type]['task']
             data_container = getattr(data, mapping[data.type]['property'])
             kwargs = {}
             delay = 0
+            routing_key = 'generic'
             for field, target in mapping[data.type]['arguments'].iteritems():
                 if field == '[NODE_ID]':
                     kwargs[target] = data.node_id
@@ -80,9 +84,14 @@ def process(queue, body):
                 else:
                     kwargs[target] = getattr(data_container, field)
             if 'options' in mapping[data.type]:
-                delay = mapping[data.type]['options'].get('delay', 0)
-                dedupe = mapping[data.type]['options'].get('dedupe', False)
-                dedupe_key = mapping[data.type]['options'].get('dedupe_key', None)
+                options = mapping[data.type]['options']
+                if options.get('execonvsa', False):
+                    vsr = VolumeStorageRouterList.get_by_vsrid(data.node_id)
+                    if vsr is not None:
+                        routing_key = 'vsa.{0}'.format(vsr.serving_vmachine.name)
+                delay = options.get('delay', 0)
+                dedupe = options.get('dedupe', False)
+                dedupe_key = options.get('dedupe_key', None)
                 if dedupe and dedupe_key:  # We can't dedupe without a key
                     key = '{}({})'.format(task.__class__.__name__, kwargs[dedupe_key])
                     key = key.replace(' ', '_')
@@ -91,17 +100,20 @@ def process(queue, body):
                         # Key exists, task was already scheduled
                         # If task is already running, the revoke message will be ignored
                         revoke(task_id)
-                    async_result = task.s(**kwargs).apply_async(countdown=delay)
+                    async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
                     cache.set(key, async_result.id)  # Store the task id
                 else:
-                    task.s(**kwargs).apply_async(countdown=delay)
+                    task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
             else:
                 task.delay(**kwargs)
-            print '[{}] mapped {} to {} with args {}. Delay: {}s'.format(queue,
-                                                                         str(data.type),
-                                                                         task.__name__,
-                                                                         json.dumps(kwargs),
-                                                                         delay)
+            print '[{0}] mapped {1} to {2} with args {3} and route {4}. Delay: {5}s'.format(
+                queue,
+                str(data.type),
+                task.__name__,
+                json.dumps(kwargs),
+                routing_key,
+                delay
+            )
         else:
             raise RuntimeError('Type %s is not yet supported' % str(data.type))
     else:
