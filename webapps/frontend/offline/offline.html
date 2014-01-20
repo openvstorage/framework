@@ -16,7 +16,7 @@
                     for (i = 0; i < nodes.length; i += 1) {
                         node = nodes[i];
                         (function(node) {
-                            $.ajax('/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
+                            $.ajax('https://' + node + '/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
                                         type: 'GET',
                                         contentType: 'application/jsonp',
                                         timeout: 5000

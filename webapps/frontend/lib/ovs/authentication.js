@@ -19,20 +19,21 @@ define([
 
         self.login = function(username, password) {
             return $.Deferred(function(deferred) {
-                var callData = {
-                        type: 'post',
-                        data: ko.toJSON({
-                            'username': username,
-                            'password': password
-                        }),
-                        contentType: 'application/json',
-                        headers: {}
-                    },
-                    cookie = generic.getCookie('csrftoken');
+                var node = '', callData, cookie;
+                callData = {
+                    type: 'post',
+                    data: ko.toJSON({
+                        'username': username,
+                        'password': password
+                    }),
+                    contentType: 'application/json' + (node !== '' ? 'p' : ''),
+                    headers: {}
+                };
+                cookie = generic.getCookie('csrftoken');
                 if (cookie !== undefined) {
                     callData.headers['X-CSRFToken'] = cookie;
                 }
-                $.ajax('/api/auth/', callData)
+                $.ajax(node + '/api/auth/', callData)
                     .done(function(result) {
                         var i, events = [];
                         self.token = result.token;

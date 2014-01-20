@@ -6,7 +6,7 @@ define([
 ], function($, shared, generic) {
     'use strict';
     function call(api, data, filter, type) {
-        var querystring = [], key, callData, cookie, jqXhr,
+        var querystring = [], key, node = '', callData, cookie, jqXhr,
             deferred = $.Deferred();
 
         filter = filter || {};
@@ -20,7 +20,7 @@ define([
         callData = {
             type: type,
             timeout: 1000 * 60 * 60,
-            contentType: 'application/json',
+            contentType: 'application/json' + (node !== '' ? 'p' : ''),
             data: JSON.stringify(data),
             headers: { }
         };
@@ -31,7 +31,7 @@ define([
         if (shared.authentication.validate()) {
             callData.headers.Authorization = shared.authentication.header();
         }
-        jqXhr = $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
+        jqXhr = $.ajax(node + '/api/internal/' + api + '/?' + querystring.join('&'), callData)
             .done(deferred.resolve)
             .fail(function(xmlHttpRequest, textStatus, errorThrown) {
                 // We check whether we actually received an error, and it's not the browser navigating away
