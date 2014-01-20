@@ -23,6 +23,9 @@ rmq_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 
 nodes = rmq_ini.getValue('main', 'nodes').split(',')
 rmq_servers = map(lambda m: rmq_ini.getValue(m, 'location'), nodes)
 
+rmq_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'celery.cfg'))
+celery_nodes = rmq_ini.getValue('main', 'nodes').split(',')
+
 celery = Celery('ovs',
                 include=['ovs.lib.vdisk',
                          'ovs.lib.vmachine',
@@ -39,11 +42,10 @@ celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.ge
                                                                 server)
                                    for server in rmq_servers])
 celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
-celery.conf.CELERY_QUEUES = (
-    Queue('ovs_generic', routing_key='generic.#'),
-    Queue('ovs_ovs100', routing_key='vsa.ovs100.#'),
-    Queue('ovs_ovs101', routing_key='vsa.ovs101.#'),
-)
+queues = [Queue('ovs_generic', routing_key='generic.#')]
+for celery_node in celery_nodes:
+    queues.append(Queue('ovs_{0}'.format(celery_node), routing_key='vsa.{0}.#'.format(celery_node)))
+celery.conf.CELERY_QUEUES = tuple(queues)
 celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
 celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
 celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
