@@ -24,7 +24,7 @@ from backend.decorators import required_roles, expose, validate
 
 class VMachineViewSet(viewsets.ViewSet):
     """
-    Information about machines
+    Information about vMachines
     """
     permission_classes = (IsAuthenticated,)
 
@@ -32,7 +32,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def list(self, request, format=None):
         """
-        Overview of all machines
+        Overview of all VMachines
         """
         _ = request, format
         vmachines = VMachineList.get_vmachines().reduced
@@ -55,7 +55,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def rollback(self, request, obj):
         """
-        Clones a machine
+        Rollbacks a vMachine to a given timestamp
         """
         task = VMachineController.rollback.delay(machineguid=obj.guid,
                                                  timestamp=request.DATA['timestamp'])
@@ -67,7 +67,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def snapshot(self, request, obj):
         """
-        Snapshots a given machine
+        Snapshots a given VMachine
         """
         label = str(request.DATA['name'])
         is_consistent = True if request.DATA['consistent'] else False  # Assure boolean type
@@ -78,7 +78,7 @@ class VMachineViewSet(viewsets.ViewSet):
 
     def _get_vsas(self, obj):
         """
-        Returns list of VSA machine guids
+        Returns a list of VSA vMachine guids
         """
         vsa_vmachine_guids = []
         for vdisk in obj.vdisks:
@@ -93,7 +93,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_vsas(self, request, obj):
         """
-        Returns list of VSA machine guids
+        Returns a list of VSA vMachine guids
         """
         _ = request
         vsa_vmachine_guids = self._get_vsas(obj)
@@ -101,7 +101,7 @@ class VMachineViewSet(viewsets.ViewSet):
 
     def _get_vpools(self, obj):
         """
-        Returns the vpool guids associated with the given VM
+        Returns the vPool guid(s) associated with the given vMachine
         """
         vpool_guids = []
         for vdisk in obj.vdisks:
@@ -114,7 +114,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_vpools(self, request, obj):
         """
-        Returns the vpool guids associated with the given VM
+        Returns the vPool guid(s) associated with the given vMachine
         """
         _ = request
         vpool_guids = self._get_vpools(obj)
@@ -122,7 +122,7 @@ class VMachineViewSet(viewsets.ViewSet):
 
     def _get_children(self, obj):
         """
-        Returns list of children vmachines guids
+        Returns a list of vMachines guid(s) of children of a given vMachine
         """
         children_vmachine_guids = set()
         for vdisk in obj.vdisks:
@@ -136,7 +136,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_children(self, request, obj):
         """
-        Returns list of children vmachines guids
+        Returns a list of vMachines guid(s) of children of a given vMachine
         """
         _ = request
         children_vmachine_guids = self._get_children(obj)
@@ -163,7 +163,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def set_as_template(self, request, obj):
         """
-        Sets a given machine as template
+        Sets a given vMachine as vTemplate
         """
         _ = request
         task = VMachineController.set_as_template.delay(machineguid=obj.guid)

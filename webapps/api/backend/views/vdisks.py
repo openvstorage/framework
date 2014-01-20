@@ -17,7 +17,7 @@ from backend.decorators import required_roles, expose, validate
 
 class VDiskViewSet(viewsets.ViewSet):
     """
-    Information about machines
+    Information about vDisks
     """
     permission_classes = (IsAuthenticated,)
 
@@ -25,7 +25,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def list(self, request, format=None):
         """
-        Overview of all machines
+        Overview of all vDisks
         """
         _ = request, format
         vmachineguid = self.request.QUERY_PARAMS.get('vmachineguid', None)
@@ -47,7 +47,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @validate(VDisk)
     def retrieve(self, request, obj):
         """
-        Load information about a given task
+        Load information about a given vDisk
         """
         _ = request
         return Response(FullSerializer(VDisk, instance=obj).data, status=status.HTTP_200_OK)
@@ -58,7 +58,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @validate(VDisk)
     def get_vsa(self, request, obj):
         """
-        Returns the guid of VSA machine
+        Returns the guid of the VSA serving the vDisk
         """
         _ = request
         vsa_vmachine_guid = None
@@ -73,7 +73,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @validate(VDisk)
     def rollback(self, request, obj):
         """
-        Clones a machine
+        Rollbacks a vDisk to a given timestamp
         """
         _ = format
         task = VDiskController.rollback.delay(diskguid=obj.guid,
