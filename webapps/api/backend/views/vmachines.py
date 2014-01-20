@@ -82,7 +82,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_vsas(self, request, obj):
         """
-        Returns list of VSA machine guids
+        Returns a list of VSA vMachine guids
         """
         _ = request
         vsa_vmachine_guids = []
@@ -98,7 +98,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_vpools(self, request, obj):
         """
-        Returns the vpool guids associated with the given VM
+        Returns the vPool guid(s) associated with the given vMachine
         """
         _ = request
         vpool_guids = []
@@ -112,7 +112,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_children(self, request, obj):
         """
-        Returns list of children vmachines guids
+        Returns a list of vMachines guid(s) of children of a given vMachine
         """
         _ = request
         children_vmachine_guids = set()

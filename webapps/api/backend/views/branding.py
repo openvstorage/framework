@@ -29,7 +29,7 @@ class BrandingViewSet(viewsets.ViewSet):
     @validate(Branding)
     def retrieve(self, request, obj):
         """
-        Load information about a given task
+        Load information about a given branding
         """
         _ = request
         return Response(FullSerializer(Branding, instance=obj).data, status=status.HTTP_200_OK)

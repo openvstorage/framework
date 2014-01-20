@@ -21,7 +21,7 @@ class PMachineViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def list(self, request, format=None):
         """
-        Overview of all vPools
+        Overview of all pMachines
         """
         _ = request, format
         pmachines = PMachineList.get_pmachines().reduced

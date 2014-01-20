@@ -14,7 +14,7 @@ from backend.decorators import required_roles, expose, validate
 
 class VPoolViewSet(viewsets.ViewSet):
     """
-    Information about machines
+    Information about vPools
     """
     permission_classes = (IsAuthenticated,)
 
@@ -45,7 +45,7 @@ class VPoolViewSet(viewsets.ViewSet):
     @validate(VPool)
     def count_disks(self, request, obj):
         """
-        Returns the amount of disks
+        Returns the amount of vDisks on the vPool
         """
         _ = request
         return Response(len(obj.vdisks), status=status.HTTP_200_OK)
@@ -56,7 +56,7 @@ class VPoolViewSet(viewsets.ViewSet):
     @validate(VPool)
     def count_machines(self, request, obj):
         """
-        Returns the amount of machines
+        Returns the amount of vMachines on the vPool
         """
         _ = request
         vmachine_guids = []
