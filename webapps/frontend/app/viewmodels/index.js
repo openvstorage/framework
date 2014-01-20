@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global define */
+/*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
     'ovs/shared', 'viewmodels/wizards/changepassword/index'
@@ -46,6 +46,16 @@ define([
             // Notifications
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";
+
+            // Cache node ips
+            $.ajax('/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
+                    type: 'GET',
+                    contentType: 'application/jsonp',
+                    timeout: 5000
+                })
+                .done(function(nodes) {
+                    window.localStorage.setItem('nodes', JSON.stringify(nodes.vsa_ips));
+                });
         }
     };
 });

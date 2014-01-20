@@ -24,15 +24,6 @@ class VDiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.list_volumes')
-    def list_volumes():
-        """
-        List all known volumes
-        """
-        response = vsr_client.list_volumes()
-        return response
-
-    @staticmethod
     @celery.task(name='ovs.disk.create_from_voldrv')
     def create_from_voldrv(volumepath, volumename, volumesize, vsrid, **kwargs):
         """

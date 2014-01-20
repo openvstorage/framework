@@ -64,3 +64,15 @@ class VMachineList(object):
                                         'items': [('is_vtemplate', DataList.operator.EQUALS, False),
                                                   ('is_internal', DataList.operator.EQUALS, False)]}}).data
         return DataObjectList(vmachines, VMachine)
+
+    @staticmethod
+    def get_vsas():
+        """
+        Returns VSA vMachines
+        """
+        vmachines = DataList({'object': VMachine,
+                              'data': DataList.select.DESCRIPTOR,
+                              'query': {'type': DataList.where_operator.AND,
+                                        'items': [('is_vtemplate', DataList.operator.EQUALS, False),
+                                                  ('is_internal', DataList.operator.EQUALS, True)]}}).data
+        return DataObjectList(vmachines, VMachine)

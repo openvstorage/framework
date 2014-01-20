@@ -15,6 +15,7 @@ from backend.views.users import UserViewSet
 from backend.views.tasks import TaskViewSet
 from backend.views.messaging import MessagingViewSet
 from backend.views.branding import BrandingViewSet
+from backend.views.generic import GenericViewSet
 from backend.router import OVSRouter
 
 
@@ -31,6 +32,7 @@ def build_router_urls(api_mode, docs):
         {'prefix': r'vdisks',              'viewset': VDiskViewSet,     'base_name': 'vdisks'},
         {'prefix': r'messages',            'viewset': MessagingViewSet, 'base_name': 'messages'},
         {'prefix': r'branding',            'viewset': BrandingViewSet,  'base_name': 'branding'},
+        {'prefix': r'generic',             'viewset': GenericViewSet,   'base_name': 'nodes'},
         {'prefix': r'statistics/memcache', 'viewset': MemcacheViewSet,  'base_name': 'memcache'}
     ]
     router = OVSRouter(api_mode, docs)
