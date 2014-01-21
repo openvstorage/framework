@@ -70,7 +70,7 @@ class Configure():
             pmachine = PMachine()
 
         # Model system VMachine and Hypervisor node
-        pmachine.ip = Configuration.get('ovs.host.Liip')
+        pmachine.ip = Configuration.get('ovs.host.ip')
         pmachine.username = Configuration.get('ovs.host.login')
         pmachine.password = Configuration.get('ovs.host.password')
         pmachine.hvtype = Configuration.get('ovs.host.hypervisor')
