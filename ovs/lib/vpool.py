@@ -15,11 +15,10 @@ class VPoolController(object):
 
     @staticmethod
     @celery.task(name='ovs.vpool.mountpoint_available_from_voldrv')
-    def mountpoint_available_from_voldrv(mountpoint, vsrid):
+    def mountpoint_available_from_voldrv(mountpoint):
         """
         Hook for (re)exporting the NFS mountpoint
         """
-        _ = vsrid
         nfs = Nfsexports()
         nfs.unexport(mountpoint)
         nfs.export(mountpoint)

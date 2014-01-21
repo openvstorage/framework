@@ -4,7 +4,6 @@ VMachine module
 """
 import time
 import logging
-import uuid
 
 from celery import group
 from ovs.celery import celery
