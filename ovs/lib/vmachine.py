@@ -117,18 +117,17 @@ class VMachineController(object):
                 )
                 disks.append(result)
                 print 'disk appended: {0}'.format(result)
-        except Exception as ex:
-            for disk in disks:
-                # @todo cleanup strategy to be defined
-                pass
+        except Exception:
+            # @todo cleanup strategy to be defined
             new_vm.delete()
             raise
 
-        provision_machine_task = target_hv.create_vm_from_template.s(
-            target_hv, name, source_vm, disks, esxhost=None, wait=True
-        )
-        provision_machine_task.link_error(VMachineController.delete.s(machineguid=new_vm.guid))
-        result = provision_machine_task()
+        try:
+            result = target_hv.create_vm_from_template(target_hv, name, source_vm, disks,
+                                                       esxhost=None, wait=True)
+        except:
+            VMachineController.delete(machineguid=new_vm.guid)
+            raise
 
         new_vm.hypervisorid = result
         new_vm.status = 'SYNC'
@@ -192,15 +191,13 @@ class VMachineController(object):
             new_disk_guids.append(result['diskguid'])
 
         hv = Factory.get(machine.pmachine)
-        provision_machine_task = hv.clone_vm.s(
-            hv, machine.hypervisorid, name, disks, None, True
-        )
-        provision_machine_task.link_error(
-            VMachineController.delete.s(machineguid=new_machine.guid)
-        )
-        result = provision_machine_task()
+        try:
+            result = hv.clone_vm(hv, machine.hypervisorid, name, disks, None, True)
+        except:
+            VMachineController.delete(machineguid=new_machine.guid)
+            raise
 
-        new_machine.hypervisorid = result.get()
+        new_machine.hypervisorid = result
         new_machine.save()
         return new_machine.guid
 
@@ -217,9 +214,7 @@ class VMachineController(object):
 
         if machine.pmachine:
             hv = Factory.get(machine.pmachine)
-            delete_vmachine_task = hv.delete_vm.s(
-                hv, machine.hypervisorid, None, True)
-            delete_vmachine_task()
+            hv.delete_vm(hv, machine.hypervisorid, None, True)
 
         for disk in machine.vdisks:
             disk.delete()

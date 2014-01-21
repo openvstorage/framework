@@ -17,7 +17,8 @@ class VMachine(DataObject):
     # pylint: disable=line-too-long
     _blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
                   'description':  (None,  str,  'Description of the vMachine.'),
-                  'hypervisorid': (None,  str,  'The Identifier of the vMachine on the Hypervisor.'),
+                  'hypervisorid': (None,  str,  'The identifier of the vMachine on the Hypervisor.'),
+                  'machineid':    (None,  str,  'The hardware identifier of the vMachine'),
                   'devicename':   (None,  str,  'The name of the container file (e.g. the VMX-file) describing the vMachine.'),
                   'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
@@ -72,9 +73,7 @@ class VMachine(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        if not self.vdisks: return {}
-        _vsr_client = VolumeStorageRouterClient().load(self.vdisks[0].vpool.name)
-        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstats = VolumeStorageRouterClient().empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:

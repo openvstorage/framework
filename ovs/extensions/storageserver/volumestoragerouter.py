@@ -7,7 +7,9 @@ from volumedriver.storagerouter import storagerouterclient
 from ovs.plugin.provider.configuration import Configuration
 import json
 import os
+
 vsr_cache = {}
+
 
 class VolumeStorageRouterClient(object):
     """
@@ -22,30 +24,31 @@ class VolumeStorageRouterClient(object):
 
     def __init__(self):
         """
+        Init method
         """
-        pass
+        self._host = None
+        self._port = None
+        self.empty_statistics = lambda: storagerouterclient.Statistics()
+        self.empty_info = lambda: storagerouterclient.VolumeInfo()
 
-    def load(self, vpool_name):
+    def load(self, vpool_guid):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding vsr
         Loads and returns the client
         """
 
-        if vpool_name in vsr_cache:
-            return vsr_cache[vpool_name]
+        if vpool_guid in vsr_cache:
+            return vsr_cache[vpool_guid]
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
-        vsrs = [vsr for vsr in VolumeStorageRouterList.get_volumestoragerouters() if vsr.vpool.name == vpool_name]
+        vsrs = [vsr for vsr in VolumeStorageRouterList.get_volumestoragerouters() if vsr.vpool_guid == vpool_guid]
         if vsrs:
             vsr = vsrs[0]
         else:
-            raise ValueError('Cannot find vsr for vpool {0}'.format(vpool_name))
-        self._host = vsr.ip #Configuration.get('ovs.grid.ip')
-        self._port = vsr.port #int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
-
+            raise ValueError('Cannot find vsr for vpool {0}'.format(vpool_guid))
+        self._host = vsr.ip
+        self._port = vsr.port
         client = storagerouterclient.StorageRouterClient(str(self._host), int(self._port))
-        client.empty_statistics = lambda: storagerouterclient.Statistics()
-        client.empty_info = lambda: storagerouterclient.VolumeInfo()
-        vsr_cache[vpool_name] = client
+        vsr_cache[vpool_guid] = client
         return client
 
 

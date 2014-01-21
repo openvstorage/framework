@@ -17,24 +17,23 @@ from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouter
 
 
 class VDiskController(object):
-
     """
     Contains all BLL regarding VDisks
     """
 
     @staticmethod
     @celery.task(name='ovs.disk.list_volumes')
-    def list_volumes(vpool_name = None):
+    def list_volumes(vpool_guid=None):
         """
         List all known volumes on a specific vpool or on all
         """
-        if vpool_name is not None:
-            vsr_client = VolumeStorageRouterClient().load(vpool_name)
+        if vpool_guid is not None:
+            vsr_client = VolumeStorageRouterClient().load(vpool_guid)
             response = vsr_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                vsr_client = VolumeStorageRouterClient().load(vpool.name)
+                vsr_client = VolumeStorageRouterClient().load(vpool.guid)
                 response.extend(vsr_client.list_volumes())
         return response
 
@@ -147,8 +146,7 @@ class VDiskController(object):
         _id = '{}'.format(disk.volumeid)
         _snap = '{}'.format(snapshotid)
         logging.info(_log.format(_snap, disk.name, _location))
-        vsr_client = VolumeStorageRouterClient().load(disk.vpool.name)
-        volumeid = vsr_client.create_clone(_location, _id, _snap)
+        volumeid = disk.vsr_client.create_clone(_location, _id, _snap)
         new_disk.copy_blueprint(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
@@ -171,12 +169,11 @@ class VDiskController(object):
         @param metadata: dict of metadata
         """
         disk = VDisk(diskguid)
-        vsr_client = VolumeStorageRouterClient().load(disk.vpool.name)
         logging.info('Create snapshot for disk {}'.format(disk.name))
         if snapshotid is None:
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
-        vsr_client.create_snapshot(
+        disk.vsr_client.create_snapshot(
             str(disk.volumeid),
             snapshot_id=snapshotid,
             metadata=metadata
@@ -198,9 +195,8 @@ class VDiskController(object):
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
-        vsr_client = VolumeStorageRouterClient().load(disk.vpool.name)
         logging.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
-        vsr_client.delete_snapshot(str(disk.volumeid), str(snapshotid))
+        disk.vsr_client.delete_snapshot(str(disk.volumeid), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
@@ -212,8 +208,7 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         disk = VDisk(diskguid)
-        vsr_client = VolumeStorageRouterClient().load(disk.vpool.name)
-        vsr_client.set_volume_as_template(str(disk.volumeid))
+        disk.vsr_client.set_volume_as_template(str(disk.volumeid))
 
     @staticmethod
     @celery.task(name='ovs.disk.rollback')
@@ -222,12 +217,11 @@ class VDiskController(object):
         Rolls back a disk based on a given disk snapshot timestamp
         """
         disk = VDisk(diskguid)
-        vsr_client = VolumeStorageRouterClient().load(disk.vpool.name)
         snapshots = [snap for snap in disk.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:
             raise ValueError('No snapshot found for timestamp {}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
-        vsr_client.rollback_volume(str(disk.volumeid), snapshotguid)
+        disk.vsr_client.rollback_volume(str(disk.volumeid), snapshotguid)
         disk.invalidate_dynamics(['snapshots'])
         return True
 
@@ -250,7 +244,6 @@ class VDiskController(object):
             'snapshotpolicyid', 'has_autobackup', 'vmachine', 'vpool']
 
         disk = VDisk(diskguid)
-        vsr_client = VolumeStorageRouterClient().load(disk.vpool.name)
         if not disk.vmachine.is_vtemplate:
             raise RuntimeError('The given disk does not belong to a template')
 
@@ -270,7 +263,7 @@ class VDiskController(object):
             disk.name, new_disk.name, device_location
         ))
         try:
-            volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
+            volumeid = disk.vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
             new_disk.volumeid = volumeid
             new_disk.save()
         except Exception as ex:

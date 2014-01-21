@@ -54,8 +54,7 @@ class Configure():
         """
         # Select/Create system vmachine
         hostname = platform.node()
-        vmachine_selector = VMachineList()
-        vmachine_list = vmachine_selector.get_vmachine_by_name(hostname)
+        vmachine_list = VMachineList.get_vmachine_by_name(hostname)
         if vmachine_list and len(vmachine_list) == 1:
             print 'System vMachine already created, updating ...'
             vmachine = vmachine_list[0]
@@ -66,26 +65,19 @@ class Configure():
             raise ValueError('Multiple System vMachines with name {} found, check your model'.format(hostname))
 
         # Select/Create host hypervisor node
-        pmachine_selector = PMachineList()
-        # @TODO implement more accurate search on PMachinelist to find pmachine
-        pmachine_list = pmachine_selector.get_pmachines()
-        pmachine = None
-        if pmachine_list:
-            for pm in pmachine_list:
-                if pm.ip == Configuration.get('ovs.host.ip'):
-                    pmachine = pm
-                    break
+        pmachine = PMachineList.get_by_ip(Configuration.get('ovs.host.ip'))
         if pmachine is None:
             pmachine = PMachine()
 
         # Model system VMachine and Hypervisor node
-        pmachine.ip = Configuration.get('ovs.host.ip')
+        pmachine.ip = Configuration.get('ovs.host.Liip')
         pmachine.username = Configuration.get('ovs.host.login')
         pmachine.password = Configuration.get('ovs.host.password')
         pmachine.hvtype = Configuration.get('ovs.host.hypervisor')
         pmachine.name = Configuration.get('ovs.host.name')
         pmachine.save()
         vmachine.name = hostname
+        vmachine.machineid = Configuration.get('ovs.core.uniqueid')
         vmachine.hvtype = Configuration.get('ovs.host.hypervisor')
         vmachine.is_vtemplate = False
         vmachine.is_internal = True
@@ -229,14 +221,14 @@ class Configure():
             vrouter = vrouters[0]
         else:
             vrouter = VolumeStorageRouter()
-        #make sure port is not already used
+        # Make sure port is not already used
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
         ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters()]
         vrouter_port_in_hrd = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
         if vrouter_port_in_hrd in ports_used_in_model:
-            vrouter_port = Console.askInteger('Provide Volumedriver connection port (make sure port is not in use', max(ports_used_in_model) + 3)
+            vrouter_port = Console.askInteger('Provide Volumedriver connection port (make sure port is not in use)', max(ports_used_in_model) + 3)
         else:
-            vrouter_port = vrouter_port_in_hrd #default
+            vrouter_port = vrouter_port_in_hrd  # Default
         this_vmachine = VMachine(vmachineguid)
         vrouter.name = vrouter_id.replace('_', ' ')
         vrouter.description = vrouter.name

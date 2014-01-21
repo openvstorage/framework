@@ -14,6 +14,7 @@ from celery.schedules import crontab
 from ovs.logging.logHandler import LogHandler
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.tools import Tools
+from ovs.dal.lists.vmachinelist import VMachineList
 
 memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
 nodes = memcache_ini.getValue('main', 'nodes').split(',')
@@ -23,8 +24,7 @@ rmq_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 
 nodes = rmq_ini.getValue('main', 'nodes').split(',')
 rmq_servers = map(lambda m: rmq_ini.getValue(m, 'location'), nodes)
 
-rmq_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'celery.cfg'))
-celery_nodes = rmq_ini.getValue('main', 'nodes').split(',')
+vsas = VMachineList.get_vsas()
 
 celery = Celery('ovs',
                 include=['ovs.lib.vdisk',
@@ -43,8 +43,8 @@ celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.ge
                                    for server in rmq_servers])
 celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
 queues = [Queue('ovs_generic', routing_key='generic.#')]
-for celery_node in celery_nodes:
-    queues.append(Queue('ovs_{0}'.format(celery_node), routing_key='vsa.{0}.#'.format(celery_node)))
+for vsa in vsas:
+    queues.append(Queue('ovs_{0}'.format(vsa.machineid), routing_key='vsa.{0}.#'.format(vsa.machineid)))
 celery.conf.CELERY_QUEUES = tuple(queues)
 celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
 celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'

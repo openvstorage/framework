@@ -39,8 +39,7 @@ class VolumeStorageRouter(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
         """
-        _vsr_client = VolumeStorageRouterClient().load(self.vpool.name)
-        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstats = VolumeStorageRouterClient().empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:

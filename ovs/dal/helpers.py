@@ -168,6 +168,9 @@ class Toolbox(object):
         """
         volatile = VolatileFactory.get_client()
         key = 'ovs_stats_cache_%s_%s' % (type, 'hit' if hit else 'miss')
-        successfull = volatile.incr(key)
-        if not successfull:
-            volatile.set(key, 1)
+        try:
+            successfull = volatile.incr(key)
+            if not successfull:
+                volatile.set(key, 1)
+        except:
+            pass

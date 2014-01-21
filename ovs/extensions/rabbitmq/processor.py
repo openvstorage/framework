@@ -88,7 +88,7 @@ def process(queue, body):
                 if options.get('execonvsa', False):
                     vsr = VolumeStorageRouterList.get_by_vsrid(data.node_id)
                     if vsr is not None:
-                        routing_key = 'vsa.{0}'.format(vsr.serving_vmachine.name)
+                        routing_key = 'vsa.{0}'.format(vsr.serving_vmachine.machineid)
                 delay = options.get('delay', 0)
                 dedupe = options.get('dedupe', False)
                 dedupe_key = options.get('dedupe_key', None)
@@ -102,16 +102,19 @@ def process(queue, body):
                         revoke(task_id)
                     async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
                     cache.set(key, async_result.id)  # Store the task id
+                    new_task_id = async_result.id
                 else:
-                    task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
+                    async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
+                    new_task_id = async_result.id
             else:
-                task.delay(**kwargs)
-            print '[{0}] mapped {1} to {2} with args {3} and route {4}. Delay: {5}s'.format(
+                async_result = task.delay(**kwargs)
+                new_task_id = async_result.id
+            print '[{0}] {1}({2}) started on {3} with taskid {4}. Delay: {5}s'.format(
                 queue,
-                str(data.type),
                 task.__name__,
                 json.dumps(kwargs),
                 routing_key,
+                new_task_id,
                 delay
             )
         else:

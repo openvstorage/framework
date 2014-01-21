@@ -41,8 +41,9 @@ class VDisk(DataObject):
         DataObject.__init__(self, *args, **kwargs)
         if self.vpool:
             self._frozen = False
-            self.vsr_client = VolumeStorageRouterClient().load(self.vpool.name)
+            self.vsr_client = VolumeStorageRouterClient().load(self.vpool.guid)
             self._frozen = True
+
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vDisk
@@ -69,15 +70,13 @@ class VDisk(DataObject):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
         """
-        if not self.vpool:
-            return {}
-        if self.volumeid:
+        if self.volumeid and self.vpool:
             try:
                 vdiskinfo = self.vsr_client.info_volume(str(self.volumeid))
             except:
-                vdiskinfo = self.vsr_client.empty_info()
+                vdiskinfo = VolumeStorageRouterClient().empty_info()
         else:
-            vdiskinfo = self.vsr_client.empty_info()
+            vdiskinfo = VolumeStorageRouterClient().empty_info()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -91,15 +90,13 @@ class VDisk(DataObject):
         """
         Fetches the Statistics for the vDisk.
         """
-        if not self.vpool:
-            return {}
-        if self.volumeid:
+        if self.volumeid and self.vpool:
             try:
                 vdiskstats = self.vsr_client.statistics_volume(str(self.volumeid))
             except:
-                vdiskstats = self.vsr_client.empty_statistics()
+                vdiskstats = VolumeStorageRouterClient().empty_statistics()
         else:
-            vdiskstats = self.vsr_client.empty_statistics()
+            vdiskstats = VolumeStorageRouterClient().empty_statistics()
 
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():

@@ -37,8 +37,7 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        _vsr_client = VolumeStorageRouterClient().load(self.name)
-        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstats = VolumeStorageRouterClient().empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:
