@@ -279,7 +279,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 type: 'GET',
                 contentType: 'application/jsonp',
                 dataType: 'jsonp',
-                timeout: 5000
+                timeout: 60000
             });
         };
         checkAndRedirect = function(node) {
