@@ -7,7 +7,7 @@ from volumedriver.storagerouter import storagerouterclient
 from ovs.plugin.provider.configuration import Configuration
 import json
 import os
-
+vsr_cache = {}
 
 class VolumeStorageRouterClient(object):
     """
@@ -22,18 +22,30 @@ class VolumeStorageRouterClient(object):
 
     def __init__(self):
         """
-        Initializes the wrapper given a configfile for the RPC communication
         """
-        self._host = Configuration.get('ovs.grid.ip')
-        self._port = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+        pass
 
-    def load(self):
+    def load(self, vpool_name):
         """
+        Initializes the wrapper given a vpool name for which it finds the corresponding vsr
         Loads and returns the client
         """
-        client = storagerouterclient.StorageRouterClient(self._host, self._port)
+
+        if vpool_name in vsr_cache:
+            return vsr_cache[vpool_name]
+        from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+        vsrs = [vsr for vsr in VolumeStorageRouterList.get_volumestoragerouters() if vsr.vpool.name == vpool_name]
+        if vsrs:
+            vsr = vsrs[0]
+        else:
+            raise ValueError('Cannot find vsr for vpool {0}'.format(vpool_name))
+        self._host = vsr.ip #Configuration.get('ovs.grid.ip')
+        self._port = vsr.port #int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+
+        client = storagerouterclient.StorageRouterClient(str(self._host), int(self._port))
         client.empty_statistics = lambda: storagerouterclient.Statistics()
         client.empty_info = lambda: storagerouterclient.VolumeInfo()
+        vsr_cache[vpool_name] = client
         return client
 
 

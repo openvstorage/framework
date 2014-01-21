@@ -23,7 +23,6 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from volumedriver.scrubber.scrubber import Scrubber
 
-_vsr_client = VolumeStorageRouterClient().load()
 _vsr_scrubber = Scrubber()
 
 
@@ -245,6 +244,7 @@ class ScheduledTaskController(object):
         total = 0
         failed = 0
         for vdisk in vdisks:
+            _vsr_client = VolumeStorageRouterClient().load(vdisk.vpool.name)
             work_units = _vsr_client.get_scrubbing_workunits(str(vdisk.volumeid))
             for work_unit in work_units:
                 try:

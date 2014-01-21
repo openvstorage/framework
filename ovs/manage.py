@@ -229,12 +229,20 @@ class Configure():
             vrouter = vrouters[0]
         else:
             vrouter = VolumeStorageRouter()
+        #make sure port is not already used
+        from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+        ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters()]
+        vrouter_port_in_hrd = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+        if vrouter_port_in_hrd in ports_used_in_model:
+            vrouter_port = Console.askInteger('Provide Volumedriver connection port (make sure port is not in use', max(ports_used_in_model) + 3)
+        else:
+            vrouter_port = vrouter_port_in_hrd #default
         this_vmachine = VMachine(vmachineguid)
         vrouter.name = vrouter_id.replace('_', ' ')
         vrouter.description = vrouter.name
         vrouter.vsrid = vrouter_id
         vrouter.ip = Configuration.get('ovs.grid.ip')
-        vrouter.port = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+        vrouter.port = vrouter_port
         vrouter.mountpoint = os.path.join(os.sep, 'mnt', vpool_name)
         vrouter.serving_vmachine = this_vmachine
         vrouter.vpool = this_vpool
@@ -321,8 +329,8 @@ class Control():
             Configure.init_nginx()
             self._start_package('openvstorage-webapps')
         vmachineguid = Configure.load_data()
+        Configure.init_storagerouter(vmachineguid, vpool_name)
         if not self._package_is_running('volumedriver'):
-            Configure.init_storagerouter(vmachineguid, vpool_name)
             self._start_package('volumedriver')
         vfs_info = os.statvfs('/mnt/{}'.format(vpool_name))
         vpool_size_bytes = vfs_info.f_blocks * vfs_info.f_bsize

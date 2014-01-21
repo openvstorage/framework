@@ -6,13 +6,11 @@ from ovs.dal.dataobject import DataObject
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import time
 
-_vsr_client = VolumeStorageRouterClient().load()
-
 
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
-    deploy vMachines. a vPool can span multiple VSRs and connetcs to a single Storage Backend.
+    deploy vMachines. a vPool can span multiple VSRs and connects to a single Storage Backend.
     """
     # pylint: disable=line-too-long
     _blueprint = {'name':               (None, str, 'Name of the vPool.'),
@@ -39,6 +37,7 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
+        _vsr_client = VolumeStorageRouterClient().load(self.name)
         vdiskstats = _vsr_client.empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():

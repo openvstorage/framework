@@ -9,8 +9,6 @@ from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouter
 import pickle
 import time
 
-_vsr_client = VolumeStorageRouterClient().load()
-
 
 class VDisk(DataObject):
     """
@@ -39,20 +37,25 @@ class VDisk(DataObject):
                'vsrid':      (60, str)}
     # pylint: enable=line-too-long
 
+    def __init__(self, *args, **kwargs):
+        DataObject.__init__(self, *args, **kwargs)
+        if self.vpool:
+            self._frozen = False
+            self.vsr_client = VolumeStorageRouterClient().load(self.vpool.name)
+            self._frozen = True
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vDisk
         """
-
         snapshots = []
-        if self.volumeid:
+        if self.volumeid and self.vpool:
             volumeid = str(self.volumeid)
             try:
-                voldrv_snapshots = _vsr_client.list_snapshots(volumeid)
+                voldrv_snapshots = self.vsr_client.list_snapshots(volumeid)
             except:
                 voldrv_snapshots = []
             for guid in voldrv_snapshots:
-                snapshot = _vsr_client.info_snapshot(volumeid, guid)
+                snapshot = self.vsr_client.info_snapshot(volumeid, guid)
                 # @todo: to be investigated howto handle during set as template
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
@@ -66,13 +69,15 @@ class VDisk(DataObject):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
         """
+        if not self.vpool:
+            return {}
         if self.volumeid:
             try:
-                vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
+                vdiskinfo = self.vsr_client.info_volume(str(self.volumeid))
             except:
-                vdiskinfo = _vsr_client.empty_info()
+                vdiskinfo = self.vsr_client.empty_info()
         else:
-            vdiskinfo = _vsr_client.empty_info()
+            vdiskinfo = self.vsr_client.empty_info()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -86,13 +91,15 @@ class VDisk(DataObject):
         """
         Fetches the Statistics for the vDisk.
         """
+        if not self.vpool:
+            return {}
         if self.volumeid:
             try:
-                vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+                vdiskstats = self.vsr_client.statistics_volume(str(self.volumeid))
             except:
-                vdiskstats = _vsr_client.empty_statistics()
+                vdiskstats = self.vsr_client.empty_statistics()
         else:
-            vdiskstats = _vsr_client.empty_statistics()
+            vdiskstats = self.vsr_client.empty_statistics()
 
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
