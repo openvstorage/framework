@@ -2,8 +2,8 @@
 /*global define */
 define([
     'plugins/router', 'jquery', 'knockout',
-    'ovs/generic'
-], function(router, $, ko, generic){
+    'ovs/generic', 'ovs/shared'
+], function(router, $, ko, generic, shared){
     "use strict";
     return function() {
         var self = this;
@@ -19,21 +19,21 @@ define([
 
         self.login = function(username, password) {
             return $.Deferred(function(deferred) {
-                var node = '', callData, cookie;
+                var callData, cookie;
                 callData = {
                     type: 'post',
                     data: ko.toJSON({
                         'username': username,
                         'password': password
                     }),
-                    contentType: 'application/json' + (node !== '' ? 'p' : ''),
+                    contentType: 'application/json',
                     headers: {}
                 };
                 cookie = generic.getCookie('csrftoken');
                 if (cookie !== undefined) {
                     callData.headers['X-CSRFToken'] = cookie;
                 }
-                $.ajax(node + '/api/auth/', callData)
+                $.ajax('/api/auth/', callData)
                     .done(function(result) {
                         var i, events = [];
                         self.token = result.token;
@@ -47,12 +47,16 @@ define([
                     })
                     .fail(function(xmlHttpRequest) {
                         // We check whether we actually received an error, and it's not the browser navigating away
-                        if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                        if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
+                            generic.validate(shared.nodes);
+                        } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                             self.token = undefined;
                             self.username(undefined);
                             self.password(undefined);
                             self.loggedIn(false);
                             deferred.reject();
+                        } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
+                            generic.validate(shared.nodes);
                         }
                     });
             }).promise();

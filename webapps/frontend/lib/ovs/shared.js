@@ -11,7 +11,8 @@ define(['knockout'], function(ko){
             language       : 'en-US',
             mode           : ko.observable('full'),
             routing        : undefined,
-            footerData     : ko.observable(ko.observable())
+            footerData     : ko.observable(ko.observable()),
+            nodes          : undefined
         };
     };
     return singleton();

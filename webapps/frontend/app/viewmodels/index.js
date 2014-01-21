@@ -54,7 +54,8 @@ define([
                     timeout: 5000
                 })
                 .done(function(nodes) {
-                    window.localStorage.setItem('nodes', JSON.stringify(nodes.vsa_ips));
+                    shared.nodes = nodes.vsa_ips;
+                    window.localStorage.setItem('nodes', JSON.stringify(shared.nodes));
                 });
         }
     };

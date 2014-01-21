@@ -6,7 +6,7 @@ define([
 ], function($, shared, generic) {
     'use strict';
     function call(api, data, filter, type) {
-        var querystring = [], key, node = '', callData, cookie, jqXhr,
+        var querystring = [], key, callData, cookie, jqXhr,
             deferred = $.Deferred();
 
         filter = filter || {};
@@ -20,7 +20,7 @@ define([
         callData = {
             type: type,
             timeout: 1000 * 60 * 60,
-            contentType: 'application/json' + (node !== '' ? 'p' : ''),
+            contentType: 'application/json',
             data: JSON.stringify(data),
             headers: { }
         };
@@ -31,12 +31,16 @@ define([
         if (shared.authentication.validate()) {
             callData.headers.Authorization = shared.authentication.header();
         }
-        jqXhr = $.ajax(node + '/api/internal/' + api + '/?' + querystring.join('&'), callData)
+        jqXhr = $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
             .done(deferred.resolve)
             .fail(function(xmlHttpRequest, textStatus, errorThrown) {
                 // We check whether we actually received an error, and it's not the browser navigating away
-                if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
+                    generic.validate(shared.nodes);
+                } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                     deferred.reject(xmlHttpRequest, textStatus, errorThrown);
+                } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
+                    generic.validate(shared.nodes);
                 }
             });
         return deferred.promise(jqXhr);

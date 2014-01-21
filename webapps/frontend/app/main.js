@@ -1,5 +1,5 @@
 ﻿// license see http://www.openvstorage.com/licenses/opensource/
-/*global requirejs, define */
+/*global requirejs, define, window */
 requirejs.config({
     paths: {
         'text'       : '../lib/require/text',
@@ -50,6 +50,10 @@ define([
         useCookie: false,
         useLocalStorage: false
     };
+
+    if (window.localStorage.hasOwnProperty('nodes') && window.localStorage.nodes !== null) {
+        shared.nodes = $.parseJSON(window.localStorage.nodes);
+    }
 
     i18n.init(i18nOptions, function() {
         app.title = $.t('ovs:title');

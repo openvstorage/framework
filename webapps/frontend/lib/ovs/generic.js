@@ -272,6 +272,33 @@ define(['jquery', 'jqp/pnotify'], function($) {
             return 0;
         });
     }
+    function validate(nodes) {
+        var i, node, check, checkAndRedirect;
+        check = function(node) {
+            return $.ajax(node + '/api/internal/generic/0/?format=jsonp&timestamp=' + (new Date().getTime()), {
+                type: 'GET',
+                contentType: 'application/jsonp',
+                dataType: 'jsonp',
+                timeout: 5000
+            });
+        };
+        checkAndRedirect = function(node) {
+            check(node)
+                .done(function() {
+                    window.location.href = node;
+                })
+                .fail(function() {
+                    // something
+                });
+        };
+        check('https://' + window.location.hostname)
+            .fail(function() {
+                for (i = 0; i < nodes.length; i += 1) {
+                    node = nodes[i];
+                    checkAndRedirect('https://' + node);
+                }
+            });
+    }
 
     return {
         getTimestamp    : getTimestamp,
@@ -298,6 +325,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         setDecimals     : setDecimals,
         crossFiller     : crossFiller,
         deg2rad         : deg2rad,
-        advancedSort    : advancedSort
+        advancedSort    : advancedSort,
+        validate        : validate
     };
 });
