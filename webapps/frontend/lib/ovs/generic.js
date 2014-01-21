@@ -249,14 +249,14 @@ define(['jquery', 'jqp/pnotify'], function($) {
         if (itemA !== undefined && itemB === undefined) {
             return 1;
         }
-        var regexAlpha = /[^a-zA-Z]/g,
-            regexNumber = /[^0-9]/g,
-            partA = itemA.replace(regexAlpha, ''),
-            partB = itemB.replace(regexAlpha, '');
-        if (partA === partB) {
+        var regexAlpha = /[\d]+/g,
+        regexNumber = /[^\d]+/g,
+        partA = itemA.replace(regexAlpha, ''),
+        partB = itemB.replace(regexAlpha, '');
+        if (partA == partB) {
             partA = parseInt(itemA.replace(regexNumber, ''), 10);
             partB = parseInt(itemB.replace(regexNumber, ''), 10);
-            return partA === partB ? 0 : (partA > partB ? 1 : -1);
+            return partA == partB ? 0 : (partA > partB ? 1 : -1);
         }
         return partA > partB ? 1 : -1;
     }
@@ -325,6 +325,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         setDecimals     : setDecimals,
         crossFiller     : crossFiller,
         deg2rad         : deg2rad,
+        numberSort      : numberSort,
         advancedSort    : advancedSort,
         validate        : validate
     };
