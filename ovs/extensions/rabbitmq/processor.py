@@ -66,8 +66,7 @@ def process(queue, body):
                    EventMessages.EventMessage.UpAndRunning:
                        {'property': 'up_and_running',
                         'task': VPoolController.mountpoint_available_from_voldrv,
-                        'arguments': {'mountpoint': 'mountpoint',
-                                      '[NODE_ID]': 'vsrid'},
+                        'arguments': {'mountpoint': 'mountpoint'},
                         'options': {'execonvsa': True}}}
 
         if data.type in mapping:

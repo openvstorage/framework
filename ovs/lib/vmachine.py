@@ -122,7 +122,7 @@ class VMachineController(object):
             raise
 
         try:
-            result = target_hv.create_vm_from_template(target_hv, name, source_vm, disks,
+            result = target_hv.create_vm_from_template(name, source_vm, disks,
                                                        esxhost=None, wait=True)
         except:
             VMachineController.delete(machineguid=new_vm.guid)
@@ -191,7 +191,7 @@ class VMachineController(object):
 
         hv = Factory.get(machine.pmachine)
         try:
-            result = hv.clone_vm(hv, machine.hypervisorid, name, disks, None, True)
+            result = hv.clone_vm(machine.hypervisorid, name, disks, None, True)
         except:
             VMachineController.delete(machineguid=new_machine.guid)
             raise
@@ -213,7 +213,7 @@ class VMachineController(object):
 
         if machine.pmachine:
             hv = Factory.get(machine.pmachine)
-            hv.delete_vm(hv, machine.hypervisorid, None, True)
+            hv.delete_vm(machine.hypervisorid, None, True)
 
         for disk in machine.vdisks:
             disk.delete()
