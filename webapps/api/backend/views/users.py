@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Module for users
 """
@@ -19,14 +32,14 @@ import hashlib
 
 class UserViewSet(viewsets.ViewSet):
     """
-    Manage users
+    Information about Users
     """
     permission_classes = (IsAuthenticated,)
 
     @staticmethod
     def _get_object(guid):
         """
-        Gets a user object, raises a 404 in case it doesn't exist
+        Gets a User object, raises a 404 in case the User doesn't exist
         """
         try:
             return User(guid)
@@ -37,7 +50,7 @@ class UserViewSet(viewsets.ViewSet):
     @required_roles(['view', 'system'])
     def list(self, request, format=None):
         """
-        Lists all available users
+        Lists all available Users
         """
         _ = request, format
         users = UserList.get_users()
@@ -48,8 +61,8 @@ class UserViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def retrieve(self, request, pk=None, format=None):
         """
-        Retreives a single user instance.
-        Only the currently logged in user is accessible, or all if the logged in user has a
+        Load information about a given User
+        Only the currently logged in User is accessible, or all if the logged in User has a
         system role
         """
         _ = format
@@ -64,7 +77,7 @@ class UserViewSet(viewsets.ViewSet):
     @required_roles(['view', 'create', 'system'])
     def create(self, request, format=None):
         """
-        Creates a user
+        Creates a User
         """
         _ = format
         serializer = FullSerializer(User, User(), request.DATA)
@@ -93,8 +106,8 @@ class UserViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def set_password(self, request, pk=None, format=None):
         """
-        Sets the password of a given user. A logged in user can only changes its own password,
-        or all passwords if he's member of a system role
+        Sets the password of a given User. A logged in User can only changes its own password,
+        or all passwords if the logged in User has a system role
         """
         _ = format
         user = UserViewSet._get_object(pk)

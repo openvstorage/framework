@@ -1,5 +1,3 @@
-# license see http://www.openvstorage.com/licenses/opensource/
-
 """
 PyDev script to trigger pythontidy code formatting on demand
 by pressing CTRL + 2 and pt

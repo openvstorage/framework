@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VMachine module
 """
@@ -82,7 +95,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_vsas(self, request, obj):
         """
-        Returns list of VSA machine guids
+        Returns a list of VSA vMachine guids
         """
         _ = request
         vsa_vmachine_guids = []
@@ -118,7 +131,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_vpools(self, request, obj):
         """
-        Returns the vpool guids associated with the given VM
+        Returns the vPool guid(s) associated with the given vMachine
         """
         _ = request
         vpool_guids = []
@@ -132,7 +145,7 @@ class VMachineViewSet(viewsets.ViewSet):
     @validate(VMachine)
     def get_children(self, request, obj):
         """
-        Returns list of children vmachines guids
+        Returns a list of vMachines guid(s) of children of a given vMachine
         """
         _ = request
         children_vmachine_guids = set()
