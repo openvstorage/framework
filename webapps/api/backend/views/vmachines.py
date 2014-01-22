@@ -96,6 +96,26 @@ class VMachineViewSet(viewsets.ViewSet):
     @expose(internal=True)
     @required_roles(['view'])
     @validate(VMachine)
+    def get_served_children(self, request, obj):
+        """
+        Returns set of served vpool guids and (indirectly) served vmachine guids
+        """
+        _ = request
+        vpool_guids = set()
+        vmachine_guids = set()
+        if obj.is_internal is False:
+            raise Http404
+        for vsr in obj.served_vsrs:
+            vpool_guids.add(vsr.vpool_guid)
+            for vdisk in vsr.vpool.vdisks:
+                vmachine_guids.add(vdisk.vmachine_guid)
+        return Response({'vpool_guids': list(vpool_guids),
+                         'vmachine_guids': list(vmachine_guids)}, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
     def get_vpools(self, request, obj):
         """
         Returns the vpool guids associated with the given VM

@@ -12,12 +12,13 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.loading = ko.observable(false);
-        self.loaded  = ko.observable(false);
+        self.loading   = ko.observable(false);
+        self.loaded    = ko.observable(false);
 
-        self.guid   = ko.observable(guid);
-        self.name   = ko.observable();
-        self.hvtype = ko.observable();
+        self.guid      = ko.observable(guid);
+        self.name      = ko.observable();
+        self.ipAddress = ko.observable();
+        self.hvtype    = ko.observable();
 
         self.load = function() {
             return $.Deferred(function(deferred) {
@@ -26,6 +27,7 @@ define([
                     .done(function(data) {
                         self.name(data.name);
                         self.hvtype(data.hvtype);
+                        self.ipAddress(data.ip);
 
                         self.loaded(true);
                         deferred.resolve();

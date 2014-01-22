@@ -1,6 +1,6 @@
 {
     "generic": {
-        "status": {
+        "states": {
             "vsa": {
                 "ok": "Online",
                 "nok": "Offline",
@@ -20,6 +20,11 @@
             "errorwhile": "An error occurred while __what__.",
             "errorwhile_error": "An error occurred while __what__: __error__",
             "notrunningrequired": "vMachine should be halted."
+        },
+        "hypervisors": {
+            "VMWARE": "VMware",
+            "HYPERV": "HyperV",
+            "XEN": "Xen"
         },
         "username": "Username",
         "password": "Password",
@@ -66,7 +71,9 @@
         "vmachines": "vMachines",
         "machines": "Machines",
         "vpool": "vPool",
+        "vpools": "vPools",
         "vsa": "VSA",
+        "vsas": "VSAs",
         "children": "Children",
         "storeddata": "Stored data",
         "topstoreddata": "Top Stored Data",
@@ -95,7 +102,18 @@
         "thousandseparator": ",",
         "finished": "Finished",
         "consistentss": "Consistent snapshots",
-        "inconsistentss": "Inconsistent snapshots"
+        "inconsistentss": "Inconsistent snapshots",
+        "status": "Status",
+        "host": "Host",
+        "type": "Type"
+    },
+    "vsas": {
+        "title": "VSAs",
+        "details": "VSA Details",
+        "detail": {
+            "title": "VSA",
+            "hostip": "Host IP"
+        }
     },
     "vpools" : {
         "title": "vPools",

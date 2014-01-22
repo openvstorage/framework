@@ -23,7 +23,6 @@ class VMachine(DataObject):
                   'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
                   'ip':           (None,  str,  'IP Address of the vMachine, if available'),
-                  'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.'),
                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
     _relations = {'pmachine': (PMachine, 'vmachines')}
     _expiry = {'snapshots':          (60, list),
@@ -78,7 +77,11 @@ class VMachine(DataObject):
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
-        for disk in self.vdisks:
+        vdisks = self.vdisks
+        if self.is_internal:
+            for vsr in self.served_vsrs:
+                vdisks += vsr.vpool.vdisks
+        for disk in vdisks:
             statistics = disk._statistics()  # Prevent double caching
             for key in vdiskstatsdict.iterkeys():
                 vdiskstatsdict[key] += statistics[key]
@@ -89,7 +92,11 @@ class VMachine(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
-        return sum([disk.info['stored'] for disk in self.vdisks])
+        vdisks = self.vdisks
+        if self.is_internal:
+            for vsr in self.served_vsrs:
+                vdisks += vsr.vpool.vdisks
+        return sum([disk.info['stored'] for disk in vdisks])
 
     def _failover_mode(self):
         """
@@ -97,7 +104,11 @@ class VMachine(DataObject):
         """
         status = 'UNKNOWN'
         status_code = 0
-        for disk in self.vdisks:
+        vdisks = self.vdisks
+        if self.is_internal:
+            for vsr in self.served_vsrs:
+                vdisks += vsr.vpool.vdisks
+        for disk in vdisks:
             mode = disk.info['failover_mode']
             current_status_code = VolumeStorageRouterClient.FOC_STATUS[mode.lower()]
             if current_status_code > status_code:

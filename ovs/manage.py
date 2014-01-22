@@ -78,7 +78,6 @@ class Configure():
         pmachine.save()
         vmachine.name = hostname
         vmachine.machineid = Configuration.get('ovs.core.uniqueid')
-        vmachine.hvtype = Configuration.get('ovs.host.hypervisor')
         vmachine.is_vtemplate = False
         vmachine.is_internal = True
         vmachine.ip = Configuration.get('ovs.grid.ip')

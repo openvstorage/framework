@@ -10,6 +10,8 @@ define(['jquery', 'ovs/generic'], function($, generic){
     ];
     siteRoutes = [
         { route: '',            moduleId: 'dashboard',    title: $.t('ovs:dashboard.title'),     titlecode: 'ovs:dashboard.title',     nav: false },
+        { route: 'vsas',        moduleId: 'vsas',         title: $.t('ovs:vsas.title'),          titlecode: 'ovs:vsas.title',          nav: true  },
+        { route: 'vsa/:guid',   moduleId: 'vsa-detail',   title: $.t('ovs:vsas.detail.title'),   titlecode: 'ovs:vsas.detail.title',   nav: false },
         { route: 'vpools',      moduleId: 'vpools',       title: $.t('ovs:vpools.title'),        titlecode: 'ovs:vpools.title',        nav: true  },
         { route: 'vpool/:guid', moduleId: 'vpool-detail', title: $.t('ovs:vpools.detail.title'), titlecode: 'ovs:vpools.detail.title', nav: false },
         { route: 'vmachines',   moduleId: 'vmachines',    title: $.t('ovs:vmachines.title'),     titlecode: 'ovs:vmachines.title',     nav: true  },

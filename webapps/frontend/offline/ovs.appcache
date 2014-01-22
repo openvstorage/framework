@@ -19,4 +19,4 @@ NETWORK:
 *
 
 FALLBACK:
-/ /offline/offline.html
+/index.html /offline/offline.html

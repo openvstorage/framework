@@ -41,7 +41,7 @@
                                              red: failoverMode() == 'degraded'
                                          },
                                          defaultColor: 'lightgrey'
-                                     }, tooltip: 'ovs:generic.status.foc.' + failoverMode()"></span>
+                                     }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
                 </td>
                 <td>
                     <i data-bind="click: function() { $root.rollback($data.guid()); }, style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : 'black' },

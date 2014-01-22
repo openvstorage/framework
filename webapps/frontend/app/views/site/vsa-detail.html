@@ -1,0 +1,71 @@
+﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<section data-bind="with: VSA()">
+	<ol class="breadcrumb">
+	    <li class="active" data-bind="text: name"></li>
+	</ol>
+    <h2><span data-i18n="ovs:vsas.detail.title"></span>: <span data-bind="text: name"></span></h2>
+    <p data-i18n="ovs:vsas.detail.introduction"></p>
+    <table style="width: 100%;">
+        <thead>
+            <tr>
+                <th data-i18n="ovs:vsas.details" colspan="2"></th>
+                <th data-i18n="ovs:vsas.statistics" colspan="2"></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="width: 15%;" data-i18n="ovs:generic.ip"></td>
+                <td style="width: 35%;"><span data-bind="text: ipAddress"></span></td>
+                <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
+                <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.host"></td>
+                <td>
+                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                        <span data-part="lazy-entry" data-bind="text: item().name()"></span>
+                    </span>
+                </td>
+                <td data-i18n="ovs:generic.cache"></td>
+                <td><span data-bind="text: cacheRatio"></span></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:vsas.detail.hostip"></td>
+                <td>
+                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                        <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
+                    </span>
+                </td>
+                <td data-i18n="ovs:generic.iops"></td>
+                <td data-bind="lazyloader: { item: iops }"></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.type"></td>
+                <td>
+                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                        <span data-part="lazy-entry" class="pointer"
+                              data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
+                    </span>
+                </td>
+                <td data-i18n="ovs:generic.readspeed"></td>
+                <td data-bind="lazyloader: { item: readSpeed }"></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.vpools"></td>
+                <td><span data-bind="text: vpools().length"></span></td>
+                <td data-i18n="ovs:generic.writespeed"></td>
+                <td data-bind="lazyloader: { item: writeSpeed }"></td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.vmachines"></td>
+                <td><span data-bind="text: vMachines().length"></span></td>
+                <td colspan="2">&nbsp;</td>
+            </tr>
+            <tr>
+                <td data-i18n="ovs:generic.vdisks"></td>
+                <td><span data-bind="text: vDisks().length"></span></td>
+                <td colspan="2">&nbsp;</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
