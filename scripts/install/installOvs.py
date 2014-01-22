@@ -303,12 +303,13 @@ configuration['openvstorage-core']['ovs.core.rabbitmq.localnode.name'] = unique_
 configuration['openvstorage-webapps'] = {}
 configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_integer('GUI certificate lifetime', min_value=1, max_value=365 * 10, default_value=365)
 
-configuration['elasticsearch'] = {}
-configuration['elasticsearch']['elasticsearch.cluster.name'] = ask_string('Enter elastic search cluster name', default_value='ovses')
-
 configuration['grid'] = {}
 configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=1, max_value=32767)
 configuration['grid']['grid.node.roles'] = 'node'
+
+es_cluster_name = ask_string('Enter elastic search cluster name', default_value='ovses')
+configuration['elasticsearch'] = {}
+configuration['elasticsearch']['elasticsearch.cluster.name'] = '{0}_{1}'.format(es_cluster_name, configuration['grid']['grid.id'])
 
 configuration['grid_master'] = {}
 configuration['grid_master']['gridmaster.grid.id'] = configuration['grid']['grid.id']
