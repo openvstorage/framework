@@ -15,7 +15,6 @@ class GenericViewSet(viewsets.ViewSet):
     """
     Generic
     """
-    permission_classes = (IsAuthenticated,)
 
     @expose(internal=True)
     def list(self, request, format=None):
