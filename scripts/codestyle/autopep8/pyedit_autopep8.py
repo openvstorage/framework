@@ -1,5 +1,3 @@
-# license see http://www.openvstorage.com/licenses/opensource/
-
 """
 PyDev script to trigger autopep8 code formatting on demand
 by pressing CTRL + 2 and p8
