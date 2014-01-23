@@ -482,10 +482,18 @@ class DataObject(object):
         Delete the given object. It also invalidates certain lists
         """
         # Invalidate no-filter queries/lists pointing to this object
-        cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
-        if '__all' in cache_list.keys():
-            for list_key in cache_list['__all']:
-                self._volatile.delete(list_key)
+        try:
+            self._mutex_listcache.acquire(10)
+            cache_key = '%s_%s' % (DataList.cachelink, self._name)
+            cache_list = Toolbox.try_get(cache_key, {})
+            if '__all' in cache_list.keys():
+                for list_key in cache_list['__all']:
+                    self._volatile.delete(list_key)
+                del cache_list['__all']
+                self._volatile.set(cache_key, cache_list)
+                self._persistent.set(cache_key, cache_list)
+        finally:
+            self._mutex_listcache.release()
 
         # Delete the object out of the persistent store
         try:

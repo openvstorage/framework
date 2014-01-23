@@ -81,6 +81,7 @@ class DataList(object):
         self._invalidation = {}
         self.data = None
         self.from_cache = False
+        self._can_cache = True
         self._load()
 
     def _exec_and(self, instance, items):
@@ -134,6 +135,8 @@ class DataList(object):
         itemcounter = 0
         for pitem in path:
             itemcounter += 1
+            if pitem in value.__class__._expiry:
+                self._can_cache = False
             self._add_invalidation(value.__class__.__name__.lower(), pitem)
             target_class = value._relations.get(pitem, None)
             value = getattr(value, pitem)
@@ -218,8 +221,8 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
-            if self._key is not None and len(keys) > 0:
-                self._volatile.set(self._key, self.data)
+            if self._key is not None and len(keys) > 0 and self._can_cache:
+                self._volatile.set(self._key, self.data, 600)
                 self._update_listinvalidation()
         else:
             Toolbox.log_cache_hit('datalist', True)

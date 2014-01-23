@@ -893,3 +893,26 @@ class Basic(TestCase):
 
         disk1.delete()
         machine.delete()
+
+    def test_querydynamic(self):
+        """
+        Validates whether a query that queried dynamic properties is never cached
+        """
+        def get_disks():
+            return DataList({'object': TestDisk,
+                             'data': DataList.select.DESCRIPTOR,
+                             'query': {'type': DataList.where_operator.AND,
+                                       'items': [('used_size', DataList.operator.NOT_EQUALS, -1)]}})
+        disk1 = TestDisk()
+        disk1.size = 100
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.size = 100
+        disk2.save()
+        query_result = get_disks()
+        self.assertEqual(len(query_result.data), 2, 'There should be 2 disks')
+        self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
+        query_result = get_disks()
+        self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
+        disk1.delete()
+        disk2.delete()

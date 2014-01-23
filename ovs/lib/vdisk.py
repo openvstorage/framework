@@ -107,7 +107,7 @@ class VDiskController(object):
             limit -= 1
             disk = VDiskList.get_vdisk_by_volumeid(volumename)
         if disk is None:
-            raise RuntimeError('Disk with devicename {} could not be found'.format(volumename))
+            raise RuntimeError('Disk with volumeid {} could not be found'.format(volumename))
         logging.info('Resize disk {} from {} to {}'.format(disk.name if disk.name else volumename,
                                                            disk.size,
                                                            volumesize))
