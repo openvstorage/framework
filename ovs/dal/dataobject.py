@@ -159,7 +159,8 @@ class DataObject(object):
                 try:
                     self._data = self._persistent.get(self._key)
                 except KeyNotFoundException:
-                    raise ObjectNotFoundException()
+                    raise ObjectNotFoundException('%s with guid \'%s\' could not be found' %
+                                                  (self.__class__.__name__, self._guid))
             else:
                 Toolbox.log_cache_hit('object_load', True)
                 self._metadata['cache'] = True
