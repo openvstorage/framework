@@ -98,7 +98,7 @@ class Configure():
         vmachine.pmachine = pmachine
         vmachine.save()
 
-        #@todo sync version number from master node
+        # @todo sync version number from master node
         if master == None:
             from ovs.extensions.migration.migration import Migration
             Migration.migrate()
@@ -196,7 +196,7 @@ class Configure():
         volumedriver_local_filesystem = Configuration.get('volumedriver.backend.mountpoint', checkExists=True)
         backend_config = {}
         if volumedriver_backend_type == 'LOCAL':
-            if not volumedriver_loca_filesystem:
+            if not volumedriver_local_filesystem:
                 volumedriver_local_filesystem = Console.askChoice(filesystems, 'Select mountpoint for local backend')
             backend_config = {'local_connection_path': volumedriver_local_filesystem}
         elif volumedriver_backend_type == 'REST':
@@ -247,9 +247,14 @@ class Configure():
         this_vpool.name = vpool_name
         this_vpool.description = "{} {}".format(volumedriver_backend_type, vpool_name)
         this_vpool.backend_type = volumedriver_backend_type
-        this_vpool.backend_connection = '{}:{}'.format(connection_host, connection_port) if connection_port else connection_host
-        this_vpool.backend_login = connection_username
-        this_vpool.backend_password = connection_password
+        if not connection_host:
+            this_vpool.backend_connection = None
+            this_vpool.backend_login = None
+            this_vpool.backend_password = None
+        else:
+            this_vpool.backend_connection = '{}:{}'.format(connection_host, connection_port)
+            this_vpool.backend_login = connection_username
+            this_vpool.backend_password = connection_password
         this_vpool.save()
         vrouters = filter(lambda v: v.vsrid == vrouter_id, this_vpool.vsrs)
 
@@ -375,7 +380,7 @@ class Control():
             this_vpool.size = vpool_size_bytes
             this_vpool.save()
             Configure.init_exportfs(vpool_name)
-            
+
             mount_vpool = Configuration.get('volumedriver.vpool.mount', checkExists=True)
             if not mount_vpool:
                 mount_vpool = Console.askYesNo('Do you want to mount the vPool?')
