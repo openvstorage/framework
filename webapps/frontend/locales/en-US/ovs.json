@@ -232,7 +232,7 @@
         "title": "Login",
         "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
         "invalidcredentials": "The username/password combination were invalid or could not be validated.",
-        "welcome": "Use the navigation to browse trough the interface."
+        "welcome": "Use the navigation to browse through the interface."
     },
     "notfound": {
         "title": "Page not found",
