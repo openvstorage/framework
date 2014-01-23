@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Wrapper class for the storagerouterclient of the voldrv team
 """
@@ -7,6 +20,8 @@ from volumedriver.storagerouter import storagerouterclient
 from ovs.plugin.provider.configuration import Configuration
 import json
 import os
+
+vsr_cache = {}
 
 
 class VolumeStorageRouterClient(object):
@@ -22,18 +37,31 @@ class VolumeStorageRouterClient(object):
 
     def __init__(self):
         """
-        Initializes the wrapper given a configfile for the RPC communication
+        Init method
         """
-        self._host = Configuration.get('ovs.grid.ip')
-        self._port = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+        self._host = None
+        self._port = None
+        self.empty_statistics = lambda: storagerouterclient.Statistics()
+        self.empty_info = lambda: storagerouterclient.VolumeInfo()
 
-    def load(self):
+    def load(self, vpool_guid):
         """
+        Initializes the wrapper given a vpool name for which it finds the corresponding vsr
         Loads and returns the client
         """
-        client = storagerouterclient.StorageRouterClient(self._host, self._port)
-        client.empty_statistics = lambda: storagerouterclient.Statistics()
-        client.empty_info = lambda: storagerouterclient.VolumeInfo()
+
+        if vpool_guid in vsr_cache:
+            return vsr_cache[vpool_guid]
+        from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+        vsrs = [vsr for vsr in VolumeStorageRouterList.get_volumestoragerouters() if vsr.vpool_guid == vpool_guid]
+        if vsrs:
+            vsr = vsrs[0]
+        else:
+            raise ValueError('Cannot find vsr for vpool {0}'.format(vpool_guid))
+        self._host = vsr.ip
+        self._port = vsr.port
+        client = storagerouterclient.StorageRouterClient(str(self._host), int(self._port))
+        vsr_cache[vpool_guid] = client
         return client
 
 

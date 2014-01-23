@@ -1,4 +1,16 @@
-// license see http://www.openvstorage.com/licenses/opensource/
+// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define([
     'jquery', 'knockout',
@@ -10,24 +22,28 @@ define([
         var self = this;
 
         // Variables
-        self.loadVDisksHandle = undefined;
-        self.loadVSAGuid      = undefined;
-        self.loadHandle       = undefined;
-        self.loadVpoolGuid    = undefined;
-        self.loadChildrenGuid = undefined;
+        self.loadVDisksHandle  = undefined;
+        self.loadVSAGuid       = undefined;
+        self.loadHandle        = undefined;
+        self.loadVpoolGuid     = undefined;
+        self.loadChildrenGuid  = undefined;
+        self.loadSChildrenGuid = undefined;
 
         // External dependencies
         self.vsas             = ko.observableArray([]);
         self.vpools           = ko.observableArray([]);
+        self.vMachines        = ko.observableArray([]);
+        self.pMachine         = ko.observable();
 
         // Observables
         self.loading          = ko.observable(false);
         self.loaded           = ko.observable(false);
 
         self.guid             = ko.observable(guid);
-        self.vpool            = ko.observable();
         self.vsaGuids         = [];
         self.vPoolGuids       = [];
+        self.vMachineGuids    = [];
+        self.pMachineGuid     = ko.observable();
         self.name             = ko.observable();
         self.hypervisorStatus = ko.observable();
         self.ipAddress        = ko.observable();
@@ -83,6 +99,18 @@ define([
                 self.loadVSAGuid = api.get('vmachines/' + self.guid() + '/get_vsas')
                     .done(function(data) {
                         self.vsaGuids = data;
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise();
+        };
+        self.fetchServedChildren = function() {
+            return $.Deferred(function(deferred) {
+                generic.xhrAbort(self.loadSChildrenGuid);
+                self.loadSChildrenGuid = api.get('vmachines/' + self.guid() + '/get_served_children')
+                    .done(function(data) {
+                        self.vPoolGuids = data.vpool_guids;
+                        self.vMachineGuids = data.vmachine_guids;
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
@@ -158,6 +186,7 @@ define([
                             self.snapshots(data.snapshots);
                             self.status(data.status.toLowerCase());
                             self.failoverMode(data.failover_mode.toLowerCase());
+                            self.pMachineGuid(data.pmachine_guid);
 
                             self.snapshots.sort(function(a, b) {
                                 // Newest first

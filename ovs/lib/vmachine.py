@@ -1,10 +1,22 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VMachine module
 """
 import time
 import logging
-import uuid
 
 from celery import group
 from ovs.celery import celery
@@ -117,18 +129,17 @@ class VMachineController(object):
                 )
                 disks.append(result)
                 print 'disk appended: {0}'.format(result)
-        except Exception as ex:
-            for disk in disks:
-                # @todo cleanup strategy to be defined
-                pass
+        except Exception:
+            # @todo cleanup strategy to be defined
             new_vm.delete()
             raise
 
-        provision_machine_task = target_hv.create_vm_from_template.s(
-            target_hv, name, source_vm, disks, esxhost=None, wait=True
-        )
-        provision_machine_task.link_error(VMachineController.delete.s(machineguid=new_vm.guid))
-        result = provision_machine_task()
+        try:
+            result = target_hv.create_vm_from_template(name, source_vm, disks,
+                                                       esxhost=None, wait=True)
+        except:
+            VMachineController.delete(machineguid=new_vm.guid)
+            raise
 
         new_vm.hypervisorid = result
         new_vm.status = 'SYNC'
@@ -192,15 +203,13 @@ class VMachineController(object):
             new_disk_guids.append(result['diskguid'])
 
         hv = Factory.get(machine.pmachine)
-        provision_machine_task = hv.clone_vm.s(
-            hv, machine.hypervisorid, name, disks, None, True
-        )
-        provision_machine_task.link_error(
-            VMachineController.delete.s(machineguid=new_machine.guid)
-        )
-        result = provision_machine_task()
+        try:
+            result = hv.clone_vm(machine.hypervisorid, name, disks, None, True)
+        except:
+            VMachineController.delete(machineguid=new_machine.guid)
+            raise
 
-        new_machine.hypervisorid = result.get()
+        new_machine.hypervisorid = result
         new_machine.save()
         return new_machine.guid
 
@@ -217,9 +226,7 @@ class VMachineController(object):
 
         if machine.pmachine:
             hv = Factory.get(machine.pmachine)
-            delete_vmachine_task = hv.delete_vm.s(
-                hv, machine.hypervisorid, None, True)
-            delete_vmachine_task()
+            hv.delete_vm(machine.hypervisorid, None, True)
 
         for disk in machine.vdisks:
             disk.delete()
@@ -360,7 +367,8 @@ class VMachineController(object):
             for disk in machine.vdisks:
                 snapshots[disk.guid] = VDiskController.create_snapshot(diskguid=disk.guid,
                                                                        metadata=metadata)
-        except:
+        except Exception as ex:
+            logging.info('Error snapshotting disk {0}: {1}'.format(disk.name, str(ex)))
             success = False
             for diskguid, snapshotid in snapshots.iteritems():
                 VDiskController.delete_snapshot(diskguid=diskguid,

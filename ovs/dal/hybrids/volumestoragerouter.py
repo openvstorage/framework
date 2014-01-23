@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VolumeStorageRouter module
 """
@@ -7,8 +20,6 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import time
-
-_vsr_client = VolumeStorageRouterClient().load()
 
 
 class VolumeStorageRouter(DataObject):
@@ -41,7 +52,7 @@ class VolumeStorageRouter(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the VSR.
         """
-        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstats = VolumeStorageRouterClient().empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:

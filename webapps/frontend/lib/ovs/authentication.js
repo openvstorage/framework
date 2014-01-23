@@ -1,9 +1,21 @@
-// license see http://www.openvstorage.com/licenses/opensource/
+// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define([
     'plugins/router', 'jquery', 'knockout',
-    'ovs/generic'
-], function(router, $, ko, generic){
+    'ovs/generic', 'ovs/shared'
+], function(router, $, ko, generic, shared){
     "use strict";
     return function() {
         var self = this;
@@ -19,16 +31,17 @@ define([
 
         self.login = function(username, password) {
             return $.Deferred(function(deferred) {
-                var callData = {
-                        type: 'post',
-                        data: ko.toJSON({
-                            'username': username,
-                            'password': password
-                        }),
-                        contentType: 'application/json',
-                        headers: {}
-                    },
-                    cookie = generic.getCookie('csrftoken');
+                var callData, cookie;
+                callData = {
+                    type: 'post',
+                    data: ko.toJSON({
+                        'username': username,
+                        'password': password
+                    }),
+                    contentType: 'application/json',
+                    headers: {}
+                };
+                cookie = generic.getCookie('csrftoken');
                 if (cookie !== undefined) {
                     callData.headers['X-CSRFToken'] = cookie;
                 }
@@ -46,12 +59,16 @@ define([
                     })
                     .fail(function(xmlHttpRequest) {
                         // We check whether we actually received an error, and it's not the browser navigating away
-                        if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
+                        if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
+                            generic.validate(shared.nodes);
+                        } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                             self.token = undefined;
                             self.username(undefined);
                             self.password(undefined);
                             self.loggedIn(false);
                             deferred.reject();
+                        } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
+                            generic.validate(shared.nodes);
                         }
                     });
             }).promise();

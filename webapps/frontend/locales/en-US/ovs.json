@@ -1,6 +1,21 @@
 {
+    "license": [
+        "Copyright 2014 CloudFounders NV",
+        "",
+        "Licensed under the Apache License, Version 2.0 (the \"License\");",
+        "you may not use this file except in compliance with the License.",
+        "You may obtain a copy of the License at",
+        "",
+        "    http://www.apache.org/licenses/LICENSE-2.0",
+        "",
+        "Unless required by applicable law or agreed to in writing, software",
+        "distributed under the License is distributed on an \"AS IS\" BASIS,",
+        "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.",
+        "See the License for the specific language governing permissions and",
+        "limitations under the License."
+    ],
     "generic": {
-        "status": {
+        "states": {
             "vsa": {
                 "ok": "Online",
                 "nok": "Offline",
@@ -20,6 +35,11 @@
             "errorwhile": "An error occurred while __what__.",
             "errorwhile_error": "An error occurred while __what__: __error__",
             "notrunningrequired": "vMachine should be halted."
+        },
+        "hypervisors": {
+            "VMWARE": "VMware",
+            "HYPERV": "HyperV",
+            "XEN": "Xen"
         },
         "username": "Username",
         "password": "Password",
@@ -66,7 +86,9 @@
         "vmachines": "vMachines",
         "machines": "Machines",
         "vpool": "vPool",
+        "vpools": "vPools",
         "vsa": "VSA",
+        "vsas": "VSAs",
         "children": "Children",
         "storeddata": "Stored data",
         "topstoreddata": "Top Stored Data",
@@ -95,7 +117,18 @@
         "thousandseparator": ",",
         "finished": "Finished",
         "consistentss": "Consistent snapshots",
-        "inconsistentss": "Inconsistent snapshots"
+        "inconsistentss": "Inconsistent snapshots",
+        "status": "Status",
+        "host": "Host",
+        "type": "Type"
+    },
+    "vsas": {
+        "title": "VSAs",
+        "details": "VSA Details",
+        "detail": {
+            "title": "VSA",
+            "hostip": "Host IP"
+        }
     },
     "vpools" : {
         "title": "vPools",

@@ -1,4 +1,16 @@
-﻿// license see http://www.openvstorage.com/licenses/opensource/
+﻿// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define([
     'knockout', 'jquery',
@@ -113,40 +125,44 @@ define([
         self.topVpoolModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
         self.topVPoolMode  = ko.observable('topstoreddata');
         self.topVPools     = ko.computed(function() {
-            var vpools = [], i;
+            var vpools = [], result, i;
             self.vpools.sort(function(a, b) {
                 if (self.topVPoolMode() === 'topstoreddata') {
-                    return ((b.storedData.raw() || 0) - (a.storedData.raw() || 0));
+                    result = (b.storedData.raw() || 0) - (a.storedData.raw() || 0);
+                    return (result !== 0 ? result : generic.numberSort(a.name(), b.name()));
                 }
-                return (
+                result = (
                     ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0)) -
                     ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0))
                 );
+                return (result !== 0 ? result : generic.numberSort(a.name(), b.name()));
             });
             for (i = 0; i < Math.min(self.topItems, self.vpools().length); i += 1) {
                 vpools.push(self.vpools()[i]);
             }
             return vpools;
-        }).extend({ delay: 250 });
+        }).extend({ delay: 500 });
 
         self.topVmachineModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
         self.topVmachineMode  = ko.observable('topstoreddata');
         self.topVmachines     = ko.computed(function() {
-            var vmachines = [], i;
+            var vmachines = [], result, i;
             self.vmachines.sort(function(a, b) {
                 if (self.topVmachineMode() === 'topstoreddata') {
-                    return ((b.storedData.raw() || 0) - (a.storedData.raw() || 0) );
+                    result = (b.storedData.raw() || 0) - (a.storedData.raw() || 0);
+                    return (result !== 0 ? result : generic.numberSort(a.name(), b.name()));
                 }
-                return (
+                result = (
                     ((b.writeSpeed.raw() || 0) + (b.readSpeed.raw() || 0)) -
                     ((a.writeSpeed.raw() || 0) + (a.readSpeed.raw() || 0))
                 );
+                return (result !== 0 ? result : generic.numberSort(a.name(), b.name()));
             });
             for (i = 0; i < Math.min(self.topItems, self.vmachines().length); i += 1) {
                 vmachines.push(self.vmachines()[i]);
             }
             return vmachines;
-        }).extend({ delay: 250 });
+        }).extend({ delay: 500 });
 
         // Functions
         self.load = function() {

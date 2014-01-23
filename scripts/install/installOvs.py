@@ -1,4 +1,18 @@
 #!/usr/bin/env python
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import sys
 import urllib2
@@ -298,16 +312,18 @@ mountpoint = ask_choice(mountpoints, question='Select metadata mountpoint', defa
 mountpoints.remove(mountpoint)
 configuration['openvstorage-core']['volumedriver.metadata'] = mountpoint
 configuration['openvstorage-core']['volumedriver.arakoon.node.name'] = unique_id
+configuration['openvstorage-core']['ovs.core.rabbitmq.localnode.name'] = unique_id
 
 configuration['openvstorage-webapps'] = {}
 configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_integer('GUI certificate lifetime', min_value=1, max_value=365 * 10, default_value=365)
 
-configuration['elasticsearch'] = {}
-configuration['elasticsearch']['elasticsearch.cluster.name'] = ask_string('Enter elastic search cluster name', default_value='ovses')
-
 configuration['grid'] = {}
 configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=1, max_value=32767)
 configuration['grid']['grid.node.roles'] = 'node'
+
+es_cluster_name = ask_string('Enter elastic search cluster name', default_value='ovses')
+configuration['elasticsearch'] = {}
+configuration['elasticsearch']['elasticsearch.cluster.name'] = '{0}_{1}'.format(es_cluster_name, configuration['grid']['grid.id'])
 
 configuration['grid_master'] = {}
 configuration['grid_master']['gridmaster.grid.id'] = configuration['grid']['grid.id']

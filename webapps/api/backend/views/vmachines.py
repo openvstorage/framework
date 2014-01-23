@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VMachine module
 """
@@ -91,6 +104,26 @@ class VMachineViewSet(viewsets.ViewSet):
                 vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
                 vsa_vmachine_guids.append(vsr.serving_vmachine.guid)
         return Response(vsa_vmachine_guids, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    def get_served_children(self, request, obj):
+        """
+        Returns set of served vpool guids and (indirectly) served vmachine guids
+        """
+        _ = request
+        vpool_guids = set()
+        vmachine_guids = set()
+        if obj.is_internal is False:
+            raise Http404
+        for vsr in obj.served_vsrs:
+            vpool_guids.add(vsr.vpool_guid)
+            for vdisk in vsr.vpool.vdisks:
+                vmachine_guids.add(vdisk.vmachine_guid)
+        return Response({'vpool_guids': list(vpool_guids),
+                         'vmachine_guids': list(vmachine_guids)}, status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True)

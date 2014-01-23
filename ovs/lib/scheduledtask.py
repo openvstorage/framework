@@ -1,4 +1,16 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """
 ScheduledTaskController module
@@ -20,10 +32,8 @@ from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from volumedriver.scrubber.scrubber import Scrubber
 
-_vsr_client = VolumeStorageRouterClient().load()
 _vsr_scrubber = Scrubber()
 
 
@@ -245,7 +255,7 @@ class ScheduledTaskController(object):
         total = 0
         failed = 0
         for vdisk in vdisks:
-            work_units = _vsr_client.get_scrubbing_workunits(str(vdisk.volumeid))
+            work_units = vdisk.vsr_client.get_scrubbing_workunits(str(vdisk.volumeid))
             for work_unit in work_units:
                 try:
                     total += 1
@@ -253,7 +263,7 @@ class ScheduledTaskController(object):
                         work_unit,
                         Configuration.get('ovs.core.tempfs.mountpoint')
                     )
-                    _vsr_client.apply_scrubbing_result(scrubbing_result)
+                    vdisk.vsr_client.apply_scrubbing_result(scrubbing_result)
                 except:
                     failed += 1
                     loghandler.logger.info('Failed scrubbing work unit for volume {}'.format(

@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Module for VDiskController
 """
@@ -12,24 +25,29 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
-
-vsr_client = VolumeStorageRouterClient().load()
 
 
 class VDiskController(object):
-
     """
     Contains all BLL regarding VDisks
     """
 
     @staticmethod
     @celery.task(name='ovs.disk.list_volumes')
-    def list_volumes():
+    def list_volumes(vpool_guid=None):
         """
-        List all known volumes
+        List all known volumes on a specific vpool or on all
         """
-        response = vsr_client.list_volumes()
+        if vpool_guid is not None:
+            vsr_client = VolumeStorageRouterClient().load(vpool_guid)
+            response = vsr_client.list_volumes()
+        else:
+            response = []
+            for vpool in VPoolList.get_vpools():
+                vsr_client = VolumeStorageRouterClient().load(vpool.guid)
+                response.extend(vsr_client.list_volumes())
         return response
 
     @staticmethod
@@ -141,7 +159,7 @@ class VDiskController(object):
         _id = '{}'.format(disk.volumeid)
         _snap = '{}'.format(snapshotid)
         logging.info(_log.format(_snap, disk.name, _location))
-        volumeid = vsr_client.create_clone(_location, _id, _snap)
+        volumeid = disk.vsr_client.create_clone(_location, _id, _snap)
         new_disk.copy_blueprint(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
@@ -168,7 +186,7 @@ class VDiskController(object):
         if snapshotid is None:
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
-        vsr_client.create_snapshot(
+        disk.vsr_client.create_snapshot(
             str(disk.volumeid),
             snapshot_id=snapshotid,
             metadata=metadata
@@ -191,7 +209,7 @@ class VDiskController(object):
         """
         disk = VDisk(diskguid)
         logging.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
-        vsr_client.delete_snapshot(str(disk.volumeid), str(snapshotid))
+        disk.vsr_client.delete_snapshot(str(disk.volumeid), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
@@ -202,9 +220,8 @@ class VDiskController(object):
 
         @param diskguid: guid of the disk
         """
-
         disk = VDisk(diskguid)
-        vsr_client.set_volume_as_template(str(disk.volumeid))
+        disk.vsr_client.set_volume_as_template(str(disk.volumeid))
 
     @staticmethod
     @celery.task(name='ovs.disk.rollback')
@@ -217,7 +234,7 @@ class VDiskController(object):
         if not snapshots:
             raise ValueError('No snapshot found for timestamp {}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
-        vsr_client.rollback_volume(str(disk.volumeid), snapshotguid)
+        disk.vsr_client.rollback_volume(str(disk.volumeid), snapshotguid)
         disk.invalidate_dynamics(['snapshots'])
         return True
 
@@ -259,7 +276,7 @@ class VDiskController(object):
             disk.name, new_disk.name, device_location
         ))
         try:
-            volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
+            volumeid = disk.vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
             new_disk.volumeid = volumeid
             new_disk.save()
         except Exception as ex:

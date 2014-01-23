@@ -1,9 +1,21 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Module for the VMware hypervisor client
 """
 
-from ovs.celery import celery
 from ovs.extensions.hypervisor.hypervisor import Hypervisor
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
@@ -31,7 +43,6 @@ class VMware(Hypervisor):
         return True
 
     @Hypervisor.connected
-    @celery.task(name='ovs.hypervisor.vmware.get_state')
     def get_state(self, vmid):
         """
         Get the current power state of a virtual machine
@@ -39,7 +50,6 @@ class VMware(Hypervisor):
         """
         return self.STATE_MAPPING[self.sdk.get_power_state(vmid)]
 
-    @celery.task(name='ovs.hypervisor.vmware.create_vm')
     @Hypervisor.connected
     def create_vm(self, *args, **kwargs):
         """
@@ -47,7 +57,6 @@ class VMware(Hypervisor):
         """
         pass
 
-    @celery.task(name='ovs.hypervisor.vmware.create_vm_from_template')
     @Hypervisor.connected
     def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
         """
@@ -64,7 +73,6 @@ class VMware(Hypervisor):
                 return task_info.info.result.value
         return None
 
-    @celery.task(name='ovs.hypervisor.vmware.clone_vm')
     @Hypervisor.connected
     def clone_vm(self, vmid, name, disks, esxhost=None, wait=False):
         """
@@ -83,7 +91,6 @@ class VMware(Hypervisor):
                 return task_info.info.result.value
         return None
 
-    @celery.task(name='ovs.hypervisor.vmware.delete_vm')
     @Hypervisor.connected
     def delete_vm(self, vmid, esxhost=None, wait=False):
         """
@@ -128,10 +135,8 @@ class VMware(Hypervisor):
         @rtype: boolean
         @return: True | False
         """
-
         return self.sdk.is_datastore_available(ip, mountpoint, esxhost)
 
-    @celery.task(name='ovs.hypervisor.vmware.set_as_template')
     @Hypervisor.connected
     def set_as_template(self, vmid, disks, esxhost=None, wait=False):
         """
@@ -141,8 +146,7 @@ class VMware(Hypervisor):
 
         @param vmid: hypervisor id of the virtual machine
         """
-        task = self.sdk.set_disk_mode(
-            vmid, disks, 'independent_nonpersistent', esxhost, wait)
+        return self.sdk.set_disk_mode(vmid, disks, 'independent_nonpersistent', esxhost, wait)
 
     @Hypervisor.connected
     def mount_nfs_datastore(self, name, remote_host, remote_path):

@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 OVS management module
 """
@@ -54,8 +67,7 @@ class Configure():
         """
         # Select/Create system vmachine
         hostname = platform.node()
-        vmachine_selector = VMachineList()
-        vmachine_list = vmachine_selector.get_vmachine_by_name(hostname)
+        vmachine_list = VMachineList.get_vmachine_by_name(hostname)
         if vmachine_list and len(vmachine_list) == 1:
             print 'System vMachine already created, updating ...'
             vmachine = vmachine_list[0]
@@ -66,15 +78,7 @@ class Configure():
             raise ValueError('Multiple System vMachines with name {} found, check your model'.format(hostname))
 
         # Select/Create host hypervisor node
-        pmachine_selector = PMachineList()
-        # @TODO implement more accurate search on PMachinelist to find pmachine
-        pmachine_list = pmachine_selector.get_pmachines()
-        pmachine = None
-        if pmachine_list:
-            for pm in pmachine_list:
-                if pm.ip == Configuration.get('ovs.host.ip'):
-                    pmachine = pm
-                    break
+        pmachine = PMachineList.get_by_ip(Configuration.get('ovs.host.ip'))
         if pmachine is None:
             pmachine = PMachine()
 
@@ -86,7 +90,7 @@ class Configure():
         pmachine.name = Configuration.get('ovs.host.name')
         pmachine.save()
         vmachine.name = hostname
-        vmachine.hvtype = Configuration.get('ovs.host.hypervisor')
+        vmachine.machineid = Configuration.get('ovs.core.uniqueid')
         vmachine.is_vtemplate = False
         vmachine.is_internal = True
         vmachine.ip = Configuration.get('ovs.grid.ip')
@@ -229,12 +233,20 @@ class Configure():
             vrouter = vrouters[0]
         else:
             vrouter = VolumeStorageRouter()
+        # Make sure port is not already used
+        from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+        ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters()]
+        vrouter_port_in_hrd = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+        if vrouter_port_in_hrd in ports_used_in_model:
+            vrouter_port = Console.askInteger('Provide Volumedriver connection port (make sure port is not in use)', max(ports_used_in_model) + 3)
+        else:
+            vrouter_port = vrouter_port_in_hrd  # Default
         this_vmachine = VMachine(vmachineguid)
         vrouter.name = vrouter_id.replace('_', ' ')
         vrouter.description = vrouter.name
         vrouter.vsrid = vrouter_id
         vrouter.ip = Configuration.get('ovs.grid.ip')
-        vrouter.port = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
+        vrouter.port = vrouter_port
         vrouter.mountpoint = os.path.join(os.sep, 'mnt', vpool_name)
         vrouter.serving_vmachine = this_vmachine
         vrouter.vpool = this_vpool
@@ -321,8 +333,8 @@ class Control():
             Configure.init_nginx()
             self._start_package('openvstorage-webapps')
         vmachineguid = Configure.load_data()
+        Configure.init_storagerouter(vmachineguid, vpool_name)
         if not self._package_is_running('volumedriver'):
-            Configure.init_storagerouter(vmachineguid, vpool_name)
             self._start_package('volumedriver')
         vfs_info = os.statvfs('/mnt/{}'.format(vpool_name))
         vpool_size_bytes = vfs_info.f_blocks * vfs_info.f_bsize
