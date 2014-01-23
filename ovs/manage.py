@@ -213,12 +213,15 @@ class Configure():
                               'rest_connection_metadata_format': "JSON"}
         elif volumedriver_backend_type == 'S3':
             if not connection_host:
-                connection_host = Console.askString('Specify fqdn or ip of your s3 host')
+                connection_host = Console.askString('Specify fqdn or ip address for your S3 compatible host')
+            if not connection_port:
+                connection_port = Console.askInteger('Specify port for your S3 compatible host')
             if not connection_username:
                 connection_username = Console.askString('Specify S3 access key')
             if not connection_password:
                 connection_password = Console.askString('Specify S3 secret key')
             backend_config = {'s3_connection_host': connection_host,
+                              's3_connection_port': connection_port,
                               's3_connection_username': connection_username,
                               's3_connection_password': connection_password,
                               's3_connection_verbose_logging': 1}
