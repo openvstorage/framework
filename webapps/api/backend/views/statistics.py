@@ -17,6 +17,8 @@ Statistics module
 """
 import re
 import datetime
+import memcache
+import os
 from backend.serializers.memcached import MemcacheSerializer
 from backend.decorators import required_roles, expose
 from rest_framework import status, viewsets
@@ -24,6 +26,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
+from ovs.plugin.provider.tools import Tools
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -33,34 +36,28 @@ class MemcacheViewSet(viewsets.ViewSet):
     permission_classes = (IsAuthenticated,)
 
     @staticmethod
-    def _get_memcachelocation():
+    def _get_memcache_nodes():
         """
-        Get the memcache location from hrd
+        Get the memcache nodes
         """
-        return '{}:{}'.format(Configuration.get('ovs.grid.ip'),
-                              Configuration.get('ovs.core.memcache.localnode.port'))
+        memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+        nodes = memcache_ini.getValue('main', 'nodes').split(',')
+        return map(lambda m: memcache_ini.getValue(m, 'location'), nodes)
 
     @staticmethod
-    def _get_instance(host):
+    def _node_stats(host):
         """
-        Returns a class with more information about a given memcache instance
+        Returns a dict with information about a given memcache instance
         """
-        class Stats:
-            """
-            Placeholder class for statistics
-            """
-            pass
-
-        import memcache
         host = memcache._Host(host)
         host.connect()
         host.send_cmd("stats")
-        stats = Stats()
+        stats = {}
         while 1:
             line = host.readline().split(None, 2)
             if line[0] == "END":
                 break
-            stat, key, value = line
+            _, key, value = line
             try:
                 # Convert to native type, if possible
                 value = int(value)
@@ -70,22 +67,24 @@ class MemcacheViewSet(viewsets.ViewSet):
                     value = datetime.datetime.fromtimestamp(value)
             except ValueError:
                 pass
-            setattr(stats, key, value)
+            stats[key] = value
         host.close_socket()
         return stats
 
     @staticmethod
-    def _add_dal_stats(stats):
+    def _dal_stats():
         """
-        Adds ovs dal statistics to the stats object
+        Creates a dict with DAL statistics
         """
+        stats = {}
         volatile = VolatileFactory.get_client()
-        setattr(stats, 'ovs_dal', {})
         keys = ['datalist', 'object_load', 'descriptor', 'relations']
         for key in keys:
             for hittype in ['hit', 'miss']:
                 cachekey = 'ovs_stats_cache_%s_%s' % (key, hittype)
-                stats.ovs_dal['%s_%s' % (key, hittype)] = volatile.get(cachekey) or 0
+                stats['%s_%s' % (key, hittype)] = volatile.get(cachekey) or 0
+        return stats
+
     @expose(internal=True)
     @required_roles(['view'])
     def list(self, request, format=None):
@@ -93,13 +92,14 @@ class MemcacheViewSet(viewsets.ViewSet):
         Returns statistics information
         """
         _ = request, format
-        match = re.match("([.\w]+:\d+)", MemcacheViewSet._get_memcachelocation())
-        if not match:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        stats = MemcacheViewSet._get_instance(match.group(1))
-        MemcacheViewSet._add_dal_stats(stats)
-        serializer = MemcacheSerializer(stats)
-        return Response(serializer.data)
+        memcache_nodes = MemcacheViewSet._get_memcache_nodes()
+        stats = {'dal': MemcacheViewSet._dal_stats(),
+                 'nodes': []}
+        for node in memcache_nodes:
+            stat = MemcacheViewSet._node_stats(node)
+            stat['node'] = node
+            stats['nodes'].append(stat)
+        return Response(stats)
 
     @expose(internal=True)
     @required_roles(['view'])
@@ -108,10 +108,11 @@ class MemcacheViewSet(viewsets.ViewSet):
         Returns statistics information
         """
         _ = request, format, pk
-        match = re.match("([.\w]+:\d+)", MemcacheViewSet._get_memcachelocation())
-        if not match:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        stats = MemcacheViewSet._get_instance(match.group(1))
-        MemcacheViewSet._add_dal_stats(stats)
-        serializer = MemcacheSerializer(stats)
-        return Response(serializer.data)
+        memcache_nodes = MemcacheViewSet._get_memcache_nodes()
+        stats = {'dal': MemcacheViewSet._dal_stats(),
+                 'nodes': []}
+        for node in memcache_nodes:
+            stat = MemcacheViewSet._node_stats(node)
+            stat['node'] = node
+            stats['nodes'].append(stat)
+        return Response(stats)

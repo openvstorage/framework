@@ -121,7 +121,8 @@ class VMachineViewSet(viewsets.ViewSet):
         for vsr in obj.served_vsrs:
             vpool_guids.add(vsr.vpool_guid)
             for vdisk in vsr.vpool.vdisks:
-                vmachine_guids.add(vdisk.vmachine_guid)
+                if vdisk.vmachine_guid is not None:
+                    vmachine_guids.add(vdisk.vmachine_guid)
         return Response({'vpool_guids': list(vpool_guids),
                          'vmachine_guids': list(vmachine_guids)}, status=status.HTTP_200_OK)
 

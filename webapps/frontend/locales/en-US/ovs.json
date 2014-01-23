@@ -157,7 +157,7 @@
             "keysincache": "Keys in cache:",
             "cachehits": "Cache hits:",
             "cachetraffic": "Cache traffic",
-            "uptime": "uptime",
+            "uptime": "Uptime",
             "rawinfo": "Raw memcached information"
         },
         "dal": {
