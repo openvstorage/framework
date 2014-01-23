@@ -13,23 +13,5 @@
 # limitations under the License.
 
 """
-This module contains configuration logic
+This package contains the grid extension.
 """
-
-
-class Configuration(object):
-    """
-    Configuration class
-    """
-
-    def __init__(self):
-        """
-        Configuration should be a complete static class
-        """
-        raise RuntimeError('This class should not be instantiated.')
-
-    get = None
-    getHRD = None
-
-from ovs.plugin.injection.injector import Injector
-Configuration = Injector.inject(Configuration)

@@ -312,7 +312,7 @@ mountpoint = ask_choice(mountpoints, question='Select metadata mountpoint', defa
 mountpoints.remove(mountpoint)
 configuration['openvstorage-core']['volumedriver.metadata'] = mountpoint
 configuration['openvstorage-core']['volumedriver.arakoon.node.name'] = unique_id
-configuration['openvstorage-core']['ovs.core.rabbitmq.localnode.name'] = unique_id
+configuration['openvstorage-core']['ovs.core.broker.localnode.name'] = unique_id
 
 configuration['openvstorage-webapps'] = {}
 configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_integer('GUI certificate lifetime', min_value=1, max_value=365 * 10, default_value=365)
@@ -356,7 +356,6 @@ branch_mapping = {'unstable': 'default',
 # Quality level mapping: key = our qualitylevel, value = jumpscale quality level
 quality_mapping = {'unstable': 'test',
                    'test': 'test'}
-
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')

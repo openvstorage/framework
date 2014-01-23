@@ -26,16 +26,16 @@ from celery import Celery
 from celery.schedules import crontab
 from ovs.logging.logHandler import LogHandler
 from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.tools import Tools
+from configobj import ConfigObj
 from ovs.dal.lists.vmachinelist import VMachineList
 
-memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-nodes = memcache_ini.getValue('main', 'nodes').split(',')
-memcache_servers = map(lambda m: memcache_ini.getValue(m, 'location'), nodes)
+memcache_ini =ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'],]
+memcache_servers = map(lambda m: memcache_ini.get(m)['location'], memcache_nodes)
 
-rmq_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-nodes = rmq_ini.getValue('main', 'nodes').split(',')
-rmq_servers = map(lambda m: rmq_ini.getValue(m, 'location'), nodes)
+rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'],]
+rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
 
 vsas = VMachineList.get_vsas()
 

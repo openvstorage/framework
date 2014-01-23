@@ -21,6 +21,7 @@ import uuid
 import os
 import re
 import platform
+import time
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.console import Console
 from ovs.plugin.provider.service import Service
@@ -61,7 +62,7 @@ class Configure():
         subprocess.call(['service', 'nfs-kernel-server', 'start'])
 
     @staticmethod
-    def load_data():
+    def load_data(master):
         """
         Load default data set
         """
@@ -97,17 +98,22 @@ class Configure():
         vmachine.pmachine = pmachine
         vmachine.save()
 
-        from ovs.extensions.migration.migration import Migration
-        Migration.migrate()
+        #@todo sync version number from master node
+        if master == None:
+            from ovs.extensions.migration.migration import Migration
+            Migration.migrate()
 
         return vmachine.guid
 
     @staticmethod
-    def init_rabbitmq():
+    def init_rabbitmq(cluster_to_join=None):
         """
         Reconfigure rabbitmq to work with ovs user.
         """
-        os.system('rabbitmq-server -detached; rabbitmqctl stop_app; rabbitmqctl reset; rabbitmqctl stop;')
+        if cluster_to_join:
+            os.system('rabbitmq-server -detached; rabbitmqctl stop_app; rabbitmqctl reset; rabbitmqctl join_cluster rabbit@{}; rabbitmqctl stop;'.format(cluster_to_join))
+        else:
+            os.system('rabbitmq-server -detached; rabbitmqctl stop_app; rabbitmqctl reset; rabbitmqctl stop;')
 
     @staticmethod
     def init_nginx():
@@ -134,7 +140,7 @@ class Configure():
     def init_storagerouter(vmachineguid, vpool_name):
         """
         Initializes the volume storage router.
-        This requires a the OVS model to be configured and reachable
+        This requires the OVS model to be configured and reachable
         @param vmachineguid: guid of the internal VSA machine hosting this volume storage router
         """
         mountpoints = [Configuration.get('volumedriver.metadata'), ]
@@ -150,7 +156,9 @@ class Configure():
                                                                             Configuration.get('volumedriver.filesystem.distributed'),
                                                                             Configuration.get('volumedriver.metadata')))
         filesystems = filter(lambda d: not mount_regex.match(d), all_mounts)
-        volumedriver_cache_mountpoint = Console.askChoice(filesystems, 'Select cache mountpoint')
+        volumedriver_cache_mountpoint = Configuration.get('volumedriver.cache.mountpoint', checkExists=True)
+        if not volumedriver_cache_mountpoint:
+            volumedriver_cache_mountpoint = Console.askChoice(filesystems, 'Select cache mountpoint')
         filesystems.remove(volumedriver_cache_mountpoint)
         cache_fs = os.statvfs(volumedriver_cache_mountpoint)
         scocache = "{}/sco".format(volumedriver_cache_mountpoint)
@@ -174,26 +182,42 @@ class Configure():
         supported_backends = Configuration.get('volumedriver.supported.backends').split(',')
         if 'REST' in supported_backends:
             supported_backends.remove('REST')  # REST is not supported for now
-        volumedriver_backend_type = Console.askChoice(supported_backends, 'Select type of storage backend')
-        vrouter_id = '{}{}'.format(vpool_name, '%x' % uuid.getnode())
-        connection_host, connection_port, connection_username, connection_password = None, None, None, None
+        volumedriver_backend_type = Configuration.get('volumedriver.backend.type', checkExists=True)
+        if not volumedriver_backend_type:
+            volumedriver_backend_type = Console.askChoice(supported_backends, 'Select type of storage backend')
+        uuid_nodeid = '%x' % uuid.getnode()
+        machine_id = uuid_nodeid.zfill(12)
+        vrouter_id = '{}{}'.format(vpool_name, machine_id)
+        connection_host = Configuration.get('volumedriver.connection.host', checkExists=True)
+        connection_port = Configuration.get('volumedriver.connection.port', checkExists=True)
+        connection_username = Configuration.get('volumedriver.connection.username', checkExists=True)
+        connection_password = Configuration.get('volumedriver.connection.password', checkExists=True)
+        rest_connection_timeout_secs = Configuration.get('volumedriver.rest.timeout', checkExists=True)
+        volumedriver_local_filesystem = Configuration.get('volumedriver.backend.mountpoint', checkExists=True)
         backend_config = {}
         if volumedriver_backend_type == 'LOCAL':
-            volumedriver_local_filesystem = Console.askChoice(filesystems, 'Select mountpoint for local backend')
+            if not volumedriver_loca_filesystem:
+                volumedriver_local_filesystem = Console.askChoice(filesystems, 'Select mountpoint for local backend')
             backend_config = {'local_connection_path': volumedriver_local_filesystem}
         elif volumedriver_backend_type == 'REST':
-            connection_host = Console.askString('Provide REST ip address')
-            connection_port = Console.askInteger('Provide REST connection port')
-            rest_connection_timeout_secs = Console.askInteger('Provide desired REST connection timeout(secs)')
+            if not connection_host:
+                connection_host = Console.askString('Provide REST ip address')
+            if not connection_port:
+                connection_port = Console.askInteger('Provide REST connection port')
+            if not rest_connection_timeout_secs:
+                rest_connection_timeout_secs = Console.askInteger('Provide desired REST connection timeout(secs)')
             backend_config = {'rest_connection_host': connection_host,
                               'rest_connection_port': connection_port,
                               'buchla_connection_log_level': "0",
                               'rest_connection_verbose_logging': rest_connection_timeout_secs,
                               'rest_connection_metadata_format': "JSON"}
         elif volumedriver_backend_type == 'S3':
-            connection_host = Console.askString('Specify fqdn or ip of your s3 host')
-            connection_username = Console.askString('Specify S3 access key')
-            connection_password = Console.askString('Specify S3 secret key')
+            if not connection_host:
+                connection_host = Console.askString('Specify fqdn or ip of your s3 host')
+            if not connection_username:
+                connection_username = Console.askString('Specify S3 access key')
+            if not connection_password:
+                connection_password = Console.askString('Specify S3 secret key')
             backend_config = {'s3_connection_host': connection_host,
                               's3_connection_username': connection_username,
                               's3_connection_password': connection_password,
@@ -235,7 +259,7 @@ class Configure():
             vrouter = VolumeStorageRouter()
         # Make sure port is not already used
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
-        ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters()]
+        ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vmachineguid)]
         vrouter_port_in_hrd = int(Configuration.get('volumedriver.filesystem.xmlrpc.port'))
         if vrouter_port_in_hrd in ports_used_in_model:
             vrouter_port = Console.askInteger('Provide Volumedriver connection port (make sure port is not in use)', max(ports_used_in_model) + 3)
@@ -304,7 +328,7 @@ class Control():
         """
         pass
 
-    def init(self, vpool_name):
+    def init(self, vpool_name, services=['openvstorage-core', 'openvstorage-webapps', 'volumedriver'], master=None):
         """
         Configure & Start the OVS components in the correct order to get your environment initialized after install
         * Reset rabbitmq
@@ -321,42 +345,58 @@ class Control():
             )
             vpool_name = Console.askString('Provide new vPool name', defaultparam=suggestion)
 
-        if not self._package_is_running('openvstorage-core'):
-            arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
-            arakoon_clusters = map(lambda d: os.path.basename(d), os.walk(arakoon_dir).next()[1])
-            for cluster in arakoon_clusters:
-                cluster_instance = ArakoonManagement().getCluster(cluster)
-                cluster_instance.createDirs(cluster_instance.listLocalNodes()[0])
-            Configure.init_rabbitmq()
-            self._start_package('openvstorage-core')
-        if not self._package_is_running('openvstorage-webapps'):
-            Configure.init_nginx()
-            self._start_package('openvstorage-webapps')
-        vmachineguid = Configure.load_data()
-        Configure.init_storagerouter(vmachineguid, vpool_name)
-        if not self._package_is_running('volumedriver'):
-            self._start_package('volumedriver')
-        vfs_info = os.statvfs('/mnt/{}'.format(vpool_name))
-        vpool_size_bytes = vfs_info.f_blocks * vfs_info.f_bsize
-        vpools = VPoolList.get_vpool_by_name(vpool_name)
-        if len(vpools) != 1:
-            raise ValueError('No or multiple vpools found with name {}, should not happen at this stage, please check your configuration'.format(vpool_name))
-        this_vpool = vpools[0]
-        this_vpool.size = vpool_size_bytes
-        this_vpool.save()
-        Configure.init_exportfs(vpool_name)
-        install = Console.askYesNo('Do you want to mount the vPool?')
-        if install is True:
-            print '  Please wait while the vPool is mounted...'
-            vmachine = VMachine(vmachineguid)
-            vrouter = [vsr for vsr in this_vpool.vsrs if vsr.serving_vmachine_guid == vmachineguid][0]
-            hypervisor = Factory.get(vmachine.pmachine)
-            try:
-                hypervisor.mount_nfs_datastore(vpool_name, vrouter.ip, vrouter.mountpoint)
-                print '    Success'
-            except Exception as ex:
-                print '    Error, please mount the vPool manually. {0}'.format(str(ex))
-        subprocess.call(['service', 'processmanager', 'start'])
+        def _init_core():
+            if not self._package_is_running('openvstorage-core'):
+                arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
+                arakoon_clusters = map(lambda d: os.path.basename(d), os.walk(arakoon_dir).next()[1])
+                for cluster in arakoon_clusters:
+                    cluster_instance = ArakoonManagement().getCluster(cluster)
+                    cluster_instance.createDirs(cluster_instance.listLocalNodes()[0])
+                Configure.init_rabbitmq(master)
+                time.sleep(5)
+                self._start_package('openvstorage-core')
+
+        def _init_webapps():
+            if not self._package_is_running('openvstorage-webapps'):
+                Configure.init_nginx()
+                self._start_package('openvstorage-webapps')
+
+        def _init_volumedriver():
+            vmachineguid = Configure.load_data(master)
+            if not self._package_is_running('volumedriver'):
+                Configure.init_storagerouter(vmachineguid, vpool_name)
+                self._start_package('volumedriver')
+            vfs_info = os.statvfs('/mnt/{}'.format(vpool_name))
+            vpool_size_bytes = vfs_info.f_blocks * vfs_info.f_bsize
+            vpools = VPoolList.get_vpool_by_name(vpool_name)
+            if len(vpools) != 1:
+                raise ValueError('No or multiple vpools found with name {}, should not happen at this stage, please check your configuration'.format(vpool_name))
+            this_vpool = vpools[0]
+            this_vpool.size = vpool_size_bytes
+            this_vpool.save()
+            Configure.init_exportfs(vpool_name)
+            
+            mount_vpool = Configuration.get('volumedriver.vpool.mount', checkExists=True)
+            if not mount_vpool:
+                mount_vpool = Console.askYesNo('Do you want to mount the vPool?')
+            if mount_vpool is True:
+                print '  Please wait while the vPool is mounted...'
+                vmachine = VMachine(vmachineguid)
+                vrouter = [vsr for vsr in this_vpool.vsrs if vsr.serving_vmachine_guid == vmachineguid][0]
+                hypervisor = Factory.get(vmachine.pmachine)
+                try:
+                    hypervisor.mount_nfs_datastore(vpool_name, vrouter.ip, vrouter.mountpoint)
+                    print '  Success'
+                except Exception as ex:
+                    print '  Error, please mount the vPool manually. {0}'.format(str(ex))
+
+        if 'openvstorage-core' in services:
+            _init_core()
+        if 'openvstorage-webapps' in services:
+            _init_webapps()
+        if 'volumedriver' in services:
+            _init_volumedriver()
+            subprocess.call(['service', 'processmanager', 'start'])
 
     def _package_is_running(self, package):
         """

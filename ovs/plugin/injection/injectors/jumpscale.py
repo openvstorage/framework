@@ -33,13 +33,21 @@ class Injector(object):
     def inject_configuration(provider):
         """ Injects the Config module """
         provider.get = j.application.config.get
+        provider.getHRD = j.core.hrd.getHRD
         return provider
 
     @staticmethod
     def inject_tools(provider):
         """ Injects the Tools module """
         provider.inifile = j.tools.inifile
+        provider.expect = j.tools.expect
         return provider
+
+    @staticmethod
+    def inject_remote(provider):
+        """ Injects the remote module """
+        import JumpScale.baselib.remote
+        return j.remote
 
     @staticmethod
     def inject_package(provider):
@@ -70,14 +78,21 @@ class Injector(object):
     def inject_service(provider):
         """ Injects the Service module """
         def add_service(package, name, command, stop_command):
-            voldrv_package = j.packages.find(domain=package[0], name=package[1])[0]
+            package = j.packages.find(domain=package[0], name=package[1])[0]
             j.tools.startupmanager.addProcess(
                 name=name, cmd=command, args='', env={}, numprocesses=1, priority=21,
-                shell=False, workingdir='', jpackage=voldrv_package,
-                domain=voldrv_package.domain, ports=[], stopcmd=stop_command
+                shell=False, workingdir='', jpackage=package,
+                domain=package.domain, ports=[], stopcmd=stop_command
             )
 
+        def get_service_status(process_name):
+            for processDef in j.tools.startupmanager.getProcessDefs():
+                if process_name == processDef.name:
+                    return processDef.isRunning()
+            return None
+
         provider.add_service = staticmethod(add_service)
+        provider.get_status = staticmethod(get_service_status)
         return provider
 
     @staticmethod
