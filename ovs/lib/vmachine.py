@@ -444,15 +444,14 @@ class VMachineController(object):
                 vmachine.devicename = vm_object['backing']['filename']
                 vmachine.save()
                 # Updating and linking disks
+                vsrs = VolumeStorageRouterList.get_volumestoragerouters()
+                datastores = ['{}:{}'.format(vsr.ip, vsr.mountpoint) for vsr in vsrs]
                 vdisk_guids = []
                 for disk in vm_object['disks']:
                     vdisk = VDiskList.get_by_devicename(disk['filename'])
                     if vdisk is not None:
-                        vsr = VolumeStorageRouterList.get_by_vsrid(vdisk.vsrid)
-                        if vsr is None:
-                            raise RuntimeError('vDisk without VSR found')
                         datastore = vm_object['datastores'][disk['datastore']]
-                        if datastore == '{}:{}'.format(vsr.ip, vsr.mountpoint):
+                        if datastore in datastores:
                             if vdisk.vmachine is None:
                                 MessageController.fire(MessageController.Type.EVENT,
                                                        {'type': 'vdisk_attached',
