@@ -118,7 +118,7 @@ class ScheduledTaskController(object):
         loghandler.logger.info('[SSA] started')
         success = []
         fail = []
-        machines = VMachineList.get_vmachines()
+        machines = VMachineList.get_customer_vmachines()
         for machine in machines:
             if not machine.is_vtemplate:
                 try:
