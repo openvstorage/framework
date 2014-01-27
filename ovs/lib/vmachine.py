@@ -23,6 +23,7 @@ from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.hypervisor.factory import Factory
@@ -109,6 +110,7 @@ class VMachineController(object):
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
+        new_vm.pmachine = target_pm
         new_vm.name = name
         new_vm.description = description
         new_vm.is_vtemplate = False
@@ -148,15 +150,17 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.create_from_voldrv')
-    def create_from_voldrv(name):
+    def create_from_voldrv(name, vsrid):
         """
         This method will create a vmachine based on a given vmx file
         """
         name = name.strip('/')
         if name.endswith('.vmx'):
-            vmachine = VMachineList.get_by_devicename(name)
+            pmachine = PMachineList.get_by_vsrid(vsrid)
+            vmachine = VMachineList.get_by_devicename_and_pmachine(name, pmachine)
             if not vmachine:
                 vmachine = VMachine()
+                vmachine.pmachine = pmachine
                 vmachine.status = 'CREATED'
             vmachine.devicename = name
             vmachine.save()
@@ -234,13 +238,14 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
-    def delete_from_voldrv(name):
+    def delete_from_voldrv(name, vsrid):
         """
         This method will delete a vmachine based on the name of the vmx given
         """
         name = name.strip('/')
         if name.endswith('.vmx'):
-            vm = VMachineList.get_by_devicename(name)
+            pmachine = PMachineList.get_by_vsrid(vsrid)
+            vm = VMachineList.get_by_devicename_and_pmachine(name, pmachine)
             if vm is not None:
                 MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
                                                                       'metadata': {'name': vm.name}})
@@ -263,12 +268,14 @@ class VMachineController(object):
         # > This way, this piece of code is hypervisor agnostic
         if old_name.endswith('.vmx') and new_name.endswith('.vmx'):
             # Most likely a change from path. Updaing path
-            vm = VMachineList.get_by_devicename(old_name)
+            pmachine = PMachineList.get_by_vsrid(vsrid)
+            vm = VMachineList.get_by_devicename_and_pmachine(old_name, pmachine)
             if vm is not None:
                 vm.devicename = new_name
                 vm.save()
         elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
-            vm = VMachineList.get_by_devicename(new_name)
+            pmachine = PMachineList.get_by_vsrid(vsrid)
+            vm = VMachineList.get_by_devicename_and_pmachine(new_name, pmachine)
             # The configuration has been updated (which happens in a tempfile), start a sync
             if vm is not None:
                 try:
@@ -395,16 +402,9 @@ class VMachineController(object):
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
             elif vsrid is not None and vmachine.devicename is not None:
                 # VSR id was given, using the devicename instead (to allow hypervisorid updates
-                # which can be caused by re-adding a vm to the inventory
+                # which can be caused by re-adding a vm to the inventory)
+                pmachine = PMachineList.get_by_vsrid(vsrid)
                 vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-                if vsr is None:
-                    raise RuntimeError('VolumeStorageRouter could not be found')
-                vsa = vsr.serving_vmachine
-                if vsa is None:
-                    raise RuntimeError('VolumeStorageRouter {} not linked to a VSA'.format(vsr.name))
-                pmachine = vsa.pmachine
-                if pmachine is None:
-                    raise RuntimeError('VSA {} not linked to a pMachine'.format(vsa.name))
                 hypervisor = Factory.get(pmachine)
                 vmachine.pmachine = pmachine
                 vmachine.save()

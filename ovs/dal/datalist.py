@@ -247,7 +247,7 @@ class DataList(object):
                 key = '%s_%s' % (DataList.cachelink, object_name)
                 mutex = VolatileMutex('listcache_%s' % object_name)
                 try:
-                    mutex.acquire(10)
+                    mutex.acquire(60)
                     cache_list = Toolbox.try_get(key, {})
                     for field in field_list:
                         list_list = cache_list.get(field, [])

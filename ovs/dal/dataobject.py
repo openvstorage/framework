@@ -442,7 +442,7 @@ class DataObject(object):
                                                        default[1]))
         # Second, invalidate property lists
         try:
-            self._mutex_listcache.acquire(10)
+            self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
             for field in cache_list.keys():
@@ -483,7 +483,7 @@ class DataObject(object):
         """
         # Invalidate no-filter queries/lists pointing to this object
         try:
-            self._mutex_listcache.acquire(10)
+            self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
             if '__all' in cache_list.keys():

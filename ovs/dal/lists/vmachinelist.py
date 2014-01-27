@@ -52,7 +52,7 @@ class VMachineList(object):
         return None
 
     @staticmethod
-    def get_by_devicename(devicename):
+    def get_by_devicename_and_pmachine(devicename, pmachine):
         """
         Returns a list of all VDisks based on a given volumeid
         """
@@ -60,9 +60,12 @@ class VMachineList(object):
         vms = DataList({'object': VMachine,
                         'data': DataList.select.DESCRIPTOR,
                         'query': {'type': DataList.where_operator.AND,
-                                  'items': [('devicename', DataList.operator.EQUALS, devicename)]}}).data  # noqa
+                                  'items': [('devicename', DataList.operator.EQUALS, devicename),
+                                            ('pmachine.guid', DataList.operator.EQUALS, pmachine.guid)]}}).data  # noqa
         # pylint: enable=line-too-long
         if vms:
+            if len(vms) != 1:
+                raise RuntimeError('Invalid amount of vMachines found: {0}'.format(len(vms)))
             return DataObjectList(vms, VMachine)[0]
         return None
 
