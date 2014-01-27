@@ -120,14 +120,13 @@ class ScheduledTaskController(object):
         fail = []
         machines = VMachineList.get_customer_vmachines()
         for machine in machines:
-            if not machine.is_vtemplate:
-                try:
-                    VMachineController.snapshot(machineguid=machine.guid,
-                                                label='',
-                                                is_consistent=False)
-                    success.append(machine.guid)
-                except:
-                    fail.append(machine.guid)
+            try:
+                VMachineController.snapshot(machineguid=machine.guid,
+                                            label='',
+                                            is_consistent=False)
+                success.append(machine.guid)
+            except:
+                fail.append(machine.guid)
         loghandler.logger.info('[SSA] {0} vMachines were snapshotted, {1} failed.'.format(
             len(success), len(fail)
         ))
