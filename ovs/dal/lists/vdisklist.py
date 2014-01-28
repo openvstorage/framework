@@ -52,7 +52,7 @@ class VDiskList(object):
         return None
 
     @staticmethod
-    def get_by_devicename(devicename):
+    def get_by_devicename_and_vpool(devicename, vpool):
         """
         Returns a list of all VDisks based on a given volumeid
         """
@@ -60,9 +60,12 @@ class VDiskList(object):
         vds = DataList({'object': VDisk,
                         'data': DataList.select.DESCRIPTOR,
                         'query': {'type': DataList.where_operator.AND,
-                                  'items': [('devicename', DataList.operator.EQUALS, devicename)]}}).data  # noqa
+                                  'items': [('devicename', DataList.operator.EQUALS, devicename),
+                                            ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]}}).data  # noqa
         # pylint: enable=line-too-long
         if vds:
+            if len(vds) != 1:
+                raise RuntimeError('Invalid amount of vDisks found: {0}'.format(len(vds)))
             return DataObjectList(vds, VDisk)[0]
         return None
 

@@ -52,7 +52,7 @@ class VMachineList(object):
         return None
 
     @staticmethod
-    def get_by_devicename_and_pmachine(devicename, pmachine):
+    def get_by_devicename_and_vpool(devicename, vpool):
         """
         Returns a list of all VDisks based on a given volumeid
         """
@@ -61,7 +61,7 @@ class VMachineList(object):
                         'data': DataList.select.DESCRIPTOR,
                         'query': {'type': DataList.where_operator.AND,
                                   'items': [('devicename', DataList.operator.EQUALS, devicename),
-                                            ('pmachine.guid', DataList.operator.EQUALS, pmachine.guid)]}}).data  # noqa
+                                            ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]}}).data  # noqa
         # pylint: enable=line-too-long
         if vms:
             if len(vms) != 1:

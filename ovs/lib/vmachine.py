@@ -18,7 +18,6 @@ VMachine module
 import time
 import logging
 
-from celery import group
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
@@ -70,8 +69,8 @@ class VMachineController(object):
 
         target_pm = PMachine(pmachineguid)
 
-        vpool = None
-        vpool_guids = set()
+        vpool = template_vm.vpool
+        vpool_guids = set([vpool.guid])
         for disk in template_vm.vdisks:
             vpool = disk.vpool
             vpool_guids.add(vpool.guid)
@@ -108,6 +107,7 @@ class VMachineController(object):
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
+        new_vm.vpool = template_vm.vpool
         new_vm.pmachine = target_pm
         new_vm.name = name
         new_vm.description = description
@@ -156,10 +156,14 @@ class VMachineController(object):
         """
         name = name.strip('/')
         if name.endswith('.vmx'):
+            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+            if vsr is None:
+                raise RuntimeError('VolumeStorageRouter could not be found')
             pmachine = PMachineList.get_by_vsrid(vsrid)
-            vmachine = VMachineList.get_by_devicename_and_pmachine(name, pmachine)
+            vmachine = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
             if not vmachine:
                 vmachine = VMachine()
+                vmachine.vpool = vsr.vpool
                 vmachine.pmachine = pmachine
                 vmachine.status = 'CREATED'
             vmachine.devicename = name
@@ -244,8 +248,10 @@ class VMachineController(object):
         """
         name = name.strip('/')
         if name.endswith('.vmx'):
-            pmachine = PMachineList.get_by_vsrid(vsrid)
-            vm = VMachineList.get_by_devicename_and_pmachine(name, pmachine)
+            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+            if vsr is None:
+                raise RuntimeError('VolumeStorageRouter could not be found')
+            vm = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
             if vm is not None:
                 MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
                                                                       'metadata': {'name': vm.name}})
@@ -266,16 +272,17 @@ class VMachineController(object):
         # if scenario == 'RENAME': f00bar
         # if scenario == 'UPDATED': f00bar
         # > This way, this piece of code is hypervisor agnostic
+        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+        if vsr is None:
+            raise RuntimeError('VolumeStorageRouter could not be found')
         if old_name.endswith('.vmx') and new_name.endswith('.vmx'):
             # Most likely a change from path. Updaing path
-            pmachine = PMachineList.get_by_vsrid(vsrid)
-            vm = VMachineList.get_by_devicename_and_pmachine(old_name, pmachine)
+            vm = VMachineList.get_by_devicename_and_vpool(old_name, vsr.vpool)
             if vm is not None:
                 vm.devicename = new_name
                 vm.save()
         elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
-            pmachine = PMachineList.get_by_vsrid(vsrid)
-            vm = VMachineList.get_by_devicename_and_pmachine(new_name, pmachine)
+            vm = VMachineList.get_by_devicename_and_vpool(new_name, vsr.vpool)
             # The configuration has been updated (which happens in a tempfile), start a sync
             if vm is not None:
                 try:
@@ -445,13 +452,13 @@ class VMachineController(object):
                 vmachine.save()
                 # Updating and linking disks
                 vsrs = VolumeStorageRouterList.get_volumestoragerouters()
-                datastores = ['{}:{}'.format(vsr.ip, vsr.mountpoint) for vsr in vsrs]
+                datastores = dict([('{}:{}'.format(vsr.ip, vsr.mountpoint), vsr) for vsr in vsrs])
                 vdisk_guids = []
                 for disk in vm_object['disks']:
-                    vdisk = VDiskList.get_by_devicename(disk['filename'])
-                    if vdisk is not None:
-                        datastore = vm_object['datastores'][disk['datastore']]
-                        if datastore in datastores:
+                    datastore = vm_object['datastores'][disk['datastore']]
+                    if datastore in datastores:
+                        vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
+                        if vdisk is not None:
                             if vdisk.vmachine is None:
                                 MessageController.fire(MessageController.Type.EVENT,
                                                        {'type': 'vdisk_attached',
