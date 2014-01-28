@@ -82,7 +82,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         for key in keys:
             for hittype in ['hit', 'miss']:
                 cachekey = 'ovs_stats_cache_%s_%s' % (key, hittype)
-                stats['%s_%s' % (key, hittype)] = volatile.get(cachekey) or 0
+                stats['%s_%s' % (key, hittype)] = volatile.get(cachekey, default=0)
         return stats
 
     @expose(internal=True)

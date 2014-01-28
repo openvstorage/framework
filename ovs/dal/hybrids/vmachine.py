@@ -17,6 +17,7 @@ VMachine module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from ovs.extensions.hypervisor.factory import Factory as hvFactory
 import time
@@ -37,7 +38,8 @@ class VMachine(DataObject):
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
                   'ip':           (None,  str,  'IP Address of the vMachine, if available'),
                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
-    _relations = {'pmachine': (PMachine, 'vmachines')}
+    _relations = {'pmachine': (PMachine, 'vmachines'),
+                  'vpool':    (VPool, 'vmachines')}
     _expiry = {'snapshots':          (60, list),
                'hypervisor_status': (300, str, True),  # The cache is invalidated on start/stop
                'statistics':          (4, dict),

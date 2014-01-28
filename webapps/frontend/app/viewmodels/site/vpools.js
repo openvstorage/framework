@@ -37,7 +37,8 @@ define([
             { key: 'iops',              value: $.t('ovs:generic.iops'),             width: 55,        colspan: undefined },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 100,       colspan: undefined },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100,       colspan: undefined },
-            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined, colspan: undefined }
+            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined, colspan: undefined },
+            { key: undefined,           value: $.t('ovs:generic.actions'),          width: 100,       colspan: undefined }
         ];
         self.vPools = ko.observableArray([]);
         self.vPoolGuids = [];
@@ -78,6 +79,47 @@ define([
                     })
                     .always(deferred.resolve);
             }).promise();
+        };
+        self.sync = function(guid) {
+            var i, vpools = self.vPools(), vp;
+            for (i = 0; i < vpools.length; i += 1) {
+                if (vpools[i].guid() === guid) {
+                    vp = vpools[i];
+                }
+            }
+            if (vp !== undefined) {
+                app.showMessage(
+                        $.t('ovs:vpools.sync.warning'),
+                        $.t('ovs:vpools.sync.title', { what: vp.name() }),
+                        [$.t('ovs:vpools.sync.no'), $.t('ovs:vpools.sync.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:vpools.sync.yes')) {
+                            generic.alertInfo(
+                                $.t('ovs:vpools.sync.marked'),
+                                $.t('ovs:vpools.sync.markedmsg', { what: vp.name() })
+                            );
+                            api.post('vpools/' + vp.guid() + '/sync_vmachines')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:vpools.sync.done'),
+                                        $.t('ovs:vpools.sync.donemsg', { what: vp.name() })
+                                    );
+                                })
+                                .fail(function(error) {
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:generic.messages.errorwhile', {
+                                            context: 'error',
+                                            what: $.t('ovs:vpools.sync.errormsg', { what: vp.name() }),
+                                            error: error
+                                        })
+                                    );
+                                });
+                        }
+                    });
+            }
         };
 
         // Durandal

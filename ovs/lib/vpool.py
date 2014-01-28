@@ -16,8 +16,11 @@
 VPool module
 """
 
-from celery import group
+from ovs.dal.hybrids.vpool import VPool
+from ovs.extensions.hypervisor.factory import Factory
+from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.celery import celery
+from ovs.lib.vmachine import VMachineController
 from ovs.extensions.fs.exportfs import Nfsexports
 
 
@@ -35,3 +38,20 @@ class VPoolController(object):
         nfs = Nfsexports()
         nfs.unexport(mountpoint)
         nfs.export(mountpoint)
+
+    @staticmethod
+    @celery.task(name='ovs.vpool.sync_with_hypervisor')
+    def sync_with_hypervisor(vpool_guid):
+        """
+        Syncs all vMachines of a given vPool with the hypervisor
+        """
+        vpool = VPool(vpool_guid)
+        for vsr in vpool.vsrs:
+            pmachine = vsr.serving_vmachine.pmachine
+            hypervisor = Factory.get(pmachine)
+            for vm_object in hypervisor.get_vms_by_nfs_mountinfo(vsr.ip, vsr.mountpoint):
+                vmachine = VMachineList.get_by_devicename_and_vpool(
+                    devicename=vm_object['backing']['filename'],
+                    vpool=vpool
+                )
+                VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)

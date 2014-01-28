@@ -58,7 +58,7 @@ class VMware(Hypervisor):
         pass
 
     @Hypervisor.connected
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Create a new vmachine from an existing template
         @param name:
@@ -66,7 +66,7 @@ class VMware(Hypervisor):
         @param target_pm: hypervisor object to create new vmachine on
         @return: celery task
         """
-        task = self.sdk.create_vm_from_template(name, source_vm, disks, esxhost, wait)
+        task = self.sdk.create_vm_from_template(name, source_vm, disks, ip, mountpoint, esxhost, wait)
         if wait is True:
             if self.sdk.validate_result(task):
                 task_info = self.sdk.get_task_info(task)
@@ -126,6 +126,14 @@ class VMware(Hypervisor):
         and datastore identifiers
         """
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
+
+    @Hypervisor.connected
+    def get_vms_by_nfs_mountinfo(self, ip, mountpoint):
+        """
+        Gets a list of agnostic vm objects for a given ip and mountpoint
+        """
+        for vm in self.sdk.get_vms(ip, mountpoint):
+            yield self.sdk.make_agnostic_config(vm)
 
     @Hypervisor.connected
     def is_datastore_available(self, ip, mountpoint, esxhost=None):

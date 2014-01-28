@@ -18,6 +18,7 @@ PMachineList module
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 
 
 class PMachineList(object):
@@ -48,3 +49,19 @@ class PMachineList(object):
         if pmachines:
             return DataObjectList(pmachines, PMachine)[0]
         return None
+
+    @staticmethod
+    def get_by_vsrid(vsrid):
+        """
+        Get pMachine that hosts a given vsrid
+        """
+        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+        if vsr is None:
+            raise RuntimeError('VolumeStorageRouter {0} could not be found'.format(vsrid))
+        vsa = vsr.serving_vmachine
+        if vsa is None:
+            raise RuntimeError('VolumeStorageRouter {0} not linked to a VSA'.format(vsr.name))
+        pmachine = vsa.pmachine
+        if pmachine is None:
+            raise RuntimeError('VSA {0} not linked to a pMachine'.format(vsa.name))
+        return pmachine

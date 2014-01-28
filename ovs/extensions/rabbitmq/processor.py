@@ -61,11 +61,13 @@ def process(queue, body):
                    EventMessages.EventMessage.FileCreate:                 # Machine create
                        {'property': 'file_create',
                         'task': VMachineController.create_from_voldrv,
-                        'arguments': {'path': 'name'}},
+                        'arguments': {'path': 'name',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileDelete:
                        {'property': 'file_delete',
                         'task': VMachineController.delete_from_voldrv,
-                        'arguments': {'path': 'name'}},
+                        'arguments': {'path': 'name',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileRename:
                        {'property': 'file_rename',
                         'task': VMachineController.rename_from_voldrv,

@@ -24,12 +24,16 @@ import os
 from kombu import Queue
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import task_postrun, worker_process_init
+from ovs.lib.messaging import MessageController
 from ovs.logging.logHandler import LogHandler
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
 from configobj import ConfigObj
 from ovs.dal.lists.vmachinelist import VMachineList
 
-memcache_ini =ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
 memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'],]
 memcache_servers = map(lambda m: memcache_ini.get(m)['location'], memcache_nodes)
 
@@ -88,6 +92,26 @@ celery.conf.CELERYBEAT_SCHEDULE = {
 }
 
 loghandler = LogHandler('celery.log')
+
+
+@task_postrun.connect
+def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs=None, **kwds):
+    """
+    Hook for celery postrun event
+    """
+    _ = sender, task, args, kwargs, kwds
+    MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
+
+
+@worker_process_init.connect
+def worker_process_init_handler(args=None, kwargs=None, **kwds):
+    """
+    Hook for process init
+    """
+    _ = args, kwargs, kwds
+    VolatileFactory.store = None
+    PersistentFactory.store = None
+
 
 if __name__ == '__main__':
     celery.start()

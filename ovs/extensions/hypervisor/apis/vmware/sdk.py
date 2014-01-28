@@ -15,7 +15,6 @@
 """
 This module contains all code for using the VMware SOAP API/SDK
 """
-
 from time import sleep
 import datetime
 import re
@@ -139,8 +138,7 @@ class Sdk(object):
                 return True
             else:
                 error = result.info.error.localizedMessage
-                raise Exception(
-                    ('%s: %s' % (message, error)) if message else error)
+                raise Exception(('%s: %s' % (message, error)) if message else error)
         raise Exception(('%s: %s' % (message, 'Unexpected result'))
                         if message else 'Unexpected result')
 
@@ -213,6 +211,26 @@ class Sdk(object):
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
         vm = self._get_object(vmid)
         return vm
+
+    @authenticated
+    def get_vms(self, ip, mountpoint, esxhost=None):
+        """
+        Get all vMachines using a given nfs share
+        """
+        esxhost = self._validate_host(esxhost)
+        datastore = self.get_datastore(ip, mountpoint, esxhost)
+        filtered_vms = []
+        vms = self._get_object(esxhost,
+                               prop_type='VirtualMachine',
+                               traversal={'name': 'HostSystemTraversalSpec',
+                                          'type': 'HostSystem',
+                                          'path': 'vm'},
+                               properties=['name', 'config'])
+        for vm in vms:
+            mapping = self._get_vm_datastore_mapping(vm)
+            if datastore.name in mapping:
+                filtered_vms.append(vm)
+        return filtered_vms
 
     @authenticated
     def add_physical_disk(self, vmname, devicename, disklabel, filename, esxhost=None, wait=False):
@@ -652,7 +670,7 @@ class Sdk(object):
         return task
 
     @authenticated
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
         """
@@ -660,7 +678,7 @@ class Sdk(object):
         esxhost = self._validate_host(esxhost)
         host_data = self._get_host_data(esxhost)
 
-        datastore = self._get_object(source_vm.datastore[0][0])
+        datastore = self.get_datastore(ip, mountpoint, esxhost)
         # Build basic config information
         config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
         config.name = name
@@ -669,8 +687,7 @@ class Sdk(object):
         config.guestId = source_vm.config.guestId
         config.deviceChange = []
         config.extraConfig = []
-        config.files = self._create_file_info(
-            self._client.factory, datastore.name)
+        config.files = self._create_file_info(self._client.factory, datastore.name)
 
         disk_controller_key = -101
         config.deviceChange.append(
@@ -684,8 +701,7 @@ class Sdk(object):
                                   disk, disks.index(disk), datastore))
 
         # Add network
-        nw_type = type(self._client.factory.create(
-            'ns0:VirtualEthernetCardNetworkBackingInfo'))
+        nw_type = type(self._client.factory.create('ns0:VirtualEthernetCardNetworkBackingInfo'))
         for device in source_vm.config.hardware.device:
             if hasattr(device, 'backing') and type(device.backing) == nw_type:
                 config.deviceChange.append(
@@ -1098,19 +1114,10 @@ class Sdk(object):
         @return: A tuple. First item: vm config, second item: Device if a vmdk was given
         """
 
-        def check_filename(bf, fn):
-            match = re.search('\[[^\]]+\]\s(.+)', bf)
-            return match and match.group(1) == fn
-
-        def check_datastore(bf, ds):
-            match = re.search('\[([^\]]+)\]\s.+', bf)
-            return match and match.group(1) == ds.name
-
         filename = filename.replace('-flat.vmdk', '.vmdk')  # Support both -flat.vmdk and .vmdk
+        if not filename.endswith('.vmdk') and not filename.endswith('.vmx'):
+            raise ValueError('Unexpected filetype')
         esxhost = self._validate_host(esxhost)
-
-        virtual_disk_type = self._client.factory.create('ns0:VirtualDisk')
-        flat_type = self._client.factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
 
         datastore = self.get_datastore(ip, mountpoint, esxhost=esxhost)
         if not datastore:
@@ -1125,24 +1132,44 @@ class Sdk(object):
         if not vms:
             raise RuntimeError('No vMachines found')
         for vm in vms:
-            if filename.endswith('.vmdk'):
-                for device in vm.config.hardware.device:
-                    if isinstance(device, type(virtual_disk_type)):
-                        if device.backing is not None and \
-                                isinstance(device.backing, type(flat_type)):
-                            backingfile = device.backing.fileName
-                            if check_filename(backingfile, filename) and \
-                                    check_datastore(backingfile, datastore):
-                                return vm, device
-            elif filename.endswith('.vmx'):
-                backingfile = vm.config.files.vmPathName
-                if check_filename(backingfile, filename) and \
-                        check_datastore(backingfile, datastore):
-                    return vm, None
-            else:
-                raise ValueError('Unexpected filetype')
-
+            mapping = self._get_vm_datastore_mapping(vm)
+            if datastore.name in mapping:
+                if filename in mapping[datastore.name]:
+                    return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
+
+    def _get_vm_datastore_mapping(self, vm):
+        """
+        Creates a datastore mapping for a vm's devices
+        Structure
+            {<datastore name>: {<backing filename>: <device>,
+                                <backing filename>: <device>},
+             <datastore name>: {<backing filename>: <device>}}
+        Example
+            {'datastore A': {'/machine1/machine1.vmx': <device>,
+                             '/machine1/disk1.vmdk': <device>},
+             'datastore B': {'/machine1/disk2.vmdk': <device>}}
+        """
+        def extract_names(backingfile, given_mapping, metadata=None):
+            match = re.search('\[([^\]]+)\]\s(.+)', backingfile)
+            if match:
+                datastore_name = match.group(1)
+                filename = match.group(2)
+                if datastore_name not in mapping:
+                    given_mapping[datastore_name] = {}
+                given_mapping[datastore_name][filename] = metadata
+            return given_mapping
+
+        virtual_disk_type = self._client.factory.create('ns0:VirtualDisk')
+        flat_type = self._client.factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
+
+        mapping = {}
+        for device in vm.config.hardware.device:
+            if isinstance(device, type(virtual_disk_type)):
+                if device.backing is not None and isinstance(device.backing, type(flat_type)):
+                    mapping = extract_names(device.backing.fileName, mapping, device)
+        mapping = extract_names(vm.config.files.vmPathName, mapping)
+        return mapping
 
     def _get_host_data(self, esxhost):
         """
