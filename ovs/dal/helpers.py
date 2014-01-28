@@ -50,8 +50,7 @@ class Descriptor(object):
             if self._descriptor is None:
                 Toolbox.log_cache_hit('descriptor', False)
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
-                name = filename.replace(os.path.dirname(filename) + os.path.sep, '') \
-                    .replace('.py', '')
+                name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
                 self._descriptor = {'name': name,
                                     'source': os.path.relpath(filename, os.path.dirname(__file__)),
                                     'type': object_type.__name__}
@@ -175,12 +174,12 @@ class Toolbox(object):
         return correct, allowed_types, given_type
 
     @staticmethod
-    def log_cache_hit(type, hit):
+    def log_cache_hit(cache_type, hit):
         """
         Registers a cache hit or miss with a specific type
         """
         volatile = VolatileFactory.get_client()
-        key = 'ovs_stats_cache_%s_%s' % (type, 'hit' if hit else 'miss')
+        key = 'ovs_stats_cache_%s_%s' % (cache_type, 'hit' if hit else 'miss')
         try:
             successfull = volatile.incr(key)
             if not successfull:

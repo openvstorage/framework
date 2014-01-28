@@ -40,7 +40,9 @@ class VolatileFactory(object):
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 memcache_servers = list()
                 memcache_config = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-                nodes = memcache_config.get('main')['nodes'] if type(memcache_config.get('main')['nodes']) == list else [memcache_config.get('main')['nodes'],]
+                nodes = memcache_config.get('main')['nodes'] if type(memcache_config.get('main')['nodes']) == list else [memcache_config.get('main')['nodes']]
+                nodes = [node.strip() for node in nodes]
+                nodes.sort()
                 for node in nodes:
                     location = memcache_config.get(node)['location']
                     memcache_servers.append(location)
