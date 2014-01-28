@@ -58,7 +58,7 @@ class VMware(Hypervisor):
         pass
 
     @Hypervisor.connected
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Create a new vmachine from an existing template
         @param name:
@@ -66,7 +66,7 @@ class VMware(Hypervisor):
         @param target_pm: hypervisor object to create new vmachine on
         @return: celery task
         """
-        task = self.sdk.create_vm_from_template(name, source_vm, disks, esxhost, wait)
+        task = self.sdk.create_vm_from_template(name, source_vm, disks, ip, mountpoint, esxhost, wait)
         if wait is True:
             if self.sdk.validate_result(task):
                 task_info = self.sdk.get_task_info(task)

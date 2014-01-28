@@ -139,8 +139,7 @@ class Sdk(object):
                 return True
             else:
                 error = result.info.error.localizedMessage
-                raise Exception(
-                    ('%s: %s' % (message, error)) if message else error)
+                raise Exception(('%s: %s' % (message, error)) if message else error)
         raise Exception(('%s: %s' % (message, 'Unexpected result'))
                         if message else 'Unexpected result')
 
@@ -652,7 +651,7 @@ class Sdk(object):
         return task
 
     @authenticated
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
         """
@@ -660,7 +659,7 @@ class Sdk(object):
         esxhost = self._validate_host(esxhost)
         host_data = self._get_host_data(esxhost)
 
-        datastore = self._get_object(source_vm.datastore[0][0])
+        datastore = self.get_datastore(ip, mountpoint, esxhost)
         # Build basic config information
         config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
         config.name = name
@@ -669,8 +668,7 @@ class Sdk(object):
         config.guestId = source_vm.config.guestId
         config.deviceChange = []
         config.extraConfig = []
-        config.files = self._create_file_info(
-            self._client.factory, datastore.name)
+        config.files = self._create_file_info(self._client.factory, datastore.name)
 
         disk_controller_key = -101
         config.deviceChange.append(
@@ -684,8 +682,7 @@ class Sdk(object):
                                   disk, disks.index(disk), datastore))
 
         # Add network
-        nw_type = type(self._client.factory.create(
-            'ns0:VirtualEthernetCardNetworkBackingInfo'))
+        nw_type = type(self._client.factory.create('ns0:VirtualEthernetCardNetworkBackingInfo'))
         for device in source_vm.config.hardware.device:
             if hasattr(device, 'backing') and type(device.backing) == nw_type:
                 config.deviceChange.append(

@@ -81,19 +81,21 @@ class VMachineController(object):
         if not template_vm.pmachine.hvtype == target_pm.hvtype:
             raise RuntimeError('Source and target hypervisor not identical')
 
-        vsr = None
-        for vsr in vpool.vsrs:
-            if vsr.serving_vmachine.pmachine.guid == target_pm.guid:
-                break
+        target_vsr = None
+        source_vsr = None
+        for vpool_vsr in vpool.vsrs:
+            if vpool_vsr.serving_vmachine.pmachine_guid == target_pm.guid:
+                target_vsr = vpool_vsr
+            if vpool_vsr.serving_vmachine.pmachine_guid == template_vm.pmachine_guid:
+                source_vsr = vpool_vsr
+        if target_vsr is None:
             raise RuntimeError('Volume not served on target hypervisor')
-        if vsr is None:
-            raise RuntimeError('No VSR found')
 
         source_hv = Factory.get(template_vm.pmachine)
         target_hv = Factory.get(target_pm)
-        if not source_hv.is_datastore_available(vsr.ip, vsr.mountpoint):
+        if not source_hv.is_datastore_available(source_vsr.ip, source_vsr.mountpoint):
             raise RuntimeError('Datastore unavailable on source hypervisor')
-        if not target_hv.is_datastore_available(vsr.ip, vsr.mountpoint):
+        if not target_hv.is_datastore_available(target_vsr.ip, target_vsr.mountpoint):
             raise RuntimeError('Datastore unavailable on target hypervisor')
 
         source_vm = source_hv.get_vm_object(template_vm.hypervisorid)
@@ -103,10 +105,6 @@ class VMachineController(object):
         name_duplicates = VMachineList.get_vmachine_by_name(name)
         if name_duplicates is not None and len(name_duplicates) > 0:
             raise RuntimeError('A vMachine with name {0} already exists'.format(name))
-
-        # @todo verify all disks can be cloned on target
-        # @todo ie vpool is available on both hypervisors
-        # @todo if so, continue
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
@@ -132,13 +130,15 @@ class VMachineController(object):
                 disks.append(result)
                 print 'disk appended: {0}'.format(result)
         except Exception:
-            # @todo cleanup strategy to be defined
+            # @TODO cleanup strategy to be defined
             new_vm.delete()
             raise
 
         try:
-            result = target_hv.create_vm_from_template(name, source_vm, disks,
-                                                       esxhost=None, wait=True)
+            result = target_hv.create_vm_from_template(
+                name, source_vm, disks, target_vsr.ip, target_vsr.mountpoint,
+                esxhost=None, wait=True
+            )
         except:
             VMachineController.delete(machineguid=new_vm.guid)
             raise

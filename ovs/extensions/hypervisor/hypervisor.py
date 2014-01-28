@@ -63,7 +63,7 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Abstract method
         """
