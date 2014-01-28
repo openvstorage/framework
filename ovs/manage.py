@@ -405,7 +405,7 @@ class Control():
             _init_volumedriver()
             subprocess.call(['service', 'processmanager', 'start'])
             # Now that the vsa has been modelled restart ovs workers for correct queues to get defined
-            subprocess.call('jsprocess', 'restart', '-n', 'ovs_workers')
+            subprocess.call(['jsprocess', 'restart', '-n', 'ovs_workers'])
 
     def _package_is_running(self, package):
         """
