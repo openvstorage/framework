@@ -105,6 +105,13 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
+    def get_vms_by_nfs_mountinfo(self, ip, mountpoint):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
     def is_datastore_available(self, ip, mountpoint, esxhost=None):
         """
         Abstract method

@@ -128,6 +128,14 @@ class VMware(Hypervisor):
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
 
     @Hypervisor.connected
+    def get_vms_by_nfs_mountinfo(self, ip, mountpoint):
+        """
+        Gets a list of agnostic vm objects for a given ip and mountpoint
+        """
+        for vm in self.sdk.get_vms(ip, mountpoint):
+            yield self.sdk.make_agnostic_config(vm)
+
+    @Hypervisor.connected
     def is_datastore_available(self, ip, mountpoint, esxhost=None):
         """
         @param ip : hypervisor ip to query for datastore presence

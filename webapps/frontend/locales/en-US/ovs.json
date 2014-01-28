@@ -146,6 +146,17 @@
         "detail": {
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties."
+        },
+        "sync": {
+            "title": "Sync all vMachines using __what__",
+            "warning": "Are you sure you want to sync all vMachines using the vPool?",
+            "yes": "Start sync",
+            "no": "Close",
+            "marked": "Sync scheduled",
+            "markedmsg": "A sync will be executed",
+            "done": "vPool synced",
+            "donemsg": "All vMachines using vPool __what__ synced",
+            "errormsg": "syncing all vMachines using __what__"
         }
     },
     "statistics": {
@@ -382,6 +393,7 @@
         "vsa": "&#xf0c2;",
         "fromtemplate": "&#xf045;",
         "notchecked": "&#xf096;",
-        "checked": "&#xf046;"
+        "checked": "&#xf046;",
+        "sync": "&#xf0ed;"
     }
 }

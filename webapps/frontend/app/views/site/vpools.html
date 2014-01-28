@@ -31,6 +31,9 @@ limitations under the License.
                 <td><span data-bind="text: backendType"></span></td>
                 <td><span data-bind="text: backendConnection"></span></td>
                 <td><span data-bind="text: backendLogin"></span></td>
+                <td>
+                    <i data-bind="click: function() { $root.sync($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.sync"></i>
+                </td>
             </tr>
         </table>
     </div>
