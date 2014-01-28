@@ -104,7 +104,7 @@ class ConfigHelper(object):
         all_nodes = list(nodes)
         if not config['name'] in all_nodes:
             all_nodes.append(config['name'])
-            grid_ini.update({'main': {'nodes': all_nodes}})
+        grid_ini.update({'main': {'nodes': all_nodes}})
         for node in nodes:
             grid_ini.update({node: {'location': ini.get(node)['location']}})
         grid_ini.update({config['name']: {'location': '{}:{}'.format(config['ip'], config['port'])}})
