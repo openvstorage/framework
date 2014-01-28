@@ -15,8 +15,6 @@
 """
 This module contains all code for using the VMware SOAP API/SDK
 """
-from mercurial.localrepo import filteredpropertycache
-
 from time import sleep
 import datetime
 import re
