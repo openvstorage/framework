@@ -1,0 +1,54 @@
+* {
+    margin: 0;
+}
+
+html, body {
+    height: 100%;
+}
+.stretch {
+    height: 100%;
+}
+div[data-view] {
+    height: 100%;
+}
+
+.wrapper {
+    min-height: 100%;
+    height: auto;
+}
+
+.footer {
+    clear: both;
+    position: relative;
+    z-index: 10;
+    height: 60px;
+    margin-top: -60px;
+}
+
+.page-host {
+    position: static !important;  /* Negate default durandal css */
+    top: auto !important;         /* Negate default durandal css */
+    padding-top: 70px;
+    padding-bottom: 60px;
+}
+
+.hand {
+    cursor: pointer;
+}
+.forbidden {
+    cursor: no-drop;
+}
+.pointer {
+    cursor: default;
+}
+
+.quote {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    border-left: 5px solid #eeeeee;
+}
+
+.popover {
+    max-width: 600px !important;
+    width: auto !important;
+}
