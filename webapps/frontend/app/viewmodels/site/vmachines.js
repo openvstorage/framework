@@ -33,13 +33,13 @@ define([
         self.vMachineHeaders = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: 150       },
             { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 150       },
-            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 150       },
+            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 100       },
             { key: undefined,      value: $.t('ovs:generic.vdisks'),     width: 60        },
             { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110       },
             { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100       },
             { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55        },
-            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 100       },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 100       },
+            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 120       },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 120       },
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 100       }
         ];
