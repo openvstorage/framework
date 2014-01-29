@@ -62,7 +62,7 @@ class VolumeStorageRouterClient(object):
                 vsr = vpool.vsrs[0]
             else:
                 raise ValueError('Cannot find vsr for vpool {0}'.format(vpool.guid))
-        self._host = vsr.ip
+        self._host = vsr.cluster_ip
         self._port = vsr.port
         client = storagerouterclient.StorageRouterClient(str(self._host), int(self._port))
         vsr_cache[vsr.vpool_guid] = client

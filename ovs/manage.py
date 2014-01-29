@@ -39,7 +39,7 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
 from ovs.extensions.fs.fstab import Fstab
 
-def boxed_message(lines, character='+', maxlength=60):
+def boxed_message(lines, character='+', maxlength=80):
     """
     Embeds a set of lines into a box
     """
@@ -171,18 +171,6 @@ class Configure():
             os.remove('/etc/nginx/sites-enabled/default')
 
     @staticmethod
-    def _get_filesystems():
-        try:
-            output = subprocess.check_output(['mount', '-v']).splitlines()
-        except subprocess.CalledProcessError:
-            output = []
-        all_mounts = map(lambda m: m.split()[2], output)
-        mount_regex = re.compile('^/$|/dev|/sys|/run|/proc|{}|{}'.format(Configuration.get('ovs.core.db.mountpoint'),
-                                                                            Configuration.get('volumedriver.metadata')))
-        filesystems = filter(lambda d: not mount_regex.match(d), all_mounts)
-        return filesystems
-
-    @staticmethod
     def _check_ceph():
         ceph_config_dir = os.path.join(os.sep, 'etc', 'ceph')
         if not os.path.exists(ceph_config_dir) or \
@@ -203,7 +191,14 @@ class Configure():
         for path in mountpoints:
             if not os.path.exists(path) or not os.path.ismount(path):
                 raise ValueError('Path to {} does not exist or is not a mountpoint'.format(path))
-        filesystems = _get_filesystems()
+        try:
+            output = subprocess.check_output(['mount', '-v']).splitlines()
+        except subprocess.CalledProcessError:
+            output = []
+        all_mounts = map(lambda m: m.split()[2], output)
+        mount_regex = re.compile('^/$|/dev|/sys|/run|/proc|{}|{}'.format(Configuration.get('ovs.core.db.mountpoint'),
+                                                                            Configuration.get('volumedriver.metadata')))
+        filesystems = filter(lambda d: not mount_regex.match(d), all_mounts)
         volumedriver_cache_mountpoint = Configuration.get('volumedriver.cache.mountpoint', checkExists=True)
         if not volumedriver_cache_mountpoint:
             volumedriver_cache_mountpoint = Console.askChoice(filesystems, 'Select cache mountpoint')
@@ -246,7 +241,7 @@ class Configure():
             ipaddresses = Net.getIpAddresses()
             grid_ip = Configuration.get('ovs.grid.ip')
             if grid_ip in ipaddresses: ipaddresses.remove(grid_ip)
-            if '127.0.0.1' in ipaddresses: ipaddresses.remove(grid_ip)
+            if '127.0.0.1' in ipaddresses: ipaddresses.remove('127.0.0.1')
             if not ipaddresses:
                 raise RuntimeError('No available ip addresses found suitable for volumerouter storage ip')
             volumedriver_storageip = Console.askChoice(ipaddresses, 'Select storage ip address for this vpool')
@@ -286,23 +281,21 @@ class Configure():
             #Create local backend filesystem
             if distributed_filesystem_mountpoint in filesystems:
                 subprocess.call(['umount', distributed_filesystem_mountpoint])
-            ceph_ok = check_ceph()
+            ceph_ok = Configure()._check_ceph()
             if not ceph_ok:
                 print boxed_message(['No or incomplete configuration files found for your Ceph S3 compatible storage backend',
                                      'Now is the time to copy following files',
-                                     '   CEPH_SERVER:/etc/ceph/ceph.conf -> /etc/ceph/ceph.conf',
-                                     '   CEPH_SERVER:/etc/ceph/ceph.client.admin.keyring -> /etc/ceph/ceph.keyring',
+                                     ' CEPH_SERVER:/etc/ceph/ceph.conf -> /etc/ceph/ceph.conf',
+                                     ' CEPH_SERVER:/etc/ceph/ceph.client.admin.keyring -> /etc/ceph/ceph.keyring',
                                      'to make sure we can connect our ceph filesystem',
                                      'When done continue the initialization here'])
                 ceph_continue = Console.askYesNo('Continue initialization')
                 if not ceph_continue:
-                    print "Exiting initialization"
-                    exit()
-                ceph_ok = check_ceph()
+                    raise RuntimeError("Exiting initialization")
+                ceph_ok = Configure()._check_ceph()
                 if not ceph_ok:
-                    print "Ceph config still not ok, exiting initialization"
-                    exit()
-            subprocess.call(['ceph-fuse', '-m', '{}:6789'.format(connection_host), distributed_filesystem_mountpoint])
+                    raise("Ceph config still not ok, exiting initialization")
+            #subprocess.call(['ceph-fuse', '-m', '{}:6789'.format(connection_host), distributed_filesystem_mountpoint])
             fstab = Fstab()
             fstab.removeConfigByDirectory(distributed_filesystem_mountpoint)
             fstab.addConfig('id=admin,conf=/etc/ceph/ceph.conf', distributed_filesystem_mountpoint, 'fuse.ceph', 'defaults,noatime', '0', '2')

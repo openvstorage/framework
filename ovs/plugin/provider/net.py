@@ -31,4 +31,4 @@ class Net(object):
     getHostname = None
 
 from ovs.plugin.injection.injector import Injector
-Process = Injector.inject(Net)
+Net = Injector.inject(Net)

@@ -201,7 +201,7 @@ if options.filesystems:
     print 'Creating filesystems...'
     mounted = check_output("mount | cut -d ' ' -f 1", shell=True).strip().split('\n')
     # Create partitions on HDD
-#     print '  On HDD...'
+    print '  On HDD...'
     if '/dev/sdb1' in mounted:
         run_command('umount /dev/sdb1', fail=False)
     if '/dev/sdb2' in mounted:
@@ -211,7 +211,7 @@ if options.filesystems:
     run_command('parted /dev/sdb -s mklabel gpt')
     run_command('parted /dev/sdb -s mkpart backendfs 2MB 80%')
     run_command('parted /dev/sdb -s mkpart distribfs 80% 90%')
-    run_command('parted /dev/sdb -s mkpart tempfs 2MB 10%')
+    run_command('parted /dev/sdb -s mkpart tempfs 90% 100%')
     run_command('mkfs.ext4 -q /dev/sdb1 -L backendfs')
     run_command('mkfs.ext4 -q /dev/sdb2 -L distribfs')
     run_command('mkfs.ext4 -q /dev/sdb3 -L tempfs')
