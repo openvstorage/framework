@@ -38,10 +38,16 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Overview of all vPools
         """
-        _ = request, format
-        vpools = VPoolList.get_vpools().reduced
-        serializer = SimpleSerializer(vpools, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            vpools = VPoolList.get_vpools()
+            serializer = FullSerializer
+        else:
+            vpools = VPoolList.get_vpools().reduced
+            serializer = SimpleSerializer
+        serialized = serializer(VPool, instance=vpools, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

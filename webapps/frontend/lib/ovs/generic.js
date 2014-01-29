@@ -188,6 +188,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
+    function xhrCompleted(token) {
+        return !(token !== undefined && token.state() === 'pending');
+    }
     function removeElement(array, element) {
         var index = array.indexOf(element);
         if (index !== -1) {
@@ -227,14 +230,16 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
-    function crossFiller(newKeyList, currentKeyList, objectList, objectLoader, key) {
-        //               Arr.        Arr             Obs. Arr    Function      Obs.
-        var i, j;
+    function crossFiller(newKeyList, objectList, objectLoader, key) {
+        //               Arr.        Obs. Arr    Function      Obs.
+        var i, j, currentKeyList = [];
+        for (i = 0; i < objectList().length; i += 1) {
+            currentKeyList.push(objectList()[i][key]());
+        }
         for (i = 0; i < newKeyList.length; i += 1) {
             if ($.inArray(newKeyList[i], currentKeyList) === -1) {
                 // One of the new keys is not yet in our current key list. This means
                 // we'll have to load the object.
-                currentKeyList.push(newKeyList[i]);
                 objectList.push(objectLoader(newKeyList[i]));
             }
         }
@@ -245,20 +250,20 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 for (j = 0; j < objectList().length; j += 1) {
                     if (objectList()[j][key]() === currentKeyList[i]) {
                         objectList.splice(j, 1);
+                        break;
                     }
                 }
-                currentKeyList.splice(i, 1);
             }
         }
     }
     function numberSort(itemA, itemB) {
-        if (itemA === undefined && itemB !== undefined) {
+        if ((itemA === undefined || itemA === null) && (itemB !== undefined && itemB !== null)) {
             return -1;
         }
-        if (itemA === undefined && itemB === undefined) {
+        if ((itemA === undefined || itemA === null) && (itemB === undefined || itemB === null)) {
             return 0;
         }
-        if (itemA !== undefined && itemB === undefined) {
+        if ((itemA !== undefined && itemA !== null) && (itemB === undefined || itemB === null)) {
             return 1;
         }
         var regexAlpha = /[\d]+/g,
@@ -329,6 +334,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         alertError      : alertError,
         keys            : keys,
         xhrAbort        : xhrAbort,
+        xhrCompleted    : xhrCompleted,
         removeElement   : removeElement,
         smooth          : smooth,
         round           : round,

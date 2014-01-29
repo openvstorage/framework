@@ -47,10 +47,16 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Overview of all machines
         """
-        _ = request, format
-        vmachines = VMachineList.get_vmachines().reduced
-        serializer = SimpleSerializer(vmachines, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            vmachines = VMachineList.get_vmachines()
+            serializer = FullSerializer
+        else:
+            vmachines = VMachineList.get_vmachines().reduced
+            serializer = SimpleSerializer
+        serialized = serializer(VMachine, instance=vmachines, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
@@ -161,14 +167,19 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Filters vMachines based on a filter object
         """
-        _ = request, pk, format
+        _ = pk, format
         query_result = DataList({'object': VMachine,
                                  'data': DataList.select.DESCRIPTOR,
-                                 'query': request.DATA['query']}).data  # noqa
-        # pylint: enable=line-too-long
-        vmachines = DataObjectList(query_result, VMachine).reduced
-        serializer = SimpleSerializer(vmachines, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+                                 'query': request.DATA['query']}).data
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            vmachines = DataObjectList(query_result, VMachine)
+            serializer = FullSerializer
+        else:
+            vmachines = DataObjectList(query_result, VMachine).reduced
+            serializer = SimpleSerializer
+        serialized = serializer(VMachine, instance=vmachines, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @action()
     @expose(internal=True, customer=True)
