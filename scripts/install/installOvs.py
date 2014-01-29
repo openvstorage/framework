@@ -178,7 +178,7 @@ parser.add_option('-c', '--clean', dest='clean', action="store_true", default=Fa
 # Warning
 print boxed_message(['WARNING. Use with caution.',
                      'This script assumes it is executed on a virtual machine',
-                     'dedicated to Open vStorage. It will repartition the',
+                     'dedicated to Open vStorage. It might repartition the',
                      'disks without further interaction, destroying all data',
                      'present. If you want to install Open vStorage on an existing',
                      'machine, please refer to the Open vStorage documentation on',
@@ -261,16 +261,16 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
         with open('/etc/fstab', 'w') as fstab:
             fstab.write(contents)
 
-# Mount all filesystems
-print 'Mounting filesystem...'
-run_command('swapoff --all')
-run_command('mountall -q &> /dev/null')
-
-supported_quality_levels = ['unstable', 'test']
-quality_level = ask_choice(supported_quality_levels, question='Select qualitylevel', default_value='unstable')
+    # Mount all filesystems
+    print 'Mounting filesystem...'
+    run_command('swapoff --all')
+    run_command('mountall -q &> /dev/null')
 
 # Requesting information
 print 'Requesting information...'
+supported_quality_levels = ['unstable', 'test']
+quality_level = ask_choice(supported_quality_levels, question='Select qualitylevel', default_value='unstable')
+
 configuration = {'openvstorage': {}}
 configuration['openvstorage']['ovs.host.hypervisor'] = 'VMWARE'
 configuration['openvstorage']['ovs.host.name'] = ask_string('Enter hypervisor hostname', default_value='esxi')
