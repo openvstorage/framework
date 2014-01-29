@@ -26,6 +26,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
@@ -41,12 +42,13 @@ class VDiskController(object):
         List all known volumes on a specific vpool or on all
         """
         if vpool_guid is not None:
-            vsr_client = VolumeStorageRouterClient().load(vpool_guid)
+            vpool = VPool(vpool_guid)
+            vsr_client = VolumeStorageRouterClient().load(vpool=vpool)
             response = vsr_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                vsr_client = VolumeStorageRouterClient().load(vpool.guid)
+                vsr_client = VolumeStorageRouterClient().load(vpool=vpool)
                 response.extend(vsr_client.list_volumes())
         return response
 

@@ -41,6 +41,16 @@ class VolumeStorageRouter(DataObject):
                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes a vDisk, setting up it's additional helpers
+        """
+        DataObject.__init__(self, *args, **kwargs)
+        if self.vpool:
+            self._frozen = False
+            self.vsr_client = VolumeStorageRouterClient().load(vsr=self)
+            self._frozen = True
+
     def _status(self):
         """
         Fetches the Status of the VSR.

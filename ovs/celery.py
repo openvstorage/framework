@@ -49,6 +49,7 @@ celery = Celery('ovs',
                          'ovs.lib.vpool',
                          'ovs.lib.messaging',
                          'ovs.lib.scheduledtask',
+                         'ovs.lib.volumestoragerouter',
                          'ovs.extensions.hypervisor.hypervisors.vmware'])
 
 celery.conf.CELERY_RESULT_BACKEND = "cache"

@@ -44,24 +44,28 @@ class VolumeStorageRouterClient(object):
         self.empty_statistics = lambda: storagerouterclient.Statistics()
         self.empty_info = lambda: storagerouterclient.VolumeInfo()
 
-    def load(self, vpool_guid):
+    def load(self, vpool=None, vsr=None):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding vsr
         Loads and returns the client
         """
 
-        if vpool_guid in vsr_cache:
-            return vsr_cache[vpool_guid]
-        from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
-        vsrs = [vsr for vsr in VolumeStorageRouterList.get_volumestoragerouters() if vsr.vpool_guid == vpool_guid]
-        if vsrs:
-            vsr = vsrs[0]
-        else:
-            raise ValueError('Cannot find vsr for vpool {0}'.format(vpool_guid))
+        if vpool is None and vsr is None:
+            raise RuntimeError('One of the parameters vpool or vsr needs to be passed')
+        if vpool is not None and vsr is not None:
+            raise RuntimeError('Only one of the parameters vpool or vsr needs to be passed')
+
+        if vpool is not None:
+            if vpool.guid in vsr_cache:
+                return vsr_cache[vpool.guid]
+            if len(vpool.vsrs) > 0:
+                vsr = vpool.vsrs[0]
+            else:
+                raise ValueError('Cannot find vsr for vpool {0}'.format(vpool.guid))
         self._host = vsr.ip
         self._port = vsr.port
         client = storagerouterclient.StorageRouterClient(str(self._host), int(self._port))
-        vsr_cache[vpool_guid] = client
+        vsr_cache[vsr.vpool_guid] = client
         return client
 
 

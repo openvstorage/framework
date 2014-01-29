@@ -127,7 +127,20 @@
         "details": "VSA Details",
         "detail": {
             "title": "VSA",
-            "hostip": "Host IP"
+            "hostip": "Host IP",
+            "moveawaytitle": "Move all vDisks",
+            "moveawaymsg": "Move all vDisks away from this VSA and start them on other VSAs.",
+            "moveaway": {
+                "warning": "Are you sure you want to move all vDisks away?",
+                "title": "Are you sure",
+                "no": "Cancel",
+                "yes": "Move away",
+                "marked": "Moving away started",
+                "markedmsg": "All vDisks will be moved away from this VSA",
+                "done": "Move away complete",
+                "donemsg": "All vDisks have been moved away from __what__",
+                "errormsg": "moving away all vDisks from __what__"
+            }
         }
     },
     "vpools" : {
@@ -394,6 +407,8 @@
         "fromtemplate": "&#xf045;",
         "notchecked": "&#xf096;",
         "checked": "&#xf046;",
-        "sync": "&#xf0ed;"
+        "sync": "&#xf0ed;",
+        "management": "&#xf0b1;",
+        "moveaway": "&#xf074;"
     }
 }

@@ -145,7 +145,7 @@ define([
                         guids.push(data[i].guid);
                     }
                     generic.crossFiller(
-                        guids, self.data.pMachineGuids, self.data.pMachines,
+                        guids, self.data.pMachines,
                         function(guid) {
                             var pm = new PMachine(guid);
                             pm.load();

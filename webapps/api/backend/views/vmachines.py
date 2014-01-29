@@ -15,7 +15,6 @@
 """
 VMachine module
 """
-import json
 
 from rest_framework import status, viewsets
 from rest_framework.response import Response
@@ -30,6 +29,7 @@ from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
+from ovs.lib.volumestoragerouter import VolumeStorageRouterController
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
 from backend.decorators import required_roles, expose, validate
@@ -243,4 +243,16 @@ class VMachineViewSet(viewsets.ViewSet):
                                                                       start=start,
                                                                       name=str(request.DATA['name']),
                                                                       description=str(request.DATA['description']))
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'system'])
+    @validate(VMachine)
+    def move_away(self, request, obj):
+        """
+        Moves away all vDisks from all VSRs this VSA is serving
+        """
+        _ = request
+        task = VolumeStorageRouterController.move_away.delay(obj.guid)
         return Response(task.id, status=status.HTTP_200_OK)
