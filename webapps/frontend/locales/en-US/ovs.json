@@ -22,8 +22,8 @@
                 "undefined": "Unknown"
             },
             "foc": {
-                "ok_standalone": "Healthy",
-                "ok_sync": "Healty",
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
                 "unknown": "Unknown",
