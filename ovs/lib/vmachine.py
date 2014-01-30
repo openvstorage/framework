@@ -471,21 +471,22 @@ class VMachineController(object):
             datastores = dict([('{}:{}'.format(vsr.storage_ip, vsr.mountpoint), vsr) for vsr in vsrs])
             vdisk_guids = []
             for disk in vm_object['disks']:
-                datastore = vm_object['datastores'][disk['datastore']]
-                if datastore in datastores:
-                    vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
-                    if vdisk is not None:
-                        if vdisk.vmachine is None:
-                            MessageController.fire(MessageController.Type.EVENT,
-                                                   {'type': 'vdisk_attached',
-                                                    'metadata': {'vmachine_name': vmachine.name,
-                                                                 'vdisk_name': disk['name']}})
-                        vdisk.vmachine = vmachine
-                        vdisk.name = disk['name']
-                        vdisk.order = disk['order']
-                        vdisk.save()
-                        vdisk_guids.append(vdisk.guid)
-                        vdisks_synced += 1
+                if disk['datastore'] in vm_object['datastores']:
+                    datastore = vm_object['datastores'][disk['datastore']]
+                    if datastore in datastores:
+                        vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
+                        if vdisk is not None:
+                            if vdisk.vmachine is None:
+                                MessageController.fire(MessageController.Type.EVENT,
+                                                       {'type': 'vdisk_attached',
+                                                        'metadata': {'vmachine_name': vmachine.name,
+                                                                     'vdisk_name': disk['name']}})
+                            vdisk.vmachine = vmachine
+                            vdisk.name = disk['name']
+                            vdisk.order = disk['order']
+                            vdisk.save()
+                            vdisk_guids.append(vdisk.guid)
+                            vdisks_synced += 1
             for vdisk in vmachine.vdisks:
                 if vdisk.guid not in vdisk_guids:
                     MessageController.fire(MessageController.Type.EVENT,
