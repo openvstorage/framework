@@ -39,6 +39,7 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
 from ovs.extensions.fs.fstab import Fstab
 
+
 def boxed_message(lines, character='+', maxlength=80):
     """
     Embeds a set of lines into a box
@@ -71,6 +72,7 @@ def boxed_message(lines, character='+', maxlength=80):
                                                   character * 3))
     newlines.append(character * (maxlen + 10))
     return '\n'.join(newlines)
+
 
 class Configure():
     """
@@ -133,7 +135,7 @@ class Configure():
         vmachine.save()
 
         # @todo sync version number from master node
-        if master == None:
+        if master is None:
             from ovs.extensions.migration.migration import Migration
             Migration.migrate()
 
@@ -196,8 +198,10 @@ class Configure():
         except subprocess.CalledProcessError:
             output = []
         all_mounts = map(lambda m: m.split()[2], output)
-        mount_regex = re.compile('^/$|/dev|/sys|/run|/proc|{}|{}'.format(Configuration.get('ovs.core.db.mountpoint'),
-                                                                            Configuration.get('volumedriver.metadata')))
+        mount_regex = re.compile('^/$|/dev|/sys|/run|/proc|{}|{}'.format(
+            Configuration.get('ovs.core.db.mountpoint'),
+            Configuration.get('volumedriver.metadata')
+        ))
         filesystems = filter(lambda d: not mount_regex.match(d), all_mounts)
         volumedriver_cache_mountpoint = Configuration.get('volumedriver.cache.mountpoint', checkExists=True)
         if not volumedriver_cache_mountpoint:
@@ -240,8 +244,10 @@ class Configure():
         if not volumedriver_storageip:
             ipaddresses = Net.getIpAddresses()
             grid_ip = Configuration.get('ovs.grid.ip')
-            if grid_ip in ipaddresses: ipaddresses.remove(grid_ip)
-            if '127.0.0.1' in ipaddresses: ipaddresses.remove('127.0.0.1')
+            if grid_ip in ipaddresses:
+                ipaddresses.remove(grid_ip)
+            if '127.0.0.1' in ipaddresses:
+                ipaddresses.remove('127.0.0.1')
             if not ipaddresses:
                 raise RuntimeError('No available ip addresses found suitable for volumerouter storage ip')
             volumedriver_storageip = Console.askChoice(ipaddresses, 'Select storage ip address for this vpool')
@@ -294,7 +300,7 @@ class Configure():
                     raise RuntimeError("Exiting initialization")
                 ceph_ok = Configure()._check_ceph()
                 if not ceph_ok:
-                    raise("Ceph config still not ok, exiting initialization")
+                    raise RuntimeError("Ceph config still not ok, exiting initialization")
             #subprocess.call(['ceph-fuse', '-m', '{}:6789'.format(connection_host), distributed_filesystem_mountpoint])
             fstab = Fstab()
             fstab.removeConfigByDirectory(distributed_filesystem_mountpoint)
@@ -469,7 +475,7 @@ class Control():
                 vrouter = [vsr for vsr in this_vpool.vsrs if vsr.serving_vmachine_guid == vmachineguid][0]
                 hypervisor = Factory.get(vmachine.pmachine)
                 try:
-                    hypervisor.mount_nfs_datastore(vpool_name, vrouter.ip, vrouter.mountpoint)
+                    hypervisor.mount_nfs_datastore(vpool_name, vrouter.storage_ip, vrouter.mountpoint)
                     print '  Success'
                 except Exception as ex:
                     print '  Error, please mount the vPool manually. {0}'.format(str(ex))
