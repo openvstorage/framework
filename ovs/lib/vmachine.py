@@ -284,13 +284,19 @@ class VMachineController(object):
         elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
             vm = VMachineList.get_by_devicename_and_vpool(new_name, vsr.vpool)
             # The configuration has been updated (which happens in a tempfile), start a sync
-            if vm is not None:
-                try:
-                    VMachineController.sync_with_hypervisor(vm.guid, vsrid)
-                    vm.status = 'SYNC'
-                except:
-                    vm.status = 'SYNC_NOK'
-                vm.save()
+            if vm is None:
+                # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
+                # Let's create it anyway
+                VMachineController.create_from_voldrv(new_name, vsrid)
+            vm = VMachineList.get_by_devicename_and_vpool(new_name, vsr.vpool)
+            if vm is None:
+                raise RuntimeError('Could not create vMachine on rename. Aborting.')
+            try:
+                VMachineController.sync_with_hypervisor(vm.guid, vsrid)
+                vm.status = 'SYNC'
+            except:
+                vm.status = 'SYNC_NOK'
+            vm.save()
 
     @staticmethod
     @celery.task(name='ovs.machine.set_as_template')
