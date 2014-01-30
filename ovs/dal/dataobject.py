@@ -17,7 +17,7 @@ DataObject module
 """
 import uuid
 import copy
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.relations.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
@@ -477,10 +477,24 @@ class DataObject(object):
     ## Other CRUDs
     #######################
 
-    def delete(self):
+    def delete(self, abandon=False):
         """
         Delete the given object. It also invalidates certain lists
         """
+        # Check foreign relations
+        relations = RelationMapper.load_foreign_relations(self.__class__)
+        if relations is not None:
+            for key, info in relations.iteritems():
+                items = getattr(self, key)
+                if len(items) > 0:
+                    if abandon is True:
+                        for item in items:
+                            setattr(item, info['key'], None)
+                            item.save()
+                    else:
+                        raise LinkedObjectException('There are %s items left in self.%s' %
+                                                    (len(items), key))
+
         # Invalidate no-filter queries/lists pointing to this object
         try:
             self._mutex_listcache.acquire(60)

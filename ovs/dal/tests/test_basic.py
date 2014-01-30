@@ -916,3 +916,20 @@ class Basic(TestCase):
         self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
         disk1.delete()
         disk2.delete()
+
+    def test_delete_abandoning(self):
+        """
+        Validates the abandoning behavior of the delete method
+        """
+        machine = TestMachine()
+        machine.save()
+        disk = TestDisk()
+        disk.machine = machine
+        disk.save()
+        self.assertRaises(LinkedObjectException, machine.delete)
+        disk_1 = TestDisk(disk.guid)
+        self.assertIsNotNone(disk_1.machine, 'The machine should still be linked')
+        machine.delete(abandon=True)
+        disk_2 = TestDisk(disk.guid)
+        self.assertIsNone(disk_2.machine, 'The machine should be unlinked')
+        disk.delete()
