@@ -101,7 +101,7 @@ define([
             }
             self.viewportkeys = vIndexes.slice();
             return vItems;
-        });
+        }).extend({ throttle: 50 });
 
         self.step = function(next) {
             if (next) {

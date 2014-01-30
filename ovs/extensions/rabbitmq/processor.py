@@ -115,7 +115,7 @@ def process(queue, body):
                         # If task is already running, the revoke message will be ignored
                         revoke(task_id)
                     async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
-                    cache.set(key, async_result.id)  # Store the task id
+                    cache.set(key, async_result.id, 600)  # Store the task id
                     new_task_id = async_result.id
                 else:
                     async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
