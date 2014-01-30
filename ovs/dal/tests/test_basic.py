@@ -468,13 +468,6 @@ class Basic(TestCase):
         machine = TestMachine()
         machine.name = 'original'
         machine.save()
-        machine2 = TestMachine()
-        machine2.save()
-        diskx = TestDisk()
-        diskx.name = 'storage_test'
-        diskx.storage = machine2
-        diskx.save()
-        machine2.delete()  # Creating an orphaned object
         disks = []
         for i in xrange(0, 10):
             disk = TestDisk()
@@ -505,7 +498,6 @@ class Basic(TestCase):
         machine.delete()
         for disk in disks:
             disk.delete()
-        diskx.delete()
 
     def test_descriptors(self):
         """
