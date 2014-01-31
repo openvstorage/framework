@@ -76,6 +76,8 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Clones a machine
         """
+        if obj.is_internal or obj.is_vtemplate:
+            raise NotAcceptable('vMachine should not be a VSA or vTemplate')
         task = VMachineController.rollback.delay(machineguid=obj.guid,
                                                  timestamp=request.DATA['timestamp'])
         return Response(task.id, status=status.HTTP_200_OK)
@@ -88,6 +90,8 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Snapshots a given machine
         """
+        if obj.is_internal or obj.is_vtemplate:
+            raise NotAcceptable('vMachine should not be a VSA or vTemplate')
         label = str(request.DATA['name'])
         is_consistent = True if request.DATA['consistent'] else False  # Assure boolean type
         task = VMachineController.snapshot.delay(machineguid=obj.guid,
@@ -123,7 +127,7 @@ class VMachineViewSet(viewsets.ViewSet):
         vpool_guids = set()
         vmachine_guids = set()
         if obj.is_internal is False:
-            raise Http404
+            raise NotAcceptable('vMachine is not a VSA')
         for vsr in obj.served_vsrs:
             vpool_guids.add(vsr.vpool_guid)
             for vdisk in vsr.vpool.vdisks:
@@ -204,9 +208,9 @@ class VMachineViewSet(viewsets.ViewSet):
         try:
             pmachine = PMachine(request.DATA['pmachineguid'])
         except ObjectNotFoundException:
-            raise Http404
+            raise Http404('pMachine could not be found')
         if obj.is_vtemplate is False:
-            raise NotAcceptable
+            raise NotAcceptable('vMachine is not a vTemplate')
         task = VMachineController.create_from_template.delay(machineguid=obj.guid,
                                                              pmachineguid=pmachine.guid,
                                                              name=str(request.DATA['name']),
@@ -228,13 +232,13 @@ class VMachineViewSet(viewsets.ViewSet):
             for pmachienguid in pmachineguids:
                 _ = PMachine(pmachienguid)
         except ObjectNotFoundException:
-            raise Http404
+            raise Http404('pMachine could not be found')
         if obj.is_vtemplate is False:
-            raise NotAcceptable
+            raise NotAcceptable('vMachine is not a vTemplate')
         amount = request.DATA['amount']
         start = request.DATA['start']
         if not isinstance(amount, int) or not isinstance(start, int):
-            raise NotAcceptable
+            raise NotAcceptable('Fields amount and start should be numeric')
         amount = max(1, amount)
         start = max(0, start)
         task = VMachineController.create_multiple_from_template.delay(machineguid=obj.guid,
@@ -254,5 +258,24 @@ class VMachineViewSet(viewsets.ViewSet):
         Moves away all vDisks from all VSRs this VSA is serving
         """
         _ = request
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
         task = VolumeStorageRouterController.move_away.delay(obj.guid)
         return Response(task.id, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    def get_target_pmachines(self, request, obj):
+        """
+        Gets all possible target pMachines for a given vMachine
+        """
+        _ = request
+        if not obj.is_vtemplate:
+            raise NotAcceptable('vMachine is not a vTemplate')
+        pmachine_guids = set()
+        for vsr in obj.vpool.vsrs:
+            pmachine_guids.add(vsr.serving_vmachine.pmachine_guid)
+        guids = [{'guid': guid} for guid in pmachine_guids]
+        return Response(guids, status=status.HTTP_200_OK)

@@ -136,9 +136,10 @@ define([
             if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.guid()) {
                 self.data.vm(new VMachine(self.data.guid()));
                 self.data.vm().load();
+                self.data.selectedPMachines([]);
             }
             generic.xhrAbort(self.loadPMachinesHandle);
-            self.loadPMachinesHandle = api.get('pmachines')
+            self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines')
                 .done(function(data) {
                     var i, guids = [];
                     for (i = 0; i < data.length; i += 1) {
@@ -150,7 +151,7 @@ define([
                             var pm = new PMachine(guid);
                             pm.load();
                             return pm;
-                        }
+                        }, 'guid'
                     );
                 });
         };

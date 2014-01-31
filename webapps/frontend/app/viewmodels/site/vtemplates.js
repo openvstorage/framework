@@ -147,7 +147,7 @@ define([
         self.createFromTemplate = function(guid) {
             dialog.show(new CreateFromTemplateWizard({
                 modal: true,
-                pmachineguid: guid
+                vmachineguid: guid
             }));
         };
 
