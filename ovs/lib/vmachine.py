@@ -116,6 +116,13 @@ class VMachineController(object):
         new_vm.status = 'CREATED'
         new_vm.save()
 
+        vsrs = [vsr for vsr in template_vm.vpool.vsrs
+                if vsr.serving_vmachine.pmachine_guid == new_vm.pmachine_guid]
+        if len(vsrs) == 0:
+            raise RuntimeError('Cannot find VSR serving {0} on {1}'.format(new_vm.vpool.name,
+                                                                           new_vm.pmachine.name))
+        vsrguid = vsrs[0].guid
+
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
         try:
@@ -125,7 +132,8 @@ class VMachineController(object):
                     diskguid=disk.guid,
                     devicename=prefix,
                     location=new_vm.name.replace(' ', '_'),
-                    machineguid=new_vm.guid
+                    machineguid=new_vm.guid,
+                    vsrguid=vsrguid
                 )
                 disks.append(result)
                 print 'disk appended: {0}'.format(result)

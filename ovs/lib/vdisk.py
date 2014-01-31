@@ -23,6 +23,7 @@ import time
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -242,7 +243,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.create_from_template')
-    def create_from_template(diskguid, location, devicename, machineguid=None):
+    def create_from_template(diskguid, location, devicename, machineguid=None, vsrguid=None):
         """
         Create a disk from a template
 
@@ -262,6 +263,12 @@ class VDiskController(object):
         if not disk.vmachine.is_vtemplate:
             raise RuntimeError('The given disk does not belong to a template')
 
+        if vsrguid is not None:
+            vsr = VolumeStorageRouter(vsrguid)
+            vsr_client = vsr.vsr_client
+        else:
+            vsr_client = disk.vsr_client
+
         device_location = '{}/{}.vmdk'.format(location, devicename)
 
         new_disk = VDisk()
@@ -278,7 +285,7 @@ class VDiskController(object):
             disk.name, new_disk.name, device_location
         ))
         try:
-            volumeid = disk.vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
+            volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
             new_disk.volumeid = volumeid
             new_disk.save()
         except Exception as ex:
