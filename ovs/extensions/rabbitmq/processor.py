@@ -36,14 +36,7 @@ def process(queue, body):
 
         data = EventMessages.EventMessage().FromString(body)
 
-        mapping = {EventMessages.EventMessage.VolumeCreate:               # Disk create
-                       {'property': 'volume_create',
-                        'task': VDiskController.create_from_voldrv,
-                        'arguments': {'name': 'volumename',
-                                      'size': 'volumesize',
-                                      'path': 'volumepath',
-                                      '[NODE_ID]': 'vsrid'}},
-                   EventMessages.EventMessage.VolumeDelete:
+        mapping = {EventMessages.EventMessage.VolumeDelete:
                        {'property': 'volume_delete',
                         'task': VDiskController.delete_from_voldrv,
                         'arguments': {'name': 'volumename'}},
@@ -51,14 +44,16 @@ def process(queue, body):
                        {'property': 'volume_resize',
                         'task': VDiskController.resize_from_voldrv,
                         'arguments': {'name': 'volumename',
-                                      'size': 'volumesize'}},
+                                      'size': 'volumesize',
+                                      'path': 'volumepath',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.VolumeRename:
                        {'property': 'volume_rename',
                         'task': VDiskController.rename_from_voldrv,
                         'arguments': {'name': 'volumename',
                                       'old_path': 'volume_old_path',
                                       'new_path': 'volume_new_path'}},
-                   EventMessages.EventMessage.FileCreate:                 # Machine create
+                   EventMessages.EventMessage.FileCreate:
                        {'property': 'file_create',
                         'task': VMachineController.create_from_voldrv,
                         'arguments': {'path': 'name',
