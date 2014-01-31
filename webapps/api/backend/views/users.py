@@ -16,7 +16,7 @@
 Module for users
 """
 from backend.serializers.user import PasswordSerializer
-from backend.serializers.serializers import FullSerializer
+from backend.serializers.serializers import FullSerializer, SimpleSerializer
 from backend.decorators import required_roles, expose
 from backend.toolbox import Toolbox
 from rest_framework import status, viewsets
@@ -52,10 +52,16 @@ class UserViewSet(viewsets.ViewSet):
         """
         Lists all available Users
         """
-        _ = request, format
-        users = UserList.get_users()
-        serializer = FullSerializer(User, instance=users, many=True)
-        return Response(serializer.data)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            users = UserList.get_users()
+            serializer = FullSerializer
+        else:
+            users = UserList.get_users().reduced
+            serializer = SimpleSerializer
+        serialized = serializer(User, instance=users, many=True)
+        return Response(serialized.data)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

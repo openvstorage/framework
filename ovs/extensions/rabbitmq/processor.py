@@ -36,14 +36,7 @@ def process(queue, body):
 
         data = EventMessages.EventMessage().FromString(body)
 
-        mapping = {EventMessages.EventMessage.VolumeCreate:               # Disk create
-                       {'property': 'volume_create',
-                        'task': VDiskController.create_from_voldrv,
-                        'arguments': {'name': 'volumename',
-                                      'size': 'volumesize',
-                                      'path': 'volumepath',
-                                      '[NODE_ID]': 'vsrid'}},
-                   EventMessages.EventMessage.VolumeDelete:
+        mapping = {EventMessages.EventMessage.VolumeDelete:
                        {'property': 'volume_delete',
                         'task': VDiskController.delete_from_voldrv,
                         'arguments': {'name': 'volumename'}},
@@ -51,21 +44,25 @@ def process(queue, body):
                        {'property': 'volume_resize',
                         'task': VDiskController.resize_from_voldrv,
                         'arguments': {'name': 'volumename',
-                                      'size': 'volumesize'}},
+                                      'size': 'volumesize',
+                                      'path': 'volumepath',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.VolumeRename:
                        {'property': 'volume_rename',
                         'task': VDiskController.rename_from_voldrv,
                         'arguments': {'name': 'volumename',
                                       'old_path': 'volume_old_path',
                                       'new_path': 'volume_new_path'}},
-                   EventMessages.EventMessage.FileCreate:                 # Machine create
+                   EventMessages.EventMessage.FileCreate:
                        {'property': 'file_create',
                         'task': VMachineController.create_from_voldrv,
-                        'arguments': {'path': 'name'}},
+                        'arguments': {'path': 'name',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileDelete:
                        {'property': 'file_delete',
                         'task': VMachineController.delete_from_voldrv,
-                        'arguments': {'path': 'name'}},
+                        'arguments': {'path': 'name',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileRename:
                        {'property': 'file_rename',
                         'task': VMachineController.rename_from_voldrv,
@@ -113,7 +110,7 @@ def process(queue, body):
                         # If task is already running, the revoke message will be ignored
                         revoke(task_id)
                     async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)
-                    cache.set(key, async_result.id)  # Store the task id
+                    cache.set(key, async_result.id, 600)  # Store the task id
                     new_task_id = async_result.id
                 else:
                     async_result = task.s(**kwargs).apply_async(countdown=delay, routing_key=routing_key)

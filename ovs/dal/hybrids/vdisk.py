@@ -51,10 +51,13 @@ class VDisk(DataObject):
     # pylint: enable=line-too-long
 
     def __init__(self, *args, **kwargs):
+        """
+        Initializes a vDisk, setting up it's additional helpers
+        """
         DataObject.__init__(self, *args, **kwargs)
         if self.vpool:
             self._frozen = False
-            self.vsr_client = VolumeStorageRouterClient().load(self.vpool.guid)
+            self.vsr_client = VolumeStorageRouterClient().load(vpool=self.vpool)
             self._frozen = True
 
     def _snapshots(self):

@@ -15,7 +15,6 @@
 """
 Messaging module
 """
-from celery.signals import task_postrun
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.generic.filemutex import FileMutex
@@ -136,12 +135,3 @@ class MessageController(object):
         Gets the last messageid
         """
         return max([m['id'] for m in _cache.get('msg_messages', [])] + [0])
-
-
-@task_postrun.connect
-def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs=None, **kwds):
-    """
-    Hook for celery postrun event
-    """
-    _ = sender, task, args, kwargs, kwds
-    MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)

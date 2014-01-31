@@ -18,9 +18,10 @@ VPool module
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import link
+from rest_framework.decorators import link, action
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
+from ovs.lib.vpool import VPoolController
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
 from backend.decorators import required_roles, expose, validate
 
@@ -37,10 +38,16 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Overview of all vPools
         """
-        _ = request, format
-        vpools = VPoolList.get_vpools().reduced
-        serializer = SimpleSerializer(vpools, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            vpools = VPoolList.get_vpools()
+            serializer = FullSerializer
+        else:
+            vpools = VPoolList.get_vpools().reduced
+            serializer = SimpleSerializer
+        serialized = serializer(VPool, instance=vpools, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
@@ -77,3 +84,15 @@ class VPoolViewSet(viewsets.ViewSet):
             if disk.vmachine is not None and disk.vmachine.guid not in vmachine_guids:
                 vmachine_guids.append(disk.vmachine.guid)
         return Response(len(vmachine_guids), status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True)
+    @required_roles(['view', 'create'])
+    @validate(VPool)
+    def sync_vmachines(self, request, obj):
+        """
+        Syncs the vMachine of this vPool
+        """
+        _ = request
+        task = VPoolController.sync_with_hypervisor.delay(obj.guid)
+        return Response(task.id, status=status.HTTP_200_OK)

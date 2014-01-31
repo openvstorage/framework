@@ -50,3 +50,14 @@ class VolumeStorageRouterList(object):
         if volumestoragerouters:
             return DataObjectList(volumestoragerouters, VolumeStorageRouter)[0]
         return None
+
+    @staticmethod
+    def get_volumestoragerouters_by_vsa(machineguid):
+        """
+        Returns a list of all VolumeStorageRouters for vsa
+        """
+        volumestoragerouters = DataList({'object': VolumeStorageRouter,
+                                         'data': DataList.select.DESCRIPTOR,
+                                         'query': {'type': DataList.where_operator.AND,
+                                                   'items': [('serving_vmachine_guid', DataList.operator.EQUALS, machineguid)]}}).data
+        return DataObjectList(volumestoragerouters, VolumeStorageRouter)

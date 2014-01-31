@@ -36,3 +36,10 @@ class ObjectNotFoundException(Exception):
     Raised when an object was queries that doesn't exist
     """
     pass
+
+
+class LinkedObjectException(Exception):
+    """
+    Raised when there are linked objects when an object is deleted
+    """
+    pass

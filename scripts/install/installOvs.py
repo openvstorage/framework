@@ -178,7 +178,7 @@ parser.add_option('-c', '--clean', dest='clean', action="store_true", default=Fa
 # Warning
 print boxed_message(['WARNING. Use with caution.',
                      'This script assumes it is executed on a virtual machine',
-                     'dedicated to Open vStorage. It will repartition the',
+                     'dedicated to Open vStorage. It might repartition the',
                      'disks without further interaction, destroying all data',
                      'present. If you want to install Open vStorage on an existing',
                      'machine, please refer to the Open vStorage documentation on',
@@ -261,16 +261,16 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
         with open('/etc/fstab', 'w') as fstab:
             fstab.write(contents)
 
-# Mount all filesystems
-print 'Mounting filesystem...'
-run_command('swapoff --all')
-run_command('mountall -q &> /dev/null')
-
-supported_quality_levels = ['unstable', 'test']
-quality_level = ask_choice(supported_quality_levels, question='Select qualitylevel', default_value='unstable')
+    # Mount all filesystems
+    print 'Mounting filesystem...'
+    run_command('swapoff --all')
+    run_command('mountall -q &> /dev/null')
 
 # Requesting information
 print 'Requesting information...'
+supported_quality_levels = ['unstable', 'test']
+quality_level = ask_choice(supported_quality_levels, question='Select qualitylevel', default_value='unstable')
+
 configuration = {'openvstorage': {}}
 configuration['openvstorage']['ovs.host.hypervisor'] = 'VMWARE'
 configuration['openvstorage']['ovs.host.name'] = ask_string('Enter hypervisor hostname', default_value='esxi')
@@ -312,7 +312,7 @@ mountpoint = ask_choice(mountpoints, question='Select metadata mountpoint', defa
 mountpoints.remove(mountpoint)
 configuration['openvstorage-core']['volumedriver.metadata'] = mountpoint
 configuration['openvstorage-core']['volumedriver.arakoon.node.name'] = unique_id
-configuration['openvstorage-core']['ovs.core.rabbitmq.localnode.name'] = unique_id
+configuration['openvstorage-core']['ovs.core.broker.localnode.name'] = unique_id
 
 configuration['openvstorage-webapps'] = {}
 configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_integer('GUI certificate lifetime', min_value=1, max_value=365 * 10, default_value=365)
@@ -356,7 +356,6 @@ branch_mapping = {'unstable': 'default',
 # Quality level mapping: key = our qualitylevel, value = jumpscale quality level
 quality_mapping = {'unstable': 'test',
                    'test': 'test'}
-
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')

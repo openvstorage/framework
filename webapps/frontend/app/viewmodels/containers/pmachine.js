@@ -32,22 +32,25 @@ define([
         self.ipAddress = ko.observable();
         self.hvtype    = ko.observable();
 
+        self.fillData = function(data) {
+            self.name(data.name);
+            self.hvtype(data.hvtype);
+            self.ipAddress(data.ip);
+            self.loaded(true);
+            self.loading(false);
+        };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 api.get('pmachines/' + self.guid())
                     .done(function(data) {
-                        self.name(data.name);
-                        self.hvtype(data.hvtype);
-                        self.ipAddress(data.ip);
-
-                        self.loaded(true);
+                        self.fillData(data);
                         deferred.resolve();
                     })
                     .fail(deferred.reject)
                     .always(function() {
                         self.loading(false);
-                    })
+                    });
             }).promise();
         }
     };

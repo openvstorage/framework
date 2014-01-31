@@ -40,20 +40,36 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Overview of all vDisks
         """
-        _ = request, format
-        vmachineguid = self.request.QUERY_PARAMS.get('vmachineguid', None)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            reduced = False
+            serializer = FullSerializer
+        else:
+            reduced = True
+            serializer = SimpleSerializer
+        vmachineguid = request.QUERY_PARAMS.get('vmachineguid', None)
         if vmachineguid is None:
-            vdisks = VDiskList.get_vdisks().reduced
+            if reduced:
+                vdisks = VDiskList.get_vdisks().reduced
+            else:
+                vdisks = VDiskList.get_vdisks()
         else:
             vmachine = VMachine(vmachineguid)
             if vmachine.is_internal:
                 vdisks = []
                 for vsr in vmachine.served_vsrs:
-                    vdisks += vsr.vpool.vdisks.reduced
+                    if reduced:
+                        vdisks += vsr.vpool.vdisks.reduced
+                    else:
+                        vdisks += vsr.vpool.vdisks
             else:
-                vdisks = vmachine.vdisks.reduced
-        serializer = SimpleSerializer(vdisks, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+                if reduced:
+                    vdisks = vmachine.vdisks.reduced
+                else:
+                    vdisks = vmachine.vdisks
+        serialized = serializer(VDisk, instance=vdisks, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

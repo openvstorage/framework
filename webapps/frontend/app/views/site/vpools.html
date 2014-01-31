@@ -15,7 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:vpools.title"></h2>
-    <div data-bind="pager: { items: vPools, headers: vPoolHeaders, pagesize: 10, key: 'guid',
+    <div data-bind="pager: { items: vPools, headers: vPoolHeaders, pagesize: 10, key: 'guid', initialLoad: vPoolsInitialLoad,
                              enterViewport: loadVPool, viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
@@ -31,6 +31,9 @@ limitations under the License.
                 <td><span data-bind="text: backendType"></span></td>
                 <td><span data-bind="text: backendConnection"></span></td>
                 <td><span data-bind="text: backendLogin"></span></td>
+                <td>
+                    <i data-bind="click: function() { $root.sync($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.sync"></i>
+                </td>
             </tr>
         </table>
     </div>

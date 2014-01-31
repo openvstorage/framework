@@ -23,7 +23,7 @@ limitations under the License.
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vsa.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: vsasLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                        <span data-bind="visible: vSAsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vsa.helptitle',
                                              content: 'ovs:dashboard.panels.vsa.helpcontent'
@@ -33,7 +33,7 @@ limitations under the License.
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: vsas,
+                                        displaymode: 'table', items: vSAs,
                                         loadedObservable: 'loaded', colspan: 4
                                     }" >
                         <table data-dummy="dummy">
@@ -85,7 +85,7 @@ limitations under the License.
                 <!-- vMachines -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vmachines.title"></b>
-                    <a data-bind="text: vmachines().length,
+                    <a data-bind="text: vMachines().length,
                                   attr: { href: $root.shared.routing.loadHash('vmachines', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
@@ -104,8 +104,10 @@ limitations under the License.
                     <div class="row">
                         <div class="col-md-8"><span data-bind="text: name"></span></div>
                         <div class="col-md-4">
-                            <span data-bind="visible: $parent.topVmachineMode() === 'topstoreddata', lazyloader: { item: storedData }"></span>
-                            <span data-bind="visible: $parent.topVmachineMode() === 'topbandwidth', lazyloader: { item: bandwidth }"></span>
+                            <span data-bind="visible: $parent.topVmachineMode() === 'topstoreddata',
+                                             text: storedData"></span>
+                            <span data-bind="visible: $parent.topVmachineMode() === 'topbandwidth',
+                                             lazyloader: { item: bandwidth }"></span>
                         </div>
                     </div>
                  </div>
@@ -159,7 +161,7 @@ limitations under the License.
                 <!-- vPools -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vpools.title"></b>
-                    <a data-bind="text: vpools().length,
+                    <a data-bind="text: vPools().length,
                                   attr: { href: $root.shared.routing.loadHash('vpools', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">

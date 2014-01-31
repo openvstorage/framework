@@ -29,6 +29,7 @@ class Configuration(object):
         raise RuntimeError('This class should not be instantiated.')
 
     get = None
+    getHRD = None
 
 from ovs.plugin.injection.injector import Injector
 Configuration = Injector.inject(Configuration)

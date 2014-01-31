@@ -77,9 +77,9 @@ class Nfsexports(object):
         List the current exported filesystems
         """
         exports = {}
-        for export in subprocess.check_output(self._cmd).splitlines():
-            directory, network = export.split('\t')
-            exports[directory.strip()] = network.strip()
+        output = subprocess.check_output(self._cmd)
+        for export in re.finditer('(\S+?)[\s\n]+(\S+)\n?', output):
+            exports[export.group(1)] = export.group(2)
         return exports
 
     def unexport(self, directory):

@@ -26,7 +26,7 @@ define([
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.createft.title')));
         self.modal(generic.tryGet(options, 'modal', false));
 
-        self.data.guid(options.pmachineguid);
+        self.data.guid(options.vmachineguid);
         self.steps([new Gather()]);
 
         self.activateStep();
