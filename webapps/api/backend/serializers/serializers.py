@@ -22,6 +22,14 @@ class SimpleSerializer(serializers.Serializer):
     """
     Serializes only the guid of a hybrid object
     """
+
+    def __init__(self, hybrid, *args, **kwargs):
+        """
+        Initializes the serializer
+        """
+        _ = hybrid
+        super(SimpleSerializer, self).__init__(*args, **kwargs)
+
     guid = serializers.Field()
 
     class Meta:
@@ -40,10 +48,11 @@ class FullSerializer(SimpleSerializer):
         """
         Initializes the serializer, mapping field types
         """
-        super(FullSerializer, self).__init__(*args, **kwargs)
+        super(FullSerializer, self).__init__(hybrid, *args, **kwargs)
         self.hybrid = hybrid
         for key, default in self.hybrid._blueprint.iteritems():
-            self.fields[key] = FullSerializer._map_type_to_field(default[1])
+            if not 'password' in key:
+                self.fields[key] = FullSerializer._map_type_to_field(default[1])
         for key in self.hybrid._expiry:
             self.fields[key] = serializers.Field()
         for key in self.hybrid._relations:

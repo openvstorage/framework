@@ -36,10 +36,16 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         Overview of all pMachines
         """
-        _ = request, format
-        pmachines = PMachineList.get_pmachines().reduced
-        serializer = SimpleSerializer(pmachines, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            pmachines = PMachineList.get_pmachines()
+            serializer = FullSerializer
+        else:
+            pmachines = PMachineList.get_pmachines().reduced
+            serializer = SimpleSerializer
+        serialized = serializer(PMachine, instance=pmachines, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True)
     @required_roles(['view'])

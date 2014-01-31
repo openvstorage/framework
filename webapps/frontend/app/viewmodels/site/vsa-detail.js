@@ -14,28 +14,28 @@
 /*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher',
-    '../containers/vmachine', '../containers/pmachine', '../containers/vpool'
-], function($, app, dialog, ko, shared, generic, Refresher, VMachine, PMachine, VPool) {
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    '../containers/vmachine', '../containers/pmachine'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine) {
     "use strict";
     return function() {
         var self = this;
 
         // System
-        self.shared    = shared;
-        self.guard     = { authenticated: true };
+        self.shared = shared;
+        self.guard = { authenticated: true };
         self.refresher = new Refresher();
-        self.widgets   = [];
+        self.widgets = [];
 
         // Data
-        self.VSA           = ko.observable();
+        self.VSA = ko.observable();
         self.pMachineCache = {};
-        self.vPoolCache    = {};
+        self.vPoolCache = {};
         self.vMachineCache = {};
 
         // Functions
         self.load = function() {
-            return $.Deferred(function(deferred) {
+            return $.Deferred(function (deferred) {
                 var vsa = self.VSA();
                 $.when.apply($, [
                         vsa.load(),
@@ -57,6 +57,40 @@ define([
                     })
                     .always(deferred.resolve);
             }).promise();
+        };
+
+        self.moveAway = function() {
+            app.showMessage(
+                    $.t('ovs:vsas.detail.moveaway.warning'),
+                    $.t('ovs:vsas.detail.moveaway.title'),
+                    [$.t('ovs:vsas.detail.moveaway.no'), $.t('ovs:vsas.detail.moveaway.yes')]
+                )
+                .done(function(answer) {
+                    if (answer === $.t('ovs:vsas.detail.moveaway.yes')) {
+                        generic.alertInfo(
+                            $.t('ovs:vsas.detail.moveaway.marked'),
+                            $.t('ovs:vsas.detail.moveaway.markedmsg')
+                        );
+                        api.post('vmachines/' + self.VSA().guid() + '/move_away')
+                            .then(self.shared.tasks.wait)
+                            .done(function() {
+                                generic.alertSuccess(
+                                    $.t('ovs:vsas.detail.moveaway.done'),
+                                    $.t('ovs:vsas.detail.moveaway.donemsg', { what: self.VSA().name() })
+                                );
+                            })
+                            .fail(function(error) {
+                                generic.alertError(
+                                    $.t('ovs:generic.error'),
+                                    $.t('ovs:generic.messages.errorwhile', {
+                                        context: 'error',
+                                        what: $.t('ovs:vsas.detail.moveaway.errormsg', { what: self.VSA().name() }),
+                                        error: (typeof error !== 'object' ? error : 'Unknown error')
+                                    })
+                                );
+                            });
+                    }
+                });
         };
 
         // Durandal

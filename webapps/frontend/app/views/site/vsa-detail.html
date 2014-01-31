@@ -17,7 +17,13 @@ limitations under the License.
 	<ol class="breadcrumb">
 	    <li class="active" data-bind="text: name"></li>
 	</ol>
-    <h2><span data-i18n="ovs:vsas.detail.title"></span>: <span data-bind="text: name"></span></h2>
+    <h2>
+        <span data-i18n="ovs:vsas.detail.title"></span>:
+        <span class="fa pointer" data-i18n="[html]ovs:icons.vsa"
+              data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
+                         style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
+        <span data-bind="text: name"></span>
+    </h2>
     <p data-i18n="ovs:vsas.detail.introduction"></p>
     <table style="width: 100%;">
         <thead>
@@ -82,4 +88,29 @@ limitations under the License.
             </tr>
         </tbody>
     </table>
+    <div>&nbsp;</div>
+    <div>
+        <ul class="nav nav-tabs">
+            <li class="active"><a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a></li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane active" id="management">
+                <table class="table table-noborder" style="width: 100%">
+                    <tbody>
+                        <tr>
+                            <td style="width: 50px; vertical-align: middle;">
+                                <button type="button" class="btn btn-lg btn-default"
+                                        data-bind="style: { color: '#428bca' }, click: function() { $parent.moveAway(); }">
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.moveaway"></span>
+                                </button>
+                            </td>
+                            <td>
+                                <h4 data-i18n="ovs:vsas.detail.moveawaytitle"></h4><span data-i18n="ovs:vsas.detail.moveawaymsg"></span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </section>

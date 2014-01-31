@@ -15,7 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:vsas.title"></h2>
-    <div data-bind="pager: { items: vsas, headers: vsasHeaders, pagesize: 10, key: 'guid',
+    <div data-bind="pager: { items: vSAs, headers: vSAsHeaders, pagesize: 10, key: 'guid', initialLoad: vSAsInitialLoad,
                              enterViewport: loadVSA, viewportRefresh: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vsa_' + guid() }">
@@ -32,13 +32,12 @@ limitations under the License.
                 <td><span data-bind="text: ipAddress"></span></td>
                 <td>
                     <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="tooltip: item().ipAddress(), text: item().name"></span>
+                        <span data-part="lazy-entry" data-bind="tooltip: item().ipAddress(), text: item().name" class="pointer"></span>
                     </span>
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" class="pointer"
-                              data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
+                        <span data-part="lazy-entry" data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
                     </span>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>

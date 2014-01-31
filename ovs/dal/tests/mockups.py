@@ -29,20 +29,6 @@ class StorageRouterClient():
         pass
 
     @staticmethod
-    def empty_statistics():
-        """
-        Returns a fake empty object
-        """
-        return type('Statistics', (), {})()
-
-    @staticmethod
-    def empty_info():
-        """
-        Returns a fake empty object
-        """
-        return type('Info', (), {})()
-
-    @staticmethod
     def info(volume_id):
         """
         Return fake info
@@ -69,6 +55,20 @@ class VolumeStorageRouterClient():
         Dummy init method
         """
         pass
+
+    @staticmethod
+    def empty_statistics():
+        """
+        Returns a fake empty object
+        """
+        return type('Statistics', (), {})()
+
+    @staticmethod
+    def empty_info():
+        """
+        Returns a fake empty object
+        """
+        return type('Info', (), {})()
 
     def load(self):
         """

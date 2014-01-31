@@ -48,18 +48,19 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 } else {
                     delta = newCounter - previousCounter;
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    if (timeDelta > 0) {
-                        newRaw = Math.max(0, delta / timeDelta);
-                        rawValue(newRaw);
-                        if (formatFunction.call) {
-                            formattedValue(formatFunction(newRaw));
-                        } else {
-                            formattedValue(newRaw);
-                        }
-                        timestamp = newTimestamp;
-                        previousCounter = newCounter;
-                        initialized(true);
+                    if (timeDelta <= 0) {
+                        timeDelta = 1;
                     }
+                    newRaw = Math.max(0, delta / timeDelta);
+                    rawValue(newRaw);
+                    if (formatFunction.call) {
+                        formattedValue(formatFunction(newRaw));
+                    } else {
+                        formattedValue(newRaw);
+                    }
+                    timestamp = newTimestamp;
+                    previousCounter = newCounter;
+                    initialized(true);
                 }
             }
         });
@@ -86,14 +87,15 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 } else {
                     delta = newCounter - previousCounter;
                     timeDelta = (newTimestamp - timestamp) / 1000;
-                    if (timeDelta > 0) {
-                        newValue = Math.max(0, delta / timeDelta);
-                        generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
-                        rawValue(newValue);
-                        timestamp = newTimestamp;
-                        previousCounter = newCounter;
-                        initialized(true);
+                    if (timeDelta <= 0) {
+                        timeDelta = 1;
                     }
+                    newValue = Math.max(0, delta / timeDelta);
+                    generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
+                    rawValue(newValue);
+                    timestamp = newTimestamp;
+                    previousCounter = newCounter;
+                    initialized(true);
                 }
             }
         });

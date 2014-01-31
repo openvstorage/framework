@@ -63,7 +63,7 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Abstract method
         """
@@ -99,6 +99,13 @@ class Hypervisor(object):
 
     @abc.abstractmethod
     def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vms_by_nfs_mountinfo(self, ip, mountpoint):
         """
         Abstract method
         """

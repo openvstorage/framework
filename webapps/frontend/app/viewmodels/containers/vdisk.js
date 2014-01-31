@@ -65,52 +65,62 @@ define([
         // Functions
         self.fetchVSAGuid = function() {
             return $.Deferred(function(deferred) {
-                generic.xhrAbort(self.loadVSAGuid);
-                self.loadVSAGuid = api.get('vdisks/' + self.guid() + '/get_vsa')
-                    .done(function(data) {
-                        self.vsaGuid(data);
-                    })
-                    .always(deferred.resolve);
+                if (generic.xhrCompleted(self.loadVSAGuid)) {
+                    self.loadVSAGuid = api.get('vdisks/' + self.guid() + '/get_vsa')
+                        .done(function(data) {
+                            self.vsaGuid(data);
+                        })
+                        .always(deferred.resolve);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
+        };
+        self.fillData = function(data) {
+            var stats = data.statistics,
+                statsTime = Math.round(stats.timestamp * 1000);
+            self.name(data.name);
+            self.iops({ value: stats.write_operations + stats.read_operations, timestamp: statsTime });
+            self.cacheHits({ value: stats.sco_cache_hits + stats.cluster_cache_hits, timestamp: statsTime });
+            self.cacheMisses({ value: stats.sco_cache_misses, timestamp: statsTime });
+            self.readSpeed({ value: stats.data_read, timestamp: statsTime });
+            self.writeSpeed({ value: stats.data_written, timestamp: statsTime });
+            self.backendWritten(stats.data_written);
+            self.backendRead(stats.data_read);
+            self.backendReads(stats.backend_read_operations);
+            self.bandwidthSaved(stats.data_read - stats.backend_data_read);
+            self.order(data.order);
+            self.snapshots(data.snapshots);
+            self.size(data.size);
+            self.storedData(data.info.stored);
+            self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
+            self.vpoolGuid(data.vpool_guid);
+            self.vMachineGuid(data.vmachine_guid);
+
+            self.snapshots.sort(function(a, b) {
+                // Sorting based on newest first
+                return b.timestamp - a.timestamp;
+            });
+
+            self.loaded(true);
+            self.loading(false);
         };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
-                generic.xhrAbort(self.loadHandle);
-                self.loadHandle = api.get('vdisks/' + self.guid())
-                    .done(function(data) {
-                        var stats = data.statistics,
-                            statsTime = Math.round(stats.timestamp * 1000);
-                        self.name(data.name);
-                        self.iops({ value: stats.write_operations + stats.read_operations, timestamp: statsTime });
-                        self.cacheHits({ value: stats.sco_cache_hits + stats.cluster_cache_hits, timestamp: statsTime });
-                        self.cacheMisses({ value: stats.sco_cache_misses, timestamp: statsTime });
-                        self.readSpeed({ value: stats.data_read, timestamp: statsTime });
-                        self.writeSpeed({ value: stats.data_written, timestamp: statsTime });
-                        self.backendWritten(stats.data_written);
-                        self.backendRead(stats.data_read);
-                        self.backendReads(stats.backend_read_operations);
-                        self.bandwidthSaved(stats.data_read - stats.backend_data_read);
-                        self.order(data.order);
-                        self.snapshots(data.snapshots);
-                        self.size(data.size);
-                        self.storedData(data.info.stored);
-                        self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
-                        self.vpoolGuid(data.vpool_guid);
-                        self.vMachineGuid(data.vmachine_guid);
-
-                        self.snapshots.sort(function(a, b) {
-                            // Sorting based on newest first
-                            return b.timestamp - a.timestamp;
+                if (generic.xhrCompleted(self.loadHandle)) {
+                    self.loadHandle = api.get('vdisks/' + self.guid())
+                        .done(function(data) {
+                            self.fillData(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function() {
+                            self.loading(false);
                         });
-
-                        self.loaded(true);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject)
-                    .always(function() {
-                        self.loading(false);
-                    });
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
     };

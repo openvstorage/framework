@@ -23,9 +23,11 @@ import time
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
@@ -41,42 +43,19 @@ class VDiskController(object):
         List all known volumes on a specific vpool or on all
         """
         if vpool_guid is not None:
-            vsr_client = VolumeStorageRouterClient().load(vpool_guid)
+            vpool = VPool(vpool_guid)
+            vsr_client = VolumeStorageRouterClient().load(vpool=vpool)
             response = vsr_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                vsr_client = VolumeStorageRouterClient().load(vpool.guid)
+                vsr_client = VolumeStorageRouterClient().load(vpool=vpool)
                 response.extend(vsr_client.list_volumes())
         return response
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_from_voldrv')
-    def create_from_voldrv(volumepath, volumename, volumesize, vsrid, **kwargs):
-        """
-        Adds an existing volume to the disk model
-        Triggered by volumedriver messages on the queue
-
-        @param volumepath: path on hypervisor to the volume
-        @param volumename: volume id of the disk
-        @param volumesize: size of the volume
-        """
-        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-        if vsr is None:
-            raise RuntimeError('VolumeStorageRouter could not be found')
-        disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        if disk is None:
-            disk = VDisk()
-        disk.devicename = volumepath.replace('-flat.vmdk', '.vmdk').strip('/')
-        disk.volumeid = volumename
-        disk.size = volumesize
-        disk.vpool = vsr.vpool
-        disk.save()
-        return kwargs
-
-    @staticmethod
     @celery.task(name='ovs.disk.delete_from_voldrv')
-    def delete_from_voldrv(volumename, **kwargs):
+    def delete_from_voldrv(volumename):
         """
         Delete a disk
         Triggered by volumedriver messages on the queue
@@ -86,11 +65,10 @@ class VDiskController(object):
         if disk is not None:
             logging.info('Delete disk {}'.format(disk.name))
             disk.delete()
-        return kwargs
 
     @staticmethod
     @celery.task(name='ovs.disk.resize_from_voldrv')
-    def resize_from_voldrv(volumename, volumesize, **kwargs):
+    def resize_from_voldrv(volumename, volumesize, volumepath, vsrid):
         """
         Resize a disk
         Triggered by volumedriver messages on the queue
@@ -99,25 +77,24 @@ class VDiskController(object):
         @param volumename: volume id of the disk
         @param volumesize: size of the volume
         """
-
+        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+        if vsr is None:
+            raise RuntimeError('VolumeStorageRouter could not be found')
+        volumepath = volumepath.replace('-flat.vmdk', '.vmdk').strip('/')
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
-        limit = 10
-        while disk is None and limit > 0:
-            time.sleep(1)
-            limit -= 1
-            disk = VDiskList.get_vdisk_by_volumeid(volumename)
         if disk is None:
-            raise RuntimeError('Disk with devicename {} could not be found'.format(volumename))
-        logging.info('Resize disk {} from {} to {}'.format(disk.name if disk.name else volumename,
-                                                           disk.size,
-                                                           volumesize))
+            disk = VDiskList.get_by_devicename_and_vpool(volumepath, vsr.vpool)
+            if disk is None:
+                disk = VDisk()
+        disk.devicename = volumepath
+        disk.volumeid = volumename
         disk.size = volumesize
+        disk.vpool = vsr.vpool
         disk.save()
-        return kwargs
 
     @staticmethod
     @celery.task(name='ovs.disk.rename_from_voldrv')
-    def rename_from_voldrv(volumename, volume_old_path, volume_new_path, **kwargs):
+    def rename_from_voldrv(volumename, volume_old_path, volume_new_path):
         """
         Rename a disk
         Triggered by volumedriver messages
@@ -133,7 +110,6 @@ class VDiskController(object):
                                                              volume_new_path))
             disk.devicename = volume_new_path
             disk.save()
-        return kwargs
 
     @staticmethod
     @celery.task(name='ovs.disk.clone')
@@ -240,7 +216,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.create_from_template')
-    def create_from_template(diskguid, location, devicename, machineguid=None):
+    def create_from_template(diskguid, location, devicename, machineguid=None, vsrguid=None):
         """
         Create a disk from a template
 
@@ -260,6 +236,12 @@ class VDiskController(object):
         if not disk.vmachine.is_vtemplate:
             raise RuntimeError('The given disk does not belong to a template')
 
+        if vsrguid is not None:
+            vsr = VolumeStorageRouter(vsrguid)
+            vsr_client = vsr.vsr_client
+        else:
+            vsr_client = disk.vsr_client
+
         device_location = '{}/{}.vmdk'.format(location, devicename)
 
         new_disk = VDisk()
@@ -276,7 +258,7 @@ class VDiskController(object):
             disk.name, new_disk.name, device_location
         ))
         try:
-            volumeid = disk.vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
+            volumeid = vsr_client.create_clone_from_template('/' + device_location, str(disk.volumeid))
             new_disk.volumeid = volumeid
             new_disk.save()
         except Exception as ex:

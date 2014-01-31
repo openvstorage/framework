@@ -101,7 +101,7 @@ define([
             }
             self.viewportkeys = vIndexes.slice();
             return vItems;
-        });
+        }).extend({ throttle: 50 });
 
         self.step = function(next) {
             if (next) {
@@ -137,6 +137,7 @@ define([
 
             self.enterViewport = generic.tryGet(settings, 'enterViewport');
             self.refresh = generic.tryGet(settings, 'viewportRefresh');
+            self.initialLoad = generic.tryGet(settings, 'initialLoad', ko.observable(false));
             self.settings(settings);
             self.headers(settings.headers);
             self.pagesize(settings.pagesize);

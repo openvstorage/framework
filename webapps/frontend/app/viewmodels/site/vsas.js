@@ -26,54 +26,68 @@ define([
         self.guard       = { authenticated: true };
         self.refresher   = new Refresher();
         self.widgets     = [];
+        self.updateSort  = false;
         self.sortTimeout = undefined;
 
         // Data
-        self.vsasHeaders = [
-            { key: 'status',     value: $.t('ovs:generic.status'),     width: 55,  colspan: undefined },
-            { key: 'name',       value: $.t('ovs:generic.name'),       width: 100, colspan: undefined },
-            { key: 'ip',         value: $.t('ovs:generic.ip'),         width: 100, colspan: undefined },
-            { key: 'host',       value: $.t('ovs:generic.host'),       width: 55,  colspan: undefined },
-            { key: 'type',       value: $.t('ovs:generic.type'),       width: 55,  colspan: undefined },
-            { key: 'vdisks',     value: $.t('ovs:generic.vdisks'),     width: 55,  colspan: undefined },
-            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 100, colspan: undefined },
-            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),      width: 100, colspan: undefined },
-            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55,  colspan: undefined },
-            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 100, colspan: undefined },
-            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 100, colspan: undefined }
+        self.vSAsHeaders = [
+            { key: 'status',     value: $.t('ovs:generic.status'),     width: 55  },
+            { key: 'name',       value: $.t('ovs:generic.name'),       width: 100 },
+            { key: 'ip',         value: $.t('ovs:generic.ip'),         width: 100 },
+            { key: 'host',       value: $.t('ovs:generic.host'),       width: 55  },
+            { key: 'type',       value: $.t('ovs:generic.type'),       width: 55  },
+            { key: 'vdisks',     value: $.t('ovs:generic.vdisks'),     width: 55  },
+            { key: 'storedData', value: $.t('ovs:generic.storeddata'), width: 100 },
+            { key: 'cacheRatio', value: $.t('ovs:generic.cache'),      width: 100 },
+            { key: 'iops',       value: $.t('ovs:generic.iops'),       width: 55  },
+            { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 100 },
+            { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 100 }
         ];
-        self.vsas = ko.observableArray([]);
-        self.vsaGuids = [];
+        self.vSAs = ko.observableArray([]);
+        self.vSAsInitialLoad = ko.observable(true);
 
         // Variables
         self.loadVsasHandle = undefined;
         self.pMachineCache = {};
 
         // Functions
-        self.load = function() {
+        self.load = function(full) {
+            full = full || false;
             return $.Deferred(function(deferred) {
-                generic.xhrAbort(self.loadVsasHandle);
-                var query = {
-                    query: {
-                        type: 'AND',
-                        items: [['is_internal', 'EQUALS', true]]
-                    }
-                };
-                self.loadVsasHandle = api.post('vmachines/filter', query)
-                    .done(function(data) {
-                        var i, guids = [];
-                        for (i = 0; i < data.length; i += 1) {
-                            guids.push(data[i].guid);
+                if (generic.xhrCompleted(self.loadVsasHandle)) {
+                    var query = {
+                        query: {
+                            type: 'AND',
+                            items: [['is_internal', 'EQUALS', true]]
                         }
-                        generic.crossFiller(
-                            guids, self.vsaGuids, self.vsas,
-                            function(guid) {
-                                return new VMachine(guid);
-                            }, 'guid'
-                        );
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                    }, filter = {};
+                    if (full) {
+                        filter.full = true;
+                    }
+                    self.loadVsasHandle = api.post('vmachines/filter', query, filter)
+                        .done(function(data) {
+                            var i, guids = [], vmdata = {};
+                            for (i = 0; i < data.length; i += 1) {
+                                guids.push(data[i].guid);
+                                vmdata[data[i].guid] = data[i];
+                            }
+                            generic.crossFiller(
+                                guids, self.vSAs,
+                                function(guid) {
+                                    var vm = new VMachine(guid);
+                                    if (full) {
+                                        vm.fillData(vmdata[guid]);
+                                    }
+                                    return vm;
+                                }, 'guid'
+                            );
+                            self.vSAsInitialLoad(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
         self.loadVSA = function(vsa) {
@@ -90,27 +104,30 @@ define([
                             vsa.pMachine(self.pMachineCache[pMachineGuid]);
                         }
                         // (Re)sort VSAs
-                        if (self.sortTimeout) {
-                            window.clearTimeout(self.sortTimeout);
+                        if (self.updateSort) {
+                            self.sort();
                         }
-                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vsas, ['name', 'guid']); }, 250);
                     })
                     .always(deferred.resolve);
             }).promise();
+        };
+        self.sort = function() {
+            if (self.sortTimeout) {
+                window.clearTimeout(self.sortTimeout);
+            }
+            self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vSAs, ['name', 'guid']); }, 250);
         };
 
         // Durandal
         self.activate = function() {
             self.refresher.init(self.load, 5000);
-            self.refresher.start();
-            self.shared.footerData(self.vsas);
+            self.shared.footerData(self.vSAs);
 
-            self.load()
-                .done(function() {
-                    var i, vsas = self.vsas();
-                    for (i = 0; i < vsas.length; i += 1) {
-                        self.loadVSA(vsas[i]);
-                    }
+            self.load(true)
+                .always(function() {
+                    self.sort();
+                    self.updateSort = true;
+                    self.refresher.start();
                 });
         };
         self.deactivate = function() {

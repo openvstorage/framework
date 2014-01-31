@@ -36,11 +36,8 @@ def locked():
             """
             Executes the decorated function in a locked context
             """
-            try:
-                self._lock.acquire()
+            with self._lock:
                 return f(self, *args, **kw)
-            finally:
-                self._lock.release()
         return new_function
     return wrap
 
