@@ -319,6 +319,7 @@ configuration['openvstorage-webapps']['ovs.webapps.certificate.period'] = ask_in
 
 configuration['grid'] = {}
 configuration['grid']['grid.id'] = ask_integer('Enter grid ID (needs to be unique): ', min_value=1, max_value=32767)
+configuration['grid']['grid.useavahi'] = 1
 configuration['grid']['grid.node.roles'] = 'node'
 
 es_cluster_name = ask_string('Enter elastic search cluster name', default_value='ovses')
@@ -352,10 +353,12 @@ if not os.path.exists('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg'):
 
 # Branch mapping: key = our qualitylevel, value = jumpscale branch
 branch_mapping = {'unstable': 'default',
-                  'test': 'default'}
+                  'test': 'default',
+                  'stable': 'default'}
 # Quality level mapping: key = our qualitylevel, value = jumpscale quality level
 quality_mapping = {'unstable': 'test',
-                   'test': 'test'}
+                   'test': 'test',
+                   'stable': 'test'}
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')
