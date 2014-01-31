@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en" manifest="/offline/ovs.appcache">
+    <head>
+        <script type="text/javascript">
+            window.addEventListener('load', function() {
+                applicationCache.addEventListener('updateready', function() {
+                    if (applicationCache.status == applicationCache.UPDATEREADY) {
+                        applicationCache.swapCache();
+                    }
+                }, false);
+                applicationCache.update();
+            }, false);
+        </script>
+    </head>
+    <body></body>
+</html>
