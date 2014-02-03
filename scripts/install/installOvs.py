@@ -266,6 +266,11 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
     run_command('swapoff --all')
     run_command('mountall -q &> /dev/null')
 
+#enable coredump
+with open('/etc/security/limits.conf', 'a') as limits:
+    limits.write('\nroot soft core  unlimited')
+    limits.write('\novs  soft core  unlimited\n')
+
 # Requesting information
 print 'Requesting information...'
 supported_quality_levels = ['unstable', 'test']
