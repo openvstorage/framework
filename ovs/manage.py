@@ -453,8 +453,8 @@ class Control():
 
         def _init_volumedriver():
             vmachineguid = Configure.load_data(master)
+            Configure.init_storagerouter(vmachineguid, vpool_name)
             if not self._package_is_running('volumedriver'):
-                Configure.init_storagerouter(vmachineguid, vpool_name)
                 self._start_package('volumedriver')
             vfs_info = os.statvfs('/mnt/{}'.format(vpool_name))
             vpool_size_bytes = vfs_info.f_blocks * vfs_info.f_bsize
