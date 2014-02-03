@@ -915,13 +915,27 @@ class Basic(TestCase):
         """
         machine = TestMachine()
         machine.save()
-        disk = TestDisk()
-        disk.machine = machine
-        disk.save()
+        disk_1 = TestDisk()
+        disk_1.machine = machine
+        disk_1.save()
+        disk_2 = TestDisk()
+        disk_2.machine = machine
+        disk_2.save()
         self.assertRaises(LinkedObjectException, machine.delete)
-        disk_1 = TestDisk(disk.guid)
-        self.assertIsNotNone(disk_1.machine, 'The machine should still be linked')
-        machine.delete(abandon=True)
-        disk_2 = TestDisk(disk.guid)
-        self.assertIsNone(disk_2.machine, 'The machine should be unlinked')
+        disk_3 = TestDisk(disk_1.guid)
+        self.assertIsNotNone(disk_3.machine, 'The machine should still be linked')
+        _ = machine.disks  # Make sure we loaded the list
+        disk_2.delete()
+        machine.delete(abandon=True)  # Should not raise due to disk_2 being deleted
+        disk_4 = TestDisk(disk_1.guid)
+        self.assertIsNone(disk_4.machine, 'The machine should be unlinked')
+        disk_1.delete()
+
+    def test_save_deleted(self):
+        """
+        Validates whether saving a previously deleted object raises
+        """
+        disk = TestDisk()
+        disk.save()
         disk.delete()
+        self.assertRaises(ObjectNotFoundException, disk.save, 'Cannot resave a deleted object')

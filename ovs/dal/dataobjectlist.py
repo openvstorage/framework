@@ -15,6 +15,7 @@
 """
 DataObjectList module
 """
+from ovs.dal.exceptions import ObjectNotFoundException
 
 
 class DataObjectList(object):
@@ -106,6 +107,16 @@ class DataObjectList(object):
         for guid in self._guids:
             if guid in self._objects:
                 yield self._objects[guid]
+
+    def itersafe(self):
+        """
+        Allows to iterate over all objects, but not caring about objects that doesn't exist
+        """
+        for guid in self._guids:
+            try:
+                yield self._get_object(guid)
+            except ObjectNotFoundException:
+                pass
 
     def __add__(self, other):
         if not isinstance(other, DataObjectList):

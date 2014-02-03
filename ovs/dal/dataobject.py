@@ -135,10 +135,10 @@ class DataObject(object):
         self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
         # Init guid
-        new = False
+        self._new = False
         if guid is None:
             self._guid = str(uuid.uuid4())
-            new = True
+            self._new = True
         else:
             self._guid = str(guid)
 
@@ -149,7 +149,7 @@ class DataObject(object):
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._metadata['cache'] = None
-        if new:
+        if self._new:
             self._data = {}
         else:
             self._data = self._volatile.get(self._key)
@@ -199,7 +199,7 @@ class DataObject(object):
         # Store original data
         self._original = copy.deepcopy(self._data)
 
-        if not new:
+        if not self._new:
             # Re-cache the object
             self._volatile.set(self._key, self._data)
 
@@ -389,12 +389,14 @@ class DataObject(object):
                         for item in getattr(self, key).iterloaded():
                             item.save(recursive=True, skip=info['key'])
 
-        new = False
         try:
             data = self._persistent.get(self._key)
         except KeyNotFoundException:
-            new = True
-            data = {}
+            if self._new:
+                data = {}
+            else:
+                raise ObjectNotFoundException('%s with guid \'%s\' was deleted' %
+                                              (self.__class__.__name__, self._guid))
         data_conflicts = []
         for attribute in self._data.keys():
             if self._data[attribute] != self._original[attribute]:
@@ -447,7 +449,7 @@ class DataObject(object):
             cache_list = Toolbox.try_get(cache_key, {})
             for field in cache_list.keys():
                 clear = False
-                if field == '__all' and new:  # This is a no-filter query hook, which can be ignored
+                if field == '__all' and self._new:  # This is a no-filter query hook, which can be ignored
                     clear = True
                 if field in self._blueprint:
                     if self._original[field] != self._data[field]:
@@ -472,6 +474,7 @@ class DataObject(object):
 
         self._original = copy.deepcopy(self._data)
         self.dirty = False
+        self._new = False
 
     #######################
     ## Other CRUDs
@@ -488,9 +491,12 @@ class DataObject(object):
                 items = getattr(self, key)
                 if len(items) > 0:
                     if abandon is True:
-                        for item in items:
+                        for item in items.itersafe():
                             setattr(item, info['key'], None)
-                            item.save()
+                            try:
+                                item.save()
+                            except ObjectNotFoundException:
+                                pass
                     else:
                         raise LinkedObjectException('There are %s items left in self.%s' %
                                                     (len(items), key))
