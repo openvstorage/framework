@@ -208,11 +208,11 @@ class Configure():
             volumedriver_cache_mountpoint = Console.askChoice(filesystems, 'Select cache mountpoint')
         filesystems.remove(volumedriver_cache_mountpoint)
         cache_fs = os.statvfs(volumedriver_cache_mountpoint)
-        scocache = "{}/sco".format(volumedriver_cache_mountpoint)
-        readcache = "{}/read".format(volumedriver_cache_mountpoint)
-        failovercache = "{}/foc".format(volumedriver_cache_mountpoint)
-        metadatapath = "{}/metadata".format(Configuration.get('volumedriver.metadata'))
-        tlogpath = "{}/tlogs".format(Configuration.get('volumedriver.metadata'))
+        scocache = "{}/sco_{}".format(volumedriver_cache_mountpoint, vpool_name)
+        readcache = "{}/read_{}".format(volumedriver_cache_mountpoint, vpool_name)
+        failovercache = "{}/foc_{}".format(volumedriver_cache_mountpoint, vpool_name)
+        metadatapath = "{}/metadata_{}".format(Configuration.get('volumedriver.metadata'), vpool_name)
+        tlogpath = "{}/tlogs_{}".format(Configuration.get('volumedriver.metadata'), vpool_name)
         dirs2create = [scocache,
                        failovercache,
                        Configuration.get('volumedriver.readcache.serialization.path'),
@@ -401,7 +401,11 @@ class Configure():
         stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vrouter.mountpoint)
         name = 'volumedriver_{}'.format(vpool_name)
         Service.add_service(package=('openvstorage', 'volumedriver'), name=name, command=cmd, stop_command=stopcmd)
-
+        #add corresponding failovercache, for each volumedriver
+        log_file = os.path.join(os.sep, 'var', 'log', 'foc_{}.log'.format(vpool_name))
+        cmd = '/usr/bin/failovercachehelper --config-file={} --logfile={}'.format(config_file, log_file)
+        name = 'failovercache_{}'.format(vpool_name)
+        Service.add_service(package=('openvstorage', 'volumedriver'), name=name, command=cmd, stop_command=None)
 
 class Control():
     """
