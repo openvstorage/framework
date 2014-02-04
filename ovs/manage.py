@@ -239,7 +239,9 @@ class Configure():
         connection_password = Configuration.get('volumedriver.connection.password', checkExists=True)
         rest_connection_timeout_secs = Configuration.get('volumedriver.rest.timeout', checkExists=True)
         volumedriver_local_filesystem = Configuration.get('volumedriver.backend.mountpoint', checkExists=True)
-        distributed_filesystem_mountpoint = Configuration.get('volumedriver.filesystem.distributed', checkExists=True)
+        distributed_filesystem_mountpoint = os.path.join(Configuration.get('volumedriver.filesystem.distributed', checkExists=True), vpool_name)
+        if not os.path.exists(distributed_filesystem_mountpoint):
+            os.makedirs(distributed_filesystem_mountpoint)
         volumedriver_storageip = Configuration.get('volumedriver.ip.storage', checkExists=True)
         if not volumedriver_storageip:
             ipaddresses = Net.getIpAddresses()
@@ -318,7 +320,7 @@ class Configure():
 
         vsr_configuration.configure_failovercache(failovercache)
 
-        filesystem_config = {'fs_backend_path': Configuration.get('volumedriver.filesystem.distributed')}
+        filesystem_config = {'fs_backend_path': distributed_filesystem_mountpoint}
         vsr_configuration.configure_filesystem(filesystem_config)
 
         volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
