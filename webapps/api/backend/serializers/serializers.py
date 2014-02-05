@@ -55,15 +55,18 @@ class FullSerializer(SimpleSerializer):
             if not 'password' in key:
                 self.fields[key] = FullSerializer._map_type_to_field(default[1])
         for key in self.hybrid._expiry:
-            if contents is None or '_dynamics' in contents or key in contents:
+            if contents is None or (('_dynamics' in contents or key in contents)
+                                    and '-{0}'.format(key) not in contents):
                 self.fields[key] = serializers.Field()
         for key in self.hybrid._relations:
-            if contents is None or '_relations' in contents or key in contents:
+            if contents is None or (('_relations' in contents or key in contents)
+                                    and '-{0}'.format(key) not in contents):
                 self.fields['%s_guid' % key] = serializers.Field()
         relations = RelationMapper.load_foreign_relations(hybrid)
         if relations is not None:
             for key, info in relations.iteritems():
-                if contents is None or '_relations' in contents or key in contents:
+                if contents is None or (('_relations' in contents or key in contents)
+                                        and '-{0}'.format(key) not in contents):
                     self.fields['%s_guids' % key] = serializers.Field()
 
     def get_identity(self, data):

@@ -65,7 +65,6 @@ class MessageController(object):
         ALL = [TASK_COMPLETE, EVENT]
 
     @staticmethod
-    @synchronized()
     def all_subscriptions():
         """
         Returns all subscriptions
@@ -73,7 +72,6 @@ class MessageController(object):
         return _cache.get('msg_subscriptions', [])
 
     @staticmethod
-    @synchronized()
     def subscriptions(subscriber_id):
         """
         Returns all subscriptions for a given subscriber
@@ -95,6 +93,15 @@ class MessageController(object):
 
     @staticmethod
     @synchronized()
+    def reset_subscriptions(subscriber_id):
+        """
+        Re-caches all subscriptions
+        """
+        subscriber_key = 'msg_subscriptions_%d' % subscriber_id
+        _cache.set(subscriber_key, _cache.get(subscriber_key, []), MessageController.TIMEOUT)
+        _cache.set('msg_subscriptions', _cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
+
+    @staticmethod
     def get_messages(subscriber_id, message_id):
         """
         Gets all messages pending for a given subscriber, from a given message id
@@ -108,10 +115,6 @@ class MessageController(object):
                 last_message_id = message['id']
             if message['id'] > message_id and message['type'] in subscriptions:
                 messages.append(message)
-
-        _cache.set('msg_messages', _cache.get('msg_messages', []), MessageController.TIMEOUT)
-        _cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
-        _cache.set('msg_subscriptions', _cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
         return messages, last_message_id
 
     @staticmethod
@@ -129,7 +132,6 @@ class MessageController(object):
         _cache.set('msg_messages', messages, MessageController.TIMEOUT)
 
     @staticmethod
-    @synchronized()
     def last_message_id():
         """
         Gets the last messageid

@@ -44,44 +44,44 @@ class Toolbox:
         return True
 
     @staticmethod
-    def human_compare(object_a, object_b, keys):
+    def extract_key(obj, keys):
         """
-        Compares (sorts) two strings on a for humans logic way. E.g.
-        ['x-10', 'x-1', 'x-2'] will become ['x-1', 'x-2', 'x-10']
+        Extracts a sortable tuple from the object using the given keys
         """
-        key = keys[0]
-        item_a = object_a
-        item_b = object_b
-        for subkey in key.split('.'):
-            if '[' in subkey:
-                attribute = subkey.split('[')[0]
-                dictkey = subkey.split('[')[1][:-1]
-                item_a = getattr(item_a, attribute)[dictkey]
-                item_b = getattr(item_b, attribute)[dictkey]
-            else:
-                item_a = getattr(item_a, subkey)
-                item_b = getattr(item_b, subkey)
-            if item_a is None or item_b is None:
-                break
-        if item_a is None and item_b is not None:
-            return -1
-        if item_a is None and item_b is None:
-            return 0
-        if item_a is not None and item_b is None:
-            return 1
-        part_a = re.sub(r'\d', '', str(item_a))
-        part_b = re.sub(r'\d', '', str(item_b))
-        if part_a == part_b:
-            part_a = int(re.sub(r'\D', '', str(item_a)))
-            part_b = int(re.sub(r'\D', '', str(item_b)))
-            if part_a == part_b:
-                if len(keys) > 1:
-                    keys.pop(0)
-                    return Toolbox.human_compare(object_a, object_b, keys)
+        def clean_list(l):
+            """
+            Cleans a given tuple, removing empty elements, and convert to an integer where possible
+            """
+            while True:
+                try:
+                    l.remove('')
+                except ValueError:
+                    break
+            for i in xrange(len(l)):
+                try:
+                    l[i] = int(l[i])
+                except ValueError:
+                    pass
+            return l
+
+        regex = re.compile(r'(\d+)')
+        sorting_key = ()
+        for key in keys:
+            value = obj
+            for subkey in key.split('.'):
+                if '[' in subkey:
+                    # We're using a dict
+                    attribute = subkey.split('[')[0]
+                    dictkey = subkey.split('[')[1][:-1]
+                    value = getattr(value, attribute)[dictkey]
                 else:
-                    return 0
-            return 1 if part_a > part_b else -1
-        return 1 if part_a > part_b else -1
+                    # Normal property
+                    value = getattr(value, subkey)
+                if value is None:
+                    break
+            value = '' if value is None else str(value)
+            sorting_key += tuple(clean_list(regex.split(value)))
+        return sorting_key
 
     @staticmethod
     def handle_list(dataobjectlist, request):
@@ -93,7 +93,7 @@ class Toolbox:
         if sort:
             desc = sort[0] == '-'
             sort = sort[1 if desc else 0:]
-            dataobjectlist.sort(cmp=lambda a, b: Toolbox.human_compare(a, b, sort.split(',')), reverse=desc)
+            dataobjectlist.sort(key=lambda e: Toolbox.extract_key(e, sort.split(',')), reverse=desc)
             # Paging
         page = request.QUERY_PARAMS.get('page')
         if page is not None and page.isdigit():

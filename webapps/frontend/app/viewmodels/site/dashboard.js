@@ -112,7 +112,7 @@ define([
                             if (generic.xhrCompleted(self.loadVMachinesHandle)) {
                                 var filter = {
                                     full: true,
-                                    contents: 'name,statistics,stored_data',
+                                    contents: 'statistics,stored_data',
                                     sort: (self.topVmachineMode() === 'topstoreddata' ? 'stored_data,name' : 'statistics[data_transfered_ps],name'),
                                     page: 1
                                 };
@@ -162,7 +162,7 @@ define([
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
                     var filter = {
                         full: true,
-                        contents: 'name,statistics,stored_data',
+                        contents: 'statistics,stored_data',
                         sort: (self.topVPoolMode() === 'topstoreddata' ? 'stored_data,name' : 'statistics[data_transfered_ps],name'),
                         page: 1
                     };

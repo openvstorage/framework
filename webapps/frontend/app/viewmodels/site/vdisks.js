@@ -55,7 +55,7 @@ define([
         self.fetchVDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVDisksHandle)) {
-                    self.loadVDisksHandle = api.get('vdisks', {}, { sort: 'name,vmachine.name' })
+                    self.loadVDisksHandle = api.get('vdisks', {}, { sort: 'vpool_guid,devicename' })
                         .done(function(data) {
                             var guids = [];
                             $.each(data, function(index, item) {
@@ -86,9 +86,10 @@ define([
                         generic.xhrAbort(self.refreshVDisksHandle[page]);
                     }
                     var options = {
-                        sort: 'name,vmachine.name',
+                        sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
                         full: true,
-                        page: page
+                        page: page,
+                        contents: '_dynamics,_relations,-snapshots'
                     };
                     self.refreshVDisksHandle[page] = api.get('vdisks', {}, options)
                         .done(function(data) {

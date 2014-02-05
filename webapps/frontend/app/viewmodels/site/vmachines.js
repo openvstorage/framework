@@ -95,7 +95,8 @@ define([
                     var options = {
                         sort: 'name',
                         full: true,
-                        page: page
+                        page: page,
+                        contents: '_dynamics,_relations,-snapshots'
                     };
                     self.refreshVMachinesHandle[page] = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {

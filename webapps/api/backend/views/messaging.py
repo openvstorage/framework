@@ -67,6 +67,7 @@ class MessagingViewSet(viewsets.ViewSet):
                 gevent.sleep(.5)
         if len(messages) == 0:
             last_message_id = MessageController.last_message_id()
+        MessageController.reset_subscriptions(subscriber_id)
         return messages, last_message_id
 
     @link()
