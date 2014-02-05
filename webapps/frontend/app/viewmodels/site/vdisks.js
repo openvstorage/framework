@@ -1,0 +1,183 @@
+﻿// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+/*global define, window */
+define([
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../wizards/rollback/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, RollbackWizard) {
+    "use strict";
+    return function() {
+        var self = this;
+
+        // System
+        self.shared      = shared;
+        self.guard       = { authenticated: true };
+        self.refresher   = new Refresher();
+        self.widgets     = [];
+
+        // Data
+        self.vDiskHeaders = [
+            { key: 'name',         value: $.t('ovs:generic.name'),         width: 150       },
+            { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),     width: 110       },
+            { key: 'vpool',        value: $.t('ovs:generic.vpool'),        width: 110       },
+            { key: 'vsa',          value: $.t('ovs:generic.vsa'),          width: 110       },
+            { key: 'size',         value: $.t('ovs:generic.size'),         width: 100       },
+            { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110       },
+            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),        width: 100       },
+            { key: 'iops',         value: $.t('ovs:generic.iops'),         width: 55        },
+            { key: 'readSpeed',    value: $.t('ovs:generic.read'),         width: 100       },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),        width: 100       },
+            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: undefined },
+            { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80        }
+        ];
+        self.vDisks = ko.observableArray([]);
+        self.vMachineCache = {};
+        self.vPoolCache = {};
+        self.vDisksInitialLoad = ko.observable(true);
+
+        // Variables
+        self.loadVDisksHandle = undefined;
+        self.refreshVDisksHandle = {};
+
+        // Functions
+        self.fetchVDisks = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadVDisksHandle)) {
+                    self.loadVDisksHandle = api.get('vdisks', {}, { sort: 'name,vmachine.name' })
+                        .done(function(data) {
+                            var guids = [];
+                            $.each(data, function(index, item) {
+                                guids.push(item.guid);
+                            });
+                            generic.crossFiller(
+                                guids, self.vDisks,
+                                function(guid) {
+                                    var vdisk = new VDisk(guid);
+                                    vdisk.loading(true);
+                                    return vdisk;
+                                }, 'guid'
+                            );
+                            self.vDisksInitialLoad(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.refreshVDisks = function(page, abort) {
+            abort = abort || false;
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.refreshVDisksHandle[page]) || abort) {
+                    if (abort) {
+                        generic.xhrAbort(self.refreshVDisksHandle[page]);
+                    }
+                    var options = {
+                        sort: 'name,vmachine.name',
+                        full: true,
+                        page: page
+                    };
+                    self.refreshVDisksHandle[page] = api.get('vdisks', {}, options)
+                        .done(function(data) {
+                            var guids = [], vddata = {};
+                            $.each(data, function(index, item) {
+                                guids.push(item.guid);
+                                vddata[item.guid] = item;
+                            });
+                            $.each(self.vDisks(), function(index, vdisk) {
+                                if ($.inArray(vdisk.guid(), guids) !== -1) {
+                                    vdisk.fillData(vddata[vdisk.guid()]);
+                                    var vm, pool,
+                                        vsaGuid = vdisk.vsaGuid(),
+                                        vMachineGuid = vdisk.vMachineGuid(),
+                                        vPoolGuid = vdisk.vpoolGuid();
+                                    if (vsaGuid && (vdisk.vsa() === undefined || vdisk.vsa().guid() !== vsaGuid)) {
+                                        if (!self.vMachineCache.hasOwnProperty(vsaGuid)) {
+                                            vm = new VMachine(vsaGuid);
+                                            vm.load();
+                                            self.vMachineCache[vsaGuid] = vm;
+                                        }
+                                        vdisk.vsa(self.vMachineCache[vsaGuid]);
+                                    }
+                                    if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
+                                        if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
+                                            vm = new VMachine(vMachineGuid);
+                                            vm.load();
+                                            self.vMachineCache[vMachineGuid] = vm;
+                                        }
+                                        vdisk.vMachine(self.vMachineCache[vMachineGuid]);
+                                    }
+                                    if (vPoolGuid && (vdisk.vpool() === undefined || vdisk.vpool().guid() !== vPoolGuid)) {
+                                        if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
+                                            pool = new VPool(vPoolGuid);
+                                            pool.load();
+                                            self.vPoolCache[vPoolGuid] = pool;
+                                        }
+                                        vdisk.vpool(self.vPoolCache[vPoolGuid]);
+                                    }
+                                }
+                            });
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+
+        self.rollback = function(guid) {
+            $.each(self.vDisks(), function(index, vdisk) {
+                if (vdisk.guid() === guid && (vdisk.vMachine() === undefined || !vdisk.vMachine().isRunning())) {
+                    dialog.show(new RollbackWizard({
+                        modal: true,
+                        type: 'vdisk',
+                        guid: guid
+                    }));
+                }
+            });
+        };
+
+        // Durandal
+        self.activate = function() {
+            self.refresher.init(self.fetchVDisks, 5000);
+            self.refresher.start();
+            self.shared.footerData(self.vDisks);
+
+            api.get('vmachines', {}, { full: true, contents: 'name'})
+                .done(function(data) {
+                    $.each(data, function(index, item) {
+                        if (!self.vMachineCache.hasOwnProperty(item.guid)) {
+                            var vm = new VMachine(item.guid);
+                            vm.fillData(item);
+                            self.vMachineCache[item.guid] = vm;
+                        }
+                    });
+                });
+
+            self.fetchVDisks().then(function() {
+                self.refreshVDisks(1);
+            });
+        };
+        self.deactivate = function() {
+            $.each(self.widgets, function(index, item) {
+                item.deactivate();
+            });
+            self.refresher.stop();
+            self.shared.footerData(ko.observable());
+        };
+    };
+});
