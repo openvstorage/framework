@@ -82,13 +82,9 @@ define([
                 }
             }).promise();
         };
-        self.refreshVSAs = function(page, abort) {
-            abort = abort || false;
+        self.refreshVSAs = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVSAsHandle[page]) || abort) {
-                    if (abort) {
-                        generic.xhrAbort(self.refreshVSAsHandle[page]);
-                    }
+                if (generic.xhrCompleted(self.refreshVSAsHandle[page])) {
                     var options = {
                         sort: 'name',
                         full: true,
@@ -119,7 +115,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };

@@ -16,37 +16,8 @@
 Messaging module
 """
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.generic.filemutex import FileMutex
 
 _cache = VolatileFactory.get_client()
-
-
-def synchronized():
-    """
-    Synchronization decorator.
-    """
-    def wrap(f):
-        """
-        Returns a wrapped function
-        """
-        def new_function(*args, **kw):
-            """
-            Executes the decorated function in a locked context
-            """
-            filemutex = FileMutex('messaging')
-            try:
-                filemutex.acquire(wait=5)
-                mutex = VolatileMutex('messaging')
-                try:
-                    mutex.acquire(wait=5)
-                    return f(*args, **kw)
-                finally:
-                    mutex.release()
-            finally:
-                filemutex.release()
-        return new_function
-    return wrap
 
 
 class MessageController(object):
@@ -79,27 +50,31 @@ class MessageController(object):
         return _cache.get('msg_subscriptions_%d' % subscriber_id, [])
 
     @staticmethod
-    @synchronized()
     def subscribe(subscriber_id, subscriptions):
         """
         Subscribes a given subscriber to a set of Types
         """
         _cache.set('msg_subscriptions_%d' % subscriber_id, subscriptions, MessageController.TIMEOUT)
-        all_subscriptions = _cache.get('msg_subscriptions', [])
-        for subscription in subscriptions:
-            if subscription not in all_subscriptions:
-                all_subscriptions.append(subscription)
-        _cache.set('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
+        result = 0
+        while result == 0:
+            all_subscriptions = _cache.gets('msg_subscriptions', [])
+            for subscription in subscriptions:
+                if subscription not in all_subscriptions:
+                    all_subscriptions.append(subscription)
+            result = _cache.cas('msg_subscriptions', all_subscriptions, MessageController.TIMEOUT)
 
     @staticmethod
-    @synchronized()
     def reset_subscriptions(subscriber_id):
         """
         Re-caches all subscriptions
         """
         subscriber_key = 'msg_subscriptions_%d' % subscriber_id
-        _cache.set(subscriber_key, _cache.get(subscriber_key, []), MessageController.TIMEOUT)
-        _cache.set('msg_subscriptions', _cache.get('msg_subscriptions', []), MessageController.TIMEOUT)
+        result = 0
+        while result == 0:
+            result = _cache.cas(subscriber_key, _cache.gets(subscriber_key, []), MessageController.TIMEOUT)
+        result = 0
+        while result == 0:
+            result = _cache.cas('msg_subscriptions', _cache.gets('msg_subscriptions', []), MessageController.TIMEOUT)
 
     @staticmethod
     def get_messages(subscriber_id, message_id):
@@ -118,18 +93,19 @@ class MessageController(object):
         return messages, last_message_id
 
     @staticmethod
-    @synchronized()
     def fire(message_type, body):
         """
         Adds a new message to the messaging queue
         """
-        last_message_id = max([m['id'] for m in _cache.get('msg_messages', [])] + [0])
-        message = {'id'  : last_message_id + 1,
-                   'type': message_type,
-                   'body': body}
-        messages = _cache.get('msg_messages', [])
-        messages.append(message)
-        _cache.set('msg_messages', messages, MessageController.TIMEOUT)
+        result = 0
+        while result == 0:
+            messages = _cache.gets('msg_messages', [])
+            last_message_id = max([m['id'] for m in messages] + [0])
+            message = {'id'  : last_message_id + 1,
+                       'type': message_type,
+                       'body': body}
+            messages.append(message)
+            result = _cache.cas('msg_messages', messages, MessageController.TIMEOUT)
 
     @staticmethod
     def last_message_id():

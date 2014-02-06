@@ -29,6 +29,7 @@ define([
         self.settings        = ko.observable({});
         self.padding         = ko.observable(2);
         self.controls        = ko.observable(true);
+        self.preloadPage     = 0;
 
         self.items = ko.computed(function() {
             var settings = self.settings();
@@ -53,7 +54,8 @@ define([
             },
             write: function(value) {
                 self.internalCurrent(value);
-                self.viewportRefresh(value, true);
+                self.viewportRefresh(value);
+                // Prefetch/refresh surrounding pages
                 if (value < self.lastPage()) {
                     self.viewportRefresh(value + 1);
                 }
@@ -128,6 +130,16 @@ define([
             if (self.refresh !== undefined) {
                 self.refresher.init(function() {
                     self.viewportRefresh(self.current());
+                    self.preloadPage += 1;
+                    if (self.preloadPage === self.current()) {
+                        self.preloadPage += 1;
+                    }
+                    if (self.preloadPage > self.lastPage()) {
+                        self.preloadPage = 1;
+                    }
+                    if (self.preloadPage !== self.current()) {
+                        self.viewportRefresh(self.preloadPage);
+                    }
                 }, self.refresh);
                 self.refresher.start();
                 settings.bindingContext.$root.widgets.push(self);

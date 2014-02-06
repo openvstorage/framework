@@ -75,13 +75,9 @@ define([
                 }
             }).promise();
         };
-        self.refreshVTemplates = function(page, abort) {
-            abort = abort || false;
+        self.refreshVTemplates = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVTemplatesHandle[page]) || abort) {
-                    if (abort) {
-                        generic.xhrAbort(self.refreshVTemplatesHandle[page]);
-                    }
+                if (generic.xhrCompleted(self.refreshVTemplatesHandle[page])) {
                     var options = {
                         sort: 'name',
                         full: true,
@@ -104,7 +100,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };

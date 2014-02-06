@@ -57,17 +57,19 @@ class MemcacheStore(object):
         Initializes the client
         """
         self._nodes = nodes
-        self._client = memcache.Client(self._nodes, dead_retry=1)
+        self._client = memcache.Client(self._nodes, dead_retry=1, cache_cas=True)
         self._lock = Lock()
         self._validate = True
 
-    @locked()
-    def get(self, key, default=None):
+    def _get(self, action, key, default=None):
         """
-        Retrieves a certain value for a given key
+        Retrieves a certain value for a given key (get or gets)
         """
         key = MemcacheStore._clean_key(key)
-        data = self._client.get(key)
+        if action == 'get':
+            data = self._client.get(key)
+        else:
+            data = self._client.gets(key)
         if data is None:
             # Cache miss
             return default
@@ -82,7 +84,20 @@ class MemcacheStore(object):
             return data
 
     @locked()
-    def set(self, key, value, time=0):
+    def get(self, key, default=None):
+        """
+        Retrieves a certain value for a given key (get)
+        """
+        return self._get('get', key, default=default)
+
+    @locked()
+    def gets(self, key, default=None):
+        """
+        Retrieves a certain value for a given key (gets)
+        """
+        return self._get('gets', key, default=default)
+
+    def _set(self, action, key, value, time=0):
         """
         Sets the value for a key to a given value
         """
@@ -92,7 +107,23 @@ class MemcacheStore(object):
                     'key': key}
         else:
             data = value
-        return self._client.set(key, data, time)
+        if action == 'set':
+            return self._client.set(key, data, time)
+        return self._client.cas(key, data, time)
+
+    @locked()
+    def set(self, key, value, time=0):
+        """
+        Sets the value for a key to a given value (set)
+        """
+        return self._set('set', key, value, time=time)
+
+    @locked()
+    def cas(self, key, value, time=0):
+        """
+        Sets the value for a key to a given value (cas)
+        """
+        return self._set('cas', key, value, time=time)
 
     @locked()
     def add(self, key, value, time=0):

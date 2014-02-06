@@ -78,13 +78,9 @@ define([
                 }
             }).promise();
         };
-        self.refreshVDisks = function(page, abort) {
-            abort = abort || false;
+        self.refreshVDisks = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVDisksHandle[page]) || abort) {
-                    if (abort) {
-                        generic.xhrAbort(self.refreshVDisksHandle[page]);
-                    }
+                if (generic.xhrCompleted(self.refreshVDisksHandle[page])) {
                     var options = {
                         sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
                         full: true,
@@ -135,7 +131,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };

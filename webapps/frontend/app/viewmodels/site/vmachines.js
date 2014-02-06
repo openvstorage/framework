@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define, window */
+/*global define */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
@@ -85,13 +85,9 @@ define([
                 }
             }).promise();
         };
-        self.refreshVMachines = function(page, abort) {
-            abort = abort || false;
+        self.refreshVMachines = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVMachinesHandle[page]) || abort) {
-                    if (abort) {
-                        generic.xhrAbort(self.refreshVMachinesHandle[page]);
-                    }
+                if (generic.xhrCompleted(self.refreshVMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
                         full: true,
@@ -136,7 +132,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };

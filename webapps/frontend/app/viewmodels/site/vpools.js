@@ -73,13 +73,9 @@ define([
                 }
             }).promise();
         };
-        self.refreshVPools = function(page, abort) {
-            abort = abort || false;
+        self.refreshVPools = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVPoolsHandle[page]) || abort) {
-                    if (abort) {
-                        generic.xhrAbort(self.refreshVPoolsHandle[page]);
-                    }
+                if (generic.xhrCompleted(self.refreshVPoolsHandle[page])) {
                     var options = {
                         sort: 'name',
                         full: true,
@@ -101,7 +97,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };
