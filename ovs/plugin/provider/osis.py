@@ -13,24 +13,22 @@
 # limitations under the License.
 
 """
-This module contains configuration logic
+This module contains process logic
 """
 
 
-class Configuration(object):
+class Osis(object):
     """
-    Configuration class
+    Osis class
     """
 
     def __init__(self):
         """
-        Configuration should be a complete static class
+        Net should be a complete static class
         """
         raise RuntimeError('This class should not be instantiated.')
 
-    get = None
-    getInt = None
-    getHRD = None
+    getClient = None
 
 from ovs.plugin.injection.injector import Injector
-Configuration = Injector.inject(Configuration)
+Osis = Injector.inject(Osis)

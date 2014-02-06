@@ -26,6 +26,8 @@ from ovs.plugin.provider.service import Service
 from ovs.plugin.provider.package import Package
 from ovs.plugin.provider.remote import Remote
 from ovs.plugin.provider.tools import Tools
+from ovs.plugin.provider.osis import Osis
+from ovs.plugin.provider.net import Net
 
 from ovs.manage import Control
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
@@ -39,7 +41,7 @@ class ConfigHelper(object):
     def __init__(self):
         self._grid_config_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'grid')
 
-    def generate_arakoon_config(self, config, config_dir):
+    def generate_arakoon_config(self, config, config_dir, extend_config):
         """
         We need to compile the
         * ovsdb.cfg/ovsdb_client.cfg
@@ -57,7 +59,7 @@ class ConfigHelper(object):
             arakoon_cluster = ArakoonManagement.getCluster(cluster)
             arakoon_cluster_client_config = arakoon_cluster.getClientConfig()
             if config.has_key(cluster):
-                if not str(config[cluster]['name']) in arakoon_cluster.listNodes():
+                if extend_config and not str(config[cluster]['name']) in arakoon_cluster.listNodes():
                     arakoon_cluster.addNode(name = str(config[cluster]['name']),
                                             ip = config[cluster]['ip'],
                                             clientPort = int(config[cluster]['client_port']),
@@ -89,7 +91,7 @@ class ConfigHelper(object):
         return arakoon_clients_grid_config
 
 
-    def generate_grid_config(self, filename, config, config_dir):
+    def generate_grid_config(self, filename, config, config_dir, extend_config):
         grid_client_config = []
         client_grid_config_file = os.path.join(config_dir, filename)
         client_config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), filename)
@@ -102,12 +104,13 @@ class ConfigHelper(object):
         else:
             nodes = []
         all_nodes = list(nodes)
-        if not config['name'] in all_nodes:
+        if extend_config and not config['name'] in all_nodes:
             all_nodes.append(config['name'])
         grid_ini.update({'main': {'nodes': all_nodes}})
         for node in nodes:
             grid_ini.update({node: {'location': ini.get(node)['location']}})
-        grid_ini.update({config['name']: {'location': '{}:{}'.format(config['ip'], config['port'])}})
+        if extend_config:
+            grid_ini.update({config['name']: {'location': '{}:{}'.format(config['ip'], config['port'])}})
         print grid_ini
         grid_ini.write()
 
@@ -119,6 +122,7 @@ class Cluster(object):
         self.localnode = socket.gethostname()
         self.template_hrd_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'grid', 'hrd', 'template')
         self.control = Control()
+        self.osis_client = Osis.getClient()
 
     def join_rabbitmq_cluster(self, master):
         join_cmd = """from ovs.manage import Control
@@ -201,6 +205,7 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
         template_hrd = [os.path.basename(item)[:-4] for item in os.listdir(self.node_hrd_dir) if item.find(".hrd")<>-1]
         hrd_to_copy = [os.path.basename(item)[:-4] for item in os.listdir("/opt/jumpscale/cfg/hrd") if item.find(".hrd")<>-1]
 
+        self.cuapi.connect(remoteip)
         for hrdname in template_hrd:
             print self.cuapi.file_upload("/opt/jumpscale/cfg/hrd/{}.hrd".format(hrdname), os.path.join(self.node_hrd_dir, '{}.hrd'.format(hrdname)))
             
@@ -208,30 +213,38 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
             hrd_path = os.path.join(os.sep, 'opt', 'jumpscale', 'cfg', 'hrd', '{}.hrd'.format(hrdname))
             print self.cuapi.file_upload(hrd_path, hrd_path)
 
-    def _push_config(self, configs, node_config_dir, update_local=True):
+    def _push_config(self, configs, node_config_dir, update_local=True, nodes=[]):
         if 'arakoon' in configs:
             arakoon_grid_config_dir = os.path.join(node_config_dir, 'arakoon')
             for dir in os.listdir(arakoon_grid_config_dir):
                 active_config_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon', dir)
-                self.cuapi.dir_ensure(active_config_dir, True)
                 for file in os.listdir(os.path.join(arakoon_grid_config_dir, dir)):
-                    src_file = os.path.join(arakoon_grid_config_dir, dir, file)
-                    dst_file = os.path.join(active_config_dir, file)
-                    self.cuapi.file_upload(dst_file, src_file)
+                    for node in nodes:
+                        self.cuapi.connect(node)
+                        node_machineid = self.cuapi.run('python -c """from JumpScale import j; print j.application.getUniqueMachineId()"""')
+                        # Do not upload the local_node file to nodes for which it was not generated, only new node should get it.
+                        if file == '{}_local_nodes.cfg'.format(dir) and node_config_dir.find(node_machineid) == -1: continue
+                        self.cuapi.dir_ensure(active_config_dir, True)
+                        src_file = os.path.join(arakoon_grid_config_dir, dir, file)
+                        dst_file = os.path.join(active_config_dir, file)
+                        self.cuapi.file_upload(dst_file, src_file)
                     if update_local and file != '{}_local_nodes.cfg'.format(dir):
                         shutil.copyfile(src_file, dst_file)
             configs.remove('arakoon')
         for config in configs:
             src_file = os.path.join(node_config_dir, config)
             dst_file = os.path.join(Configuration.get('ovs.core.cfgdir'), config)
-            self.cuapi.file_upload(dst_file, src_file)
+            for node in nodes:
+                self.cuapi.connect(node)
+                self.cuapi.dir_ensure(os.path.dirname(dst_file), True)
+                self.cuapi.file_upload(dst_file, src_file)
+                #Add code to transfer /var/lib/rabbitmq/.erlang.cookie which is required for new node to properly join the cluster
+                rabbitmq_cookie_file = os.path.join(os.sep, 'var', 'lib', 'rabbitmq', '.erlang.cookie')
+                self.cuapi.dir_ensure(os.path.dirname(rabbitmq_cookie_file), True)
+                self.cuapi.file_upload(rabbitmq_cookie_file, rabbitmq_cookie_file)
+                self.cuapi.file_attribs(rabbitmq_cookie_file, mode=400)
             if update_local:
                 shutil.copyfile(src_file, dst_file)
-        #Add code to transfer /var/lib/rabbitmq/.erlang.cookie which is required for new node to properly join the cluster
-        rabbitmq_cookie_file = os.path.join(os.sep, 'var', 'lib', 'rabbitmq', '.erlang.cookie')
-        self.cuapi.dir_ensure(os.path.dirname(rabbitmq_cookie_file), True)
-        self.cuapi.file_upload(rabbitmq_cookie_file, rabbitmq_cookie_file)
-        self.cuapi.file_attribs(rabbitmq_cookie_file, mode=400)
     
     def _remote_control_init(self, vpool_name, services, master):
         """
@@ -243,6 +256,39 @@ Control.init(\'{}\',{},\'{}\')
 """.format(vpool_name, services, master)
         print self.cuapi.run("source /etc/profile; /opt/OpenvStorage/bin/python -c \"{}\"".format(init_cmd))
 
+    def _get_cluster_nodes(self):
+        grid_nodes = []
+        local_addresses = Net.getIpAddresses()
+        local_ovs_grid_ip = Configuration.get('ovs.grid.ip')
+        grid_id = Configuration.getInt('grid.id')
+        osis_client_node = Osis.getClientForCategory(self.osis_client, 'system', 'node')
+        for node_key in osis_client_node.list():
+            node = osis_client_node.get(node_key)
+            if node.gid != grid_id: continue
+            ip_found = False
+            for ip in node.ipaddr:
+                if Net.getReachableIpAddress(ip, 80) == local_ovs_grid_ip:
+                    grid_nodes.append(ip)
+                    ip_found = True
+                    break
+            if not ip_found:
+                raise RuntimeError('No suitable ip address found for node %s'%node.machineguid)
+        print grid_nodes
+        grid_nodes.remove(local_ovs_grid_ip)
+        return grid_nodes
+
+    def _execute_on_clusternodes(self, command, interpreter='bash', nodes=[]):
+        """
+        Run the command on all nodes in the cluster
+        """
+        for node in nodes:
+            if node in self.nodes:
+                self.cuapi.connect(node)
+                if interpreter == 'python':
+                    self.cuapi.run('/opt/OpenvStorage/bin/python -c """%s"""'%command)
+                else:
+                    self.cuapi.run(command)
+
     def initializeNode(self, vpool, remote_ip, passwd, seedpasswd):
         """
         Initialize a remote node to join the Open vStorage cluster
@@ -252,6 +298,8 @@ Control.init(\'{}\',{},\'{}\')
         @param passwd: password to set on the new node
         @param seedpasswd: current password of the new node
         """
+        self.nodes = self._get_cluster_nodes()
+        self.remote_ip = remote_ip
         configs_to_push = ['memcacheclient.cfg', 'rabbitmqclient.cfg']
         local_configs_to_push = []
         Remote.cuisine.fabric.env["password"]=passwd
@@ -291,7 +339,17 @@ Control.init(\'{}\',{},\'{}\')
  
         unique_machine_id = Remote.cuisine.api.run('python -c """from JumpScale import j; print j.application.getUniqueMachineId()"""')
         machine_hostname = Remote.cuisine.api.run('python -c "import socket; print socket.gethostname()"')
-#         
+
+        """
+        Retrieve info of the current environment
+        In the future this might all be asked to the jumpscale grid framework
+        """
+        arakoon_cluster = ArakoonManagement().getCluster('ovsdb')
+        arakoon_nodes = arakoon_cluster.listNodes()
+        extend_config = False
+        if len(arakoon_nodes) < 3 and not unique_machine_id in arakoon_nodes:
+            extend_config = True
+
         """
         Build hrd's for new node
         """
@@ -330,6 +388,7 @@ Control.init(\'{}\',{},\'{}\')
         node_openvstorage_hrd.set('volumedriver.backend.mountpoint', volumedriver_local_filesystem)
         node_openvstorage_hrd.set('volumedriver.vpool.mount', mount_vpool)
         node_openvstorage_hrd.set('volumedriver.ip.storage', Configuration.get('volumedriver.ip.storage'))
+
         """
         Build new grid configuration for arakoon
         """
@@ -355,29 +414,35 @@ Control.init(\'{}\',{},\'{}\')
         new_node_arakoon_config = {'ovsdb' : new_node_ovsdb_hrd,
                                    'voldrv' : new_node_volumedriver_hrd}
         
-        arakoon_clients = self._config_helper.generate_arakoon_config(new_node_arakoon_config, self.node_cfg_dir)
+        arakoon_clients = self._config_helper.generate_arakoon_config(new_node_arakoon_config, self.node_cfg_dir, extend_config)
   
         """
         Build new grid configuration for memcache
         """
         new_node_memcache_hrd = {'ip': remote_ip, 'name': unique_machine_id, 'port': '11211'}
-        self._config_helper.generate_grid_config('memcacheclient.cfg', new_node_memcache_hrd, self.node_cfg_dir)
+        self._config_helper.generate_grid_config('memcacheclient.cfg', new_node_memcache_hrd, self.node_cfg_dir, extend_config)
 
         """
         Build new grid configuration for rabbitmq brokers
         """
         new_node_rabbitmq_broker_hrd = {'ip': remote_ip, 'name': unique_machine_id, 'port': '5672'}
-        self._config_helper.generate_grid_config('rabbitmqclient.cfg', new_node_rabbitmq_broker_hrd, self.node_cfg_dir)
+        self._config_helper.generate_grid_config('rabbitmqclient.cfg', new_node_rabbitmq_broker_hrd, self.node_cfg_dir, extend_config)
 
         """
         Stop OVS services on all nodes
-         
-        @todo: We need to stop processmanager as well or disable the autorestart of the processes, otherwise this might intervene and fail the node init
         """
-        subprocess.call(['service', 'processmanager', 'stop'])
-        self.stop_ovs_service('volumedriver', remote=False)
-        self.stop_ovs_service('openvstorage-webapps', remote=False)
-        self.stop_ovs_service('openvstorage-core', remote=False)
+        if extend_config:
+            subprocess.call(['service', 'processmanager', 'stop'])
+            self.stop_ovs_service('volumedriver', remote=False)
+            self.stop_ovs_service('openvstorage-webapps', remote=False)
+            self.stop_ovs_service('openvstorage-core', remote=False)
+            subprocess.call(['jsprocess', 'start', '-n', 'elasticsearch'])
+            subprocess.call(['jsprocess', 'start', '-n', 'osis'])
+            stop_ovs_processes = """
+service processmanager stop
+jsprocess stop
+"""
+            self._execute_on_clusternodes(stop_ovs_processes, interpreter='bash', nodes=self.nodes)
 
 
         """
@@ -390,7 +455,11 @@ Control.init(\'{}\',{},\'{}\')
         VPOOL_REGEX = re.compile('(.*)\.json')
         existing_vpools = []
         
-        self._push_config(configs=['arakoon',], node_config_dir=self.node_cfg_dir, update_local=True)
+        config_destinations = [remote_ip,]
+        if extend_config:
+            if self.nodes:
+                config_destinations.extend(self.nodes)
+            self._push_config(configs=['arakoon',], node_config_dir=self.node_cfg_dir, update_local=True, nodes=config_destinations)
         
         voldrv_arakoon_cluster_id = Configuration.get('volumedriver.arakoon.clusterid')
         voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
@@ -400,10 +469,27 @@ Control.init(\'{}\',{},\'{}\')
             if pool_match:
                 existing_vpools.append(pool_match.groups()[0])
         
+        # @todo: Only the local node is taken into account to detect wether the vpool is already existing, this should actually be on the full grid.
+        vrouter_ips = list()
         for vpool_name in existing_vpools:
             vsr_configuration = VolumeStorageRouterConfiguration(vpool_name)
-            vsr_configuration.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
-            local_vrouter_config = dict(vsr_configuration._config_file_content['volume_router'])
+            vsr_configuration.load_config()
+            if extend_config:
+                vsr_configuration.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+                third_node_command = """
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+vsr_configuration = VolumeStorageRouterConfiguration('%(vpool)s')
+vsr_configuration.configure_arakoon_cluster('%(cluster_id)s', %(client_config)s)
+""" %{'vpool': vpool_name,
+      'cluster_id': voldrv_arakoon_cluster_id,
+      'client_config': voldrv_arakoon_client_config}
+                self._execute_on_clusternodes(third_node_command, interpreter='python', nodes=self.nodes)
+            local_vrouter_cluster = dict(vsr_configuration._config_file_content['volume_router_cluster'])
+            vrouter_ips = map(lambda n: n['host'], local_vrouter_cluster['vrouter_cluster_nodes'])
+            for ip in Net.getIpAddresses():
+                if ip in vrouter_ips:
+                    vrouter_ips.remove(ip)
             if vpool_name == vpool:
                 vrouter_config = {"vrouter_id": '{}{}'.format(vpool_name, unique_machine_id),
                                   "vrouter_redirect_timeout_ms": "5000",
@@ -413,7 +499,14 @@ Control.init(\'{}\',{},\'{}\')
                                   "xmlrpc_port": 12323}
                 vsr_configuration.configure_volumerouter(vpool_name, vrouter_config)
                 shutil.copyfile(os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json'.format(vpool)), os.path.join(self.node_cfg_dir, '{}.json'.format(vpool)))
-                vsr_configuration.configure_volumerouter(vpool_name, local_vrouter_config, update_cluster=False)
+                #@todo: Following third_node command should only be executed on nodes running this vpool
+                third_node_command = """
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+vsr_configuration = VolumeStorageRouterConfiguration('%(vpool)s')
+vsr_configuration.configure_volumerouter('%(vpool)s', %(vrouter_config)s) 
+"""%{'vpool': vpool_name,
+     'vrouter_config': vrouter_config}
+                self._execute_on_clusternodes(third_node_command, interpreter='python', nodes=vrouter_ips)
                 local_configs_to_push.append('{}.json'.format(vpool))
                 self.cuapi.dir_ensure("/etc/ceph")
                 self.cuapi.file_upload("/etc/ceph/ceph.conf","/etc/ceph/ceph.conf")
@@ -427,19 +520,29 @@ Control.init(\'{}\',{},\'{}\')
         Secondly we do not only need to update the new node and ourselfs but also a 2nd node already in place when adding nr 3.
         """
         self._push_hrds()
-        self._push_config(configs=configs_to_push, node_config_dir=self.node_cfg_dir, update_local=True)
-        self._push_config(configs=local_configs_to_push, node_config_dir=self.node_cfg_dir, update_local=False)
+        self._push_config(configs=configs_to_push, node_config_dir=self.node_cfg_dir, update_local=True, nodes=config_destinations)
+        self._push_config(configs=local_configs_to_push, node_config_dir=self.node_cfg_dir, update_local=False, nodes=[remote_ip,])
 
         """
         Update the local and remote hosts file.
         """
-        # Add content to fstab
+        # Update hosts file
         j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip=remote_ip, hostname=machine_hostname)
-        Remote.cuisine.api.run('python -c "from JumpScale import j; j.system.net.updateHostsFile(hostsfile=\'/etc/hosts\', ip=\'{}\', hostname=\'{}\')"'.format(Configuration.get('ovs.grid.ip'), socket.gethostname()))
+        third_nodes_dict = {}
+        for node in self.nodes:
+            if node in Net.getIpAddresses(): continue
+            self.cuapi.connect(node)
+            self.cuapi.run('python -c "from JumpScale import j; j.system.net.updateHostsFile(hostsfile=\'/etc/hosts\', ip=\'{}\', hostname=\'{}\')"'.format(remote_ip, machine_hostname))
+            third_nodes_dict[node] = self.cuapi.run('python -c "import socket; print socket.gethostname()"')
+        
+        self.cuapi.connect(remote_ip)
+        for ip,nodename in third_nodes_dict.iteritems():
+            self.cuapi.run('python -c "from JumpScale import j; j.system.net.updateHostsFile(hostsfile=\'/etc/hosts\', ip=\'{}\', hostname=\'{}\')"'.format(ip, nodename))
 
         """
         Install the required software
         """
+        self.cuapi.connect(remote_ip)
         self.cuapi.run('apt-get -y -q install python-dev')
         self.cuapi.run('jpackage_install -n openvstorage')
         
@@ -452,12 +555,24 @@ Control.init(\'{}\',{},\'{}\')
         3. other nodes
         """
         self.control._start_package('openvstorage-core')
+        for node in vrouter_ips:
+            self.cuapi.connect(node)
+            self.cuapi.run('jpackage_start -n openvstorage-core')
+        self.cuapi.connect(remote_ip)
         self._remote_control_init(vpool, services=['openvstorage-core'], master=socket.gethostname())
         
-        #@todo Configure volumerouter cluster in arakoon
+        #@todo Configure volumerouter cluster in arakoon, will be required by one of the next releases of volumedriver
         
         self.control._start_package('openvstorage-webapps')
+        for node in vrouter_ips:
+            self.cuapi.connect(node)
+            self.cuapi.run('jpackage_start -n openvstorage-webapps')
+        self.cuapi.connect(remote_ip)
         self._remote_control_init(vpool, services=['openvstorage-webapps'], master=socket.gethostname())
-        #self.control.init(vpool_name, services=['volumedriver',])
+        
         self.control._start_package('volumedriver')
+        for node in vrouter_ips:
+            self.cuapi.connect(node)
+            self.cuapi.run('jpackage_start -n volumedriver')
+        self.cuapi.connect(remote_ip)
         self._remote_control_init(vpool, services=['volumedriver',], master=socket.gethostname())
