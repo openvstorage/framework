@@ -16,6 +16,7 @@
 JumpScale Injector module
 """
 from JumpScale import j
+from JumpScale import grid
 
 
 class Injector(object):
@@ -33,6 +34,7 @@ class Injector(object):
     def inject_configuration(provider):
         """ Injects the Config module """
         provider.get = j.application.config.get
+        provider.getInt = j.application.config.getInt
         provider.getHRD = j.core.hrd.getHRD
         return provider
 
@@ -118,3 +120,9 @@ class Injector(object):
         """ Injects the Net module """
         _ = provider
         return j.system.net
+
+    @staticmethod
+    def inject_osis(provider):
+        """ Injects the osis module """
+        _ = provider
+        return j.core.osis
