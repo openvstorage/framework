@@ -50,7 +50,9 @@ class VDiskViewSet(viewsets.ViewSet):
             if vmachine.is_internal:
                 vdisks = []
                 for vsr in vmachine.served_vsrs:
-                    vdisks += vsr.vpool.vdisks
+                    for vdisk in vsr.vpool.vdisks:
+                        if vdisk.vsrid == vsr.vsrid:
+                            vdisks.append(vdisk)
             else:
                 vdisks = vmachine.vdisks
         vdisks, serializer, contents = Toolbox.handle_list(vdisks, request)

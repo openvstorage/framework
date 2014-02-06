@@ -39,7 +39,8 @@ define([
                 var vsa = self.VSA();
                 $.when.apply($, [
                         vsa.load(),
-                        vsa.fetchServedChildren()
+                        vsa.fetchServedChildren(),
+                        vsa.loadDisks()
                     ])
                     .done(function() {
                         var pMachineGuid = vsa.pMachineGuid(), pm;
@@ -52,7 +53,7 @@ define([
                             vsa.pMachine(self.pMachineCache[pMachineGuid]);
                         }
                         // Move child guids to the observables for easy display
-                        vsa.vpools(vsa.vPoolGuids);
+                        vsa.vPools(vsa.vPoolGuids);
                         vsa.vMachines(vsa.vMachineGuids);
                     })
                     .always(deferred.resolve);

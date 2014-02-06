@@ -211,7 +211,8 @@ define([
                             );
                             $.each(self.vSAs(), function(index, vmachine) {
                                 vmachine.fillData(vmdata[vmachine.guid()]);
-                                vmachine.load(false, true);
+                                vmachine.load();
+                                vmachine.loadDisks();
                             });
                             deferred.resolve();
                         })

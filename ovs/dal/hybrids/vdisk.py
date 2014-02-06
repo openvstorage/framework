@@ -49,9 +49,9 @@ class VDisk(DataObject):
                   'parent_vdisk': (None, 'child_vdisks')}
     _expiry = {'snapshots':  (60, list),
                'info':       (60, dict),
-               'statistics':  (4, dict),
+               'statistics':  (5, dict),
                'vsrid':      (60, str),
-               'vsa_guid':   (60, str)}
+               'vsa_guid':   (15, str)}
     # pylint: enable=line-too-long
 
     def __init__(self, *args, **kwargs):

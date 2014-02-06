@@ -44,11 +44,11 @@ class VMachine(DataObject):
                   'vpool':    (VPool, 'vmachines')}
     _expiry = {'snapshots':          (60, list),
                'hypervisor_status': (300, str, True),  # The cache is invalidated on start/stop
-               'statistics':          (4, dict),
+               'statistics':          (5, dict),
                'stored_data':        (60, int),
                'failover_mode':      (60, str),
-               'vsas_guids':         (60, list),
-               'vpools_guids':       (60, list)}
+               'vsas_guids':         (15, list),
+               'vpools_guids':       (15, list)}
     # pylint: enable=line-too-long
 
     def _snapshots(self):
@@ -96,10 +96,14 @@ class VMachine(DataObject):
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['%s_ps' % key] = 0
-        vdisks = self.vdisks
         if self.is_internal:
+            vdisks = []
             for vsr in self.served_vsrs:
-                vdisks += vsr.vpool.vdisks
+                for vdisk in vsr.vpool.vdisks:
+                    if vdisk.vsrid == vsr.vsrid:
+                        vdisks.append(vdisk)
+        else:
+            vdisks = self.vdisks
         for disk in vdisks:
             statistics = disk._statistics()  # Prevent double caching
             for key, value in statistics.iteritems():

@@ -100,6 +100,7 @@ define([
                             $.each(self.vSAs(), function(index, vsa) {
                                 if ($.inArray(vsa.guid(), guids) !== -1) {
                                     vsa.fillData(vsadata[vsa.guid()]);
+                                    vsa.loadDisks();
                                     var pMachineGuid = vsa.pMachineGuid(), pm;
                                     if (pMachineGuid && (vsa.pMachine() === undefined || vsa.pMachine().guid() !== pMachineGuid)) {
                                         if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {

@@ -112,6 +112,29 @@ define([
                 }
             }).promise();
         };
+        self.loadDisks = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadVDisksHandle)) {
+                    self.loadVDisksHandle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
+                        .done(function(data) {
+                            var guids = [];
+                            $.each(data, function(index, item) {
+                                guids.push(item.guid);
+                            });
+                            generic.crossFiller(
+                                guids, self.vDisks,
+                                function(guid) {
+                                    return new VDisk(guid);
+                                }, 'guid'
+                            );
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.hypervisorStatus, data, 'hypervisor_status');
@@ -129,7 +152,9 @@ define([
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }
-            if (data.hasOwnProperty('vdisks_guids')) {
+            // The vdisks from a full object data is only valid for non-VSA vMachines, since those
+            // don't have disks, but only serve disks.
+            if (data.hasOwnProperty('vdisks_guids') && self.isInternal() === false) {
                 generic.crossFiller(
                     data.vdisks_guids, self.vDisks,
                     function(guid) {
@@ -158,34 +183,23 @@ define([
             self.loaded(true);
             self.loading(false);
         };
-        self.load = function(onlyextends) {
-            onlyextends = onlyextends || false;
+        self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
-                var calls = [];
-                if (!onlyextends) {
-                    calls.push($.Deferred(function(deferred) {
-                        if (generic.xhrCompleted(self.loadHandle)) {
-                            self.loadHandle = api.get('vmachines/' + self.guid())
-                                .done(function(data) {
-                                    self.fillData(data);
-                                    deferred.resolve();
-                                })
-                                .fail(deferred.reject);
-                        } else {
-                            deferred.reject();
-                        }
-                    }).promise());
+                if (generic.xhrCompleted(self.loadHandle)) {
+                    self.loadHandle = api.get('vmachines/' + self.guid())
+                        .done(function(data) {
+                            self.fillData(data);
+                            self.loaded(true);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject)
+                        .always(function() {
+                            self.loading(false);
+                        });
+                } else {
+                    deferred.resolve();
                 }
-                $.when.apply($, calls)
-                    .done(function() {
-                        self.loaded(true);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject)
-                    .always(function() {
-                        self.loading(false);
-                    });
             }).promise();
         };
     };

@@ -18,6 +18,7 @@ Contains various helping classes
 import re
 import math
 from backend.serializers.serializers import SimpleSerializer, FullSerializer
+from ovs.dal.dataobjectlist import DataObjectList
 
 
 class Toolbox:
@@ -110,6 +111,7 @@ class Toolbox:
         if full is not None:
             serializer = FullSerializer
         else:
-            dataobjectlist = dataobjectlist.reduced
+            if isinstance(dataobjectlist, DataObjectList):
+                dataobjectlist = dataobjectlist.reduced
             serializer = SimpleSerializer
         return dataobjectlist, serializer, contents
