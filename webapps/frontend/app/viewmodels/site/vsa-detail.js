@@ -40,7 +40,8 @@ define([
                 $.when.apply($, [
                         vsa.load(),
                         vsa.fetchServedChildren(),
-                        vsa.loadDisks()
+                        vsa.loadDisks(),
+                        vsa.getAvailableActions()
                     ])
                     .done(function() {
                         var pMachineGuid = vsa.pMachineGuid(), pm;

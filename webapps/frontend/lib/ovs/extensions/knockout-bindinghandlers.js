@@ -89,8 +89,8 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
         update: function(element, valueAccessor) {
             var value, id, arc, percentage, color;
             value = valueAccessor();
-            if (!isNaN(value.primary())) {
-                percentage = value.primary();
+            if (!isNaN(value.primary.raw())) {
+                percentage = value.primary.raw();
                 id = $($(element).children()[0]).attr('id');
                 color = d3.scale.linear().domain([0, 50, 100]).range(['red', 'orange', 'green']);
                 arc = d3.svg.arc()

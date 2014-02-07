@@ -118,8 +118,11 @@ class VMachine(DataObject):
         """
         vdisks = self.vdisks
         if self.is_internal:
+            vdisks = []
             for vsr in self.served_vsrs:
-                vdisks += vsr.vpool.vdisks
+                for vdisk in vsr.vpool.vdisks:
+                    if vdisk.vsrid == vsr.vsrid:
+                        vdisks.append(vdisk)
         return sum([disk.info['stored'] for disk in vdisks])
 
     def _failover_mode(self):
@@ -160,6 +163,13 @@ class VMachine(DataObject):
         Gets the vPool guids linked to this vMachine
         """
         vpool_guids = set()
-        for vdisk in self.vdisks:
+        vdisks = self.vdisks
+        if self.is_internal:
+            vdisks = []
+            for vsr in self.served_vsrs:
+                for vdisk in vsr.vpool.vdisks:
+                    if vdisk.vsrid == vsr.vsrid:
+                        vdisks.append(vdisk)
+        for vdisk in vdisks:
             vpool_guids.add(vdisk.vpool_guid)
         return list(vpool_guids)

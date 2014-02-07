@@ -100,7 +100,9 @@ limitations under the License.
                         <tr>
                             <td style="width: 50px; vertical-align: middle;">
                                 <button type="button" class="btn btn-lg btn-default"
-                                        data-bind="style: { color: '#428bca' }, click: function() { $parent.moveAway(); }">
+                                        data-bind="click: function() { $parent.moveAway(); },
+                                                   style: { color: ($.inArray('MOVE_AWAY', availableActions()) !== -1 ? '#428bca' : 'grey') },
+                                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1">
                                     <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.moveaway"></span>
                                 </button>
                             </td>

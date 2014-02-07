@@ -74,7 +74,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 return formatter(target());
             },
             write: target
-        });
+        }).extend({ notify: 'always' });
         computed(target());
         computed.raw = target;
         return computed;

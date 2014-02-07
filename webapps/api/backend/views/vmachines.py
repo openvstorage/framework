@@ -240,3 +240,19 @@ class VMachineViewSet(viewsets.ViewSet):
             pmachine_guids.add(vsr.serving_vmachine.pmachine_guid)
         guids = [{'guid': guid} for guid in pmachine_guids]
         return Response(guids, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    def get_available_actions(self, request, obj):
+        """
+        Gets a list of all available actions
+        """
+        _ = request
+        actions = []
+        if obj.is_internal and not obj.is_vtemplate:
+            vsas = VMachineList.get_vsas()
+            if len(vsas) > 1:
+                actions.append('MOVE_AWAY')
+        return Response(actions, status=status.HTTP_200_OK)

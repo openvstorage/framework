@@ -66,6 +66,7 @@ define([
         self.snapshots             = ko.observableArray([]);
         self.vDisks                = ko.observableArray([]);
         self.templateChildrenGuids = ko.observableArray([]);
+        self.availableActions      = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -105,6 +106,20 @@ define([
                     self.loadChildrenGuid = api.get('vmachines/' + self.guid() + '/get_children')
                         .done(function(data) {
                             self.templateChildrenGuids(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.getAvailableActions = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadChildrenGuid)) {
+                    self.loadChildrenGuid = api.get('vmachines/' + self.guid() + '/get_available_actions')
+                        .done(function(data) {
+                            self.availableActions(data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
