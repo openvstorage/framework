@@ -138,7 +138,9 @@ class VDisk(DataObject):
             if key in client.stat_keys:
                 delta = vdiskstatsdict['timestamp'] - previousdict.get('timestamp',
                                                                        vdiskstatsdict['timestamp'])
-                if delta == 0:
+                if delta < 0:
+                    vdiskstatsdict['%s_ps' % key] = 0
+                elif delta == 0:
                     vdiskstatsdict['%s_ps' % key] = previousdict.get('%s_ps' % key, 0)
                 else:
                     vdiskstatsdict['%s_ps' % key] = (vdiskstatsdict[key] - previousdict[key]) / delta
