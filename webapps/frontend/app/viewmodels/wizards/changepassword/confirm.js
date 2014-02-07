@@ -20,11 +20,15 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.shared = shared;
 
+        // Observables
         self.currentPassword = ko.observable('');
-        self.newPassword = ko.observable('');
-        self.newPassword2 = ko.observable('');
+        self.newPassword     = ko.observable('');
+        self.newPassword2    = ko.observable('');
+
+        // Computed
         self.canContinue = ko.computed(function() {
             if (self.currentPassword() === '') {
                 return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.entercurrent') };
@@ -41,6 +45,7 @@ define([
             return { value: true, reason: undefined };
         });
 
+        // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 api.post('users/' + self.shared.authentication.token + '/set_password', {

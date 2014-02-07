@@ -25,8 +25,6 @@ define([
         self.refreshTimeout = undefined;
 
         // Obserables
-        self.nodes = ko.observableArray([]);
-
         self.ovsDRhit   = ko.observable(0);
         self.ovsDRtot   = ko.observable(0);
         self.ovsDRrat   = ko.observable(0);
@@ -43,6 +41,7 @@ define([
         self.ovsRLtot   = ko.observable(0);
         self.ovsRLrat   = ko.observable(0);
         self.ovsRLspeed = ko.deltaObservable(generic.formatShort);
+        self.nodes      = ko.observableArray([]);
 
         // Functions
         self.refresh = function() {

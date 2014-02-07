@@ -21,13 +21,21 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared      = shared;
-        self.guard       = { authenticated: true };
-        self.refresher   = new Refresher();
-        self.widgets     = [];
-
-        // Data
+        // Variables
+        self.shared          = shared;
+        self.guard           = { authenticated: true };
+        self.refresher       = new Refresher();
+        self.widgets         = [];
+        self.vPoolCache      = {};
+        self.vsaCache        = {};
+        self.query           = {
+            query: {
+                type: 'AND',
+                items: [['is_internal', 'EQUALS', false],
+                        ['is_vtemplate', 'EQUALS', false],
+                        ['status', 'NOT_EQUALS', 'CREATED']]
+            }
+        };
         self.vMachineHeaders = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: 150       },
             { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 150       },
@@ -41,22 +49,14 @@ define([
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 100       }
         ];
-        self.vMachines = ko.observableArray([]);
-        self.vPoolCache = {};
-        self.vsaCache = {};
-        self.vMachinesInitialLoad = ko.observable(true);
 
-        // Variables
+        // Handles
         self.loadVMachinesHandle = undefined;
         self.refreshVMachinesHandle = {};
-        self.query = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', false],
-                        ['is_vtemplate', 'EQUALS', false],
-                        ['status', 'NOT_EQUALS', 'CREATED']]
-            }
-        };
+
+        // Observables
+        self.vMachines            = ko.observableArray([]);
+        self.vMachinesInitialLoad = ko.observable(true);
 
         // Functions
         self.fetchVMachines = function() {

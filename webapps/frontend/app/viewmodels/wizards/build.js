@@ -17,14 +17,17 @@ define([
 ], function(activator, dialog, ko) {
     "use strict";
     return function(parent) {
+        // Observables
         parent.title   = ko.observable();
-        parent.steps   = ko.observableArray([]);
         parent.step    = ko.observable(0);
         parent.modal   = ko.observable(false);
         parent.running = ko.observable(false);
+        parent.steps   = ko.observableArray([]);
 
+        // Builded variable
         parent.activeStep = activator.create();
 
+        // Computed
         parent.stepsLength = ko.computed(function() {
             return parent.steps().length;
         });
@@ -60,6 +63,7 @@ define([
             return {value: true, reason: undefined};
         });
 
+        // Functions
         parent.next = function() {
             if (parent.step() < parent.stepsLength() ) {
                 parent.step(parent.step() + 1);
@@ -101,7 +105,6 @@ define([
                     window.setTimeout(function() { parent.running(false); }, 500);
                 });
         };
-
         parent.getView = function() {
             return 'views/wizards/index.html';
         };

@@ -21,13 +21,11 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared      = shared;
-        self.guard       = { authenticated: true };
-        self.refresher   = new Refresher();
-        self.widgets     = [];
-
-        // Data
+        // Variables
+        self.shared       = shared;
+        self.guard        = { authenticated: true };
+        self.refresher    = new Refresher();
+        self.widgets      = [];
         self.vPoolHeaders = [
             { key: 'name',              value: $.t('ovs:generic.name'),             width: 150       },
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 100       },
@@ -39,11 +37,13 @@ define([
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined },
             { key: undefined,           value: $.t('ovs:generic.actions'),          width: 100       }
         ];
-        self.vPools = ko.observableArray([]);
+
+        // Observables
+        self.vPools            = ko.observableArray([]);
         self.vPoolsInitialLoad = ko.observable(true);
 
-        // Variables
-        self.loadVPoolsHandle = undefined;
+        // Handles
+        self.loadVPoolsHandle    = undefined;
         self.refreshVPoolsHandle = {};
 
         // Functions

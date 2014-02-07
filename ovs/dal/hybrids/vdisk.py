@@ -112,7 +112,7 @@ class VDisk(DataObject):
         """
         client = VolumeStorageRouterClient()
         volatile = VolatileFactory.get_client()
-        key = '%s_%s' % (self._key, 'statistics_previous')
+        prev_key = '%s_%s' % (self._key, 'statistics_previous')
         # Load data from volumedriver
         if self.volumeid and self.vpool:
             try:
@@ -133,7 +133,7 @@ class VDisk(DataObject):
                 vdiskstatsdict[key] += vdiskstatsdict[item]
         vdiskstatsdict['timestamp'] = time.time()
         # Calculate delta's based on previously loaded dictionary
-        previousdict = volatile.get(key, default={})
+        previousdict = volatile.get(prev_key, default={})
         for key in vdiskstatsdict.keys():
             if key in client.stat_keys:
                 delta = vdiskstatsdict['timestamp'] - previousdict.get('timestamp',
@@ -142,7 +142,7 @@ class VDisk(DataObject):
                     vdiskstatsdict['%s_ps' % key] = previousdict.get('%s_ps' % key, 0)
                 else:
                     vdiskstatsdict['%s_ps' % key] = (vdiskstatsdict[key] - previousdict[key]) / delta
-        volatile.set(key, vdiskstatsdict, self._expiry['statistics'][0] * 10)
+        volatile.set(prev_key, vdiskstatsdict, self._expiry['statistics'][0] * 10)
         # Returning the dictionary
         return vdiskstatsdict
 

@@ -20,18 +20,18 @@ define([
     return function(guid) {
         var self = this;
 
-        // Variables
+        // Handles
         self.loadHandle = undefined;
 
         // Observables
         self.loading   = ko.observable(false);
         self.loaded    = ko.observable(false);
-
         self.guid      = ko.observable(guid);
         self.name      = ko.observable();
         self.ipAddress = ko.observable();
         self.hvtype    = ko.observable();
 
+        // Functions
         self.fillData = function(data) {
             self.name(data.name);
             self.hvtype(data.hvtype);

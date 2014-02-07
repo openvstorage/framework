@@ -19,9 +19,12 @@ define([
     return function() {
         var self = this;
 
+        // Observables
         self.dataLoading     = ko.observable(false);
         self.widgetActivated = ko.observable(false);
         self.data            = ko.observable();
+
+        // Computed
         self.hasData         = ko.computed(function() {
             return !(
                 (!self.widgetActivated()) ||  // The widget is not loaded yet
@@ -30,21 +33,6 @@ define([
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
         }).extend({ throttle: 50 });
-
-        self._fetchData = function(observable, property) {
-            self.dataLoading(true);
-            var total = 0, i;
-            if (observable instanceof Array) {
-                for (i = 0; i < observable.length; i += 1) {
-                    total += (observable[i][property].raw() || 0);
-                }
-            } else if (observable !== undefined) {
-                total = observable[property].raw() || 0;
-            }
-            self.dataLoading(false);
-            return total;
-        };
-
         self.backendReads = ko.computed(function() {
             var total = 0;
             if (self.hasData()) {
@@ -74,6 +62,22 @@ define([
             return generic.formatBytes(total);
         });
 
+        // Functions
+        self._fetchData = function(observable, property) {
+            self.dataLoading(true);
+            var total = 0, i;
+            if (observable instanceof Array) {
+                for (i = 0; i < observable.length; i += 1) {
+                    total += (observable[i][property].raw() || 0);
+                }
+            } else if (observable !== undefined) {
+                total = observable[property].raw() || 0;
+            }
+            self.dataLoading(false);
+            return total;
+        };
+
+        // Durandal
         self.activate = function(settings) {
             if (!settings.hasOwnProperty('data')) {
                 throw 'Data should be specified';

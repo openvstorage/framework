@@ -19,14 +19,12 @@ define([
     "use strict";
     return function(options) {
         var self = this;
-
         build(self);
 
+        // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.changepassword.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-
         self.steps([new Confirm()]);
-
         self.activateStep();
     };
 });

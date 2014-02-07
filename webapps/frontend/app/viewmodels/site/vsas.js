@@ -21,14 +21,19 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared      = shared;
-        self.guard       = { authenticated: true };
-        self.refresher   = new Refresher();
-        self.widgets     = [];
-
-        // Data
-        self.vSAsHeaders = [
+        // Variables
+        self.shared        = shared;
+        self.guard         = { authenticated: true };
+        self.refresher     = new Refresher();
+        self.widgets       = [];
+        self.pMachineCache = {};
+        self.query         = {
+            query: {
+                type: 'AND',
+                items: [['is_internal', 'EQUALS', true]]
+            }
+        };
+        self.vSAsHeaders   = [
             { key: 'status',     value: $.t('ovs:generic.status'),     width: 55  },
             { key: 'name',       value: $.t('ovs:generic.name'),       width: 100 },
             { key: 'ip',         value: $.t('ovs:generic.ip'),         width: 100 },
@@ -41,19 +46,14 @@ define([
             { key: 'readSpeed',  value: $.t('ovs:generic.read'),       width: 100 },
             { key: 'writeSpeed', value: $.t('ovs:generic.write'),      width: 100 }
         ];
+
+        // Observables
         self.vSAs = ko.observableArray([]);
         self.vSAsInitialLoad = ko.observable(true);
 
-        // Variables
+        // Handles
         self.loadVSAsHandle = undefined;
         self.refreshVSAsHandle = {};
-        self.pMachineCache = {};
-        self.query = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', true]]
-            }
-        };
 
         // Functions
         self.fetchVSAs = function() {

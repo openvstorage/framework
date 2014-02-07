@@ -19,18 +19,19 @@ define([
     "use strict";
     return function(options) {
         var self = this;
-
-        self.data = data;
         build(self);
 
+        // Variables
+        self.data = data;
+
+        // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.clone.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-
         self.data.machineGuid(options.machineguid);
         self.steps([new Gather(), new Confirm()]);
-
         self.activateStep();
 
+        // Functions
         self.compositionComplete = function() {
             var amount = $("#amount");
             amount.on('keypress', function(e) {

@@ -21,32 +21,32 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared      = shared;
-        self.guard       = { authenticated: true };
-        self.refresher   = new Refresher();
-        self.widgets     = [];
-
-        // Data
-        self.vTemplateHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
-            { key: undefined,      value: $.t('ovs:generic.disks'),      width: 60        },
-            { key: 'children',     value: $.t('ovs:generic.children'),   width: 110       },
-            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80        }
-        ];
-        self.vTemplates = ko.observableArray([]);
-        self.vTemplatesInitialLoad = ko.observable(true);
-
         // Variables
-        self.loadVTemplatesHandle = undefined;
-        self.refreshVTemplatesHandle = {};
-        self.query = {
+        self.shared           = shared;
+        self.guard            = { authenticated: true };
+        self.refresher        = new Refresher();
+        self.widgets          = [];
+        self.query            = {
             query: {
                 type: 'AND',
                 items: [['is_internal', 'EQUALS', false],
                         ['is_vtemplate', 'EQUALS', true]]
             }
         };
+        self.vTemplateHeaders = [
+            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
+            { key: undefined,      value: $.t('ovs:generic.disks'),      width: 60        },
+            { key: 'children',     value: $.t('ovs:generic.children'),   width: 110       },
+            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80        }
+        ];
+
+        // Observables
+        self.vTemplates            = ko.observableArray([]);
+        self.vTemplatesInitialLoad = ko.observable(true);
+
+        // Handles
+        self.loadVTemplatesHandle    = undefined;
+        self.refreshVTemplatesHandle = {};
 
         // Functions
         self.fetchVTemplates = function() {

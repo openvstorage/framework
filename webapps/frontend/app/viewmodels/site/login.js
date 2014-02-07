@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'jquery', 'knockout', 'plugins/router', 'plugins/history',
     'ovs/shared'
@@ -20,15 +20,15 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared = shared;
+        // Variables
+        self.shared   = shared;
+        self.referrer = undefined;
 
-        // Data
-        self.username    = ko.observable();
-        self.password    = ko.observable();
-        self.loggedIn    = ko.observable(false);
-        self.failed      = ko.observable(false);
-        self.referrer    = undefined;
+        // Observables
+        self.username = ko.observable();
+        self.password = ko.observable();
+        self.loggedIn = ko.observable(false);
+        self.failed   = ko.observable(false);
 
         // Functions
         self.login = function() {
@@ -49,7 +49,7 @@ define([
         // Durandal
         self.activate = function() {
             self.referrer = window.localStorage.getItem('referrer');
-            setTimeout(function() {
+            window.setTimeout(function() {
                 $('#inputUsername').focus();
             }, 250);
         };

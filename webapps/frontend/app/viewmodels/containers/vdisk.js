@@ -20,40 +20,40 @@ define([
     return function(guid) {
         var self = this;
 
-        // Variables
+        // Handles
         self.loadHandle             = undefined;
         self.loadVSAGuidHandle      = undefined;
         self.loadVMachineGuidHandle = undefined;
 
         // External dependencies
-        self.vsa            = ko.observable();
-        self.vMachine       = ko.observable();
-        self.vpool          = ko.observable();
+        self.vsa      = ko.observable();
+        self.vMachine = ko.observable();
+        self.vpool    = ko.observable();
 
         // Observables
         self.loading        = ko.observable(false);
         self.loaded         = ko.observable(false);
-
         self.guid           = ko.observable(guid);
         self.name           = ko.observable();
         self.order          = ko.observable(0);
         self.snapshots      = ko.observableArray([]);
-        self.size           = ko.smoothObservable(undefined, generic.formatBytes);
-        self.storedData     = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits      = ko.smoothObservable(undefined);
-        self.cacheMisses    = ko.smoothObservable(undefined);
-        self.iops           = ko.smoothObservable(undefined, generic.formatNumber);
-        self.readSpeed      = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.writeSpeed     = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.backendReads   = ko.smoothObservable(undefined, generic.formatNumber);
-        self.backendWritten = ko.smoothObservable(undefined, generic.formatBytes);
-        self.backendRead    = ko.smoothObservable(undefined, generic.formatBytes);
-        self.bandwidthSaved = ko.smoothObservable(undefined, generic.formatBytes);
+        self.size           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.storedData     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.iops           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReads   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.backendWritten = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.vsaGuid        = ko.observable();
         self.vpoolGuid      = ko.observable();
         self.vMachineGuid   = ko.observable();
         self.failoverMode   = ko.observable();
 
+        // Computed
         self.cacheRatio = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {

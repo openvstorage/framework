@@ -20,10 +20,10 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.refresher       = new Refresher();
+        // Variables
+        self.refresher = new Refresher();
 
-        // Fields
+        // Observables
         self.internalCurrent = ko.observable(1);
         self.headers         = ko.observableArray([]);
         self.settings        = ko.observable({});
@@ -31,6 +31,7 @@ define([
         self.controls        = ko.observable(true);
         self.preloadPage     = 0;
 
+        // Computed
         self.items = ko.computed(function() {
             var settings = self.settings();
             if (settings.hasOwnProperty('items')) {
@@ -100,6 +101,7 @@ define([
             return vItems;
         }).extend({ throttle: 50 });
 
+        // Functions
         self.step = function(next) {
             if (next) {
                 if (self.hasNext()) {
@@ -112,6 +114,7 @@ define([
             }
         };
 
+        // Durandal
         self.activate = function(settings) {
             if (!settings.hasOwnProperty('items')) {
                 throw 'Items should be specified';

@@ -21,13 +21,13 @@ define([
     return function() {
         var self = this;
 
-        // System
+        // Variables
         self.shared    = shared;
         self.guard     = { authenticated: true };
         self.refresher = new Refresher();
         self.widgets   = [];
 
-        // Data
+        // Observables
         self.vPool = ko.observable();
 
         // Functions

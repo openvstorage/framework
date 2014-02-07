@@ -20,8 +20,10 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.data = data;
 
+        // Computed
         self.canContinue = ko.computed(function() {
             if (self.data.vm() === undefined) {
                 return {value: false, reason: $.t('ovs:wizards.clone.gather.nomachine')};
@@ -35,6 +37,7 @@ define([
             return {value: true, reason: undefined};
         });
 
+        // Functions
         self.activate = function() {
             if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.machineGuid()) {
                 self.data.vm(new VMachine(self.data.machineGuid()));

@@ -22,7 +22,12 @@ define([
         var self = this;
 
         // Variables
-        self.shared = shared;
+        self.shared        = shared;
+        self.vSAGuids      = [];
+        self.vPoolGuids    = [];
+        self.vMachineGuids = [];
+
+        // Handles
         self.loadVDisksHandle  = undefined;
         self.loadVSAGuid       = undefined;
         self.loadHandle        = undefined;
@@ -31,39 +36,39 @@ define([
         self.loadSChildrenGuid = undefined;
 
         // External dependencies
-        self.vSAs             = ko.observableArray([]);
-        self.vPools           = ko.observableArray([]);
-        self.vMachines        = ko.observableArray([]);
-        self.pMachine         = ko.observable();
+        self.pMachine  = ko.observable();
+        self.vSAs      = ko.observableArray([]);
+        self.vPools    = ko.observableArray([]);
+        self.vMachines = ko.observableArray([]);
 
         // Observables
-        self.loading          = ko.observable(false);
-        self.loaded           = ko.observable(false);
+        self.guid                  = ko.observable(guid);
+        self.loading               = ko.observable(false);
+        self.loaded                = ko.observable(false);
+        self.pMachineGuid          = ko.observable();
+        self.name                  = ko.observable();
+        self.hypervisorStatus      = ko.observable();
+        self.ipAddress             = ko.observable();
+        self.isInternal            = ko.observable();
+        self.isVTemplate           = ko.observable();
+        self.status                = ko.observable();
+        self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReads          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.failoverMode          = ko.observable();
+        self.snapshots             = ko.observableArray([]);
+        self.vDisks                = ko.observableArray([]);
+        self.templateChildrenGuids = ko.observableArray([]);
 
-        self.guid             = ko.observable(guid);
-        self.vSAGuids         = [];
-        self.vPoolGuids       = [];
-        self.vMachineGuids    = [];
-        self.pMachineGuid     = ko.observable();
-        self.name             = ko.observable();
-        self.hypervisorStatus = ko.observable();
-        self.ipAddress        = ko.observable();
-        self.isInternal       = ko.observable();
-        self.isVTemplate      = ko.observable();
-        self.snapshots        = ko.observableArray([]);
-        self.status           = ko.observable();
-        self.iops             = ko.smoothObservable(undefined, generic.formatNumber);
-        self.storedData       = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits        = ko.smoothObservable(undefined);
-        self.cacheMisses      = ko.smoothObservable(undefined);
-        self.readSpeed        = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.writeSpeed       = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.backendReads     = ko.smoothObservable(undefined, generic.formatNumber);
-        self.backendWritten   = ko.smoothObservable(undefined, generic.formatBytes);
-        self.backendRead      = ko.smoothObservable(undefined, generic.formatBytes);
-        self.bandwidthSaved   = ko.smoothObservable(undefined, generic.formatBytes);
-        self.failoverMode     = ko.observable();
-        self.cacheRatio       = ko.computed(function() {
+        // Computed
+        self.cacheRatio = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
@@ -73,10 +78,6 @@ define([
         self.isRunning = ko.computed(function() {
             return self.hypervisorStatus() === 'RUNNING';
         });
-
-        self.vDisks                = ko.observableArray([]);
-        self.templateChildrenGuids = ko.observableArray([]);
-
         self.bandwidth = ko.computed(function() {
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);

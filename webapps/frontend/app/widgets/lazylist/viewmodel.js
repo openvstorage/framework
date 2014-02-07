@@ -20,14 +20,20 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.loadedObservable = '';
-        self.colspan          = ko.observable(0);
-        self.displaymode      = ko.observable('span');
-        self.items            = ko.observableArray([]);
-        self.isLoaded         = function(observable) {
+
+        // Observables
+        self.colspan     = ko.observable(0);
+        self.displaymode = ko.observable('span');
+        self.items       = ko.observableArray([]);
+
+        // Functions
+        self.isLoaded = function(observable) {
             return observable[self.loadedObservable]();
         };
 
+        // Durandal
         self.activate = function(settings) {
             if (!settings.hasOwnProperty('items')) {
                 throw 'Items should be specified';

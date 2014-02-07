@@ -21,14 +21,14 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared      = shared;
-        self.guard       = { authenticated: true };
-        self.refresher   = new Refresher();
-        self.widgets     = [];
-
-        // Data
-        self.vDiskHeaders = [
+        // Variables
+        self.shared              = shared;
+        self.guard               = { authenticated: true };
+        self.refresher           = new Refresher();
+        self.widgets             = [];
+        self.vMachineCache       = {};
+        self.vPoolCache          = {};
+        self.vDiskHeaders        = [
             { key: 'name',         value: $.t('ovs:generic.name'),         width: 150       },
             { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),     width: 110       },
             { key: 'vpool',        value: $.t('ovs:generic.vpool'),        width: 110       },
@@ -42,14 +42,14 @@ define([
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80        }
         ];
-        self.vDisks = ko.observableArray([]);
-        self.vMachineCache = {};
-        self.vPoolCache = {};
-        self.vDisksInitialLoad = ko.observable(true);
 
-        // Variables
-        self.loadVDisksHandle = undefined;
+        // Handles
+        self.loadVDisksHandle    = undefined;
         self.refreshVDisksHandle = {};
+
+        // Observables
+        self.vDisks            = ko.observableArray([]);
+        self.vDisksInitialLoad = ko.observable(true);
 
         // Functions
         self.fetchVDisks = function() {
@@ -135,7 +135,6 @@ define([
                 }
             }).promise();
         };
-
         self.rollback = function(guid) {
             $.each(self.vDisks(), function(index, vdisk) {
                 if (vdisk.guid() === guid && (vdisk.vMachine() === undefined || !vdisk.vMachine().isRunning())) {

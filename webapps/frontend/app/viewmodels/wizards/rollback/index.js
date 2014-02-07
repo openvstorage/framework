@@ -19,17 +19,17 @@ define([
     "use strict";
     return function(options) {
         var self = this;
-
-        self.data = data;
         build(self);
 
+        // Variables
+        self.data = data;
+
+        // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.rollback.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-
         self.data.guid(options.guid);
         self.data.type = options.type;
         self.steps([new Gather()]);
-
         self.activateStep();
     };
 });

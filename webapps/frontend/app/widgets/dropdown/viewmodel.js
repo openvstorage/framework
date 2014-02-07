@@ -20,12 +20,17 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.text          = undefined;
+
+        // Observables
         self.key           = ko.observable();
         self.keyIsFunction = ko.observable(false);
+        self.multi         = ko.observable(false);
         self.items         = ko.observableArray([]);
         self.target        = ko.observableArray([]);
-        self.multi         = ko.observable(false);
+
+        // Computed
         self.selected      = ko.computed(function() {
             var items = [], i;
             for (i = 0; i < self.items().length; i += 1) {
@@ -35,7 +40,9 @@ define([
             }
             return items;
         });
-        self.set    = function(item) {
+
+        // Functions
+        self.set = function(item) {
             if (self.multi()) {
                 if (self.contains(item)) {
                     self.target.remove(item);
@@ -50,6 +57,7 @@ define([
             return $.inArray(item, self.target()) !== -1;
         };
 
+        // Durandal
         self.activate = function(settings) {
             if (!settings.hasOwnProperty('items')) {
                 throw 'Items should be specified';

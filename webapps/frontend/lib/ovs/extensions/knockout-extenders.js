@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
-define(['knockout'], function(ko) {
+/*global define, window */
+define(['knockout', 'ovs/generic'], function(ko, generic) {
     "use strict";
     ko.extenders.numeric = function(target, settings) {
         var computed;
@@ -31,6 +31,52 @@ define(['knockout'], function(ko) {
             }
         }).extend({ notify: 'always' });
         computed(target());
+        return computed;
+    };
+    ko.extenders.smooth = function(target, settings) {
+        var computed;
+        computed = ko.computed({
+            read: target,
+            write: function(newValue) {
+                var diff, stepSize, decimals, execute, currentValue = target();
+                if (currentValue === undefined) {
+                    target(newValue);
+                } else {
+                    diff = newValue - currentValue;
+                    if (diff !== 0) {
+                        decimals = Math.max(
+                            (currentValue.toString().split('.')[1] || []).length,
+                            (newValue.toString().split('.')[1] || []).length
+                        );
+                        stepSize = generic.ceil(diff / generic.tryGet(settings, 'steps', 3), decimals);
+                        stepSize = stepSize === 0 ? 1 : stepSize;
+                        execute = function() {
+                            if (Math.abs(newValue - currentValue) > Math.abs(stepSize)) {
+                                currentValue += stepSize;
+                                target(currentValue);
+                                window.setTimeout(execute, 75);
+                            } else {
+                                target(newValue);
+                            }
+                        };
+                        window.setTimeout(execute, 75);
+                    }
+                }
+            }
+        }).extend({ notify: 'always' });
+        computed(target());
+        return computed;
+    };
+    ko.extenders.format = function(target, formatter) {
+        var computed;
+        computed = ko.computed({
+            read: function() {
+                return formatter(target());
+            },
+            write: target
+        });
+        computed(target());
+        computed.raw = target;
         return computed;
     };
 });

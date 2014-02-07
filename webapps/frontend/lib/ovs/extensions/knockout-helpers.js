@@ -12,23 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define(['knockout', 'ovs/generic'], function(ko, generic) {
+define(['knockout'], function(ko) {
     "use strict";
-    ko.smoothObservable = function(initialValue, formatFunction) {
-        var formattedValue = ko.observable(initialValue),
-            rawValue = ko.observable(initialValue), computed;
-        computed = ko.computed({
-            read: function() {
-                return formattedValue();
-            },
-            write: function(newValue) {
-                generic.smooth(formattedValue, rawValue(), newValue, 3, formatFunction);
-                rawValue(newValue);
-            }
-        });
-        computed.raw = rawValue;
-        return computed;
-    };
     ko.deltaObservable = function(formatFunction) {
         var formattedValue = ko.observable(), rawValue = ko.observable(), initialized = ko.observable(false),
             timestamp, newTimestamp, previousCounter, delta, timeDelta, result, newRaw;

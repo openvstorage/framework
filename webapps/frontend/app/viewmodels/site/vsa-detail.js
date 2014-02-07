@@ -21,17 +21,17 @@ define([
     return function() {
         var self = this;
 
-        // System
-        self.shared = shared;
-        self.guard = { authenticated: true };
-        self.refresher = new Refresher();
-        self.widgets = [];
-
-        // Data
-        self.VSA = ko.observable();
+        // Variables
+        self.shared        = shared;
+        self.guard         = { authenticated: true };
+        self.refresher     = new Refresher();
+        self.widgets       = [];
         self.pMachineCache = {};
-        self.vPoolCache = {};
+        self.vPoolCache    = {};
         self.vMachineCache = {};
+
+        // Observables
+        self.VSA = ko.observable();
 
         // Functions
         self.load = function() {
@@ -59,7 +59,6 @@ define([
                     .always(deferred.resolve);
             }).promise();
         };
-
         self.moveAway = function() {
             app.showMessage(
                     $.t('ovs:vsas.detail.moveaway.warning'),

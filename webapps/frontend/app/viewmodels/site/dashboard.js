@@ -21,28 +21,41 @@ define([
     return function() {
         var self = this;
 
-        // System
+        // Variables
         self.shared    = shared;
         self.guard     = { authenticated: true };
         self.refresher = new Refresher();
+        self.topItems  = 10;
+        self.query     = {
+            query: {
+                type: 'AND',
+                items: [['is_internal', 'EQUALS', false],
+                        ['is_vtemplate', 'EQUALS', false],
+                        ['status', 'NOT_EQUALS', 'CREATED']]
+            }
+        };
 
-        self.topItems                = 10;
+        // Handles
         self.loadVsasHandle          = undefined;
         self.loadVPoolsHandle        = undefined;
         self.loadVMachinesHandle     = undefined;
         self.loadVMachineGuidsHandle = undefined;
 
-        self.vSAsLoading       = ko.observable(false);
-        self.vPoolsLoading     = ko.observable(false);
-        self.vMachinesLoading  = ko.observable(false);
+        // Observ ables
+        self.vSAsLoading      = ko.observable(false);
+        self.vPoolsLoading    = ko.observable(false);
+        self.vMachinesLoading = ko.observable(false);
+        self.topVPoolMode     = ko.observable('topstoreddata');
+        self.topVmachineMode  = ko.observable('topstoreddata');
+        self.vSAs             = ko.observableArray([]);
+        self.vPools           = ko.observableArray([]);
+        self.vMachineGuids    = ko.observableArray([]);
+        self.topVMachines     = ko.observableArray([]);
+        self.topVPools        = ko.observableArray([]);
+        self.topVpoolModes    = ko.observableArray(['topstoreddata', 'topbandwidth']);
+        self.topVmachineModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
 
-        self.vSAs          = ko.observableArray([]);
-        self.vPools        = ko.observableArray([]);
-
-        self.vMachineGuids = ko.observableArray([]);
-        self.topVMachines  = ko.observableArray([]);
-        self.topVPools     = ko.observableArray([]);
-
+        // Computed
         self.cacheRatio = ko.computed(function() {
             var hits = 0, misses = 0, total;
             $.each(self.vPools(), function(index, vpool) {
@@ -77,21 +90,6 @@ define([
             return generic.formatSpeed(total);
         });
 
-        self.topVpoolModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
-        self.topVPoolMode  = ko.observable('topstoreddata');
-
-        self.topVmachineModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
-        self.topVmachineMode  = ko.observable('topstoreddata');
-
-        self.query = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', false],
-                        ['is_vtemplate', 'EQUALS', false],
-                        ['status', 'NOT_EQUALS', 'CREATED']]
-            }
-        };
-
         // Functions
         self.load = function() {
             return $.Deferred(function(deferred) {
@@ -113,7 +111,7 @@ define([
                                 var filter = {
                                     full: true,
                                     contents: 'statistics,stored_data',
-                                    sort: (self.topVmachineMode() === 'topstoreddata' ? 'stored_data,name' : 'statistics[data_transfered_ps],name'),
+                                    sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : 'statistics[data_transfered_ps],-name'),
                                     page: 1
                                 };
                                 self.loadVMachinesHandle = api.post('vmachines/filter', self.query, filter)
@@ -129,7 +127,7 @@ define([
                                     })
                                     .fail(vms_dfr.reject);
                             } else {
-                                vms_dfr.resolve();
+                                vms_dfr.reject();
                             }
                         }).promise(),
                         $.Deferred(function(vmg_dfr) {
@@ -145,15 +143,15 @@ define([
                                     })
                                     .fail(vmg_dfr.reject);
                             } else {
-                                vmg_dfr.resolve();
+                                vmg_dfr.reject();
                             }
                         }).promise()
                     )
-                    .done(deferred.resolve)
-                    .fail(deferred.reject)
-                    .always(function() {
+                    .done(function() {
                         self.vMachinesLoading(false);
-                    });
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
             }).promise();
         };
         self.loadVPools = function() {
@@ -163,7 +161,7 @@ define([
                     var filter = {
                         full: true,
                         contents: 'statistics,stored_data',
-                        sort: (self.topVPoolMode() === 'topstoreddata' ? 'stored_data,name' : 'statistics[data_transfered_ps],name'),
+                        sort: (self.topVPoolMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transfered_ps],name'),
                         page: 1
                     };
                     self.loadVPoolsHandle = api.get('vpools', {}, filter)
@@ -226,6 +224,7 @@ define([
             }).promise();
         };
 
+        // Subscriptions
         self.topVmachineMode.subscribe(function() {
             self.loadVMachines();
         });

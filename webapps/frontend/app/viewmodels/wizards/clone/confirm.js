@@ -20,11 +20,14 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.shared = shared;
         self.data   = data;
 
+        // Computed
         self.canContinue = ko.observable({value: true, reason: undefined});
 
+        // Functions
         self._clone = function(i, vm, callData) {
             var currentData = $.extend({}, callData);
             currentData.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
@@ -47,7 +50,6 @@ define([
                     });
             }).promise();
         };
-
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var i, clones = [],

@@ -21,9 +21,11 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.shared = shared;
         self.data = data;
 
+        // Computed
         self.canContinue = ko.computed(function() {
             if (self.data.vm() === undefined) {
                 return {value: false, reason: $.t('ovs:wizards.snapshot.gather.nomachine')};
@@ -34,6 +36,7 @@ define([
             return {value: true, reason: undefined};
         });
 
+        // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var data = {
@@ -66,6 +69,7 @@ define([
             }).promise();
         };
 
+        // Durandal
         self.activate = function() {
             if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.machineGuid()) {
                 self.data.vm(new VMachine(self.data.machineGuid()));

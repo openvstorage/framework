@@ -21,10 +21,14 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.data   = data;
         self.shared = shared;
+
+        // Handles
         self.loadPMachinesHandle = undefined;
 
+        // Computed
         self.namehelp = ko.computed(function() {
             if (data.name() === undefined || data.name() === '') {
                 return $.t('ovs:wizards.createft.gather.noname');
@@ -36,7 +40,6 @@ define([
                 end: data.name() + '-' + (data.startnr() + data.amount() - 1)
             });
         });
-
         self.canStart = ko.computed(function() {
             if (self.data.vm() === undefined) {
                 return {value: false, reason: $.t('ovs:wizards.createft.gather.nomachine')};
@@ -60,6 +63,7 @@ define([
             return {value: true, reason: undefined};
         });
 
+        // Functions
         self._create = function(name, description, pmachine) {
             return $.Deferred(function(deferred) {
                 api.post('/vmachines/' + self.data.vm().guid() + '/create_from_template', {
@@ -84,7 +88,6 @@ define([
                     });
             }).promise();
         };
-
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 var calls = [], i, max = self.data.startnr() + self.data.amount() - 1,
@@ -132,6 +135,7 @@ define([
             }).promise();
         };
 
+        // Durandal
         self.activate = function() {
             if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.guid()) {
                 self.data.vm(new VMachine(self.data.guid()));

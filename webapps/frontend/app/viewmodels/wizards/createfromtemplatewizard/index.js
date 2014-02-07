@@ -19,18 +19,19 @@ define([
     "use strict";
     return function(options) {
         var self = this;
-
-        self.data = data;
         build(self);
 
+        // Variables
+        self.data = data;
+
+        // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.createft.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-
         self.data.guid(options.vmachineguid);
         self.steps([new Gather()]);
-
         self.activateStep();
 
+        // Functions
         self.compositionComplete = function() {
             var i, fields = ['amount', 'startnr'], element;
             for (i = 0; i < fields.length; i += 1) {

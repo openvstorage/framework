@@ -20,36 +20,36 @@ define([
     return function(guid) {
         var self = this;
 
-        // Variables
-        self.loadHandle       = undefined;
-        self.diskHandle       = undefined;
-        self.machineHandle    = undefined;
+        // Handles
+        self.loadHandle    = undefined;
+        self.diskHandle    = undefined;
+        self.machineHandle = undefined;
 
         // Observables
         self.loading           = ko.observable(false);
         self.loaded            = ko.observable(false);
-
         self.guid              = ko.observable(guid);
         self.name              = ko.observable();
-        self.size              = ko.smoothObservable(undefined, generic.formatBytes);
-        self.iops              = ko.smoothObservable(undefined, generic.formatNumber);
-        self.storedData        = ko.smoothObservable(undefined, generic.formatBytes);
-        self.cacheHits         = ko.smoothObservable(undefined);
-        self.cacheMisses       = ko.smoothObservable(undefined);
-        self.numberOfDisks     = ko.smoothObservable(undefined);
-        self.numberOfMachines  = ko.smoothObservable(undefined);
-        self.readSpeed         = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.writeSpeed        = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.backendWriteSpeed = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.backendReadSpeed  = ko.smoothObservable(undefined, generic.formatSpeed);
-        self.backendReads      = ko.smoothObservable(undefined, generic.formatNumber);
-        self.backendWritten    = ko.smoothObservable(undefined, generic.formatBytes);
-        self.backendRead       = ko.smoothObservable(undefined, generic.formatBytes);
-        self.bandwidthSaved    = ko.smoothObservable(undefined, generic.formatBytes);
+        self.size              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.storedData        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.numberOfDisks     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.numberOfMachines  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendWriteSpeed = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReadSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReads      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendType       = ko.observable();
         self.backendConnection = ko.observable();
         self.backendLogin      = ko.observable();
 
+        // Computed
         self.cacheRatio = ko.computed(function() {
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
@@ -63,12 +63,12 @@ define([
             }
             return generic.formatRatio((self.size.raw() - (self.storedData.raw() || 0)) / self.size.raw() * 100);
         });
-
         self.bandwidth = ko.computed(function() {
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
         });
 
+        // Functions
         self.fillData = function(data) {
              var type = '', stats = data.statistics;
             if (data.backend_type) {

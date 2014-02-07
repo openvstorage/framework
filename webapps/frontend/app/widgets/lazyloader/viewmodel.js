@@ -20,10 +20,15 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.loadedObservable = '';
+
+        // Observable
         self._item            = ko.observable();
         self.undefinedLoading = ko.observable(true);
-        self.isLoaded         = ko.computed(function() {
+
+        // Computed
+        self.isLoaded = ko.computed(function() {
             var observable = self._item();
             if (observable === undefined) {
                 return false;
@@ -39,7 +44,7 @@ define([
             }
             return true;
         });
-        self.item             = ko.computed(function() {
+        self.item = ko.computed(function() {
             var returnValue = self._item();
             if (returnValue !== undefined) {
                 return returnValue();
@@ -47,6 +52,7 @@ define([
             return returnValue;
         });
 
+        // Durandal
         self.activate = function(settings) {
             if (!settings.hasOwnProperty('item')) {
                 throw 'Item should be specified';
