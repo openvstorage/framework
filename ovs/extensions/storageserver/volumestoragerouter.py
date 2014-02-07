@@ -52,7 +52,7 @@ class VolumeStorageRouterClient(object):
                               'write_operations']
         self.stat_sums = {'operations': ['write_operations', 'read_operations'],
                           'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
-                          'data_transfered': ['data_written', 'data_read']}
+                          'data_transferred': ['data_written', 'data_read']}
         self.stat_keys = self.stat_counters + self.stat_sums.keys()
 
     def load(self, vpool=None, vsr=None):

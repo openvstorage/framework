@@ -123,7 +123,7 @@ define([
                                 var filter = {
                                     full: true,
                                     contents: 'statistics,stored_data',
-                                    sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transfered_ps],name'),
+                                    sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
                                     page: 1
                                 };
                                 self.loadVMachinesHandle = api.post('vmachines/filter', self.query, filter)
@@ -173,7 +173,7 @@ define([
                     var filter = {
                         full: true,
                         contents: 'statistics,stored_data',
-                        sort: (self.topVPoolMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transfered_ps],name')
+                        sort: (self.topVPoolMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name')
                     };
                     self.loadVPoolsHandle = api.get('vpools', {}, filter)
                         .done(function(data) {
