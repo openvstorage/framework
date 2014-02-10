@@ -200,12 +200,12 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
         print self.cuapi.run("jpackage_update")
         print self.cuapi.run("jpackage_install -n core")
 
-    def _push_hrds(self):
+    def _push_hrds(self, remote_ip):
         
         template_hrd = [os.path.basename(item)[:-4] for item in os.listdir(self.node_hrd_dir) if item.find(".hrd")<>-1]
         hrd_to_copy = [os.path.basename(item)[:-4] for item in os.listdir("/opt/jumpscale/cfg/hrd") if item.find(".hrd")<>-1]
 
-        self.cuapi.connect(remoteip)
+        self.cuapi.connect(remote_ip)
         for hrdname in template_hrd:
             print self.cuapi.file_upload("/opt/jumpscale/cfg/hrd/{}.hrd".format(hrdname), os.path.join(self.node_hrd_dir, '{}.hrd'.format(hrdname)))
             
@@ -347,7 +347,7 @@ Control.init(\'{}\',{},\'{}\')
         arakoon_cluster = ArakoonManagement().getCluster('ovsdb')
         arakoon_nodes = arakoon_cluster.listNodes()
         extend_config = False
-        if len(arakoon_nodes) < 3 and not unique_machine_id in arakoon_nodes:
+        if len(arakoon_nodes) < 3:
             extend_config = True
 
         """
@@ -508,6 +508,7 @@ vsr_configuration.configure_volumerouter('%(vpool)s', %(vrouter_config)s)
      'vrouter_config': vrouter_config}
                 self._execute_on_clusternodes(third_node_command, interpreter='python', nodes=vrouter_ips)
                 local_configs_to_push.append('{}.json'.format(vpool))
+                self.cuapi.connect(remote_ip)
                 self.cuapi.dir_ensure("/etc/ceph")
                 self.cuapi.file_upload("/etc/ceph/ceph.conf","/etc/ceph/ceph.conf")
                 self.cuapi.file_upload("/etc/ceph/ceph.keyring", "/etc/ceph/ceph.keyring")
@@ -519,7 +520,7 @@ vsr_configuration.configure_volumerouter('%(vpool)s', %(vrouter_config)s)
         we should check how many nodes are in the cluster and only reconfigure certain components based on that
         Secondly we do not only need to update the new node and ourselfs but also a 2nd node already in place when adding nr 3.
         """
-        self._push_hrds()
+        self._push_hrds(remote_ip)
         self._push_config(configs=configs_to_push, node_config_dir=self.node_cfg_dir, update_local=True, nodes=config_destinations)
         self._push_config(configs=local_configs_to_push, node_config_dir=self.node_cfg_dir, update_local=False, nodes=[remote_ip,])
 
@@ -536,6 +537,7 @@ vsr_configuration.configure_volumerouter('%(vpool)s', %(vrouter_config)s)
             third_nodes_dict[node] = self.cuapi.run('python -c "import socket; print socket.gethostname()"')
         
         self.cuapi.connect(remote_ip)
+        self.cuapi.run('python -c "from JumpScale import j; j.system.net.updateHostsFile(hostsfile=\'/etc/hosts\', ip=\'{}\', hostname=\'{}\')"'.format(Configuration.get('ovs.grid.ip'), socket.gethostname()))
         for ip,nodename in third_nodes_dict.iteritems():
             self.cuapi.run('python -c "from JumpScale import j; j.system.net.updateHostsFile(hostsfile=\'/etc/hosts\', ip=\'{}\', hostname=\'{}\')"'.format(ip, nodename))
 

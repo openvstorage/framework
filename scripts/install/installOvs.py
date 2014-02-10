@@ -273,7 +273,7 @@ with open('/etc/security/limits.conf', 'a') as limits:
 
 # Requesting information
 print 'Requesting information...'
-supported_quality_levels = ['unstable', 'test']
+supported_quality_levels = ['unstable', 'test', 'stable']
 quality_level = ask_choice(supported_quality_levels, question='Select qualitylevel', default_value='unstable')
 
 configuration = {'openvstorage': {}}
