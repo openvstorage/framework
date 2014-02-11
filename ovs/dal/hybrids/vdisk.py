@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VDisk module
 """
@@ -8,8 +21,6 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import pickle
 import time
-
-_vsr_client = VolumeStorageRouterClient().load()
 
 
 class VDisk(DataObject):
@@ -39,20 +50,29 @@ class VDisk(DataObject):
                'vsrid':      (60, str)}
     # pylint: enable=line-too-long
 
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes a vDisk, setting up it's additional helpers
+        """
+        DataObject.__init__(self, *args, **kwargs)
+        if self.vpool:
+            self._frozen = False
+            self.vsr_client = VolumeStorageRouterClient().load(vpool=self.vpool)
+            self._frozen = True
+
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vDisk
         """
-
         snapshots = []
-        if self.volumeid:
+        if self.volumeid and self.vpool:
             volumeid = str(self.volumeid)
             try:
-                voldrv_snapshots = _vsr_client.list_snapshots(volumeid)
+                voldrv_snapshots = self.vsr_client.list_snapshots(volumeid)
             except:
                 voldrv_snapshots = []
             for guid in voldrv_snapshots:
-                snapshot = _vsr_client.info_snapshot(volumeid, guid)
+                snapshot = self.vsr_client.info_snapshot(volumeid, guid)
                 # @todo: to be investigated howto handle during set as template
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
@@ -66,13 +86,13 @@ class VDisk(DataObject):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
         """
-        if self.volumeid:
+        if self.volumeid and self.vpool:
             try:
-                vdiskinfo = _vsr_client.info_volume(str(self.volumeid))
+                vdiskinfo = self.vsr_client.info_volume(str(self.volumeid))
             except:
-                vdiskinfo = _vsr_client.empty_info()
+                vdiskinfo = VolumeStorageRouterClient().empty_info()
         else:
-            vdiskinfo = _vsr_client.empty_info()
+            vdiskinfo = VolumeStorageRouterClient().empty_info()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -86,13 +106,13 @@ class VDisk(DataObject):
         """
         Fetches the Statistics for the vDisk.
         """
-        if self.volumeid:
+        if self.volumeid and self.vpool:
             try:
-                vdiskstats = _vsr_client.statistics_volume(str(self.volumeid))
+                vdiskstats = self.vsr_client.statistics_volume(str(self.volumeid))
             except:
-                vdiskstats = _vsr_client.empty_statistics()
+                vdiskstats = VolumeStorageRouterClient().empty_statistics()
         else:
-            vdiskstats = _vsr_client.empty_statistics()
+            vdiskstats = VolumeStorageRouterClient().empty_statistics()
 
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():

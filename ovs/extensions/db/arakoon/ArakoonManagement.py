@@ -179,7 +179,7 @@ class ArakoonCluster:
         Get an object that contains all node information in the supplied cluster
         @return dict the dict can be used as param for the ArakoonConfig object
         """
-        config = self._getConfigFile()
+        config = self._getClientConfigFile()
         clientconfig = dict()
 
         nodes = self.__getNodes(config)
@@ -258,7 +258,7 @@ class ArakoonCluster:
             raise Exception("A name should be passed.  An empty name is not an option")
 
         if not type(name) == type(str()):
-            raise Exception("Name should be of type string")
+            raise Exception("Name should be of type string: %s"%name)
 
         for char in [' ', ',', '#']:
             if char in name:
@@ -552,6 +552,8 @@ class ArakoonCluster:
 
         if configFilename:
             config.filename = configFilename
+            if not os.path.exists(os.path.dirname(configFilename)):
+                os.makedirs(os.path.dirname(configFilename))
         config.write()
 
         if isLocal:
@@ -586,6 +588,8 @@ class ArakoonCluster:
 
             if configFilename:
                 nodesconfig.filename = configFilename
+                if not os.path.exists(os.path.dirname(configFilename)):
+                    os.makedirs(os.path.dirname(configFilename))
             nodesconfig.write()
 
             return

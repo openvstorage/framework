@@ -1,4 +1,16 @@
-﻿// license see http://www.openvstorage.com/licenses/opensource/
+﻿// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
@@ -14,47 +26,61 @@ define([
         self.guard       = { authenticated: true };
         self.refresher   = new Refresher();
         self.widgets     = [];
+        self.updateSort  = false;
         self.sortTimeout = undefined;
 
         // Data
         self.vTemplateHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined, colspan: undefined },
-            { key: undefined,      value: $.t('ovs:generic.disks'),      width: 60,        colspan: undefined },
-            { key: 'children',     value: $.t('ovs:generic.children'),   width: 110,       colspan: undefined },
-            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80,        colspan: undefined }
+            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
+            { key: undefined,      value: $.t('ovs:generic.disks'),      width: 60        },
+            { key: 'children',     value: $.t('ovs:generic.children'),   width: 110       },
+            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80        }
         ];
         self.vTemplates = ko.observableArray([]);
-        self.vTemplateGuids = [];
+        self.vTemplatesInitialLoad = ko.observable(true);
 
         // Variables
         self.loadVTemplatesHandle = undefined;
 
         // Functions
-        self.load = function() {
+        self.load = function(full) {
+            full = full || false;
             return $.Deferred(function(deferred) {
-                generic.xhrAbort(self.loadVTemplatesHandle);
-                var query = {
-                        query: {
-                            type: 'AND',
-                            items: [['is_internal', 'EQUALS', false],
-                                    ['is_vtemplate', 'EQUALS', true]]
-                        }
-                    };
-                self.loadVTemplatesHandle = api.post('vmachines/filter', query)
-                    .done(function(data) {
-                        var i, guids = [];
-                        for (i = 0; i < data.length; i += 1) {
-                            guids.push(data[i].guid);
-                        }
-                        generic.crossFiller(
-                            guids, self.vTemplateGuids, self.vTemplates,
-                            function(guid) {
-                                return new VMachine(guid);
-                            }, 'guid'
-                        );
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                if (generic.xhrCompleted(self.loadVTemplatesHandle)) {
+                    var query = {
+                            query: {
+                                type: 'AND',
+                                items: [['is_internal', 'EQUALS', false],
+                                        ['is_vtemplate', 'EQUALS', true]]
+                            }
+                        }, filter = {};
+                    if (full) {
+                        filter.full = true;
+                    }
+                    self.loadVTemplatesHandle = api.post('vmachines/filter', query, filter)
+                        .done(function(data) {
+                            var i, guids = [], vmdata = {};
+                            for (i = 0; i < data.length; i += 1) {
+                                guids.push(data[i].guid);
+                                vmdata[data[i].guid] = data[i];
+                            }
+                            generic.crossFiller(
+                                guids, self.vTemplates,
+                                function(guid) {
+                                    var vm = new VMachine(guid);
+                                    if (full) {
+                                        vm.fillData(vmdata[guid]);
+                                    }
+                                    return vm;
+                                }, 'guid'
+                            );
+                            self.vTemplatesInitialLoad(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
         self.loadVTemplate = function(vt) {
@@ -63,13 +89,18 @@ define([
                     .then(vt.fetchTemplateChildrenGuids)
                     .done(function() {
                         // (Re)sort vTemplates
-                        if (self.sortTimeout) {
-                            window.clearTimeout(self.sortTimeout);
+                        if (self.updateSort) {
+                            self.sort();
                         }
-                        self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vTemplates, ['name', 'guid']); }, 250);
                     })
                     .always(deferred.resolve);
             }).promise();
+        };
+        self.sort = function() {
+            if (self.sortTimeout) {
+                window.clearTimeout(self.sortTimeout);
+            }
+            self.sortTimeout = window.setTimeout(function() { generic.advancedSort(self.vTemplates, ['name', 'guid']); }, 250);
         };
         self.deleteVT = function(guid) {
             var i, vts = self.vTemplates(), vm;
@@ -116,22 +147,20 @@ define([
         self.createFromTemplate = function(guid) {
             dialog.show(new CreateFromTemplateWizard({
                 modal: true,
-                pmachineguid: guid
+                vmachineguid: guid
             }));
         };
 
         // Durandal
         self.activate = function() {
             self.refresher.init(self.load, 5000);
-            self.refresher.start();
             self.shared.footerData(self.vTemplates);
 
-            self.load()
-                .done(function() {
-                    var i, vtemplates = self.vTemplates();
-                    for (i = 0; i < vtemplates.length; i += 1) {
-                        self.loadVTemplate(vtemplates[i]);
-                    }
+            self.load(true)
+                .always(function() {
+                    self.sort();
+                    self.updateSort = true;
+                    self.refresher.start();
                 });
         };
         self.deactivate = function() {

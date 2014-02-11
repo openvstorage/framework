@@ -1,9 +1,49 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Memcache store module
 """
 import memcache
 import re
+import os
+
+from threading import Lock
+
+
+def locked():
+    """
+    Locking decorator.
+    """
+    def wrap(f):
+        """
+        Returns a wrapped function
+        """
+        def new_function(self, *args, **kwargs):
+            """
+            Executes the decorated function in a locked context
+            """
+            lock = kwargs.get('lock', True)
+            if 'lock' in kwargs:
+                del kwargs['lock']
+            if lock:
+                with self._lock:
+                    return f(self, *args, **kwargs)
+            else:
+                return f(self, *args, **kwargs)
+        return new_function
+    return wrap
 
 
 class MemcacheStore(object):
@@ -18,32 +58,72 @@ class MemcacheStore(object):
         """
         self._nodes = nodes
         self._client = memcache.Client(self._nodes, dead_retry=1)
+        self._lock = Lock()
+        self._validate = True
 
+    @locked()
     def get(self, key, default=None):
         """
         Retrieves a certain value for a given key
         """
-        value = self._client.get(MemcacheStore._clean_key(key))
-        return value if value is not None else default
+        key = MemcacheStore._clean_key(key)
+        data = self._client.get(key)
+        if data is None:
+            # Cache miss
+            return default
+        if self._validate:
+            if data['key'] == key:
+                return data['value']
+            error = 'Invalid data received'
+            os.system("echo '" + error + "' >> /var/log/ovs/memcache.log")
+            os.system("echo '" + 'Got key {0}, requested key {1}'.format(data['key'], key) + "' >> /var/log/ovs/memcache.log")
+            raise RuntimeError(error)
+        else:
+            return data
 
+    @locked()
     def set(self, key, value, time=0):
         """
         Sets the value for a key to a given value
         """
-        return self._client.set(MemcacheStore._clean_key(key), value, time)
+        key = MemcacheStore._clean_key(key)
+        if self._validate:
+            data = {'value': value,
+                    'key': key}
+        else:
+            data = value
+        return self._client.set(key, data, time)
 
+    @locked()
     def add(self, key, value, time=0):
         """
         Adds a given key to the store, expecting the key does not exists yet
         """
-        return self._client.add(MemcacheStore._clean_key(key), value, time)
+        key = MemcacheStore._clean_key(key)
+        if self._validate:
+            data = {'value': value,
+                    'key': key}
+        else:
+            data = value
+        return self._client.add(key, data, time)
 
+    @locked()
     def incr(self, key, delta=1):
         """
         Increments the value of the key, expecting it exists
         """
-        return self._client.incr(MemcacheStore._clean_key(key), delta)
+        if self._validate:
+            value = self.get(key, lock=False)
+            if value is not None:
+                value += delta
+            else:
+                value = 1
+            self.set(key, value, 60, lock=False)
+            return True
+        else:
+            return self._client.incr(MemcacheStore._clean_key(key), delta)
 
+    @locked()
     def delete(self, key):
         """
         Deletes a given key from the store

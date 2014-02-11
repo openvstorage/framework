@@ -1,8 +1,20 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 This module contains all code for using the VMware SOAP API/SDK
 """
-
 from time import sleep
 import datetime
 import re
@@ -126,8 +138,7 @@ class Sdk(object):
                 return True
             else:
                 error = result.info.error.localizedMessage
-                raise Exception(
-                    ('%s: %s' % (message, error)) if message else error)
+                raise Exception(('%s: %s' % (message, error)) if message else error)
         raise Exception(('%s: %s' % (message, 'Unexpected result'))
                         if message else 'Unexpected result')
 
@@ -200,6 +211,26 @@ class Sdk(object):
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
         vm = self._get_object(vmid)
         return vm
+
+    @authenticated
+    def get_vms(self, ip, mountpoint, esxhost=None):
+        """
+        Get all vMachines using a given nfs share
+        """
+        esxhost = self._validate_host(esxhost)
+        datastore = self.get_datastore(ip, mountpoint, esxhost)
+        filtered_vms = []
+        vms = self._get_object(esxhost,
+                               prop_type='VirtualMachine',
+                               traversal={'name': 'HostSystemTraversalSpec',
+                                          'type': 'HostSystem',
+                                          'path': 'vm'},
+                               properties=['name', 'config'])
+        for vm in vms:
+            mapping = self._get_vm_datastore_mapping(vm)
+            if datastore.name in mapping:
+                filtered_vms.append(vm)
+        return filtered_vms
 
     @authenticated
     def add_physical_disk(self, vmname, devicename, disklabel, filename, esxhost=None, wait=False):
@@ -639,7 +670,7 @@ class Sdk(object):
         return task
 
     @authenticated
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
         """
@@ -647,7 +678,7 @@ class Sdk(object):
         esxhost = self._validate_host(esxhost)
         host_data = self._get_host_data(esxhost)
 
-        datastore = self._get_object(source_vm.datastore[0][0])
+        datastore = self.get_datastore(ip, mountpoint, esxhost)
         # Build basic config information
         config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
         config.name = name
@@ -656,8 +687,7 @@ class Sdk(object):
         config.guestId = source_vm.config.guestId
         config.deviceChange = []
         config.extraConfig = []
-        config.files = self._create_file_info(
-            self._client.factory, datastore.name)
+        config.files = self._create_file_info(self._client.factory, datastore.name)
 
         disk_controller_key = -101
         config.deviceChange.append(
@@ -671,8 +701,7 @@ class Sdk(object):
                                   disk, disks.index(disk), datastore))
 
         # Add network
-        nw_type = type(self._client.factory.create(
-            'ns0:VirtualEthernetCardNetworkBackingInfo'))
+        nw_type = type(self._client.factory.create('ns0:VirtualEthernetCardNetworkBackingInfo'))
         for device in source_vm.config.hardware.device:
             if hasattr(device, 'backing') and type(device.backing) == nw_type:
                 config.deviceChange.append(
@@ -803,8 +832,7 @@ class Sdk(object):
         for store in host_system.datastore[0]:
             store = self._get_object(store)
             if hasattr(store.info, 'nas'):
-                if store.info.nas.remoteHost == ip and \
-                        store.info.nas.remotePath == mountpoint:
+                if store.info.nas.remoteHost == ip and store.info.nas.remotePath == mountpoint:
                     datastore = store
 
         return datastore
@@ -955,6 +983,39 @@ class Sdk(object):
                                 properties=['runtime.powerState']).runtime.powerState
 
     @authenticated
+    def mount_nfs_datastore(self, name, remote_host, remote_path, esxhost=None):
+        """
+        Mounts a given NFS export as a datastore
+        """
+        esxhost = self._validate_host(esxhost)
+        host = self._get_object(esxhost, properties=['datastore',
+                                                     'name',
+                                                     'configManager',
+                                                     'configManager.datastoreSystem'])
+        for store in host.datastore[0]:
+            store = self._get_object(store)
+            if hasattr(store.info, 'nas'):
+                if store.info.name == name:
+                    if store.info.nas.remoteHost == remote_host and \
+                            store.info.nas.remotePath == remote_path:
+                        # We'll remove this store, as it's identical to the once we'll add,
+                        # forcing a refresh
+                        self._client.service.RemoveDatastore(host.configManager.datastoreSystem,
+                                                             store.obj_identifier)
+                        break
+                    else:
+                        raise RuntimeError('A datastore {0} already exists, pointing to {1}:{2}'.format(
+                            name, store.info.nas.remoteHost, store.info.nas.remotePath
+                        ))
+        spec = self._client.factory.create('ns0:HostNasVolumeSpec')
+        spec.accessMode = 'readWrite'
+        spec.localPath = name
+        spec.remoteHost = remote_host
+        spec.remotePath = remote_path
+        spec.type = 'nfs'
+        return self._client.service.CreateNasDatastore(host.configManager.datastoreSystem, spec)
+
+    @authenticated
     def register_extension(self, description, xmlurl, company, company_email, key, version):
         """
         Register an extension to the vcenter host we're talking to. In case the extension
@@ -1053,19 +1114,10 @@ class Sdk(object):
         @return: A tuple. First item: vm config, second item: Device if a vmdk was given
         """
 
-        def check_filename(bf, fn):
-            match = re.search('\[[^\]]+\]\s(.+)', bf)
-            return match and match.group(1) == fn
-
-        def check_datastore(bf, ds):
-            match = re.search('\[([^\]]+)\]\s.+', bf)
-            return match and match.group(1) == ds.name
-
         filename = filename.replace('-flat.vmdk', '.vmdk')  # Support both -flat.vmdk and .vmdk
+        if not filename.endswith('.vmdk') and not filename.endswith('.vmx'):
+            raise ValueError('Unexpected filetype')
         esxhost = self._validate_host(esxhost)
-
-        virtual_disk_type = self._client.factory.create('ns0:VirtualDisk')
-        flat_type = self._client.factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
 
         datastore = self.get_datastore(ip, mountpoint, esxhost=esxhost)
         if not datastore:
@@ -1080,24 +1132,44 @@ class Sdk(object):
         if not vms:
             raise RuntimeError('No vMachines found')
         for vm in vms:
-            if filename.endswith('.vmdk'):
-                for device in vm.config.hardware.device:
-                    if isinstance(device, type(virtual_disk_type)):
-                        if device.backing is not None and \
-                                isinstance(device.backing, type(flat_type)):
-                            backingfile = device.backing.fileName
-                            if check_filename(backingfile, filename) and \
-                                    check_datastore(backingfile, datastore):
-                                return vm, device
-            elif filename.endswith('.vmx'):
-                backingfile = vm.config.files.vmPathName
-                if check_filename(backingfile, filename) and \
-                        check_datastore(backingfile, datastore):
-                    return vm, None
-            else:
-                raise ValueError('Unexpected filetype')
-
+            mapping = self._get_vm_datastore_mapping(vm)
+            if datastore.name in mapping:
+                if filename in mapping[datastore.name]:
+                    return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
+
+    def _get_vm_datastore_mapping(self, vm):
+        """
+        Creates a datastore mapping for a vm's devices
+        Structure
+            {<datastore name>: {<backing filename>: <device>,
+                                <backing filename>: <device>},
+             <datastore name>: {<backing filename>: <device>}}
+        Example
+            {'datastore A': {'/machine1/machine1.vmx': <device>,
+                             '/machine1/disk1.vmdk': <device>},
+             'datastore B': {'/machine1/disk2.vmdk': <device>}}
+        """
+        def extract_names(backingfile, given_mapping, metadata=None):
+            match = re.search('\[([^\]]+)\]\s(.+)', backingfile)
+            if match:
+                datastore_name = match.group(1)
+                filename = match.group(2)
+                if datastore_name not in mapping:
+                    given_mapping[datastore_name] = {}
+                given_mapping[datastore_name][filename] = metadata
+            return given_mapping
+
+        virtual_disk_type = self._client.factory.create('ns0:VirtualDisk')
+        flat_type = self._client.factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
+
+        mapping = {}
+        for device in vm.config.hardware.device:
+            if isinstance(device, type(virtual_disk_type)):
+                if device.backing is not None and isinstance(device.backing, type(flat_type)):
+                    mapping = extract_names(device.backing.fileName, mapping, device)
+        mapping = extract_names(vm.config.files.vmPathName, mapping)
+        return mapping
 
     def _get_host_data(self, esxhost):
         """

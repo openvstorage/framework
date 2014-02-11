@@ -1,11 +1,24 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Performance unittest module
 """
 import time
 from unittest import TestCase
-from ovs.dal.hybrids._testdisk import TestDisk
-from ovs.dal.hybrids._testmachine import TestMachine
+from ovs.dal.hybrids.t_testdisk import TestDisk
+from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
 
 
@@ -16,7 +29,7 @@ class LotsOfObjects(TestCase):
 
     def test_lotsofobjects(self):
         """
-        Main and only test in this testcase
+        A test creating, linking and querying a lot of objects
         """
         print 'start test'
         print 'start loading data'
@@ -75,6 +88,28 @@ class LotsOfObjects(TestCase):
             machine = TestMachine(mguids[i])
             for disk in machine.disks:
                 disk.delete()
+            machine.delete()
+        seconds_passed = (time.time() - start)
+        print 'completed in %d seconds' % seconds_passed
+
+    def test_pkstretching(self):
+        """
+        Creating lots of object of a single type, testing the primary key list limits
+        """
+        print 'start test'
+        start = time.time()
+        machine_guids = []
+        for i in xrange(0, 50000):
+            machine = TestMachine()
+            machine.name = 'Machine {0}'.format(i)
+            machine.save()
+            machine_guids.append(machine.guid)
+            keys = DataList._get_pks(machine._namespace, machine._name)
+            self.assertEqual(len(machine_guids), len(list(keys)), 'The primary key list should be correct')
+            if i % 100 == 0:
+                print '  progress: {0}'.format(i)
+        for guid in machine_guids:
+            machine = TestMachine(guid)
             machine.delete()
         seconds_passed = (time.time() - start)
         print 'completed in %d seconds' % seconds_passed

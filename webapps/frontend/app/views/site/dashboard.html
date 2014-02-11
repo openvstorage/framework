@@ -1,4 +1,18 @@
-﻿<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+﻿<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
 <section>
     <p data-bind="visible: shared.mode() !== 'full'">&nbsp;</p>
     <div class="row">
@@ -9,7 +23,7 @@
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vsa.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: vsasLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                        <span data-bind="visible: vSAsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
                                              title: 'ovs:dashboard.panels.vsa.helptitle',
                                              content: 'ovs:dashboard.panels.vsa.helpcontent'
@@ -19,7 +33,7 @@
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: vsas,
+                                        displaymode: 'table', items: vSAs,
                                         loadedObservable: 'loaded', colspan: 4
                                     }" >
                         <table data-dummy="dummy">
@@ -35,10 +49,12 @@
                                 <tr data-part="table-entry">
                                         <td>
                                             <span class="fa pointer" data-i18n="[html]ovs:icons.vsa"
-                                                  data-bind="tooltip: 'ovs:generic.status.vsa.' + status(),
+                                                  data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
                                                              style: { color: status().indexOf('ok') === -1 ? 'red' : 'green' }"></span>
                                         </td>
-                                        <td data-bind="text: name"></td>
+                                        <td>
+                                            <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
+                                        </td>
                                         <td data-bind="text: ipAddress"></td>
                                         <td data-bind="text: vDisks().length"></td>
                                 </tr>
@@ -69,7 +85,7 @@
                 <!-- vMachines -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vmachines.title"></b>
-                    <a data-bind="text: vmachines().length,
+                    <a data-bind="text: vMachines().length,
                                   attr: { href: $root.shared.routing.loadHash('vmachines', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
@@ -88,8 +104,10 @@
                     <div class="row">
                         <div class="col-md-8"><span data-bind="text: name"></span></div>
                         <div class="col-md-4">
-                            <span data-bind="visible: $parent.topVmachineMode() === 'topstoreddata', lazyloader: { item: storedData }"></span>
-                            <span data-bind="visible: $parent.topVmachineMode() === 'topbandwidth', lazyloader: { item: bandwidth }"></span>
+                            <span data-bind="visible: $parent.topVmachineMode() === 'topstoreddata',
+                                             text: storedData"></span>
+                            <span data-bind="visible: $parent.topVmachineMode() === 'topbandwidth',
+                                             lazyloader: { item: bandwidth }"></span>
                         </div>
                     </div>
                  </div>
@@ -143,7 +161,7 @@
                 <!-- vPools -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vpools.title"></b>
-                    <a data-bind="text: vpools().length,
+                    <a data-bind="text: vPools().length,
                                   attr: { href: $root.shared.routing.loadHash('vpools', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">

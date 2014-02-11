@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VDisk module
 """
@@ -17,7 +30,7 @@ from backend.decorators import required_roles, expose, validate
 
 class VDiskViewSet(viewsets.ViewSet):
     """
-    Information about machines
+    Information about vDisks
     """
     permission_classes = (IsAuthenticated,)
 
@@ -25,29 +38,45 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def list(self, request, format=None):
         """
-        Overview of all machines
+        Overview of all vDisks
         """
-        _ = request, format
-        vmachineguid = self.request.QUERY_PARAMS.get('vmachineguid', None)
+        _ = format
+        full = request.QUERY_PARAMS.get('full')
+        if full is not None:
+            reduced = False
+            serializer = FullSerializer
+        else:
+            reduced = True
+            serializer = SimpleSerializer
+        vmachineguid = request.QUERY_PARAMS.get('vmachineguid', None)
         if vmachineguid is None:
-            vdisks = VDiskList.get_vdisks().reduced
+            if reduced:
+                vdisks = VDiskList.get_vdisks().reduced
+            else:
+                vdisks = VDiskList.get_vdisks()
         else:
             vmachine = VMachine(vmachineguid)
             if vmachine.is_internal:
                 vdisks = []
                 for vsr in vmachine.served_vsrs:
-                    vdisks += vsr.vpool.vdisks.reduced
+                    if reduced:
+                        vdisks += vsr.vpool.vdisks.reduced
+                    else:
+                        vdisks += vsr.vpool.vdisks
             else:
-                vdisks = vmachine.vdisks.reduced
-        serializer = SimpleSerializer(vdisks, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+                if reduced:
+                    vdisks = vmachine.vdisks.reduced
+                else:
+                    vdisks = vmachine.vdisks
+        serialized = serializer(VDisk, instance=vdisks, many=True)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
     @validate(VDisk)
     def retrieve(self, request, obj):
         """
-        Load information about a given task
+        Load information about a given vDisk
         """
         _ = request
         return Response(FullSerializer(VDisk, instance=obj).data, status=status.HTTP_200_OK)
@@ -58,7 +87,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @validate(VDisk)
     def get_vsa(self, request, obj):
         """
-        Returns the guid of VSA machine
+        Returns the guid of the VSA serving the vDisk
         """
         _ = request
         vsa_vmachine_guid = None
@@ -73,7 +102,7 @@ class VDiskViewSet(viewsets.ViewSet):
     @validate(VDisk)
     def rollback(self, request, obj):
         """
-        Clones a machine
+        Rollbacks a vDisk to a given timestamp
         """
         _ = format
         task = VDiskController.rollback.delay(diskguid=obj.guid,

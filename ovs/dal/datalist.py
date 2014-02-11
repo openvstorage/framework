@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 DataList module
 """
@@ -68,21 +81,8 @@ class DataList(object):
         self._invalidation = {}
         self.data = None
         self.from_cache = False
+        self._can_cache = True
         self._load()
-
-    @staticmethod
-    def get_pks(namespace, name):
-        """
-        This method will load the primary keys for a given namespace and name
-        (typically, for ovs_data_*)
-        """
-        volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
-        key = 'ovs_primarykeys_%s' % name
-        keys = volatile.get(key)
-        if keys is None:
-            keys = persistent.prefix('%s_%s_' % (namespace, name))
-        return keys
 
     def _exec_and(self, instance, items):
         """
@@ -135,6 +135,8 @@ class DataList(object):
         itemcounter = 0
         for pitem in path:
             itemcounter += 1
+            if pitem in value.__class__._expiry:
+                self._can_cache = False
             self._add_invalidation(value.__class__.__name__.lower(), pitem)
             target_class = value._relations.get(pitem, None)
             value = getattr(value, pitem)
@@ -219,8 +221,8 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
-            if self._key is not None and len(keys) > 0:
-                self._volatile.set(self._key, self.data)
+            if self._key is not None and len(keys) > 0 and self._can_cache:
+                self._volatile.set(self._key, self.data, 600)
                 self._update_listinvalidation()
         else:
             Toolbox.log_cache_hit('datalist', True)
@@ -245,7 +247,7 @@ class DataList(object):
                 key = '%s_%s' % (DataList.cachelink, object_name)
                 mutex = VolatileMutex('listcache_%s' % object_name)
                 try:
-                    mutex.acquire(10)
+                    mutex.acquire(60)
                     cache_list = Toolbox.try_get(key, {})
                     for field in field_list:
                         list_list = cache_list.get(field, [])
@@ -256,3 +258,81 @@ class DataList(object):
                     self._persistent.set(key, cache_list)
                 finally:
                     mutex.release()
+
+    @staticmethod
+    def get_pks(namespace, name):
+        """
+        This method will load the primary keys for a given namespace and name
+        (typically, for ovs_data_*)
+        """
+        return DataList._get_pks(namespace, name)
+
+    @staticmethod
+    def add_pk(namespace, name, key):
+        """
+        This adds the current primary key to the primary key index
+        """
+        mutex = VolatileMutex('primarykeys_%s' % name)
+        try:
+            mutex.acquire(10)
+            keys = DataList._get_pks(namespace, name)
+            keys.add(key)
+            DataList._save_pks(name, keys)
+        finally:
+            mutex.release()
+
+    @staticmethod
+    def delete_pk(namespace, name, key):
+        """
+        This deletes the current primary key from the primary key index
+        """
+        mutex = VolatileMutex('primarykeys_%s' % name)
+        try:
+            mutex.acquire(10)
+            keys = DataList._get_pks(namespace, name)
+            try:
+                keys.remove(key)
+            except KeyError:
+                pass
+            DataList._save_pks(name, keys)
+        finally:
+            mutex.release()
+
+    @staticmethod
+    def _get_pks(namespace, name):
+        """
+        Loads the primary key set information and pages, merges them to a single set
+        and returns it
+        """
+        internal_key = 'ovs_primarykeys_%s' % name
+        volatile = VolatileFactory.get_client()
+        persistent = PersistentFactory.get_client()
+        keys = set()
+        key_sets = volatile.get(internal_key)
+        if key_sets is None:
+            return set(persistent.prefix('%s_%s_' % (namespace, name)))
+        for key_set in key_sets:
+            subset = volatile.get('%s_%d' % (internal_key, key_set))
+            if subset is None:
+                return set(persistent.prefix('%s_%s_' % (namespace, name)))
+            else:
+                keys = keys.union(subset)
+        return keys
+
+    @staticmethod
+    def _save_pks(name, keys):
+        """
+        Pages and saves a set
+        """
+        internal_key = 'ovs_primarykeys_%s' % name
+        volatile = VolatileFactory.get_client()
+        keys = list(keys)
+        old_key_sets = volatile.get(internal_key) or []
+        key_sets = []
+        for i in range(0, len(keys), 5000):
+            volatile.set('%s_%d' % (internal_key, i), keys[i:i + 5000])
+            key_sets.append(i)
+        for key_set in old_key_sets:
+            if key_set not in key_sets:
+                volatile.delete('%s_%d' % (internal_key, key_set))
+        volatile.set(internal_key, key_sets)

@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Module for the abstract Hypervisor object
 """
@@ -50,7 +63,7 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def create_vm_from_template(self, name, source_vm, disks, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
         """
         Abstract method
         """
@@ -92,6 +105,13 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
+    def get_vms_by_nfs_mountinfo(self, ip, mountpoint):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
     def is_datastore_available(self, ip, mountpoint, esxhost=None):
         """
         Abstract method
@@ -102,5 +122,12 @@ class Hypervisor(object):
     def set_as_template(self, vmid, disks, esxhost=None, wait=False):
         """
         Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def mount_nfs_datastore(self, name, remote_host, remote_path):
+        """
+        Mounts a given NFS export as a datastore
         """
         pass

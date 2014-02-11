@@ -1,4 +1,16 @@
-// license see http://www.openvstorage.com/licenses/opensource/
+// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define([
     'jquery', 'knockout',
@@ -48,37 +60,75 @@ define([
             return {value: true, reason: undefined};
         });
 
-        self.finish = function() {
+        self._create = function(name, description, pmachine) {
             return $.Deferred(function(deferred) {
-                var i, pmachineguids = [];
-                for (i = 0; i < self.data.selectedPMachines().length; i += 1) {
-                    pmachineguids.push(self.data.selectedPMachines()[i].guid());
-                }
-                api.post('/vmachines/' + self.data.vm().guid() + '/create_multiple_from_template', {
-                        pmachineguids: pmachineguids,
-                        name: self.data.name(),
-                        description: self.data.description(),
-                        start: self.data.startnr(),
-                        amount: self.data.amount()
+                api.post('/vmachines/' + self.data.vm().guid() + '/create_from_template', {
+                        pmachineguid: pmachine.guid(),
+                        name: name,
+                        description: description
                     })
                     .then(self.shared.tasks.wait)
                     .done(function() {
-                        generic.alertSuccess(
-                            $.t('ovs:wizards.createft.gather.complete'),
-                            $.t('ovs:wizards.createft.gather.success', { what: self.data.vm().name() })
-                        );
+                        deferred.resolve(true);
                     })
-                    .fail(function() {
-                        generic.alert(
-                            $.t('ovs:wizards.createft.gather.complete'),
-                            $.t('ovs:wizards.createft.gather.somefailed', { what: self.data.vm().name() })
+                    .fail(function(error) {
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.messages.errorwhile', {
+                                context: 'error',
+                                what: $.t('ovs:wizards.createft.gather.creating', { what: self.data.vm().name() }),
+                                error: error
+                            })
                         );
+                        deferred.resolve(false);
                     });
+            }).promise();
+        };
+
+        self.finish = function() {
+            return $.Deferred(function(deferred) {
+                var calls = [], i, max = self.data.startnr() + self.data.amount() - 1,
+                    name, pmachinecounter = 0;
+                for (i = self.data.startnr(); i <= max; i += 1) {
+                    name = self.data.name();
+                    if (self.data.amount() > 1) {
+                        name += ('-' + i.toString());
+                    }
+                    calls.push(self._create(name, self.data.description(), self.data.selectedPMachines()[pmachinecounter]));
+                    pmachinecounter += 1;
+                    if (pmachinecounter >= self.data.selectedPMachines().length) {
+                        pmachinecounter = 0;
+                    }
+                }
                 generic.alertInfo(
                     $.t('ovs:wizards.createft.gather.started'),
                     $.t('ovs:wizards.createft.gather.inprogress', { what: self.data.vm().name() })
                 );
                 deferred.resolve();
+                $.when.apply($, calls)
+                    .done(function() {
+                        var i, args = Array.prototype.slice.call(arguments),
+                            success = 0;
+                        for (i = 0; i < args.length; i += 1) {
+                            success += (args[i] ? 1 : 0);
+                        }
+                        if (success === args.length) {
+                        generic.alertSuccess(
+                            $.t('ovs:wizards.createft.gather.complete'),
+                            $.t('ovs:wizards.createft.gather.success', { what: self.data.vm().name() })
+                        );
+                        } else if (success > 0) {
+                        generic.alert(
+                            $.t('ovs:wizards.createft.gather.complete'),
+                            $.t('ovs:wizards.createft.gather.somefailed', { what: self.data.vm().name() })
+                        );
+                        } else if (self.data.amount() > 2) {
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:wizards.createft.gather.allfailed', { what: self.data.vm().name() })
+                            );
+                        }
+                    });
             }).promise();
         };
 
@@ -86,21 +136,22 @@ define([
             if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.guid()) {
                 self.data.vm(new VMachine(self.data.guid()));
                 self.data.vm().load();
+                self.data.selectedPMachines([]);
             }
             generic.xhrAbort(self.loadPMachinesHandle);
-            self.loadPMachinesHandle = api.get('pmachines')
+            self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines')
                 .done(function(data) {
                     var i, guids = [];
                     for (i = 0; i < data.length; i += 1) {
                         guids.push(data[i].guid);
                     }
                     generic.crossFiller(
-                        guids, self.data.pMachineGuids, self.data.pMachines,
+                        guids, self.data.pMachines,
                         function(guid) {
                             var pm = new PMachine(guid);
                             pm.load();
                             return pm;
-                        }
+                        }, 'guid'
                     );
                 });
         };

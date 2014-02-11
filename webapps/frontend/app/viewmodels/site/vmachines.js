@@ -1,4 +1,16 @@
-﻿// license see http://www.openvstorage.com/licenses/opensource/
+﻿// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define, window */
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
@@ -19,53 +31,66 @@ define([
 
         // Data
         self.vMachineHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),       width: 150,       colspan: undefined },
-            { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 150,       colspan: undefined },
-            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 150,       colspan: undefined },
-            { key: undefined,      value: $.t('ovs:generic.vdisks'),     width: 60,        colspan: undefined },
-            { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110,       colspan: undefined },
-            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100,       colspan: undefined },
-            { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55,        colspan: undefined },
-            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 100,       colspan: undefined },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 100,       colspan: undefined },
-            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: undefined, colspan: undefined },
-            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 100,       colspan: undefined }
+            { key: 'name',         value: $.t('ovs:generic.name'),       width: 150       },
+            { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 150       },
+            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 100       },
+            { key: undefined,      value: $.t('ovs:generic.vdisks'),     width: 60        },
+            { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110       },
+            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100       },
+            { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55        },
+            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 120       },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 120       },
+            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: undefined },
+            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 100       }
         ];
         self.vMachines = ko.observableArray([]);
-        self.vMachineGuids = [];
         self.vPoolCache = {};
         self.vsaCache = {};
+        self.vMachinesInitialLoad = ko.observable(true);
 
         // Variables
         self.loadVMachinesHandle = undefined;
 
         // Functions
-        self.fetchVMachines = function() {
+        self.fetchVMachines = function(full) {
+            full = full || false;
             return $.Deferred(function(deferred) {
-                generic.xhrAbort(self.loadVMachinesHandle);
-                var query = {
-                        query: {
-                            type: 'AND',
-                            items: [['is_internal', 'EQUALS', false],
-                                    ['is_vtemplate', 'EQUALS', false],
-                                    ['status', 'NOT_EQUALS', 'CREATED']]
-                        }
-                    };
-                self.loadVMachinesHandle = api.post('vmachines/filter', query)
-                    .done(function(data) {
-                        var i, guids = [];
-                        for (i = 0; i < data.length; i += 1) {
-                            guids.push(data[i].guid);
-                        }
-                        generic.crossFiller(
-                            guids, self.vMachineGuids, self.vMachines,
-                            function(guid) {
-                                return new VMachine(guid);
-                            }, 'guid'
-                        );
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                if (generic.xhrCompleted(self.loadVMachinesHandle)) {
+                    var query = {
+                            query: {
+                                type: 'AND',
+                                items: [['is_internal', 'EQUALS', false],
+                                        ['is_vtemplate', 'EQUALS', false],
+                                        ['status', 'NOT_EQUALS', 'CREATED']]
+                            }
+                        }, filter = {};
+                    if (full) {
+                        filter.full = true;
+                    }
+                    self.loadVMachinesHandle = api.post('vmachines/filter', query, filter)
+                        .done(function(data) {
+                            var i, guids = [], vmdata = {};
+                            for (i = 0; i < data.length; i += 1) {
+                                guids.push(data[i].guid);
+                                vmdata[data[i].guid] = data[i];
+                            }
+                            generic.crossFiller(
+                                guids, self.vMachines,
+                                function(guid) {
+                                    var vm = new VMachine(guid);
+                                    if (full) {
+                                        vm.fillData(vmdata[guid]);
+                                    }
+                                    return vm;
+                                }, 'guid'
+                            );
+                            self.vMachinesInitialLoad(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
         self.loadVMachine = function(vm, reduced) {
@@ -79,12 +104,8 @@ define([
                 $.when.apply($, calls)
                     .done(function() {
                         // Merge in the VSAs
-                        var i, currentGuids = [];
-                        for (i = 0; i < vm.vsas().length; i += 1) {
-                            currentGuids.push(vm.vsas()[i].guid());
-                        }
                         generic.crossFiller(
-                            vm.vsaGuids, currentGuids, vm.vsas,
+                            vm.vSAGuids, vm.vsas,
                             function(guid) {
                                 if (!self.vsaCache.hasOwnProperty(guid)) {
                                     var vm = new VMachine(guid);
@@ -95,12 +116,8 @@ define([
                             }, 'guid'
                         );
                         // Merge in the vPools
-                        currentGuids = [];
-                        for (i = 0; i < vm.vpools().length; i += 1) {
-                            currentGuids.push(vm.vpools()[i].guid());
-                        }
                         generic.crossFiller(
-                            vm.vPoolGuids, currentGuids, vm.vpools,
+                            vm.vPoolGuids, vm.vpools,
                             function(guid) {
                                 if (!self.vPoolCache.hasOwnProperty(guid)) {
                                     var vp = new VPool(guid);
@@ -191,21 +208,13 @@ define([
         // Durandal
         self.activate = function() {
             self.refresher.init(self.fetchVMachines, 5000);
-            self.refresher.start();
             self.shared.footerData(self.vMachines);
 
-            var loads = [];
-            self.fetchVMachines()
-                .done(function() {
-                    var i, vmachines = self.vMachines();
-                    for (i = 0; i < vmachines.length; i += 1) {
-                        loads.push(self.loadVMachine(vmachines[i], true));
-                    }
-                });
-            $.when.apply($, loads)
-                .done(function() {
+            self.fetchVMachines(true)
+                .always(function() {
                     self.sort();
                     self.updateSort = true;
+                    self.refresher.start();
                 });
         };
         self.deactivate = function() {

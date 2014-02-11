@@ -1,4 +1,16 @@
-// license see http://www.openvstorage.com/licenses/opensource/
+// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define([
     'jquery', 'knockout',
@@ -89,7 +101,7 @@ define([
             }
             self.viewportkeys = vIndexes.slice();
             return vItems;
-        });
+        }).extend({ throttle: 50 });
 
         self.step = function(next) {
             if (next) {
@@ -125,6 +137,7 @@ define([
 
             self.enterViewport = generic.tryGet(settings, 'enterViewport');
             self.refresh = generic.tryGet(settings, 'viewportRefresh');
+            self.initialLoad = generic.tryGet(settings, 'initialLoad', ko.observable(false));
             self.settings(settings);
             self.headers(settings.headers);
             self.pagesize(settings.pagesize);

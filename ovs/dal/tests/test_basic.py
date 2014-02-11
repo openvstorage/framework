@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Basic test module
 """
@@ -455,13 +468,6 @@ class Basic(TestCase):
         machine = TestMachine()
         machine.name = 'original'
         machine.save()
-        machine2 = TestMachine()
-        machine2.save()
-        diskx = TestDisk()
-        diskx.name = 'storage_test'
-        diskx.storage = machine2
-        diskx.save()
-        machine2.delete()  # Creating an orphaned object
         disks = []
         for i in xrange(0, 10):
             disk = TestDisk()
@@ -492,7 +498,6 @@ class Basic(TestCase):
         machine.delete()
         for disk in disks:
             disk.delete()
-        diskx.delete()
 
     def test_descriptors(self):
         """
@@ -880,3 +885,43 @@ class Basic(TestCase):
 
         disk1.delete()
         machine.delete()
+
+    def test_querydynamic(self):
+        """
+        Validates whether a query that queried dynamic properties is never cached
+        """
+        def get_disks():
+            return DataList({'object': TestDisk,
+                             'data': DataList.select.DESCRIPTOR,
+                             'query': {'type': DataList.where_operator.AND,
+                                       'items': [('used_size', DataList.operator.NOT_EQUALS, -1)]}})
+        disk1 = TestDisk()
+        disk1.size = 100
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.size = 100
+        disk2.save()
+        query_result = get_disks()
+        self.assertEqual(len(query_result.data), 2, 'There should be 2 disks')
+        self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
+        query_result = get_disks()
+        self.assertFalse(query_result.from_cache, 'Disk should not be loaded from cache')
+        disk1.delete()
+        disk2.delete()
+
+    def test_delete_abandoning(self):
+        """
+        Validates the abandoning behavior of the delete method
+        """
+        machine = TestMachine()
+        machine.save()
+        disk = TestDisk()
+        disk.machine = machine
+        disk.save()
+        self.assertRaises(LinkedObjectException, machine.delete)
+        disk_1 = TestDisk(disk.guid)
+        self.assertIsNotNone(disk_1.machine, 'The machine should still be linked')
+        machine.delete(abandon=True)
+        disk_2 = TestDisk(disk.guid)
+        self.assertIsNone(disk_2.machine, 'The machine should be unlinked')
+        disk.delete()

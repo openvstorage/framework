@@ -1,8 +1,21 @@
 #!/bin/python
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """
 Prerequisites:
-* ESXi 5.1 pre-installed
+* ESXi pre-installed
 * At least 1 datastore
 
 This script will automatically create disk RDM's and an OVS vm config
@@ -48,7 +61,7 @@ class InstallHelper():
                     print invalid_message
 
     @staticmethod
-    def ask_choice(choice_options):
+    def ask_choice(choice_options, default_value=None):
         """
         Lets the user chose one of a set of options
         """
@@ -60,14 +73,18 @@ class InstallHelper():
         choice_options.sort()
         print 'Make a selection please: '
         nr = 0
+        default_nr = None
         for section in choice_options:
             nr += 1
             print '   {0}: {1}'.format(nr, section)
+            if section == default_value:
+                default_nr = nr
 
         result = InstallHelper.ask_integer(
             question='   Select Nr: ',
-            min_value=0,
-            max_value=len(choice_options)
+            min_value=1,
+            max_value=len(choice_options),
+            default_value=default_nr
         )
         return choice_options[result - 1]
 
@@ -202,16 +219,16 @@ class VMwareSystem():
         """
         Retrieve disk containing datastore
         """
-        vmfsdevices = []
+        found_vmfsdevices = []
+        found_datastores = {}
         _, vmfs = InstallHelper.execute_command(['esxcli', '--formatter=keyvalue', 'storage', 'vmfs', 'extent', 'list'])
         convertedvmfs = InstallHelper.convert_keyvalue(''.join(vmfs))
-        found_datastore = None
         for fs in convertedvmfs:
             if self._verbose:
                 print 'Datastore:{0} UUID:{1} Device:{2}'.format(fs['VolumeName'], fs['VMFSUUID'], fs['DeviceName'])
-            vmfsdevices.append(fs['DeviceName'])
-            found_datastore = fs['VMFSUUID']
-        return found_datastore, vmfsdevices
+            found_vmfsdevices.append(fs['DeviceName'])
+            found_datastores[fs['VolumeName']] = fs['VMFSUUID']
+        return found_datastores, found_vmfsdevices
 
     def get_boot_device(self):
         """
@@ -231,7 +248,6 @@ class VMwareSystem():
         """
         Retrieve scsi disks
         """
-        _, vmfsdevices = self.get_vmfs_devices()
         devicestoexclude = list(vmfsdevices)
         devicestoexclude.append(self.get_boot_device())
         freedevices = []
@@ -308,8 +324,7 @@ class VMwareSystem():
         return nic_vmx
 
     def create_vm_config(self, name, cpu_value, memory_value, guestos_value, osbits_value, nic_vmx, disk_vmx, iso_vmx):
-        found_datastore, vmfsdevices = self.get_vmfs_devices()
-        vmpath = '/vmfs/volumes/{0}/{1}'.format(found_datastore, name)
+        vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, name)
         vmconfigfile = '{0}/{1}.vmx'.format(vmpath, name)
         if not (os.path.exists(vmpath) or os.path.islink(vmpath)):
             os.mkdir(vmpath)
@@ -379,8 +394,7 @@ usb_xhci.present = "TRUE"
         @param dconfig: the configuration to which the config has to be appended
         @return: the diskConfig
         """
-        found_datastore, vmfsdevices = self.get_vmfs_devices()
-        vmpath = '/vmfs/volumes/{0}/{1}'.format(found_datastore, vm)
+        vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, vm)
         if not (os.path.exists(vmpath) or os.path.islink(vmpath)):
             os.mkdir(vmpath)
         vmdkpath = '{0}/vhd{1}.vmdk'.format(vmpath, seq)
@@ -402,9 +416,8 @@ usb_xhci.present = "TRUE"
         """
         Create a raw device mapping for disk and assign to VSA
         """
-        found_datastore, vmfsdevices = self.get_vmfs_devices()
         self._verbose = False
-        vmpath = '/vmfs/volumes/{0}/{1}'.format(found_datastore, vm)
+        vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, vm)
         if not (os.path.exists(vmpath) or os.path.islink(vmpath)):
             os.mkdir(vmpath)
         vmdkpath = '{0}/{1}{2}.vmdk'.format(vmpath, 'ssd' if dsk['IsSSD'] else 'hdd', seq)
@@ -444,6 +457,33 @@ if __name__ == '__main__':
         print InstallHelper.boxed_message(['Unable to find ISO', imagefile])
         sys.exit(1)
 
+    # Warning
+    print InstallHelper.boxed_message(['WARNING. Use with caution.',
+                                       'This script assumes it is executed on an ESXi hypervisor',
+                                       'dedicated to Open vStorage. It will create raw device',
+                                       'mappings and configure virtual machines without further',
+                                       'interaction. If you want to install Open vStorage on an',
+                                       'existing server, please refer to the Open vStorage',
+                                       'documentation on how to do so.'])
+    proceed = InstallHelper.ask_yesno('Continue with the install?', True)
+    if not proceed:
+        sys.exit(1)
+
+    # Datastores
+    datastores, vmfsdevices = vm_sys.get_vmfs_devices()
+    if len(datastores) == 0:
+        print InstallHelper.boxed_message(['No datastores using local disks were found'])
+        sys.exit(1)
+    elif len(datastores) == 1:
+        datastore_key = datastores.keys()[0]
+    else:
+        print 'Please select the datastore, you need at least 70GB free space:'
+        keys = datastores.keys()
+        keys.sort()
+        datastore_key = InstallHelper.ask_choice(keys, default_value=keys[0])
+    datastore = datastores[datastore_key]
+    print 'Using datastore \'{0}\''.format(datastore_key)
+
     # Networking
     print 'Determine ESX host networking to use'
     vswitches = vm_sys.list_switches()
@@ -457,7 +497,7 @@ if __name__ == '__main__':
         sys.exit(1)
     print 'Please select your public network:'
     public_pg = InstallHelper.ask_choice(pg_names)
-    print 'Please select your private network:'
+    print 'Please select your storage network:'
     uplinks = []
     private_pg = ''
     while len(uplinks) == 0:
@@ -490,7 +530,6 @@ if __name__ == '__main__':
     disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, ssds[0], disk_config)
 
     # Add CD drive
-    datastore, vmfs_devices = vm_sys.get_vmfs_devices()
     if imagefile:
         cd_config = """ide1:0.present = "TRUE"
 ide1:0.fileName = "{0}"

@@ -1,4 +1,18 @@
-<!-- license see http://www.openvstorage.com/licenses/opensource/ -->
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
 <section>
     <h2 data-i18n="ovs:statistics.title"></h2>
     <p data-i18n="ovs:statistics.introduction"></p>
@@ -66,33 +80,42 @@
         </li>
     </ul>
     <h3 data-i18n="ovs:statistics.memcache.title"></h3>
-    <ul>
-        <li>
-            <span data-i18n="ovs:statistics.memcache.memoryusage"></span>
-            <span data-bind="text: memcached.bytes"></span>
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.memcache.keysincache"></span>
-            <span data-bind="text: memcached.currItems"></span>
-            <span data-i18n="ovs:generic.of"></span>
-            <span data-bind="text: memcached.totalItems"></span>
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.memcache.cachehits"></span>
-            <span data-bind="text: memcached.getHits"></span>
-            <span data-i18n="ovs:generic.of"></span>
-            <span data-bind="text: memcached.cmdGet"></span>: <b><span data-bind="text: memcached.hitRate"></span>%</b>
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.memcache.cachetraffic"></span>
-            <span data-bind="text: memcached.bytesRead"></span> in, <span data-bind="text: memcached.bytesWritten"></span> out
-        </li>
-        <li>
-            <span data-i18n="ovs:statistics.memcache.uptime"></span>
-            <span data-bind="text: memcached.uptime"></span>
-        </li>
-    </ul>
-    <p data-i18n="ovs:statistics.memcache.rawinfo"></p>
-    <pre data-bind="html: memcached.raw">
-    </pre>
+    <div style="width: 100%; overflow: auto;">
+        <div data-bind="style: { width: (memcached.nodes().length * 470) + 'px' }">
+            <!-- ko foreach: memcached.nodes() -->
+                <div class="pull-right" style="width: 450px; margin-right: 20px;">
+                    <h4><span data-bind="text: node"></span></h4>
+                    <ul>
+                        <li>
+                            <span data-i18n="ovs:statistics.memcache.memoryusage"></span>
+                            <span data-bind="text: bytes"></span>
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:statistics.memcache.keysincache"></span>
+                            <span data-bind="text: currItems"></span>
+                            <span data-i18n="ovs:generic.of"></span>
+                            <span data-bind="text: totalItems"></span>
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:statistics.memcache.cachehits"></span>
+                            <span data-bind="text: getHits"></span>
+                            <span data-i18n="ovs:generic.of"></span>
+                            <span data-bind="text: cmdGet"></span>: <b><span data-bind="text: hitRate"></span>%</b>
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:statistics.memcache.cachetraffic"></span>
+                            <span data-bind="text: bytesRead"></span> in, <span data-bind="text: bytesWritten"></span> out
+                        </li>
+                        <li>
+                            <span data-i18n="ovs:statistics.memcache.uptime"></span>
+                            <span data-bind="text: uptime"></span>
+                        </li>
+                    </ul>
+                    <p data-i18n="ovs:statistics.memcache.rawinfo"></p>
+                    <pre data-bind="html: raw">
+                    </pre>
+                </div>
+            <!-- /ko -->
+        </div>
+    </div>
 </section>

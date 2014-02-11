@@ -1,4 +1,16 @@
-// license see http://www.openvstorage.com/licenses/opensource/
+// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define([
     'jquery', 'knockout',
@@ -67,59 +79,77 @@ define([
             return self._bandwidth().initialized;
         });
 
-        self.load = function() {
+        self.fillData = function(data) {
+             var type = '', stats = data.statistics,
+                statsTime = Math.round(stats.timestamp * 1000);
+            if (data.backend_type) {
+                type = $.t('ovs:vpools.backendtypes.' + data.backend_type);
+            }
+            self.name(data.name);
+            self.iops({ value: stats.write_operations + stats.read_operations, timestamp: statsTime });
+            self.size(data.size);
+            self.storedData(data.stored_data);
+            self.cacheHits({ value: stats.sco_cache_hits + stats.cluster_cache_hits, timestamp: statsTime });
+            self.cacheMisses({ value: stats.sco_cache_misses, timestamp: statsTime });
+            self.readSpeed({ value: stats.data_read, timestamp: statsTime });
+            self.writeSpeed({ value: stats.data_written, timestamp: statsTime });
+            self.backendReadSpeed({ value: stats.backend_data_read, timestamp: statsTime });
+            self.backendWriteSpeed({ value: stats.backend_data_written, timestamp: statsTime });
+            self.backendWritten(stats.data_written);
+            self.backendRead(stats.data_read);
+            self.backendReads(stats.backend_read_operations);
+            self.bandwidthSaved(stats.data_read - stats.backend_data_read);
+            self.backendType(type);
+            self.backendConnection(data.backend_connection);
+            self.backendLogin(data.backend_login);
+
+            self.loaded(true);
+            self.loading(false);
+        };
+        self.load = function(onlyextends) {
             self.loading(true);
+            onlyextends = onlyextends || false;
             return $.Deferred(function(deferred) {
-                $.when.apply($, [
-                        $.Deferred(function(mainDeferred) {
-                            generic.xhrAbort(self.loadHandle);
-                            self.loadHandle = api.get('vpools/' + self.guid())
-                                .done(function(data) {
-                                    var type = '', stats = data.statistics,
-                                        statsTime = Math.round(stats.timestamp * 1000);
-                                    if (data.backend_type) {
-                                        type = $.t('ovs:vpools.backendtypes.' + data.backend_type);
-                                    }
-                                    self.name(data.name);
-                                    self.iops({ value: stats.write_operations + stats.read_operations, timestamp: statsTime });
-                                    self.size(data.size);
-                                    self.storedData(data.stored_data);
-                                    self.cacheHits({ value: stats.sco_cache_hits + stats.cluster_cache_hits, timestamp: statsTime });
-                                    self.cacheMisses({ value: stats.sco_cache_misses, timestamp: statsTime });
-                                    self.readSpeed({ value: stats.data_read, timestamp: statsTime });
-                                    self.writeSpeed({ value: stats.data_written, timestamp: statsTime });
-                                    self.backendReadSpeed({ value: stats.backend_data_read, timestamp: statsTime });
-                                    self.backendWriteSpeed({ value: stats.backend_data_written, timestamp: statsTime });
-                                    self.backendWritten(stats.data_written);
-                                    self.backendRead(stats.data_read);
-                                    self.backendReads(stats.backend_read_operations);
-                                    self.bandwidthSaved(stats.data_read - stats.backend_data_read);
-                                    self.backendType(type);
-                                    self.backendConnection(data.backend_connection);
-                                    self.backendLogin(data.backend_login);
-                                    mainDeferred.resolve();
-                                })
-                                .fail(mainDeferred.reject);
-                        }).promise(),
-                        $.Deferred(function(diskDeferred) {
-                            generic.xhrAbort(self.diskHandle);
-                            self.diskHandle = api.get('vpools/' + self.guid() + '/count_disks')
-                                .done(function(data) {
-                                    self.numberOfDisks(data);
-                                    diskDeferred.resolve();
-                                })
-                                .fail(diskDeferred.reject);
-                        }).promise(),
-                        $.Deferred(function(machineDeferred) {
-                            generic.xhrAbort(self.machineHandle);
-                            self.machineHandle = api.get('vpools/' + self.guid() + '/count_machines')
-                                .done(function(data) {
-                                    self.numberOfMachines(data);
-                                    machineDeferred.resolve();
-                                })
-                                .fail(machineDeferred.reject);
-                        }).promise()
-                    ])
+                var calls = [];
+                if (!onlyextends) {
+                    calls.push($.Deferred(function(mainDeferred) {
+                            if (generic.xhrCompleted(self.loadHandle)) {
+                                self.loadHandle = api.get('vpools/' + self.guid())
+                                    .done(function(data) {
+                                        self.fillData(data);
+                                        mainDeferred.resolve();
+                                    })
+                                    .fail(mainDeferred.reject);
+                            } else {
+                                mainDeferred.reject();
+                            }
+                        }).promise());
+                }
+                calls.push($.Deferred(function(diskDeferred) {
+                            if (generic.xhrCompleted(self.diskHandle)) {
+                                self.diskHandle = api.get('vpools/' + self.guid() + '/count_disks')
+                                    .done(function(data) {
+                                        self.numberOfDisks(data);
+                                        diskDeferred.resolve();
+                                    })
+                                    .fail(diskDeferred.reject);
+                            } else {
+                                diskDeferred.reject();
+                            }
+                        }).promise());
+                calls.push($.Deferred(function(machineDeferred) {
+                            if (generic.xhrCompleted(self.machineHandle)) {
+                                self.machineHandle = api.get('vpools/' + self.guid() + '/count_machines')
+                                    .done(function(data) {
+                                        self.numberOfMachines(data);
+                                        machineDeferred.resolve();
+                                    })
+                                    .fail(machineDeferred.reject);
+                            } else {
+                                machineDeferred.reject();
+                            }
+                        }).promise());
+                $.when.apply($, calls)
                     .done(function() {
                         self.loaded(true);
                         deferred.resolve();

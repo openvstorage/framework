@@ -1,14 +1,29 @@
 {
+    "license": [
+        "Copyright 2014 CloudFounders NV",
+        "",
+        "Licensed under the Apache License, Version 2.0 (the \"License\");",
+        "you may not use this file except in compliance with the License.",
+        "You may obtain a copy of the License at",
+        "",
+        "    http://www.apache.org/licenses/LICENSE-2.0",
+        "",
+        "Unless required by applicable law or agreed to in writing, software",
+        "distributed under the License is distributed on an \"AS IS\" BASIS,",
+        "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.",
+        "See the License for the specific language governing permissions and",
+        "limitations under the License."
+    ],
     "generic": {
-        "status": {
+        "states": {
             "vsa": {
                 "ok": "Online",
                 "nok": "Offline",
                 "undefined": "Unknown"
             },
             "foc": {
-                "ok_standalone": "Healthy",
-                "ok_sync": "Healty",
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
                 "catch_up": "Rebuilding",
                 "degraded": "Degraded",
                 "unknown": "Unknown",
@@ -20,6 +35,11 @@
             "errorwhile": "An error occurred while __what__.",
             "errorwhile_error": "An error occurred while __what__: __error__",
             "notrunningrequired": "vMachine should be halted."
+        },
+        "hypervisors": {
+            "VMWARE": "VMware",
+            "HYPERV": "HyperV",
+            "XEN": "Xen"
         },
         "username": "Username",
         "password": "Password",
@@ -66,7 +86,9 @@
         "vmachines": "vMachines",
         "machines": "Machines",
         "vpool": "vPool",
+        "vpools": "vPools",
         "vsa": "VSA",
+        "vsas": "VSAs",
         "children": "Children",
         "storeddata": "Stored data",
         "topstoreddata": "Top Stored Data",
@@ -95,7 +117,31 @@
         "thousandseparator": ",",
         "finished": "Finished",
         "consistentss": "Consistent snapshots",
-        "inconsistentss": "Inconsistent snapshots"
+        "inconsistentss": "Inconsistent snapshots",
+        "status": "Status",
+        "host": "Host",
+        "type": "Type"
+    },
+    "vsas": {
+        "title": "VSAs",
+        "details": "VSA Details",
+        "detail": {
+            "title": "VSA",
+            "hostip": "Host IP",
+            "moveawaytitle": "Move all vDisks",
+            "moveawaymsg": "Move all vDisks away from this VSA and start them on other VSAs.",
+            "moveaway": {
+                "warning": "Are you sure you want to move all vDisks away?",
+                "title": "Are you sure",
+                "no": "Cancel",
+                "yes": "Move away",
+                "marked": "Moving away started",
+                "markedmsg": "All vDisks will be moved away from this VSA",
+                "done": "Move away complete",
+                "donemsg": "All vDisks have been moved away from __what__",
+                "errormsg": "moving away all vDisks from __what__"
+            }
+        }
     },
     "vpools" : {
         "title": "vPools",
@@ -113,6 +159,17 @@
         "detail": {
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties."
+        },
+        "sync": {
+            "title": "Sync all vMachines using __what__",
+            "warning": "Are you sure you want to sync all vMachines using the vPool?",
+            "yes": "Start sync",
+            "no": "Close",
+            "marked": "Sync scheduled",
+            "markedmsg": "A sync will be executed",
+            "done": "vPool synced",
+            "donemsg": "All vMachines using vPool __what__ synced",
+            "errormsg": "syncing all vMachines using __what__"
         }
     },
     "statistics": {
@@ -124,7 +181,7 @@
             "keysincache": "Keys in cache:",
             "cachehits": "Cache hits:",
             "cachetraffic": "Cache traffic",
-            "uptime": "uptime",
+            "uptime": "Uptime",
             "rawinfo": "Raw memcached information"
         },
         "dal": {
@@ -199,7 +256,7 @@
         "title": "Login",
         "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
         "invalidcredentials": "The username/password combination were invalid or could not be validated.",
-        "welcome": "Use the navigation to browse trough the interface."
+        "welcome": "Use the navigation to browse through the interface."
     },
     "notfound": {
         "title": "Page not found",
@@ -349,6 +406,9 @@
         "vsa": "&#xf0c2;",
         "fromtemplate": "&#xf045;",
         "notchecked": "&#xf096;",
-        "checked": "&#xf046;"
+        "checked": "&#xf046;",
+        "sync": "&#xf0ed;",
+        "management": "&#xf0b1;",
+        "moveaway": "&#xf074;"
     }
 }

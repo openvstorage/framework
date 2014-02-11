@@ -1,10 +1,23 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 DataObject module
 """
 import uuid
 import copy
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.relations.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
@@ -75,9 +88,6 @@ class DataObject(object):
         - 1-n relations with automatic property propagation
         - Recursive save
     """
-    # @TODO: Deleting is not recursive
-    # @TODO: There is a soft limit to the amount of objects per type that is situated around 10k
-
     __metaclass__ = MetaClass
 
     #######################
@@ -122,7 +132,6 @@ class DataObject(object):
         # Worker fields/objects
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex_pk = VolatileMutex('primarykeys_%s' % self._name)
         self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
         # Init guid
@@ -150,7 +159,8 @@ class DataObject(object):
                 try:
                     self._data = self._persistent.get(self._key)
                 except KeyNotFoundException:
-                    raise ObjectNotFoundException()
+                    raise ObjectNotFoundException('%s with guid \'%s\' could not be found' %
+                                                  (self.__class__.__name__, self._guid))
             else:
                 Toolbox.log_cache_hit('object_load', True)
                 self._metadata['cache'] = True
@@ -410,7 +420,7 @@ class DataObject(object):
         # Save the data
         self._data = copy.deepcopy(data)
         self._persistent.set(self._key, self._data)
-        self._add_pk(self._key)
+        DataList.add_pk(self._namespace, self._name, self._key)
 
         # Invalidate lists/queries
         # First, invalidate reverse lists (where we point to a remote object,
@@ -432,7 +442,7 @@ class DataObject(object):
                                                        default[1]))
         # Second, invalidate property lists
         try:
-            self._mutex_listcache.acquire(10)
+            self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
             for field in cache_list.keys():
@@ -467,15 +477,37 @@ class DataObject(object):
     ## Other CRUDs
     #######################
 
-    def delete(self):
+    def delete(self, abandon=False):
         """
         Delete the given object. It also invalidates certain lists
         """
+        # Check foreign relations
+        relations = RelationMapper.load_foreign_relations(self.__class__)
+        if relations is not None:
+            for key, info in relations.iteritems():
+                items = getattr(self, key)
+                if len(items) > 0:
+                    if abandon is True:
+                        for item in items:
+                            setattr(item, info['key'], None)
+                            item.save()
+                    else:
+                        raise LinkedObjectException('There are %s items left in self.%s' %
+                                                    (len(items), key))
+
         # Invalidate no-filter queries/lists pointing to this object
-        cache_list = Toolbox.try_get('%s_%s' % (DataList.cachelink, self._name), {})
-        if '__all' in cache_list.keys():
-            for list_key in cache_list['__all']:
-                self._volatile.delete(list_key)
+        try:
+            self._mutex_listcache.acquire(60)
+            cache_key = '%s_%s' % (DataList.cachelink, self._name)
+            cache_list = Toolbox.try_get(cache_key, {})
+            if '__all' in cache_list.keys():
+                for list_key in cache_list['__all']:
+                    self._volatile.delete(list_key)
+                del cache_list['__all']
+                self._volatile.set(cache_key, cache_list)
+                self._persistent.set(cache_key, cache_list)
+        finally:
+            self._mutex_listcache.release()
 
         # Delete the object out of the persistent store
         try:
@@ -486,7 +518,7 @@ class DataObject(object):
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-        self._delete_pk(self._key)
+        DataList.delete_pk(self._namespace, self._name, self._key)
 
     # Discard all pending changes
     def discard(self):
@@ -584,41 +616,6 @@ class DataObject(object):
                                     % (caller_name, str(allowed_types), given_type))
             self._volatile.set(cache_key, cached_data, self._expiry[caller_name][0])
         return cached_data
-
-    def _add_pk(self, key):
-        """
-        This adds the current primary key to the primary key index
-        """
-        internal_key = 'ovs_primarykeys_%s' % self._name
-        try:
-            self._mutex_pk.acquire(10)
-            keys = self._volatile.get(internal_key)
-            if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
-            else:
-                keys.add(key)
-            self._volatile.set(internal_key, keys)
-        finally:
-            self._mutex_pk.release()
-
-    def _delete_pk(self, key):
-        """
-        This deletes the current primary key from the primary key index
-        """
-        internal_key = 'ovs_primarykeys_%s' % self._name
-        try:
-            self._mutex_pk.acquire(10)
-            keys = self._volatile.get(internal_key)
-            if keys is None:
-                keys = set(self._persistent.prefix('%s_%s_' % (self._namespace, self._name)))
-            else:
-                try:
-                    keys.remove(key)
-                except KeyError:
-                    pass
-            self._volatile.set(internal_key, keys)
-        finally:
-            self._mutex_pk.release()
 
     def __str__(self):
         """

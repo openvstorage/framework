@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Module containing certain helper classes providing various logic
 """
@@ -37,8 +50,7 @@ class Descriptor(object):
             if self._descriptor is None:
                 Toolbox.log_cache_hit('descriptor', False)
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
-                name = filename.replace(os.path.dirname(filename) + os.path.sep, '') \
-                    .replace('.py', '')
+                name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
                 self._descriptor = {'name': name,
                                     'source': os.path.relpath(filename, os.path.dirname(__file__)),
                                     'type': object_type.__name__}
@@ -162,12 +174,15 @@ class Toolbox(object):
         return correct, allowed_types, given_type
 
     @staticmethod
-    def log_cache_hit(type, hit):
+    def log_cache_hit(cache_type, hit):
         """
         Registers a cache hit or miss with a specific type
         """
         volatile = VolatileFactory.get_client()
-        key = 'ovs_stats_cache_%s_%s' % (type, 'hit' if hit else 'miss')
-        successfull = volatile.incr(key)
-        if not successfull:
-            volatile.set(key, 1)
+        key = 'ovs_stats_cache_%s_%s' % (cache_type, 'hit' if hit else 'miss')
+        try:
+            successfull = volatile.incr(key)
+            if not successfull:
+                volatile.set(key, 1)
+        except:
+            pass

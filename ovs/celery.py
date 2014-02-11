@@ -1,4 +1,17 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 Celery entry point module
 """
@@ -8,15 +21,27 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
+from kombu import Queue
 from celery import Celery
 from celery.schedules import crontab
+from celery.signals import task_postrun, worker_process_init
+from ovs.lib.messaging import MessageController
 from ovs.logging.logHandler import LogHandler
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.tools import Tools
+from configobj import ConfigObj
+from ovs.dal.lists.vmachinelist import VMachineList
 
-memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-nodes = memcache_ini.getValue('main', 'nodes').split(',')
-memcache_servers = map(lambda m: memcache_ini.getValue(m, 'location'), nodes)
+memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'],]
+memcache_servers = map(lambda m: memcache_ini.get(m)['location'], memcache_nodes)
+
+rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'],]
+rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+
+vsas = VMachineList.get_vsas()
 
 celery = Celery('ovs',
                 include=['ovs.lib.vdisk',
@@ -24,15 +49,25 @@ celery = Celery('ovs',
                          'ovs.lib.vpool',
                          'ovs.lib.messaging',
                          'ovs.lib.scheduledtask',
+                         'ovs.lib.volumestoragerouter',
                          'ovs.extensions.hypervisor.hypervisors.vmware'])
 
 celery.conf.CELERY_RESULT_BACKEND = "cache"
-celery.conf.CELERY_CACHE_BACKEND = 'memcached://{}/'.format(';'.join(memcache_servers))
-celery.conf.BROKER_URL = '{}://{}:{}@{}:{}//'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                     Configuration.get('ovs.core.broker.login'),
-                                                     Configuration.get('ovs.core.broker.password'),
-                                                     Configuration.get('ovs.grid.ip'),
-                                                     Configuration.get('ovs.core.broker.port'))
+celery.conf.CELERY_CACHE_BACKEND = 'memcached://{0}/'.format(';'.join(memcache_servers))
+celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                                Configuration.get('ovs.core.broker.login'),
+                                                                Configuration.get('ovs.core.broker.password'),
+                                                                server)
+                                   for server in rmq_servers])
+celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
+queues = [Queue('ovs_generic', routing_key='generic.#')]
+for vsa in vsas:
+    queues.append(Queue('ovs_{0}'.format(vsa.machineid), routing_key='vsa.{0}.#'.format(vsa.machineid)))
+celery.conf.CELERY_QUEUES = tuple(queues)
+celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
+celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
+celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
+
 celery.conf.CELERYBEAT_SCHEDULE = {
     # Snapshot policy
     # > Executes every day, hourly between 02:00 and 22:00 hour
@@ -58,6 +93,26 @@ celery.conf.CELERYBEAT_SCHEDULE = {
 }
 
 loghandler = LogHandler('celery.log')
+
+
+@task_postrun.connect
+def task_postrun_handler(sender=None, task_id=None, task=None, args=None, kwargs=None, **kwds):
+    """
+    Hook for celery postrun event
+    """
+    _ = sender, task, args, kwargs, kwds
+    MessageController.fire(MessageController.Type.TASK_COMPLETE, task_id)
+
+
+@worker_process_init.connect
+def worker_process_init_handler(args=None, kwargs=None, **kwds):
+    """
+    Hook for process init
+    """
+    _ = args, kwargs, kwds
+    VolatileFactory.store = None
+    PersistentFactory.store = None
+
 
 if __name__ == '__main__':
     celery.start()

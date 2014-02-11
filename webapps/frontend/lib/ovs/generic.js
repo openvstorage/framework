@@ -1,4 +1,16 @@
-// license see http://www.openvstorage.com/licenses/opensource/
+// Copyright 2014 CloudFounders NV
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 /*global define */
 define(['jquery', 'jqp/pnotify'], function($) {
     "use strict";
@@ -176,6 +188,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
+    function xhrCompleted(token) {
+        return !(token !== undefined && token.state() === 'pending');
+    }
     function removeElement(array, element) {
         var index = array.indexOf(element);
         if (index !== -1) {
@@ -215,14 +230,16 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
-    function crossFiller(newKeyList, currentKeyList, objectList, objectLoader, key) {
-        //               Arr.        Arr             Obs. Arr    Function      Obs.
-        var i, j;
+    function crossFiller(newKeyList, objectList, objectLoader, key) {
+        //               Arr.        Obs. Arr    Function      Obs.
+        var i, j, currentKeyList = [];
+        for (i = 0; i < objectList().length; i += 1) {
+            currentKeyList.push(objectList()[i][key]());
+        }
         for (i = 0; i < newKeyList.length; i += 1) {
             if ($.inArray(newKeyList[i], currentKeyList) === -1) {
                 // One of the new keys is not yet in our current key list. This means
                 // we'll have to load the object.
-                currentKeyList.push(newKeyList[i]);
                 objectList.push(objectLoader(newKeyList[i]));
             }
         }
@@ -233,25 +250,71 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 for (j = 0; j < objectList().length; j += 1) {
                     if (objectList()[j][key]() === currentKeyList[i]) {
                         objectList.splice(j, 1);
+                        break;
                     }
                 }
-                currentKeyList.splice(i, 1);
             }
         }
     }
+    function numberSort(itemA, itemB) {
+        if ((itemA === undefined || itemA === null) && (itemB !== undefined && itemB !== null)) {
+            return -1;
+        }
+        if ((itemA === undefined || itemA === null) && (itemB === undefined || itemB === null)) {
+            return 0;
+        }
+        if ((itemA !== undefined && itemA !== null) && (itemB === undefined || itemB === null)) {
+            return 1;
+        }
+        var regexAlpha = /[\d]+/g,
+        regexNumber = /[^\d]+/g,
+        partA = itemA.replace(regexAlpha, ''),
+        partB = itemB.replace(regexAlpha, '');
+        if (partA == partB) {
+            partA = parseInt(itemA.replace(regexNumber, ''), 10);
+            partB = parseInt(itemB.replace(regexNumber, ''), 10);
+            return partA == partB ? 0 : (partA > partB ? 1 : -1);
+        }
+        return partA > partB ? 1 : -1;
+    }
     function advancedSort(list, properties) {
         list.sort(function(a, b) {
-            var i;
+            var i, result;
             for (i = 0; i < properties.length; i += 1) {
-                if (a[properties[i]]() < b[properties[i]]()) {
-                    return -1;
-                }
-                if (a[properties[i]]() > b[properties[i]]()) {
-                    return 1;
+                result = numberSort(a[properties[i]](), b[properties[i]]());
+                if (result !== 0) {
+                    return result;
                 }
             }
             return 0;
         });
+    }
+    function validate(nodes) {
+        var i, node, check, checkAndRedirect;
+        check = function(node) {
+            return $.ajax(node + '/api/internal/generic/0/?format=jsonp&timestamp=' + (new Date().getTime()), {
+                type: 'GET',
+                contentType: 'application/jsonp',
+                dataType: 'jsonp',
+                timeout: 60000
+            });
+        };
+        checkAndRedirect = function(node) {
+            check(node)
+                .done(function() {
+                    window.location.href = node;
+                })
+                .fail(function() {
+                    // something
+                });
+        };
+        check('https://' + window.location.hostname)
+            .fail(function() {
+                for (i = 0; i < nodes.length; i += 1) {
+                    node = nodes[i];
+                    checkAndRedirect('https://' + node);
+                }
+            });
     }
 
     return {
@@ -271,6 +334,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         alertError      : alertError,
         keys            : keys,
         xhrAbort        : xhrAbort,
+        xhrCompleted    : xhrCompleted,
         removeElement   : removeElement,
         smooth          : smooth,
         round           : round,
@@ -279,6 +343,8 @@ define(['jquery', 'jqp/pnotify'], function($) {
         setDecimals     : setDecimals,
         crossFiller     : crossFiller,
         deg2rad         : deg2rad,
-        advancedSort    : advancedSort
+        numberSort      : numberSort,
+        advancedSort    : advancedSort,
+        validate        : validate
     };
 });

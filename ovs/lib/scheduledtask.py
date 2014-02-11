@@ -1,4 +1,16 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """
 ScheduledTaskController module
@@ -20,10 +32,8 @@ from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from volumedriver.scrubber.scrubber import Scrubber
 
-_vsr_client = VolumeStorageRouterClient().load()
 _vsr_scrubber = Scrubber()
 
 
@@ -69,7 +79,8 @@ def ensure_single(tasknames):
                     for taskname in tasknames:
                         for worker in scheduled.values():
                             for task in worker:
-                                if task['id'] != task_id and taskname == task['name']:
+                                request = task['request']
+                                if request['id'] != task_id and taskname == request['name']:
                                     return False
                     reserved = inspector.reserved()
                     for taskname in tasknames:
@@ -82,6 +93,9 @@ def ensure_single(tasknames):
             if can_run():
                 return function(*args, **kwargs)
             else:
+                print 'Execution of task {0}[{1}] discarded'.format(
+                    self.name, self.request.id
+                )
                 return None
 
         return wrapped
@@ -97,23 +111,25 @@ class ScheduledTaskController(object):
     @staticmethod
     @celery.task(name='ovs.scheduled.snapshotall', bind=True)
     @ensure_single(['ovs.scheduled.snapshotall', 'ovs.scheduled.deletescrubsnapshots'])
-    def snapshot_all_vms(*args, **kwargs):
+    def snapshot_all_vms():
         """
         Snapshots all VMachines
         """
-
-        _ = (args, kwargs)
         loghandler.logger.info('[SSA] started')
-        tasks = []
-        machines = VMachineList.get_vmachines()
+        success = []
+        fail = []
+        machines = VMachineList.get_customer_vmachines()
         for machine in machines:
-            if not machine.is_vtemplate:
-                tasks.append(VMachineController.snapshot.s(machineguid=machine.guid,
-                                                           label='',
-                                                           is_consistent=False))
-        workflow = group(task for task in tasks)
-        loghandler.logger.info('[SSA] %d disk snapshots launched' % len(tasks))
-        return workflow()
+            try:
+                VMachineController.snapshot(machineguid=machine.guid,
+                                            label='',
+                                            is_consistent=False)
+                success.append(machine.guid)
+            except:
+                fail.append(machine.guid)
+        loghandler.logger.info('[SSA] {0} vMachines were snapshotted, {1} failed.'.format(
+            len(success), len(fail)
+        ))
 
     @staticmethod
     @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True)
@@ -238,7 +254,7 @@ class ScheduledTaskController(object):
         total = 0
         failed = 0
         for vdisk in vdisks:
-            work_units = _vsr_client.get_scrubbing_workunits(str(vdisk.volumeid))
+            work_units = vdisk.vsr_client.get_scrubbing_workunits(str(vdisk.volumeid))
             for work_unit in work_units:
                 try:
                     total += 1
@@ -246,7 +262,7 @@ class ScheduledTaskController(object):
                         work_unit,
                         Configuration.get('ovs.core.tempfs.mountpoint')
                     )
-                    _vsr_client.apply_scrubbing_result(scrubbing_result)
+                    vdisk.vsr_client.apply_scrubbing_result(scrubbing_result)
                 except:
                     failed += 1
                     loghandler.logger.info('Failed scrubbing work unit for volume {}'.format(

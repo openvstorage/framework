@@ -1,14 +1,26 @@
-# license see http://www.openvstorage.com/licenses/opensource/
+# Copyright 2014 CloudFounders NV
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """
 VMachine module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from ovs.extensions.hypervisor.factory import Factory as hvFactory
 import time
-
-_vsr_client = VolumeStorageRouterClient().load()
 
 
 class VMachine(DataObject):
@@ -19,14 +31,15 @@ class VMachine(DataObject):
     # pylint: disable=line-too-long
     _blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
                   'description':  (None,  str,  'Description of the vMachine.'),
-                  'hypervisorid': (None,  str,  'The Identifier of the vMachine on the Hypervisor.'),
+                  'hypervisorid': (None,  str,  'The identifier of the vMachine on the Hypervisor.'),
+                  'machineid':    (None,  str,  'The hardware identifier of the vMachine'),
                   'devicename':   (None,  str,  'The name of the container file (e.g. the VMX-file) describing the vMachine.'),
                   'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
                   'ip':           (None,  str,  'IP Address of the vMachine, if available'),
-                  'hvtype':       (None,  ['HYPERV', 'VMWARE', 'XEN'], 'Hypervisor type serving the vMachine.'),
                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
-    _relations = {'pmachine': (PMachine, 'vmachines')}
+    _relations = {'pmachine': (PMachine, 'vmachines'),
+                  'vpool':    (VPool, 'vmachines')}
     _expiry = {'snapshots':          (60, list),
                'hypervisor_status': (300, str, True),  # The cache is invalidated on start/stop
                'statistics':          (4, dict),
@@ -65,18 +78,25 @@ class VMachine(DataObject):
         if self.hypervisorid is None or self.pmachine is None:
             return 'UNKNOWN'
         hv = hvFactory.get(self.pmachine)
-        return hv.get_state(self.hypervisorid)
+        try:
+            return hv.get_state(self.hypervisorid)
+        except:
+            return 'UNKNOWN'
 
     def _statistics(self):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        vdiskstats = _vsr_client.empty_statistics()
+        vdiskstats = VolumeStorageRouterClient().empty_statistics()
         vdiskstatsdict = {}
         for key, value in vdiskstats.__class__.__dict__.items():
             if type(value) is property:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
-        for disk in self.vdisks:
+        vdisks = self.vdisks
+        if self.is_internal:
+            for vsr in self.served_vsrs:
+                vdisks += vsr.vpool.vdisks
+        for disk in vdisks:
             statistics = disk._statistics()  # Prevent double caching
             for key in vdiskstatsdict.iterkeys():
                 vdiskstatsdict[key] += statistics[key]
@@ -87,7 +107,11 @@ class VMachine(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
-        return sum([disk.info['stored'] for disk in self.vdisks])
+        vdisks = self.vdisks
+        if self.is_internal:
+            for vsr in self.served_vsrs:
+                vdisks += vsr.vpool.vdisks
+        return sum([disk.info['stored'] for disk in vdisks])
 
     def _failover_mode(self):
         """
@@ -95,7 +119,11 @@ class VMachine(DataObject):
         """
         status = 'UNKNOWN'
         status_code = 0
-        for disk in self.vdisks:
+        vdisks = self.vdisks
+        if self.is_internal:
+            for vsr in self.served_vsrs:
+                vdisks += vsr.vpool.vdisks
+        for disk in vdisks:
             mode = disk.info['failover_mode']
             current_status_code = VolumeStorageRouterClient.FOC_STATUS[mode.lower()]
             if current_status_code > status_code:
