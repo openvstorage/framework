@@ -16,9 +16,7 @@
 VMachine module
 """
 import time
-from ovs.logging.logHandler import LogHandler
-logging = LogHandler('ovs.lib')
-
+import logging
 
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine

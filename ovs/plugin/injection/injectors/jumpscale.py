@@ -17,7 +17,6 @@ JumpScale Injector module
 """
 from JumpScale import j
 from JumpScale import grid
-from JumpScale.grid.grid.LogTargetElasticSearch import LogTargetElasticSearch
 
 
 class Injector(object):
@@ -108,20 +107,7 @@ class Injector(object):
     def inject_logger(provider):
         """ Injects the Logger module """
         provider.log = j.logger.log
-        provider.LogTargetElasticSearch = LogTargetElasticSearch
-        def set_name(name):
-            j.application.appname = name
-        provider.set_name = staticmethod(set_name)
-        def logTargetAdd(target):
-            target.enabled = True
-            target.maxlevel = 6
-            j.logger.logTargetAdd(target)
-        def logTargetsClear():
-            j.logger.logTargets = []
-        provider.logTargetAdd = staticmethod(logTargetAdd)
-        provider.logTargetsClear = staticmethod(logTargetsClear)
         return provider
-
 
     @staticmethod
     def inject_process(provider):

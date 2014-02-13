@@ -15,8 +15,7 @@
 """
 Module for VDiskController
 """
-from ovs.logging.logHandler import LogHandler
-logging = LogHandler('ovs.lib')
+import logging
 import pickle
 import uuid
 import time
