@@ -25,6 +25,7 @@ import os
 import sys
 import urllib2
 import re
+import platform
 
 from configobj import ConfigObj
 from optparse import OptionParser
@@ -190,8 +191,10 @@ class Manager(object):
         is_local = Client.is_local(ip)
 
         arakoon_management = ArakoonManagement()
-        nodes = Manager._get_cluster_nodes()  # All nodes, including the the local and the new one
+        nodes = Manager._get_cluster_nodes()  # All nodes, including the local and the new one
         arakoon_nodes = arakoon_management.getCluster('ovsdb').listNodes()
+        client = Client.load(ip, password)
+        new_node_hostname = client.run('hostname')
         if is_local and Configuration.get('grid.node.id') != '1':
             # If the script is executed local and there are multiple nodes, the script is executed on node 2+.
             # This is not allowed since a the existing configuration is requred to extend. On extra nodes there is no
@@ -223,7 +226,7 @@ class Manager(object):
             client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
             unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
             remote_ips = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-            remote_ip = [ip.strip() for ip in nodes if ip in remote_ips][0]
+            remote_ip = [ipa.strip() for ipa in nodes if ipa in remote_ips][0]
 
             # Configure servers, joining clusters, ...
             for cluster in clusters:
@@ -231,40 +234,81 @@ class Manager(object):
                 # able to update it
                 cfg = ConfigObj('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
                 global_section = cfg.get('global')
-                cluster_nodes = [node.strip() for node in global_section['cluster'].split(',')]
+                cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster'],]
                 if unique_id not in cluster_nodes:
+                    print "++++ IP: %s++++"%ip
                     client = Client.load(ip, password)
                     remote_config = client.file_read('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
                     with open('/tmp/arakoon_{0}_cfg'.format(unique_id), 'w') as the_file:
                         the_file.write(remote_config)
                     remote_cfg = ConfigObj('/tmp/arakoon_{0}_cfg'.format(unique_id))
-                    global_section['cluster'] += ',{0}'.format(unique_id)
+                    cluster_nodes.append(unique_id)
+                    global_section['cluster'] = cluster_nodes
                     cfg.update({'global': global_section})
-                    cfg.update(remote_cfg.get(unique_id))
+                    cfg.update({unique_id: remote_cfg.get(unique_id)})
                     cfg.write()
                     for node in nodes:
                         node_client = Client.load(node, password)
                         node_client.file_upload('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster),
                                                 '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
+                arakoon_create_directories = """
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+arakoon_management = ArakoonManagement()
+arakoon_cluster = arakoon_management.getCluster('%(cluster)s')
+arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
+"""%{'cluster': cluster}
+                client.run('/opt/OpenvStorage/bin/python -c """{}"""'.format(arakoon_create_directories))
+
+            # Update all nodes hosts file with new node and new node hosts file with all others
+            for node in nodes:
+                client_node = Client.load(node, password)
+                update_hosts_file = """
+from JumpScale import j
+j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
+"""%{'ip': ip,
+     'host': new_node_hostname}
+                client_node.run('python -c """{}"""'.format(update_hosts_file))
+                client_node.run('jsprocess enable -n rabbitmq')
+                client_node.run('jsprocess start -n rabbitmq')
+                if node == ip:
+                    for node in nodes:
+                        client_node = Client.load(node,password)
+                        node_hostname = client_node.run('hostname')
+                        update_hosts_file = """
+from JumpScale import j
+j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
+"""%{'ip': node,
+     'host': node_hostname}
+                        client = Client.load(ip,password)
+                        client.run('python -c """{}"""'.format(update_hosts_file))
+                
+
+
+            client = Client.load(ip, password)
+            client.run('rabbitmq-server -detached; rabbitmqctl stop_app; rabbitmqctl reset;')
             if not is_local:
                 # Copy rabbitmq cookie
-                rabbitmq_cookie_file = 'var/lib/rabbitmq/.erlang.cookie'
-                client = Client.load(ip, password)
+                rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
                 client.dir_ensure(os.path.dirname(rabbitmq_cookie_file), True)
                 client.file_upload(rabbitmq_cookie_file, rabbitmq_cookie_file)
                 client.file_attribs(rabbitmq_cookie_file, mode=400)
                 # If not local, a cluster needs to be joined.
                 master_client = Client.load(Configuration.get('grid.master.ip'), password)
                 master_hostname = master_client.run('hostname')
+                master_client.run('jsprocess enable -n rabbitmq')
+                master_client.run('jsprocess start -n rabbitmq')
                 client = Client.load(ip, password)
-                client.run('rabbitmq-server -detached; rabbitmqctl stop_app; rabbitmqctl reset; rabbitmqctl join_cluster rabbit@{}; rabbitmqctl stop;'.format(master_hostname))
+                client.run('rabbitmqctl join_cluster rabbit@{};'.format(master_hostname))
+            client.run('rabbitmqctl stop;')
 
             # Update local client configurations
             for config in arakoon_configfiles:
                 cfg = ConfigObj(config)
                 global_section = cfg.get('global')
-                if unique_id not in global_section['cluster']:
-                    global_section['cluster'] += ',{0}'.format(unique_id)
+                cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster'],]
+                if unique_id not in cluster_nodes:
+                    cluster_nodes.append(unique_id)
+                    global_section['cluster'] = cluster_nodes
                     cfg.update({'global': global_section})
                     cfg.update({unique_id: {'ip': remote_ip,
                                             'client_port': '8870'}})
@@ -272,9 +316,10 @@ class Manager(object):
             for config, port in generic_configfiles.iteritems():
                 cfg = ConfigObj(config)
                 main_section = cfg.get('main')
-                if unique_id not in main_section['nodes']:
-                    main_section['nodes'] += ', {0}'.format(unique_id)
-                    cfg.update({'main': main_section})
+                generic_nodes = main_section['nodes'] if type(main_section['nodes']) == list else [main_section['nodes'],]
+                if unique_id not in generic_nodes:
+                    nodes.append(unique_id)
+                    cfg.update({'main': {'nodes': generic_nodes}})
                     cfg.update({unique_id: {'location': '{0}:{1}'.format(remote_ip, port)}})
                     cfg.write()
 
@@ -284,12 +329,22 @@ class Manager(object):
                 for config in arakoon_configfiles + generic_configfiles.keys():
                     node_client.file_upload(config, config)
 
+            client = Client.load(ip, password)
+            Manager._configure_nginx(client)
+
             # Restart services
             for node in nodes:
                 node_client = Client.load(node, password)
                 for service in all_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
+            
+            # If this is first node we need to load default model values.
+            # @todo: Think about better detection algorithm.
+            if len(nodes) == 1:
+                from ovs.extensions.migration.migration import Migration
+                Migration.migrate()
+            
         else:
             client = Client.load(ip, password)
             # Disable master services
