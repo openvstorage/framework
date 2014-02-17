@@ -25,17 +25,11 @@ import os
 import sys
 import urllib2
 import re
-import platform
 
-from configobj import ConfigObj
 from optparse import OptionParser
 from random import choice
 from string import lowercase
 from subprocess import check_output
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.net import Net
-from ovs.plugin.provider.osis import Osis
 
 
 class Manager(object):
@@ -187,8 +181,22 @@ class Manager(object):
         master nodes regardless of the given parameter.
         """
 
+        from configobj import ConfigObj
+        from ovs.dal.hybrids.pmachine import PMachine
+        from ovs.dal.lists.pmachinelist import PMachineList
+        from ovs.dal.hybrids.vmachine import VMachine
+        from ovs.dal.lists.vmachinelist import VMachineList
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+        from ovs.plugin.provider.configuration import Configuration
+
+        if ip == '127.0.0.1':
+            print 'Do not use 127.0.0.1 as ip address, use the public grid ip instead.'
+            sys.exit(1)
+
         # Make sure to ALWAYS reload the client when switching targets, as Fabric seems to be singleton-ish
         is_local = Client.is_local(ip)
+        client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
+        unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
 
         arakoon_management = ArakoonManagement()
         nodes = Manager._get_cluster_nodes()  # All nodes, including the local and the new one
@@ -224,7 +232,6 @@ class Manager(object):
 
             # Fetch some information
             client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
-            unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
             remote_ips = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
             remote_ip = [ipa.strip() for ipa in nodes if ipa in remote_ips][0]
 
@@ -234,9 +241,8 @@ class Manager(object):
                 # able to update it
                 cfg = ConfigObj('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
                 global_section = cfg.get('global')
-                cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster'],]
+                cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster']]
                 if unique_id not in cluster_nodes:
-                    print "++++ IP: %s++++"%ip
                     client = Client.load(ip, password)
                     remote_config = client.file_read('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
                     with open('/tmp/arakoon_{0}_cfg'.format(unique_id), 'w') as the_file:
@@ -251,61 +257,60 @@ class Manager(object):
                         node_client = Client.load(node, password)
                         node_client.file_upload('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster),
                                                 '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
+                client = Client.load(ip, password)
                 arakoon_create_directories = """
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 arakoon_management = ArakoonManagement()
 arakoon_cluster = arakoon_management.getCluster('%(cluster)s')
 arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
-"""%{'cluster': cluster}
+""" % {'cluster': cluster}
                 client.run('/opt/OpenvStorage/bin/python -c """{}"""'.format(arakoon_create_directories))
 
             # Update all nodes hosts file with new node and new node hosts file with all others
             for node in nodes:
                 client_node = Client.load(node, password)
                 update_hosts_file = """
-from JumpScale import j
-j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
-"""%{'ip': ip,
+from ovs.plugin.provider.net import Net
+Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
+""" % {'ip': ip,
      'host': new_node_hostname}
                 client_node.run('python -c """{}"""'.format(update_hosts_file))
-                client_node.run('jsprocess enable -n rabbitmq')
-                client_node.run('jsprocess start -n rabbitmq')
-                if node == ip:
-                    for node in nodes:
-                        client_node = Client.load(node,password)
+                if node != ip:
+                    client_node.run('jsprocess enable -n rabbitmq')
+                    client_node.run('jsprocess start -n rabbitmq')
+                else:
+                    for subnode in nodes:
+                        client_node = Client.load(subnode, password)
                         node_hostname = client_node.run('hostname')
                         update_hosts_file = """
-from JumpScale import j
-j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
-"""%{'ip': node,
+from ovs.plugin.provider.net import Net
+Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
+""" % {'ip': subnode,
      'host': node_hostname}
-                        client = Client.load(ip,password)
+                        client = Client.load(ip, password)
                         client.run('python -c """{}"""'.format(update_hosts_file))
-                
-
 
             client = Client.load(ip, password)
-            client.run('rabbitmq-server -detached; rabbitmqctl stop_app; rabbitmqctl reset;')
+            client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
             if not is_local:
                 # Copy rabbitmq cookie
                 rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
                 client.dir_ensure(os.path.dirname(rabbitmq_cookie_file), True)
                 client.file_upload(rabbitmq_cookie_file, rabbitmq_cookie_file)
                 client.file_attribs(rabbitmq_cookie_file, mode=400)
+                client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
                 # If not local, a cluster needs to be joined.
                 master_client = Client.load(Configuration.get('grid.master.ip'), password)
                 master_hostname = master_client.run('hostname')
-                master_client.run('jsprocess enable -n rabbitmq')
-                master_client.run('jsprocess start -n rabbitmq')
                 client = Client.load(ip, password)
-                client.run('rabbitmqctl join_cluster rabbit@{};'.format(master_hostname))
-            client.run('rabbitmqctl stop;')
+                client.run('rabbitmqctl join_cluster rabbit@{}; sleep 5;'.format(master_hostname))
+                client.run('rabbitmqctl stop; sleep 5;')
 
             # Update local client configurations
             for config in arakoon_configfiles:
                 cfg = ConfigObj(config)
                 global_section = cfg.get('global')
-                cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster'],]
+                cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster']]
                 if unique_id not in cluster_nodes:
                     cluster_nodes.append(unique_id)
                     global_section['cluster'] = cluster_nodes
@@ -316,9 +321,9 @@ j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(ho
             for config, port in generic_configfiles.iteritems():
                 cfg = ConfigObj(config)
                 main_section = cfg.get('main')
-                generic_nodes = main_section['nodes'] if type(main_section['nodes']) == list else [main_section['nodes'],]
+                generic_nodes = main_section['nodes'] if type(main_section['nodes']) == list else [main_section['nodes']]
                 if unique_id not in generic_nodes:
-                    nodes.append(unique_id)
+                    generic_nodes.append(unique_id)
                     cfg.update({'main': {'nodes': generic_nodes}})
                     cfg.update({unique_id: {'location': '{0}:{1}'.format(remote_ip, port)}})
                     cfg.write()
@@ -338,13 +343,13 @@ j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(ho
                 for service in all_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
-            
+
             # If this is first node we need to load default model values.
-            # @todo: Think about better detection algorithm.
+            # @TODO: Think about better detection algorithm.
             if len(nodes) == 1:
                 from ovs.extensions.migration.migration import Migration
                 Migration.migrate()
-            
+
         else:
             client = Client.load(ip, password)
             # Disable master services
@@ -370,6 +375,39 @@ j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(ho
             client.run('jsprocess start -n nginx')
             client.run('jsprocess start -n ovs_workers')
 
+        # Add VSA and pMachine in the model, if they don't yet exist
+        client = Client.load(ip, password)
+        pmachine = None
+        pmachine_ip = Manager._read_remote_config(client, 'ovs.host.ip')
+        pmachine_hvtype = Manager._read_remote_config(client, 'ovs.host.hypervisor')
+        for current_pmachine in PMachineList.get_pmachines():
+            if current_pmachine.ip == pmachine_ip and current_pmachine.hvtype == pmachine_hvtype:
+                pmachine = current_pmachine
+                break
+        if pmachine is None:
+            pmachine = PMachine()
+            pmachine.ip = pmachine_ip
+            pmachine.username = Manager._read_remote_config(client, 'ovs.host.login')
+            pmachine.password = Manager._read_remote_config(client, 'ovs.host.password')
+            pmachine.hvtype = pmachine_hvtype
+            pmachine.name = Manager._read_remote_config(client, 'ovs.host.name')
+            pmachine.save()
+        vsa = None
+        for current_vsa in VMachineList.get_vsas():
+            if current_vsa.ip == ip and current_vsa.machineid == unique_id:
+                vsa = current_vsa
+                break
+        if vsa is None:
+            vsa = VMachine()
+            vsa.name = new_node_hostname
+            vsa.is_vtemplate = False
+            vsa.is_internal = True
+            vsa.machineid = unique_id
+            vsa.ip = ip
+            vsa.save()
+        vsa.pmachine = pmachine
+        vsa.save()
+
     @staticmethod
     def init_vpool(ip, password, vpool):
         """
@@ -385,7 +423,25 @@ j.system.net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(ho
         raise NotImplementedError()
 
     @staticmethod
+    def _read_remote_config(client, key):
+        """
+        Reads remote configuration key
+        """
+        read = """
+from ovs.plugin.provider.configuration import Configuration
+print Configuration.get('{0}')
+""".format(key)
+        return client.run('python -c """{}"""'.format(read))
+
+    @staticmethod
     def _get_cluster_nodes():
+        """
+        Get nodes from Osis
+        """
+        from ovs.plugin.provider.net import Net
+        from ovs.plugin.provider.osis import Osis
+        from ovs.plugin.provider.configuration import Configuration
+
         grid_nodes = []
         local_ovs_grid_ip = Configuration.get('ovs.grid.ip')
         grid_id = Configuration.getInt('grid.id')
