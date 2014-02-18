@@ -615,21 +615,21 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vsr_config_script = """
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
-vsr_configuration = VolumeStorageRouterConfiguration({0})
+vsr_configuration = VolumeStorageRouterConfiguration('{0}')
 vsr_configuration.configure_backend({1})
 vsr_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
 vsr_configuration.configure_scocache({3}, '1GB', '2GB')
 vsr_configuration.configure_failovercache('{4}')
 vsr_configuration.configure_filesystem({5})
 vsr_configuration.configure_volumemanager({6})
-vsr_configuration.configure_volumerouter({0}, {7})
-vsr_configuration.configure_arakoon_cluster({8})
+vsr_configuration.configure_volumerouter('{0}', {7})
+vsr_configuration.configure_arakoon_cluster('{8}')
 queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
-                 'events_amqp_uri': '{{}}://{{}}:{{}}@{{}}:{{}}{{}}'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                                            Configuration.get('ovs.core.broker.login'),
-                                                                            Configuration.get('ovs.core.broker.password'),
-                                                                            Configuration.get('ovs.grid.ip'),
-                                                                            Configuration.get('ovs.core.broker.port'))}}
+                 'events_amqp_uri': '{{}}://{{}}:{{}}@{{}}:{{}}'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                                        Configuration.get('ovs.core.broker.login'),
+                                                                        Configuration.get('ovs.core.broker.password'),
+                                                                        Configuration.get('ovs.grid.ip'),
+                                                                        Configuration.get('ovs.core.broker.port'))}}
 vsr_configuration.configure_event_publisher(queue_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id)
@@ -661,7 +661,7 @@ for filename in {1}:
         open(filename, 'a').close()""".format(dirs2create, files2create)
             Manager._exec_python(client, file_create_script)
 
-            config_file = '{0}/voldrv_vpools/{2}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
+            config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
             log_file = 'var/log/{0}.log'.format(vpool_name)
             vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o uid=0 -o gid=0 -o sync_read'.format(config_file, vsr.mountpoint, log_file)
             vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)

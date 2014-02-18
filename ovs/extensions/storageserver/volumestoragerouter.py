@@ -16,14 +16,13 @@
 Wrapper class for the storagerouterclient of the voldrv team
 """
 
-from volumedriver.storagerouter import storagerouterclient
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient, ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.net import Net
 import json
 import os
 
-vsr_cache = {}
-
+client_cache = {}
 
 class VolumeStorageRouterClient(object):
     """
@@ -40,10 +39,8 @@ class VolumeStorageRouterClient(object):
         """
         Init method
         """
-        self._host = None
-        self._port = None
-        self.empty_statistics = lambda: storagerouterclient.Statistics()
-        self.empty_info = lambda: storagerouterclient.VolumeInfo()
+        self.empty_statistics = lambda: Statistics()
+        self.empty_info = lambda: VolumeInfo()
         self.stat_counters = ['backend_data_read', 'backend_data_written',
                               'backend_read_operations', 'backend_write_operations',
                               'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
@@ -66,18 +63,16 @@ class VolumeStorageRouterClient(object):
         if vpool is not None and vsr is not None:
             raise RuntimeError('Only one of the parameters vpool or vsr needs to be passed')
 
-        if vpool is not None:
-            if vpool.guid in vsr_cache:
-                return vsr_cache[vpool.guid]
-            if len(vpool.vsrs) > 0:
-                vsr = vpool.vsrs[0]
-            else:
-                raise ValueError('Cannot find vsr for vpool {0}'.format(vpool.guid))
-        self._host = vsr.cluster_ip
-        self._port = vsr.port
-        client = storagerouterclient.StorageRouterClient(str(self._host), int(self._port))
-        vsr_cache[vsr.vpool_guid] = client
-        return client
+        if vpool is None:
+            vpool = vsr.vpool
+
+        if vpool.guid not in client_cache:
+            cluster_contacts = []
+            for vsr in vpool.vsrs:
+                cluster_contacts.append(ClusterContact(vsr.cluster_ip, vsr.port))
+            client = StorageRouterClient(str(vsr.vpool.name), cluster_contacts)
+            client_cache[vpool.guid] = client
+        return client_cache[vpool.guid]
 
 
 class VolumeStorageRouterConfiguration(object):
