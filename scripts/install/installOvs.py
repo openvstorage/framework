@@ -357,9 +357,9 @@ if not os.path.exists('/opt/jumpscale/cfg/jsconfig/bitbucket.cfg'):
             ))
 
 # Branch mapping: key = our qualitylevel, value = jumpscale branch
-branch_mapping = {'unstable': 'default',
-                  'test': 'default',
-                  'stable': 'default'}
+branch_mapping = {'unstable': 'stable',
+                  'test': 'stable',
+                  'stable': 'stable'}
 # Quality level mapping: key = our qualitylevel, value = jumpscale quality level
 quality_mapping = {'unstable': 'stable',
                    'test': 'stable',
