@@ -1219,7 +1219,7 @@ if __name__ == '__main__':
 
     parser = OptionParser(description='Open vStorage Setup')
     parser.add_option('-n', '--no-filesystems', dest='filesystems', action='store_false', default=True,
-                      help='Don't create partitions and filesystems')
+                      help="Don't create partitions and filesystems")
     parser.add_option('-c', '--clean', dest='clean', action='store_true', default=False,
                       help='Try to clean environment before reinstalling')
     (options, args) = parser.parse_args()
