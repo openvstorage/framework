@@ -361,9 +361,9 @@ branch_mapping = {'unstable': 'default',
                   'test': 'default',
                   'stable': 'default'}
 # Quality level mapping: key = our qualitylevel, value = jumpscale quality level
-quality_mapping = {'unstable': 'test',
-                   'test': 'test',
-                   'stable': 'test'}
+quality_mapping = {'unstable': 'stable',
+                   'test': 'stable',
+                   'stable': 'stable'}
 # Install all software components
 print 'Updating software...'
 run_command('apt-get -y -qq update')
