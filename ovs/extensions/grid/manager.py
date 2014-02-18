@@ -249,7 +249,7 @@ arakoon_management = ArakoonManagement()
 arakoon_cluster = arakoon_management.getCluster('%(cluster)s')
 arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 """ % {'cluster': cluster}
-                client.run('/opt/OpenvStorage/bin/python -c """{}"""'.format(arakoon_create_directories))
+                Manager._exec_python(client, arakoon_create_directories)
 
             # Update all nodes hosts file with new node and new node hosts file with all others
             for node in nodes:
@@ -259,7 +259,7 @@ from ovs.plugin.provider.net import Net
 Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
 """ % {'ip': ip,
      'host': new_node_hostname}
-                client_node.run('python -c """{}"""'.format(update_hosts_file))
+                Manager._exec_python(client, update_hosts_file)
                 if node != ip:
                     client_node.run('jsprocess enable -n rabbitmq')
                     client_node.run('jsprocess start -n rabbitmq')
@@ -273,7 +273,7 @@ Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
 """ % {'ip': subnode,
      'host': node_hostname}
                         client = Client.load(ip, password)
-                        client.run('python -c """{}"""'.format(update_hosts_file))
+                        Manager._exec_python(client, update_hosts_file)
 
             # Update arakoon cluster configuration in voldrv configuration files
             for node in nodes:
@@ -295,7 +295,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
         vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
 """
-                client_node.run('python -c """{}"""'.format(update_voldrv))
+                Manager._exec_python(client, update_voldrv)
 
             # Join rabbitMQ clusters
             client = Client.load(ip, password)
@@ -629,7 +629,7 @@ queue_config = {'events_amqp_routing_key': Configuration.get('ovs.core.broker.vo
 vsr_configuration.configure_event_publisher(queue_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id)
-            client.run('python -c """{}"""'.format(vsr_config_script))
+            Manager._exec_python(client, vsr_config_script)
 
             # Updating the model
             vsr = VolumeStorageRouter()
@@ -655,7 +655,7 @@ for directory in {0}:
 for filename in {1}:
     if not os.path.exists(filename):
         open(filename, 'a').close()""".format(dirs2create, files2create)
-            client.run('python -c """{}"""'.format(file_create_script))
+            Manager._exec_python(client, file_create_script)
 
             config_file = '{0}/voldrv_vpools/{2}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
             log_file = 'var/log/{0}.log'.format(vpool_name)
@@ -674,7 +674,7 @@ Service.add_service(package=('openvstorage', 'volumedriver'), name={3}, command=
                 vd_name, vd_cmd, vd_stopcmd,
                 fc_name, fc_cmd
             )
-            client.run('python -c """{}"""'.format(service_script))
+            Manager._exec_python(client, service_script)
 
         if vpool.backend_type == 'S3':
             # If using S3, then help setting up the ceph connection - for now
@@ -700,7 +700,7 @@ fstab = Fstab()
 fstab.remove_config_by_directory({0})
 fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', {0}, 'fuse.ceph', 'defaults,noatime', '0', '2')
 """.format(vsr.mountpoint_dfs)
-            client.run('python -c """{}"""'.format(fstab_script))
+            Manager._exec_python(client, fstab_script)
             client.run('mount {0}'.format(vsr.mountpoint_dfs))
 
         # Start services
@@ -730,7 +730,14 @@ fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', {0}, 'fuse.ceph', 'default
 from ovs.plugin.provider.configuration import Configuration
 print Configuration.get('{0}')
 """.format(key)
-        return client.run('python -c """{}"""'.format(read))
+        return Manager._exec_python(client, read)
+
+    @staticmethod
+    def _exec_python(client, script):
+        """
+        Executes a python script on the client inside the OVS virtualenv
+        """
+        return client.run('source /opt/OpenvStorage/bin/activate; python -c """{0}"""'.format(script))
 
     @staticmethod
     def _get_cluster_nodes():
