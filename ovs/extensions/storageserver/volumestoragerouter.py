@@ -87,8 +87,10 @@ class VolumeStorageRouterConfiguration(object):
     def __init__(self, vpool_name):
         self._vpool = vpool_name
         self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'specs', 'volumedriverfs.json')
-        self._config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json'.format(vpool_name))
-        self._config_tmpfile = os.path.join(Configuration.get('ovs.core.cfgdir'), '{}.json.tmp'.format(vpool_name))
+        if not os.path.exists(os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools')):
+            os.makedirs(os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools'))
+        self._config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools', '{}.json'.format(vpool_name))
+        self._config_tmpfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools', '{}.json.tmp'.format(vpool_name))
         self._config_readfile_handler = None
         self._config_file_handler = None
         self._config_specfile_handler = None
@@ -182,36 +184,21 @@ class VolumeStorageRouterConfiguration(object):
         """
         nics = Net.getNics()
         nics.remove('lo')
-        mac_addresses = sorted(map(lambda n: Net.getMacAddress(n).replace(':',''), nics))
+        mac_addresses = sorted(map(lambda n: Net.getMacAddress(n).replace(':', ''), nics))
         unique_machine_id = mac_addresses[0]
         self.load_config()
         if vrouter_config['vrouter_id'] == '{}{}'.format(self._vpool, unique_machine_id):
             for key, value in vrouter_config.iteritems():
-                if not key in ('host', 'xmlrpc_port'):
-                    self._config_file_content['volume_router'][key] = value
+                self._config_file_content['volume_router'][key] = value
         # Configure the vrouter arakoon with empty values in order to use tokyo cabinet
         self._config_file_content['volume_router']['vrouter_arakoon_cluster_id'] = ''
         self._config_file_content['volume_router']['vrouter_arakoon_cluster_nodes'] = []
         if not 'volume_router_cluster' in self._config_file_content:
             self._config_file_content['volume_router_cluster'] = {}
         self._config_file_content['volume_router_cluster'].update({'vrouter_cluster_id': vrouter_cluster})
-        if 'vrouter_cluster_nodes' in self._config_file_content['volume_router_cluster']:
-            for node in self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes']:
-                if node['vrouter_id'] == vrouter_config['vrouter_id'] or \
-                        node['host'] == '127.0.0.1':
-                    self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'].remove(node)
-                    break
-        else:
-            self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'] = []
-        new_node = {'vrouter_id': vrouter_config['vrouter_id'],
-                    'host': vrouter_config['host'],
-                    'message_port': int(vrouter_config['xmlrpc_port']) - 1,
-                    'xmlrpc_port': vrouter_config['xmlrpc_port'],
-                    'failovercache_port': int(vrouter_config['xmlrpc_port']) + 1}
-        self._config_file_content['volume_router_cluster']['vrouter_cluster_nodes'].append(new_node)
         self.write_config()
 
-    def configure_arakoon_cluster(self, arakoon_cluster_id, arakoon_nodes):
+    def configure_arakoon_cluster(self, arakoon_cluster_id):
         """
         Configures volume storage router arakoon cluster
         @param arakoon_cluster_id: name of the arakoon cluster
@@ -221,10 +208,6 @@ class VolumeStorageRouterConfiguration(object):
         if not 'volume_registry' in self._config_file_content:
             self._config_file_content['volume_registry'] = {}
         self._config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
-        self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
-        for node_id, node_config in arakoon_nodes.iteritems():
-            node_dict = {'node_id' : node_id, 'host' : node_config[0][0], 'port' : node_config[1]}
-            self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'].append(node_dict)
         self.write_config()
 
     def configure_event_publisher(self, queue_config):

@@ -12,45 +12,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sys import *
 import re
-import pprint
+
 
 class Fstab(object):
     """
     /etc/fstab manager
     """
-    def __init__(self, fstabFile=None):
+    def __init__(self):
         """
         Init
         """
-        self.fstabFile = '/etc/fstab'
+        self.fstab_file = '/etc/fstab'
 
     def _slurp(self):
         """
         Read from /etc/fstab
         """
-        f = open(self.fstabFile, 'r')
+        f = open(self.fstab_file, 'r')
         dlist = []
         for line in f:
-            if not re.match('^\s*$', line): dlist.append(line)
+            if not re.match('^\s*$', line):
+                dlist.append(line)
         f.close()
-        dlist = [ i.strip() for i in dlist if not i.startswith('#') ]
-        dlist = [ re.split('\ +|\t+',i) for i in dlist ]
-        keys=['device','directory','fstype','options','dump','fsck']
-        ldict = [ dict(zip(keys,line)) for line in dlist ]
+        dlist = [i.strip() for i in dlist if not i.startswith('#')]
+        dlist = [re.split(' +|\t+', i) for i in dlist]
+        keys = ['device', 'directory', 'fstype', 'options', 'dump', 'fsck']
+        ldict = [dict(zip(keys, line)) for line in dlist]
 
         return ldict
 
-    def showConfig(self):
+    def show_config(self):
         """
         Print the content of /etc/fstab
         """
         l = self._slurp()
         for i in l:
-            print "%s %s %s %s %s %s" % ( i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck'] )
+            print "%s %s %s %s %s %s" % (i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck'])
 
-    def addConfig(self, fs_spec, fs_file, fs_vfstype, fs_mntops='defaults', fs_freq='0', fs_passno='0'):
+    def add_config(self, fs_spec, fs_file, fs_vfstype, fs_mntops='defaults', fs_freq='0', fs_passno='0'):
         """
         Add an entry to /etc/fstab
 
@@ -61,70 +61,73 @@ class Fstab(object):
         @param fs_freq: dump value
         @param fs_passno: fsck value
         """
-        print "/etc/fstab: appending entry %s %s %s %s %s %s to %s" % (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstabFile)
-        f = open(self.fstabFile, 'a')
+        print "/etc/fstab: appending entry %s %s %s %s %s %s to %s" % \
+              (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
+        f = open(self.fstab_file, 'a')
         f.write('%s %s %s %s %s %s\n' % (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno))
         f.close()
 
-
-    def modifyConfigByDevice(self, device, fs_file = '', fs_vfstype = '', fs_mntops='', fs_freq='', fs_passno = ''):
+    def modify_config_by_device(self, device, fs_file = '', fs_vfstype = '', fs_mntops='', fs_freq='', fs_passno = ''):
         """
         Modify an entry to /etc/fstab
 
-        @param fs_spec: device
+        @param device: device
         @param fs_file: directory or mount point
         @param fs_vfstype: Type of filesystem
         @param fs_mntops: options
         @param fs_freq: dump value
         @param fs_passno: fsck value
         """
-        print "%s: modifying entry %s to %s %s %s %s %s to %s" % (self.fstabFile, device, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstabFile)
+        print "%s: modifying entry %s to %s %s %s %s %s to %s" % \
+              (self.fstab_file, device, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
+
+        def x_if_x_else_key(x, dictionary, key):
+            """ Small helper function """
+            return x if x else dictionary[key]
 
         l = self._slurp()
-        f = open(self.fstabFile, 'w')
+        f = open(self.fstab_file, 'w')
         for i in l:
             if i['device'] == device:
-                new_fs_file    = fs_file    if fs_file    else i['directory']
-                new_fs_vfstype = fs_vfstype if fs_vfstype else i['fstype']
-                new_fs_mntops  = fs_mntops  if fs_mntops  else i['options']
-                new_fs_freq    = fs_freq    if fs_freq    else i['dump']
-                new_fs_passno  = fs_passno  if fs_passno  else i['fsck']
+                new_fs_file = x_if_x_else_key(fs_file, i, 'directory')
+                new_fs_vfstype = x_if_x_else_key(fs_vfstype, i, 'fstype')
+                new_fs_mntops = x_if_x_else_key(fs_mntops, i, 'options')
+                new_fs_freq = x_if_x_else_key(fs_freq, i, 'dump')
+                new_fs_passno = x_if_x_else_key(fs_passno, i, 'fsck')
 
-                f.write('%s %s %s %s %s %s\n' % (device, new_fs_file, new_fs_vfstype, new_fs_mntops, new_fs_freq, new_fs_passno))
+                f.write('%s %s %s %s %s %s\n' %
+                        (device, new_fs_file, new_fs_vfstype, new_fs_mntops, new_fs_freq, new_fs_passno))
             else:
-                f.write("%s %s %s %s %s %s\n" % ( i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck'] ))
+                f.write("%s %s %s %s %s %s\n" %
+                        (i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck']))
         f.close()
 
-
-    def removeConfigByDevice(self, device):
+    def remove_config_by_device(self, device):
         """
-        Remove an entry from /etc/fstab
-
-        @param device: Device to remove config by
-        @param device: string
+        Remove an entry from /etc/fstab based on the device
         """
-        l = self._slurp()
-        for i in l:
-            if i['device'] == device:
-                l.remove(i)
-                f = open(self.fstabFile, 'w')
-                for i in l:
-                    f.write("%s %s %s %s %s %s\n" % ( i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck'] ))
-                f.close()
-                return
+        return self._remove_config_by_('device', device)
 
+    def remove_config_by_directory(self, directory):
+        """
+        Removes an entry from /etc/fstab based on directory
+        """
+        return self._remove_config_by_('directory', directory)
 
-    def removeConfigByDirectory(self, dir):
+    def _remove_config_by_(self, match_type, match_value):
         """
-        Remove an from /etc/fstab
+        Remove a line from /etc/fstab
         """
-        l = self._slurp()
-        for i in l:
-            if i['directory'] == dir:
-                l.remove(i)
-                f = open(self.fstabFile, 'w')
-                for i in l:
-                    f.write("%s %s %s %s %s %s\n" % ( i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck'] ))
-                f.close()
-                return
-        print "%s: no such entry %s found" % (self.fstabFile, dir)
+        lines = self._slurp()
+        line_removed = False
+        for line in lines:
+            if line[match_type] == match_value:
+                lines.remove(line)
+                line_removed = True
+        if line_removed:
+            with open(self.fstab_file, 'w') as fstab_file:
+                for line in lines:
+                    fstab_file.write("%s %s %s %s %s %s\n" %
+                                     (line['device'], line['directory'], line['fstype'], line['options'], line['dump'], line['fsck']))
+        else:
+            print "%s: no such entry %s found" % (self.fstab_file, match_value)

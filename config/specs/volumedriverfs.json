@@ -51,12 +51,7 @@
                                              "port" : "8872"}]
     },
     "volume_router_cluster": {
-        "vrouter_cluster_id" : "voldrv",
-        "vrouter_cluster_nodes": [{"vrouter_id" : "voldrv1",
-                                   "host" : "127.0.0.1",
-                                   "message_port" : "12320",
-                                   "xmlrpc_port": "12321",
-                                   "failovercache_port": "12322"}]
+        "vrouter_cluster_id" : "voldrv"
     },
     "failovercache": {
         "failovercache_path": "/mnt/foc"

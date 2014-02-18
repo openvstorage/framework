@@ -85,11 +85,6 @@ class Manager(object):
                                                                               default_value=Helper.find_in_list(ipaddresses, ip))
         mountpoints = client.run('mount -v').strip().split('\n')
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2 and ('/mnt/' in p.split(' ')[2] or '/var' in p.split(' ')[2])]
-        mountpoint = Helper.ask_choice(mountpoints,
-                                       question='Select temporary FS mountpoint',
-                                       default_value=Helper.find_in_list(mountpoints, 'tmp'))
-        mountpoints.remove(mountpoint)
-        configuration['openvstorage-core']['ovs.core.tempfs.mountpoint'] = mountpoint
         unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0]
         configuration['openvstorage-core']['ovs.core.memcache.localnode.name'] = unique_id
         mountpoint = Helper.ask_choice(mountpoints,
@@ -98,16 +93,6 @@ class Manager(object):
         mountpoints.remove(mountpoint)
         configuration['openvstorage-core']['ovs.core.db.mountpoint'] = mountpoint
         configuration['openvstorage-core']['ovs.core.db.arakoon.node.name'] = unique_id
-        mountpoint = Helper.ask_choice(mountpoints,
-                                       question='Select distributed FS mountpoint',
-                                       default_value=Helper.find_in_list(mountpoints, 'dfs'))
-        mountpoints.remove(mountpoint)
-        configuration['openvstorage-core']['volumedriver.filesystem.distributed'] = mountpoint
-        mountpoint = Helper.ask_choice(mountpoints,
-                                       question='Select metadata mountpoint',
-                                       default_value=Helper.find_in_list(mountpoints, 'md'))
-        mountpoints.remove(mountpoint)
-        configuration['openvstorage-core']['volumedriver.metadata'] = mountpoint
         configuration['openvstorage-core']['volumedriver.arakoon.node.name'] = unique_id
         configuration['openvstorage-core']['ovs.core.broker.localnode.name'] = unique_id
 
@@ -235,7 +220,7 @@ class Manager(object):
             remote_ips = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
             remote_ip = [ipa.strip() for ipa in nodes if ipa in remote_ips][0]
 
-            # Configure servers, joining clusters, ...
+            # Configure arakoon
             for cluster in clusters:
                 # The Arakoon extension is not used since the config file needs to be parsed/loaded anyway to be
                 # able to update it
@@ -290,6 +275,27 @@ Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
                         client = Client.load(ip, password)
                         client.run('python -c """{}"""'.format(update_hosts_file))
 
+            # Update arakoon cluster configuration in voldrv configuration files
+            for node in nodes:
+                client_node = Client.load(node, password)
+                update_voldrv = """
+import os
+from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+arakoon_management = ArakoonManagement()
+voldrv_arakoon_cluster_id = 'voldrv'
+voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
+voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+configuration_dir = Configuration.get('ovs.core.cfgdir')
+for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
+    if json_file.endswith('.json'):
+        vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
+        vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+"""
+                client_node.run('python -c """{}"""'.format(update_voldrv))
+
+            # Join rabbitMQ clusters
             client = Client.load(ip, password)
             client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
             if not is_local:
@@ -409,18 +415,309 @@ Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
         vsa.save()
 
     @staticmethod
-    def init_vpool(ip, password, vpool):
+    def init_vpool(ip, password, vpool_name):
         """
         Initializes a vpool on a given node
         """
 
-        # @TODO: Not yet implemented
-        # 1. Fetch vpool information
-        # 2. Validate vpool info (does it exist, is it clustered, can we add it)
-        # 3. Stop voldrv processes, if appropriate
-        # 4. Configure volumedriver (on all appropriate nodes)
-        # 5. Restart volumedriver
-        raise NotImplementedError()
+        from ovs.dal.hybrids.vpool import VPool
+        from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
+        from ovs.dal.lists.vpoollist import VPoolList
+        from ovs.dal.lists.vmachinelist import VMachineList
+        from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+        from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+
+        while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
+            print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
+            suggestion = re.sub(
+                '^([\-_]*)(?P<correct>[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*)([\-_]*)$',
+                '\g<correct>',
+                re.sub('[^0-9a-zA-Z\-_]', '_', vpool_name)
+            )
+            vpool_name = Helper.ask_string('Provide new vPool name', default_value=suggestion)
+
+        client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
+        unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
+
+        vsa = None
+        for current_vsa in VMachineList.get_vsas():
+            if current_vsa.ip == ip and current_vsa.machineid == unique_id:
+                vsa = current_vsa
+                break
+        if vsa is None:
+            raise RuntimeError('Could not find VSA with given ip address')
+
+        vpool = VPoolList.get_vpool_by_name(vpool_name)
+        vsr = None
+        if vpool is not None:
+            if vpool.backend_type == 'LOCAL':
+                raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
+            for vpool_vsr in vpool.vsrs:
+                if vpool_vsr.serving_vmachine_guid == vsa.guid:
+                    vsr = vpool_vsr  # The vPool is already added to this VSA and this might be a cleanup/recovery
+
+            # Check whether there are running machines on this vPool
+            machine_guids = []
+            for vdisk in vpool.vdisks:
+                if vdisk.vmachine_guid not in machine_guids:
+                    machine_guids.append(vdisk.vmachine_guid)
+                    if vdisk.vmachine.hypervisor_status in ['RUNNING', 'PAUSED']:
+                        raise RuntimeError('At least one vMachine using this vPool is still running or paused. Make sure there are no active vMachines')
+
+        nodes = [ip]
+        if vpool is not None:
+            for vpool_vsr in vpool.vsrs:
+                nodes.append(vpool_vsr.serving_vmachine.ip)
+
+        services = ['volumedriver_{0}'.format(vpool_name),
+                    'failovercache_{0}'.format(vpool_name)]
+
+        # Stop services
+        for node in nodes:
+            node_client = Client.load(node, password)
+            for service in services:
+                node_client.run('jsprocess disable -n {0}'.format(service))
+                node_client.run('jsprocess stop -n {0}'.format(service))
+
+        # Keep in mind that if the VSR exists, the vPool does as well
+
+        client = Client.load(ip, password)
+        mountpoints = client.run('mount -v').strip().split('\n')
+        mountpoints = [p.split(' ')[2] for p in mountpoints if
+                       len(p.split(' ')) > 2 and ('/mnt/' in p.split(' ')[2] or '/var' in p.split(' ')[2])]
+
+        if vpool is None:
+            vpool = VPool()
+            supported_backends = Manager._read_remote_config(client, 'volumedriver.supported.backends').split(',')
+            if 'REST' in supported_backends:
+                supported_backends.remove('REST')  # REST is not supported for now
+            vpool.backend_type = Helper.ask_choice(supported_backends, 'Select type of storage backend')
+            connection_host = connection_port = connection_username = connection_password = None
+            if vpool.backend_type == 'REST':
+                connection_host = Helper.ask_string('Provide REST ip address')
+                connection_port = Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
+                rest_connection_timeout_secs = Helper.ask_integer('Provide desired REST connection timeout(secs)',
+                                                                  min_value=0, max_value=99999)
+                vpool.backend_metadata = {'rest_connection_host': connection_host,
+                                          'rest_connection_port': connection_port,
+                                          'buchla_connection_log_level': "0",
+                                          'rest_connection_verbose_logging': rest_connection_timeout_secs,
+                                          'rest_connection_metadata_format': "JSON"}
+            elif vpool.backend_type == 'S3':
+                connection_host = Helper.ask_string('Specify fqdn or ip address for your S3 compatible host')
+                connection_port = Helper.ask_integer('Specify port for your S3 compatible host', min_value=1,
+                                                     max_value=65535)
+                connection_username = Helper.ask_string('Specify S3 access key')
+                connection_password = getpass.getpass()
+                vpool.backend_metadata = {'s3_connection_host': connection_host,
+                                          's3_connection_port': connection_port,
+                                          's3_connection_username': connection_username,
+                                          's3_connection_password': connection_password,
+                                          's3_connection_verbose_logging': 1}
+            vpool.backend_metadata.update({'backend_type': vpool.backend_type})
+
+            vpool.name = vpool_name
+            vpool.description = "{} {}".format(vpool.backend_type, vpool_name)
+            vpool.backend_login = connection_username
+            vpool.backend_password = connection_password
+            if not connection_host:
+                vpool.backend_connection = None
+            else:
+                vpool.backend_connection = '{}:{}'.format(connection_host, connection_port)
+            vpool.save()
+
+        # Connection information is VSR related information
+        if vsr is None:
+            mountpoint_temp = Helper.ask_choice(mountpoints,
+                                                question='Select temporary FS mountpoint',
+                                                default_value=Helper.find_in_list(mountpoints, 'tmp'))
+            mountpoints.remove(mountpoint_temp)
+            mountpoint_dfs = Helper.ask_choice(mountpoints,
+                                               question='Select distributed FS mountpoint',
+                                               default_value=Helper.find_in_list(mountpoints, 'dfs'))
+            mountpoints.remove(mountpoint_dfs)
+            mountpoint_md = Helper.ask_choice(mountpoints,
+                                              question='Select metadata mountpoint',
+                                              default_value=Helper.find_in_list(mountpoints, 'md'))
+            mountpoints.remove(mountpoint_md)
+            mountpoint_cache = Helper.ask_choice(mountpoints,
+                                                 question='Select cache mountpoint',
+                                                 default_value=Helper.find_in_list(mountpoints, 'cache'))
+            mountpoints.remove(mountpoint_cache)
+            cache_fs = os.statvfs(mountpoint_cache)
+            scocache = "{}/sco_{}".format(mountpoint_cache, vpool_name)
+            readcache = "{}/read_{}".format(mountpoint_cache, vpool_name)
+            failovercache = "{}/foc_{}".format(mountpoint_cache, vpool_name)
+            metadatapath = "{}/metadata_{}".format(mountpoint_md, vpool_name)
+            tlogpath = "{}/tlogs_{}".format(mountpoint_md, vpool_name)
+            dirs2create = [scocache, failovercache, metadatapath, tlogpath,
+                           Manager._read_remote_config(client, 'volumedriver.readcache.serialization.path')]
+            files2create = [readcache]
+            # Cache sizes
+            # 20% = scocache
+            # 20% = failovercache (@TODO: check if this can possibly consume more than 20%)
+            # 60% = readcache
+            scocache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
+            readcache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
+            ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vsa.guid)]
+            vrouter_port_in_hrd = int(Manager._read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
+            if vrouter_port_in_hrd in ports_used_in_model:
+                vrouter_port = Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
+                                                  min_value=1024, max_value=max(ports_used_in_model) + 3)
+            else:
+                vrouter_port = vrouter_port_in_hrd
+            ipaddresses = client.run(
+                "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
+            ipaddresses = [ip for ip in ipaddresses if ip != '127.0.0.1']
+            grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
+            if grid_ip in ipaddresses:
+                ipaddresses.remove(grid_ip)
+            if not ipaddresses:
+                raise RuntimeError('No available ip addresses found suitable for volumerouter storage ip')
+            volumedriver_storageip = Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
+            vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
+
+            vrouter_config = {"vrouter_id": vrouter_id,
+                              "vrouter_redirect_timeout_ms": "5000",
+                              "vrouter_migrate_timeout_ms": "5000",
+                              "vrouter_write_threshold": 1024}
+            voldrv_arakoon_cluster_id = Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid')
+            voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+            voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+            arakoon_node_configs = []
+            for arakoon_node in voldrv_arakoon_client_config.keys():
+                arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
+                                                              voldrv_arakoon_client_config[arakoon_node][0][0],
+                                                              voldrv_arakoon_client_config[arakoon_node][1]))
+            vrouter_clusterregistry = ClusterRegistry(voldrv_arakoon_cluster_id, vpool_name, arakoon_node_configs)
+            node_configs = []
+            for existing_vsr in VolumeStorageRouterList.get_volumestoragerouters():
+                if existing_vsr.vpool_guid == vpool.guid:
+                    node_configs.append(ClusterNodeConfig(existing_vsr.vsrid, existing_vsr.storage_ip,
+                                                          existing_vsr.port - 1,
+                                                          existing_vsr.port,
+                                                          existing_vsr.port + 1))
+            node_configs.append(ClusterNodeConfig(vrouter_id, volumedriver_storageip,
+                                                  vrouter_port - 1, vrouter_port, vrouter_port + 1))
+            vrouter_clusterregistry.set_node_configs(node_configs)
+
+            readcaches = [{'path': readcache, 'size': readcache_size}]
+            scocaches = [{'path': scocache, 'size': scocache_size}]
+            filesystem_config = {'fs_backend_path': mountpoint_dfs}
+            volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
+            vsr_config_script = """
+from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+vsr_configuration = VolumeStorageRouterConfiguration({0})
+vsr_configuration.configure_backend({1})
+vsr_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
+vsr_configuration.configure_scocache({3}, "1GB", "2GB")
+vsr_configuration.configure_failovercache({4})
+vsr_configuration.configure_filesystem({5})
+vsr_configuration.configure_volumemanager({6})
+vsr_configuration.configure_volumerouter({0}, {7})
+vsr_configuration.configure_arakoon_cluster({8})
+queue_config = {'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
+                'events_amqp_uri': '{}://{}:{}@{}:{}'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                             Configuration.get('ovs.core.broker.login'),
+                                                             Configuration.get('ovs.core.broker.password'),
+                                                             Configuration.get('ovs.grid.ip'),
+                                                             Configuration.get('ovs.core.broker.port'))}
+vsr_configuration.configure_event_publisher(queue_config)
+""".format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
+           volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id)
+            client.run('python -c """{}"""'.format(vsr_config_script))
+
+            # Updating the model
+            vsr = VolumeStorageRouter()
+            vsr.vsrid = vrouter_id
+            vsr.name = vrouter_id.replace('_', ' ')
+            vsr.description = vsr.name
+            vsr.storage_ip = volumedriver_storageip
+            vsr.cluster_ip = grid_ip
+            vsr.port = vrouter_port
+            vsr.mountpoint = '/mnt/{0}'.format(vpool_name)
+            vsr.mountpoint_temp = mountpoint_temp
+            vsr.mountpoint_dfs = mountpoint_dfs
+            vsr.serving_vmachine = vsa
+            vsr.vpool = vpool
+            vsr.save()
+
+            dirs2create.append(vsr.mountpoint)
+            file_create_script = """
+import os
+for directory in {0}:
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+for filename in {1}:
+    if not os.path.exists(filename):
+        open(filename, 'a').close()""".format(dirs2create, files2create)
+            client.run('python -c """{}"""'.format(file_create_script))
+
+            config_file = '{0}/voldrv_vpools/{2}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
+            log_file = 'var/log/{0}.log'.format(vpool_name)
+            vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o uid=0 -o gid=0 -o sync_read'.format(config_file, vsr.mountpoint, log_file)
+            vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
+            vd_name = 'volumedriver_{}'.format(vpool_name)
+
+            log_file = os.path.join(os.sep, 'var', 'log', 'foc_{0}.log'.format(vpool_name))
+            fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(config_file, log_file)
+            fc_name = 'failovercache_{0}'.format(vpool_name)
+
+            service_script = """
+from ovs.plugin.provider.service import Service
+Service.add_service(package=('openvstorage', 'volumedriver'), name={0}, command={1}, stop_command={2})
+Service.add_service(package=('openvstorage', 'volumedriver'), name={3}, command={4}, stop_command=None)""".format(
+                vd_name, vd_cmd, vd_stopcmd,
+                fc_name, fc_cmd
+            )
+            client.run('python -c """{}"""'.format(service_script))
+
+        if vpool.backend_type == 'S3':
+            # If using S3, then help setting up the ceph connection - for now
+            client.run('umount {0}'.format(vsr.mountpoint_dfs))
+            ceph_ok = Manager._check_ceph(client)
+            if not ceph_ok:
+                print Helper.boxed_message(
+                    ['No or incomplete configuration files found for your Ceph S3 compatible storage backend',
+                     'Now is the time to copy following files',
+                     ' CEPH_SERVER:/etc/ceph/ceph.conf -> /etc/ceph/ceph.conf',
+                     ' CEPH_SERVER:/etc/ceph/ceph.client.admin.keyring -> /etc/ceph/ceph.keyring',
+                     'to make sure we can connect our ceph filesystem',
+                     'When done continue the initialization here'])
+                ceph_continue = Helper.ask_yesno('Continue initialization', default_value=False)
+                if not ceph_continue:
+                    raise RuntimeError("Exiting initialization")
+                ceph_ok = Manager._check_ceph(client)
+                if not ceph_ok:
+                    raise RuntimeError("Ceph config still not ok, exiting initialization")
+            fstab_script = """
+from ovs.extensions.fs.fstab import Fstab
+fstab = Fstab()
+fstab.remove_config_by_directory({0})
+fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', {0}, 'fuse.ceph', 'defaults,noatime', '0', '2')
+""".format(vsr.mountpoint_dfs)
+            client.run('python -c """{}"""'.format(fstab_script))
+            client.run('mount {0}'.format(vsr.mountpoint_dfs))
+
+        # Start services
+        for node in nodes:
+            node_client = Client.load(node, password)
+            for service in services:
+                node_client.run('jsprocess enable -n {0}'.format(service))
+                node_client.run('jsprocess start -n {0}'.format(service))
+
+    @staticmethod
+    def _check_ceph(client):
+        ceph_config_dir = 'etc/ceph'
+        if not client.dir_exists(ceph_config_dir):
+            return False
+        if not client.file_exists(os.path.join(ceph_config_dir, 'ceph.conf')) or \
+                not client.file_exists(os.path.join(ceph_config_dir, 'ceph.keyring')):
+            return False
+        client.file_attribs(os.path.join(ceph_config_dir, 'ceph.keyring'), mode=644)
+        return True
 
     @staticmethod
     def _read_remote_config(client, key):
@@ -568,9 +865,10 @@ LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
         client.dir_ensure('/opt/jumpscale/cfg/jpackages/', True)
 
         # Quality mapping
-        quality_mapping = {'unstable': ['test', 'default'],
-                           'test': ['test', 'default'],
-                           'stable': ['test', 'default']}
+        # Tese mappings were ['unstable', 'default'] and ['default', 'default'] before
+        quality_mapping = {'unstable': ['stable', 'stable'],
+                           'test': ['stable', 'stable'],
+                           'stable': ['stable', 'stable']}
 
         if not is_local:
             if os.path.exists('/opt/jumpscale/cfg/jpackages/sources.cfg'):
@@ -865,6 +1163,40 @@ class Helper(object):
             if search_string in item:
                 return item
         return None
+
+    @staticmethod
+    def boxed_message(lines, character='+', maxlength=80):
+        """
+        Embeds a set of lines into a box
+        """
+        character = str(character)  # This must be a string
+        corrected_lines = []
+        for line in lines:
+            if len(line) > maxlength:
+                linepart = ''
+                for word in line.split(' '):
+                    if len(linepart + ' ' + word) <= maxlength:
+                        linepart += word + ' '
+                    elif len(word) >= maxlength:
+                        if len(linepart) > 0:
+                            corrected_lines.append(linepart.strip())
+                            linepart = ''
+                        corrected_lines.append(word.strip())
+                    else:
+                        if len(linepart) > 0:
+                            corrected_lines.append(linepart.strip())
+                        linepart = word + ' '
+                if len(linepart) > 0:
+                    corrected_lines.append(linepart.strip())
+            else:
+                corrected_lines.append(line)
+        maxlen = len(max(corrected_lines, key=len))
+        newlines = [character * (maxlen + 10)]
+        for line in corrected_lines:
+            newlines.append('{0}  {1}{2}  {3}'.format(character * 3, line, ' ' * (maxlen - len(line)),
+                                                      character * 3))
+        newlines.append(character * (maxlen + 10))
+        return '\n'.join(newlines)
 
 
 if __name__ == '__main__':
