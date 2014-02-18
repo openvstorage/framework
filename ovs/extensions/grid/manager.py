@@ -288,6 +288,8 @@ voldrv_arakoon_cluster_id = 'voldrv'
 voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
 voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
 configuration_dir = Configuration.get('ovs.core.cfgdir')
+if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
+    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
 for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
     if json_file.endswith('.json'):
         vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
