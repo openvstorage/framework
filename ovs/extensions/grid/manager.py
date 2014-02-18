@@ -454,7 +454,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         vsr = None
         if vpool is not None:
             if vpool.backend_type == 'LOCAL':
-                raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
+                # Might be an issue, investigating whether it's on the same not or not
+                if len(vpool.vsrs) == 1 and vpool.vsrs[0].serving_vmachine.machineid != unique_id:
+                    raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
             for vpool_vsr in vpool.vsrs:
                 if vpool_vsr.serving_vmachine_guid == vsa.guid:
                     vsr = vpool_vsr  # The vPool is already added to this VSA and this might be a cleanup/recovery
@@ -494,8 +496,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             supported_backends = Manager._read_remote_config(client, 'volumedriver.supported.backends').split(',')
             if 'REST' in supported_backends:
                 supported_backends.remove('REST')  # REST is not supported for now
-            vpool.backend_type = Helper.ask_choice(supported_backends, 'Select type of storage backend')
+            vpool.backend_type = Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='S3')
             connection_host = connection_port = connection_username = connection_password = None
+            if vpool.backend_type == 'LOCAL':
+                vpool.backend_metadata = {}
             if vpool.backend_type == 'REST':
                 connection_host = Helper.ask_string('Provide REST ip address')
                 connection_port = Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
@@ -548,11 +552,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                                  default_value=Helper.find_in_list(mountpoints, 'cache'))
             mountpoints.remove(mountpoint_cache)
             cache_fs = os.statvfs(mountpoint_cache)
-            scocache = "{}/sco_{}".format(mountpoint_cache, vpool_name)
-            readcache = "{}/read_{}".format(mountpoint_cache, vpool_name)
-            failovercache = "{}/foc_{}".format(mountpoint_cache, vpool_name)
-            metadatapath = "{}/metadata_{}".format(mountpoint_md, vpool_name)
-            tlogpath = "{}/tlogs_{}".format(mountpoint_md, vpool_name)
+            scocache = '{}/sco_{}'.format(mountpoint_cache, vpool_name)
+            readcache = '{}/read_{}'.format(mountpoint_cache, vpool_name)
+            failovercache = '{}/foc_{}'.format(mountpoint_cache, vpool_name)
+            metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
+            tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
             dirs2create = [scocache, failovercache, metadatapath, tlogpath,
                            Manager._read_remote_config(client, 'volumedriver.readcache.serialization.path')]
             files2create = [readcache]
@@ -560,8 +564,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             # 20% = scocache
             # 20% = failovercache (@TODO: check if this can possibly consume more than 20%)
             # 60% = readcache
-            scocache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
-            readcache_size = "{0}KiB".format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
+            scocache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
+            readcache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
             ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vsa.guid)]
             vrouter_port_in_hrd = int(Manager._read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
             if vrouter_port_in_hrd in ports_used_in_model:
@@ -580,11 +584,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             volumedriver_storageip = Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
             vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
 
-            vrouter_config = {"vrouter_id": vrouter_id,
-                              "vrouter_redirect_timeout_ms": "5000",
-                              "vrouter_migrate_timeout_ms": "5000",
-                              "vrouter_write_threshold": 1024}
-            voldrv_arakoon_cluster_id = Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid')
+            vrouter_config = {'vrouter_id': vrouter_id,
+                              'vrouter_redirect_timeout_ms': '5000',
+                              'vrouter_migrate_timeout_ms': '5000',
+                              'vrouter_write_threshold': 1024}
+            voldrv_arakoon_cluster_id = str(Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid'))
             voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
             voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
             arakoon_node_configs = []
@@ -592,7 +596,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
                                                               voldrv_arakoon_client_config[arakoon_node][0][0],
                                                               voldrv_arakoon_client_config[arakoon_node][1]))
-            vrouter_clusterregistry = ClusterRegistry(voldrv_arakoon_cluster_id, vpool_name, arakoon_node_configs)
+            vrouter_clusterregistry = ClusterRegistry(vpool_name, voldrv_arakoon_cluster_id, arakoon_node_configs)
             node_configs = []
             for existing_vsr in VolumeStorageRouterList.get_volumestoragerouters():
                 if existing_vsr.vpool_guid == vpool.guid:
@@ -614,18 +618,18 @@ from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouter
 vsr_configuration = VolumeStorageRouterConfiguration({0})
 vsr_configuration.configure_backend({1})
 vsr_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
-vsr_configuration.configure_scocache({3}, "1GB", "2GB")
-vsr_configuration.configure_failovercache({4})
+vsr_configuration.configure_scocache({3}, '1GB', '2GB')
+vsr_configuration.configure_failovercache('{4}')
 vsr_configuration.configure_filesystem({5})
 vsr_configuration.configure_volumemanager({6})
 vsr_configuration.configure_volumerouter({0}, {7})
 vsr_configuration.configure_arakoon_cluster({8})
-queue_config = {'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
-                'events_amqp_uri': '{}://{}:{}@{}:{}'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                             Configuration.get('ovs.core.broker.login'),
-                                                             Configuration.get('ovs.core.broker.password'),
-                                                             Configuration.get('ovs.grid.ip'),
-                                                             Configuration.get('ovs.core.broker.port'))}
+queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
+                 'events_amqp_uri': '{{}}://{{}}:{{}}@{{}}:{{}}{{}}'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                                            Configuration.get('ovs.core.broker.login'),
+                                                                            Configuration.get('ovs.core.broker.password'),
+                                                                            Configuration.get('ovs.grid.ip'),
+                                                                            Configuration.get('ovs.core.broker.port'))}}
 vsr_configuration.configure_event_publisher(queue_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id)
@@ -690,10 +694,10 @@ Service.add_service(package=('openvstorage', 'volumedriver'), name={3}, command=
                      'When done continue the initialization here'])
                 ceph_continue = Helper.ask_yesno('Continue initialization', default_value=False)
                 if not ceph_continue:
-                    raise RuntimeError("Exiting initialization")
+                    raise RuntimeError('Exiting initialization')
                 ceph_ok = Manager._check_ceph(client)
                 if not ceph_ok:
-                    raise RuntimeError("Ceph config still not ok, exiting initialization")
+                    raise RuntimeError('Ceph config still not ok, exiting initialization')
             fstab_script = """
 from ovs.extensions.fs.fstab import Fstab
 fstab = Fstab()
@@ -1108,7 +1112,7 @@ class Helper(object):
         if not choice_options:
             return None
         if len(choice_options) == 1:
-            print "Found exactly one choice: {0}".format(choice_options[0])
+            print 'Found exactly one choice: {0}'.format(choice_options[0])
             return choice_options[0]
         choice_options.sort()
         print '{0}Make a selection please: '.format('{0}. '.format(question) if question is not None else '')
@@ -1214,10 +1218,10 @@ if __name__ == '__main__':
         sys.exit(1)
 
     parser = OptionParser(description='Open vStorage Setup')
-    parser.add_option('-n', '--no-filesystems', dest='filesystems', action="store_false", default=True,
-                      help="Don't create partitions and filesystems")
-    parser.add_option('-c', '--clean', dest='clean', action="store_true", default=False,
-                      help="Try to clean environment before reinstalling")
+    parser.add_option('-n', '--no-filesystems', dest='filesystems', action='store_false', default=True,
+                      help='Don't create partitions and filesystems')
+    parser.add_option('-c', '--clean', dest='clean', action='store_true', default=False,
+                      help='Try to clean environment before reinstalling')
     (options, args) = parser.parse_args()
 
     try:
