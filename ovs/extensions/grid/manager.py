@@ -708,6 +708,19 @@ Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', comman
             client.run('umount {0}'.format(vsr.mountpoint_dfs))
             ceph_ok = Manager._check_ceph(client)
             if not ceph_ok:
+                # First, try to copy them over
+                for vpool_vsr in vpool.vsrs:
+                    if vpool_vsr.guid != vsr.guid:
+                        remote_client = Client.load(vpool_vsr.serving_vmachine.ip, password)
+                        client.dir_ensure('/etc/ceph', True)
+                        for cfg_file in ['/etc/ceph/ceph.conf', '/etc/ceph/ceph.keyring']:
+                            cfg_content = remote_client.file_read(cfg_file)
+                            client.file_write(cfg_file, cfg_content)
+                        client.file_attribs('/etc/ceph/ceph.keyring', mode=644)
+                        break
+                ceph_ok = Manager._check_ceph(client)
+            if not ceph_ok:
+                # If not yet ok, let the user copy the files
                 print Helper.boxed_message(
                     ['No or incomplete configuration files found for your Ceph S3 compatible storage backend',
                      'Now is the time to copy following files',
@@ -730,6 +743,8 @@ fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', '{0}', 'fuse.ceph', 'defau
             Manager._exec_python(client, fstab_script)
             client.run('mount {0}'.format(vsr.mountpoint_dfs))
 
+        Manager.init_exportfs(client, vpool.name)
+
         # Start services
         for node in nodes:
             node_client = Client.load(node, password)
@@ -747,6 +762,23 @@ fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', '{0}', 'fuse.ceph', 'defau
             return False
         client.file_attribs(os.path.join(ceph_config_dir, 'ceph.keyring'), mode=644)
         return True
+
+    @staticmethod
+    def init_exportfs(client, vpool_name):
+        """
+        Configure nfs
+        """
+        import uuid
+
+        vpool_mountpoint = '/mnt/{0}'.format(vpool_name)
+        client.dir_ensure(vpool_mountpoint, True)
+        nfs_script = """
+from ovs.extensions.fs.exportfs import Nfsexports
+Nfsexports().add({0}, '*', 'rw,fsid={1},sync,no_root_squash,no_subtree_check')""".format(
+            vpool_mountpoint, uuid.uuid4()
+        )
+        Manager._exec_python(client, nfs_script)
+        client.run('service nfs-kernel-server start')
 
     @staticmethod
     def _read_remote_config(client, key):
