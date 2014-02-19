@@ -25,6 +25,7 @@ import os
 import sys
 import urllib2
 import re
+import time
 
 from optparse import OptionParser
 from random import choice
@@ -382,6 +383,17 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             client.run('jsprocess start -n webapp_api')
             client.run('jsprocess start -n nginx')
             client.run('jsprocess start -n ovs_workers')
+
+            for cluster in ['ovsdb', 'voldrv']:
+                master_elected = False
+                while not master_elected:
+                    client = arakoon_management.getCluster(cluster).getClient()
+                    try:
+                        client.whomaster()
+                        master_elected = True
+                    except:
+                        print "Arakoon master not yet determined for {0}".format(cluster)
+                        time.sleep(1)
 
         # Add VSA and pMachine in the model, if they don't yet exist
         client = Client.load(ip, password)
@@ -831,7 +843,7 @@ print Configuration.get('{0}')
         client.run('mkfs.ext4 -q /dev/sdb2 -L distribfs')
         client.run('mkfs.ext4 -q /dev/sdb3 -L tempfs')
 
-        #Create partitions on SSD
+        # Create partitions on SSD
         if '/dev/sdc1' in mounted:
             client.run('umount /dev/sdc1')
         if '/dev/sdc2' in mounted:
