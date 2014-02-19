@@ -644,7 +644,7 @@ vsr_configuration.configure_failovercache('{4}')
 vsr_configuration.configure_filesystem({5})
 vsr_configuration.configure_volumemanager({6})
 vsr_configuration.configure_volumerouter('{0}', {7})
-vsr_configuration.configure_arakoon_cluster('{8}')
+vsr_configuration.configure_arakoon_cluster('{8}', {9})
 queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
                  'events_amqp_uri': '{{}}://{{}}:{{}}@{{}}:{{}}'.format(Configuration.get('ovs.core.broker.protocol'),
                                                                         Configuration.get('ovs.core.broker.login'),
@@ -653,7 +653,7 @@ queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.v
                                                                         Configuration.get('ovs.core.broker.port'))}}
 vsr_configuration.configure_event_publisher(queue_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
-           volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id)
+           volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
         Manager._exec_python(client, vsr_config_script)
 
         # Updating the model

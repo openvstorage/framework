@@ -197,7 +197,7 @@ class VolumeStorageRouterConfiguration(object):
         self._config_file_content['volume_router_cluster'].update({'vrouter_cluster_id': vrouter_cluster})
         self.write_config()
 
-    def configure_arakoon_cluster(self, arakoon_cluster_id):
+    def configure_arakoon_cluster(self, arakoon_cluster_id, arakoon_nodes):
         """
         Configures volume storage router arakoon cluster
         @param arakoon_cluster_id: name of the arakoon cluster
@@ -207,6 +207,10 @@ class VolumeStorageRouterConfiguration(object):
         if not 'volume_registry' in self._config_file_content:
             self._config_file_content['volume_registry'] = {}
         self._config_file_content['volume_registry']['vregistry_arakoon_cluster_id'] = arakoon_cluster_id
+        self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'] = []
+        for node_id, node_config in arakoon_nodes.iteritems():
+            node_dict = {'node_id': node_id, 'host': node_config[0][0], 'port': node_config[1]}
+            self._config_file_content['volume_registry']['vregistry_arakoon_cluster_nodes'].append(node_dict)
         self.write_config()
 
     def configure_event_publisher(self, queue_config):
