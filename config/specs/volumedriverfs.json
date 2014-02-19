@@ -45,10 +45,7 @@
         "events_amqp_uri": "amqp://localhost:5672"
     },
     "volume_registry": {
-        "vregistry_arakoon_cluster_id" : "voldrv",
-        "vregistry_arakoon_cluster_nodes": [{"node_id" : "voldrv1",
-                                             "host" : "127.0.0.1",
-                                             "port" : "8872"}]
+        "vregistry_arakoon_cluster_id" : "voldrv"
     },
     "volume_router_cluster": {
         "vrouter_cluster_id" : "voldrv"
