@@ -39,7 +39,7 @@ class Manager(object):
     """
 
     @staticmethod
-    def install_node(ip, password, create_filesystems=True, clean=False):
+    def install_node(ip, password, create_extra_filesystems=False, clean=False):
         """
         Installs the Open vStorage software on a (remote) node.
         """
@@ -50,8 +50,7 @@ class Manager(object):
 
         if clean:
             Manager._clean(client)
-        if create_filesystems:
-            Manager._create_filesystems(client)
+        Manager._create_filesystems(client, create_extra_filesystems)
 
         # Ask a bunch of questions and prepare HRD files for installation
         first_node = False
@@ -556,10 +555,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                             question='Select temporary FS mountpoint',
                                             default_value=Helper.find_in_list(mountpoints, 'tmp'))
         mountpoints.remove(mountpoint_temp)
-        mountpoint_dfs = Helper.ask_choice(mountpoints,
-                                           question='Select distributed FS mountpoint',
-                                           default_value=Helper.find_in_list(mountpoints, 'dfs'))
-        mountpoints.remove(mountpoint_dfs)
+        if vpool.backend_type == 'S3':
+            mountpoint_dfs = Helper.ask_string(message='Enter a mountpoint for the S3 backend',
+                                               default_value='/mnt/bfs')
+        else:
+            mountpoint_dfs = Helper.ask_choice(mountpoints,
+                                               question='Select distributed FS mountpoint',
+                                               default_value=Helper.find_in_list(mountpoints, 'dfs'))
+            mountpoints.remove(mountpoint_dfs)
         mountpoint_md = Helper.ask_choice(mountpoints,
                                           question='Select metadata mountpoint',
                                           default_value=Helper.find_in_list(mountpoints, 'md'))
@@ -823,12 +826,13 @@ print Configuration.get('{0}')
         client.run('rm -rf /mnt/db/arakoon /mnt/db/tlogs /mnt/cache/foc /mnt/cache/sco /mnt/cache/read')
 
     @staticmethod
-    def _create_filesystems(client):
+    def _create_filesystems(client, create_extra):
         """
         Creates filesystems on the first two additional disks
         """
         mounted = client.run("mount | cut -d ' ' -f 1").strip().split('\n')
-        # Create partitions on HDD
+
+        # Create partitions on SSD
         if '/dev/sdb1' in mounted:
             client.run('umount /dev/sdb1')
         if '/dev/sdb2' in mounted:
@@ -836,33 +840,42 @@ print Configuration.get('{0}')
         if '/dev/sdb3' in mounted:
             client.run('umount /dev/sdb3')
         client.run('parted /dev/sdb -s mklabel gpt')
-        client.run('parted /dev/sdb -s mkpart backendfs 2MB 80%')
-        client.run('parted /dev/sdb -s mkpart distribfs 80% 90%')
-        client.run('parted /dev/sdb -s mkpart tempfs 90% 100%')
-        client.run('mkfs.ext4 -q /dev/sdb1 -L backendfs')
-        client.run('mkfs.ext4 -q /dev/sdb2 -L distribfs')
-        client.run('mkfs.ext4 -q /dev/sdb3 -L tempfs')
-
-        # Create partitions on SSD
-        if '/dev/sdc1' in mounted:
-            client.run('umount /dev/sdc1')
-        if '/dev/sdc2' in mounted:
-            client.run('umount /dev/sdc2')
-        if '/dev/sdc3' in mounted:
-            client.run('umount /dev/sdc3')
-        client.run('parted /dev/sdc -s mklabel gpt')
-        client.run('parted /dev/sdc -s mkpart cache 2MB 50%')
-        client.run('parted /dev/sdc -s mkpart db 50% 75%')
-        client.run('parted /dev/sdc -s mkpart mdpath 75% 100%')
-        client.run('mkfs.ext4 -q /dev/sdc1 -L cache')
-        client.run('mkfs.ext4 -q /dev/sdc2 -L db')
-        client.run('mkfs.ext4 -q /dev/sdc3 -L mdpath')
+        client.run('parted /dev/sdb -s mkpart cache 2MB 50%')
+        client.run('parted /dev/sdb -s mkpart db 50% 75%')
+        client.run('parted /dev/sdb -s mkpart mdpath 75% 100%')
+        client.run('mkfs.ext4 -q /dev/sdb1 -L cache')
+        client.run('mkfs.ext4 -q /dev/sdb2 -L db')
+        client.run('mkfs.ext4 -q /dev/sdb3 -L mdpath')
 
         client.run('mkdir -p /mnt/db')
         client.run('mkdir -p /mnt/cache')
         client.run('mkdir -p /mnt/md')
-        client.run('mkdir -p /mnt/bfs')
-        client.run('mkdir -p /mnt/dfs')
+
+        extra_mountpoints = ''
+        if create_extra:
+            # Create partitions on HDD
+            if '/dev/sdc1' in mounted:
+                client.run('umount /dev/sdc1')
+            if '/dev/sdc2' in mounted:
+                client.run('umount /dev/sdc2')
+            if '/dev/sdc3' in mounted:
+                client.run('umount /dev/sdc3')
+            client.run('parted /dev/sdc -s mklabel gpt')
+            client.run('parted /dev/sdc -s mkpart backendfs 2MB 80%')
+            client.run('parted /dev/sdc -s mkpart distribfs 80% 90%')
+            client.run('parted /dev/sdc -s mkpart tempfs 90% 100%')
+            client.run('mkfs.ext4 -q /dev/sdc1 -L backendfs')
+            client.run('mkfs.ext4 -q /dev/sdc2 -L distribfs')
+            client.run('mkfs.ext4 -q /dev/sdc3 -L tempfs')
+
+            extra_mountpoints = """
+LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
+"""
+
+            client.run('mkdir -p /mnt/bfs')
+            client.run('mkdir -p /mnt/dfs')
 
         # Add content to fstab
         new_filesystems = """
@@ -870,11 +883,9 @@ print Configuration.get('{0}')
 LABEL=db        /mnt/db    ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=cache     /mnt/cache ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
+{0}
 # END Open vStorage
-"""
+""".format(extra_mountpoints)
         must_update = False
         fstab_content = client.file_read('/etc/fstab')
         if not '# BEGIN Open vStorage' in fstab_content:
@@ -1238,13 +1249,13 @@ if __name__ == '__main__':
         sys.exit(1)
 
     parser = OptionParser(description='Open vStorage Setup')
-    parser.add_option('-n', '--no-filesystems', dest='filesystems', action='store_false', default=True,
-                      help="Don't create partitions and filesystems")
+    parser.add_option('-e', '--extra-filesystems', dest='filesystems', action='store_true', default=False,
+                      help="Create extra filesystems on third disk for backend-, distributed- and temporary FS")
     parser.add_option('-c', '--clean', dest='clean', action='store_true', default=False,
                       help='Try to clean environment before reinstalling')
     (options, args) = parser.parse_args()
 
     try:
-        Manager.install_node('127.0.0.1', None, create_filesystems=options.filesystems, clean=options.clean)
+        Manager.install_node('127.0.0.1', None, create_extra_filesystems=options.filesystems, clean=options.clean)
     except KeyboardInterrupt:
         print '\nAborting'
