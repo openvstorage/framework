@@ -394,8 +394,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                         print "Arakoon master not yet determined for {0}".format(cluster)
                         time.sleep(1)
 
-        # Add VSA and pMachine in the model, if they don't yet exist
+        # Make sure the process manager is started
         client = Client.load(ip, password)
+        client.run('service processmanager start')
+
+        # Add VSA and pMachine in the model, if they don't yet exist
         pmachine = None
         pmachine_ip = Manager._read_remote_config(client, 'ovs.host.ip')
         pmachine_hvtype = Manager._read_remote_config(client, 'ovs.host.hypervisor')
@@ -598,7 +601,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vrouter_port = vsr.port
         ipaddresses = client.run(
             "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-        ipaddresses = [ip for ip in ipaddresses if ip != '127.0.0.1']
+        ipaddresses = [ip.strip() for ip in ipaddresses if ip.strip() != '127.0.0.1']
         grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
@@ -774,7 +777,7 @@ fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', '{0}', 'fuse.ceph', 'defau
         client.dir_ensure(vpool_mountpoint, True)
         nfs_script = """
 from ovs.extensions.fs.exportfs import Nfsexports
-Nfsexports().add({0}, '*', 'rw,fsid={1},sync,no_root_squash,no_subtree_check')""".format(
+Nfsexports().add('{0}', '*', 'rw,fsid={1},sync,no_root_squash,no_subtree_check')""".format(
             vpool_mountpoint, uuid.uuid4()
         )
         Manager._exec_python(client, nfs_script)
