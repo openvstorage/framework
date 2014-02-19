@@ -709,8 +709,8 @@ Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', comman
             fstab_script = """
 from ovs.extensions.fs.fstab import Fstab
 fstab = Fstab()
-fstab.remove_config_by_directory({0})
-fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', {0}, 'fuse.ceph', 'defaults,noatime', '0', '2')
+fstab.remove_config_by_directory('{0}')
+fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', '{0}', 'fuse.ceph', 'defaults,noatime', '0', '2')
 """.format(vsr.mountpoint_dfs)
             Manager._exec_python(client, fstab_script)
             client.run('mount {0}'.format(vsr.mountpoint_dfs))
@@ -724,7 +724,7 @@ fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', {0}, 'fuse.ceph', 'default
 
     @staticmethod
     def _check_ceph(client):
-        ceph_config_dir = 'etc/ceph'
+        ceph_config_dir = '/etc/ceph'
         if not client.dir_exists(ceph_config_dir):
             return False
         if not client.file_exists(os.path.join(ceph_config_dir, 'ceph.conf')) or \
