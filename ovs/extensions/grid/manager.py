@@ -32,11 +32,14 @@ from random import choice
 from string import lowercase
 from subprocess import check_output
 
+ARAKOON_CONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
+ARAKOON_CLIENTCONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
 
 class Manager(object):
     """
     Contains grid management functionality
     """
+
 
     @staticmethod
     def install_node(ip, password, create_extra_filesystems=False, clean=False):
@@ -201,7 +204,7 @@ class Manager(object):
 
         all_services = ['arakoon_ovsdb', 'arakoon_voldrv', 'memcached', 'rabbitmq', 'ovs_consumer_volumerouter',
                         'ovs_flower', 'ovs_scheduled_tasks', 'webapp_api', 'nginx', 'ovs_workers']
-        arakoon_configfiles = ['/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'.format(cluster) for cluster in clusters]
+        arakoon_clientconfigfiles = [ARAKOON_CLIENTCONFIG_TAG.format(cluster) for cluster in clusters]
         generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                                '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
 
@@ -224,12 +227,12 @@ class Manager(object):
             for cluster in clusters:
                 # The Arakoon extension is not used since the config file needs to be parsed/loaded anyway to be
                 # able to update it
-                cfg = ConfigObj('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
+                cfg = ConfigObj(ARAKOON_CONFIG_TAG.format(cluster))
                 global_section = cfg.get('global')
                 cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster']]
                 if unique_id not in cluster_nodes:
                     client = Client.load(ip, password)
-                    remote_config = client.file_read('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
+                    remote_config = client.file_read(ARAKOON_CONFIG_TAG.format(cluster))
                     with open('/tmp/arakoon_{0}_cfg'.format(unique_id), 'w') as the_file:
                         the_file.write(remote_config)
                     remote_cfg = ConfigObj('/tmp/arakoon_{0}_cfg'.format(unique_id))
@@ -240,8 +243,8 @@ class Manager(object):
                     cfg.write()
                     for node in nodes:
                         node_client = Client.load(node, password)
-                        node_client.file_upload('/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster),
-                                                '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'.format(cluster))
+                        node_client.file_upload(ARAKOON_CONFIG_TAG.format(cluster),
+                                                ARAKOON_CONFIG_TAG.format(cluster))
                 client = Client.load(ip, password)
                 arakoon_create_directories = """
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
@@ -315,8 +318,13 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 client.run('rabbitmqctl stop; sleep 5;')
 
             # Update local client configurations
-            for config in arakoon_configfiles:
-                cfg = ConfigObj(config)
+            db_client_port_mapper = dict()
+            for cluster in clusters:
+                db_cfg = ConfigObj(ARAKOON_CONFIG_TAG.format(cluster))
+                db_client_port_mapper[cluster] = db_cfg.get(unique_id)['client_port']
+
+            for cluster in clusters:
+                cfg = ConfigObj(ARAKOON_CLIENTCONFIG_TAG.format(cluster))
                 global_section = cfg.get('global')
                 cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster']]
                 if unique_id not in cluster_nodes:
@@ -324,8 +332,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     global_section['cluster'] = cluster_nodes
                     cfg.update({'global': global_section})
                     cfg.update({unique_id: {'ip': remote_ip,
-                                            'client_port': '8870'}})
+                                            'client_port': db_client_port_mapper[cluster]}})
                     cfg.write()
+
             for config, port in generic_configfiles.iteritems():
                 cfg = ConfigObj(config)
                 main_section = cfg.get('main')
@@ -339,7 +348,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             # Upload local client configurations to all nodes
             for node in nodes:
                 node_client = Client.load(node, password)
-                for config in arakoon_configfiles + generic_configfiles.keys():
+                for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                     node_client.file_upload(config, config)
 
             client = Client.load(ip, password)
@@ -374,7 +383,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 client.run('jsprocess stop -n {0}'.format(service))
 
             # The client config files can be copied from this node, since all client configurations are equal
-            for config in arakoon_configfiles + generic_configfiles.keys():
+            for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                 client.file_upload(config, config)
             Manager._configure_nginx(client)
 
@@ -383,16 +392,16 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             client.run('jsprocess start -n nginx')
             client.run('jsprocess start -n ovs_workers')
 
-            for cluster in ['ovsdb', 'voldrv']:
-                master_elected = False
-                while not master_elected:
-                    client = arakoon_management.getCluster(cluster).getClient()
-                    try:
-                        client.whomaster()
-                        master_elected = True
-                    except:
-                        print "Arakoon master not yet determined for {0}".format(cluster)
-                        time.sleep(1)
+        for cluster in ['ovsdb', 'voldrv']:
+            master_elected = False
+            while not master_elected:
+                client = arakoon_management.getCluster(cluster).getClient()
+                try:
+                    client.whoMaster()
+                    master_elected = True
+                except:
+                    print "Arakoon master not yet determined for {0}".format(cluster)
+                    time.sleep(1)
 
         # Make sure the process manager is started
         client = Client.load(ip, password)
