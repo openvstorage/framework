@@ -35,11 +35,11 @@ from subprocess import check_output
 ARAKOON_CONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
 ARAKOON_CLIENTCONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
 
+
 class Manager(object):
     """
     Contains grid management functionality
     """
-
 
     @staticmethod
     def install_node(ip, password, create_extra_filesystems=False, clean=False):
@@ -438,6 +438,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vsa.save()
         vsa.pmachine = pmachine
         vsa.save()
+
+        for node in nodes:
+            node_client = Client.load(node, password)
+            node_client.run('jsprocess restart -n ovs_workers')
 
     @staticmethod
     def init_vpool(ip, password, vpool_name):
