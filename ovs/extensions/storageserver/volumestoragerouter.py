@@ -22,7 +22,8 @@ from ovs.plugin.provider.net import Net
 import json
 import os
 
-client_cache = {}
+client_vpool_cache = {}
+client_vsr_cache = {}
 
 class VolumeStorageRouterClient(object):
     """
@@ -64,15 +65,18 @@ class VolumeStorageRouterClient(object):
             raise RuntimeError('Only one of the parameters vpool or vsr needs to be passed')
 
         if vpool is None:
-            vpool = vsr.vpool
+            if vsr.guid not in client_vsr_cache:
+                client = StorageRouterClient(str(vsr.vpool.name), [ClusterContact(str(vsr.cluster_ip), vsr.port)])
+                client_vsr_cache[vsr.guid] = client
+            return client_vsr_cache[vsr.guid]
 
-        if vpool.guid not in client_cache:
+        if vpool.guid not in client_vpool_cache:
             cluster_contacts = []
             for vsr in vpool.vsrs:
-                cluster_contacts.append(ClusterContact(vsr.cluster_ip, vsr.port))
-            client = StorageRouterClient(str(vsr.vpool.name), cluster_contacts)
-            client_cache[vpool.guid] = client
-        return client_cache[vpool.guid]
+                cluster_contacts.append(ClusterContact(str(vsr.cluster_ip), vsr.port))
+            client = StorageRouterClient(str(vpool.name), cluster_contacts)
+            client_vpool_cache[vpool.guid] = client
+        return client_vpool_cache[vpool.guid]
 
 
 class VolumeStorageRouterConfiguration(object):
