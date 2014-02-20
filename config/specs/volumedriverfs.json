@@ -23,7 +23,8 @@
         "metadata_path": "/mnt/metadata",
         "clean_interval": 1,
         "tlog_path": "/mnt/tlogs",
-        "foc_throttle_usecs": 4000
+        "foc_throttle_usecs": 4000,
+        "read_cache_default_behaviour": "CacheOnWrite"
     },
     "scocache": {
         "backoff_gap": "2GB",
