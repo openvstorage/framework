@@ -42,7 +42,7 @@ class VPoolViewSet(viewsets.ViewSet):
         _ = format
         vpools = VPoolList.get_vpools()
         vpools, serializer, contents = Toolbox.handle_list(vpools, request)
-        serialized = serializer(VPool, instance=vpools, many=True)
+        serialized = serializer(VPool, contents=contents, instance=vpools, many=True)
         return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
@@ -52,19 +52,8 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Load information about a given vPool
         """
-        _ = request
-        return Response(FullSerializer(VPool, instance=obj).data, status=status.HTTP_200_OK)
-
-    @link()
-    @expose(internal=True, customer=True)
-    @required_roles(['view'])
-    @validate(VPool)
-    def count_disks(self, request, obj):
-        """
-        Returns the amount of vDisks on the vPool
-        """
-        _ = request
-        return Response(len(obj.vdisks), status=status.HTTP_200_OK)
+        contents = Toolbox.handle_retrieve(request)
+        return Response(FullSerializer(VPool, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True, customer=True)
@@ -75,10 +64,10 @@ class VPoolViewSet(viewsets.ViewSet):
         Returns the amount of vMachines on the vPool
         """
         _ = request
-        vmachine_guids = []
+        vmachine_guids = set()
         for disk in obj.vdisks:
-            if disk.vmachine is not None and disk.vmachine.guid not in vmachine_guids:
-                vmachine_guids.append(disk.vmachine.guid)
+            if disk.vmachine_guid is not None:
+                vmachine_guids.add(disk.vmachine_guid)
         return Response(len(vmachine_guids), status=status.HTTP_200_OK)
 
     @action()

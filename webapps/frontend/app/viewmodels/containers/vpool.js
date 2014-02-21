@@ -70,74 +70,69 @@ define([
 
         // Functions
         self.fillData = function(data) {
-             var type = '', stats = data.statistics;
-            if (data.backend_type) {
-                type = $.t('ovs:vpools.backendtypes.' + data.backend_type);
+            generic.trySet(self.name, data, 'name');
+            generic.trySet(self.storedData, data, 'stored_data');
+            generic.trySet(self.size, data, 'size');
+            if (data.hasOwnProperty('backend_type')) {
+                self.backendType($.t('ovs:vpools.backendtypes.' + data.backend_type));
+            } else {
+                self.backendType('');
             }
-            self.name(data.name);
-            self.iops(stats.write_operations_ps + stats.read_operations_ps);
-            self.size(data.size);
-            self.storedData(data.stored_data);
-            self.cacheHits(stats.sco_cache_hits_ps + stats.cluster_cache_hits_ps);
-            self.cacheMisses(stats.sco_cache_misses_ps);
-            self.readSpeed(stats.data_read_ps);
-            self.writeSpeed(stats.data_written_ps);
-            self.backendReadSpeed(stats.backend_data_read_ps);
-            self.backendWriteSpeed(stats.backend_data_written_ps);
-            self.backendWritten(stats.data_written);
-            self.backendRead(stats.data_read);
-            self.backendReads(stats.backend_read_operations);
-            self.bandwidthSaved(stats.data_read - stats.backend_data_read);
-            self.backendType(type);
-            self.backendConnection(data.backend_connection);
-            self.backendLogin(data.backend_login);
+            if (data.hasOwnProperty('vdisks_guids')) {
+                self.numberOfDisks(data.vdisks_guids.length);
+            }
+            if (data.hasOwnProperty('statistics')) {
+                var stats = data.statistics;
+                self.iops(stats.write_operations_ps + stats.read_operations_ps);
+                self.cacheHits(stats.sco_cache_hits_ps + stats.cluster_cache_hits_ps);
+                self.cacheMisses(stats.sco_cache_misses_ps);
+                self.readSpeed(stats.data_read_ps);
+                self.writeSpeed(stats.data_written_ps);
+                self.backendWritten(stats.data_written);
+                self.backendRead(stats.data_read);
+                self.backendReads(stats.backend_read_operations);
+                self.bandwidthSaved(stats.data_read - stats.backend_data_read);
+                self.backendReadSpeed(stats.backend_data_read_ps);
+                self.backendWriteSpeed(stats.backend_data_written_ps);
+                self.backendConnection(data.backend_connection);
+                self.backendLogin(data.backend_login);
+            }
 
             self.loaded(true);
             self.loading(false);
         };
-        self.load = function(onlyextends) {
+        self.load = function(contents) {
             self.loading(true);
-            onlyextends = onlyextends || false;
             return $.Deferred(function(deferred) {
-                var calls = [];
-                if (!onlyextends) {
-                    calls.push($.Deferred(function(mainDeferred) {
-                            if (generic.xhrCompleted(self.loadHandle)) {
-                                self.loadHandle = api.get('vpools/' + self.guid())
-                                    .done(function(data) {
-                                        self.fillData(data);
-                                        mainDeferred.resolve();
-                                    })
-                                    .fail(mainDeferred.reject);
-                            } else {
-                                mainDeferred.reject();
+                var calls = [
+                    $.Deferred(function(mainDeferred) {
+                        if (generic.xhrCompleted(self.loadHandle)) {
+                            var options = {};
+                            if (contents !== undefined) {
+                                options.contents = contents;
                             }
-                        }).promise());
-                }
-                calls.push($.Deferred(function(diskDeferred) {
-                            if (generic.xhrCompleted(self.diskHandle)) {
-                                self.diskHandle = api.get('vpools/' + self.guid() + '/count_disks')
-                                    .done(function(data) {
-                                        self.numberOfDisks(data);
-                                        diskDeferred.resolve();
-                                    })
-                                    .fail(diskDeferred.reject);
-                            } else {
-                                diskDeferred.reject();
-                            }
-                        }).promise());
-                calls.push($.Deferred(function(machineDeferred) {
-                            if (generic.xhrCompleted(self.machineHandle)) {
-                                self.machineHandle = api.get('vpools/' + self.guid() + '/count_machines')
-                                    .done(function(data) {
-                                        self.numberOfMachines(data);
-                                        machineDeferred.resolve();
-                                    })
-                                    .fail(machineDeferred.reject);
-                            } else {
-                                machineDeferred.reject();
-                            }
-                        }).promise());
+                            self.loadHandle = api.get('vpools/' + self.guid(), undefined, options)
+                                .done(function(data) {
+                                    self.fillData(data);
+                                    mainDeferred.resolve();
+                                })
+                                .fail(mainDeferred.reject);
+                        } else {
+                            mainDeferred.reject();
+                        }
+                    }).promise(),
+                    $.Deferred(function(machineDeferred) {
+                        if (generic.xhrCompleted(self.machineHandle)) {
+                            self.machineHandle = api.get('vpools/' + self.guid() + '/count_machines')
+                                .done(function(data) {
+                                    self.numberOfMachines(data);
+                                    machineDeferred.resolve();
+                                })
+                                .fail(machineDeferred.reject);
+                        } else {
+                            machineDeferred.reject();
+                        }
+                    }).promise()];
                 $.when.apply($, calls)
                     .done(function() {
                         self.loaded(true);

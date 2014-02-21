@@ -70,6 +70,9 @@ define([
 
         // Computed
         self.cacheRatio = ko.computed(function() {
+            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
+                return undefined;
+            }
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
@@ -80,6 +83,9 @@ define([
             return self.hypervisorStatus() === 'RUNNING';
         });
         self.bandwidth = ko.computed(function() {
+            if (self.readSpeed() === undefined || self.writeSpeed() === undefined) {
+                return undefined;
+            }
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
         });
@@ -174,7 +180,9 @@ define([
                 generic.crossFiller(
                     data.vdisks_guids, self.vDisks,
                     function(guid) {
-                        return new VDisk(guid);
+                        var vd = new VDisk(guid);
+                        vd.loading(true);
+                        return vd;
                     }, 'guid'
                 );
             }
@@ -199,11 +207,15 @@ define([
             self.loaded(true);
             self.loading(false);
         };
-        self.load = function() {
+        self.load = function(contents) {
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('vmachines/' + self.guid())
+                    var options = {};
+                    if (contents !== undefined) {
+                        options.contents = contents;
+                    }
+                    self.loadHandle = api.get('vmachines/' + self.guid(), undefined, options)
                         .done(function(data) {
                             self.fillData(data);
                             self.loaded(true);

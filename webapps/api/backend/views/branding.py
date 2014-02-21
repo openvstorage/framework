@@ -37,7 +37,7 @@ class BrandingViewSet(viewsets.ViewSet):
         _ = format
         brands = BrandingList.get_brandings()
         pmachines, serializer, contents = Toolbox.handle_list(brands, request)
-        serialized = serializer(Branding, instance=brands, many=True)
+        serialized = serializer(Branding, contents=contents, instance=brands, many=True)
         return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True)
@@ -46,5 +46,5 @@ class BrandingViewSet(viewsets.ViewSet):
         """
         Load information about a given branding
         """
-        _ = request
-        return Response(FullSerializer(Branding, instance=obj).data, status=status.HTTP_200_OK)
+        contents = Toolbox.handle_retrieve(request)
+        return Response(FullSerializer(Branding, contents=contents, instance=obj).data, status=status.HTTP_200_OK)

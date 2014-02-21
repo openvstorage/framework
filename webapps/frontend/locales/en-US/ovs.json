@@ -90,7 +90,7 @@
         "vsa": "VSA",
         "vsas": "VSAs",
         "children": "Children",
-        "storeddata": "Stored data",
+        "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
         "cache": "Cache",
         "cacheratio": "Cache Hit Ratio",
@@ -120,7 +120,10 @@
         "inconsistentss": "Inconsistent snapshots",
         "status": "Status",
         "host": "Host",
-        "type": "Type"
+        "type": "Type",
+        "consistent": "Consistent",
+        "description": "Description",
+        "datetime": "Date / Time"
     },
     "vsas": {
         "title": "VSAs",
@@ -216,6 +219,12 @@
             "done": "Machine set as template",
             "donemsg": "Machine __what__ set as template",
             "errormsg": "setting __what__ as template"
+        },
+        "details": "Details",
+        "performance": "Performance",
+        "detail": {
+            "title": "vMachine detail",
+            "snapshots": "Snapshots"
         }
     },
     "vdisks": {
@@ -411,6 +420,8 @@
         "checked": "&#xf046;",
         "sync": "&#xf0ed;",
         "management": "&#xf0b1;",
-        "moveaway": "&#xf074;"
+        "moveaway": "&#xf074;",
+        "information": "&#xf05a;",
+        "vdisks": "&#xf0a0;"
     }
 }

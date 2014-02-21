@@ -80,10 +80,16 @@ class VDisk(DataObject):
                 # @todo: to be investigated howto handle during set as template
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
+                    try:
+                        stored = int(snapshot.stored)
+                    except ValueError:
+                        stored = 0
                     snapshots.append({'guid': guid,
                                       'timestamp': metadata['timestamp'],
                                       'label': metadata['label'],
-                                      'is_consistent': metadata['is_consistent']})
+                                      'is_consistent': metadata['is_consistent'],
+                                      'is_automatic': metadata.get('is_automatic', True),
+                                      'stored': stored})
         return snapshots
 
     def _info(self):

@@ -153,7 +153,7 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vDisks);
 
-            api.get('vmachines', {}, { full: true, contents: 'name'})
+            api.get('vmachines', {}, { full: true, contents: ''})
                 .done(function(data) {
                     $.each(data, function(index, item) {
                         if (!self.vMachineCache.hasOwnProperty(item.guid)) {

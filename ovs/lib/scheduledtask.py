@@ -123,7 +123,8 @@ class ScheduledTaskController(object):
             try:
                 VMachineController.snapshot(machineguid=machine.guid,
                                             label='',
-                                            is_consistent=False)
+                                            is_consistent=False,
+                                            is_automatic=True)
                 success.append(machine.guid)
             except:
                 fail.append(machine.guid)
