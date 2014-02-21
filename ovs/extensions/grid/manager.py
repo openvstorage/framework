@@ -524,10 +524,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             supported_backends = Manager._read_remote_config(client, 'volumedriver.supported.backends').split(',')
             if 'REST' in supported_backends:
                 supported_backends.remove('REST')  # REST is not supported for now
-            vpool.backend_type = Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='S3')
+            vpool.backend_type = Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
             connection_host = connection_port = connection_username = connection_password = None
             if vpool.backend_type == 'LOCAL':
-                vpool.backend_metadata = {}
+                vpool.backend_metadata = {'backend_type': 'LOCAL'}
             if vpool.backend_type == 'REST':
                 connection_host = Helper.ask_string('Provide REST ip address')
                 connection_port = Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
@@ -537,8 +537,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                           'rest_connection_port': connection_port,
                                           'buchla_connection_log_level': "0",
                                           'rest_connection_verbose_logging': rest_connection_timeout_secs,
-                                          'rest_connection_metadata_format': "JSON"}
-            elif vpool.backend_type == 'S3':
+                                          'rest_connection_metadata_format': "JSON",
+                                          'backend_type': 'REST'}
+            elif vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
                 connection_host = Helper.ask_string('Specify fqdn or ip address for your S3 compatible host')
                 connection_port = Helper.ask_integer('Specify port for your S3 compatible host', min_value=1,
                                                      max_value=65535)
@@ -548,8 +549,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                           's3_connection_port': connection_port,
                                           's3_connection_username': connection_username,
                                           's3_connection_password': connection_password,
-                                          's3_connection_verbose_logging': 1}
-            vpool.backend_metadata.update({'backend_type': vpool.backend_type})
+                                          's3_connection_verbose_logging': 1,
+                                          'backend_type': 'S3'}
 
             vpool.name = vpool_name
             vpool.description = "{} {}".format(vpool.backend_type, vpool_name)
@@ -571,9 +572,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                             question='Select temporary FS mountpoint',
                                             default_value=Helper.find_in_list(mountpoints, 'tmp'))
         mountpoints.remove(mountpoint_temp)
-        if vpool.backend_type == 'S3':
+        mountpoint_dfs_default = Helper.find_in_list(mountpoints, 'vpool_local')
+        if vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
             mountpoint_dfs = Helper.ask_string(message='Enter a mountpoint for the S3 backend',
-                                               default_value='/mnt/bfs')
+                                               default_value='/mnt/dfs/vpool_{}'.format(vpool.name))
         else:
             mountpoint_dfs = Helper.ask_choice(mountpoints,
                                                question='Select distributed FS mountpoint',
@@ -614,7 +616,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vrouter_port = vsr.port
         ipaddresses = client.run(
             "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-        ipaddresses = [ip.strip() for ip in ipaddresses if ip.strip() != '127.0.0.1']
+        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses if ipaddr.strip() != '127.0.0.1']
         grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
@@ -639,12 +641,12 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         node_configs = []
         for existing_vsr in VolumeStorageRouterList.get_volumestoragerouters():
             if existing_vsr.vpool_guid == vpool.guid:
-                node_configs.append(ClusterNodeConfig(str(existing_vsr.vsrid), str(existing_vsr.storage_ip),
+                node_configs.append(ClusterNodeConfig(str(existing_vsr.vsrid), str(existing_vsr.cluster_ip),
                                                       existing_vsr.port - 1,
                                                       existing_vsr.port,
                                                       existing_vsr.port + 1))
         if new_vsr:
-            node_configs.append(ClusterNodeConfig(vrouter_id, volumedriver_storageip,
+            node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip,
                                                   vrouter_port - 1, vrouter_port, vrouter_port + 1))
         vrouter_clusterregistry.set_node_configs(node_configs)
 
@@ -719,18 +721,38 @@ Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', comman
         )
         Manager._exec_python(client, service_script)
 
-        if vpool.backend_type == 'S3':
-            # If using S3, then help setting up the ceph connection - for now
-            client.run('umount {0}'.format(vsr.mountpoint_dfs))
+        fstab_script_remove = """
+from ovs.extensions.fs.fstab import Fstab
+fstab = Fstab()
+fstab.remove_config_by_directory('{0}')
+"""
+
+        fstab_script_add = """
+from ovs.extensions.fs.fstab import Fstab
+fstab = Fstab()
+fstab.remove_config_by_directory('{0}')
+fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
+"""
+
+        if mountpoint_dfs_default and mountpoint_dfs_default != vsr.mountpoint_dfs:
+            client.run('umount {0}'.format(mountpoint_dfs_default))
+            client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
+            fstab_script = fstab_script_remove.format(mountpoint_dfs_default)
+            Manager._exec_python(client, fstab_script)
+        if vpool.backend_type == 'CEPH_S3':
+            # If using CEPH_S3, then help setting up the ceph connection - for now
+            if Helper.find_in_list(mountpoints, vsr.mountpoint_dfs):
+                client.run('umount {0}'.format(vsr.mountpoint_dfs))
             ceph_ok = Manager._check_ceph(client)
             if not ceph_ok:
                 # First, try to copy them over
                 for vpool_vsr in vpool.vsrs:
                     if vpool_vsr.guid != vsr.guid:
-                        remote_client = Client.load(vpool_vsr.serving_vmachine.ip, password)
                         client.dir_ensure('/etc/ceph', True)
                         for cfg_file in ['/etc/ceph/ceph.conf', '/etc/ceph/ceph.keyring']:
+                            remote_client = Client.load(vpool_vsr.serving_vmachine.ip, password)
                             cfg_content = remote_client.file_read(cfg_file)
+                            client = Client.load(ip, password)
                             client.file_write(cfg_file, cfg_content)
                         client.file_attribs('/etc/ceph/ceph.keyring', mode=644)
                         break
@@ -750,14 +772,11 @@ Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', comman
                 ceph_ok = Manager._check_ceph(client)
                 if not ceph_ok:
                     raise RuntimeError('Ceph config still not ok, exiting initialization')
-            fstab_script = """
-from ovs.extensions.fs.fstab import Fstab
-fstab = Fstab()
-fstab.remove_config_by_directory('{0}')
-fstab.add_config('id=admin,conf=/etc/ceph/ceph.conf', '{0}', 'fuse.ceph', 'defaults,noatime', '0', '2')
-""".format(vsr.mountpoint_dfs)
+            fstab_script = fstab_script_add.format(vsr.mountpoint_dfs, 'id=admin,conf=/etc/ceph/ceph.conf',
+                                                   'fuse.ceph', 'defaults,noatime', '0', '2')
             Manager._exec_python(client, fstab_script)
-            client.run('mount {0}'.format(vsr.mountpoint_dfs))
+            client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
+            client.run('mount {0}'.format(vsr.mountpoint_dfs), pty=False)
 
         Manager.init_exportfs(client, vpool.name)
 
@@ -918,12 +937,12 @@ print Configuration.get('{0}')
 
             extra_mountpoints = """
 LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=distribfs /mnt/dfs   ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=distribfs /mnt/dfs/vpool_local   ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
 """
 
             client.run('mkdir -p /mnt/bfs')
-            client.run('mkdir -p /mnt/dfs')
+            client.run('mkdir -p /mnt/dfs/vpool_local')
 
         # Add content to fstab
         new_filesystems = """
