@@ -33,18 +33,20 @@ limitations under the License.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default" data-bind="click: function() { $root.snapshot($data.guid()); }" style="color: #428bca;">
-                    <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
+                    <span class="fa" data-i18n="[html]ovs:icons.snapshot" data-bind="tooltip: 'ovs:vmachines.detail.snapshot'"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $root.setAsTemplate($data.guid()); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: !isRunning()">
+                                   enable: !isRunning(),
+                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate'">
                     <span class="fa" data-i18n="[html]ovs:icons.setastemplate"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $root.rollback($data.guid()); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: !isRunning()">
+                                   enable: !isRunning(),
+                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback'">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>
@@ -172,7 +174,7 @@ limitations under the License.
                 </div>
             </div>
             <div class="tab-pane" id="snapshots" style="padding: 15px;">
-                <h4 data-i18n="ovs:vmachine.detail.snapshots"></h4>
+                <h4 data-i18n="ovs:vmachines.detail.snapshots"></h4>
                 <div data-bind="pager: { items: snapshots, headers: $parent.snapshotHeaders, initialLoad: $parent.snapshotsInitialLoad,
                                          viewportRefresh: $parent.refreshSnapshots, viewportRefreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
@@ -185,6 +187,10 @@ limitations under the License.
                                                                     tooltip: (is_consistent ? 'ovs:generic.consistentss' : 'ovs:generic.inconsistentss')"></span></td>
                         </tr>
                     </table>
+                </div>
+                <div>
+                    <span data-i18n="[html]ovs:icons.consistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.consistentss"></span><br />
+                    <span data-i18n="[html]ovs:icons.inconsistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.inconsistentss"></span>
                 </div>
             </div>
         </div>

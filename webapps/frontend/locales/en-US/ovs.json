@@ -225,13 +225,21 @@
         "performance": "Performance",
         "detail": {
             "title": "vMachine detail",
-            "snapshots": "Snapshots"
+            "snapshots": "Snapshots",
+            "rollback": "Rollback",
+            "setastemplate": "Set as vTemplate",
+            "snapshot": "Take snapshot"
         }
     },
     "vdisks": {
         "title": "vDisks",
         "details": "Details",
-        "performance": "Performance"
+        "performance": "Performance",
+        "detail": {
+            "title": "vDisk detail",
+            "snapshots": "Snapshots",
+            "rollback": "Rollback"
+        }
     },
     "vtemplates": {
         "title": "vTemplates"

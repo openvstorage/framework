@@ -39,7 +39,8 @@ limitations under the License.
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $root.rollback($data.guid()); },
-                                   style: { color: '#428bca' }">
+                                   style: { color: '#428bca' },
+                                   tooltip: 'ovs:vdisks.detail.rollback'">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>
@@ -128,7 +129,7 @@ limitations under the License.
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="snapshots" style="padding: 15px;">
-                <h4 data-i18n="ovs:vmachine.detail.snapshots"></h4>
+                <h4 data-i18n="ovs:vdisks.detail.snapshots"></h4>
                 <div data-bind="pager: { items: snapshots, headers: $parent.snapshotHeaders, initialLoad: $parent.snapshotsInitialLoad,
                                          viewportRefresh: $parent.refreshSnapshots, viewportRefreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
@@ -141,6 +142,10 @@ limitations under the License.
                                                                     tooltip: (is_consistent ? 'ovs:generic.consistentss' : 'ovs:generic.inconsistentss')"></span></td>
                         </tr>
                     </table>
+                </div>
+                <div>
+                    <span data-i18n="[html]ovs:icons.consistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.consistentss"></span><br />
+                    <span data-i18n="[html]ovs:icons.inconsistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.inconsistentss"></span>
                 </div>
             </div>
         </div>
