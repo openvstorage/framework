@@ -29,6 +29,7 @@ define(['jquery', 'ovs/generic'], function($, generic){
         { route: 'vmachines',      moduleId: 'vmachines',       title: $.t('ovs:vmachines.title'),        titlecode: 'ovs:vmachines.title',        nav: true  },
         { route: 'vmachine/:guid', moduleId: 'vmachine-detail', title: $.t('ovs:vmachines.detail.title'), titlecode: 'ovs:vmachines.detail.title', nav: false },
         { route: 'vdisks',         moduleId: 'vdisks',          title: $.t('ovs:vdisks.title'),           titlecode: 'ovs:vdisks.title',           nav: true  },
+        { route: 'vdisk/:guid',    moduleId: 'vdisk-detail',    title: $.t('ovs:vdisks.detail.title'),    titlecode: 'ovs:vdisks.detail.title',    nav: false },
         { route: 'vtemplates',     moduleId: 'vtemplates',      title: $.t('ovs:vtemplates.title'),       titlecode: 'ovs:vtemplates.title',       nav: true  },
         { route: 'statistics',     moduleId: 'statistics',      title: $.t('ovs:statistics.title'),       titlecode: 'ovs:statistics.title',       nav: false },
         { route: 'login',          moduleId: 'login',           title: $.t('ovs:login.title'),            titlecode: 'ovs:login.title',            nav: false }

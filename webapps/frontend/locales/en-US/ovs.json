@@ -123,7 +123,8 @@
         "type": "Type",
         "consistent": "Consistent",
         "description": "Description",
-        "datetime": "Date / Time"
+        "datetime": "Date / Time",
+        "snapshots": "Snapshots"
     },
     "vsas": {
         "title": "VSAs",
@@ -228,7 +229,9 @@
         }
     },
     "vdisks": {
-        "title": "vDisks"
+        "title": "vDisks",
+        "details": "Details",
+        "performance": "Performance"
     },
     "vtemplates": {
         "title": "vTemplates"

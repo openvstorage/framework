@@ -148,7 +148,8 @@ limitations under the License.
                             <td>
                                 <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
                                    class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                                <span data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : ''"></span>
+                                <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
+                                              attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
                             </td>
                             <td><span data-bind="text: size"></span></td>
                             <td><span data-bind="text: storedData"></span></td>
@@ -176,7 +177,7 @@ limitations under the License.
                                          viewportRefresh: $parent.refreshSnapshots, viewportRefreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
                         <tr data-part="vitem">
-                            <td><span data-bind="html: (label !== '' && label !== undefined) ? label : '<i>name not set</i>'"></span></td>
+                            <td><span data-bind="html: (label !== '' && label !== undefined) ? label : '<i>automatic snapshot</i>'"></span></td>
                             <td><span data-bind="text: (new Date(timestamp * 1000)).toLocaleDateString() + ' ' + (new Date(timestamp * 1000)).toLocaleTimeString()"></span></td>
                             <td><span data-bind="text: $parents[2].formatBytes(stored)"></span></td>
                             <td><span data-bind="text: (is_automatic ? 'Automatic' : 'Manual')"></span></td>
