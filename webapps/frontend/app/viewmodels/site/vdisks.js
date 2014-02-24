@@ -29,18 +29,17 @@ define([
         self.vMachineCache       = {};
         self.vPoolCache          = {};
         self.vDiskHeaders        = [
-            { key: 'name',         value: $.t('ovs:generic.name'),         width: 150       },
-            { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),     width: 110       },
-            { key: 'vpool',        value: $.t('ovs:generic.vpool'),        width: 110       },
-            { key: 'vsa',          value: $.t('ovs:generic.vsa'),          width: 110       },
-            { key: 'size',         value: $.t('ovs:generic.size'),         width: 100       },
-            { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110       },
-            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),        width: 100       },
-            { key: 'iops',         value: $.t('ovs:generic.iops'),         width: 55        },
-            { key: 'readSpeed',    value: $.t('ovs:generic.read'),         width: 100       },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),        width: 100       },
-            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: undefined },
-            { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80        }
+            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
+            { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),   width: 110       },
+            { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 110       },
+            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 110       },
+            { key: 'size',         value: $.t('ovs:generic.size'),       width: 100       },
+            { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110       },
+            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100       },
+            { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55        },
+            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 100       },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 100       },
+            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: 50        }
         ];
 
         // Handles
@@ -135,17 +134,6 @@ define([
                 }
             }).promise();
         };
-        self.rollback = function(guid) {
-            $.each(self.vDisks(), function(index, vdisk) {
-                if (vdisk.guid() === guid && (vdisk.vMachine() === undefined || !vdisk.vMachine().isRunning())) {
-                    dialog.show(new RollbackWizard({
-                        modal: true,
-                        type: 'vdisk',
-                        guid: guid
-                    }));
-                }
-            });
-        };
 
         // Durandal
         self.activate = function() {
@@ -153,7 +141,7 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vDisks);
 
-            api.get('vmachines', {}, { full: true, contents: 'name'})
+            api.get('vmachines', {}, { full: true, contents: ''})
                 .done(function(data) {
                     $.each(data, function(index, item) {
                         if (!self.vMachineCache.hasOwnProperty(item.guid)) {

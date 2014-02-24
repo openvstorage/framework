@@ -33,6 +33,4 @@ class VolumeStorageRouterController(object):
         """
         vsa = VMachine(vsa_guid)
         for vsr in vsa.served_vsrs:
-            import time
-            time.sleep(10)  # @TODO: Make sure to execute the actual call, and remove the sleep
-            # vsr.vsr_client.move_away()
+            vsr.vsr_client.mark_node_offline(str(vsr.vsrid))

@@ -45,6 +45,9 @@ class VPoolList(object):
                            'data': DataList.select.DESCRIPTOR,
                            'query': {'type': DataList.where_operator.AND,
                                      'items': [('name', DataList.operator.EQUALS, vpool_name)]}}).data
-        if vpools:
-            return DataObjectList(vpools, VPool)
-        return None
+        if len(vpools) == 0:
+            return None
+        if len(vpools) == 1:
+            return DataObjectList(vpools, VPool)[0]
+        else:
+            raise RuntimeError('Only one vPool with name {0} should exist.'.format(vpool_name))

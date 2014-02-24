@@ -360,7 +360,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, is_automatic=False):
         """
         Snapshot VMachine disks
 
@@ -376,7 +376,8 @@ class VMachineController(object):
         metadata = {'label': label,
                     'is_consistent': is_consistent,
                     'timestamp': timestamp,
-                    'machineguid': machineguid}
+                    'machineguid': machineguid,
+                    'is_automatic': is_automatic}
         machine = VMachine(machineguid)
 
         # @todo: we now skip creating a snapshot when a vmachine's disks

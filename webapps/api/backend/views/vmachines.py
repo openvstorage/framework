@@ -61,8 +61,8 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Load information about a given vMachine
         """
-        _ = request
-        return Response(FullSerializer(VMachine, instance=obj).data, status=status.HTTP_200_OK)
+        contents = Toolbox.handle_retrieve(request)
+        return Response(FullSerializer(VMachine, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
     @action()
     @expose(internal=True, customer=True)
@@ -92,7 +92,8 @@ class VMachineViewSet(viewsets.ViewSet):
         is_consistent = True if request.DATA['consistent'] else False  # Assure boolean type
         task = VMachineController.snapshot.delay(machineguid=obj.guid,
                                                  label=label,
-                                                 is_consistent=is_consistent)
+                                                 is_consistent=is_consistent,
+                                                 is_automatic=False)
         return Response(task.id, status=status.HTTP_200_OK)
 
     @link()

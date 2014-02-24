@@ -90,7 +90,7 @@
         "vsa": "VSA",
         "vsas": "VSAs",
         "children": "Children",
-        "storeddata": "Stored data",
+        "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
         "cache": "Cache",
         "cacheratio": "Cache Hit Ratio",
@@ -120,7 +120,11 @@
         "inconsistentss": "Inconsistent snapshots",
         "status": "Status",
         "host": "Host",
-        "type": "Type"
+        "type": "Type",
+        "consistent": "Consistent",
+        "description": "Description",
+        "datetime": "Date / Time",
+        "snapshots": "Snapshots"
     },
     "vsas": {
         "title": "VSAs",
@@ -147,7 +151,9 @@
         "title": "vPools",
         "backendtype": "Type",
         "backendtypes": {
-            "S3": "Amazon S3",
+            "AMAZON_S3": "Amazon S3",
+            "CEPH_S3": "Ceph S3",
+            "SWIFT_S3": "Swift S3",
             "LOCAL": "Local FS",
             "REST": "REST backend"
         },
@@ -214,10 +220,18 @@
             "done": "Machine set as template",
             "donemsg": "Machine __what__ set as template",
             "errormsg": "setting __what__ as template"
+        },
+        "details": "Details",
+        "performance": "Performance",
+        "detail": {
+            "title": "vMachine detail",
+            "snapshots": "Snapshots"
         }
     },
     "vdisks": {
-        "title": "vDisks"
+        "title": "vDisks",
+        "details": "Details",
+        "performance": "Performance"
     },
     "vtemplates": {
         "title": "vTemplates"
@@ -409,6 +423,8 @@
         "checked": "&#xf046;",
         "sync": "&#xf0ed;",
         "management": "&#xf0b1;",
-        "moveaway": "&#xf074;"
+        "moveaway": "&#xf074;",
+        "information": "&#xf05a;",
+        "vdisks": "&#xf0a0;"
     }
 }

@@ -66,8 +66,8 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         Load information about a given vDisk
         """
-        _ = request
-        return Response(FullSerializer(VDisk, instance=obj).data, status=status.HTTP_200_OK)
+        contents = Toolbox.handle_retrieve(request)
+        return Response(FullSerializer(VDisk, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
     @action()
     @expose(internal=True, customer=True)

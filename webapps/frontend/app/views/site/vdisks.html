@@ -22,11 +22,14 @@ limitations under the License.
                 <td>
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                    <span data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : ''"></span>
+                    <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
+                                  attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
                 </td>
                 <td>
                     <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="text: item().name"></span>
+                        <a data-part="lazy-entry"
+                           data-bind="text: item().name,
+                                      attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
                     </span>
                 </td>
                 <td>
@@ -56,12 +59,6 @@ limitations under the License.
                                          },
                                          defaultColor: 'lightgrey'
                                      }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
-                </td>
-                <td>
-                    <i data-bind="click: function() { $root.rollback($data.guid()); }, style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : 'black' },
-                                  tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : '',
-                                  css: { hand: !(vMachine() !== undefined && vMachine().isRunning()), forbidden: vMachine() !== undefined && vMachine().isRunning() }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.rollback"></i>
                 </td>
             </tr>
         </table>

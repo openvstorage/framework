@@ -78,3 +78,12 @@ div[data-view] {
 .table-noborder td {
     border: 0 !important;
 }
+
+.nav .actions {
+    margin-top: 9px;
+    margin-left: 20px;
+}
+
+.btn-mini {
+    padding: 2px 6px 2px 6px !important;
+}

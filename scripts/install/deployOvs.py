@@ -498,12 +498,7 @@ if __name__ == '__main__':
     print 'Please select your public network:'
     public_pg = InstallHelper.ask_choice(pg_names)
     print 'Please select your storage network:'
-    uplinks = []
-    private_pg = ''
-    while len(uplinks) == 0:
-        print '- The private virtual switch should have a required vmnic'
-        private_pg = InstallHelper.ask_choice(pg_names)
-        uplinks = [s for s in vswitches if private_pg in s['Portgroups'] and len(s['Uplinks']) > 0]
+    private_pg = InstallHelper.ask_choice(pg_names)
 
     nic_config = VMwareSystem.build_nic_config([private_pg, public_pg])
 
@@ -526,8 +521,8 @@ if __name__ == '__main__':
     size = InstallHelper.ask_integer('Specify the size in GB (min: 50)', 50, 9999, default_value=100)
     disk_config = ''
     disk_config = vm_sys.create_vdisk(vm_name, 0, '{0}G'.format(size), disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, hdds[0], disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, ssds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdds[0], disk_config)
 
     # Add CD drive
     if imagefile:

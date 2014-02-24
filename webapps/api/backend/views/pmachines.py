@@ -40,7 +40,7 @@ class PMachineViewSet(viewsets.ViewSet):
         _ = format
         pmachines = PMachineList.get_pmachines()
         pmachines, serializer, contents = Toolbox.handle_list(pmachines, request)
-        serialized = serializer(PMachine, instance=pmachines, many=True)
+        serialized = serializer(PMachine, contents=contents, instance=pmachines, many=True)
         return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True)
@@ -50,5 +50,5 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         Load information about a given pMachine
         """
-        _ = request
-        return Response(FullSerializer(PMachine, instance=obj).data, status=status.HTTP_200_OK)
+        contents = Toolbox.handle_retrieve(request)
+        return Response(FullSerializer(PMachine, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
