@@ -870,7 +870,10 @@ class Sdk(object):
                     backingfile = device.backing.fileName
                     match = re.search(regex, backingfile)
                     if match:
-                        config['disks'].append({'filename': match.group(2),
+                        filename = match.group(2)
+                        backingfile = filename.replace('.vmdk', '-flat.vmdk')
+                        config['disks'].append({'filename': filename,
+                                                'backingfilename': backingfile,
                                                 'datastore': match.group(1),
                                                 'name': device.deviceInfo.label,
                                                 'order': device.unitNumber})
