@@ -572,10 +572,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                             question='Select temporary FS mountpoint',
                                             default_value=Helper.find_in_list(mountpoints, 'tmp'))
         mountpoints.remove(mountpoint_temp)
-        mountpoint_dfs_default = Helper.find_in_list(mountpoints, 'vpool_local')
+        mountpoint_dfs_default = Helper.find_in_list(mountpoints, 'local')
         if vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
             mountpoint_dfs = Helper.ask_string(message='Enter a mountpoint for the S3 backend',
-                                               default_value='/mnt/dfs/vpool_{}'.format(vpool.name))
+                                               default_value='/mnt/dfs/{}'.format(vpool.name))
         else:
             mountpoint_dfs = Helper.ask_choice(mountpoints,
                                                question='Select distributed FS mountpoint',
@@ -937,12 +937,12 @@ print Configuration.get('{0}')
 
             extra_mountpoints = """
 LABEL=backendfs /mnt/bfs   ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=distribfs /mnt/dfs/vpool_local   ext4    defaults,nobootwait,noatime,discard    0    2
+LABEL=distribfs /mnt/dfs/local   ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=tempfs    /var/tmp   ext4    defaults,nobootwait,noatime,discard    0    2
 """
 
             client.run('mkdir -p /mnt/bfs')
-            client.run('mkdir -p /mnt/dfs/vpool_local')
+            client.run('mkdir -p /mnt/dfs/local')
 
         # Add content to fstab
         new_filesystems = """
