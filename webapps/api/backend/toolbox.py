@@ -85,12 +85,14 @@ class Toolbox:
         return sorting_key
 
     @staticmethod
-    def handle_list(dataobjectlist, request):
+    def handle_list(dataobjectlist, request, default_sort=None):
         """
         Processes/prepares a data object list based on request parameters.
         """
         # Sorting
         sort = request.QUERY_PARAMS.get('sort')
+        if sort is None and default_sort is not None:
+            sort = default_sort
         if sort:
             desc = sort[0] == '-'
             sort = sort[1 if desc else 0:]

@@ -38,7 +38,7 @@ limitations under the License.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default"
-                        data-bind="click: function() { $root.rollback($data.guid()); },
+                        data-bind="click: function() { $root.rollback(); },
                                    style: { color: '#428bca' },
                                    tooltip: 'ovs:vdisks.detail.rollback'">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
@@ -100,7 +100,7 @@ limitations under the License.
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.snapshots"></td>
+                            <td data-i18n="ovs:generic.nrofsnapshots"></td>
                             <td><span data-bind="text: snapshots().length"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
