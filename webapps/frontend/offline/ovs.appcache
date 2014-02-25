@@ -1,0 +1,22 @@
+CACHE MANIFEST
+# version=0.0.0b0
+
+CACHE:
+# html
+/offline/offline.html
+# css
+/lib/font-awesome/css/font-awesome.min.css
+/css/durandal.css
+# javascript
+/lib/jquery/jquery-1.9.1.js
+# fonts
+/lib/font-awesome/fonts/fontawesome-webfont.woff?v=4.0.3
+/lib/font-awesome/fonts/fontawesome-webfont.ttf?v=4.0.3
+/lib/font-awesome/fonts/fontawesome-webfont.svg?v=4.0.3
+
+
+NETWORK:
+*
+
+FALLBACK:
+/index.html /offline/offline.html
