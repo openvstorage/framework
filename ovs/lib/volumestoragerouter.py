@@ -18,6 +18,7 @@ VolumeStorageRouter module
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
 class VolumeStorageRouterController(object):
@@ -31,6 +32,8 @@ class VolumeStorageRouterController(object):
         """
         Moves away all vDisks from all VSRs this VSA is serving
         """
-        vsa = VMachine(vsa_guid)
-        for vsr in vsa.served_vsrs:
-            vsr.vsr_client.mark_node_offline(str(vsr.vsrid))
+        served_vsrs = VMachine(vsa_guid).served_vsrs
+        if len(served_vsrs) > 0:
+            vsr_client = VolumeStorageRouterClient().load(served_vsrs[0].vpool)
+            for vsr in served_vsrs:
+                vsr_client.mark_node_offline(str(vsr.vsrid))

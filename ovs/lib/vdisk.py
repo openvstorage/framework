@@ -18,7 +18,6 @@ Module for VDiskController
 import logging
 import pickle
 import uuid
-import time
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
@@ -238,7 +237,7 @@ class VDiskController(object):
 
         if vsrguid is not None:
             vsr = VolumeStorageRouter(vsrguid)
-            vsr_client = vsr.vsr_client
+            vsr_client = VolumeStorageRouterClient().load(vsr.vpool, vsr_guid=vsr.guid)
         else:
             vsr_client = disk.vsr_client
 
