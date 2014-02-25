@@ -18,11 +18,11 @@ VDisk module
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import link, action
+from rest_framework.decorators import action
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
 from backend.serializers.serializers import FullSerializer
 from backend.decorators import required_roles, expose, validate
@@ -43,9 +43,8 @@ class VDiskViewSet(viewsets.ViewSet):
         """
         _ = format
         vmachineguid = request.QUERY_PARAMS.get('vmachineguid', None)
-        if vmachineguid is None:
-            vdisks = VDiskList.get_vdisks()
-        else:
+        vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
+        if vmachineguid is not None:
             vmachine = VMachine(vmachineguid)
             if vmachine.is_internal:
                 vdisks = []
@@ -55,7 +54,12 @@ class VDiskViewSet(viewsets.ViewSet):
                             vdisks.append(vdisk)
             else:
                 vdisks = vmachine.vdisks
-        vdisks, serializer, contents = Toolbox.handle_list(vdisks, request)
+        elif vpoolguid is not None:
+            vpool = VPool(vpoolguid)
+            vdisks = vpool.vdisks
+        else:
+            vdisks = VDiskList.get_vdisks()
+        vdisks, serializer, contents = Toolbox.handle_list(vdisks, request, default_sort='vpool_guid,devicename')
         serialized = serializer(VDisk, contents=contents, instance=vdisks, many=True)
         return Response(serialized.data, status=status.HTTP_200_OK)
 

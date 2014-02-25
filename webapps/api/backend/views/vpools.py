@@ -41,7 +41,7 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         _ = format
         vpools = VPoolList.get_vpools()
-        vpools, serializer, contents = Toolbox.handle_list(vpools, request)
+        vpools, serializer, contents = Toolbox.handle_list(vpools, request, default_sort='name')
         serialized = serializer(VPool, contents=contents, instance=vpools, many=True)
         return Response(serialized.data, status=status.HTTP_200_OK)
 
@@ -55,21 +55,6 @@ class VPoolViewSet(viewsets.ViewSet):
         contents = Toolbox.handle_retrieve(request)
         return Response(FullSerializer(VPool, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
-    @link()
-    @expose(internal=True, customer=True)
-    @required_roles(['view'])
-    @validate(VPool)
-    def count_machines(self, request, obj):
-        """
-        Returns the amount of vMachines on the vPool
-        """
-        _ = request
-        vmachine_guids = set()
-        for disk in obj.vdisks:
-            if disk.vmachine_guid is not None:
-                vmachine_guids.add(disk.vmachine_guid)
-        return Response(len(vmachine_guids), status=status.HTTP_200_OK)
-
     @action()
     @expose(internal=True)
     @required_roles(['view', 'create'])
@@ -81,3 +66,17 @@ class VPoolViewSet(viewsets.ViewSet):
         _ = request
         task = VPoolController.sync_with_hypervisor.delay(obj.guid)
         return Response(task.id, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VPool)
+    def serving_vsas(self, request, obj):
+        """
+        Retreives a list of VSA guids, serving a given vPool
+        """
+        _ = request
+        vsa_guids = []
+        for vsr in obj.vsrs:
+            vsa_guids.append(vsr.serving_vmachine_guid)
+        return Response(vsa_guids, status=status.HTTP_200_OK)

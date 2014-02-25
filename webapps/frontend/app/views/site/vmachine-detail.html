@@ -32,18 +32,18 @@ limitations under the License.
             </li>
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default" data-bind="click: function() { $root.snapshot($data.guid()); }" style="color: #428bca;">
+                <button type="button" class="btn btn-mini btn-default" data-bind="click: function() { $root.snapshot(); }" style="color: #428bca;">
                     <span class="fa" data-i18n="[html]ovs:icons.snapshot" data-bind="tooltip: 'ovs:vmachines.detail.snapshot'"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
-                        data-bind="click: function() { $root.setAsTemplate($data.guid()); },
+                        data-bind="click: function() { $root.setAsTemplate(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    enable: !isRunning(),
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate'">
                     <span class="fa" data-i18n="[html]ovs:icons.setastemplate"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
-                        data-bind="click: function() { $root.rollback($data.guid()); },
+                        data-bind="click: function() { $root.rollback(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    enable: !isRunning(),
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback'">
@@ -112,7 +112,7 @@ limitations under the License.
                             <td colspan="2">&nbsp;</td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.vdisks"></td>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>

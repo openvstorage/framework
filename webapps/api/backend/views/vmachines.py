@@ -23,9 +23,9 @@ from rest_framework.decorators import action, link
 from rest_framework.exceptions import NotAcceptable
 from django.http import Http404
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
@@ -49,8 +49,19 @@ class VMachineViewSet(viewsets.ViewSet):
         Overview of all machines
         """
         _ = format
-        vmachines = VMachineList.get_vmachines()
-        vmachines, serializer, contents = Toolbox.handle_list(vmachines, request)
+        vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
+        if vpoolguid is not None:
+            vpool = VPool(vpoolguid)
+            vmachine_guids = []
+            vmachines = []
+            for vdisk in vpool.vdisks:
+                if vdisk.vmachine_guid is not None and vdisk.vmachine_guid not in vmachine_guids:
+                    vmachine_guids.append(vdisk.vmachine.guid)
+                    if vdisk.vmachine.is_internal is False and vdisk.vmachine.is_vtemplate is False:
+                        vmachines.append(vdisk.vmachine)
+        else:
+            vmachines = VMachineList.get_vmachines()
+        vmachines, serializer, contents = Toolbox.handle_list(vmachines, request, default_sort='name,vpool_guid')
         serialized = serializer(VMachine, contents=contents, instance=vmachines, many=True)
         return Response(serialized.data, status=status.HTTP_200_OK)
 

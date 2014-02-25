@@ -124,7 +124,11 @@
         "consistent": "Consistent",
         "description": "Description",
         "datetime": "Date / Time",
-        "snapshots": "Snapshots"
+        "snapshots": "Snapshots",
+        "nrofsnapshots": "# Snapshots",
+        "nrofvdisks": "# vDisks",
+        "nrofvmachines": "# vMachines",
+        "nrofvpools": "# vPools"
     },
     "vsas": {
         "title": "VSAs",
@@ -144,13 +148,16 @@
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
-            }
+            },
+            "vsavpoollink": "vPools served by this VSA",
+            "updateserving": "Save changes"
         }
     },
     "vpools" : {
         "title": "vPools",
         "backendtype": "Type",
         "backendtypes": {
+            "S3": "S3",
             "AMAZON_S3": "Amazon S3",
             "CEPH_S3": "Ceph S3",
             "SWIFT_S3": "Swift S3",
@@ -164,7 +171,10 @@
         "freespace": "Free space",
         "detail": {
             "title": "vPool",
-            "introduction": "Below an overview of the vPool properties."
+            "introduction": "Below an overview of the vPool properties.",
+            "sync": "Sync vPool with reality",
+            "vsavpoollink": "VSAs serving this vPool",
+            "updateserving": "Save changes"
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -176,7 +186,8 @@
             "done": "vPool synced",
             "donemsg": "All vMachines using vPool __what__ synced",
             "errormsg": "syncing all vMachines using __what__"
-        }
+        },
+        "add": "Add new vPool"
     },
     "statistics": {
         "title": "Statistics",
@@ -224,7 +235,7 @@
         "details": "Details",
         "performance": "Performance",
         "detail": {
-            "title": "vMachine detail",
+            "title": "vMachine",
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "setastemplate": "Set as vTemplate",
@@ -236,7 +247,7 @@
         "details": "Details",
         "performance": "Performance",
         "detail": {
-            "title": "vDisk detail",
+            "title": "vDisk",
             "snapshots": "Snapshots",
             "rollback": "Rollback"
         }
@@ -433,6 +444,9 @@
         "management": "&#xf0b1;",
         "moveaway": "&#xf074;",
         "information": "&#xf05a;",
-        "vdisks": "&#xf0a0;"
+        "vdisks": "&#xf0a0;",
+        "add": "&#xf067;",
+        "vmachines": "&#xf0e8;",
+        "vsavpoollink": "&#xf07c;"
     }
 }

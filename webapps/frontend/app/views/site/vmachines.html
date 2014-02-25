@@ -30,7 +30,9 @@ limitations under the License.
                                   attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
                 <td data-bind="lazylist: { items: vSAs, loadedObservable: 'loaded' }">
-                    <span data-part="entry" data-bind="text: name"></span>
+                    <a data-part="entry"
+                       data-bind="text: name,
+                                  attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
                 <td><span data-bind="text: storedData"></span></td>
