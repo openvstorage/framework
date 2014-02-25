@@ -127,7 +127,8 @@
         "snapshots": "Snapshots",
         "nrofsnapshots": "# Snapshots",
         "nrofvdisks": "# vDisks",
-        "nrofvmachines": "# vMachines"
+        "nrofvmachines": "# vMachines",
+        "nrofvpools": "# vPools"
     },
     "vsas": {
         "title": "VSAs",
@@ -147,7 +148,9 @@
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
-            }
+            },
+            "vsavpoollink": "vPools served by this VSA",
+            "updateserving": "Save changes"
         }
     },
     "vpools" : {
