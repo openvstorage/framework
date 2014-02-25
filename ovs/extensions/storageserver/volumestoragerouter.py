@@ -54,30 +54,28 @@ class VolumeStorageRouterClient(object):
                           'data_transferred': ['data_written', 'data_read']}
         self.stat_keys = self.stat_counters + self.stat_sums.keys()
 
-    def load(self, vpool=None, vsr=None):
+    def load(self, vpool, vsr_guid=None):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding vsr
         Loads and returns the client
         """
 
-        if vpool is None and vsr is None:
-            raise RuntimeError('One of the parameters vpool or vsr needs to be passed')
-        if vpool is not None and vsr is not None:
-            raise RuntimeError('Only one of the parameters vpool or vsr needs to be passed')
-
-        if vpool is None:
-            if vsr.guid not in client_vsr_cache:
-                client = StorageRouterClient(str(vsr.vpool.name), [ClusterContact(str(vsr.cluster_ip), vsr.port)])
-                client_vsr_cache[vsr.guid] = client
-            return client_vsr_cache[vsr.guid]
-
-        if vpool.guid not in client_vpool_cache:
-            cluster_contacts = []
+        key = '{0}_{1}'.format(vpool.guid, vsr_guid if vsr_guid is not None else '')
+        if key not in client_vpool_cache:
+            vsr_data = {}
             for vsr in vpool.vsrs:
-                cluster_contacts.append(ClusterContact(str(vsr.cluster_ip), vsr.port))
+                vsr_data[vsr.guid] = (str(vsr.cluster_ip), vsr.port)
+            cluster_contacts = []
+            if vsr_guid is not None and vsr_guid in vsr_data:
+                cluster_contacts = [ClusterContact(vsr_data[vsr_guid][0], vsr_data[vsr_guid][1])]
+                print 'Added preferred contact for VSR {0}: {1}'.format(vsr_guid, vsr_data[vsr_guid])
+            for guid, item in vsr_data.iteritems():
+                if guid != vsr_guid:
+                    cluster_contacts.append(ClusterContact(item[0], item[1]))
+                    print 'Added contact for VSR {0}: {1}'.format(guid, item)
             client = StorageRouterClient(str(vpool.name), cluster_contacts)
-            client_vpool_cache[vpool.guid] = client
-        return client_vpool_cache[vpool.guid]
+            client_vpool_cache[key] = client
+        return client_vpool_cache[key]
 
 
 class VolumeStorageRouterConfiguration(object):

@@ -61,7 +61,7 @@ class VDisk(DataObject):
         DataObject.__init__(self, *args, **kwargs)
         if self.vpool:
             self._frozen = False
-            self.vsr_client = VolumeStorageRouterClient().load(vpool=self.vpool)
+            self.vsr_client = VolumeStorageRouterClient().load(self.vpool)
             self._frozen = True
 
     def _snapshots(self):
