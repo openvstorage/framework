@@ -809,7 +809,7 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
         client.dir_ensure(vpool_mountpoint, True)
         nfs_script = """
 from ovs.extensions.fs.exportfs import Nfsexports
-Nfsexports().add('{0}', '*', 'rw,fsid={1},sync,no_root_squash,no_subtree_check')""".format(
+Nfsexports().add('{0}', '*', 'rw,fsid={1},async,no_root_squash,no_subtree_check')""".format(
             vpool_mountpoint, uuid.uuid4()
         )
         Manager._exec_python(client, nfs_script)
