@@ -15,9 +15,11 @@
 """
 DataList module
 """
+
 import hashlib
 import json
 import copy
+from random import randint
 from ovs.dal.helpers import Descriptor, Toolbox
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -62,7 +64,7 @@ class DataList(object):
     namespace = 'ovs_list'
     cachelink = 'ovs_listcache'
 
-    def __init__(self, query, key=None):
+    def __init__(self, query, key=None, load=True):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         """
@@ -83,7 +85,8 @@ class DataList(object):
         self.data = None
         self.from_cache = False
         self._can_cache = True
-        self._load()
+        if load is True:
+            self._load()
 
     def _exec_and(self, instance, items):
         """
@@ -185,6 +188,9 @@ class DataList(object):
             # properties, you can dot as far as you like. This means you can combine AND and OR
             # in any possible combination
 
+            import os, time
+            s = time.time()
+
             Toolbox.log_cache_hit('datalist', False)
 
             items = self._query['query']['items']
@@ -224,8 +230,10 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
+            os.system("echo 'Query took " + str(time.time() - s) + "s (" + str(self._key) + ")' >> /var/log/ovs/timing.log")
+
             if self._key is not None and len(keys) > 0 and self._can_cache:
-                self._volatile.set(self._key, self.data, 600)
+                self._volatile.set(self._key, self.data, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
                 self._update_listinvalidation()
         else:
             Toolbox.log_cache_hit('datalist', True)
@@ -252,15 +260,88 @@ class DataList(object):
                 try:
                     mutex.acquire(60)
                     cache_list = Toolbox.try_get(key, {})
-                    for field in field_list:
-                        list_list = cache_list.get(field, [])
-                        if self._key not in list_list:
-                            list_list.append(self._key)
-                        cache_list[field] = list_list
+                    current_fields = cache_list.get(self._key, [])
+                    current_fields = list(set(current_fields + field_list))
+                    cache_list[self._key] = current_fields
                     self._volatile.set(key, cache_list)
                     self._persistent.set(key, cache_list)
                 finally:
-                    mutex.release()
+                        mutex.release()
+
+    @staticmethod
+    def get_relation_set(remote_class, remote_key, own_class, own_key, own_guid):
+        """
+        This method will get a DataList for a relation.
+        On a cache miss, the relation DataList will be rebuild and due to the nature of the full table scan, it will
+        update all relations in the mean time.
+        """
+        own_name = own_class.__name__.lower()
+        datalist = DataList({}, '%s_%s_%s' % (own_name, own_guid, remote_key), load=False)
+        base_key = '%s_%s_%%s_%s' % (DataList.namespace, own_name, own_key)  # <ns>_<oc>_%s_<rk>
+
+        data = datalist._volatile.get(base_key % own_guid)
+        if data is None:
+            # Cache miss
+            import os, time
+            s = time.time()
+
+            Toolbox.log_cache_hit('datalist', False)
+
+            remote_namespace = remote_class()._namespace
+            remote_name = remote_class.__name__.lower()
+            remote_base_key = '%s_%s_' % (remote_namespace, remote_name)
+            remote_keys = DataList.get_pks(remote_namespace, remote_name)
+
+            own_namespace = own_class()._namespace
+            own_base_key = '%s_%s_' % (own_namespace, own_name)
+            own_keys = DataList.get_pks(own_namespace, own_name)
+
+            lists = {}
+            for key in own_keys:
+                guid = key.replace(own_base_key, '')
+                lists[guid] = []
+            if own_guid not in lists:
+                lists[own_guid] = []
+
+            for key in remote_keys:
+                guid = key.replace(remote_base_key, '')
+                try:
+                    instance = remote_class(guid)
+                    foreign_key = getattr(instance, '%s_guid' % remote_key)
+                    if foreign_key not in lists:
+                        lists[foreign_key] = []
+                    lists[foreign_key].append(Descriptor(remote_class, guid).descriptor)
+                except ObjectNotFoundException:
+                    pass
+
+            os.system("echo 'Rel took " + str(time.time() - s) + "s (" + str(base_key % own_guid) + ")' >> /var/log/ovs/timing.log")
+
+            list_keys = []
+            for guid in lists:
+                list_keys.append(base_key % guid)
+                datalist._volatile.set(base_key % guid, lists[guid], 300 + randint(0, 300))  # Cache between 5 and 10 minutes
+
+            key = '%s_%s' % (DataList.cachelink, remote_name)
+            mutex = VolatileMutex('listcache_%s' % remote_name)
+            try:
+                mutex.acquire(60)
+                cache_list = Toolbox.try_get(key, {})
+                for list_key in list_keys:
+                    current_fields = cache_list.get(list_key, [])
+                    current_fields = list(set(current_fields + ['__all', remote_key]))
+                    cache_list[list_key] = current_fields
+                datalist._volatile.set(key, cache_list)
+                datalist._persistent.set(key, cache_list)
+            finally:
+                mutex.release()
+
+            datalist.data = lists.get(own_guid)
+            datalist._update_listinvalidation()
+        else:
+            Toolbox.log_cache_hit('datalist', True)
+            datalist.data = data
+            datalist.from_cache = True
+        return datalist
 
     @staticmethod
     def get_pks(namespace, name):

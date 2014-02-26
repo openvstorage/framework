@@ -71,13 +71,15 @@ define([
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
                 vpool.load(undefined, { skipDisks: true })
+                    .then(function() {
+                        self.vDisksInitialLoad(false);
+                        self.vMachinesInitialLoad(false);
+                    })
                     .then(vpool.loadVDisks)
                     .then(vpool.loadServingVSAs)
                     .then(self.loadVSAs)
                     .then(function() {
                         self.checkedVSAGuids(self.vPool().servingVSAGuids());
-                        self.vDisksInitialLoad(false);
-                        self.vMachinesInitialLoad(false);
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -85,16 +87,19 @@ define([
         self.loadVSAs = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVSAsHandle)) {
-                    self.loadVSAsHandle = api.post('vmachines/filter', {
+                    var query, options;
+                    query = {
                         query: {
                             type: 'AND',
                             items: [['is_internal', 'EQUALS', true]]
                         }
-                    }, {
+                    };
+                    options = {
                         sort: 'name',
                         full: true,
                         contents: ''
-                    })
+                    };
+                    self.loadVSAsHandle = api.post('vmachines/filter', query, options)
                         .done(function(data) {
                             var guids = [], vsadata = {};
                             $.each(data, function(index, item) {
@@ -142,7 +147,7 @@ define([
                                     if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
                                         if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
                                             vm = new VMachine(vMachineGuid);
-                                            vm.load();
+                                            vm.load('');
                                             self.vMachineCache[vMachineGuid] = vm;
                                         }
                                         vdisk.vMachine(self.vMachineCache[vMachineGuid]);

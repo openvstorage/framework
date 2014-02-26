@@ -49,7 +49,7 @@ class VolatileMutex(object):
                 raise RuntimeError('Could not aquire lock %s' % self.key())
         passed = time.time() - self._start
         if passed > 0.025:  # More than 25 ms is a long time to wait!
-            print 'Waited %s seconds for lock %s' % (passed, self.key())
+            VolatileMutex._log('Waited %s seconds for lock %s' % (passed, self.key()))
         self._start = time.time()
         self._has_lock = True
         return True
@@ -62,7 +62,7 @@ class VolatileMutex(object):
             self._volatile.delete(self.key())
             passed = time.time() - self._start
             if passed > 0.25:  # More than 250 ms is a long time to hold a lock
-                print 'A lock on %s was kept for %s seconds' % (self.key(), passed)
+                VolatileMutex._log('A lock on %s was kept for %s seconds' % (self.key(), passed))
             self._has_lock = False
 
     def key(self):
@@ -76,3 +76,12 @@ class VolatileMutex(object):
         __del__ hook, releasing the lock
         """
         self.release()
+
+    @staticmethod
+    def _log(entry):
+        """
+        Logs towards a logging endpoint
+        """
+        import os
+        print entry
+        os.system("echo '" + entry + "' >> /var/log/ovs/vmutex.log")

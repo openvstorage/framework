@@ -292,14 +292,7 @@ class DataObject(object):
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
         remote_key   = info['key']
-        # pylint: disable=line-too-long
-        datalist = DataList(query = {'object': remote_class,
-                                     'data': DataList.select.DESCRIPTOR,
-                                     'query': {'type': DataList.where_operator.AND,
-                                               'items': [('%s.guid' % remote_key, DataList.operator.EQUALS, self.guid)]}},  # noqa
-                            key   = '%s_%s_%s' % (self._name, self._guid, attribute))
-        # pylint: enable=line-too-long
-
+        datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, attribute, self.guid)
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
         else:
@@ -406,10 +399,12 @@ class DataObject(object):
             else:
                 raise ObjectNotFoundException('%s with guid \'%s\' was deleted' %
                                               (self.__class__.__name__, self._guid))
+        changed_fields = []
         data_conflicts = []
         for attribute in self._data.keys():
             if self._data[attribute] != self._original[attribute]:
                 # We changed this value
+                changed_fields.append(attribute)
                 if attribute in data and self._original[attribute] != data[attribute]:
                     # Some other process also wrote to the database
                     if self._datastore_wins is None:
@@ -456,22 +451,10 @@ class DataObject(object):
             self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
-            for field in cache_list.keys():
-                clear = False
-                if field == '__all' and self._new:  # This is a no-filter query hook, which can be ignored
-                    clear = True
-                if field in self._blueprint:
-                    if self._original[field] != self._data[field]:
-                        clear = True
-                if field in self._relations:
-                    if self._original[field]['guid'] != self._data[field]['guid']:
-                        clear = True
-                if field in self._expiry:
-                    clear = True
-                if clear:
-                    for list_key in cache_list[field]:
-                        self._volatile.delete(list_key)
-                    del cache_list[field]
+            for list_key, fields in cache_list.iteritems():
+                if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
+                    self._volatile.delete(list_key)
+                    del cache_list[list_key]
             self._volatile.set(cache_key, cache_list)
             self._persistent.set(cache_key, cache_list)
         finally:
@@ -515,12 +498,12 @@ class DataObject(object):
             self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
-            if '__all' in cache_list.keys():
-                for list_key in cache_list['__all']:
+            for list_key, fields in cache_list.iteritems():
+                if '__all' in fields:
                     self._volatile.delete(list_key)
-                del cache_list['__all']
-                self._volatile.set(cache_key, cache_list)
-                self._persistent.set(cache_key, cache_list)
+                    del cache_list[list_key]
+            self._volatile.set(cache_key, cache_list)
+            self._persistent.set(cache_key, cache_list)
         finally:
             self._mutex_listcache.release()
 

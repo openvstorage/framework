@@ -61,16 +61,25 @@ define([
         self.fetchVMachines = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVMachinesHandle)) {
-                    self.loadVMachinesHandle = api.post('vmachines/filter', self.query, { sort: 'name' })
+                    var options = {
+                        sort: 'name',
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVMachinesHandle = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vmdata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vmdata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vMachines,
                                 function(guid) {
                                     var vmachine = new VMachine(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vmachine.fillData(vmdata[guid]);
+                                    }
                                     vmachine.loading(true);
                                     return vmachine;
                                 }, 'guid'

@@ -45,7 +45,7 @@ class Toolbox:
         return True
 
     @staticmethod
-    def extract_key(obj, keys):
+    def extract_key(obj, key):
         """
         Extracts a sortable tuple from the object using the given keys
         """
@@ -66,22 +66,20 @@ class Toolbox:
             return l
 
         regex = re.compile(r'(\d+)')
-        sorting_key = ()
-        for key in keys:
-            value = obj
-            for subkey in key.split('.'):
-                if '[' in subkey:
-                    # We're using a dict
-                    attribute = subkey.split('[')[0]
-                    dictkey = subkey.split('[')[1][:-1]
-                    value = getattr(value, attribute)[dictkey]
-                else:
-                    # Normal property
-                    value = getattr(value, subkey)
-                if value is None:
-                    break
-            value = '' if value is None else str(value)
-            sorting_key += tuple(clean_list(regex.split(value)))
+        value = obj
+        for subkey in key.split('.'):
+            if '[' in subkey:
+                # We're using a dict
+                attribute = subkey.split('[')[0]
+                dictkey = subkey.split('[')[1][:-1]
+                value = getattr(value, attribute)[dictkey]
+            else:
+                # Normal property
+                value = getattr(value, subkey)
+            if value is None:
+                break
+        value = '' if value is None else str(value)
+        sorting_key = tuple(clean_list(regex.split(value)))
         return sorting_key
 
     @staticmethod
@@ -94,9 +92,10 @@ class Toolbox:
         if sort is None and default_sort is not None:
             sort = default_sort
         if sort:
-            desc = sort[0] == '-'
-            sort = sort[1 if desc else 0:]
-            dataobjectlist.sort(key=lambda e: Toolbox.extract_key(e, sort.split(',')), reverse=desc)
+            for sort_item in reversed(sort.split(',')):
+                desc = sort_item[0] == '-'
+                field = sort_item[1 if desc else 0:]
+                dataobjectlist.sort(key=lambda e: Toolbox.extract_key(e, field), reverse=desc)
         # Paging
         page = request.QUERY_PARAMS.get('page')
         if page is not None and page.isdigit():

@@ -129,10 +129,10 @@ class Toolbox(object):
         store. If not found, it returns the fallback
         """
         volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
         data = volatile.get(key)
         if data is None:
             try:
+                persistent = PersistentFactory.get_client()
                 data = persistent.get(key)
             except:
                 data = fallback

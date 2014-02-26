@@ -54,14 +54,27 @@ class VolumeStorageRouterClient():
         """
         Dummy init method
         """
-        pass
+        self.stat_counters = ['backend_data_read', 'backend_data_written',
+                              'backend_read_operations', 'backend_write_operations',
+                              'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
+                              'data_written', 'metadata_store_hits', 'metadata_store_misses',
+                              'read_operations', 'sco_cache_hits', 'sco_cache_misses',
+                              'write_operations']
+        self.stat_sums = {'operations': ['write_operations', 'read_operations'],
+                          'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
+                          'data_transferred': ['data_written', 'data_read']}
+        self.stat_keys = self.stat_counters + self.stat_sums.keys()
 
     @staticmethod
     def empty_statistics():
         """
         Returns a fake empty object
         """
-        return type('Statistics', (), {})()
+        vsr = VolumeStorageRouterClient()
+        mocked_class = type('Statistics', (), dict((key, 0) for key in vsr.stat_counters))
+        for key in vsr.stat_counters:
+            setattr(mocked_class, key, property(lambda: 0))
+        return mocked_class
 
     @staticmethod
     def empty_info():

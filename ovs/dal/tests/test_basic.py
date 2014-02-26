@@ -344,6 +344,7 @@ class Basic(TestCase):
                     or prop in ['%s_guid' % key for key in cls._relations.keys()] \
                     or prop in cls._expiry \
                     or prop in remote_properties \
+                    or prop in ['%s_guids' % key for key in remote_properties] \
                     or prop == 'guid'
                 if not found:
                     missing_metadata.append(prop)

@@ -77,6 +77,8 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
+            generic.trySet(self.backendConnection, data, 'backend_connection');
+            generic.trySet(self.backendLogin, data, 'backend_login');
             if (data.hasOwnProperty('backend_type')) {
                 self.backendType($.t('ovs:vpools.backendtypes.' + data.backend_type));
             } else {
@@ -103,8 +105,6 @@ define([
                 self.bandwidthSaved(stats.data_read - stats.backend_data_read);
                 self.backendReadSpeed(stats.backend_data_read_ps);
                 self.backendWriteSpeed(stats.backend_data_written_ps);
-                self.backendConnection(data.backend_connection);
-                self.backendLogin(data.backend_login);
             }
 
             self.loaded(true);
@@ -133,21 +133,28 @@ define([
                     }).promise(),
                     $.Deferred(function(machineDeferred) {
                         if (generic.xhrCompleted(self.machineHandle)) {
-                            self.machineHandle = api.get('vmachines', undefined, {
+                            var options = {
                                 sort: 'name',
-                                vpoolguid: self.guid()
-                            })
+                                full: true,
+                                vpoolguid: self.guid(),
+                                contents: ''
+                            };
+                            self.machineHandle = api.get('vmachines', undefined, options)
                                 .done(function(data) {
-                                    var guids = [];
+                                    var guids = [], vmdata = {};
                                     $.each(data, function(index, item) {
                                         guids.push(item.guid);
+                                        vmdata[item.guid] = item;
                                     });
                                     generic.crossFiller(
                                         guids, self.vMachines,
                                         function(guid) {
-                                            var vm = new VMachine(guid);
-                                            vm.loading(true);
-                                            return vm;
+                                            var vmachine = new VMachine(guid);
+                                            if ($.inArray(guid, guids) !== -1) {
+                                                vmachine.fillData(vmdata[guid]);
+                                            }
+                                            vmachine.loading(true);
+                                            return vmachine;
                                         }, 'guid'
                                     );
                                     machineDeferred.resolve();
@@ -171,19 +178,26 @@ define([
         self.loadVDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.diskHandle)) {
-                    self.diskHandle = api.get('vdisks', undefined, {
+                    var options = {
+                        full: true,
                         sort: 'devicename',
-                        vpoolguid: self.guid()
-                    })
+                        vpoolguid: self.guid(),
+                        contents: ''
+                    };
+                    self.diskHandle = api.get('vdisks', undefined, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vddata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vddata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vDisks,
                                 function(guid) {
                                     var vdisk = new VDisk(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vdisk.fillData(vddata[guid]);
+                                    }
                                     vdisk.loading(true);
                                     return vdisk;
                                 }, 'guid'

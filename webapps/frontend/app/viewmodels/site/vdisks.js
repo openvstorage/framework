@@ -54,16 +54,25 @@ define([
         self.fetchVDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVDisksHandle)) {
-                    self.loadVDisksHandle = api.get('vdisks', {}, { sort: 'vpool_guid,devicename' })
+                    var options = {
+                        sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVDisksHandle = api.get('vdisks', undefined, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vddata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vddata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vDisks,
                                 function(guid) {
                                     var vdisk = new VDisk(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vdisk.fillData(vddata[guid]);
+                                    }
                                     vdisk.loading(true);
                                     return vdisk;
                                 }, 'guid'

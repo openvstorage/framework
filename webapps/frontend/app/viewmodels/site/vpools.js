@@ -49,16 +49,25 @@ define([
         self.fetchVPools = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    self.loadVPoolsHandle = api.get('vpools', {}, { sort: 'name' })
+                    var options = {
+                        sort: 'name',
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVPoolsHandle = api.get('vpools', undefined, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vpdata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vpdata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vPools,
                                 function(guid) {
                                     var vpool = new VPool(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vpool.fillData(vpdata[guid]);
+                                    }
                                     vpool.loading(true);
                                     return vpool;
                                 }, 'guid'
