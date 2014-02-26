@@ -70,11 +70,85 @@ class VolumeStorageRouterClient():
         """
         Returns a fake empty object
         """
-        vsr = VolumeStorageRouterClient()
-        mocked_class = type('Statistics', (), dict((key, 0) for key in vsr.stat_counters))
-        for key in vsr.stat_counters:
-            setattr(mocked_class, key, property(lambda: 0))
-        return mocked_class
+
+        class Statistics():
+            """ Dummy class """
+
+            def __init__(self):
+                """ Dummy init """
+                pass
+
+            @property
+            def backend_data_read(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def backend_data_written(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def backend_read_operations(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def backend_write_operations(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def cluster_cache_hits(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def cluster_cache_misses(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def data_read(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def data_written(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def metadata_store_hits(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def metadata_store_misses(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def read_operations(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def sco_cache_hits(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def sco_cache_misses(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def write_operations(self):
+                """ Dummy property """
+                return 0
+
+        return Statistics()
 
     @staticmethod
     def empty_info():

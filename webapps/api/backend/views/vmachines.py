@@ -49,8 +49,6 @@ class VMachineViewSet(viewsets.ViewSet):
         Overview of all machines
         """
         _ = format
-        import os, time
-        s = time.time()
         vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
@@ -63,15 +61,9 @@ class VMachineViewSet(viewsets.ViewSet):
                         vmachines.append(vdisk.vmachine)
         else:
             vmachines = VMachineList.get_vmachines()
-        os.system("echo 'LLoad took " + str((time.time() - s) * 1000) + "ms' >> /var/log/ovs/timing.log")
-        s = time.time()
         vmachines, serializer, contents = Toolbox.handle_list(vmachines, request, default_sort='name,vpool_guid')
-        os.system("echo 'LSort took " + str((time.time() - s) * 1000) + "ms' >> /var/log/ovs/timing.log")
-        s = time.time()
         serialized = serializer(VMachine, contents=contents, instance=vmachines, many=True)
-        d = serialized.data
-        os.system("echo 'LSer took " + str((time.time() - s) * 1000) + "ms' >> /var/log/ovs/timing.log")
-        return Response(d, status=status.HTTP_200_OK)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
@@ -163,16 +155,10 @@ class VMachineViewSet(viewsets.ViewSet):
         query_result = DataList({'object': VMachine,
                                  'data': DataList.select.DESCRIPTOR,
                                  'query': request.DATA['query']}).data
-        import os, time
         vmachines = DataObjectList(query_result, VMachine)
-        s = time.time()
         vmachines, serializer, contents = Toolbox.handle_list(vmachines, request)
-        os.system("echo 'FSort took " + str((time.time() - s) * 1000) + "ms' >> /var/log/ovs/timing.log")
-        s = time.time()
         serialized = serializer(VMachine, contents=contents, instance=vmachines, many=True)
-        d = serialized.data
-        os.system("echo 'FSer took " + str((time.time() - s) * 1000) + "ms' >> /var/log/ovs/timing.log")
-        return Response(d, status=status.HTTP_200_OK)
+        return Response(serialized.data, status=status.HTTP_200_OK)
 
     @action()
     @expose(internal=True, customer=True)

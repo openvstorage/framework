@@ -451,7 +451,8 @@ class DataObject(object):
             self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
-            for list_key, fields in cache_list.iteritems():
+            for list_key in cache_list.keys():
+                fields = cache_list[list_key]
                 if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
                     self._volatile.delete(list_key)
                     del cache_list[list_key]
@@ -498,7 +499,8 @@ class DataObject(object):
             self._mutex_listcache.acquire(60)
             cache_key = '%s_%s' % (DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
-            for list_key, fields in cache_list.iteritems():
+            for list_key in cache_list.keys():
+                fields = cache_list[list_key]
                 if '__all' in fields:
                     self._volatile.delete(list_key)
                     del cache_list[list_key]

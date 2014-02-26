@@ -82,6 +82,4 @@ class VolatileMutex(object):
         """
         Logs towards a logging endpoint
         """
-        import os
         print entry
-        os.system("echo '" + entry + "' >> /var/log/ovs/vmutex.log")

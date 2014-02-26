@@ -188,9 +188,6 @@ class DataList(object):
             # properties, you can dot as far as you like. This means you can combine AND and OR
             # in any possible combination
 
-            import os, time
-            s = time.time()
-
             Toolbox.log_cache_hit('datalist', False)
 
             items = self._query['query']['items']
@@ -229,8 +226,6 @@ class DataList(object):
                             raise NotImplementedError('The given selector type is not implemented')
                 except ObjectNotFoundException:
                     pass
-
-            os.system("echo 'Query took " + str(time.time() - s) + "s (" + str(self._key) + ")' >> /var/log/ovs/timing.log")
 
             if self._key is not None and len(keys) > 0 and self._can_cache:
                 self._volatile.set(self._key, self.data, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
@@ -282,9 +277,6 @@ class DataList(object):
         data = datalist._volatile.get(base_key % own_guid)
         if data is None:
             # Cache miss
-            import os, time
-            s = time.time()
-
             Toolbox.log_cache_hit('datalist', False)
 
             remote_namespace = remote_class()._namespace
@@ -313,8 +305,6 @@ class DataList(object):
                     lists[foreign_key].append(Descriptor(remote_class, guid).descriptor)
                 except ObjectNotFoundException:
                     pass
-
-            os.system("echo 'Rel took " + str(time.time() - s) + "s (" + str(base_key % own_guid) + ")' >> /var/log/ovs/timing.log")
 
             list_keys = []
             for guid in lists:

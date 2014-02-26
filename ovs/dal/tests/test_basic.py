@@ -973,3 +973,37 @@ class Basic(TestCase):
         self.assertEqual(filtered[2].name, 'disk_3', 'Disks should be properly sliced')
         for disk in disks:
             disk.delete()
+
+    def test_fullrelation_load(self):
+        """
+        Validates whether a single relation load will preload all other related relations
+        """
+        machine_1 = TestMachine()
+        machine_1.save()
+        disk_1_1 = TestDisk()
+        disk_1_1.machine = machine_1
+        disk_1_1.save()
+        disk_1_2 = TestDisk()
+        disk_1_2.machine = machine_1
+        disk_1_2.save()
+        machine_2 = TestMachine()
+        machine_2.save()
+        disk_2_1 = TestDisk()
+        disk_2_1.machine = machine_2
+        disk_2_1.save()
+        disk_2_2 = TestDisk()
+        disk_2_2.machine = machine_2
+        disk_2_2.save()
+        # Load relations
+        disks_1 = DataList.get_relation_set(TestDisk, 'machine', TestMachine, 'disks', machine_1.guid)
+        self.assertEqual(len(disks_1.data), 2, 'There should be 2 child disks')
+        self.assertFalse(disks_1.from_cache, 'The relation should not be loaded from cache')
+        disks_2 = DataList.get_relation_set(TestDisk, 'machine', TestMachine, 'disks', machine_2.guid)
+        self.assertEqual(len(disks_2.data), 2, 'There should be 2 child disks')
+        self.assertTrue(disks_2.from_cache, 'The relation should be loaded from cache')
+        for disk in machine_1.disks:
+            disk.delete()
+        machine_1.delete()
+        for disk in machine_2.disks:
+            disk.delete()
+        machine_2.delete()

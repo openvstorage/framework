@@ -51,7 +51,7 @@ class DummyVolatileStore(object):
             data = {'t': {}, 's': {}}
         return data
 
-    def get(self, key):
+    def get(self, key, default=None):
         """
         Retrieves a certain value for a given key
         """
@@ -61,7 +61,7 @@ class DummyVolatileStore(object):
             if 'ovs_primarykeys_' in key:
                 value = set(value)
             return value
-        return None
+        return default
 
     def set(self, key, value, timeout=99999999):
         """
