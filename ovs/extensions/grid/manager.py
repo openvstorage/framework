@@ -773,7 +773,7 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 if not ceph_ok:
                     raise RuntimeError('Ceph config still not ok, exiting initialization')
             fstab_script = fstab_script_add.format(vsr.mountpoint_dfs, 'id=admin,conf=/etc/ceph/ceph.conf',
-                                                   'fuse.ceph', 'defaults,nobootwait,noatime', '0', '2')
+                                                   'fuse.ceph', 'defaults,noatime', '0', '2')
             Manager._exec_python(client, fstab_script)
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
             client.run('mount {0}'.format(vsr.mountpoint_dfs), pty=False)
