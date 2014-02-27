@@ -102,5 +102,5 @@ class VMachineList(object):
                               'data': DataList.select.DESCRIPTOR,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': [('is_vtemplate', DataList.operator.EQUALS, True),
-                                                  ('is_internal', DataList.operator.EQUALS, True)]}}).data
+                                                  ('is_internal', DataList.operator.EQUALS, False)]}}).data
         return DataObjectList(vmachines, VMachine)
