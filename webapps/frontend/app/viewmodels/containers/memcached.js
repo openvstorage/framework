@@ -48,6 +48,36 @@ define([
             if (generic.xhrCompleted(self.refreshHandle)) {
                 self.refreshHandle = api.get('statistics/memcache')
                     .done(function(data) {
+                        $.each(data.offline, function(index, node) {
+                            var node_info, add = false;
+                            $.each(self.nodes(), function(oindex, onode) {
+                                if (onode.node() === node) {
+                                    node_info = onode;
+                                }
+                            });
+                            if (node_info === undefined) {
+                                node_info = {
+                                    node         : ko.observable(''),
+                                    bytes        : ko.observable(''),
+                                    currItems    : ko.observable(0),
+                                    totalItems   : ko.observable(0),
+                                    getHits      : ko.observable(0),
+                                    cmdGet       : ko.observable(0),
+                                    hitRate      : ko.observable(0),
+                                    bytesRead    : ko.observable(''),
+                                    bytesWritten : ko.observable(''),
+                                    uptime       : ko.observable(0),
+                                    raw          : ko.observable(''),
+                                    online       : ko.observable(true)
+                                };
+                                add = true;
+                            }
+                            node_info.node(node);
+                            node_info.online(false);
+                            if (add) {
+                                self.nodes.push(node_info);
+                            }
+                        });
                         $.each(data.nodes, function(index, node) {
                             var node_info, add = false, rawString = '', attribute;
                             $.each(self.nodes(), function(oindex, onode) {
@@ -67,11 +97,13 @@ define([
                                     bytesRead    : ko.observable(''),
                                     bytesWritten : ko.observable(''),
                                     uptime       : ko.observable(0),
-                                    raw          : ko.observable('')
+                                    raw          : ko.observable(''),
+                                    online       : ko.observable(true)
                                 };
                                 add = true;
                             }
                             node_info.node(node.node);
+                            node_info.online(true);
                             node_info.bytes(generic.formatBytes(node.bytes));
                             node_info.currItems(node.curr_items);
                             node_info.totalItems(node.total_items);
