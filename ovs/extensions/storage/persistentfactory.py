@@ -30,6 +30,8 @@ class PersistentFactory(object):
         """
 
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
+            print 'Loading new persistent client'
+
             if client_type is None:
                 client_type = Configuration.get('ovs.core.storage.persistent')
 
