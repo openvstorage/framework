@@ -654,6 +654,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         scocaches = [{'path': scocache, 'size': scocache_size}]
         filesystem_config = {'fs_backend_path': mountpoint_dfs}
         volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
+        amqp_uri = '{}://{}:{}@{}:{}'.format(Configuration.get('ovs.core.broker.protocol'),
+                                             Configuration.get('ovs.core.broker.login'),
+                                             Configuration.get('ovs.core.broker.password'),
+                                             Configuration.get('ovs.grid.ip'),
+                                             Configuration.get('ovs.core.broker.port'))
         vsr_config_script = """
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
@@ -667,14 +672,11 @@ vsr_configuration.configure_volumemanager({6})
 vsr_configuration.configure_volumerouter('{0}', {7})
 vsr_configuration.configure_arakoon_cluster('{8}', {9})
 queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
-                 'events_amqp_uri': '{{}}://{{}}:{{}}@{{}}:{{}}'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                                        Configuration.get('ovs.core.broker.login'),
-                                                                        Configuration.get('ovs.core.broker.password'),
-                                                                        Configuration.get('ovs.grid.ip'),
-                                                                        Configuration.get('ovs.core.broker.port'))}}
+                 'events_amqp_uri': '{10}'}}
 vsr_configuration.configure_event_publisher(queue_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
-           volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+           volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
+           amqp_uri)
         Manager._exec_python(client, vsr_config_script)
 
         # Updating the model
