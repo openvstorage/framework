@@ -1,0 +1,10 @@
+ovs.webapps.dir=webapps
+ovs.webapps.admin.name=CloudFounders Engineering Dept.
+ovs.webapps.admin.email=engineering@cloudfounders.com
+ovs.webapps.main.appname=api
+ovs.webapps.main.uiname=api
+ovs.webapps.main.dbname=api.sqlite3
+ovs.webapps.main.secret=6e-%9ce4rx125jw69vp-ar1fpu9ta5#g6w73^vvrf65+14ovpi
+ovs.webapps.logging.dir=/var/log/ovs/api
+ovs.webapps.logging.file=django.log
+ovs.webapps.certificate.period=CERTIFICATE_VALID_PERIOD

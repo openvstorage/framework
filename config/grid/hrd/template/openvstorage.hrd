@@ -1,0 +1,6 @@
+ovs.user=ovs
+ovs.host.hypervisor=VMWARE
+ovs.host.ip=HYPERVISOR_IP
+ovs.host.login=HYPERVISOR_LOGIN
+ovs.host.password=HYPERVISOR_PASSWORD
+ovs.host.name=HYPERVISOR_HOST_NAME
