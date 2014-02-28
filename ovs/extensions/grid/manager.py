@@ -456,6 +456,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
         from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+        from ovs.plugin.provider.configuration import Configuration
 
         while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
             print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
