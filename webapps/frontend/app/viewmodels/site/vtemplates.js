@@ -52,16 +52,25 @@ define([
         self.fetchVTemplates = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVTemplatesHandle)) {
-                    self.loadVTemplatesHandle = api.post('vmachines/filter', self.query, { sort: 'name' })
+                    var options = {
+                        sort: 'name',
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVTemplatesHandle = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vtdata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vtdata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vTemplates,
                                 function(guid) {
                                     var vmachine = new VMachine(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vmachine.fillData(vtdata[guid]);
+                                    }
                                     vmachine.loading(true);
                                     return vmachine;
                                 }, 'guid'
@@ -81,7 +90,8 @@ define([
                     var options = {
                         sort: 'name',
                         full: true,
-                        page: page
+                        page: page,
+                        contents: ''
                     };
                     self.refreshVTemplatesHandle[page] = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {

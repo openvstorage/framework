@@ -205,7 +205,11 @@ define([
                             items: [['is_internal', 'EQUALS', true]]
                         }
                     };
-                    self.loadVsasHandle = api.post('vmachines/filter', query, { full: true })
+                    self.loadVsasHandle = api.post('vmachines/filter', query, {
+                        full: true,
+                        contents: '',
+                        sort: 'name'
+                    })
                         .done(function(data) {
                             var guids = [], vmdata = {};
                             $.each(data, function(index, item) {
@@ -220,7 +224,6 @@ define([
                             );
                             $.each(self.vSAs(), function(index, vmachine) {
                                 vmachine.fillData(vmdata[vmachine.guid()]);
-                                vmachine.load();
                                 vmachine.loadDisks();
                             });
                             deferred.resolve();

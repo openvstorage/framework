@@ -90,7 +90,7 @@
         "vsa": "VSA",
         "vsas": "VSAs",
         "children": "Children",
-        "storeddata": "Stored data",
+        "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
         "cache": "Cache",
         "cacheratio": "Cache Hit Ratio",
@@ -120,7 +120,15 @@
         "inconsistentss": "Inconsistent snapshots",
         "status": "Status",
         "host": "Host",
-        "type": "Type"
+        "type": "Type",
+        "consistent": "Consistent",
+        "description": "Description",
+        "datetime": "Date / Time",
+        "snapshots": "Snapshots",
+        "nrofsnapshots": "# Snapshots",
+        "nrofvdisks": "# vDisks",
+        "nrofvmachines": "# vMachines",
+        "nrofvpools": "# vPools"
     },
     "vsas": {
         "title": "VSAs",
@@ -140,14 +148,19 @@
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
-            }
+            },
+            "vsavpoollink": "vPools served by this VSA",
+            "updateserving": "Save changes"
         }
     },
     "vpools" : {
         "title": "vPools",
         "backendtype": "Type",
         "backendtypes": {
-            "S3": "Amazon S3",
+            "S3": "S3",
+            "AMAZON_S3": "Amazon S3",
+            "CEPH_S3": "Ceph S3",
+            "SWIFT_S3": "Swift S3",
             "LOCAL": "Local FS",
             "REST": "REST backend"
         },
@@ -158,7 +171,10 @@
         "freespace": "Free space",
         "detail": {
             "title": "vPool",
-            "introduction": "Below an overview of the vPool properties."
+            "introduction": "Below an overview of the vPool properties.",
+            "sync": "Sync vPool with reality",
+            "vsavpoollink": "VSAs serving this vPool",
+            "updateserving": "Save changes"
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -170,7 +186,8 @@
             "done": "vPool synced",
             "donemsg": "All vMachines using vPool __what__ synced",
             "errormsg": "syncing all vMachines using __what__"
-        }
+        },
+        "add": "Add new vPool"
     },
     "statistics": {
         "title": "Statistics",
@@ -214,10 +231,26 @@
             "done": "Machine set as template",
             "donemsg": "Machine __what__ set as template",
             "errormsg": "setting __what__ as template"
+        },
+        "details": "Details",
+        "performance": "Performance",
+        "detail": {
+            "title": "vMachine",
+            "snapshots": "Snapshots",
+            "rollback": "Rollback",
+            "setastemplate": "Set as vTemplate",
+            "snapshot": "Take snapshot"
         }
     },
     "vdisks": {
-        "title": "vDisks"
+        "title": "vDisks",
+        "details": "Details",
+        "performance": "Performance",
+        "detail": {
+            "title": "vDisk",
+            "snapshots": "Snapshots",
+            "rollback": "Rollback"
+        }
     },
     "vtemplates": {
         "title": "vTemplates"
@@ -407,8 +440,13 @@
         "fromtemplate": "&#xf045;",
         "notchecked": "&#xf096;",
         "checked": "&#xf046;",
-        "sync": "&#xf0ed;",
+        "sync": "&#xf021;",
         "management": "&#xf0b1;",
-        "moveaway": "&#xf074;"
+        "moveaway": "&#xf074;",
+        "information": "&#xf05a;",
+        "vdisks": "&#xf0a0;",
+        "add": "&#xf067;",
+        "vmachines": "&#xf0e8;",
+        "vsavpoollink": "&#xf07c;"
     }
 }

@@ -123,7 +123,8 @@ class ScheduledTaskController(object):
             try:
                 VMachineController.snapshot(machineguid=machine.guid,
                                             label='',
-                                            is_consistent=False)
+                                            is_consistent=False,
+                                            is_automatic=True)
                 success.append(machine.guid)
             except:
                 fail.append(machine.guid)
@@ -258,10 +259,7 @@ class ScheduledTaskController(object):
             for work_unit in work_units:
                 try:
                     total += 1
-                    scrubbing_result = _vsr_scrubber.scrub(
-                        work_unit,
-                        Configuration.get('ovs.core.tempfs.mountpoint')
-                    )
+                    scrubbing_result = _vsr_scrubber.scrub(work_unit, vdisk.vpool.mountpoint_temp)
                     vdisk.vsr_client.apply_scrubbing_result(scrubbing_result)
                 except:
                     failed += 1

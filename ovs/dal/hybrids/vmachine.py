@@ -63,8 +63,11 @@ class VMachine(DataObject):
                 if timestamp not in snapshots_structure:
                     snapshots_structure[timestamp] = {'label': snapshot['label'],
                                                       'is_consistent': snapshot['is_consistent'],
+                                                      'is_automatic': snapshot.get('is_automatic', True),
+                                                      'stored': 0,
                                                       'snapshots': {}}
                 snapshots_structure[timestamp]['snapshots'][disk.guid] = snapshot['guid']
+                snapshots_structure[timestamp]['stored'] = snapshots_structure[timestamp]['stored'] + snapshot['stored']
 
         snapshots = []
         for timestamp in sorted(snapshots_structure.keys()):
@@ -72,6 +75,8 @@ class VMachine(DataObject):
             snapshots.append({'timestamp': timestamp,
                               'label': item['label'],
                               'is_consistent': item['is_consistent'],
+                              'is_automatic': item.get('is_automatic', True),
+                              'stored': item['stored'],
                               'snapshots': item['snapshots']})
         return snapshots
 

@@ -28,29 +28,21 @@ class VolumeStorageRouter(DataObject):
     on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':        (None, str, 'Name of the VSR.'),
-                  'description': (None, str, 'Description of the VSR.'),
-                  'port':        (None, int, 'Port on which the VSR is listening.'),
-                  'cluster_ip':  (None, str, 'IP address on which the VSR is listening.'),
-                  'storage_ip':  (None, str, 'IP address on which the vpool is shared to hypervisor'),
-                  'vsrid':       (None, str, 'ID of the VSR in the Open vStorage Volume Driver.'),
-                  'mountpoint':  (None, str, 'Mountpoint from which the VSR serves data')}
+    _blueprint = {'name':            (None, str, 'Name of the VSR.'),
+                  'description':     (None, str, 'Description of the VSR.'),
+                  'port':            (None, int, 'Port on which the VSR is listening.'),
+                  'cluster_ip':      (None, str, 'IP address on which the VSR is listening.'),
+                  'storage_ip':      (None, str, 'IP address on which the vpool is shared to hypervisor'),
+                  'vsrid':           (None, str, 'ID of the VSR in the Open vStorage Volume Driver.'),
+                  'mountpoint':      (None, str, 'Mountpoint from which the VSR serves data'),
+                  'mountpoint_temp': (None, str, 'Mountpoint for temporary workload (scrubbing etc)'),
+                  'mountpoint_dfs':  (None, str, 'Mointpoint for the distributed filesystem (non-vdisk files)')}
     _relations = {'vpool':            (VPool, 'vsrs'),
                   'serving_vmachine': (VMachine, 'served_vsrs')}
     _expiry = {'status':        (30, str),
                'statistics':     (4, dict),
                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
-
-    def __init__(self, *args, **kwargs):
-        """
-        Initializes a vDisk, setting up it's additional helpers
-        """
-        DataObject.__init__(self, *args, **kwargs)
-        if self.vpool:
-            self._frozen = False
-            self.vsr_client = VolumeStorageRouterClient().load(vsr=self)
-            self._frozen = True
 
     def _status(self):
         """

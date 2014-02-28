@@ -28,14 +28,13 @@ define([
         self.widgets      = [];
         self.vPoolHeaders = [
             { key: 'name',              value: $.t('ovs:generic.name'),             width: 150       },
-            { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 100       },
-            { key: 'freeSpace',         value: $.t('ovs:vpools.freespace'),         width: 100       },
+            { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 150       },
+            { key: 'freeSpace',         value: $.t('ovs:vpools.freespace'),         width: 150       },
             { key: 'cacheRatio',        value: $.t('ovs:generic.cache'),            width: 100       },
             { key: 'iops',              value: $.t('ovs:generic.iops'),             width: 55        },
             { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 100       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100       },
-            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined },
-            { key: undefined,           value: $.t('ovs:generic.actions'),          width: 100       }
+            { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined }
         ];
 
         // Observables
@@ -50,16 +49,25 @@ define([
         self.fetchVPools = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    self.loadVPoolsHandle = api.get('vpools', {}, { sort: 'name' })
+                    var options = {
+                        sort: 'name',
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVPoolsHandle = api.get('vpools', undefined, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vpdata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vpdata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vPools,
                                 function(guid) {
                                     var vpool = new VPool(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vpool.fillData(vpdata[guid]);
+                                    }
                                     vpool.loading(true);
                                     return vpool;
                                 }, 'guid'
@@ -79,7 +87,8 @@ define([
                     var options = {
                         sort: 'name',
                         full: true,
-                        page: page
+                        page: page,
+                        contents: '_dynamics'
                     };
                     self.refreshVPoolsHandle[page] = api.get('vpools', {}, options)
                         .done(function(data) {
@@ -101,42 +110,8 @@ define([
                 }
             }).promise();
         };
-        self.sync = function(guid) {
-            $.each(self.vPools(), function(index, vp) {
-                if (vp.guid() === guid) {
-                    app.showMessage(
-                            $.t('ovs:vpools.sync.warning'),
-                            $.t('ovs:vpools.sync.title', { what: vp.name() }),
-                            [$.t('ovs:vpools.sync.no'), $.t('ovs:vpools.sync.yes')]
-                        )
-                        .done(function(answer) {
-                            if (answer === $.t('ovs:vpools.sync.yes')) {
-                                generic.alertInfo(
-                                    $.t('ovs:vpools.sync.marked'),
-                                    $.t('ovs:vpools.sync.markedmsg', { what: vp.name() })
-                                );
-                                api.post('vpools/' + vp.guid() + '/sync_vmachines')
-                                    .then(self.shared.tasks.wait)
-                                    .done(function() {
-                                        generic.alertSuccess(
-                                            $.t('ovs:vpools.sync.done'),
-                                            $.t('ovs:vpools.sync.donemsg', { what: vp.name() })
-                                        );
-                                    })
-                                    .fail(function(error) {
-                                        generic.alertError(
-                                            $.t('ovs:generic.error'),
-                                            $.t('ovs:generic.messages.errorwhile', {
-                                                context: 'error',
-                                                what: $.t('ovs:vpools.sync.errormsg', { what: vp.name() }),
-                                                error: error
-                                            })
-                                        );
-                                    });
-                            }
-                        });
-                }
-            });
+        self.addVPool = function() {
+            generic.alertError('Not implemented', 'This functionality is not implemented.');
         };
 
         // Durandal

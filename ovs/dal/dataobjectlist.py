@@ -100,7 +100,7 @@ class DataObjectList(object):
             self._guids.sort()
         else:
             self.load()
-            objects = self._objects.values()
+            objects = [self._objects[guid] for guid in self._guids]
             objects.sort(**kwargs)
             self._guids = [obj.guid for obj in objects]
 

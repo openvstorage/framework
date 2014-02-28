@@ -21,6 +21,7 @@ import logging
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -360,7 +361,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.snapshot')
-    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None):
+    def snapshot(machineguid, label=None, is_consistent=False, timestamp=None, is_automatic=False):
         """
         Snapshot VMachine disks
 
@@ -376,7 +377,8 @@ class VMachineController(object):
         metadata = {'label': label,
                     'is_consistent': is_consistent,
                     'timestamp': timestamp,
-                    'machineguid': machineguid}
+                    'machineguid': machineguid,
+                    'is_automatic': is_automatic}
         machine = VMachine(machineguid)
 
         # @todo: we now skip creating a snapshot when a vmachine's disks
@@ -483,18 +485,28 @@ class VMachineController(object):
                     datastore = vm_object['datastores'][disk['datastore']]
                     if datastore in datastores:
                         vdisk = VDiskList.get_by_devicename_and_vpool(disk['filename'], datastores[datastore].vpool)
-                        if vdisk is not None:
-                            if vdisk.vmachine is None:
-                                MessageController.fire(MessageController.Type.EVENT,
-                                                       {'type': 'vdisk_attached',
-                                                        'metadata': {'vmachine_name': vmachine.name,
-                                                                     'vdisk_name': disk['name']}})
-                            vdisk.vmachine = vmachine
-                            vdisk.name = disk['name']
-                            vdisk.order = disk['order']
+                        if vdisk is None:
+                            # The disk couldn't be located, but is in our datastore. We might be in a recovery scenario
+                            vdisk = VDisk()
+                            vdisk.vpool = datastores[datastore].vpool
                             vdisk.save()
-                            vdisk_guids.append(vdisk.guid)
-                            vdisks_synced += 1
+                            vdisk = VDisk(vdisk.guid)  # Reload the vDisk, loading the vsr_client
+                            vdisk.devicename = disk['filename']
+                            vdisk.volumeid = vdisk.vsr_client.get_volume_id(str(disk['backingfilename']))
+                            vdisk.size = vdisk.info['volume_size']
+                        # Update the disk with information from the hypervisor
+                        if vdisk.vmachine is None:
+                            MessageController.fire(MessageController.Type.EVENT,
+                                                   {'type': 'vdisk_attached',
+                                                    'metadata': {'vmachine_name': vmachine.name,
+                                                                 'vdisk_name': disk['name']}})
+                        vdisk.vmachine = vmachine
+                        vdisk.name = disk['name']
+                        vdisk.order = disk['order']
+                        vdisk.save()
+                        vdisk_guids.append(vdisk.guid)
+                        vdisks_synced += 1
+
             for vdisk in vmachine.vdisks:
                 if vdisk.guid not in vdisk_guids:
                     MessageController.fire(MessageController.Type.EVENT,

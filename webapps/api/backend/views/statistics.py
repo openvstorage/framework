@@ -42,6 +42,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
         nodes = memcache_ini.getValue('main', 'nodes').split(',')
+        nodes = [node.strip() for node in nodes]
         return map(lambda m: memcache_ini.getValue(m, 'location'), nodes)
 
     @staticmethod

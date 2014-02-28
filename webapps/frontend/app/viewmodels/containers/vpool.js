@@ -14,8 +14,9 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api'
-], function($, ko, generic, api) {
+    'ovs/generic', 'ovs/api',
+    'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
+], function($, ko, generic, api, VDisk, VMachine) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -24,6 +25,7 @@ define([
         self.loadHandle    = undefined;
         self.diskHandle    = undefined;
         self.machineHandle = undefined;
+        self.vsaHandle     = undefined;
 
         // Observables
         self.loading           = ko.observable(false);
@@ -35,8 +37,6 @@ define([
         self.storedData        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.numberOfDisks     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.numberOfMachines  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendWriteSpeed = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
@@ -48,6 +48,9 @@ define([
         self.backendType       = ko.observable();
         self.backendConnection = ko.observable();
         self.backendLogin      = ko.observable();
+        self.vDisks            = ko.observableArray([]);
+        self.vMachines         = ko.observableArray([]);
+        self.servingVSAGuids   = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -69,75 +72,98 @@ define([
         });
 
         // Functions
-        self.fillData = function(data) {
-             var type = '', stats = data.statistics;
-            if (data.backend_type) {
-                type = $.t('ovs:vpools.backendtypes.' + data.backend_type);
+        self.fillData = function(data, options) {
+            options = options || {};
+            generic.trySet(self.name, data, 'name');
+            generic.trySet(self.storedData, data, 'stored_data');
+            generic.trySet(self.size, data, 'size');
+            generic.trySet(self.backendConnection, data, 'backend_connection');
+            generic.trySet(self.backendLogin, data, 'backend_login');
+            if (data.hasOwnProperty('backend_type')) {
+                self.backendType($.t('ovs:vpools.backendtypes.' + data.backend_type));
+            } else {
+                self.backendType('');
             }
-            self.name(data.name);
-            self.iops(stats.write_operations_ps + stats.read_operations_ps);
-            self.size(data.size);
-            self.storedData(data.stored_data);
-            self.cacheHits(stats.sco_cache_hits_ps + stats.cluster_cache_hits_ps);
-            self.cacheMisses(stats.sco_cache_misses_ps);
-            self.readSpeed(stats.data_read_ps);
-            self.writeSpeed(stats.data_written_ps);
-            self.backendReadSpeed(stats.backend_data_read_ps);
-            self.backendWriteSpeed(stats.backend_data_written_ps);
-            self.backendWritten(stats.data_written);
-            self.backendRead(stats.data_read);
-            self.backendReads(stats.backend_read_operations);
-            self.bandwidthSaved(stats.data_read - stats.backend_data_read);
-            self.backendType(type);
-            self.backendConnection(data.backend_connection);
-            self.backendLogin(data.backend_login);
+            if (data.hasOwnProperty('vdisks_guids') && !generic.tryGet(options, 'skipDisks', false)) {
+                generic.crossFiller(
+                    data.vdisks_guids, self.vDisks,
+                    function(guid) {
+                        return new VDisk(guid);
+                    }, 'guid'
+                );
+            }
+            if (data.hasOwnProperty('statistics')) {
+                var stats = data.statistics;
+                self.iops(stats.write_operations_ps + stats.read_operations_ps);
+                self.cacheHits(stats.sco_cache_hits_ps + stats.cluster_cache_hits_ps);
+                self.cacheMisses(stats.sco_cache_misses_ps);
+                self.readSpeed(stats.data_read_ps);
+                self.writeSpeed(stats.data_written_ps);
+                self.backendWritten(stats.data_written);
+                self.backendRead(stats.data_read);
+                self.backendReads(stats.backend_read_operations);
+                self.bandwidthSaved(stats.data_read - stats.backend_data_read);
+                self.backendReadSpeed(stats.backend_data_read_ps);
+                self.backendWriteSpeed(stats.backend_data_written_ps);
+            }
 
             self.loaded(true);
             self.loading(false);
         };
-        self.load = function(onlyextends) {
+        self.load = function(contents, options) {
+            options = options || {};
             self.loading(true);
-            onlyextends = onlyextends || false;
             return $.Deferred(function(deferred) {
-                var calls = [];
-                if (!onlyextends) {
-                    calls.push($.Deferred(function(mainDeferred) {
-                            if (generic.xhrCompleted(self.loadHandle)) {
-                                self.loadHandle = api.get('vpools/' + self.guid())
-                                    .done(function(data) {
-                                        self.fillData(data);
-                                        mainDeferred.resolve();
-                                    })
-                                    .fail(mainDeferred.reject);
-                            } else {
-                                mainDeferred.reject();
+                var calls = [
+                    $.Deferred(function(mainDeferred) {
+                        if (generic.xhrCompleted(self.loadHandle)) {
+                            var listOptions = {};
+                            if (contents !== undefined) {
+                                listOptions.contents = contents;
                             }
-                        }).promise());
-                }
-                calls.push($.Deferred(function(diskDeferred) {
-                            if (generic.xhrCompleted(self.diskHandle)) {
-                                self.diskHandle = api.get('vpools/' + self.guid() + '/count_disks')
-                                    .done(function(data) {
-                                        self.numberOfDisks(data);
-                                        diskDeferred.resolve();
-                                    })
-                                    .fail(diskDeferred.reject);
-                            } else {
-                                diskDeferred.reject();
-                            }
-                        }).promise());
-                calls.push($.Deferred(function(machineDeferred) {
-                            if (generic.xhrCompleted(self.machineHandle)) {
-                                self.machineHandle = api.get('vpools/' + self.guid() + '/count_machines')
-                                    .done(function(data) {
-                                        self.numberOfMachines(data);
-                                        machineDeferred.resolve();
-                                    })
-                                    .fail(machineDeferred.reject);
-                            } else {
-                                machineDeferred.reject();
-                            }
-                        }).promise());
+                            self.loadHandle = api.get('vpools/' + self.guid(), undefined, listOptions)
+                                .done(function(data) {
+                                    self.fillData(data, options);
+                                    mainDeferred.resolve();
+                                })
+                                .fail(mainDeferred.reject);
+                        } else {
+                            mainDeferred.reject();
+                        }
+                    }).promise(),
+                    $.Deferred(function(machineDeferred) {
+                        if (generic.xhrCompleted(self.machineHandle)) {
+                            var options = {
+                                sort: 'name',
+                                full: true,
+                                vpoolguid: self.guid(),
+                                contents: ''
+                            };
+                            self.machineHandle = api.get('vmachines', undefined, options)
+                                .done(function(data) {
+                                    var guids = [], vmdata = {};
+                                    $.each(data, function(index, item) {
+                                        guids.push(item.guid);
+                                        vmdata[item.guid] = item;
+                                    });
+                                    generic.crossFiller(
+                                        guids, self.vMachines,
+                                        function(guid) {
+                                            var vmachine = new VMachine(guid);
+                                            if ($.inArray(guid, guids) !== -1) {
+                                                vmachine.fillData(vmdata[guid]);
+                                            }
+                                            vmachine.loading(true);
+                                            return vmachine;
+                                        }, 'guid'
+                                    );
+                                    machineDeferred.resolve();
+                                })
+                                .fail(machineDeferred.reject);
+                        } else {
+                            machineDeferred.reject();
+                        }
+                    }).promise()];
                 $.when.apply($, calls)
                     .done(function() {
                         self.loaded(true);
@@ -147,6 +173,55 @@ define([
                     .always(function() {
                         self.loading(false);
                     });
+            }).promise();
+        };
+        self.loadVDisks = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.diskHandle)) {
+                    var options = {
+                        full: true,
+                        sort: 'devicename',
+                        vpoolguid: self.guid(),
+                        contents: ''
+                    };
+                    self.diskHandle = api.get('vdisks', undefined, options)
+                        .done(function(data) {
+                            var guids = [], vddata = {};
+                            $.each(data, function(index, item) {
+                                guids.push(item.guid);
+                                vddata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.vDisks,
+                                function(guid) {
+                                    var vdisk = new VDisk(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vdisk.fillData(vddata[guid]);
+                                    }
+                                    vdisk.loading(true);
+                                    return vdisk;
+                                }, 'guid'
+                            );
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.loadServingVSAs = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.vsaHandle)) {
+                    self.vsaHandle = api.get('vpools/' + self.guid() + '/serving_vsas')
+                        .done(function(data) {
+                            self.servingVSAGuids(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
     };

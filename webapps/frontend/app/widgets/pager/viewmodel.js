@@ -30,6 +30,7 @@ define([
         self.padding         = ko.observable(2);
         self.controls        = ko.observable(true);
         self.preloadPage     = 0;
+        self.preloadHandle   = undefined;
 
         // Computed
         self.items = ko.computed(function() {
@@ -133,15 +134,17 @@ define([
             if (self.refresh !== undefined) {
                 self.refresher.init(function() {
                     self.viewportRefresh(self.current());
-                    self.preloadPage += 1;
-                    if (self.preloadPage === self.current()) {
+                    if (generic.xhrCompleted(self.preloadHandle)) {
                         self.preloadPage += 1;
-                    }
-                    if (self.preloadPage > self.lastPage()) {
-                        self.preloadPage = 1;
-                    }
-                    if (self.preloadPage !== self.current()) {
-                        self.viewportRefresh(self.preloadPage);
+                        if (self.preloadPage === self.current()) {
+                            self.preloadPage += 1;
+                        }
+                        if (self.preloadPage > self.lastPage()) {
+                            self.preloadPage = 1;
+                        }
+                        if (self.preloadPage !== self.current()) {
+                            self.preloadHandle = self.viewportRefresh(self.preloadPage);
+                        }
                     }
                 }, self.refresh);
                 self.refresher.start();

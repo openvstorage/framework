@@ -18,6 +18,9 @@ See the GNU Affero General Public License for more details.
 You should have received a copy of the
 GNU Affero General Public License along with this program (file "COPYING").
 If not, see <http://www.gnu.org/licenses/>.
+
+Changes applied by CloudFounders NV:
+- No default reconnect on __init__
 """
 
 import socket
@@ -35,7 +38,7 @@ class ArakoonClientConnection :
         self._connected = False
         self._socket = None
         self._socketInfo = None
-        self._reconnect()
+        # self._reconnect()
 
     def _reconnect(self):
         self.close()

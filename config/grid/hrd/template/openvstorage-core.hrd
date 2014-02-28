@@ -33,5 +33,4 @@ volumedriver.arakoon.node.messagingport=8873
 volumedriver.arakoon.node.loglevel=info
 volumedriver.arakoon.node.logdir=/var/log/arakoon/voldrv
 volumedriver.arakoon.node.fsync=true
-ovs.core.tempfs.mountpoint=/var/tmp
 ovs.core.rabbitmq.localnode.name=UNIQUE_MACHINE_ID

@@ -59,16 +59,25 @@ define([
         self.fetchVSAs = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVSAsHandle)) {
-                    self.loadVSAsHandle = api.post('vmachines/filter', self.query, { sort: 'name' })
+                    var options = {
+                        sort: 'name',
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVSAsHandle = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vsadata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vsadata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vSAs,
                                 function(guid) {
                                     var vmachine = new VMachine(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vmachine.fillData(vsadata[guid]);
+                                    }
                                     vmachine.loading(true);
                                     return vmachine;
                                 }, 'guid'
@@ -88,7 +97,8 @@ define([
                     var options = {
                         sort: 'name',
                         full: true,
-                        page: page
+                        page: page,
+                        contents: '_relations,statistics'
                     };
                     self.refreshVSAsHandle[page] = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {

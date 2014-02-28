@@ -15,14 +15,14 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:vmachines.title"></h2>
-    <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, kinitialLoad: vMachinesInitialLoad,
+    <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, initialLoad: vMachinesInitialLoad,
                              viewportRefresh: refreshVMachines, viewportRefreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vmachine_' + guid() }">
                 <td>
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                    <span data-bind="text: name"></span>
+                    <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: guid }) }"></a>
                 </td>
                 <td data-bind="lazylist: { items: vPools, loadedObservable: 'loaded' }">
                     <a data-part="entry"
@@ -30,7 +30,9 @@ limitations under the License.
                                   attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
                 <td data-bind="lazylist: { items: vSAs, loadedObservable: 'loaded' }">
-                    <span data-part="entry" data-bind="text: name"></span>
+                    <a data-part="entry"
+                       data-bind="text: name,
+                                  attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
                 <td><span data-bind="text: storedData"></span></td>
@@ -47,15 +49,6 @@ limitations under the License.
                                          },
                                          defaultColor: 'lightgrey'
                                      }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
-                </td>
-                <td>
-                    <i data-bind="click: function() { $root.snapshot($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.snapshot"></i>
-                    <i data-bind="click: function() { $root.setAsTemplate($data.guid()); }, style: { color: isRunning() ? 'lightgrey' : 'black' },
-                                  tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : '', css: { hand: !isRunning(), forbidden: isRunning() }"
-                       class="fa fa-fw" data-i18n="[html]ovs:icons.setastemplate"></i>
-                    <i data-bind="click: function() { $root.rollback($data.guid()); }, style: { color: isRunning() ? 'lightgrey' : 'black' },
-                                  tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : '', css: { hand: !isRunning(), forbidden: isRunning() }"
-                       class="fa fa-fw" data-i18n="[html]ovs:icons.rollback"></i>
                 </td>
             </tr>
         </table>

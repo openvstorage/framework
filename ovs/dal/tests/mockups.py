@@ -54,14 +54,101 @@ class VolumeStorageRouterClient():
         """
         Dummy init method
         """
-        pass
+        self.stat_counters = ['backend_data_read', 'backend_data_written',
+                              'backend_read_operations', 'backend_write_operations',
+                              'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
+                              'data_written', 'metadata_store_hits', 'metadata_store_misses',
+                              'read_operations', 'sco_cache_hits', 'sco_cache_misses',
+                              'write_operations']
+        self.stat_sums = {'operations': ['write_operations', 'read_operations'],
+                          'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
+                          'data_transferred': ['data_written', 'data_read']}
+        self.stat_keys = self.stat_counters + self.stat_sums.keys()
 
     @staticmethod
     def empty_statistics():
         """
         Returns a fake empty object
         """
-        return type('Statistics', (), {})()
+
+        class Statistics():
+            """ Dummy class """
+
+            def __init__(self):
+                """ Dummy init """
+                pass
+
+            @property
+            def backend_data_read(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def backend_data_written(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def backend_read_operations(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def backend_write_operations(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def cluster_cache_hits(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def cluster_cache_misses(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def data_read(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def data_written(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def metadata_store_hits(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def metadata_store_misses(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def read_operations(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def sco_cache_hits(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def sco_cache_misses(self):
+                """ Dummy property """
+                return 0
+
+            @property
+            def write_operations(self):
+                """ Dummy property """
+                return 0
+
+        return Statistics()
 
     @staticmethod
     def empty_info():

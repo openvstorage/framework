@@ -29,18 +29,17 @@ define([
         self.vMachineCache       = {};
         self.vPoolCache          = {};
         self.vDiskHeaders        = [
-            { key: 'name',         value: $.t('ovs:generic.name'),         width: 150       },
-            { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),     width: 110       },
-            { key: 'vpool',        value: $.t('ovs:generic.vpool'),        width: 110       },
-            { key: 'vsa',          value: $.t('ovs:generic.vsa'),          width: 110       },
-            { key: 'size',         value: $.t('ovs:generic.size'),         width: 100       },
-            { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110       },
-            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),        width: 100       },
-            { key: 'iops',         value: $.t('ovs:generic.iops'),         width: 55        },
-            { key: 'readSpeed',    value: $.t('ovs:generic.read'),         width: 100       },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),        width: 100       },
-            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: undefined },
-            { key: undefined,      value: $.t('ovs:generic.actions'),      width: 80        }
+            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
+            { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),   width: 110       },
+            { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 110       },
+            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 110       },
+            { key: 'size',         value: $.t('ovs:generic.size'),       width: 100       },
+            { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110       },
+            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100       },
+            { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55        },
+            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 100       },
+            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 100       },
+            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: 50        }
         ];
 
         // Handles
@@ -55,16 +54,25 @@ define([
         self.fetchVDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVDisksHandle)) {
-                    self.loadVDisksHandle = api.get('vdisks', {}, { sort: 'vpool_guid,devicename' })
+                    var options = {
+                        sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
+                        full: true,
+                        contents: ''
+                    };
+                    self.loadVDisksHandle = api.get('vdisks', undefined, options)
                         .done(function(data) {
-                            var guids = [];
+                            var guids = [], vddata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
+                                vddata[item.guid] = item;
                             });
                             generic.crossFiller(
                                 guids, self.vDisks,
                                 function(guid) {
                                     var vdisk = new VDisk(guid);
+                                    if ($.inArray(guid, guids) !== -1) {
+                                        vdisk.fillData(vddata[guid]);
+                                    }
                                     vdisk.loading(true);
                                     return vdisk;
                                 }, 'guid'
@@ -135,17 +143,6 @@ define([
                 }
             }).promise();
         };
-        self.rollback = function(guid) {
-            $.each(self.vDisks(), function(index, vdisk) {
-                if (vdisk.guid() === guid && (vdisk.vMachine() === undefined || !vdisk.vMachine().isRunning())) {
-                    dialog.show(new RollbackWizard({
-                        modal: true,
-                        type: 'vdisk',
-                        guid: guid
-                    }));
-                }
-            });
-        };
 
         // Durandal
         self.activate = function() {
@@ -153,7 +150,7 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vDisks);
 
-            api.get('vmachines', {}, { full: true, contents: 'name'})
+            api.get('vmachines', {}, { full: true, contents: ''})
                 .done(function(data) {
                     $.each(data, function(index, item) {
                         if (!self.vMachineCache.hasOwnProperty(item.guid)) {

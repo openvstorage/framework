@@ -14,7 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2 data-i18n="ovs:vpools.title"></h2>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:vpools.title"></h2>
+        <button class="btn btn-default pull-right" data-bind="click: addVPool"
+                style="display: none; margin-top: 20px; margin-bottom: 10px;">
+            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+            <span data-i18n="ovs:vpools.add"></span>
+        </button>
+    </div>
     <div data-bind="pager: { items: vPools, headers: vPoolHeaders, initialLoad: vPoolsInitialLoad,
                              viewportRefresh: refreshVPools, viewportRefreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
@@ -31,9 +38,6 @@ limitations under the License.
                 <td><span data-bind="text: backendType"></span></td>
                 <td><span data-bind="text: backendConnection"></span></td>
                 <td><span data-bind="text: backendLogin"></span></td>
-                <td>
-                    <i data-bind="click: function() { $root.sync($data.guid()); }"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.sync"></i>
-                </td>
             </tr>
         </table>
     </div>

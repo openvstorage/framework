@@ -17,97 +17,126 @@ limitations under the License.
 	<ol class="breadcrumb">
 	    <li class="active" data-bind="text: name"></li>
 	</ol>
-    <h2>
-        <span data-i18n="ovs:vsas.detail.title"></span>:
-        <span class="fa pointer" data-i18n="[html]ovs:icons.vsa"
-              data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
-                         style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
-        <span data-bind="text: name"></span>
-    </h2>
-    <p data-i18n="ovs:vsas.detail.introduction"></p>
-    <table style="width: 100%;">
-        <thead>
-            <tr>
-                <th data-i18n="ovs:vsas.details" colspan="2"></th>
-                <th data-i18n="ovs:vsas.statistics" colspan="2"></th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td style="width: 15%;" data-i18n="ovs:generic.ip"></td>
-                <td style="width: 35%;"><span data-bind="text: ipAddress"></span></td>
-                <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
-                <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
-            </tr>
-            <tr>
-                <td data-i18n="ovs:generic.host"></td>
-                <td>
-                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="text: item().name()"></span>
-                    </span>
-                </td>
-                <td data-i18n="ovs:generic.cache"></td>
-                <td><span data-bind="text: cacheRatio"></span></td>
-            </tr>
-            <tr>
-                <td data-i18n="ovs:vsas.detail.hostip"></td>
-                <td>
-                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
-                    </span>
-                </td>
-                <td data-i18n="ovs:generic.iops"></td>
-                <td><span data-bind="text: iops"></span></td>
-            </tr>
-            <tr>
-                <td data-i18n="ovs:generic.type"></td>
-                <td>
-                    <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry" class="pointer"
-                              data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
-                    </span>
-                </td>
-                <td data-i18n="ovs:generic.readspeed"></td>
-                <td><span data-bind="text: readSpeed"></span></td>
-            </tr>
-            <tr>
-                <td data-i18n="ovs:generic.vpools"></td>
-                <td><span data-bind="text: vPools().length"></span></td>
-                <td data-i18n="ovs:generic.writespeed"></td>
-                <td><span data-bind="text: writeSpeed"></span></td>
-            </tr>
-            <tr>
-                <td data-i18n="ovs:generic.vmachines"></td>
-                <td><span data-bind="text: vMachines().length"></span></td>
-                <td colspan="2">&nbsp;</td>
-            </tr>
-            <tr>
-                <td data-i18n="ovs:generic.vdisks"></td>
-                <td><span data-bind="text: vDisks().length"></span></td>
-                <td colspan="2">&nbsp;</td>
-            </tr>
-        </tbody>
-    </table>
-    <div>&nbsp;</div>
+    <div>
+        <ul class="nav nav-tabs">
+            <li class="active">
+                <a href="#information" data-toggle="tab" >
+                    <span class="fa" data-i18n="[html]ovs:icons.information"
+                          data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
+                                     style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
+                    <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
+                </a>
+            </li>
+            <li class="actions">
+                <span data-i18n="ovs:generic.actions"></span>:
+                <button type="button" class="btn btn-mini btn-default"
+                        data-bind="click: function() { $parent.moveAway(); },
+                                   style: { color: ($.inArray('MOVE_AWAY', availableActions()) !== -1 ? '#428bca' : 'grey') },
+                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1">
+                    <span class="fa" data-i18n="[html]ovs:icons.moveaway" data-bind="tooltip: 'ovs:vsas.detail.moveaway'"></span>
+                </button>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane active" id="information" style="padding: 15px;">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th data-i18n="ovs:vsas.details" colspan="2"></th>
+                            <th data-i18n="ovs:vsas.statistics" colspan="2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="width: 15%;" data-i18n="ovs:generic.ip"></td>
+                            <td style="width: 35%;"><span data-bind="text: ipAddress"></span></td>
+                            <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
+                            <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.host"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="text: item().name()"></span>
+                                </span>
+                            </td>
+                            <td data-i18n="ovs:generic.cache"></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:vsas.detail.hostip"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
+                                </span>
+                            </td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.type"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" class="pointer"
+                                          data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
+                                </span>
+                            </td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvpools"></td>
+                            <td><span data-bind="text: vPools().length"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvmachines"></td>
+                            <td><span data-bind="text: vMachines().length"></span></td>
+                            <td colspan="2">&nbsp;</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td colspan="2">&nbsp;</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
     <div>
         <ul class="nav nav-tabs">
             <li class="active"><a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a></li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane active" id="management">
-                <table class="table table-noborder" style="width: 100%">
+            <div class="tab-pane active" id="management" style="padding: 15px;">
+                <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
-                            <td style="width: 50px; vertical-align: middle;">
-                                <button type="button" class="btn btn-lg btn-default"
-                                        data-bind="click: function() { $parent.moveAway(); },
-                                                   style: { color: ($.inArray('MOVE_AWAY', availableActions()) !== -1 ? '#428bca' : 'grey') },
-                                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1">
-                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.moveaway"></span>
+                            <td style="width: 90px; vertical-align: middle; padding: 0;">
+                                <button type="button" class="btn btn-lg" data-bind="enable: false">
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.vsavpoollink"></span>
                                 </button>
                             </td>
-                            <td>
-                                <h4 data-i18n="ovs:vsas.detail.moveawaytitle"></h4><span data-i18n="ovs:vsas.detail.moveawaymsg"></span>
+                            <td style="padding: 0;">
+                                <h4 data-i18n="ovs:vsas.detail.vsavpoollink"></h4>
+                                <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
+                                <div data-bind="foreach: $root.vPools">
+                                    <div>
+                                        <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
+                                                                          checked: $.inArray(guid(), $root.checkedVPoolGuids()) !== -1,
+                                                                          disable: $.inArray(guid(), $parent.vPoolGuids) !== -1"
+                                                style="vertical-align: text-bottom;">
+                                        <label data-bind="attr: { for: 'vpool_' + guid() }" style="font-weight: normal; margin-left: 7px;">
+                                            <span data-bind="text: name"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-default" data-bind="click: $root.updateVSAServing"
+                                        style="display: none; margin-top: 10px;">
+                                    <span data-i18n="ovs:vsas.detail.updateserving"></span>
+                                </button>
                             </td>
                         </tr>
                     </tbody>

@@ -299,6 +299,16 @@ class VMwareSystem():
         return portgroupsresult
 
     @staticmethod
+    def list_vmkernel_ports():
+        """
+        List the current vmkernel ports
+        """
+        vmkernelports_result = {}
+        _, interfaceout = InstallHelper.execute_command(['esxcli', '--formatter=keyvalue', 'network', 'ip', 'interface', 'list'])
+        vmkernel_interfaces = InstallHelper.convert_keyvalue(''.join(interfaceout))
+        return vmkernel_interfaces
+
+    @staticmethod
     def build_nic_config(nics):
         """
         Build the nic vmx content for the required nics and assign them with semi-random MAC addresses
@@ -490,20 +500,16 @@ if __name__ == '__main__':
     if not vswitches:
         print InstallHelper.boxed_message(['No portgroups found in your ESXi network configuration'])
         sys.exit(1)
-    available_pgs = VMwareSystem.list_vm_portgroups()
-    pg_names = available_pgs.keys()
-    if len(pg_names) < 2:
+    all_pgs = VMwareSystem.list_vm_portgroups()
+    kernel_pgs = map(lambda p: p['Portgroup'],VMwareSystem.list_vmkernel_ports())
+    vm_pg_names = filter(lambda p: not p in kernel_pgs,all_pgs.keys())
+    if len(vm_pg_names) < 2:
         print InstallHelper.boxed_message(['There should be at least two portgroups configured'])
         sys.exit(1)
     print 'Please select your public network:'
-    public_pg = InstallHelper.ask_choice(pg_names)
+    public_pg = InstallHelper.ask_choice(vm_pg_names)
     print 'Please select your storage network:'
-    uplinks = []
-    private_pg = ''
-    while len(uplinks) == 0:
-        print '- The private virtual switch should have a required vmnic'
-        private_pg = InstallHelper.ask_choice(pg_names)
-        uplinks = [s for s in vswitches if private_pg in s['Portgroups'] and len(s['Uplinks']) > 0]
+    private_pg = InstallHelper.ask_choice(vm_pg_names)
 
     nic_config = VMwareSystem.build_nic_config([private_pg, public_pg])
 
@@ -526,8 +532,8 @@ if __name__ == '__main__':
     size = InstallHelper.ask_integer('Specify the size in GB (min: 50)', 50, 9999, default_value=100)
     disk_config = ''
     disk_config = vm_sys.create_vdisk(vm_name, 0, '{0}G'.format(size), disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, hdds[0], disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, ssds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssds[0], disk_config)
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdds[0], disk_config)
 
     # Add CD drive
     if imagefile:
