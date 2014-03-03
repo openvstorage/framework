@@ -151,13 +151,13 @@ class Manager(object):
         client.file_append('/etc/security/limits.conf', '\nroot soft core  unlimited\novs  soft core  unlimited\n')
 
         # Install base framework, JumpScale in this case
-        install_branch = Manager._prepare_jscore(client, is_local)
+        install_branch, ovs_version = Manager._prepare_jscore(client, is_local)
         Manager._install_jscore(client, install_branch)
 
         # Install Open vStorage
         print 'Installing Open vStorage...'
         client.run('apt-get -y -q install python-dev')
-        client.run('jpackage_install -n openvstorage')
+        client.run('jpackage_install -n openvstorage -v {0}'.format(ovs_version))
 
     @staticmethod
     def init_node(ip, password, join_masters=False):
@@ -980,9 +980,9 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
 
         # Quality mapping
         # Tese mappings were ['unstable', 'default'] and ['default', 'default'] before
-        quality_mapping = {'unstable': ['stable', 'stable'],
-                           'test': ['stable', 'stable'],
-                           'stable': ['stable', 'stable']}
+        quality_mapping = {'unstable': ['stable', 'stable', '1.0.2'],
+                           'test': ['stable', 'stable', '1.0.1'],
+                           'stable': ['stable', 'stable', '1.0.1']}
 
         if not is_local:
             if os.path.exists('/opt/jumpscale/cfg/jpackages/sources.cfg'):
@@ -1084,7 +1084,7 @@ blobstorlocal = jpackages_local
             jp_sources_config.write(jp_openvstorage_repo)
             jp_sources_config.close()
 
-        return quality_mapping[quality_level][1]
+        return quality_mapping[quality_level][1], quality_mapping[quality_level][2]
 
     @staticmethod
     def _install_jscore(client, install_branch):
