@@ -35,9 +35,7 @@ def authenticated(function):
     """
 
     def new_function(self, *args, **kwargs):
-        """
-        Executes the functions
-        """
+        self.__doc__ = function.__doc__
         try:
             return function(self, *args, **kwargs)
         except WebFault as fault:
@@ -206,6 +204,9 @@ class Sdk(object):
 
     @authenticated
     def get_vm(self, key, esxhost=None):
+        """
+        Retreives a vm object, based on its key
+        """
         vmid = self.exists(esxhost=esxhost, key=key)
         if vmid is None:
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))

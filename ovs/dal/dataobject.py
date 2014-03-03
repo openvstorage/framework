@@ -46,14 +46,12 @@ class MetaClass(type):
                     itemtype = 'Enum(%s)' % default[1][0].__class__.__name__
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in default[1]])
                 dct[attribute] = property(
-                    doc='[persistent] %s %s\n@type: %s'
-                        % (docstring, extra_info, itemtype)
+                    doc='[persistent] %s %s\n@type: %s' % (docstring, extra_info, itemtype)
                 )
             for attribute, relation in dct['_relations'].iteritems():
                 itemtype = relation[0].__name__ if relation[0] is not None else name
                 dct[attribute] = property(
-                    doc='[relation] one-to-many relation with %s.%s\n@type: %s'
-                        % (itemtype, relation[1], itemtype)
+                    doc='[relation] one-to-many relation with %s.%s\n@type: %s' % (itemtype, relation[1], itemtype)
                 )
             for attribute, info in dct['_expiry'].iteritems():
                 docstring = dct['_%s' % attribute].__doc__.strip()
@@ -65,8 +63,7 @@ class MetaClass(type):
                     extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
                 dct[attribute] = property(
                     fget=dct['_%s' % attribute],
-                    doc='[dynamic] (%ds) %s %s\n@rtype: %s'
-                        % (info[0], docstring, extra_info, itemtype)
+                    doc='[dynamic] (%ds) %s %s\n@rtype: %s' % (info[0], docstring, extra_info, itemtype)
                 )
 
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
