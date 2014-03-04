@@ -25,6 +25,7 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.dal.relations.relations import RelationMapper
 
 
 class DataList(object):
@@ -64,7 +65,7 @@ class DataList(object):
     namespace = 'ovs_list'
     cachelink = 'ovs_listcache'
 
-    def __init__(self, query, key=None, load=True):
+    def __init__(self, query, key=None, load=True, post_query_hook=None):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         """
@@ -81,7 +82,7 @@ class DataList(object):
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query
-        self._invalidation = {}
+        self._post_query_hook = post_query_hook
         self.data = None
         self.from_cache = False
         self._can_cache = True
@@ -141,17 +142,8 @@ class DataList(object):
             itemcounter += 1
             if pitem in value.__class__._expiry:
                 self._can_cache = False
-            self._add_invalidation(value.__class__.__name__.lower(), pitem)
-            target_class = value._relations.get(pitem, None)
             value = getattr(value, pitem)
             if value is None and itemcounter != len(path):
-                # We loaded a None in the middle of our path
-                if target_class is not None:
-                    if target_class[0] is None:
-                        classname = value.__class__.__name__.lower()
-                    else:
-                        classname = target_class[0].__name__.lower()
-                    self._add_invalidation(classname, path[itemcounter])
                 return False  # Fail the filter
 
         # Apply operators
@@ -195,6 +187,23 @@ class DataList(object):
             query_data = self._query['data']
             query_object = self._query['object']
 
+            invalidations = {query_object.__name__.lower(): ['__all']}
+            DataList._build_invalidations(invalidations, query_object, items)
+
+            for class_name in invalidations:
+                key = '%s_%s' % (DataList.cachelink, class_name)
+                mutex = VolatileMutex('listcache_%s' % class_name)
+                try:
+                    mutex.acquire(60)
+                    cache_list = Toolbox.try_get(key, {})
+                    current_fields = cache_list.get(self._key, [])
+                    current_fields = list(set(current_fields + ['__all'] + invalidations[class_name]))
+                    cache_list[self._key] = current_fields
+                    self._volatile.set(key, cache_list)
+                    self._persistent.set(key, cache_list)
+                finally:
+                    mutex.release()
+
             self.from_cache = False
             namespace = query_object()._namespace
             name = query_object.__name__.lower()
@@ -206,7 +215,6 @@ class DataList(object):
             else:
                 self.data = []
 
-            self._add_invalidation(name, '__all')
             for key in keys:
                 guid = key.replace(base_key, '')
                 try:
@@ -227,41 +235,76 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
+            if self._post_query_hook is not None:
+                self._post_query_hook(self)
+
             if self._key is not None and len(keys) > 0 and self._can_cache:
-                self._volatile.set(self._key, self.data, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
-                self._update_listinvalidation()
+                invalidated = False
+                for class_name in invalidations:
+                    key = '%s_%s' % (DataList.cachelink, class_name)
+                    cache_list = Toolbox.try_get(key, {})
+                    if self._key not in cache_list:
+                        invalidated = True
+                # If the key under which the list should be saved was already invalidated since the invalidations
+                # were saved, the returned list is most likely outdated. This is OK for this result, but the list
+                # won't get cached
+                if invalidated is False:
+                    self._volatile.set(self._key, self.data, 300 + randint(0, 300))  # Cache between 5 and 10 minutes
         else:
             Toolbox.log_cache_hit('datalist', True)
             self.from_cache = True
         return self
 
-    def _add_invalidation(self, object_name, field):
+    @staticmethod
+    def _build_invalidations(invalidations, object_type, items):
         """
-        This method adds an invalidation to an internal list that will be saved when the
-        query is completed
+        Builds an invalidation set out of a given object type and query items. It will use type information
+        to build the invalidations, and not the actual data.
         """
-        field_list = self._invalidation.get(object_name, [])
-        field_list.append(field)
-        self._invalidation[object_name] = field_list
+        def add(class_name, field):
+            if class_name not in invalidations:
+                invalidations[class_name] = []
+            if field not in invalidations[class_name]:
+                invalidations[class_name].append(field)
 
-    def _update_listinvalidation(self):
-        """
-        This method will save the list invalidation mapping to volatile and persistent storage
-        """
-        if self._key is not None:
-            for object_name, field_list in self._invalidation.iteritems():
-                key = '%s_%s' % (DataList.cachelink, object_name)
-                mutex = VolatileMutex('listcache_%s' % object_name)
-                try:
-                    mutex.acquire(60)
-                    cache_list = Toolbox.try_get(key, {})
-                    current_fields = cache_list.get(self._key, [])
-                    current_fields = list(set(current_fields + field_list))
-                    cache_list[self._key] = current_fields
-                    self._volatile.set(key, cache_list)
-                    self._persistent.set(key, cache_list)
-                finally:
-                        mutex.release()
+        for item in items:
+            if isinstance(item, dict):
+                # Recursive
+                DataList._build_invalidations(invalidations, object_type, item['items'])
+            else:
+                path = item[0].split('.')
+                value = object_type
+                itemcounter = 0
+                for pitem in path:
+                    itemcounter += 1
+                    class_name = value.__name__.lower()
+                    if pitem == 'guid':
+                        # The guid is a final value which can't be changed so it shouldn't be taken into account
+                        break
+                    elif pitem in value._blueprint:
+                        # The pitem is in the blueprint, so it's a simple property (e.g. vmachine.name)
+                        add(class_name, pitem)
+                        break
+                    elif pitem in value._relations:
+                        # The pitem is in the relations, so it's a relation property (e.g. vdisk.vmachine)
+                        add(class_name, pitem)
+                        if value._relations[pitem][0] is not None:
+                            value = value._relations[pitem][0]
+                        continue
+                    elif pitem in value._expiry:
+                        # The pitem is a dynamic property, which will be ignored anyway
+                        break
+                    else:
+                        # No blueprint and no relation, it might be a foreign relation (e.g. vmachine.vdisks)
+                        # this means the pitem most likely contains an index
+                        cleaned_pitem = pitem.split('[')[0]
+                        relations = RelationMapper.load_foreign_relations(value)
+                        if relations is not None:
+                            if cleaned_pitem in relations:
+                                value = Descriptor().load(relations[cleaned_pitem]['class']).get_object()
+                                add(value.__name__.lower(), relations[cleaned_pitem]['key'])
+                                continue
+                    raise RuntimeError('Invalid path given: {0}, currently pointing to {1}'.format(path, pitem))
 
     @staticmethod
     def get_relation_set(remote_class, remote_key, own_class, own_key, own_guid):
@@ -269,23 +312,23 @@ class DataList(object):
         This method will get a DataList for a relation.
         On a cache miss, the relation DataList will be rebuild and due to the nature of the full table scan, it will
         update all relations in the mean time.
+        This is used to fetch e.g. vmachine.vdisks where remote_class is vDisk, remote key is vmachine, own_class is
+        vMachine, own_key is vdisks and own_guid is whatever guid the current vMachine has.
         """
         own_name = own_class.__name__.lower()
         datalist = DataList({}, '%s_%s_%s' % (own_name, own_guid, remote_key), load=False)
-        base_key = '%s_%s_%%s_%s' % (DataList.namespace, own_name, own_key)  # <ns>_<oc>_%s_<rk>
+        base_key = '%s_%s_%%s_%s' % (DataList.namespace, own_name, own_key)
+        # base_key is e.g. ovs_list_vmachine_%s_vdisks
 
         data = datalist._volatile.get(base_key % own_guid)
         if data is None:
             # Cache miss
             Toolbox.log_cache_hit('datalist', False)
 
-            remote_namespace = remote_class()._namespace
             remote_name = remote_class.__name__.lower()
-            remote_base_key = '%s_%s_' % (remote_namespace, remote_name)
-            remote_keys = DataList.get_pks(remote_namespace, remote_name)
 
             own_namespace = own_class()._namespace
-            own_base_key = '%s_%s_' % (own_namespace, own_name)
+            own_base_key = '%s_%s_' % (own_namespace, own_name)  # e.g. ovs_data_vmachine_
             own_keys = DataList.get_pks(own_namespace, own_name)
 
             lists = {}
@@ -294,6 +337,26 @@ class DataList(object):
                 lists[guid] = []
             if own_guid not in lists:
                 lists[own_guid] = []
+
+            # Save invalidations
+            key = '%s_%s' % (DataList.cachelink, remote_name)  # e.g. ovs_listcache_vdisk
+            mutex = VolatileMutex('listcache_%s' % remote_name)
+            try:
+                mutex.acquire(60)
+                cache_list = Toolbox.try_get(key, {})
+                for guid in lists:
+                    list_key = base_key % guid
+                    current_fields = cache_list.get(list_key, [])
+                    current_fields = list(set(current_fields + ['__all', remote_key]))
+                    cache_list[list_key] = current_fields
+                datalist._volatile.set(key, cache_list)
+                datalist._persistent.set(key, cache_list)
+            finally:
+                mutex.release()
+
+            remote_namespace = remote_class()._namespace
+            remote_base_key = '%s_%s_' % (remote_namespace, remote_name)  # e.g. ovs_data_vdisk_
+            remote_keys = DataList.get_pks(remote_namespace, remote_name)
 
             for key in remote_keys:
                 guid = key.replace(remote_base_key, '')
@@ -306,27 +369,23 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
-            list_keys = []
+            abort = False
             for guid in lists:
-                list_keys.append(base_key % guid)
-                datalist._volatile.set(base_key % guid, lists[guid], 300 + randint(0, 300))  # Cache between 5 and 10 minutes
-
-            key = '%s_%s' % (DataList.cachelink, remote_name)
-            mutex = VolatileMutex('listcache_%s' % remote_name)
-            try:
-                mutex.acquire(60)
+                list_key = base_key % guid
+                key = '%s_%s' % (DataList.cachelink, remote_name)  # e.g. ovs_listcache_vdisk
                 cache_list = Toolbox.try_get(key, {})
-                for list_key in list_keys:
-                    current_fields = cache_list.get(list_key, [])
-                    current_fields = list(set(current_fields + ['__all', remote_key]))
-                    cache_list[list_key] = current_fields
-                datalist._volatile.set(key, cache_list)
-                datalist._persistent.set(key, cache_list)
-            finally:
-                mutex.release()
+                if list_key in cache_list:
+                    datalist._volatile.set(list_key, lists[guid], 300 + randint(0, 300))  # Cache between 5 and 10 minutes
+                else:
+                    abort = True
+                    break
+
+            if abort:
+                for guid in lists:
+                    list_key = base_key % guid
+                    datalist._volatile.delete(list_key)
 
             datalist.data = lists.get(own_guid)
-            datalist._update_listinvalidation()
         else:
             Toolbox.log_cache_hit('datalist', True)
             datalist.data = data
