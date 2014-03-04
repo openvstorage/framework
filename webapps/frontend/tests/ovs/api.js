@@ -213,7 +213,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
         beforeEach(function() {
             spyOn($, 'ajax').andCallFake(function() {
                 return $.Deferred(function(deferred) {
-                    deferred.reject({ readyState: 0, status: 0 }, 'textStatus', 'errorThrown');
+                    deferred.reject({ readyState: 0, status: 1 }, 'textStatus', 'errorThrown');
                 }).promise();
             });
         });
