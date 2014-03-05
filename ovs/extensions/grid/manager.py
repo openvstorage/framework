@@ -871,7 +871,6 @@ print Configuration.get('{0}')
         """
         Get nodes from Osis
         """
-        from ovs.plugin.provider.net import Net
         from ovs.plugin.provider.osis import Osis
         from ovs.plugin.provider.configuration import Configuration
 
@@ -884,14 +883,32 @@ print Configuration.get('{0}')
             if node.gid != grid_id:
                 continue
             ip_found = False
-            for ip in node.ipaddr:
-                if Net.getReachableIpAddress(ip, 22) == local_ovs_grid_ip:
-                    grid_nodes.append(ip)
-                    ip_found = True
-                    break
-            if not ip_found:
-                raise RuntimeError('No suitable ip address found for node {0}'.format(node.machineguid))
+            if local_ovs_grid_ip in node.ipaddr:
+                # For the local node, the local grid ip is saved as node ip
+                grid_nodes.append(local_ovs_grid_ip)
+            else:
+                for ip in node.ipaddr:
+                    if Manager._get_local_endpoint_to(ip, 22) == local_ovs_grid_ip:
+                        grid_nodes.append(ip)
+                        ip_found = True
+                        break
+                if not ip_found:
+                    raise RuntimeError('No suitable ip address found for node {0}'.format(node.machineguid))
         return grid_nodes
+
+    @staticmethod
+    def _get_local_endpoint_to(ip, port, timeout=2):
+        """
+        Checks from which local ip this machine can connect to a given ip and port. Returns None if it can't connect
+        """
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(timeout)
+            sock.connect((ip, port))
+        except:
+            return None
+        return sock.getsockname()[0]
 
     @staticmethod
     def _configure_nginx(client):
