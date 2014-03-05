@@ -291,6 +291,10 @@ class DataList(object):
                         if value._relations[pitem][0] is not None:
                             value = value._relations[pitem][0]
                         continue
+                    elif pitem.endswith('_guid') and pitem.replace('_guid', '') in value._relations:
+                        # The pitem is the guid pointing to a relation, so it can be handled like a simple property (e.g. vdisk.vmachine_guid)
+                        add(class_name, pitem.replace('_guid', ''))
+                        break
                     elif pitem in value._expiry:
                         # The pitem is a dynamic property, which will be ignored anyway
                         break

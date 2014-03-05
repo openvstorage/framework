@@ -1034,3 +1034,21 @@ class Basic(TestCase):
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 1, 'One disks should be found ({0})'.format(len(disks)))
+
+    def test_guid_query(self):
+        """
+        Validates whether queries can use the _guid fields
+        """
+        machine = TestMachine()
+        machine.save()
+        disk = TestDisk()
+        disk.name = 'test'
+        disk.machine = machine
+        disk.save()
+
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('machine_guid', DataList.operator.EQUALS, machine.guid)]}}).data
+        disks = DataObjectList(data, TestDisk)
+        self.assertEqual(len(disks), 1, 'There should be one disk ({0})'.format(len(disks)))
