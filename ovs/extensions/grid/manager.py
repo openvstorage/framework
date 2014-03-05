@@ -571,7 +571,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                           'backend_type': 'REST'}
             elif vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
                 connection_host = Helper.ask_string('Specify fqdn or ip address for your S3 compatible host')
-                connection_port = Helper.ask_integer('Specify port for your S3 compatible host', min_value=1,
+                connection_port = Helper.ask_integer('Specify port for your S3 compatible host: ', min_value=1,
                                                      max_value=65535)
                 connection_username = Helper.ask_string('Specify S3 access key')
                 connection_password = getpass.getpass()
@@ -934,13 +934,23 @@ print Configuration.get('{0}')
         """
         Cleans a previous install (dirty)
         """
-        client.run('service nfs-kernel-server stop')
-        client.run('pkill arakoon')
-        client.run('rm -rf /usr/local/lib/python2.7/*-packages/JumpScale*')
-        client.run('rm -rf /usr/local/lib/python2.7/dist-packages/jumpscale.pth')
-        client.run('rm -rf /opt/jumpscale')
-        client.run('rm -rf /opt/OpenvStorage')
-        client.run('rm -rf /mnt/db/arakoon /mnt/db/tlogs /mnt/cache/foc /mnt/cache/sco /mnt/cache/read')
+
+        def try_run(command):
+            """
+            Tries executing a command, ignoring any error
+            """
+            try:
+                client.run(command)
+            except:
+                pass
+
+        try_run('service nfs-kernel-server stop')
+        try_run('pkill arakoon')
+        try_run('rm -rf /usr/local/lib/python2.7/*-packages/JumpScale*')
+        try_run('rm -rf /usr/local/lib/python2.7/dist-packages/jumpscale.pth')
+        try_run('rm -rf /opt/jumpscale')
+        try_run('rm -rf /opt/OpenvStorage')
+        try_run('rm -rf /mnt/db/arakoon /mnt/db/tlogs /mnt/cache/foc /mnt/cache/sco /mnt/cache/read')
 
     @staticmethod
     def _create_filesystems(client, create_extra):
@@ -1002,7 +1012,7 @@ print Configuration.get('{0}')
                 print 'No HDD was found. At least one HDD is required when creating extra filesystems'
                 sys.exit(1)
             if len(hdds) > 1:
-                hdd = Helper.ask_choice(ssds, question='Choose the HDD to use for Open vStorage')
+                hdd = Helper.ask_choice(hdds, question='Choose the HDD to use for Open vStorage')
             else:
                 hdd = hdds[0]
             print 'Using {0} as extra HDD'.format(hdd)
