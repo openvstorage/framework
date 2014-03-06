@@ -247,7 +247,7 @@ class Manager(object):
             # Fetch some information
             client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
             remote_ips = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-            remote_ip = [ipa.strip() for ipa in nodes if ipa in remote_ips][0]
+            remote_ip = [ipa.strip() for ipa in remote_ips if ipa.strip() in nodes][0]
 
             # Configure arakoon
             for cluster in clusters:
