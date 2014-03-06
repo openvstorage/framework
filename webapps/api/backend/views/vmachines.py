@@ -116,17 +116,14 @@ class VMachineViewSet(viewsets.ViewSet):
         Returns set of served vpool guids and (indirectly) served vmachine guids
         """
         _ = request
-        vpool_guids = set()
         vmachine_guids = set()
         if obj.is_internal is False:
             raise NotAcceptable('vMachine is not a VSA')
         for vsr in obj.served_vsrs:
-            vpool_guids.add(vsr.vpool_guid)
             for vdisk in vsr.vpool.vdisks:
                 if vdisk.vsrid == vsr.vsrid and vdisk.vmachine_guid is not None:
                     vmachine_guids.add(vdisk.vmachine_guid)
-        return Response({'vpool_guids': list(vpool_guids),
-                         'vmachine_guids': list(vmachine_guids)}, status=status.HTTP_200_OK)
+        return Response(list(vmachine_guids), status=status.HTTP_200_OK)
 
     @link()
     @expose(internal=True)

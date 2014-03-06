@@ -208,6 +208,7 @@ define([
         };
         self.sync = function() {
             if (self.vPool() !== undefined) {
+                var vp = self.vPool();
                 app.showMessage(
                         $.t('ovs:vpools.sync.warning'),
                         $.t('ovs:vpools.sync.title', { what: vp.name() }),
