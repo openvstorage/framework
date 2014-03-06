@@ -168,13 +168,9 @@ class VMachine(DataObject):
         Gets the vPool guids linked to this vMachine
         """
         vpool_guids = set()
-        vdisks = self.vdisks
         if self.is_internal:
-            vdisks = []
             for vsr in self.served_vsrs:
-                for vdisk in vsr.vpool.vdisks:
-                    if vdisk.vsrid == vsr.vsrid:
-                        vdisks.append(vdisk)
-        for vdisk in vdisks:
+                vpool_guids.add(vsr.vpool_guid)
+        for vdisk in self.vdisks:
             vpool_guids.add(vdisk.vpool_guid)
         return list(vpool_guids)
