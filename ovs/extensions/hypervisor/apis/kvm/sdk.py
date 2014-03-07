@@ -63,16 +63,18 @@ class Sdk(object):
 
     def _get_ram(self, vm_object):
         """
-        returns RAM size in GiB
+        returns RAM size in MiB
         """
         tree=ElementTree.fromstring(vm_object.XMLDesc(0))
         mem = tree.findall('memory')[0]
         unit = mem.items()[0][1]
         value = mem.text
-        if unit == 'GiB':
-            return int(value)
+        if unit == 'MiB':
+            return float(value)
         elif unit == 'KiB':
-            return int(value) / 1024
+            return float(value) / 1024.0
+        elif unit == 'GiB':
+            return float(value) / 1024.0 / 1024.0
 
     def _get_disk_size(self, filename):
         cmd = ['qemu-img', 'info', filename]
