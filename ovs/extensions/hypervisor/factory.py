@@ -18,6 +18,7 @@ Hypervisor factory module
 from hypervisors.vmware import VMware
 from hypervisors.hyperv import HyperV
 from hypervisors.xen import Xen
+from hypervisors.kvm import KVM
 from ovs.extensions.generic.filemutex import FileMutex
 
 
@@ -49,6 +50,8 @@ class Factory(object):
                         hypervisor = VMware(ip, username, password)
                     elif hvtype == 'XEN':
                         hypervisor = Xen(ip, username, password)
+                    elif hvtype =='KVM':
+                        hypervisor = KVM(ip, username, password)
                     else:
                         raise Exception('Invalid hypervisor')
                     Factory.hypervisors[key] = hypervisor
