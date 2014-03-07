@@ -61,6 +61,19 @@ class Sdk(object):
         tree=ElementTree.fromstring(vm_object.XMLDesc(0))
         return [_recurse(item) for item in tree.findall("devices/interface")]
 
+    def _get_ram(self, vm_object):
+        """
+        returns RAM size in GiB
+        """
+        tree=ElementTree.fromstring(vm_object.XMLDesc(0))
+        mem = tree.findall('memory')[0]
+        unit = mem.items()[0][1]
+        value = mem.text
+        if unit == 'GiB':
+            return int(value)
+        elif unit == 'KiB':
+            return int(value) / 1024
+
     def _get_disk_size(self, filename):
         cmd = ['qemu-img', 'info', filename]
         try:
@@ -78,6 +91,10 @@ class Sdk(object):
         return 0
 
     def make_agnostic_config(self, vm_object):
+        """
+        return an agnostic config (no hypervisor specific type or structure)
+        TODO: kvm has no concept of datastore (so the "datastore" is assumed to be the vpool mountpoint)
+        """
         config = {'name': vm_object.name(),
                   'id': vm_object.ID(),
                   'backing': {'filename': vm_object.name() + '.xml',
@@ -150,7 +167,7 @@ class Sdk(object):
         vm_object.create()
         return self.get_power_state(vmid)
 
-    def create_vm_from_template(name, source_vm, disks, ip, mountpoint):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint):
         """
         Create a vm based on an existing template on specified hypervisor
         #source_vm might be an esx machine object or a libvirt.VirDomain object
@@ -160,18 +177,31 @@ class Sdk(object):
         #ip, mountpoint = are used to locate the datastore
          kvm doesn't have datastores, all files are in /mnt/vpool_x/name/
          @TODO: we need to receive /mnt/vpool_x (?) or we can take it from disks ['backingdevice']
+        @TODO:
+         move ROOT_PATH+/+(name).xml to /mnt/vpool_X/(name)/(name).xml
+         symlink back to ROOT_PATH+/+(name).xml
         """
         vm_disks = []
         #get agnostic config of source vm
-
+        if hasattr(source_vm, 'config'):
+            vcpus = source_vm.config.hardware.numCPU
+            ram = source_vm.config.hardware.memoryMB
+        elif isinstance(source_vm, libvirt.virDomain):
+            vcpus = source_vm.info()[3]
+            ram = self._get_ram(source_vm)
+        else:
+            raise ValueError('Unexpected object type {} {}'.format(source_vm, type(source_vm)))
         #assume disks are raw
         for disk in disks:
-            vm_disks.append((disk['backingdevice']))
+            vm_disks.append((disk['backingdevice'], 'raw', 'virtio'))
+        out = self._vm_create(name, vcpus, ram, disks)
 
     def _vm_create(self, name, vcpus, ram, disks, cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0'):
         """
         disks = list of tuples [(disk_name, disk_size_GB, disk_format ENUM(raw, qcow2, vmdk), bus ENUM(virtio, ide, sata)]
         #e.g [(/vms/vm1.vmdk,10,vmdk,virtio), ]
+        #when using existing storage, size can be ommited
+        #e.g [(/vms/vm1.raw,raw,virtio), ]
         """
         command = 'virt-install'
         options = ['--connect qemu:///system', #only local connections
@@ -180,7 +210,10 @@ class Sdk(object):
                    '--ram {}'.format(ram),
                    '--graphics vnc,listen={}'.format(vnc_listen)] #have to specify 0.0.0.0 else it will listen on 127.0.0.1 only
         for disk in disks:
-            options.append('--disk {},device=disk,size={},format={},bus={}'.format(*disk))
+            if len(disk) == 3:
+                options.append('--disk {},device=disk,format={},bus={}'.format(*disk))
+            else:
+                options.append('--disk {},device=disk,size={},format={},bus={}'.format(*disk))
         if cdrom_iso is None:
             options.append('--import')
         else:

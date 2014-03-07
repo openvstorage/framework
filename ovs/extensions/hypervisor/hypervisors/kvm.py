@@ -50,7 +50,7 @@ class KVM(Hypervisor):
 
     @Hypervisor.connected
     def delete_vm(self, vmid):
-        return True
+        return self.sdk.delete_vm(vmid)
 
     @Hypervisor.connected
     def get_vm_agnostic_object(self, vmid):
@@ -79,6 +79,7 @@ class KVM(Hypervisor):
     def set_as_template(self, vmid, disks):
         """
         Dummy method
+        TODO: Not yet implemented, setting an existing kvm guest as template
         """
         raise NotImplementedError()
 
@@ -87,7 +88,7 @@ class KVM(Hypervisor):
         """
         Dummy method
         """
-        return self.sdk.get_vm_object(vm)
+        return self.sdk.get_vm_object(vmid)
 
     @Hypervisor.connected
     def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
