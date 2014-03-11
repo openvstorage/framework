@@ -77,6 +77,19 @@ class VMachineViewSet(viewsets.ViewSet):
 
     @action()
     @expose(internal=True, customer=True)
+    @required_roles(['delete'])
+    @validate(VMachine)
+    def destroy(self, request, obj):
+        """
+        Deletes a machine
+        """
+        if not obj.is_vtemplate:
+            raise NotAcceptable('vMachine should be a vTemplate')
+        task = VMachineController.delete.delay(machineguid=obj.guid)
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
     @validate(VMachine)
     def rollback(self, request, obj):
