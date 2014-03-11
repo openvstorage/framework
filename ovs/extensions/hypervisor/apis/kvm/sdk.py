@@ -19,6 +19,9 @@ This module contains all code for using the KVM libvirt api
 import libvirt  #required
 from xml.etree import ElementTree
 import subprocess
+import socket
+import shutil
+import os
 
 ROOT_PATH = "/etc/libvirt/qemu/" #get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = "/var/run/libvirt/qemu/" #get live info from here
@@ -74,7 +77,7 @@ class Sdk(object):
         elif unit == 'KiB':
             return float(value) / 1024.0
         elif unit == 'GiB':
-            return float(value) / 1024.0 / 1024.0
+            return float(value) * 1024.0
 
     def _get_disk_size(self, filename):
         cmd = ['qemu-img', 'info', filename]
@@ -92,10 +95,25 @@ class Sdk(object):
                 return size
         return 0
 
+    def _get_vm_pid(self, vm_object):
+        """
+        return pid of kvm process running this machine (if any)
+        """
+        if self.get_power_state(vm_object.name()) == 'RUNNING':
+            pid_path = '{}/{}.pid'.format(RUN_PATH, vm_object.name())
+            try:
+                with open(pid_path, 'r') as pid_file:
+                    pid = pid_file.read()
+                return int(pid)
+            except IOError:
+                #vmachine is running but no run file?
+                return '-1'
+        return '-2' #no pid, machine is halted
+
     def make_agnostic_config(self, vm_object):
         """
         return an agnostic config (no hypervisor specific type or structure)
-        TODO: kvm has no concept of datastore (so the "datastore" is assumed to be the vpool mountpoint)
+        kvm has no concept of datastore (so the "datastore" is assumed to be the vpool mountpoint)
         """
         config = {'name': vm_object.name(),
                   'id': vm_object.ID(),
@@ -137,23 +155,6 @@ class Sdk(object):
         """
         return self._conn.listAllDomains()
 
-    def _get_vm_pid(self, vmid):
-        """
-        return pid of kvm process running this machine (if any)
-        """
-        vm_object = self.get_vm_object(vmid)
-        if self.get_power_state(vmid) == 'RUNNING':
-            xml_path = '{}/{}.xml'.format(RUN_PATH, vm_object.name())
-            try:
-                with open(xml_path, 'r') as xml_file:
-                    xml_tree = ElementTree.fromstring(xml_file.read())
-                items = dict(xml_tree.items())
-                return items.get('pid', '-0') #file found but no pid
-            except IOError:
-                #vmachine is running but no run file?
-                return '-1'
-        return '-2' #no pid, machine is halted
-
     def shutdown(self, vmid):
         vm_object = self.get_vm_object(vmid)
         vm_object.shutdown()
@@ -169,21 +170,43 @@ class Sdk(object):
         vm_object.create()
         return self.get_power_state(vmid)
 
-    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint):
+    def clone_vm(self, vmid, name, disks):
+        """
+        create a clone vm
+        similar to create_vm_from template (?)
+        """
+        source_vm = self.get_vm_object(vmid)
+        #TODO:
+        ## copy nics
+        return self.create_vm_from_template(name, source_vm, disks)
+
+    def create_vm_from_template(self, name, source_vm, disks):
         """
         Create a vm based on an existing template on specified hypervisor
         #source_vm might be an esx machine object or a libvirt.VirDomain object
          @TODO: make sure source_vm is agnostic object (dict)
         #disks: list of dicts (agnostic)
          {'diskguid': new_disk.guid, 'name': new_disk.name, 'backingdevice': device_location.strip('/')}
-        #ip, mountpoint = are used to locate the datastore
-         kvm doesn't have datastores, all files are in /mnt/vpool_x/name/
-         @TODO: we need to receive /mnt/vpool_x (?) or we can take it from disks ['backingdevice']
-        @TODO:
-         move ROOT_PATH+/+(name).xml to /mnt/vpool_X/(name)/(name).xml
-         symlink back to ROOT_PATH+/+(name).xml
+        ---
+         kvm doesn't have datastores, all files should be in /mnt/vpool_x/name/ and shared between nodes
+         to "migrate" a kvm machine just symlink the xml on another node and use virsh define name.xml to reimport it
+         (assuming that the vpool is in the same location)
+        ---
         """
         vm_disks = []
+
+        #get the datastore from the new disks
+        #we need the full path of the disk images to be able to create vmachine
+        from ovs.dal.hybrids.vdisk import VDisk
+        datastore = None
+        for disk in disks:
+            disk_object = VDisk(disk['diskguid'])
+            for vsr in disk.vpool.vsrs:
+                if vsr.serving_vmachine.name == socket.gethostname():
+                    datastore = vsr.mountpoint
+        if datastore is None:
+            raise RuntimeError('Cannot identify volumedriverfs mountpoint for vmachine {}'.format(vmid))
+
         #get agnostic config of source vm
         if hasattr(source_vm, 'config'):
             vcpus = source_vm.config.hardware.numCPU
@@ -193,17 +216,31 @@ class Sdk(object):
             ram = self._get_ram(source_vm)
         else:
             raise ValueError('Unexpected object type {} {}'.format(source_vm, type(source_vm)))
+
         #assume disks are raw
         for disk in disks:
-            vm_disks.append((disk['backingdevice'], 'raw', 'virtio'))
+            vm_disks.append(("{}/{}".format(datastore, disk['backingdevice']), 'virtio'))
+
         out = self._vm_create(name, vcpus, ram, disks)
 
-    def _vm_create(self, name, vcpus, ram, disks, cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0'):
+        if 'ERROR' in out:
+            msg = out.replace('ERROR', '').strip().split('\n')[0]
+            raise RuntimeError(msg)
+        source_xml = '{}/{}.xml'.format(ROOT_PATH, name)
+        dest_xml = '{}/{}.xml'.format(datastore, name)
+        shutil.move(source_xml, dest_xml)
+        os.symlink(dest_xml, source_xml)
+        return self.get_power_state(vmid) #confirm vmachine was created  and is running
+
+    def _vm_create(self, name, vcpus, ram, disks,
+                   cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
+                   network = ('network=default', 'mac=RANDOM', 'model=e1000')):
         """
-        disks = list of tuples [(disk_name, disk_size_GB, disk_format ENUM(raw, qcow2, vmdk), bus ENUM(virtio, ide, sata)]
-        #e.g [(/vms/vm1.vmdk,10,vmdk,virtio), ]
+        disks = list of tuples [(disk_name, disk_size_GB, bus ENUM(virtio, ide, sata)]
+        #e.g [(/vms/vm1.vmdk,10,virtio), ]
         #when using existing storage, size can be ommited
         #e.g [(/vms/vm1.raw,raw,virtio), ]
+        #network: (network name: "default", specific mac or RANDOM, nic model as seen inside vmachine: e1000
         """
         command = 'virt-install'
         options = ['--connect qemu:///system', #only local connections
@@ -212,10 +249,10 @@ class Sdk(object):
                    '--ram {}'.format(ram),
                    '--graphics vnc,listen={}'.format(vnc_listen)] #have to specify 0.0.0.0 else it will listen on 127.0.0.1 only
         for disk in disks:
-            if len(disk) == 3:
-                options.append('--disk {},device=disk,format={},bus={}'.format(*disk))
+            if len(disk) == 2:
+                options.append('--disk {},device=disk,bus={}'.format(*disk))
             else:
-                options.append('--disk {},device=disk,size={},format={},bus={}'.format(*disk))
+                options.append('--disk {},device=disk,size={},bus={}'.format(*disk))
         if cdrom_iso is None:
             options.append('--import')
         else:
@@ -224,6 +261,10 @@ class Sdk(object):
             options.append('--os-type {}'.format(os_type))
         if os_variant is not None:
             options.append('-- os-variant {}'.format(os_variant))
+        if network is None:
+            options.append('--nonetworks')
+        else:
+            options.append('--network {}'.format(','.join(network)))
         print(' '.join(options))
         try:
             return subprocess.check_output("{} {}".format(command, " ".join(options)),
