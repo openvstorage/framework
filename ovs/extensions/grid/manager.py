@@ -51,6 +51,8 @@ class Manager(object):
         is_local = Client.is_local(ip)
         client = Client.load(ip, password, bypass_local=True)
 
+        client.run('apt-get install lsscsi')
+
         if clean:
             Manager._clean(client)
         Manager._create_filesystems(client, create_extra_filesystems)
@@ -968,11 +970,16 @@ print Configuration.get('{0}')
                 identifier = drive.replace('/dev/', '')
                 if client.run('cat /sys/block/{0}/device/type'.format(identifier)).strip() == '0' \
                         and client.run('cat /sys/block/{0}/removable'.format(identifier)).strip() == '0':
+                    ssd_output = ''
                     try:
-                        ssd_output = client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State'".format(drive)).strip()
+                        ssd_output = client.run("/usr/bin/lsscsi | grep 'FUSIONIO' | grep {0}".format(drive)).strip()
                     except:
-                        ssd_output = ''
-                    drives[drive] = {'ssd': 'Solid State' in ssd_output,
+                        pass
+                    try:
+                        ssd_output = ssd_output + str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State'".format(drive)).strip())
+                    except:
+                        pass
+                    drives[drive] = {'ssd': ('Solid State' in ssd_output or 'FUSIONIO' in ssd_output),
                                      'partitions': []}
             if drive in drives:
                 drives[drive]['partitions'].append(partition)
@@ -1337,13 +1344,13 @@ class Helper(object):
         Asks the user a yes/no question
         """
         if default_value is None:
-            ynstring = ' (y/n):'
+            ynstring = ' (y/n): '
             failuremsg = "Illegal value. Press 'y' or 'n'."
         elif default_value is True:
-            ynstring = ' ([y]/n)'
+            ynstring = ' ([y]/n): '
             failuremsg = "Illegal value. Press 'y' or 'n' (or nothing for default)."
         elif default_value is False:
-            ynstring = ' (y/[n])'
+            ynstring = ' (y/[n]): '
             failuremsg = "Illegal value. Press 'y' or 'n' (or nothing for default)."
         else:
             raise ValueError('Invalid default value {0}'.format(default_value))

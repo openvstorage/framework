@@ -25,6 +25,7 @@ and boot the OVSVSA from that iso to install.
 import subprocess as sp
 import os
 import re
+import shlex
 
 
 class InstallHelper():
@@ -61,7 +62,7 @@ class InstallHelper():
                     print invalid_message
 
     @staticmethod
-    def ask_choice(choice_options, default_value=None):
+    def ask_choice(choice_options, default_value=None, columns=[]):
         """
         Lets the user chose one of a set of options
         """
@@ -76,7 +77,13 @@ class InstallHelper():
         default_nr = None
         for section in choice_options:
             nr += 1
-            print '   {0}: {1}'.format(nr, section)
+            output = ''
+            for column in columns:
+                output = output + ' {0:<18}'.format(section[column])
+            if not output:
+                print '   {0}: {1}'.format(nr, section)
+            else:
+                print '   {0}: {1}'.format(nr, output)
             if section == default_value:
                 default_nr = nr
 
@@ -136,13 +143,13 @@ class InstallHelper():
         Asks the user a yes/no question
         """
         if default_value is None:
-            ynstring = " (y/n):"
+            ynstring = " (y/n): "
             failuremsg = "Illegal value. Press 'y' or 'n'."
         elif default_value is True:
-            ynstring = " ([y]/n)"
+            ynstring = " ([y]/n): "
             failuremsg = "Illegal value. Press 'y' or 'n' (or nothing for default)."
         elif default_value is False:
-            ynstring = " (y/[n])"
+            ynstring = " (y/[n]): "
             failuremsg = "Illegal value. Press 'y' or 'n' (or nothing for default)."
         else:
             raise ValueError("Invalid default value {0}".format(default_value))
@@ -167,7 +174,9 @@ class InstallHelper():
             process.wait()
             return process.returncode, output
         else:
-            sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.STDOUT)
+            process = sp.Popen(cmd, stdout=sp.PIPE, stderr=sp.PIPE)
+            output = process.communicate()
+            return process.returncode, output
 
     @staticmethod
     def boxed_message(lines, character='+', maxlength=60):
@@ -215,6 +224,27 @@ class VMwareSystem():
         """
         pass
 
+    def get_rdms_in_use(self):
+        """
+        Retrieve raw device mapping currently in use
+        """
+
+        KEY = 'Maps to: '
+        vmdk_to_rdm_map = {}
+        found_datastores = {}
+        cmd = """find /vmfs/volumes/ -type f -name '*.vmdk' -size -1024k -exec grep -l '^createType=.*RawDeviceMap' {} \;"""
+        _, rdms_in_use = InstallHelper.execute_command(shlex.split(cmd),
+                                                       catch_output=False)
+        for rdm in rdms_in_use[0].split():
+            _, mapping = InstallHelper.execute_command(['vmkfstools', '-q', rdm])
+            for line in mapping:
+                if KEY in line:
+                    vml_link = line.replace(KEY, '')
+                    _, disk = InstallHelper.execute_command(['ls', '-alh', '/vmfs/devices/disks/' + vml_link.strip()])
+                    vmdk_to_rdm_map[rdm] = disk[0].split(' -> ')[1].strip()
+
+        return vmdk_to_rdm_map
+
     def get_vmfs_devices(self):
         """
         Retrieve disk containing datastore
@@ -228,6 +258,7 @@ class VMwareSystem():
                 print 'Datastore:{0} UUID:{1} Device:{2}'.format(fs['VolumeName'], fs['VMFSUUID'], fs['DeviceName'])
             found_vmfsdevices.append(fs['DeviceName'])
             found_datastores[fs['VolumeName']] = fs['VMFSUUID']
+
         return found_datastores, found_vmfsdevices
 
     def get_boot_device(self):
@@ -408,18 +439,25 @@ usb_xhci.present = "TRUE"
         if not (os.path.exists(vmpath) or os.path.islink(vmpath)):
             os.mkdir(vmpath)
         vmdkpath = '{0}/vhd{1}.vmdk'.format(vmpath, seq)
-        if self._verbose:
-            print 'Creating vmdk'
-        returncode, output = InstallHelper.execute_command(['vmkfstools', '-c', size, '-d', 'zeroedthick', vmdkpath])
-        if returncode != 0:
-            print InstallHelper.boxed_message(['Error occurred during creation of vhd:'] + output)
-            sys.exit(1)
 
         dconfig += """scsi0:%(target)s.present = "TRUE"
         scsi0:%(target)s.fileName = "%(disksource)s"
         scsi0:%(target)s.deviceType = "scsi-hardDisk"
         """ % {'disksource': vmdkpath,
                'target'    : seq if seq <= 6 else seq + 1}
+
+        if os.path.exists(vmdkpath):
+            print 'Existing vmdk {0} detected - please remove vm on esx level first!'.format(vmdkpath)
+            sys.exit(1)
+
+        if self._verbose:
+            print 'Creating vmdk'
+
+        returncode, output = InstallHelper.execute_command(['vmkfstools', '-c', size, '-d', 'zeroedthick', vmdkpath])
+        if returncode != 0:
+            print InstallHelper.boxed_message(['Error occurred during creation of vhd:'] + output)
+            sys.exit(1)
+
         return dconfig
 
     def create_vdisk_mapping(self, vm, seq, dsk, dconfig):
@@ -456,7 +494,7 @@ if __name__ == '__main__':
     parser.add_option('-i', '--image', dest='image', help='absolute path to your ubuntu iso')
     (options, args) = parser.parse_args()
     if not options.image:
-        print 'No ISO image was speficied, you\'ll need to attach it to the VM yourself'
+        print 'No ISO image was specified, you\'ll need to attach it to the VM yourself'
         proceed = InstallHelper.ask_yesno('Continue with the install?', True)
         if not proceed:
             sys.exit(1)
@@ -466,6 +504,7 @@ if __name__ == '__main__':
     if imagefile and not os.path.isfile(imagefile):
         print InstallHelper.boxed_message(['Unable to find ISO', imagefile])
         sys.exit(1)
+
 
     # Warning
     print InstallHelper.boxed_message(['WARNING. Use with caution.',
@@ -501,8 +540,8 @@ if __name__ == '__main__':
         print InstallHelper.boxed_message(['No portgroups found in your ESXi network configuration'])
         sys.exit(1)
     all_pgs = VMwareSystem.list_vm_portgroups()
-    kernel_pgs = map(lambda p: p['Portgroup'],VMwareSystem.list_vmkernel_ports())
-    vm_pg_names = filter(lambda p: not p in kernel_pgs,all_pgs.keys())
+    kernel_pgs = map(lambda p: p['Portgroup'], VMwareSystem.list_vmkernel_ports())
+    vm_pg_names = filter(lambda p: not p in kernel_pgs, all_pgs.keys())
     if len(vm_pg_names) < 2:
         print InstallHelper.boxed_message(['There should be at least two portgroups configured'])
         sys.exit(1)
@@ -512,6 +551,16 @@ if __name__ == '__main__':
     private_pg = InstallHelper.ask_choice(vm_pg_names)
 
     nic_config = VMwareSystem.build_nic_config([private_pg, public_pg])
+
+    print '------'
+    rdms_in_use = vm_sys.get_rdms_in_use()
+    if rdms_in_use:
+        print 'RDM mappings currently in use:'
+        for disk, rdm in vm_sys.get_rdms_in_use().iteritems():
+            print 'vmdk: {0}, rdm: {1}'.format(disk, rdm)
+    else:
+        print 'No RDM mapping are currently in use'
+    print '------'
 
     # RDM
     print 'Creating Raw Device Mappings'
@@ -527,11 +576,16 @@ if __name__ == '__main__':
         print InstallHelper.boxed_message(['Not enough SSD devices available to continue the install. Min: 1'])
         sys.exit(1)
     size = InstallHelper.ask_integer('Specify the size in GB (min: 50)', 50, 9999, default_value=100)
+
     disk_config = ''
     disk_config = vm_sys.create_vdisk(vm_name, 0, '{0}G'.format(size), disk_config)
-    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssds[0], disk_config)
+
+    ssd = InstallHelper.ask_choice(ssds, columns=['Vendor', 'Model', 'DevfsPath'])
+    disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssd, disk_config)
+
     if len(hdds) > 0:
-        disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdds[0], disk_config)
+        hdd = InstallHelper.ask_choice(hdds, columns=['Vendor', 'Model', 'DevfsPath'])
+        disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdd, disk_config)
 
     # Add CD drive
     if imagefile:
@@ -559,8 +613,8 @@ ide1:0.startConnected = "FALSE"
 
     # Configure states
     print 'Configuring PStates and CStates'
-    InstallHelper.execute_command(['esxcli', 'system', 'settings', 'advanced', 'set', '-o', '/Power/UseCStates',  '--int-value=1'])
-    InstallHelper.execute_command(['esxcli', 'system', 'settings', 'advanced', 'set', '-o', '/Power/UsePStates',  '--int-value=0'])
+    InstallHelper.execute_command(['esxcli', 'system', 'settings', 'advanced', 'set', '-o', '/Power/UseCStates', '--int-value=1'])
+    InstallHelper.execute_command(['esxcli', 'system', 'settings', 'advanced', 'set', '-o', '/Power/UsePStates', '--int-value=0'])
 
     # Register VSA
     print 'Register VSA'
