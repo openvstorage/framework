@@ -16,7 +16,6 @@
 This module contains all code for using the KVM libvirt api
 """
 
-import libvirt  #required
 from xml.etree import ElementTree
 import subprocess
 import socket
@@ -25,14 +24,6 @@ import os
 
 ROOT_PATH = "/etc/libvirt/qemu/" #get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = "/var/run/libvirt/qemu/" #get live info from here
-
-STATES = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
-          libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
-          libvirt.VIR_DOMAIN_BLOCKED:  'BLOCKED',
-          libvirt.VIR_DOMAIN_PAUSED:   'PAUSED',
-          libvirt.VIR_DOMAIN_SHUTDOWN: 'SHUTDOWN',
-          libvirt.VIR_DOMAIN_SHUTOFF:  'TURNEDOFF',
-          libvirt.VIR_DOMAIN_CRASHED:  'CRASHED'}
 
 #Helpers
 def _recurse(treeitem):
@@ -50,9 +41,20 @@ class Sdk(object):
     """
 
     def __init__(self, host='localhost', login='root', passwd=None):
-        self._conn = libvirt.open("qemu:///system") #only local connection
-        #remote:
-        #self._conn = libvirt.open("qemu+ssh://{0}@{1}/system".format(login, host))
+        import libvirt  #required
+        self.STATES = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
+                       libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
+                       libvirt.VIR_DOMAIN_BLOCKED:  'BLOCKED',
+                       libvirt.VIR_DOMAIN_PAUSED:   'PAUSED',
+                       libvirt.VIR_DOMAIN_SHUTDOWN: 'SHUTDOWN',
+                       libvirt.VIR_DOMAIN_SHUTOFF:  'TURNEDOFF',
+                       libvirt.VIR_DOMAIN_CRASHED:  'CRASHED'}
+
+        if host == 'localhost':
+            self._conn = libvirt.open("qemu:///system") #only local connection
+        else:
+            self._conn = libvirt.open("qemu+ssh://{0}@{1}/system".format(login, host))
+        self.libvirt = libvirt
         #password is not used, must set up SSH keys (passwordless login)
         # see ssh-copy-id ...
 
@@ -138,7 +140,7 @@ class Sdk(object):
         """
         vm = self.get_vm_object(vmid)
         state = vm.info()[0]
-        return STATES.get(state, 'UNKNOWN')
+        return self.STATES.get(state, 'UNKNOWN')
 
     def get_vm_object(self, vmid):
         """
@@ -146,7 +148,8 @@ class Sdk(object):
         """
         try:
             return self._conn.lookupByName(str(vmid))
-        except libvirt.libvirtError:
+        except self.libvirt.libvirtError as le:
+            print(str(le))
             raise RuntimeError('Virtual Machine with id {} could not be found.'.format(vmid))
 
     def get_vms(self):
