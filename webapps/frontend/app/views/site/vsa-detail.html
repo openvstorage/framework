@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Copyright 2014 CloudFounders NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +32,9 @@ limitations under the License.
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $parent.moveAway(); },
                                    style: { color: ($.inArray('MOVE_AWAY', availableActions()) !== -1 ? '#428bca' : 'grey') },
-                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1">
-                    <span class="fa" data-i18n="[html]ovs:icons.moveaway" data-bind="tooltip: 'ovs:vsas.detail.moveaway'"></span>
+                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1,
+                                   tooltip: 'ovs:vsas.detail.moveawaymsg'">
+                    <span class="fa" data-i18n="[html]ovs:icons.moveaway"></span>
                 </button>
             </li>
         </ul>

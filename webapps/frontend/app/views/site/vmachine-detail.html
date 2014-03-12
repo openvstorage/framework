@@ -32,8 +32,11 @@ limitations under the License.
             </li>
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default" data-bind="click: function() { $root.snapshot(); }" style="color: #428bca;">
-                    <span class="fa" data-i18n="[html]ovs:icons.snapshot" data-bind="tooltip: 'ovs:vmachines.detail.snapshot'"></span>
+                <button type="button" class="btn btn-mini btn-default"
+                        style="color: #428bca;"
+                        data-bind="click: function() { $root.snapshot(); },
+                                   tooltip: 'ovs:vmachines.detail.snapshot'">
+                    <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $root.setAsTemplate(); },

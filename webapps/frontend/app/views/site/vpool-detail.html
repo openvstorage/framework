@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 Copyright 2014 CloudFounders NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,8 +27,11 @@ limitations under the License.
             </li>
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default" data-bind="click: function() { $root.sync(); }" style="color: #428bca;">
-                    <span class="fa" data-i18n="[html]ovs:icons.sync" data-bind="tooltip: 'ovs:vpools.detail.sync'"></span>
+                <button type="button" class="btn btn-mini btn-default"
+                        data-bind="click: function() { $root.sync(); },
+                                   style: { color: '#428bca' },
+                                   tooltip: 'ovs:vpools.detail.sync'">
+                    <span class="fa" data-i18n="[html]ovs:icons.sync"></span>
                 </button>
             </li>
         </ul>
