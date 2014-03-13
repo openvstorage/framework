@@ -24,7 +24,7 @@ import os
 from kombu import Queue
 from celery import Celery
 from celery.beat import Scheduler, ScheduleEntry  # Do not remove, need these in celery_beat.py
-from celery import current_app                    # Do not remove, need these in celery_beat.py
+from celery import current_app  # Do not remove, need these in celery_beat.py
 from celery.schedules import crontab
 from celery.signals import task_postrun, worker_process_init
 from ovs.lib.messaging import MessageController
@@ -33,15 +33,18 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
 from configobj import ConfigObj
+from subprocess import check_output
 from ovs.dal.lists.vmachinelist import VMachineList
 
 memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'],]
+memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'], ]
 memcache_servers = map(lambda m: memcache_ini.get(m)['location'], memcache_nodes)
 
 rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'],]
+rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'], ]
 rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+
+unique_id = sorted(check_output("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'", shell=True).strip().split('\n'))[0]
 
 vsas = VMachineList.get_vsas()
 
@@ -64,7 +67,8 @@ celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.ge
 celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
 queues = [Queue('ovs_generic', routing_key='generic.#')]
 for vsa in vsas:
-    queues.append(Queue('ovs_{0}'.format(vsa.machineid), routing_key='vsa.{0}.#'.format(vsa.machineid)))
+    if vsa.machineid == unique_id:
+        queues.append(Queue('ovs_{0}'.format(vsa.machineid), routing_key='vsa.{0}.#'.format(vsa.machineid)))
 celery.conf.CELERY_QUEUES = tuple(queues)
 celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
 celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'

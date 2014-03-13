@@ -470,7 +470,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         vsa.pmachine = pmachine
         vsa.save()
 
-        client.run('jsprocess restart -n ovs_workers')
+        for node in nodes:
+            node_client = Client.load(node, password)
+            node_client.run('jsprocess restart -n ovs_workers')
 
     @staticmethod
     def init_vpool(ip, password, vpool_name, parameters=None):
