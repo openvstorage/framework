@@ -25,6 +25,7 @@ define([
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.steps([new GatherVPool(), new GatherMountPoints(), new Confirm()]);
+        self.step(0);
         self.activateStep();
 
         // Cleaning data

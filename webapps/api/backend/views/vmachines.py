@@ -324,12 +324,14 @@ class VMachineViewSet(viewsets.ViewSet):
 
         fields = ['vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_dfs', 'mountpoint_md',
-                  'mountpoint_cacahe', 'storage_ip', 'vrouter_port', 'vsa_password']
+                  'mountpoint_cache', 'storage_ip', 'vrouter_port', 'vsa_password']
         parameters = {'vsa_ip': obj.ip}
         for field in fields:
             if field not in request.DATA:
                 raise NotAcceptable('Invalid data passed')
             parameters[field] = request.DATA[field]
+            if not parameters[field] is int:
+                parameters[field] = str(parameters[field])
 
-        task = VMachineController.add_vpool.s(**parameters).apply_async(routing_key='vsa.{0}'.format(obj.machineid))
+        task = VMachineController.add_vpool.s(parameters).apply_async(routing_key='vsa.{0}'.format(obj.machineid))
         return Response(task.id, status=status.HTTP_200_OK)

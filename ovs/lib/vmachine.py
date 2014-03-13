@@ -552,6 +552,7 @@ class VMachineController(object):
         """
         from ovs.plugin.provider.remote import Remote
 
+        # @TODO: Run locally instead of trough Cuisine
         client = Remote.cuisine.api
         Remote.cuisine.fabric.env['password'] = password
         client.connect(ip)

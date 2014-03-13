@@ -14,8 +14,9 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    '../../containers/vmachine', './data'
-], function($, ko, VMachine, data) {
+    '../../containers/vmachine', './data',
+    'ovs/api', 'ovs/generic', 'ovs/shared'
+], function($, ko, VMachine, data, api, generic, shared) {
     "use strict";
     return function() {
         var self = this;
@@ -30,9 +31,34 @@ define([
 
         // Functions
         self.finish = function() {
-            // 'vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
-            // 'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_dfs', 'mountpoint_md',
-            // 'mountpoint_cacahe', 'storage_ip', 'vrouter_port', 'vsa_password'
+            return $.Deferred(function(deferred) {
+                var post_data = {
+                    vpool_name: self.data.name(),
+                    backend_type: self.data.backend(),
+                    connection_host: self.data.host(),
+                    connection_port: self.data.port(),
+                    connection_timeout: self.data.timeout(),
+                    connection_username: self.data.accesskey(),
+                    connection_password: self.data.secretkey(),
+                    mountpoint_temp: self.data.mtptTemp(),
+                    mountpoint_dfs: self.data.mtptDFS(),
+                    mountpoint_md: self.data.mtptMD(),
+                    mountpoint_cache: self.data.mtptCache(),
+                    storage_ip: self.data.storageIP(),
+                    vrouter_port: self.data.vRouterPort(),
+                    vsa_password: self.data.targetPassword()
+                };
+                api.post('vmachines/' + self.data.target().guid() + '/add_vpool', post_data)
+                        .then(shared.tasks.wait)
+                        .done(function() {
+                            generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.addvpool.confirm.success', { what: self.data.name() }));
+                        })
+                        .fail(function() {
+                            generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.addvpool.confirm.creating') }));
+                        });
+                generic.alertInfo($.t('ovs:wizards.addvpool.confirm.started'), $.t('ovs:wizards.addvpool.confirm.inprogress', { what: self.data.name() }));
+                deferred.resolve();
+            }).promise();
         };
     };
 });

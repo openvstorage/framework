@@ -27,7 +27,7 @@ from backend.toolbox import Toolbox
 
 class VolumeStorageRouterViewSet(viewsets.ViewSet):
     """
-    Information about pMachines
+    Information about VolumeStorageRouters
     """
     permission_classes = (IsAuthenticated,)
 
@@ -35,7 +35,7 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['view'])
     def list(self, request, format=None):
         """
-        Overview of all pMachines
+        Overview of all VolumeStorageRouters
         """
         _ = format
         vsrs = VolumeStorageRouterList.get_volumestoragerouters()
@@ -48,7 +48,7 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
     @validate(VolumeStorageRouter)
     def retrieve(self, request, obj):
         """
-        Load information about a given pMachine
+        Load information about a given VolumeStorageRouter
         """
         contents = Toolbox.handle_retrieve(request)
         return Response(FullSerializer(VolumeStorageRouter, contents=contents, instance=obj).data, status=status.HTTP_200_OK)

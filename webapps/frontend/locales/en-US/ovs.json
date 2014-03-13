@@ -325,7 +325,7 @@
                 "extendedinfo": "Extended vPool information",
                 "initialvsa": "Initial VSA:",
                 "vsarootpassword": "Root password:",
-                "invalidpassword": "Invalid root password"
+                "invalidpassword": "Invalid VSA root password"
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all VSAs serving this vPool. Please also set the vPool connection info.",
@@ -345,7 +345,11 @@
                 "basicinfo": "Validate the basic vPool information.",
                 "vsainfo": "Validate whether the correct VSA was selected.",
                 "mountpoints": "Validate whether mountpoints and connection information are correct.",
-                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion."
+                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
+                "started": "Creation started",
+                "inprogress": "Creation of vPool __what__ is started.",
+                "creating": "creating the vPool",
+                "success": "Creation of vPool __what__ finished."
             }
         },
         "createft": {
