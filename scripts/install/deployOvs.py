@@ -584,11 +584,9 @@ if __name__ == '__main__':
     ssd = InstallHelper.ask_choice(ssds, columns=['Vendor', 'Model', 'DevfsPath'])
     disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssd, disk_config)
 
-
-    if len(hdds) > 0:
-        if not options.skip:
-            hdd = InstallHelper.ask_choice(hdds, columns=['Vendor', 'Model', 'DevfsPath'])
-            disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdd, disk_config)
+    if len(hdds) > 0 and not options.skip:
+        hdd = InstallHelper.ask_choice(hdds, columns=['Vendor', 'Model', 'DevfsPath'])
+        disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdd, disk_config)
 
     # Add CD drive
     if imagefile:
