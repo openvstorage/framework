@@ -538,7 +538,7 @@ class VMachineController(object):
                        and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
                        and p.split(' ')[2] != '/']
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
-        ipaddresses = [ip.strip() for ip in ipaddresses if ip.strip() != '127.0.0.1']
+        ipaddresses = [ip.strip() for ip in ipaddresses]
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,

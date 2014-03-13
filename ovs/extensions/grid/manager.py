@@ -74,7 +74,7 @@ class Manager(object):
         hypervisor = Helper.ask_choice(['VMWARE', 'KVM'], question='Which hypervisor will be backing this VSA?', default_value=possible_hypervisor)
 
         ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-        ipaddresses = [found_ip for found_ip in ipaddresses if found_ip != '127.0.0.1']
+        ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
 
         # Ask a bunch of questions and prepare HRD files for installation
         first_node = False
@@ -197,6 +197,7 @@ class Manager(object):
         master nodes regardless of the given parameter.
         """
 
+        import M2Crypto
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
@@ -419,6 +420,29 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             client.run('jsprocess start -n webapp_api')
             client.run('jsprocess start -n nginx')
             client.run('jsprocess start -n ovs_workers')
+
+        # Generate RSA keypairs
+        client = Client.load(ip, password)
+        ssh_folder = '/root/.ssh'
+        private_key_filename = '{0}/id_rsa'.format(ssh_folder)
+        public_key_filename = '{0}/id_rsa.pub'.format(ssh_folder)
+        authorized_keys_filename = '{0}/authorized_keys'.format(ssh_folder)
+        client.dir_ensure(ssh_folder)
+        client.run("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename))
+        public_key = client.file_read(public_key_filename).strip()
+        authorized_keys = ''
+        for node in nodes:
+            node_client = Client.load(node, password)
+            authorized_keys += node_client.file_read(public_key_filename)  # Read the node's public key
+            if node_client.file_exists(authorized_keys_filename):
+                node_authorized_keys = node_client.file_read(authorized_keys_filename)
+            else:
+                node_authorized_keys = ''
+            if public_key not in node_authorized_keys:  # If our public key is not yet authorized on this node
+                node_authorized_keys += public_key + '\n'
+                node_client.file_write(authorized_keys_filename, node_authorized_keys)  # ... authorize it.
+        client = Client.load(ip, password)
+        client.file_write(authorized_keys_filename, authorized_keys)
 
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
@@ -648,9 +672,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 vrouter_port = vrouter_port_in_hrd
         else:
             vrouter_port = vsr.port
-        ipaddresses = client.run(
-            "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses if ipaddr.strip() != '127.0.0.1']
+        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
+        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
         grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
@@ -1227,6 +1250,13 @@ class Client(object):
                 """
                 with open(filename, 'r') as the_file:
                     return the_file.read()
+
+            @staticmethod
+            def file_exists(filename):
+                """
+                Checks whether a filename exists
+                """
+                return os.path.isfile(filename)
 
             @staticmethod
             def file_write(filename, contents):
