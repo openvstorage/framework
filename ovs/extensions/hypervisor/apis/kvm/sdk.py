@@ -21,6 +21,8 @@ import subprocess
 import socket
 import shutil
 import os
+import re
+import time
 
 ROOT_PATH = "/etc/libvirt/qemu/" #get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = "/var/run/libvirt/qemu/" #get live info from here
@@ -41,6 +43,7 @@ class Sdk(object):
     """
 
     def __init__(self, host='localhost', login='root', passwd=None):
+        print('init libvirt')
         import libvirt  #required
         self.STATES = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
                        libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
@@ -50,13 +53,30 @@ class Sdk(object):
                        libvirt.VIR_DOMAIN_SHUTOFF:  'TURNEDOFF',
                        libvirt.VIR_DOMAIN_CRASHED:  'CRASHED'}
 
-        if host == 'localhost':
-            self._conn = libvirt.open("qemu:///system") #only local connection
-        else:
-            self._conn = libvirt.open("qemu+ssh://{0}@{1}/system".format(login, host))
-        self.libvirt = libvirt
         #password is not used, must set up SSH keys (passwordless login)
         # see ssh-copy-id ...
+        self.libvirt = libvirt
+        self.host = host
+        self.login = login
+        self._reconnect()
+        print('init complete')
+
+    def _reconnect(self, attempt = 0):
+        # host always comes as ip so we need to ssh-copy-id our own key to ourself (!)
+        #TODO: get local ips
+        print('init conn', self.host, self.login, os.getgid(), os.getuid())
+        try:
+            if self.host == 'localhost': #or host in (localips...):
+                self._conn = self.libvirt.open("qemu:///system") #only local connection
+            else:
+                self._conn = self.libvirt.open("qemu+ssh://{0}@{1}/system".format(self.login, self.host))
+        except self.libvirt.libvirtError as le:
+            print(str(le), le.get_error_code())
+            if attempt < 5:
+                time.sleep(1)
+                self._reconnect(attempt + 1)
+            else:
+                raise
 
     def _get_disks(self, vm_object):
         tree=ElementTree.fromstring(vm_object.XMLDesc(0))
@@ -69,17 +89,18 @@ class Sdk(object):
     def _get_ram(self, vm_object):
         """
         returns RAM size in MiB
+        MUST BE INTEGER! not float
         """
         tree=ElementTree.fromstring(vm_object.XMLDesc(0))
         mem = tree.findall('memory')[0]
         unit = mem.items()[0][1]
         value = mem.text
         if unit == 'MiB':
-            return float(value)
+            return int(value)
         elif unit == 'KiB':
-            return float(value) / 1024.0
+            return int(value) / 1024
         elif unit == 'GiB':
-            return float(value) * 1024.0
+            return int(value) * 1024
 
     def _get_disk_size(self, filename):
         cmd = ['qemu-img', 'info', filename]
@@ -115,22 +136,33 @@ class Sdk(object):
     def make_agnostic_config(self, vm_object):
         """
         return an agnostic config (no hypervisor specific type or structure)
-        kvm has no concept of datastore (so the "datastore" is assumed to be the vpool mountpoint)
         """
-        config = {'name': vm_object.name(),
-                  'id': vm_object.ID(),
-                  'backing': {'filename': vm_object.name() + '.xml',
-                              'datastore': ROOT_PATH},
-                  'disks': [],
-                  'datastores': {ROOT_PATH: "localhost:{}".format(ROOT_PATH)}}
+        storage_ip = '127.0.0.1' #TODO : make sure vsr.storage_ip is set to 127.0.0.1 !ALWAYS
+        regex = '/mnt/([^/]+)/(.+$)'
+        config = {}
+        config['disks'] = []
+        mountpoint = 'UNKNOWN'
+
         order = 0
         for disk in self._get_disks(vm_object):
-            config['disks'].append({'filename': disk['source']['file'],
-                                    'backingfilename': disk['source']['file'],
-                                    'datastore': ROOT_PATH,
+            backingfilename = disk['source']['file']
+            match = re.search(regex, backingfilename)
+            mountpoint = os.path.join('/mnt', match.group(1))
+            config['disks'].append({'filename': os.path.basename(backingfilename),
+                                    'backingfilename': backingfilename.replace(mountpoint, '').strip('/'),
+                                    'datastore': mountpoint,
                                     'name': disk.get('alias', {}).get('name', 'UNKNOWN'),
                                     'order': order})
             order += 1
+
+        datastore = "{}:{}".format(storage_ip, mountpoint) #this is "storageIP:/mnt/vpool_X"
+
+        config['name'] =  vm_object.name()
+        config['id'] = str(vm_object.UUIDString())
+        config['backing'] = {'filename': vm_object.name() + '.xml',
+                             'datastore': mountpoint}
+        config['datastores'] =  {mountpoint: datastore}
+
         return config
 
     def get_power_state(self, vmid):
@@ -145,12 +177,32 @@ class Sdk(object):
     def get_vm_object(self, vmid):
         """
         return virDomain object representing virtual machine
+        vmid is the name or the uuid
+        cannot use ID, since for a stopped vm id is always -1
         """
+        func = "lookupByUUIDString"
         try:
-            return self._conn.lookupByName(str(vmid))
+            import uuid
+            uuid.UUID(vmid)
+        except ValueError:
+            func = "lookupByName"
+        try:
+            return getattr(self._conn, func)(vmid)
         except self.libvirt.libvirtError as le:
             print(str(le))
-            raise RuntimeError('Virtual Machine with id {} could not be found.'.format(vmid))
+            try:
+                self._reconnect()
+                return getattr(self._conn, func)(vmid)
+            except self.libvirt.libvirtError as le:
+                print(str(le))
+                raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(vmid))
+
+    def get_vm_object_by_filename(self, filename):
+        """
+        get vm based on filename: vmachines/template/template.xml
+        """
+        vmid = filename.split('/')[-1].replace('.xml', '')
+        return self.get_vm_object(vmid)
 
     def get_vms(self):
         """
@@ -204,7 +256,7 @@ class Sdk(object):
         datastore = None
         for disk in disks:
             disk_object = VDisk(disk['diskguid'])
-            for vsr in disk.vpool.vsrs:
+            for vsr in disk_object.vpool.vsrs:
                 if vsr.serving_vmachine.name == socket.gethostname():
                     datastore = vsr.mountpoint
         if datastore is None:
@@ -214,7 +266,7 @@ class Sdk(object):
         if hasattr(source_vm, 'config'):
             vcpus = source_vm.config.hardware.numCPU
             ram = source_vm.config.hardware.memoryMB
-        elif isinstance(source_vm, libvirt.virDomain):
+        elif isinstance(source_vm, self.libvirt.virDomain):
             vcpus = source_vm.info()[3]
             ram = self._get_ram(source_vm)
         else:
@@ -224,16 +276,28 @@ class Sdk(object):
         for disk in disks:
             vm_disks.append(("{}/{}".format(datastore, disk['backingdevice']), 'virtio'))
 
-        out = self._vm_create(name, vcpus, ram, disks)
-
+        out = self._vm_create(name, vcpus, int(ram), vm_disks)
+        print(out)
         if 'ERROR' in out:
             msg = out.replace('ERROR', '').strip().split('\n')[0]
             raise RuntimeError(msg)
-        source_xml = '{}/{}.xml'.format(ROOT_PATH, name)
+        if 'error' in out:
+            msg = out.split('error:')[-1].strip()
+            raise RuntimeError(msg)
+        source_xml = '{}{}.xml'.format(ROOT_PATH, name)
         dest_xml = '{}/{}.xml'.format(datastore, name)
         shutil.move(source_xml, dest_xml)
         os.symlink(dest_xml, source_xml)
-        return self.get_power_state(vmid) #confirm vmachine was created  and is running
+        try:
+            return self.get_vm_object(name).UUIDString()
+        except self.libvirt.libvirtError as le:
+            print(str(le))
+            try:
+                self._reconnect()
+                return self.get_vm_object(name).UUIDString()
+            except self.libvirt.libvirtError as le:
+                print(str(le))
+                raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(vmid))
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
@@ -246,7 +310,7 @@ class Sdk(object):
         #network: (network name: "default", specific mac or RANDOM, nic model as seen inside vmachine: e1000
         """
         command = 'virt-install'
-        options = ['--connect qemu:///system', #only local connections
+        options = ['--connect qemu+ssh://{}@{}/system'.format(self.login, self.host),
                    '--name {}'.format(name),
                    '--vcpus {}'.format(vcpus),
                    '--ram {}'.format(ram),

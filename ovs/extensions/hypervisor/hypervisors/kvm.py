@@ -45,19 +45,25 @@ class KVM(Hypervisor):
         return self.sdk.get_power_state(vmid)
 
     @Hypervisor.connected
-    def create_vm_from_template(self, name, source_vm, disks, **kwargs):
+    def create_vm_from_template(self, name, source_vm, disks, storage_ip, mountpoint, *args, **kwargs):
+        """
+        create vm from template
+        TODO:
+        storage_ip and mountpoint refer to target vsr
+        but on kvm vsr.storage_ip is 127.0.0.1
+        """
         return self.sdk.create_vm_from_template(name, source_vm, disks)
 
     @Hypervisor.connected
-    def delete_vm(self, vmid, **kwargs):
+    def delete_vm(self, vmid, *args, **kwargs):
         return self.sdk.delete_vm(vmid)
 
     @Hypervisor.connected
-    def get_vm_agnostic_object(self, vmid, **kwargs):
+    def get_vm_agnostic_object(self, vmid, *args, **kwargs):
         return self.sdk.make_agnostic_config(self.sdk.get_vm_object(vmid))
 
     @Hypervisor.connected
-    def get_vms_by_nfs_mountinfo(self):
+    def get_vms_by_nfs_mountinfo(self,**kwargs):
         """
         Gets a list of agnostic vm objects for a given ip and mountpoint
         """
@@ -65,7 +71,7 @@ class KVM(Hypervisor):
             yield self.sdk.make_agnostic_config(vm)
 
     @Hypervisor.connected
-    def is_datastore_available(self, **kwargs):
+    def is_datastore_available(self, *args, **kwargs):
         return True
 
     @Hypervisor.connected
@@ -94,9 +100,9 @@ class KVM(Hypervisor):
     @Hypervisor.connected
     def get_vm_object_by_devicename(self, devicename, ip, mountpoint):
         """
-        TODO
+        devicename = vmachines/template/template.xml # relative to mountpoint
         """
-        raise NotImplementedError()
+        return self.sdk.make_agnostic_config(self.sdk.get_vm_object_by_filename(devicename))
 
     @Hypervisor.connected
     def mount_nfs_datastore(self, name, remote_host, remote_path):
