@@ -492,7 +492,7 @@ if __name__ == '__main__':
     # ISO selection
     parser = OptionParser(description='Open vStorage VSA Setup')
     parser.add_option('-i', '--image', dest='image', help='absolute path to your ubuntu iso')
-    parser.add_option('-s', '--skip', dest='sata', help='skip the sata as 3rd disk')
+    parser.add_option('-s', '--skip', action="store_true", dest='skip', help='skip the sata as 3rd disk')
     (options, args) = parser.parse_args()
     if not options.image:
         print 'No ISO image was specified, you\'ll need to attach it to the VM yourself'
