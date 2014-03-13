@@ -492,7 +492,7 @@ if __name__ == '__main__':
     # ISO selection
     parser = OptionParser(description='Open vStorage VSA Setup')
     parser.add_option('-i', '--image', dest='image', help='absolute path to your ubuntu iso')
-    parser.add_option('-s', '--skip', action="store_true", dest='skip', help='skip the sata as 3rd disk')
+    parser.add_option('-s', '--skip', action="store_true", dest='skip', help='skip the sata as 3rd disk', default=False)
     (options, args) = parser.parse_args()
     if not options.image:
         print 'No ISO image was specified, you\'ll need to attach it to the VM yourself'
@@ -584,7 +584,7 @@ if __name__ == '__main__':
     ssd = InstallHelper.ask_choice(ssds, columns=['Vendor', 'Model', 'DevfsPath'])
     disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssd, disk_config)
 
-    if len(hdds) > 0 and not options.skip:
+    if len(hdds) > 0 and options.skip is False:
         hdd = InstallHelper.ask_choice(hdds, columns=['Vendor', 'Model', 'DevfsPath'])
         disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdd, disk_config)
 
