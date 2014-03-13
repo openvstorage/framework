@@ -164,10 +164,10 @@ class VMachineController(object):
     @celery.task(name='ovs.machine.create_from_voldrv')
     def create_from_voldrv(name, vsrid):
         """
-        This method will create a vmachine based on a given vmx file
+        This method will create a vmachine based on a given vmx/xml file
         """
         name = name.strip('/')
-        if name.endswith('.vmx'):
+        if name.endswith('.vmx') or name.endswith('.xml'):
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
             if vsr is None:
                 raise RuntimeError('VolumeStorageRouter could not be found')
@@ -179,6 +179,13 @@ class VMachineController(object):
                 vmachine.pmachine = pmachine
                 vmachine.status = 'CREATED'
             vmachine.devicename = name
+            vmachine.save()
+        if name.endswith('.xml'):
+            try:
+                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
+                vmachine.status = 'SYNC'
+            except:
+                vmachine.status = 'SYNC_NOK'
             vmachine.save()
 
     @staticmethod

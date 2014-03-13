@@ -242,6 +242,13 @@ class VDiskController(object):
             vsr_client = disk.vsr_client
 
         device_location = '{}/{}.vmdk'.format(location, devicename)
+        if machineguid:
+            parent_vm = VMachine(machineguid)
+            if parent_vm.pmachine and parent_vm.pmachine.hvtype:
+                if parent_vm.pmachine.hvtype == 'KVM':
+                    #disks are created on the root of the vpool
+                    #make sure the root of the vpool is defined as storage pool
+                    device_location = '{}_{}.raw'.format(location, devicename)
 
         new_disk = VDisk()
         new_disk.copy_blueprint(disk, include=properties_to_clone)
