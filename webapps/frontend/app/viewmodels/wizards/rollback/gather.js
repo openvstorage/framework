@@ -27,13 +27,17 @@ define([
 
         // Computed
         self.canContinue = ko.computed(function() {
+            var valid = true, reasons = [], fields = [];
             if (self.data.velement() === undefined) {
-                return {value: false, reason: $.t('ovs:wizards.rollback.gather.no' + self.data.type)};
+                valid = false;
+                fields.push('velement');
+                reasons.push($.t('ovs:wizards.rollback.gather.no' + self.data.type));
+            } else if (self.data.velement().snapshots() === undefined || self.data.velement().snapshots().length === 0) {
+                valid = false;
+                fields.push('snapshots');
+                reasons.push($.t('ovs:wizards.rollback.gather.nosnapshots'));
             }
-            if (self.data.velement().snapshots() === undefined || self.data.velement().snapshots().length === 0) {
-                return {value: false, reason: $.t('ovs:wizards.rollback.gather.nosnapshots')};
-            }
-            return {value: true, reason: undefined};
+            return { value: valid, reason: reasons, fields: fields };
         });
 
         // Functions

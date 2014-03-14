@@ -80,7 +80,7 @@ define([
             generic.trySet(self.backendConnection, data, 'backend_connection');
             generic.trySet(self.backendLogin, data, 'backend_login');
             if (data.hasOwnProperty('backend_type')) {
-                self.backendType($.t('ovs:vpools.backendtypes.' + data.backend_type));
+                self.backendType($.t('ovs:generic.backendtypes.' + data.backend_type));
             } else {
                 self.backendType('');
             }

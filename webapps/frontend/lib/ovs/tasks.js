@@ -22,24 +22,48 @@ define([
 
         self.shared = shared;
         self.hooks = {};
+        self.taskIDQueue = [];
+
         self.wait = function(taskID) {
+            var i;
+            for (i = 0; i < self.taskIDQueue.length; i += 1){
+                if (self.taskIDQueue[i].id === taskID) {
+                    return self.load(taskID);
+                }
+            }
             self.hooks[taskID] = $.Deferred();
             return self.hooks[taskID].promise();
+        };
+        self.load = function(taskID) {
+            return $.Deferred(function(deferred) {
+                api.get('tasks/' + taskID)
+                    .done(function(data) {
+                        if (data.successful === true) {
+                            deferred.resolve(data.result);
+                        } else {
+                            deferred.reject(data.result);
+                        }
+                    })
+                    .fail(function(data) {
+                        deferred.reject(data);
+                    });
+            }).promise();
         };
 
         self.shared.messaging.subscribe('TASK_COMPLETE', function(taskID) {
             if (self.hooks.hasOwnProperty(taskID)) {
-                api.get('tasks/' + taskID)
-                    .done(function(data) {
-                        if (data.successful === true) {
-                            self.hooks[taskID].resolve(data.result);
-                        } else {
-                            self.hooks[taskID].reject(data.result);
-                        }
-                    })
-                    .fail(function(data) {
-                        self.hooks[taskID].reject(data);
-                    });
+                self.load(taskID)
+                    .done(self.hooks[taskID].resolve)
+                    .fail(self.hooks[taskID].reject);
+            } else {
+                var now = generic.getTimestamp(), i, newQueue = [];
+                self.taskIDQueue.push({ id: taskID, timestamp: now });
+                for (i = 0; i < self.taskIDQueue.length; i += 1) {
+                    if (self.taskIDQueue[i].timestamp >= now - 10000) {
+                        newQueue.push(self.taskIDQueue[i]);
+                    }
+                }
+                self.taskIDQueue = newQueue;
             }
         });
     };

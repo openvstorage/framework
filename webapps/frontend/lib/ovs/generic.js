@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window, document */
 define(['jquery', 'jqp/pnotify'], function($) {
     "use strict";
     function getTimestamp() {
@@ -282,10 +282,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
         regexNumber = /[^\d]+/g,
         partA = itemA.replace(regexAlpha, ''),
         partB = itemB.replace(regexAlpha, '');
-        if (partA == partB) {
+        if (partA === partB) {
             partA = parseInt(itemA.replace(regexNumber, ''), 10);
             partB = parseInt(itemB.replace(regexNumber, ''), 10);
-            return partA == partB ? 0 : (partA > partB ? 1 : -1);
+            return partA === partB ? 0 : (partA > partB ? 1 : -1);
         }
         return partA > partB ? 1 : -1;
     }

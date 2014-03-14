@@ -13,16 +13,17 @@
 // limitations under the License.
 /*global define, window */
 define([
-    'durandal/activator', 'plugins/dialog', 'knockout'
-], function(activator, dialog, ko) {
+    'durandal/activator', 'plugins/dialog', 'knockout', 'jquery'
+], function(activator, dialog, ko, $) {
     "use strict";
     return function(parent) {
         // Observables
-        parent.title   = ko.observable();
-        parent.step    = ko.observable(0);
-        parent.modal   = ko.observable(false);
-        parent.running = ko.observable(false);
-        parent.steps   = ko.observableArray([]);
+        parent.title       = ko.observable();
+        parent.step        = ko.observable(0);
+        parent.modal       = ko.observable(false);
+        parent.running     = ko.observable(false);
+        parent.steps       = ko.observableArray([]);
+        parent.loadingNext = ko.observable(false);
 
         // Builded variable
         parent.activeStep = activator.create();
@@ -60,14 +61,36 @@ define([
             if (step !== undefined) {
                 return step.canContinue();
             }
-            return {value: true, reason: undefined};
+            return { value: true, reasons: [] };
         });
 
         // Functions
         parent.next = function() {
             if (parent.step() < parent.stepsLength() ) {
-                parent.step(parent.step() + 1);
-                parent.activateStep();
+                var step = parent.steps()[parent.step()], result;
+                $.Deferred(function(deferred) {
+                    if (step.hasOwnProperty('next') && step.next && step.next.call) {
+                        result = step.next();
+                        if (result.then) {
+                            parent.loadingNext(true);
+                            result
+                                .done(deferred.resolve)
+                                .fail(deferred.reject)
+                                .always(function() {
+                                    parent.loadingNext(false);
+                                });
+                        } else {
+                            deferred.resolve();
+                        }
+                    } else {
+                        deferred.resolve();
+                    }
+                })
+                    .promise()
+                    .then(function() {
+                        parent.step(parent.step() + 1);
+                        parent.activateStep();
+                    });
             }
         };
         parent.activateStep = function() {

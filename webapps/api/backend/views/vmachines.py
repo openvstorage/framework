@@ -280,3 +280,58 @@ class VMachineViewSet(viewsets.ViewSet):
             if len(vsas) > 1:
                 actions.append('MOVE_AWAY')
         return Response(actions, status=status.HTTP_200_OK)
+
+    @link()
+    @expose(internal=True, customer=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    def get_physical_metadata(self, request, obj):
+        """
+        Returns a list of mountpoints on the given VSA
+        """
+        _ = request
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+
+        task = VMachineController.get_physical_metadata.s().apply_async(routing_key='vsa.{0}'.format(obj.machineid))
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    def validate_password(self, request, obj):
+        """
+        Validates a given password on the given VSA
+        """
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+
+        password = request.DATA['password']
+        task = VMachineController.validate_password.s(obj.ip, password).apply_async(routing_key='vsa.{0}'.format(obj.machineid))
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'create'])
+    @validate(VMachine)
+    def add_vpool(self, request, obj):
+        """
+        Adds a vPool to a given VSA
+        """
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+
+        fields = ['vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
+                  'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_dfs', 'mountpoint_md',
+                  'mountpoint_cache', 'storage_ip', 'vrouter_port', 'vsa_password']
+        parameters = {'vsa_ip': obj.ip}
+        for field in fields:
+            if field not in request.DATA:
+                raise NotAcceptable('Invalid data passed')
+            parameters[field] = request.DATA[field]
+            if not parameters[field] is int:
+                parameters[field] = str(parameters[field])
+
+        task = VMachineController.add_vpool.s(parameters).apply_async(routing_key='vsa.{0}'.format(obj.machineid))
+        return Response(task.id, status=status.HTTP_200_OK)

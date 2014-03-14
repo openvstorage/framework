@@ -26,6 +26,9 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 if (settings.hasOwnProperty('min')) {
                     parsedValue = Math.max(settings.min, parsedValue);
                 }
+                if (settings.hasOwnProperty('max')) {
+                    parsedValue = Math.min(settings.max, parsedValue);
+                }
                 target(parsedValue);
                 target.notifySubscribers(parsedValue);
             }
@@ -77,6 +80,24 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         }).extend({ notify: 'always' });
         computed(target());
         computed.raw = target;
+        return computed;
+    };
+    ko.extenders.regex = function(target, regex) {
+        var computed, valid = ko.observable(false);
+        computed = ko.computed({
+            read: target,
+            write: function(newValue) {
+                target(newValue);
+                if (newValue !== undefined) {
+                    valid(newValue.match(regex) !== null);
+                } else {
+                    valid(false);
+                }
+                target.notifySubscribers(newValue);
+            }
+        }).extend({ notify: 'always' });
+        computed(target());
+        computed.valid = valid;
         return computed;
     };
 });

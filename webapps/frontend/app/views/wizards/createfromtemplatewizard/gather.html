@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<div style="min-width: 700px;">
+<div>
     <form data-bind="visible: canStart().value" role="form form-horizontal" class="form-horizontal">
         <p data-i18n="ovs:wizards.createft.gather.basicinfo"></p>
         <div class="form-group">
@@ -28,7 +28,7 @@ limitations under the License.
                 <input type="text" id="description" class="autofocus form-control" data-bind="value: data.description, valueUpdate: 'afterkeydown'">
             </div>
         </div>
-        <div class="form-group" style="margin-bottom: 0px;">
+        <div class="form-group" style="margin-bottom: 0;">
             <label class="col-lg-2 control-label" for="amount" data-i18n="ovs:wizards.createft.gather.amount"></label>
             <div class="col-lg-3">
                 <div class="input-group">
@@ -80,10 +80,18 @@ limitations under the License.
             </div>
         </div>
     </form>
-    <div class="alert alert-warning" data-bind="visible: !canContinue().value">
-        <p data-bind="text: canContinue().reason"></p>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
     </div>
-    <div class="alert alert-warning" data-bind="visible: !canStart().value">
-        <p data-bind="text: canStart().reason"></p>
+    <div class="alert alert-danger" data-bind="visible: !canStart().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canStart().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canStart().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canStart().reasons.length > 0, foreach: canStart().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
     </div>
 </div>

@@ -15,8 +15,9 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VPool) {
+    '../containers/vpool',
+    '../wizards/addvpool/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VPool, AddVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -111,7 +112,9 @@ define([
             }).promise();
         };
         self.addVPool = function() {
-            generic.alertError('Not implemented', 'This functionality is not implemented.');
+            dialog.show(new AddVPoolWizard({
+                modal: true
+            }));
         };
 
         // Durandal

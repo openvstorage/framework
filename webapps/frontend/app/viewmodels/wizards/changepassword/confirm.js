@@ -30,19 +30,27 @@ define([
 
         // Computed
         self.canContinue = ko.computed(function() {
+            var valid = true, reasons = [], fields = [];
             if (self.currentPassword() === '') {
-                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.entercurrent') };
-            }
-            if (self.currentPassword() !== self.shared.authentication.password()) {
-                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.currentinvalid') };
+                valid = false;
+                fields.push('currentpassword');
+                reasons.push($.t('ovs:wizards.changepassword.confirm.entercurrent'));
+            } else if (self.currentPassword() !== self.shared.authentication.password()) {
+                valid = false;
+                fields.push('currentpassword');
+                reasons.push($.t('ovs:wizards.changepassword.confirm.currentinvalid'));
             }
             if (self.newPassword() === '') {
-                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.enternew') };
+                valid = false;
+                fields.push('newpassword');
+                reasons.push($.t('ovs:wizards.changepassword.confirm.enternew'));
+            } else if (self.newPassword() !== self.newPassword2()) {
+                valid = false;
+                fields.push('newpassword');
+                fields.push('newpassword2');
+                reasons.push($.t('ovs:wizards.changepassword.confirm.shouldmatch'));
             }
-            if (self.newPassword() !== self.newPassword2()) {
-                return { value: false, reason: $.t('ovs:wizards.changepassword.confirm.shouldmatch') };
-            }
-            return { value: true, reason: undefined };
+            return { value: valid, reasons: reasons, fields: fields };
         });
 
         // Functions

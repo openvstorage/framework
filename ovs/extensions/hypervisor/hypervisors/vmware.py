@@ -51,14 +51,7 @@ class VMware(Hypervisor):
         return self.STATE_MAPPING[self.sdk.get_power_state(vmid)]
 
     @Hypervisor.connected
-    def create_vm(self, *args, **kwargs):
-        """
-        Configure the vmachine on the hypervisor
-        """
-        pass
-
-    @Hypervisor.connected
-    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         Create a new vmachine from an existing template
         @param name:
@@ -66,7 +59,7 @@ class VMware(Hypervisor):
         @param target_pm: hypervisor object to create new vmachine on
         @return: celery task
         """
-        task = self.sdk.create_vm_from_template(name, source_vm, disks, ip, mountpoint, esxhost, wait)
+        task = self.sdk.create_vm_from_template(name, source_vm, disks, ip, mountpoint, wait)
         if wait is True:
             if self.sdk.validate_result(task):
                 task_info = self.sdk.get_task_info(task)
@@ -74,7 +67,7 @@ class VMware(Hypervisor):
         return None
 
     @Hypervisor.connected
-    def clone_vm(self, vmid, name, disks, esxhost=None, wait=False):
+    def clone_vm(self, vmid, name, disks, wait=False):
         """
         Clone a vmachine
 
@@ -84,7 +77,7 @@ class VMware(Hypervisor):
         @param esxhost: esx host identifier
         @param wait: wait for action to complete
         """
-        task = self.sdk.clone_vm(vmid, name, disks, esxhost, wait)
+        task = self.sdk.clone_vm(vmid, name, disks, wait)
         if wait is True:
             if self.sdk.validate_result(task):
                 task_info = self.sdk.get_task_info(task)
@@ -92,7 +85,7 @@ class VMware(Hypervisor):
         return None
 
     @Hypervisor.connected
-    def delete_vm(self, vmid, esxhost=None, wait=False):
+    def delete_vm(self, vmid, wait=False):
         """
         Remove the vmachine from the hypervisor
 
@@ -108,7 +101,6 @@ class VMware(Hypervisor):
         """
         Gets the VMware virtual machine object from VMware by its identifier
         """
-
         return self.sdk.get_vm(vmid)
 
     @Hypervisor.connected
@@ -116,7 +108,6 @@ class VMware(Hypervisor):
         """
         Gets the VMware virtual machine object from VMware by its identifier
         """
-
         return self.sdk.make_agnostic_config(self.sdk.get_vm(vmid))
 
     @Hypervisor.connected
@@ -136,17 +127,17 @@ class VMware(Hypervisor):
             yield self.sdk.make_agnostic_config(vm)
 
     @Hypervisor.connected
-    def is_datastore_available(self, ip, mountpoint, esxhost=None):
+    def is_datastore_available(self, ip, mountpoint):
         """
         @param ip : hypervisor ip to query for datastore presence
         @param mountpoint: nfs mountpoint on hypervisor
         @rtype: boolean
         @return: True | False
         """
-        return self.sdk.is_datastore_available(ip, mountpoint, esxhost)
+        return self.sdk.is_datastore_available(ip, mountpoint)
 
     @Hypervisor.connected
-    def set_as_template(self, vmid, disks, esxhost=None, wait=False):
+    def set_as_template(self, vmid, disks, wait=False):
         """
         Configure a vm as template
         This lets the machine exist on the hypervisor but configures
@@ -154,7 +145,7 @@ class VMware(Hypervisor):
 
         @param vmid: hypervisor id of the virtual machine
         """
-        return self.sdk.set_disk_mode(vmid, disks, 'independent_nonpersistent', esxhost, wait)
+        return self.sdk.set_disk_mode(vmid, disks, 'independent_nonpersistent', wait)
 
     @Hypervisor.connected
     def mount_nfs_datastore(self, name, remote_host, remote_path):

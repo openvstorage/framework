@@ -22,16 +22,19 @@ define([
 
         // Variables
         self.text          = undefined;
+        self.unique        = generic.getTimestamp().toString();
 
         // Observables
         self.key           = ko.observable();
         self.keyIsFunction = ko.observable(false);
         self.multi         = ko.observable(false);
+        self.free          = ko.observable(false);
         self.items         = ko.observableArray([]);
         self.target        = ko.observableArray([]);
+        self._freeValue    = ko.observable();
 
         // Computed
-        self.selected      = ko.computed(function() {
+        self.selected  = ko.computed(function() {
             var items = [], i;
             for (i = 0; i < self.items().length; i += 1) {
                 if (self.contains(self.items()[i])) {
@@ -39,6 +42,15 @@ define([
                 }
             }
             return items;
+        });
+        self.freeValue = ko.computed({
+            read: function() {
+                return self._freeValue();
+            },
+            write: function(newValue) {
+                self.target(newValue);
+                self._freeValue(newValue);
+            }
         });
 
         // Functions
@@ -51,6 +63,9 @@ define([
                 }
             } else {
                 self.target(item);
+                if (self.free() && $.inArray(self.target(), self.items()) === -1) {
+                    self._freeValue(item);
+                }
             }
         };
         self.contains = function(item) {
@@ -65,24 +80,43 @@ define([
             if (!settings.hasOwnProperty('target')) {
                 throw 'Target should be specified';
             }
-            if (!settings.hasOwnProperty('key')) {
-                throw 'Key should be specified';
+            self.key(generic.tryGet(settings, 'key', undefined));
+            self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));
+            self.free(generic.tryGet(settings, 'free', false));
+            if (self.free()) {
+                if (!settings.hasOwnProperty('defaultfree')) {
+                    throw 'If free values are allowed, a default should be provided';
+                }
+                self._freeValue(settings.defaultfree);
             }
-            if (!settings.hasOwnProperty('keyisfunction')) {
-                throw 'Keyisfunction should be specified';
-            }
-            self.key(settings.key);
-            self.keyIsFunction(settings.keyisfunction);
             self.items = settings.items;
             self.target = settings.target;
-
+            self.text = generic.tryGet(settings, 'text', function(item) { return item; });
             if (self.target.isObservableArray) {
                 self.multi(true);
             } else if (self.target() === undefined && self.items().length > 0) {
-                self.target(self.items()[0]);
+                var foundDefault = false;
+                if (settings.hasOwnProperty('defaultRegex')) {
+                    $.each(self.items(), function(index, item) {
+                        if (self.text(item).match(settings.defaultRegex) !== null) {
+                            self.target(item);
+                            foundDefault = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                }
+                if (!foundDefault) {
+                    self.target(self.items()[0]);
+                }
             }
-            self.text = generic.tryGet(settings, 'text', function(item) { return item; });
-            self.target.valueHasMutated();
+            if (self.free() && self.multi()) {
+                throw 'A dropdown cannot be a multiselect and allow free values at the same time.';
+            }
+
+            if (!ko.isComputed(self.target)) {
+                self.target.valueHasMutated();
+            }
         };
     };
 });

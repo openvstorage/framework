@@ -74,7 +74,7 @@ class Manager(object):
         hypervisor = Helper.ask_choice(['VMWARE', 'KVM'], question='Which hypervisor will be backing this VSA?', default_value=possible_hypervisor)
 
         ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-        ipaddresses = [found_ip for found_ip in ipaddresses if found_ip != '127.0.0.1']
+        ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
 
         # Ask a bunch of questions and prepare HRD files for installation
         first_node = False
@@ -197,6 +197,7 @@ class Manager(object):
         master nodes regardless of the given parameter.
         """
 
+        import M2Crypto
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
@@ -420,6 +421,29 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             client.run('jsprocess start -n nginx')
             client.run('jsprocess start -n ovs_workers')
 
+        # Generate RSA keypairs
+        client = Client.load(ip, password)
+        ssh_folder = '/root/.ssh'
+        private_key_filename = '{0}/id_rsa'.format(ssh_folder)
+        public_key_filename = '{0}/id_rsa.pub'.format(ssh_folder)
+        authorized_keys_filename = '{0}/authorized_keys'.format(ssh_folder)
+        client.dir_ensure(ssh_folder)
+        client.run("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename))
+        public_key = client.file_read(public_key_filename).strip()
+        authorized_keys = ''
+        for node in nodes:
+            node_client = Client.load(node, password)
+            authorized_keys += node_client.file_read(public_key_filename)  # Read the node's public key
+            if node_client.file_exists(authorized_keys_filename):
+                node_authorized_keys = node_client.file_read(authorized_keys_filename)
+            else:
+                node_authorized_keys = ''
+            if public_key not in node_authorized_keys:  # If our public key is not yet authorized on this node
+                node_authorized_keys += public_key + '\n'
+                node_client.file_write(authorized_keys_filename, node_authorized_keys)  # ... authorize it.
+        client = Client.load(ip, password)
+        client.file_write(authorized_keys_filename, authorized_keys)
+
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
             while not master_elected:
@@ -475,7 +499,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             node_client.run('jsprocess restart -n ovs_workers')
 
     @staticmethod
-    def init_vpool(ip, password, vpool_name):
+    def init_vpool(ip, password, vpool_name, parameters=None):
         """
         Initializes a vpool on a given node
         """
@@ -488,6 +512,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
         from ovs.plugin.provider.configuration import Configuration
+
+        parameters = {} if parameters is None else parameters
 
         while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
             print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
@@ -556,15 +582,15 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             supported_backends = Manager._read_remote_config(client, 'volumedriver.supported.backends').split(',')
             if 'REST' in supported_backends:
                 supported_backends.remove('REST')  # REST is not supported for now
-            vpool.backend_type = Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
+            vpool.backend_type = parameters.get('backend_type') or Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
             connection_host = connection_port = connection_username = connection_password = None
             if vpool.backend_type == 'LOCAL':
                 vpool.backend_metadata = {'backend_type': 'LOCAL'}
             if vpool.backend_type == 'REST':
-                connection_host = Helper.ask_string('Provide REST ip address')
-                connection_port = Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
-                rest_connection_timeout_secs = Helper.ask_integer('Provide desired REST connection timeout(secs)',
-                                                                  min_value=0, max_value=99999)
+                connection_host = parameters.get('connection_host') or Helper.ask_string('Provide REST ip address')
+                connection_port = parameters.get('connection_port') or Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
+                rest_connection_timeout_secs = parameters.get('connection_timeout') or Helper.ask_integer('Provide desired REST connection timeout(secs)',
+                                                                                                          min_value=0, max_value=99999)
                 vpool.backend_metadata = {'rest_connection_host': connection_host,
                                           'rest_connection_port': connection_port,
                                           'buchla_connection_log_level': "0",
@@ -572,11 +598,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                           'rest_connection_metadata_format': "JSON",
                                           'backend_type': 'REST'}
             elif vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
-                connection_host = Helper.ask_string('Specify fqdn or ip address for your S3 compatible host')
-                connection_port = Helper.ask_integer('Specify port for your S3 compatible host: ', min_value=1,
-                                                     max_value=65535)
-                connection_username = Helper.ask_string('Specify S3 access key')
-                connection_password = getpass.getpass()
+                connection_host = parameters.get('connection_host') or Helper.ask_string('Specify fqdn or ip address for your S3 compatible host')
+                connection_port = parameters.get('connection_port') or Helper.ask_integer('Specify port for your S3 compatible host: ', min_value=1,
+                                                                                          max_value=65535)
+                connection_username = parameters.get('connection_username') or Helper.ask_string('Specify S3 access key')
+                connection_password = parameters.get('connection_password') or getpass.getpass()
                 vpool.backend_metadata = {'s3_connection_host': connection_host,
                                           's3_connection_port': connection_port,
                                           's3_connection_username': connection_username,
@@ -600,26 +626,26 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vsr = VolumeStorageRouter()
             new_vsr = True
 
-        mountpoint_temp = Helper.ask_choice(mountpoints,
-                                            question='Select temporary FS mountpoint',
-                                            default_value=Helper.find_in_list(mountpoints, 'tmp'))
+        mountpoint_temp = parameters.get('mountpoint_temp') or Helper.ask_choice(mountpoints,
+                                                                                 question='Select temporary FS mountpoint',
+                                                                                 default_value=Helper.find_in_list(mountpoints, 'tmp'))
         mountpoints.remove(mountpoint_temp)
         mountpoint_dfs_default = Helper.find_in_list(mountpoints, 'local')
         if vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
-            mountpoint_dfs = Helper.ask_string(message='Enter a mountpoint for the S3 backend',
-                                               default_value='/mnt/dfs/{}'.format(vpool.name))
+            mountpoint_dfs = parameters.get('mountpoint_dfs') or Helper.ask_string(message='Enter a mountpoint for the S3 backend',
+                                                                                   default_value='/mnt/dfs/{}'.format(vpool.name))
         else:
-            mountpoint_dfs = Helper.ask_choice(mountpoints,
-                                               question='Select distributed FS mountpoint',
-                                               default_value=Helper.find_in_list(mountpoints, 'dfs'))
+            mountpoint_dfs = parameters.get('mountpoint_dfs') or Helper.ask_choice(mountpoints,
+                                                                                   question='Select distributed FS mountpoint',
+                                                                                   default_value=Helper.find_in_list(mountpoints, 'dfs'))
             mountpoints.remove(mountpoint_dfs)
-        mountpoint_md = Helper.ask_choice(mountpoints,
-                                          question='Select metadata mountpoint',
-                                          default_value=Helper.find_in_list(mountpoints, 'md'))
+        mountpoint_md = parameters.get('mountpoint_md') or Helper.ask_choice(mountpoints,
+                                                                             question='Select metadata mountpoint',
+                                                                             default_value=Helper.find_in_list(mountpoints, 'md'))
         mountpoints.remove(mountpoint_md)
-        mountpoint_cache = Helper.ask_choice(mountpoints,
-                                             question='Select cache mountpoint',
-                                             default_value=Helper.find_in_list(mountpoints, 'cache'))
+        mountpoint_cache = parameters.get('mountpoint_cache') or Helper.ask_choice(mountpoints,
+                                                                                   question='Select cache mountpoint',
+                                                                                   default_value=Helper.find_in_list(mountpoints, 'cache'))
         mountpoints.remove(mountpoint_cache)
         cache_fs = os.statvfs(mountpoint_cache)
         scocache = '{}/sco_{}'.format(mountpoint_cache, vpool_name)
@@ -640,21 +666,20 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vsa.guid)]
             vrouter_port_in_hrd = int(Manager._read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
             if vrouter_port_in_hrd in ports_used_in_model:
-                vrouter_port = Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
-                                                  min_value=1024, max_value=max(ports_used_in_model) + 3)
+                vrouter_port = parameters.get('vrouter_port') or Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
+                                                                                    min_value=1024, max_value=max(ports_used_in_model) + 3)
             else:
                 vrouter_port = vrouter_port_in_hrd
         else:
             vrouter_port = vsr.port
-        ipaddresses = client.run(
-            "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
-        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses if ipaddr.strip() != '127.0.0.1']
+        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
+        ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
         grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
             raise RuntimeError('No available ip addresses found suitable for volumerouter storage ip')
-        volumedriver_storageip = Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
+        volumedriver_storageip = parameters.get('storage_ip') or Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
 
         vrouter_config = {'vrouter_id': vrouter_id,
@@ -1211,10 +1236,11 @@ class Client(object):
             """
 
             @staticmethod
-            def run(command):
+            def run(command, pty=None):
                 """
                 Executes a command
                 """
+                _ = pty  # Compatibility with Cuisine
                 return check_output(command, shell=True)
 
             @staticmethod
@@ -1224,6 +1250,13 @@ class Client(object):
                 """
                 with open(filename, 'r') as the_file:
                     return the_file.read()
+
+            @staticmethod
+            def file_exists(filename):
+                """
+                Checks whether a filename exists
+                """
+                return os.path.isfile(filename)
 
             @staticmethod
             def file_write(filename, contents):

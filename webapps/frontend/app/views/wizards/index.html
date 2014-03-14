@@ -13,26 +13,31 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<div data-bind="css: { 'modal-content': modal() }">
-    <div class="modal-header" data-bind="visible: modal()">
-        <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
-        <h3 data-bind="text: title"></h3>
-    </div>
-    <h2 data-bind="visible: !modal(), text: title"></h2>
-    <div data-bind="if: modal()">
-        <div class="modal-body" data-bind="compose: activeStep"></div>
-    </div>
-    <div data-bind="if: !modal()">
-        <div class="quote" data-bind="compose: activeStep"></div>
-    </div>
-    <div data-bind="css: { 'modal-footer': modal() }">
-        <button type="button" class="btn btn-default pull-left"
-                data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel"></button>
-        <button type="button" class="btn btn-default"
-                data-bind="visible: hasPrevious(), click: previous" data-i18n="[html]ovs:generic.previous"></button>
-        <button type="button"  class="btn btn-primary"
-                data-bind="css: { disabled: !hasNext() }, visible: !hasFinish(), click: next" data-i18n="[html]ovs:generic.next"></button>
-        <button type="button"  class="btn btn-primary"
-                data-bind="visible: hasFinish(), click: finish" data-i18n="ovs:generic.finish"></button>
+<div class="modal-dialog" style="min-width: 700px;">
+    <div data-bind="css: { 'modal-content': modal() }">
+        <div class="modal-header" data-bind="visible: modal()">
+            <button type="button" class="close" data-bind="click: function() { close(false); }">&times;</button>
+            <h3 data-bind="text: title"></h3>
+        </div>
+        <h2 data-bind="visible: !modal(), text: title"></h2>
+        <div data-bind="if: modal()">
+            <div class="modal-body" data-bind="compose: activeStep"></div>
+        </div>
+        <div data-bind="if: !modal()">
+            <div class="quote" data-bind="compose: activeStep"></div>
+        </div>
+        <div data-bind="css: { 'modal-footer': modal() }">
+            <button type="button" class="btn btn-default pull-left"
+                    data-bind="click: function() { close(false); }" data-i18n="ovs:generic.cancel"></button>
+            <button type="button"  class="pull-right btn btn-primary"
+                    data-bind="visible: hasFinish(), click: finish" data-i18n="ovs:generic.finish"></button>
+            <button type="button"  class="pull-right btn btn-primary"
+                    data-bind="css: { disabled: !hasNext() }, visible: !hasFinish(), click: next" data-i18n="[html]ovs:generic.next"></button>
+            <button type="button" class="pull-right btn btn-default"
+                    data-bind="visible: hasPrevious(), click: previous" data-i18n="[html]ovs:generic.previous"></button>
+            <div class="pull-right" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">
+                <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+            </div>
+        </div>
     </div>
 </div>

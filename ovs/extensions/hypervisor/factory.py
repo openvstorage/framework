@@ -44,16 +44,12 @@ class Factory(object):
             try:
                 mutex.acquire(30)
                 if key not in Factory.hypervisors:
-                    if hvtype == 'HYPERV':
-                        hypervisor = HyperV(ip, username, password)
-                    elif hvtype == 'VMWARE':
+                    if hvtype == 'VMWARE':
                         hypervisor = VMware(ip, username, password)
-                    elif hvtype == 'XEN':
-                        hypervisor = Xen(ip, username, password)
-                    elif hvtype =='KVM':
+                    elif hvtype == 'KVM':
                         hypervisor = KVM(ip, username, password)
                     else:
-                        raise Exception('Invalid hypervisor')
+                        raise NotImplementedError('Hypervisor {0} is not yet supported'.format(hvtype))
                     Factory.hypervisors[key] = hypervisor
             finally:
                 mutex.release()

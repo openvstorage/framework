@@ -25,7 +25,7 @@ define([
         self.data   = data;
 
         // Computed
-        self.canContinue = ko.observable({value: true, reason: undefined});
+        self.canContinue = ko.observable({ value: true, reasons: [], fields: [] });
 
         // Functions
         self._clone = function(i, vm, callData) {

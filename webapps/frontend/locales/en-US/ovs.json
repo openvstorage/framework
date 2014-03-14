@@ -42,6 +42,14 @@
             "XEN": "Xen",
             "KVM": "KVM"
         },
+        "backendtypes": {
+            "S3": "S3",
+            "AMAZON_S3": "Amazon S3",
+            "CEPH_S3": "Ceph S3",
+            "SWIFT_S3": "Swift S3",
+            "LOCAL": "Local FS",
+            "REST": "REST backend"
+        },
         "username": "Username",
         "password": "Password",
         "logout": "Log out",
@@ -129,7 +137,15 @@
         "nrofsnapshots": "# Snapshots",
         "nrofvdisks": "# vDisks",
         "nrofvmachines": "# vMachines",
-        "nrofvpools": "# vPools"
+        "nrofvpools": "# vPools",
+        "nothingselected": "Nothing selected",
+        "customvalue": "Custom:",
+        "errorsfound": "Errors were found. Please check the contents of all fields.",
+        "followingerrorsfound": "Following errors were found:",
+        "cachefs": "Cache",
+        "dfs": "DFS",
+        "tempfs": "Temporary",
+        "mdfs": "Metadata"
     },
     "vsas": {
         "title": "VSAs",
@@ -157,14 +173,6 @@
     "vpools" : {
         "title": "vPools",
         "backendtype": "Type",
-        "backendtypes": {
-            "S3": "S3",
-            "AMAZON_S3": "Amazon S3",
-            "CEPH_S3": "Ceph S3",
-            "SWIFT_S3": "Swift S3",
-            "LOCAL": "Local FS",
-            "REST": "REST backend"
-        },
         "backendconnection": "Connection",
         "backendlogin": "Login",
         "statistics": "Statistics",
@@ -300,6 +308,50 @@
         "vpool": "vPool"
     },
     "wizards" : {
+        "addvpool": {
+            "title": "Add new vPool",
+            "gathervpool": {
+                "basicinfo": "Add basic vPool information",
+                "name": "Name:",
+                "invalidname": "vPool name is invalid",
+                "backendtype": "Backend:",
+                "host": "Host (FQDN/IP):",
+                "port": "Port:",
+                "timeout": "Timeout:",
+                "accesskey": "Access key:",
+                "secretkey": "Secret key:",
+                "invalidhost": "Invalid host (should be a FQDN or IP address)",
+                "nocredentials": "No credentials were entered",
+                "extendedinfo": "Extended vPool information",
+                "initialvsa": "Initial VSA:",
+                "vsarootpassword": "Root password:",
+                "invalidpassword": "Invalid VSA root password"
+            },
+            "gathermountpoints": {
+                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all VSAs serving this vPool. Please also set the vPool connection info.",
+                "tempfs": "Temporary FS:",
+                "dfs": "Distributed FS:",
+                "md": "Metadata:",
+                "cache": "Cache location:",
+                "mtptinuse": "The given __what__ location is already in use on this VSA",
+                "ipaddress": "Storage IP:",
+                "port": "vRouter port:",
+                "portsinuse": "Ports in use:",
+                "dfsexclusive": "The DFS mountpoint must have exclusive use",
+                "dfsnotshared": "The DFS mountpoint should not be shared between vPools",
+                "portinuse": "The given port is already in use"
+            },
+            "confirm": {
+                "basicinfo": "Validate the basic vPool information.",
+                "vsainfo": "Validate whether the correct VSA was selected.",
+                "mountpoints": "Validate whether mountpoints and connection information are correct.",
+                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
+                "started": "Creation started",
+                "inprogress": "Creation of vPool __what__ is started.",
+                "creating": "creating the vPool",
+                "success": "Creation of vPool __what__ finished."
+            }
+        },
         "createft": {
             "title": "Create from vTemplate",
             "gather": {

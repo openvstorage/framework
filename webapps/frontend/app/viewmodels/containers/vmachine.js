@@ -22,10 +22,11 @@ define([
         var self = this;
 
         // Variables
-        self.shared        = shared;
-        self.vSAGuids      = [];
-        self.vPoolGuids    = [];
-        self.vMachineGuids = [];
+        self.shared         = shared;
+        self.vSAGuids       = [];
+        self.vPoolGuids     = [];
+        self.vMachineGuids  = [];
+        self.servedVSRGuids = [];
 
         // Handles
         self.loadVDisksHandle  = undefined;
@@ -172,6 +173,9 @@ define([
             }
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
+            }
+            if (data.hasOwnProperty('served_vsrs_guids')) {
+                self.servedVSRGuids = data.served_vsrs_guids;
             }
             // The vdisks from a full object data is only valid for non-VSA vMachines, since those
             // don't have disks, but only serve disks.

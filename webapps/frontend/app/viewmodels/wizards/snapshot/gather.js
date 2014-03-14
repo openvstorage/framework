@@ -27,13 +27,17 @@ define([
 
         // Computed
         self.canContinue = ko.computed(function() {
+            var valid = true, reasons = [], fields = [];
             if (self.data.vm() === undefined) {
-                return {value: false, reason: $.t('ovs:wizards.snapshot.gather.nomachine')};
+                valid = false;
+                fields.push('vm');
+                reasons.push($.t('ovs:wizards.snapshot.gather.nomachine'));
+            } else if (!self.data.name()) {
+                valid = false;
+                fields.push('name');
+                reasons.push($.t('ovs:wizards.snapshot.gather.noname'));
             }
-            if (!self.data.name()) {
-                return {value: false, reason: $.t('ovs:wizards.snapshot.gather.noname')};
-            }
-            return {value: true, reason: undefined};
+            return { value: valid, reasons: reasons, fields: fields };
         });
 
         // Functions

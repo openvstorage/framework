@@ -17,7 +17,9 @@ VMachine module
 """
 import time
 import logging
+import crypt
 
+from subprocess import check_output
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
@@ -29,6 +31,7 @@ from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
+from ovs.plugin.provider.configuration import Configuration
 
 
 class VMachineController(object):
@@ -145,8 +148,7 @@ class VMachineController(object):
 
         try:
             result = target_hv.create_vm_from_template(
-                name, source_vm, disks, target_vsr.storage_ip, target_vsr.mountpoint,
-                esxhost=None, wait=True
+                name, source_vm, disks, target_vsr.storage_ip, target_vsr.mountpoint, wait=True
             )
         except:
             VMachineController.delete(machineguid=new_vm.guid)
@@ -161,10 +163,10 @@ class VMachineController(object):
     @celery.task(name='ovs.machine.create_from_voldrv')
     def create_from_voldrv(name, vsrid):
         """
-        This method will create a vmachine based on a given vmx file
+        This method will create a vmachine based on a given vmx/xml file
         """
         name = name.strip('/')
-        if name.endswith('.vmx'):
+        if name.endswith('.vmx') or name.endswith('.xml'):
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
             if vsr is None:
                 raise RuntimeError('VolumeStorageRouter could not be found')
@@ -176,6 +178,13 @@ class VMachineController(object):
                 vmachine.pmachine = pmachine
                 vmachine.status = 'CREATED'
             vmachine.devicename = name
+            vmachine.save()
+        if name.endswith('.xml'):
+            try:
+                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
+                vmachine.status = 'SYNC'
+            except:
+                vmachine.status = 'SYNC_NOK'
             vmachine.save()
 
     @staticmethod
@@ -522,3 +531,56 @@ class VMachineController(object):
         except Exception as ex:
             logging.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.get_physical_metadata')
+    def get_physical_metadata():
+        """
+        Gets physical information about the machine this task is running on
+        """
+        mountpoints = check_output('mount -v', shell=True).strip().split('\n')
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
+                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
+                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
+                       and p.split(' ')[2] != '/']
+        ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
+        ipaddresses = [ip.strip() for ip in ipaddresses]
+        xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
+        return {'mountpoints': mountpoints,
+                'ipaddresses': ipaddresses,
+                'xmlrpcport': xmlrpcport}
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.validate_password')
+    def validate_password(ip, password):
+        """
+        Validates whether a given password can be used to connect to the machine this task is running on
+        """
+        from ovs.plugin.provider.remote import Remote
+
+        # @TODO: Run locally instead of trough Cuisine
+        client = Remote.cuisine.api
+        Remote.cuisine.fabric.env['password'] = password
+        client.connect(ip)
+        try:
+            shadow = client.file_read('/etc/shadow')
+            for line in shadow.split('\n'):
+                if 'root' in line:
+                    parts = line.split('$')
+                    password_hash = crypt.crypt(password, '${0}${1}$'.format(parts[1], parts[2]))
+                    if password_hash in line:
+                        return True
+            return False
+        except:
+            return False
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.add_vpool')
+    def add_vpool(parameters):
+        """
+        Add a vPool to the machine this task is running on
+        """
+        from ovs.extensions.grid.manager import Manager
+
+        Manager.init_vpool(parameters['vsa_ip'], parameters['vsa_password'],
+                           parameters['vpool_name'], parameters=parameters)

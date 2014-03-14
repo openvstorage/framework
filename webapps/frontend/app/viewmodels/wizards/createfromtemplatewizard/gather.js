@@ -32,7 +32,8 @@ define([
         self.namehelp = ko.computed(function() {
             if (data.name() === undefined || data.name() === '') {
                 return $.t('ovs:wizards.createft.gather.noname');
-            } else if (data.amount() === 1) {
+            }
+            if (data.amount() === 1) {
                 return $.t('ovs:wizards.createft.gather.amountone');
             }
             return $.t('ovs:wizards.createft.gather.amountmultiple', {
@@ -41,26 +42,36 @@ define([
             });
         });
         self.canStart = ko.computed(function() {
+            var valid = true, reasons = [], fields = [];
             if (self.data.vm() === undefined) {
-                return {value: false, reason: $.t('ovs:wizards.createft.gather.nomachine')};
+                valid = false;
+                fields.push('vm');
+                reasons.push($.t('ovs:wizards.createft.gather.nomachine'));
             }
             if (self.data.pMachines().length === 0) {
-                return {value: false, reason: $.t('ovs:wizards.createft.gather.nopmachines')};
+                valid = false;
+                fields.push('pmachines');
+                reasons.push($.t('ovs:wizards.createft.gather.nopmachines'));
             }
-            return {value: true, reason: undefined};
+            return { value: valid, reasons: reasons, fields: fields };
         });
         self.canContinue = ko.computed(function() {
-            var data = self.canStart();
+            var valid = true, reasons = [], fields = [],
+                data = self.canStart();
             if (!data.value) {
                 return data;
             }
             if (self.data.name() === undefined || self.data.name() === '') {
-                return {value: false, reason: $.t('ovs:wizards.createft.gather.noname')};
+                valid = false;
+                fields.push('name');
+                reasons.push($.t('ovs:wizards.createft.gather.noname'));
             }
             if (self.data.selectedPMachines().length === 0) {
-                return {value: false, reason: $.t('ovs:wizards.createft.gather.nopmachinesselected')};
+                valid = false;
+                fields.push('pmachines');
+                reasons.push($.t('ovs:wizards.createft.gather.nopmachinesselected'));
             }
-            return {value: true, reason: undefined};
+            return { value: valid, reasons: reasons, fields: fields };
         });
 
         // Functions

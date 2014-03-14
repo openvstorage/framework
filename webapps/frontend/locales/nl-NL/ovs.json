@@ -15,6 +15,10 @@
         "limitations under the License."
     ],
     "generic": {
+        "backendtypes": {
+            "S3": "Amazon S3",
+            "FILESYSTEM": "Bestandssystem"
+        },
         "username": "Gebruikersnaam",
         "password": "Paswoord",
         "logout": "Uitloggen",
@@ -68,10 +72,6 @@
     "vpools" : {
         "title": "vPools",
         "backendtype": "Type",
-        "backendtypes": {
-            "S3": "Amazon S3",
-            "FILESYSTEM": "Bestandssystem"
-        },
         "backendconnection": "Connectie",
         "backendlogin": "Login"
     },

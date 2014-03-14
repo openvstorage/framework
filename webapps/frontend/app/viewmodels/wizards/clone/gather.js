@@ -25,19 +25,26 @@ define([
 
         // Computed
         self.canContinue = ko.computed(function() {
+            var valid = true, reasons = [], fields = [];
             if (self.data.vm() === undefined) {
-                return {value: false, reason: $.t('ovs:wizards.clone.gather.nomachine')};
+                valid = false;
+                fields.push('vm');
+                reasons.push($.t('ovs:wizards.clone.gather.nomachine'));
             }
             if (!self.data.name()) {
-                return {value: false, reason: $.t('ovs:wizards.clone.gather.noname')};
+                valid = false;
+                fields.push('name');
+                reasons.push($.t('ovs:wizards.clone.gather.noname'));
             }
             if (self.data.vm().snapshots().length === 0) {
-                return {value: false, reason: $.t('ovs:wizards.clone.gather.nosnapshots')};
+                valid = false;
+                fields.push('snapshots');
+                reasons.push($.t('ovs:wizards.clone.gather.nosnapshots'));
             }
-            return {value: true, reason: undefined};
+            return { value: valid, reasons: reasons, fields: fields };
         });
 
-        // Functions
+        // Durandal
         self.activate = function() {
             if (self.data.vm() === undefined || self.data.vm().guid() !== self.data.machineGuid()) {
                 self.data.vm(new VMachine(self.data.machineGuid()));

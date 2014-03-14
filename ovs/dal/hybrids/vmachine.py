@@ -43,7 +43,7 @@ class VMachine(DataObject):
     _relations = {'pmachine': (PMachine, 'vmachines'),
                   'vpool':    (VPool, 'vmachines')}
     _expiry = {'snapshots':          (60, list),
-               'hypervisor_status': (300, str, True),  # The cache is invalidated on start/stop
+               'hypervisor_status': (300, str),
                'statistics':          (5, dict),
                'stored_data':        (60, int),
                'failover_mode':      (60, str),

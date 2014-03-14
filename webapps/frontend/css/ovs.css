@@ -24,7 +24,7 @@ html, body {
 .stretch {
     height: 100%;
 }
-div[data-view] {
+div[data-view]:not(.modal-dialog) {
     height: 100%;
 }
 

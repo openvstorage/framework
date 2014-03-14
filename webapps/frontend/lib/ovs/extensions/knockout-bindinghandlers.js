@@ -141,7 +141,7 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto right',
+                    placement: 'auto left',
                     title: title
                 });
             }
@@ -153,13 +153,13 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto right',
+                    placement: 'auto left',
                     title: title
                 });
             }
         }
     };
-    ko.bindingHandlers.icon = {
+    ko.bindingHandlers.translate = {
         init: function(element, valueAccessor) {
             var value = valueAccessor();
             $(element).html($.t(value));

@@ -75,15 +75,17 @@ define(['durandal/system', 'durandal/app', 'durandal/composition', 'durandal/act
      * @static
      */
     MessageBox.defaultViewMarkup = [
-        '<div data-view="plugins/messageBox" class="messageBox">',
-            '<div class="modal-header">',
-                '<h3 data-bind="text: title"></h3>',
-            '</div>',
-            '<div class="modal-body">',
-                '<p class="message" data-bind="text: message"></p>',
-            '</div>',
-            '<div class="modal-footer" data-bind="foreach: options">',
-                '<button class="btn" data-bind="click: function () { $parent.selectOption($data); }, text: $data, css: { \'btn-primary\': $index() == 0, autofocus: $index() == 0 }"></button>',
+        '<div class="modal-dialog" data-view="plugins/messageBox" class="messageBox">',
+            '<div class="modal-content">',
+                '<div class="modal-header">',
+                    '<h3 data-bind="text: title"></h3>',
+                '</div>',
+                '<div class="modal-body">',
+                    '<p class="message" data-bind="text: message"></p>',
+                '</div>',
+                '<div class="modal-footer" data-bind="foreach: options">',
+                    '<button class="btn" data-bind="click: function () { $parent.selectOption($data); }, text: $data, css: { \'btn-primary\': $index() == 0, autofocus: $index() == 0 }"></button>',
+                '</div>',
             '</div>',
         '</div>'
     ].join('\n');
@@ -302,7 +304,7 @@ define(['durandal/system', 'durandal/app', 'durandal/composition', 'durandal/act
     /**
      * @class DialogContext
      */
-    dialog.addContext('default', {
+    dialog.addContext('original', {
         blockoutOpacity: .2,
         removeDelay: 200,
         /**
@@ -387,7 +389,7 @@ define(['durandal/system', 'durandal/app', 'durandal/composition', 'durandal/act
             var setDialogPosition = function () {
                 //Setting a short timeout is need in IE8, otherwise we could do this straight away
                 setTimeout(function () {
-                    //We will clear and then set width for dialogs without width set 
+                    //We will clear and then set width for dialogs without width set
                     if (!$child.data("predefinedWidth")) {
                         $child.css({ width: '' }); //Reset width
                     }
@@ -428,6 +430,26 @@ define(['durandal/system', 'durandal/app', 'durandal/composition', 'durandal/act
                 });
             }
         }
+    });
+
+    dialog.addContext('default', {
+        addHost: function (theDialog) {
+            $('<div class=\'modal fade\' id=\'my-modal\'></div>').appendTo($('body'));
+            theDialog.host = $('#my-modal').get(0);
+        },
+        removeHost: function () {
+            window.setTimeout(function () {
+                $('#my-modal').modal('hide');
+                $('body').removeClass('modal-open');
+                $('.modal-backdrop').remove();
+            }, 50);
+        },
+        compositionComplete: function () {
+            var $modal = $('#my-modal');
+            $modal.modal('show');
+            $modal.find('.autofocus').first().focus();
+        },
+        attached: null
     });
 
     return dialog;

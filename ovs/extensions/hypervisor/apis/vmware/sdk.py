@@ -671,12 +671,12 @@ class Sdk(object):
         return task
 
     @authenticated
-    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
         """
 
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         host_data = self._get_host_data(esxhost)
 
         datastore = self.get_datastore(ip, mountpoint, esxhost)
@@ -733,7 +733,7 @@ class Sdk(object):
         return task
 
     @authenticated
-    def clone_vm(self, vmid, name, disks, esxhost=None, wait=True):
+    def clone_vm(self, vmid, name, disks, wait=True):
         """
         Clone a existing VM configuration
 
@@ -745,7 +745,7 @@ class Sdk(object):
         @param wait: wait for task to complete or not (True/False)
         """
 
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         host_data = self._get_host_data(esxhost)
 
         source_vm_object = self.exists(key=vmid)
@@ -819,7 +819,7 @@ class Sdk(object):
         return vm
 
     @authenticated
-    def get_datastore(self, ip, mountpoint, esxhost=None):
+    def get_datastore(self, ip, mountpoint):
         """
         @param ip : hypervisor ip to query for datastore presence
         @param mountpoint: nfs mountpoint on hypervisor
@@ -828,7 +828,7 @@ class Sdk(object):
         """
 
         datastore = None
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         host_system = self._get_object(esxhost, properties=['datastore'])
         for store in host_system.datastore[0]:
             store = self._get_object(store)
@@ -839,7 +839,7 @@ class Sdk(object):
         return datastore
 
     @authenticated
-    def is_datastore_available(self, ip, mountpoint, esxhost=None):
+    def is_datastore_available(self, ip, mountpoint):
         """
         @param ip : hypervisor ip to query for datastore presence
         @param mountpoint: nfs mountpoint on hypervisor
@@ -847,7 +847,7 @@ class Sdk(object):
         @return: True | False
         """
 
-        if self.get_datastore(ip, mountpoint, esxhost):
+        if self.get_datastore(ip, mountpoint):
             return True
         else:
             return False

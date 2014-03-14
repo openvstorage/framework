@@ -63,14 +63,14 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, esxhost=None, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         Abstract method
         """
         pass
 
     @abc.abstractmethod
-    def clone_vm(self, vmid, name, disks, esxhost=None, wait=False):
+    def clone_vm(self, vmid, name, disks, wait=False):
         """
         Abstract method
         """
@@ -112,14 +112,14 @@ class Hypervisor(object):
         pass
 
     @abc.abstractmethod
-    def is_datastore_available(self, ip, mountpoint, esxhost=None):
+    def is_datastore_available(self, ip, mountpoint):
         """
         Abstract method
         """
         pass
 
     @abc.abstractmethod
-    def set_as_template(self, vmid, disks, esxhost=None, wait=False):
+    def set_as_template(self, vmid, disks, wait=False):
         """
         Abstract method
         """
