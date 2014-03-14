@@ -30,6 +30,8 @@ RUN_PATH = "/var/run/libvirt/qemu/" #get live info from here
 #Helpers
 def _recurse(treeitem):
     result = {}
+    for key, item in treeitem.items():
+        result[key] = item
     for child in treeitem.getchildren():
         result[child.tag] = _recurse(child)
         for key, item in child.items():
@@ -145,9 +147,12 @@ class Sdk(object):
 
         order = 0
         for disk in self._get_disks(vm_object):
+            if disk['device'] == 'cdrom': #skip cdrom/iso
+                continue
             backingfilename = disk['source']['file']
             match = re.search(regex, backingfilename)
-            mountpoint = os.path.join('/mnt', match.group(1))
+            if match:
+                mountpoint = os.path.join('/mnt', match.group(1))
             config['disks'].append({'filename': os.path.basename(backingfilename),
                                     'backingfilename': backingfilename.replace(mountpoint, '').strip('/'),
                                     'datastore': mountpoint,
