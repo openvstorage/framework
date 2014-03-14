@@ -148,8 +148,7 @@ class VMachineController(object):
 
         try:
             result = target_hv.create_vm_from_template(
-                name, source_vm, disks, target_vsr.storage_ip, target_vsr.mountpoint,
-                esxhost=None, wait=True
+                name, source_vm, disks, target_vsr.storage_ip, target_vsr.mountpoint, wait=True
             )
         except:
             VMachineController.delete(machineguid=new_vm.guid)

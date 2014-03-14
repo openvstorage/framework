@@ -19,6 +19,7 @@ Module for the KVM hypervisor client
 from ovs.extensions.hypervisor.hypervisor import Hypervisor
 from ovs.extensions.hypervisor.apis.kvm.sdk import Sdk
 
+
 class KVM(Hypervisor):
     """
     Represents the hypervisor client for KVM
@@ -38,56 +39,71 @@ class KVM(Hypervisor):
         return True
 
     @Hypervisor.connected
-    def get_state(self, vmid, **kwargs):
+    def get_state(self, vmid):
         """
         Dummy method
         """
         return self.sdk.get_power_state(vmid)
 
     @Hypervisor.connected
-    def create_vm_from_template(self, name, source_vm, disks, storage_ip, mountpoint, *args, **kwargs):
+    def create_vm_from_template(self, name, source_vm, disks, storage_ip, mountpoint, wait=True):
         """
         create vm from template
         TODO:
         storage_ip and mountpoint refer to target vsr
         but on kvm vsr.storage_ip is 127.0.0.1
         """
+        _ = wait  # For compatibility purposes only
         return self.sdk.create_vm_from_template(name, source_vm, disks)
 
     @Hypervisor.connected
-    def delete_vm(self, vmid, *args, **kwargs):
+    def delete_vm(self, vmid, wait=True):
+        """
+        Deletes a given VM
+        """
+        _ = wait  # For compatibility purposes only
         return self.sdk.delete_vm(vmid)
 
     @Hypervisor.connected
-    def get_vm_agnostic_object(self, vmid, *args, **kwargs):
+    def get_vm_agnostic_object(self, vmid):
+        """
+        Loads a VM and returns a hypervisor agnostic representation
+        """
         return self.sdk.make_agnostic_config(self.sdk.get_vm_object(vmid))
 
     @Hypervisor.connected
-    def get_vms_by_nfs_mountinfo(self,**kwargs):
+    def get_vms_by_nfs_mountinfo(self, ip, mountpoint):
         """
         Gets a list of agnostic vm objects for a given ip and mountpoint
         """
+        _ = ip, mountpoint  # @TODO: These should be used to only fetch the correct vMachines
         for vm in self.sdk.get_vms():
             yield self.sdk.make_agnostic_config(vm)
 
     @Hypervisor.connected
-    def is_datastore_available(self, *args, **kwargs):
+    def is_datastore_available(self, ip, mountpoint):
+        """
+        Check whether a given datastore is in use on the hypervisor
+        """
+        _ = ip, mountpoint  # @TODO: Check whether the mountpoint is available
         return True
 
     @Hypervisor.connected
-    def clone_vm(self, vmid, name, disks):
+    def clone_vm(self, vmid, name, disks, wait=False):
         """
         create a clone at vmachine level
         #disks are cloned by VDiskController
         """
+        _ = wait  # For compatibility purposes only
         return self.sdk.clone_vm(vmid, name, disks)
 
     @Hypervisor.connected
-    def set_as_template(self, vmid, disks):
+    def set_as_template(self, vmid, disks, wait=False):
         """
         Dummy method
         TODO: Not yet implemented, setting an existing kvm guest as template
         """
+        _ = wait  # For compatibility purposes only
         raise NotImplementedError()
 
     @Hypervisor.connected
