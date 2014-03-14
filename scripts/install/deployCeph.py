@@ -239,3 +239,5 @@ run_command('/etc/init.d/radosgw start')
 run_command('radosgw-admin user create --uid=johndoe --display-name="John Doe" --email=john@example.com')
 
 run_command('ceph status')
+
+run_command('touch /var/lib/ceph/radosgw/ceph-radosgw.gateway/done')
