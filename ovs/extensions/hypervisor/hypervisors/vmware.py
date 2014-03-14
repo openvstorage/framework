@@ -154,3 +154,44 @@ class VMware(Hypervisor):
         """
         return self.sdk.mount_nfs_datastore(name, remote_host, remote_path)
 
+    def clean_backing_disk_filename(self, path):
+        """
+        Cleans a backing disk filename to the corresponding disk filename
+        """
+        return path.replace('-flat.vmdk', '.vmdk').strip('/')
+
+    def get_backing_disk_path(self, machinename, devicename):
+        """
+        Builds the path for the file backing a given device/disk
+        """
+        return '/{}/{}-flat.vmdk'.format(machinename.replace(' ', '_'), devicename)
+
+    def get_disk_path(self, machinename, devicename):
+        """
+        Builds the path for the file backing a given device/disk
+        """
+        return '/{}/{}.vmdk'.format(machinename.replace(' ', '_'), devicename)
+
+    def clean_vmachine_filename(self, path):
+        """
+        Cleans a VM filename
+        """
+        return path.strip('/')
+
+    def get_vmachine_path(self, machinename, vsa_machineid):
+        """
+        Builds the path for the file representing a given vmachine
+        """
+        _ = vsa_machineid  # For compatibility purposes only
+        machinename = machinename.replace(' ', '_')
+        return '/{}/{}.vmx'.format(machinename, machinename)
+
+    def get_rename_scenario(self, old_name, new_name):
+        """
+        Gets the rename scenario based on the old and new name
+        """
+        if old_name.endswith('.vmx') and new_name.endswith('.vmx'):
+            return 'RENAME'
+        elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
+            return 'UPDATE'
+        return 'UNSUPPORTED'

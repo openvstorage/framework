@@ -15,6 +15,7 @@
 """
 VMachine module
 """
+
 import time
 import logging
 import crypt
@@ -35,7 +36,6 @@ from ovs.plugin.provider.configuration import Configuration
 
 
 class VMachineController(object):
-
     """
     Contains all BLL related to VMachines
     """
@@ -72,6 +72,7 @@ class VMachineController(object):
             return False
 
         target_pm = PMachine(pmachineguid)
+        target_hypervisor = Factory.get(target_pm)
 
         vpool = template_vm.vpool
         vpool_guids = set([vpool.guid])
@@ -109,6 +110,8 @@ class VMachineController(object):
         if name_duplicates is not None and len(name_duplicates) > 0:
             raise RuntimeError('A vMachine with name {0} already exists'.format(name))
 
+        vm_path = target_hypervisor.get_vmachine_path(name, target_vsr.serving_vmachine.machineid)
+
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
         new_vm.vpool = template_vm.vpool
@@ -116,7 +119,7 @@ class VMachineController(object):
         new_vm.name = name
         new_vm.description = description
         new_vm.is_vtemplate = False
-        new_vm.devicename = '{}/{}.vmx'.format(name.replace(' ', '_'), name.replace(' ', '_'))
+        new_vm.devicename = target_hypervisor.clean_vmachine_filename(vm_path)
         new_vm.status = 'CREATED'
         new_vm.save()
 
@@ -135,7 +138,8 @@ class VMachineController(object):
                 result = VDiskController.create_from_template(
                     diskguid=disk.guid,
                     devicename=prefix,
-                    location=new_vm.name.replace(' ', '_'),
+                    pmachineguid=target_pm.guid,
+                    machinename=new_vm.name,
                     machineguid=new_vm.guid,
                     vsrguid=vsrguid
                 )
@@ -165,11 +169,11 @@ class VMachineController(object):
         """
         This method will create a vmachine based on a given vmx/xml file
         """
-        name = name.strip('/')
-        if name.endswith('.vmx') or name.endswith('.xml'):
+        pmachine = PMachineList.get_by_vsrid(vsrid)
+        hypervisor = Factory.get(pmachine)
+        name = hypervisor.clean_vmachine_filename(name)
+        if pmachine.hvtype in ['VMWARE', 'KVM']:
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            if vsr is None:
-                raise RuntimeError('VolumeStorageRouter could not be found')
             pmachine = PMachineList.get_by_vsrid(vsrid)
             vmachine = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
             if not vmachine:
@@ -179,7 +183,7 @@ class VMachineController(object):
                 vmachine.status = 'CREATED'
             vmachine.devicename = name
             vmachine.save()
-        if name.endswith('.xml'):
+        if pmachine.hvtype == 'KVM':
             try:
                 VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
                 vmachine.status = 'SYNC'
@@ -197,7 +201,6 @@ class VMachineController(object):
         @param timestamp: timestamp of the disk snapshots to use for the clone
         @param name: name for the new machine
         """
-
         _ = kwargs
         machine = VMachine(machineguid)
 
@@ -210,6 +213,7 @@ class VMachineController(object):
         new_machine = VMachine()
         new_machine.copy_blueprint(machine)
         new_machine.name = name
+        new_machine.pmachine = machine.pmachine
         new_machine.save()
 
         new_disk_guids = []
@@ -224,7 +228,8 @@ class VMachineController(object):
             result = VDiskController.clone(diskguid=currentDisk.guid,
                                            snapshotid=snapshotid,
                                            devicename=prefix,
-                                           location=new_machine.name,
+                                           pmachineguid=new_machine.pmachine_guid,
+                                           machinename=new_machine.name,
                                            machineguid=new_machine.guid)
             new_disk_guids.append(result['diskguid'])
 
@@ -264,11 +269,11 @@ class VMachineController(object):
         """
         This method will delete a vmachine based on the name of the vmx given
         """
-        name = name.strip('/')
-        if name.endswith('.vmx'):
+        pmachine = PMachineList.get_by_vsrid(vsrid)
+        hypervisor = Factory.get(pmachine)
+        name = hypervisor.clean_vmachine_filename(name)
+        if pmachine.hvtype in ['VMWARE', 'KVM']:
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            if vsr is None:
-                raise RuntimeError('VolumeStorageRouter could not be found')
             vm = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
             if vm is not None:
                 MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
@@ -281,27 +286,21 @@ class VMachineController(object):
         """
         This machine will handle the rename of a vmx file
         """
-        old_name = old_name.strip('/')
-        new_name = new_name.strip('/')
-        # @TODO: When implementing more hypervisors, move part of code to hypervisor factory
-        # vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-        # hypervisor = Factory.get(vsr.serving_vmachine.pmachine)
-        # scenario = hypervisor.get_scenario(old_name, new_name)
-        # if scenario == 'RENAME': f00bar
-        # if scenario == 'UPDATED': f00bar
-        # > This way, this piece of code is hypervisor agnostic
+        pmachine = PMachineList.get_by_vsrid(vsrid)
+        hypervisor = Factory.get(pmachine)
         vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-        if vsr is None:
-            raise RuntimeError('VolumeStorageRouter could not be found')
-        if old_name.endswith('.vmx') and new_name.endswith('.vmx'):
+
+        old_name = hypervisor.clean_vmachine_filename(old_name)
+        new_name = hypervisor.clean_vmachine_filename(new_name)
+        scenario = hypervisor.get_rename_scenario(old_name, new_name)
+        if scenario == 'RENAME':
             # Most likely a change from path. Updaing path
             vm = VMachineList.get_by_devicename_and_vpool(old_name, vsr.vpool)
             if vm is not None:
                 vm.devicename = new_name
                 vm.save()
-        elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
+        elif scenario == 'UPDATE':
             vm = VMachineList.get_by_devicename_and_vpool(new_name, vsr.vpool)
-            # The configuration has been updated (which happens in a tempfile), start a sync
             if vm is None:
                 # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
                 # Let's create it anyway
@@ -335,9 +334,7 @@ class VMachineController(object):
 
         vmachine = VMachine(machineguid)
         if vmachine.hypervisor_status == 'RUNNING':
-            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(
-                vmachine.name
-            ))
+            raise RuntimeError('vMachine {0} may not be running to set it as vTemplate'.format(vmachine.name))
 
         for disk in vmachine.vdisks:
             VDiskController.set_as_template(diskguid=disk.guid)
@@ -395,8 +392,9 @@ class VMachineController(object):
         #        subtask will now raise an exception earlier in the workflow
         for disk in machine.vdisks:
             if not disk.volumeid:
-                message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}' \
-                    .format(disk.guid, machine.guid)
+                message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}'.format(
+                    disk.guid, machine.guid
+                )
                 logging.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
 

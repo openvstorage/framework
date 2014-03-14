@@ -148,11 +148,11 @@ class Sdk(object):
         return self._get_object(task)
 
     @authenticated
-    def get_vm_ip_information(self, esxhost=None):
+    def get_vm_ip_information(self):
         """
         Get the IP information for all vms on a given esxi host
         """
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         configuration = []
         for vm in self._get_object(esxhost,
                                    prop_type='VirtualMachine',
@@ -174,11 +174,11 @@ class Sdk(object):
         return configuration
 
     @authenticated
-    def exists(self, esxhost=None, name=None, key=None):
+    def exists(self, name=None, key=None):
         """
         Checks whether a vm with a given name or key exists on a given esxi host
         """
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         if name is not None or key is not None:
             try:
                 if name is not None:
@@ -203,23 +203,23 @@ class Sdk(object):
             raise Exception('A name or key should be passed.')
 
     @authenticated
-    def get_vm(self, key, esxhost=None):
+    def get_vm(self, key):
         """
         Retreives a vm object, based on its key
         """
-        vmid = self.exists(esxhost=esxhost, key=key)
+        vmid = self.exists(key=key)
         if vmid is None:
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
         vm = self._get_object(vmid)
         return vm
 
     @authenticated
-    def get_vms(self, ip, mountpoint, esxhost=None):
+    def get_vms(self, ip, mountpoint):
         """
         Get all vMachines using a given nfs share
         """
-        esxhost = self._validate_host(esxhost)
-        datastore = self.get_datastore(ip, mountpoint, esxhost)
+        esxhost = self._validate_host(None)
+        datastore = self.get_datastore(ip, mountpoint)
         filtered_vms = []
         vms = self._get_object(esxhost,
                                prop_type='VirtualMachine',
@@ -234,7 +234,7 @@ class Sdk(object):
         return filtered_vms
 
     @authenticated
-    def add_physical_disk(self, vmname, devicename, disklabel, filename, esxhost=None, wait=False):
+    def add_physical_disk(self, vmname, devicename, disklabel, filename, wait=False):
         """
         Adds a physical disk to a vm on a given esxi host. It tries to place the disk in the
         first free slot
@@ -256,7 +256,7 @@ class Sdk(object):
             self._client.factory.create('ns0:VirtualLsiLogicSASController'))
         disk_type = type(self._client.factory.create('ns0:VirtualDisk'))
 
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         vms = self._get_object(esxhost,
                                prop_type='VirtualMachine',
                                traversal={'name': 'HostSystemTraversalSpec',
@@ -368,7 +368,7 @@ class Sdk(object):
         return task
 
     @authenticated
-    def remove_disk(self, vm, disk, esxhost=None, wait=True):
+    def remove_disk(self, vm, disk, wait=True):
         """
         Removes a disk from a given vm
         """
@@ -376,7 +376,7 @@ class Sdk(object):
         config.deviceChange = []
 
         # Map disk to uuid
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         iqn_mapping = self._get_host_iqn_mapping(esxhost)
         disk_lun = None
         if disk.iqn in iqn_mapping:
@@ -503,7 +503,7 @@ class Sdk(object):
         return task
 
     @authenticated
-    def update_vm(self, vm, name, os, disks, kvmport, esxhost=None, wait=True):
+    def update_vm(self, vm, name, os, disks, kvmport, wait=True):
         """
         Update a existing vm
         """
@@ -519,7 +519,7 @@ class Sdk(object):
         config.extraConfig = []
 
         # Add disk devices
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         iqn_mapping = self._get_host_iqn_mapping(esxhost, rescan=True)
         disk_map = {}
         for disk in disks:
@@ -592,12 +592,11 @@ class Sdk(object):
         return task
 
     @authenticated
-    def create_vm(self, name, cpus, memory, os, disks, nics,
-                  kvmport, datastore, esxhost=None, wait=False):
+    def create_vm(self, name, cpus, memory, os, disks, nics, kvmport, datastore, wait=False):
         """
         Create a vm with a given set of settings
         """
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         hostdata = self._get_host_data(esxhost)
 
         # Build basic config information
@@ -679,7 +678,7 @@ class Sdk(object):
         esxhost = self._validate_host(None)
         host_data = self._get_host_data(esxhost)
 
-        datastore = self.get_datastore(ip, mountpoint, esxhost)
+        datastore = self.get_datastore(ip, mountpoint)
         # Build basic config information
         config = self._client.factory.create('ns0:VirtualMachineConfigSpec')
         config.name = name
@@ -811,8 +810,8 @@ class Sdk(object):
         return task
 
     @authenticated
-    def get_vm(self, key, esxhost=None):
-        vmid = self.exists(esxhost=esxhost, key=key)
+    def get_vm(self, key):
+        vmid = self.exists(key=key)
         if vmid is None:
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
         vm = self._get_object(vmid)
@@ -852,10 +851,10 @@ class Sdk(object):
         else:
             return False
 
-    def make_agnostic_config(self, vm_object, esxhost=None):
+    def make_agnostic_config(self, vm_object):
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
 
         config = {'name': vm_object.config.name,
                   'id': vm_object.obj_identifier.value,
@@ -889,11 +888,11 @@ class Sdk(object):
         return config
 
     @authenticated
-    def register_vm(self, vmxpath, esxhost=None, wait=False):
+    def register_vm(self, vmxpath, wait=False):
         """
         Register a vm with a given esxhost
         """
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         hostdata = self._get_host_data(esxhost)
         task = self._client.service.RegisterVM_Task(hostdata['folder'],
                                                     path=vmxpath,
@@ -987,11 +986,11 @@ class Sdk(object):
                                 properties=['runtime.powerState']).runtime.powerState
 
     @authenticated
-    def mount_nfs_datastore(self, name, remote_host, remote_path, esxhost=None):
+    def mount_nfs_datastore(self, name, remote_host, remote_path):
         """
         Mounts a given NFS export as a datastore
         """
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
         host = self._get_object(esxhost, properties=['datastore',
                                                      'name',
                                                      'configManager',
@@ -1104,7 +1103,7 @@ class Sdk(object):
             state = self.get_task_info(task).info.state
 
     @authenticated
-    def get_nfs_datastore_object(self, ip, mountpoint, filename, esxhost=None):
+    def get_nfs_datastore_object(self, ip, mountpoint, filename):
         """
         ip : "10.130.12.200", string
         mountpoint: "/srv/volumefs", string
@@ -1121,9 +1120,9 @@ class Sdk(object):
         filename = filename.replace('-flat.vmdk', '.vmdk')  # Support both -flat.vmdk and .vmdk
         if not filename.endswith('.vmdk') and not filename.endswith('.vmx'):
             raise ValueError('Unexpected filetype')
-        esxhost = self._validate_host(esxhost)
+        esxhost = self._validate_host(None)
 
-        datastore = self.get_datastore(ip, mountpoint, esxhost=esxhost)
+        datastore = self.get_datastore(ip, mountpoint)
         if not datastore:
             raise RuntimeError('Could not find datastore')
 

@@ -15,9 +15,8 @@
 """
 Hypervisor factory module
 """
+
 from hypervisors.vmware import VMware
-from hypervisors.hyperv import HyperV
-from hypervisors.xen import Xen
 from hypervisors.kvm import KVM
 from ovs.extensions.generic.filemutex import FileMutex
 

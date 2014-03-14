@@ -127,3 +127,41 @@ class KVM(Hypervisor):
         """
         raise NotImplementedError()
 
+    def clean_backing_disk_filename(self, path):
+        """
+        Cleans a backing disk filename to the corresponding disk filename
+        """
+        return path.strip('/')
+
+    def get_backing_disk_path(self, machinename, devicename):
+        """
+        Builds the path for the file backing a given device/disk
+        """
+        return self.get_disk_path(machinename.replace(' ', '_'), devicename)
+
+    def get_disk_path(self, machinename, devicename):
+        """
+        Builds the path for the file backing a given device/disk
+        """
+        return '/{}_{}.raw'.format(machinename.replace(' ', '_'), devicename)
+
+    def clean_vmachine_filename(self, path):
+        """
+        Cleans a VM filename
+        """
+        return path.strip('/')
+
+    def get_vmachine_path(self, machinename, vsa_machineid):
+        """
+        Builds the path for the file representing a given vmachine
+        """
+        machinename = machinename.replace(' ', '_')
+        return '/vms/{}/{}.xml'.format(vsa_machineid, machinename)
+
+    def get_rename_scenario(self, old_name, new_name):
+        """
+        Gets the rename scenario based on the old and new name
+        """
+        if old_name.endswith('.xml') and new_name.endswith('.xml'):
+            return 'RENAME'
+        return 'UNSUPPORTED'
