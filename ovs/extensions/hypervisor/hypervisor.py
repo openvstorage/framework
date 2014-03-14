@@ -131,3 +131,45 @@ class Hypervisor(object):
         Mounts a given NFS export as a datastore
         """
         pass
+
+    @abc.abstractmethod
+    def clean_backing_disk_filename(self, path):
+        """
+        Cleans a backing disk filename to the corresponding disk filename
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_backing_disk_path(self, machinename, devicename):
+        """
+        Builds the path for the file backing a given device/disk
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_disk_path(self, machinename, devicename):
+        """
+        Builds the path for the file representing a given device/disk
+        """
+        pass
+
+    @abc.abstractmethod
+    def clean_vmachine_filename(self, path):
+        """
+        Cleans a VM filename
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_vmachine_path(self, machinename, vsa_machineid):
+        """
+        Builds the path for the file representing a given vmachine
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_rename_scenario(self, old_name, new_name):
+        """
+        Gets the rename scenario based on the old and new name
+        """
+        pass

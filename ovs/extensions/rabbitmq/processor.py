@@ -52,7 +52,8 @@ def process(queue, body):
                         'task': VDiskController.rename_from_voldrv,
                         'arguments': {'name': 'volumename',
                                       'old_path': 'volume_old_path',
-                                      'new_path': 'volume_new_path'}},
+                                      'new_path': 'volume_new_path',
+                                      '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileCreate:
                        {'property': 'file_create',
                         'task': VMachineController.create_from_voldrv,
