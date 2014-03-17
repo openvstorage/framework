@@ -182,6 +182,9 @@ class Manager(object):
         install_branch, ovs_version = Manager._prepare_jscore(client, is_local)
         Manager._install_jscore(client, install_branch)
 
+        # Install extra packages
+        client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
+
         # Install Open vStorage
         print 'Installing Open vStorage...'
         client.run('apt-get -y -q install python-dev')
@@ -197,7 +200,6 @@ class Manager(object):
         master nodes regardless of the given parameter.
         """
 
-        import M2Crypto
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
@@ -380,6 +382,13 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                     node_client.file_upload(config, config)
 
+            # Update possible volumedrivers with new amqp configuration.
+            # On each node, it will loop trough all already configured vpools and update their amqp connection
+            # info with those of the new rabbitmq client configuration file.
+            for node in nodes:
+                node_client = Client.load(node, password)
+                Manager._configure_amqp_to_volumedriver(node_client)
+
             client = Client.load(ip, password)
             Manager._configure_nginx(client)
 
@@ -511,7 +520,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
         from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-        from ovs.plugin.provider.configuration import Configuration
 
         parameters = {} if parameters is None else parameters
 
@@ -711,11 +719,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         scocaches = [{'path': scocache, 'size': scocache_size}]
         filesystem_config = {'fs_backend_path': mountpoint_dfs}
         volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
-        amqp_uri = '{}://{}:{}@{}:{}'.format(Configuration.get('ovs.core.broker.protocol'),
-                                             Configuration.get('ovs.core.broker.login'),
-                                             Configuration.get('ovs.core.broker.password'),
-                                             Configuration.get('ovs.grid.ip'),
-                                             Configuration.get('ovs.core.broker.port'))
         vsr_config_script = """
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
@@ -728,13 +731,12 @@ vsr_configuration.configure_filesystem({5})
 vsr_configuration.configure_volumemanager({6})
 vsr_configuration.configure_volumerouter('{0}', {7})
 vsr_configuration.configure_arakoon_cluster('{8}', {9})
-queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
-                 'events_amqp_uri': '{10}'}}
-vsr_configuration.configure_event_publisher(queue_config)
+vsr_configuration.configure_hypervisor('{10}')
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           amqp_uri)
+           vsa.pmachine.hvtype)
         Manager._exec_python(client, vsr_config_script)
+        Manager._configure_amqp_to_volumedriver(client, vpool_name)
 
         # Updating the model
         vsr.vsrid = vrouter_id
@@ -745,7 +747,9 @@ vsr_configuration.configure_event_publisher(queue_config)
         vsr.port = vrouter_port
         vsr.mountpoint = '/mnt/{0}'.format(vpool_name)
         vsr.mountpoint_temp = mountpoint_temp
+        vsr.mountpoint_cache = mountpoint_cache
         vsr.mountpoint_dfs = mountpoint_dfs
+        vsr.mountpoint_md = mountpoint_md
         vsr.serving_vmachine = vsa
         vsr.vpool = vpool
         vsr.save()
@@ -840,6 +844,11 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
         if vsa.pmachine.hvtype == 'VMWARE':
             Manager.init_exportfs(client, vpool.name)
 
+        if vsa.pmachine.hvtype == 'KVM':
+            client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, vsr.mountpoint))
+            client.run('virsh pool-build {0}'.format(vpool_name))
+            client.run('virsh pool-start {0}'.format(vpool_name))
+
         # Start services
         for node in nodes:
             node_client = Client.load(node, password)
@@ -857,6 +866,35 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
             return False
         client.file_attribs(os.path.join(ceph_config_dir, 'ceph.keyring'), mode=644)
         return True
+
+    @staticmethod
+    def _configure_amqp_to_volumedriver(client, vpname=None):
+        """
+        Reads out the RabbitMQ client config, using that to (re)configure the volumedriver configuration(s)
+        """
+        remote_script = """
+import os
+from configobj import ConfigObj
+from ovs.plugin.provider.configuration import Configuration
+protocol = Configuration.get('ovs.core.broker.protocol')
+login = Configuration.get('ovs.core.broker.login')
+password = Configuration.get('ovs.core.broker.password')
+vpool_name = {0}
+uris = []
+cfg = ConfigObj('/opt/OpenvStorage/config/rabbitmqclient.cfg')
+main_section = cfg.get('main')
+nodes = main_section['nodes'] if type(main_section['nodes']) == list else [main_section['nodes']]
+for node in nodes:
+    uris.append({{'amqp_uri': '{{0}}://{{1}}:{{2}}@{{3}}'.format(protocol, login, password, cfg.get(node)['location'])}})
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
+                 'events_amqp_uris': uris}}
+for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
+    this_vpool_name = config_file.replace('.json', '')
+    if config_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
+        vsr_configuration = VolumeStorageRouterConfiguration(this_vpool_name)
+        vsr_configuration.configure_event_publisher(queue_config)"""
+        Manager._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
 
     @staticmethod
     def init_exportfs(client, vpool_name):

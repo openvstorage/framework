@@ -29,6 +29,7 @@ from backend.views.tasks import TaskViewSet
 from backend.views.messaging import MessagingViewSet
 from backend.views.branding import BrandingViewSet
 from backend.views.generic import GenericViewSet
+from backend.views.volumestoragerouters import VolumeStorageRouterViewSet
 from backend.router import OVSRouter
 
 
@@ -37,16 +38,17 @@ def build_router_urls(api_mode, docs):
     Creates a router instance to generate API urls for Customer and Internal API
     """
     routes = [
-        {'prefix': r'users',               'viewset': UserViewSet,      'base_name': 'users'},
-        {'prefix': r'tasks',               'viewset': TaskViewSet,      'base_name': 'tasks'},
-        {'prefix': r'vpools',              'viewset': VPoolViewSet,     'base_name': 'vpools'},
-        {'prefix': r'vmachines',           'viewset': VMachineViewSet,  'base_name': 'vmachines'},
-        {'prefix': r'pmachines',           'viewset': PMachineViewSet,  'base_name': 'pmachines'},
-        {'prefix': r'vdisks',              'viewset': VDiskViewSet,     'base_name': 'vdisks'},
-        {'prefix': r'messages',            'viewset': MessagingViewSet, 'base_name': 'messages'},
-        {'prefix': r'branding',            'viewset': BrandingViewSet,  'base_name': 'branding'},
-        {'prefix': r'generic',             'viewset': GenericViewSet,   'base_name': 'nodes'},
-        {'prefix': r'statistics/memcache', 'viewset': MemcacheViewSet,  'base_name': 'memcache'}
+        {'prefix': r'users',                'viewset': UserViewSet,                'base_name': 'users'},
+        {'prefix': r'tasks',                'viewset': TaskViewSet,                'base_name': 'tasks'},
+        {'prefix': r'vpools',               'viewset': VPoolViewSet,               'base_name': 'vpools'},
+        {'prefix': r'vmachines',            'viewset': VMachineViewSet,            'base_name': 'vmachines'},
+        {'prefix': r'pmachines',            'viewset': PMachineViewSet,            'base_name': 'pmachines'},
+        {'prefix': r'volumestoragerouters', 'viewset': VolumeStorageRouterViewSet, 'base_name': 'volumestoragerouters'},
+        {'prefix': r'vdisks',               'viewset': VDiskViewSet,               'base_name': 'vdisks'},
+        {'prefix': r'messages',             'viewset': MessagingViewSet,           'base_name': 'messages'},
+        {'prefix': r'branding',             'viewset': BrandingViewSet,            'base_name': 'branding'},
+        {'prefix': r'generic',              'viewset': GenericViewSet,             'base_name': 'nodes'},
+        {'prefix': r'statistics/memcache',  'viewset': MemcacheViewSet,            'base_name': 'memcache'}
     ]
     router = OVSRouter(api_mode, docs)
     for route in routes:

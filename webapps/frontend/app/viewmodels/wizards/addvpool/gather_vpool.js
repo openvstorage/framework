@@ -93,9 +93,9 @@ define([
                         var vsr = new VolumeStorageRouter(guid);
                         calls.push($.Deferred(function(deferred) {
                             generic.xhrAbort(self.loadVSRsHandle[guid]);
-                            self.loadVSAHandle[guid] = api.get('volumestoragerouter/' + guid)
-                                .done(function() {
-                                    vsr.fillData(data);
+                            self.loadVSAHandle[guid] = api.get('volumestoragerouters/' + guid)
+                                .done(function(vsr_data) {
+                                    vsr.fillData(vsr_data);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);

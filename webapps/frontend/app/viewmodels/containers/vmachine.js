@@ -48,6 +48,7 @@ define([
         self.loaded                = ko.observable(false);
         self.pMachineGuid          = ko.observable();
         self.name                  = ko.observable();
+        self.machineid             = ko.observable();
         self.hypervisorStatus      = ko.observable();
         self.ipAddress             = ko.observable();
         self.isInternal            = ko.observable();
@@ -163,6 +164,7 @@ define([
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.ipAddress, data, 'ip');
             generic.trySet(self.isInternal, data, 'is_internal');
+            generic.trySet(self.machineid, data, 'machineid');
             generic.trySet(self.isVTemplate, data, 'is_vtemplate');
             generic.trySet(self.snapshots, data, 'snapshots');
             generic.trySet(self.status, data, 'status', generic.lower);

@@ -156,6 +156,28 @@ class VolumeStorageRouterConfiguration(object):
         self._config_file_content['scocache']['backoff_gap'] = backoff_gap
         self.write_config()
 
+    def configure_hypervisor(self, hypervisor_type):
+        """
+        Configures the volume storage router to handle hypervisor specific behavior
+        """
+        self.load_config()
+        if hypervisor_type == 'VMWARE':
+            self._config_file_content['filesystem']['fs_virtual_disk_format'] = 'vmdk'
+            self._config_file_content['filesystem']['fs_file_event_rules'] = [
+                {'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename'],
+                 'fs_file_event_rule_path_regex': '.*.vmx'},
+                {'fs_file_event_rule_calls': ['Rename'],
+                 'fs_file_event_rule_path_regex': '.*.vmx~'}
+            ]
+        elif hypervisor_type == 'KVM':
+            self._config_file_content['filesystem']['fs_virtual_disk_format'] = 'raw'
+            self._config_file_content['filesystem']['fs_raw_disk_suffix'] = '.raw'
+            self._config_file_content['filesystem']['fs_file_event_rules'] = [
+                {'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename', 'Write'],
+                 'fs_file_event_rule_path_regex': '.*.xml'}
+            ]
+        self.write_config()
+
     def configure_failovercache(self, failovercache):
         """
         Configures volume storage router failover cache path

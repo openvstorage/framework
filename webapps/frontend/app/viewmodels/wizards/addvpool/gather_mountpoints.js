@@ -27,6 +27,9 @@ define([
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
             $.each(self.data.vsrs(), function(index, vsr) {
+                if (self.data.target() !== undefined && vsr.vsrid() === (self.data.name() + self.data.target().machineid())) {
+                    return true;
+                }
                 if (self.data.mtptCache() === vsr.mountpointCache() && $.inArray('cache', fields) === -1) {
                     valid = false;
                     fields.push('cache');
@@ -58,6 +61,7 @@ define([
                     fields.push('port');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.portinuse'));
                 }
+                return true;
             });
             if ((self.data.mtptDFS() === self.data.mtptCache() || self.data.mtptDFS() === self.data.mtptMD() ||
                     self.data.mtptDFS() === self.data.mtptTemp()) && $.inArray('dfs', fields) === -1) {
