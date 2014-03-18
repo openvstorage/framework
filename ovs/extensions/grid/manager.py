@@ -42,15 +42,23 @@ class Manager(object):
     """
 
     @staticmethod
-    def install_node(ip, password, create_extra_filesystems=False, clean=False):
+    def install_node(ip, create_extra_filesystems=False, clean=False):
         """
         Installs the Open vStorage software on a (remote) node.
         """
 
+        if not os.geteuid() == 0:
+            print 'Please run this script as root'
+            sys.exit(1)
+
         # Load client, local or remote
         is_local = Client.is_local(ip)
-        client = Client.load(ip, password, bypass_local=True)
+        password = None
+        if is_local is False:
+            print 'Enter the root password for: {0}'.format(ip)
+            password = getpass.getpass()
 
+        client = Client.load(ip, password, bypass_local=True)
         client.run('apt-get install lsscsi')
 
         if clean:
@@ -191,7 +199,7 @@ class Manager(object):
         client.run('jpackage_install -n openvstorage -v {0}'.format(ovs_version))
 
     @staticmethod
-    def init_node(ip, password, join_masters=False):
+    def init_node(ip, join_masters=False):
         """
         Initializes a node, making sure all required services are up and running.
         Optionally, the node can also join the masters, also participating in the arakoon and memcache
@@ -212,15 +220,67 @@ class Manager(object):
             print 'Do not use 127.0.0.1 as ip address, use the public grid ip instead.'
             sys.exit(1)
 
+        nodes = Manager._get_cluster_nodes()  # All nodes, including the local and the new one
+
+        # Generate RSA keypairs
+        print 'Setting up key authentication.'
+        print 'Enter root password for: {0}'.format(ip)
+        local_password = getpass.getpass()
+        client = Client.load(ip, local_password)
+        root_ssh_folder = '{0}/.ssh'.format(client.run('echo ~'))
+        ovs_ssh_folder = '{0}/.ssh'.format(client.run('su - ovs -c "echo ~"'))
+        private_key_filename = '{0}/id_rsa'
+        public_key_filename = '{0}/id_rsa.pub'
+        authorized_keys_filename = '{0}/authorized_keys'
+        # Generate keys for root
+        client.dir_ensure(root_ssh_folder)
+        client.run("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename.format(root_ssh_folder)))
+        # Generate keys for ovs
+        client.run('su - ovs -c "mkdir -p {0}"'.format(ovs_ssh_folder))
+        client.run('su - ovs -c "ssh-keygen -t rsa -b 4096 -f {0} -N \'\'"'.format(private_key_filename.format(ovs_ssh_folder)))
+        root_public_key = client.file_read(public_key_filename.format(root_ssh_folder)).strip()
+        ovs_public_key = client.file_read(public_key_filename.format(ovs_ssh_folder)).strip()
+        root_authorized_keys = ''
+        ovs_authorized_keys = ''
+        for node in nodes:
+            if node != ip:
+                print 'Enter the root password for: {0}'.format(node)
+                node_password = getpass.getpass()
+            else:
+                node_password = local_password
+            node_client = Client.load(node, node_password)
+            root_authorized_keys += node_client.file_read(public_key_filename.format(root_ssh_folder))
+            ovs_authorized_keys += node_client.file_read(public_key_filename.format(ovs_ssh_folder))
+            # Root keys
+            if node_client.file_exists(authorized_keys_filename.format(root_ssh_folder)):
+                node_authorized_keys = node_client.file_read(authorized_keys_filename.format(root_ssh_folder))
+            else:
+                node_authorized_keys = ''
+            changed = False
+            if root_public_key not in node_authorized_keys:
+                node_authorized_keys += root_public_key + '\n'
+                changed = True
+            if ovs_public_key not in node_authorized_keys:
+                node_authorized_keys += ovs_public_key + '\n'
+                changed = True
+            if changed:
+                for user, folder in [('root', root_ssh_folder), ('ovs', ovs_ssh_folder)]:
+                    client.run('su - {0} -c "touch {1}"'.format(user, authorized_keys_filename.format(folder)))
+                    node_client.run('su - {0} -c "chmod 600 {1}; chown {0}:{0} {1}"'.format(user, authorized_keys_filename.format(folder)))
+                    node_client.file_write(authorized_keys_filename.format(folder), node_authorized_keys)
+        client = Client.load(ip, local_password)
+        client.file_write(authorized_keys_filename.format(root_ssh_folder), root_authorized_keys + ovs_authorized_keys)
+        client.file_write(authorized_keys_filename.format(ovs_ssh_folder), root_authorized_keys + ovs_authorized_keys)
+
+        print 'Starting initialization...'
         # Make sure to ALWAYS reload the client when switching targets, as Fabric seems to be singleton-ish
         is_local = Client.is_local(ip)
-        client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
+        client = Client.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
         unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
 
         arakoon_management = ArakoonManagement()
-        nodes = Manager._get_cluster_nodes()  # All nodes, including the local and the new one
         arakoon_nodes = arakoon_management.getCluster('ovsdb').listNodes()
-        client = Client.load(ip, password)
+        client = Client.load(ip)
         new_node_hostname = client.run('hostname')
         if is_local and Configuration.get('grid.node.id') != '1':
             # If the script is executed local and there are multiple nodes, the script is executed on node 2+.
@@ -244,13 +304,13 @@ class Manager(object):
 
             # Stop services (on all nodes)
             for node in nodes:
-                node_client = Client.load(node, password)
+                node_client = Client.load(node)
                 for service in all_services:
                     node_client.run('jsprocess disable -n {0}'.format(service))
                     node_client.run('jsprocess stop -n {0}'.format(service))
 
             # Fetch some information
-            client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
+            client = Client.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
             remote_ips = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
             remote_ip = [ipa.strip() for ipa in remote_ips if ipa.strip() in nodes][0]
 
@@ -262,7 +322,7 @@ class Manager(object):
                 global_section = cfg.get('global')
                 cluster_nodes = global_section['cluster'] if type(global_section['cluster']) == list else [global_section['cluster']]
                 if unique_id not in cluster_nodes:
-                    client = Client.load(ip, password)
+                    client = Client.load(ip)
                     remote_config = client.file_read(ARAKOON_CONFIG_TAG.format(cluster))
                     with open('/tmp/arakoon_{0}_cfg'.format(unique_id), 'w') as the_file:
                         the_file.write(remote_config)
@@ -273,10 +333,10 @@ class Manager(object):
                     cfg.update({unique_id: remote_cfg.get(unique_id)})
                     cfg.write()
                     for node in nodes:
-                        node_client = Client.load(node, password)
+                        node_client = Client.load(node)
                         node_client.file_upload(ARAKOON_CONFIG_TAG.format(cluster),
                                                 ARAKOON_CONFIG_TAG.format(cluster))
-                client = Client.load(ip, password)
+                client = Client.load(ip)
                 arakoon_create_directories = """
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 arakoon_management = ArakoonManagement()
@@ -287,7 +347,7 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 
             # Update all nodes hosts file with new node and new node hosts file with all others
             for node in nodes:
-                client_node = Client.load(node, password)
+                client_node = Client.load(node)
                 update_hosts_file = """
 from ovs.plugin.provider.net import Net
 Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
@@ -299,19 +359,19 @@ Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
                     client_node.run('jsprocess start -n rabbitmq')
                 else:
                     for subnode in nodes:
-                        client_node = Client.load(subnode, password)
+                        client_node = Client.load(subnode)
                         node_hostname = client_node.run('hostname')
                         update_hosts_file = """
 from ovs.plugin.provider.net import Net
 Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
 """ % {'ip': subnode,
      'host': node_hostname}
-                        client = Client.load(ip, password)
+                        client = Client.load(ip)
                         Manager._exec_python(client, update_hosts_file)
 
             # Update arakoon cluster configuration in voldrv configuration files
             for node in nodes:
-                client_node = Client.load(node, password)
+                client_node = Client.load(node)
                 update_voldrv = """
 import os
 from ovs.plugin.provider.configuration import Configuration
@@ -332,7 +392,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 Manager._exec_python(client_node, update_voldrv)
 
             # Join rabbitMQ clusters
-            client = Client.load(ip, password)
+            client = Client.load(ip)
             client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
             if not is_local:
                 # Copy rabbitmq cookie
@@ -342,9 +402,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 client.file_attribs(rabbitmq_cookie_file, mode=400)
                 client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
                 # If not local, a cluster needs to be joined.
-                master_client = Client.load(Configuration.get('grid.master.ip'), password)
+                master_client = Client.load(Configuration.get('grid.master.ip'))
                 master_hostname = master_client.run('hostname')
-                client = Client.load(ip, password)
+                client = Client.load(ip)
                 client.run('rabbitmqctl join_cluster rabbit@{}; sleep 5;'.format(master_hostname))
                 client.run('rabbitmqctl stop; sleep 5;')
 
@@ -378,7 +438,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
             # Upload local client configurations to all nodes
             for node in nodes:
-                node_client = Client.load(node, password)
+                node_client = Client.load(node)
                 for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                     node_client.file_upload(config, config)
 
@@ -386,15 +446,15 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             # On each node, it will loop trough all already configured vpools and update their amqp connection
             # info with those of the new rabbitmq client configuration file.
             for node in nodes:
-                node_client = Client.load(node, password)
+                node_client = Client.load(node)
                 Manager._configure_amqp_to_volumedriver(node_client)
 
-            client = Client.load(ip, password)
+            client = Client.load(ip)
             Manager._configure_nginx(client)
 
             # Restart services
             for node in nodes:
-                node_client = Client.load(node, password)
+                node_client = Client.load(node)
                 for service in all_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
@@ -406,7 +466,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 Migration.migrate()
 
         else:
-            client = Client.load(ip, password)
+            client = Client.load(ip)
             # Disable master services
             client.run('jsprocess disable -n arakoon_ovsdb')
             client.run('jsprocess disable -n arakoon_voldrv')
@@ -430,29 +490,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             client.run('jsprocess start -n nginx')
             client.run('jsprocess start -n ovs_workers')
 
-        # Generate RSA keypairs
-        client = Client.load(ip, password)
-        ssh_folder = '/root/.ssh'
-        private_key_filename = '{0}/id_rsa'.format(ssh_folder)
-        public_key_filename = '{0}/id_rsa.pub'.format(ssh_folder)
-        authorized_keys_filename = '{0}/authorized_keys'.format(ssh_folder)
-        client.dir_ensure(ssh_folder)
-        client.run("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename))
-        public_key = client.file_read(public_key_filename).strip()
-        authorized_keys = ''
-        for node in nodes:
-            node_client = Client.load(node, password)
-            authorized_keys += node_client.file_read(public_key_filename)  # Read the node's public key
-            if node_client.file_exists(authorized_keys_filename):
-                node_authorized_keys = node_client.file_read(authorized_keys_filename)
-            else:
-                node_authorized_keys = ''
-            if public_key not in node_authorized_keys:  # If our public key is not yet authorized on this node
-                node_authorized_keys += public_key + '\n'
-                node_client.file_write(authorized_keys_filename, node_authorized_keys)  # ... authorize it.
-        client = Client.load(ip, password)
-        client.file_write(authorized_keys_filename, authorized_keys)
-
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
             while not master_elected:
@@ -465,7 +502,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     time.sleep(1)
 
         # Make sure the process manager is started
-        client = Client.load(ip, password)
+        client = Client.load(ip)
         try:
             client.run('service processmanager start')
         except:
@@ -504,11 +541,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         vsa.save()
 
         for node in nodes:
-            node_client = Client.load(node, password)
+            node_client = Client.load(node)
             node_client.run('jsprocess restart -n ovs_workers')
 
     @staticmethod
-    def init_vpool(ip, password, vpool_name, parameters=None):
+    def init_vpool(ip, vpool_name, parameters=None):
         """
         Initializes a vpool on a given node
         """
@@ -532,7 +569,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             )
             vpool_name = Helper.ask_string('Provide new vPool name', default_value=suggestion)
 
-        client = Client.load(ip, password)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
+        client = Client.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
         unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
 
         vsa = None
@@ -573,14 +610,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
         # Stop services
         for node in nodes:
-            node_client = Client.load(node, password)
+            node_client = Client.load(node)
             for service in services:
                 node_client.run('jsprocess disable -n {0}'.format(service))
                 node_client.run('jsprocess stop -n {0}'.format(service))
 
         # Keep in mind that if the VSR exists, the vPool does as well
 
-        client = Client.load(ip, password)
+        client = Client.load(ip)
         mountpoints = client.run('mount -v').strip().split('\n')
         mountpoints = [p.split(' ')[2] for p in mountpoints if
                        len(p.split(' ')) > 2 and ('/mnt/' in p.split(' ')[2] or '/var' in p.split(' ')[2])]
@@ -813,9 +850,9 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                     if vpool_vsr.guid != vsr.guid:
                         client.dir_ensure('/etc/ceph', True)
                         for cfg_file in ['/etc/ceph/ceph.conf', '/etc/ceph/ceph.keyring']:
-                            remote_client = Client.load(vpool_vsr.serving_vmachine.ip, password)
+                            remote_client = Client.load(vpool_vsr.serving_vmachine.ip)
                             cfg_content = remote_client.file_read(cfg_file)
-                            client = Client.load(ip, password)
+                            client = Client.load(ip)
                             client.file_write(cfg_file, cfg_content)
                         client.file_attribs('/etc/ceph/ceph.keyring', mode=644)
                         break
@@ -851,7 +888,7 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
 
         # Start services
         for node in nodes:
-            node_client = Client.load(node, password)
+            node_client = Client.load(node)
             for service in services:
                 node_client.run('jsprocess enable -n {0}'.format(service))
                 node_client.run('jsprocess start -n {0}'.format(service))
@@ -1039,7 +1076,7 @@ print Configuration.get('{0}')
                     except:
                         pass
                     try:
-                        ssd_output = ssd_output + str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State'".format(drive)).strip())
+                        ssd_output += str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State'".format(drive)).strip())
                     except:
                         pass
                     drives[drive] = {'ssd': ('Solid State' in ssd_output or 'FUSIONIO' in ssd_output),
@@ -1264,7 +1301,7 @@ class Client(object):
     """
 
     @staticmethod
-    def load(ip, password, bypass_local=False):
+    def load(ip, password=None, bypass_local=False):
         """
         Opens a client connection to a remote or local system
         """
@@ -1493,6 +1530,6 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     try:
-        Manager.install_node('127.0.0.1', None, create_extra_filesystems=options.filesystems, clean=options.clean)
+        Manager.install_node('127.0.0.1', create_extra_filesystems=options.filesystems, clean=options.clean)
     except KeyboardInterrupt:
         print '\nAborting'
