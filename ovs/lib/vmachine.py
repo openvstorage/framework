@@ -257,7 +257,7 @@ class VMachineController(object):
 
         if machine.pmachine:
             hv = Factory.get(machine.pmachine)
-            hv.delete_vm(machine.hypervisorid, None, True)
+            hv.delete_vm(machine.hypervisorid, True)
 
         for disk in machine.vdisks:
             disk.delete()
