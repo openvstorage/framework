@@ -26,6 +26,26 @@ define([
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
+            if (self.data.mtptCache() === '/' && $.inArray('cache', fields) === -1) {
+                valid = false;
+                fields.push('cache');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+            }
+            if (self.data.mtptDFS() === '/' && $.inArray('dfs', fields) === -1) {
+                valid = false;
+                fields.push('dfs');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.dfs') }));
+            }
+            if (self.data.mtptMD() === '/' && $.inArray('md', fields) === -1) {
+                valid = false;
+                fields.push('md');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.mdfs') }));
+            }
+            if (self.data.mtptTemp() === '/' && $.inArray('temp', fields) === -1) {
+                valid = false;
+                fields.push('temp');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
+            }
             $.each(self.data.vsrs(), function(index, vsr) {
                 if (self.data.target() !== undefined && vsr.vsrid() === (self.data.name() + self.data.target().machineid())) {
                     return true;

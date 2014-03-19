@@ -162,11 +162,11 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
     ko.bindingHandlers.translate = {
         init: function(element, valueAccessor) {
             var value = valueAccessor();
-            $(element).html($.t(value));
+            $(element).html($.t(value, { defaultValue: '' }));
         },
         update: function(element, valueAccessor) {
             var value = valueAccessor();
-            $(element).html($.t(value));
+            $(element).html($.t(value, { defaultValue: '' }));
         }
     };
     ko.bindingHandlers.shortText = {

@@ -446,6 +446,7 @@ define(['durandal/system', 'durandal/app', 'durandal/composition', 'durandal/act
         },
         compositionComplete: function () {
             var $modal = $('#my-modal');
+            $modal.modal({ backdrop: 'static', show: false, keyboard: false });
             $modal.modal('show');
             $modal.find('.autofocus').first().focus();
         },

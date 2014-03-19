@@ -27,14 +27,6 @@ define([
         self.loadVSASHandle   = undefined;
         self.loadVSAHandle    = undefined;
         self.loadVSRsHandle   = {};
-        self.validatingHandle = undefined;
-        self.validateTimeout  = undefined;
-        self.subscription     = undefined;
-        self.oldPassword      = undefined;
-
-        // Observables
-        self.targetValidating = ko.observable(false);
-        self.targetValid      = ko.observable(false);
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -56,14 +48,6 @@ define([
                     fields.push('secretkey');
                     reasons.push($.t('ovs:wizards.addvpool.gathervpool.nocredentials'));
                 }
-            }
-            if (!self.targetValid()) {
-                valid = false;
-                fields.push('password');
-                reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidpassword'));
-            }
-            if (self.targetValidating()) {
-                valid = false;
             }
             return { value: valid, reasons: reasons, fields: fields };
         });
@@ -94,8 +78,8 @@ define([
                         calls.push($.Deferred(function(deferred) {
                             generic.xhrAbort(self.loadVSRsHandle[guid]);
                             self.loadVSAHandle[guid] = api.get('volumestoragerouters/' + guid)
-                                .done(function(vsr_data) {
-                                    vsr.fillData(vsr_data);
+                                .done(function(vsrData) {
+                                    vsr.fillData(vsrData);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);
@@ -142,34 +126,6 @@ define([
                         self.data.target(self.data.vsas()[0]);
                     }
                 });
-            self.subscription = self.data.targetPassword.subscribe(function(newValue) {
-                window.clearTimeout(self.validateTimeout);
-                self.validateTimeout = window.setTimeout(function() {
-                    if (self.oldPassword !== newValue) {
-                        self.targetValidating(true);
-                        generic.xhrAbort(self.validatingHandle);
-                        self.validatingHandle = api.post('vmachines/' + self.data.target().guid() + '/validate_password', {
-                            password: newValue
-                        })
-                            .then(self.shared.tasks.wait)
-                            .done(function(data) {
-                                self.targetValid(data);
-                            })
-                            .fail(function() {
-                                self.targetValid(false);
-                            })
-                            .always(function() {
-                                self.targetValidating(false);
-                                self.oldPassword = newValue;
-                            });
-                    }
-                }, 250);
-            });
-        };
-        self.deactivate = function() {
-            if (self.subscription !== undefined) {
-                self.subscription.dispose();
-            }
         };
     };
 });

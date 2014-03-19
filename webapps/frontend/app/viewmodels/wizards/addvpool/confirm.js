@@ -45,8 +45,7 @@ define([
                     mountpoint_md: self.data.mtptMD(),
                     mountpoint_cache: self.data.mtptCache(),
                     storage_ip: self.data.storageIP(),
-                    vrouter_port: self.data.vRouterPort(),
-                    vsa_password: self.data.targetPassword()
+                    vrouter_port: self.data.vRouterPort()
                 };
                 api.post('vmachines/' + self.data.target().guid() + '/add_vpool', post_data)
                         .then(shared.tasks.wait)

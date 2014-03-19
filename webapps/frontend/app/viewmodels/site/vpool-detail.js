@@ -15,8 +15,9 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool', '../containers/vmachine'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VPool, VMachine) {
+    '../containers/vpool', '../containers/vmachine',
+    '../wizards/vsatovpool/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, VPool, VMachine, VSAToVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -62,15 +63,27 @@ define([
         self.vDisksInitialLoad    = ko.observable(true);
         self.vMachinesInitialLoad = ko.observable(true);
         self.vSAsLoaded           = ko.observable(false);
+        self.addingVSAs           = ko.observable(false);
         self.vPool                = ko.observable();
         self.vSAs                 = ko.observableArray([]);
         self.checkedVSAGuids      = ko.observableArray([]);
+
+        // Computed
+        self.pendingVSAs = ko.computed(function() {
+            var vsas = [];
+            $.each(self.vSAs(), function(index, vsa) {
+                if ($.inArray(vsa.guid(), self.checkedVSAGuids()) !== -1 && $.inArray(vsa.guid(), self.vPool().servingVSAGuids()) === -1) {
+                    vsas.push(vsa);
+                }
+            });
+            return vsas;
+        });
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
-                vpool.load(undefined, { skipDisks: true })
+                vpool.load('vsrs', { skipDisks: true })
                     .then(function() {
                         self.vDisksInitialLoad(false);
                         self.vMachinesInitialLoad(false);
@@ -79,7 +92,9 @@ define([
                     .then(vpool.loadServingVSAs)
                     .then(self.loadVSAs)
                     .then(function() {
-                        self.checkedVSAGuids(self.vPool().servingVSAGuids());
+                        if (self.checkedVSAGuids().length === 0) {
+                            self.checkedVSAGuids(self.vPool().servingVSAGuids());
+                        }
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -243,7 +258,21 @@ define([
             }
         };
         self.updateVSAServing = function() {
-            generic.alertError('Not implemented', 'This functionality is not implemented.');
+            self.addingVSAs(true);
+            var deferred = $.Deferred(), wizard;
+            wizard = new VSAToVPoolWizard({
+                modal: true,
+                completed: deferred,
+                vPool: self.vPool(),
+                vSAs: self.pendingVSAs
+            });
+            wizard.closing.always(function() {
+                deferred.resolve();
+            });
+            dialog.show(wizard);
+            deferred.always(function() {
+                self.addingVSAs(false);
+            });
         };
 
         // Durandal

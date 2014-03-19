@@ -32,6 +32,7 @@ define([
         self.items         = ko.observableArray([]);
         self.target        = ko.observableArray([]);
         self._freeValue    = ko.observable();
+        self.useFree       = ko.observable(false);
 
         // Computed
         self.selected  = ko.computed(function() {
@@ -63,7 +64,7 @@ define([
                 }
             } else {
                 self.target(item);
-                if (self.free() && $.inArray(self.target(), self.items()) === -1) {
+                if (self.free() && $.inArray(self.target(), self.items()) === -1 && self.useFree()) {
                     self._freeValue(item);
                 }
             }
@@ -113,6 +114,7 @@ define([
             if (self.free() && self.multi()) {
                 throw 'A dropdown cannot be a multiselect and allow free values at the same time.';
             }
+            self.useFree(false);
 
             if (!ko.isComputed(self.target)) {
                 self.target.valueHasMutated();

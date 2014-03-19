@@ -674,7 +674,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         mountpoint_temp = parameters.get('mountpoint_temp') or Helper.ask_choice(mountpoints,
                                                                                  question='Select temporary FS mountpoint',
                                                                                  default_value=Helper.find_in_list(mountpoints, 'tmp'))
-        mountpoints.remove(mountpoint_temp)
+        if mountpoint_temp in mountpoints:
+            mountpoints.remove(mountpoint_temp)
         mountpoint_dfs_default = Helper.find_in_list(mountpoints, 'local')
         if vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
             mountpoint_dfs = parameters.get('mountpoint_dfs') or Helper.ask_string(message='Enter a mountpoint for the S3 backend',
@@ -683,15 +684,27 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             mountpoint_dfs = parameters.get('mountpoint_dfs') or Helper.ask_choice(mountpoints,
                                                                                    question='Select distributed FS mountpoint',
                                                                                    default_value=Helper.find_in_list(mountpoints, 'dfs'))
-            mountpoints.remove(mountpoint_dfs)
+            if mountpoint_dfs in mountpoints:
+                mountpoints.remove(mountpoint_dfs)
         mountpoint_md = parameters.get('mountpoint_md') or Helper.ask_choice(mountpoints,
                                                                              question='Select metadata mountpoint',
                                                                              default_value=Helper.find_in_list(mountpoints, 'md'))
-        mountpoints.remove(mountpoint_md)
+        if mountpoint_md in mountpoints:
+            mountpoints.remove(mountpoint_md)
         mountpoint_cache = parameters.get('mountpoint_cache') or Helper.ask_choice(mountpoints,
                                                                                    question='Select cache mountpoint',
                                                                                    default_value=Helper.find_in_list(mountpoints, 'cache'))
-        mountpoints.remove(mountpoint_cache)
+        if mountpoint_cache in mountpoints:
+            mountpoints.remove(mountpoint_cache)
+
+        client = Client.load(ip)
+        dir_create_script = """
+import os
+for directory in {0}:
+    if not os.path.exists(directory):
+        os.makedirs(directory)""".format([mountpoint_temp, mountpoint_dfs, mountpoint_md, mountpoint_cache])
+        Manager._exec_python(client, dir_create_script)
+
         cache_fs = os.statvfs(mountpoint_cache)
         scocache = '{}/sco_{}'.format(mountpoint_cache, vpool_name)
         readcache = '{}/read_{}'.format(mountpoint_cache, vpool_name)

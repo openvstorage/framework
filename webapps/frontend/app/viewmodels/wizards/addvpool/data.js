@@ -25,7 +25,6 @@ define(['knockout'], function(ko){
             accesskey:      ko.observable(''),
             secretkey:      ko.observable(''),
             backend:        ko.observable('LOCAL'),
-            targetPassword: ko.observable(),
             mtptTemp:       ko.observable().extend({ regex: mountpointRegex }),
             mtptDFS:        ko.observable().extend({ regex: mountpointRegex }),
             mtptMD:         ko.observable().extend({ regex: mountpointRegex }),

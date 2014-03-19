@@ -33,7 +33,6 @@ define([
         data.accesskey('');
         data.secretkey('');
         data.backend('LOCAL');
-        data.targetPassword(undefined);
         data.mtptTemp(undefined);
         data.mtptDFS(undefined);
         data.mtptMD(undefined);

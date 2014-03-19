@@ -65,11 +65,8 @@ celery.conf.BROKER_URL = ';'.join(['{0}://{1}:{2}@{3}//'.format(Configuration.ge
                                                                 server)
                                    for server in rmq_servers])
 celery.conf.CELERY_DEFAULT_QUEUE = 'ovs_generic'
-queues = [Queue('ovs_generic', routing_key='generic.#')]
-for vsa in vsas:
-    if vsa.machineid == unique_id:
-        queues.append(Queue('ovs_{0}'.format(vsa.machineid), routing_key='vsa.{0}.#'.format(vsa.machineid)))
-celery.conf.CELERY_QUEUES = tuple(queues)
+celery.conf.CELERY_QUEUES = tuple([Queue('ovs_generic', routing_key='generic.#'),
+                                   Queue('ovs_{0}'.format(unique_id), routing_key='vsa.{0}.#'.format(unique_id))])
 celery.conf.CELERY_DEFAULT_EXCHANGE = 'generic'
 celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
 celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'

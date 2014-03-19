@@ -46,7 +46,7 @@ define([
             self.storageIP(data.storage_ip);
             self.vsrid(data.vsrid);
             self.mountpoint(data.mountpoint);
-            self.mountpointTemp(data.mountpoint_tenp);
+            self.mountpointTemp(data.mountpoint_temp);
             self.mountpointDFS(data.mountpoint_dfs);
             self.mountpointMD(data.mountpoint_md);
             self.mountpointCache(data.mountpoint_cache);

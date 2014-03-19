@@ -35,7 +35,7 @@ limitations under the License.
                 <td><span data-bind="text: freeSpace"></span></td>
                 <td><span data-bind="text: cacheRatio"></span></td>
                 <td><span data-bind="text: iops"></span></td>
-                <td><span data-bind="text: backendType"></span></td>
+                <td><span data-bind="translate: 'ovs:generic.backendtypes.' + backendType()"></span></td>
                 <td><span data-bind="text: backendConnection"></span></td>
                 <td><span data-bind="text: backendLogin"></span></td>
             </tr>

@@ -51,6 +51,7 @@ define([
         self.vDisks            = ko.observableArray([]);
         self.vMachines         = ko.observableArray([]);
         self.servingVSAGuids   = ko.observableArray([]);
+        self.vSRGuids          = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -80,9 +81,9 @@ define([
             generic.trySet(self.backendConnection, data, 'backend_connection');
             generic.trySet(self.backendLogin, data, 'backend_login');
             if (data.hasOwnProperty('backend_type')) {
-                self.backendType($.t('ovs:generic.backendtypes.' + data.backend_type));
+                self.backendType(data.backend_type);
             } else {
-                self.backendType('');
+                self.backendType(undefined);
             }
             if (data.hasOwnProperty('vdisks_guids') && !generic.tryGet(options, 'skipDisks', false)) {
                 generic.crossFiller(
@@ -91,6 +92,9 @@ define([
                         return new VDisk(guid);
                     }, 'guid'
                 );
+            }
+            if (data.hasOwnProperty('vsrs_guids')) {
+                self.vSRGuids(data.vsrs_guids);
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;

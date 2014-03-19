@@ -18,7 +18,6 @@ VMachine module
 
 import time
 import logging
-import crypt
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -549,30 +548,6 @@ class VMachineController(object):
                 'xmlrpcport': xmlrpcport}
 
     @staticmethod
-    @celery.task(name='ovs.vsa.validate_password')
-    def validate_password(ip, password):
-        """
-        Validates whether a given password can be used to connect to the machine this task is running on
-        """
-        from ovs.plugin.provider.remote import Remote
-
-        # @TODO: Run locally instead of trough Cuisine
-        client = Remote.cuisine.api
-        Remote.cuisine.fabric.env['password'] = password
-        client.connect(ip)
-        try:
-            shadow = client.file_read('/etc/shadow')
-            for line in shadow.split('\n'):
-                if 'root' in line:
-                    parts = line.split('$')
-                    password_hash = crypt.crypt(password, '${0}${1}$'.format(parts[1], parts[2]))
-                    if password_hash in line:
-                        return True
-            return False
-        except:
-            return False
-
-    @staticmethod
     @celery.task(name='ovs.vsa.add_vpool')
     def add_vpool(parameters):
         """
@@ -580,5 +555,4 @@ class VMachineController(object):
         """
         from ovs.extensions.grid.manager import Manager
 
-        Manager.init_vpool(parameters['vsa_ip'], parameters['vsa_password'],
-                           parameters['vpool_name'], parameters=parameters)
+        Manager.init_vpool(parameters['vsa_ip'], parameters['vpool_name'], parameters=parameters)

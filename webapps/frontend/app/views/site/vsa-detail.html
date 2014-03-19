@@ -127,14 +127,16 @@ limitations under the License.
                                     <div>
                                         <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
                                                                           checked: $.inArray(guid(), $root.checkedVPoolGuids()) !== -1,
-                                                                          disable: $.inArray(guid(), $parent.vPoolGuids) !== -1"
+                                                                          disable: backendType() === 'LOCAL' || $.inArray(guid(), $parent.vPoolGuids) !== -1"
                                                 style="vertical-align: text-bottom;">
-                                        <label data-bind="attr: { for: 'vpool_' + guid() }" style="font-weight: normal; margin-left: 7px;">
+                                        <label data-bind="attr: { for: 'vpool_' + guid() },
+                                                          tooltip: $.inArray(guid(), $root.checkedVPoolGuids()) === -1 && backendType() === 'LOCAL' ? 'ovs:vsas.detail.localvpool' : ''"
+                                               style="font-weight: normal; margin-left: 7px;">
                                             <span data-bind="text: name"></span>
                                         </label>
                                     </div>
                                 </div>
-                                <button class="btn btn-default" data-bind="click: $root.updateVSAServing"
+                                <button class="btn btn-default" data-bind="visible: false, click: $root.updateVSAServing"
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vsas.detail.updateserving"></span>
                                 </button>

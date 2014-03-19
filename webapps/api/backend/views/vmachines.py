@@ -26,6 +26,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
@@ -298,21 +299,6 @@ class VMachineViewSet(viewsets.ViewSet):
 
     @action()
     @expose(internal=True, customer=True)
-    @required_roles(['view'])
-    @validate(VMachine)
-    def validate_password(self, request, obj):
-        """
-        Validates a given password on the given VSA
-        """
-        if not obj.is_internal:
-            raise NotAcceptable('vMachine is not a VSA')
-
-        password = request.DATA['password']
-        task = VMachineController.validate_password.s(obj.ip, password).apply_async(routing_key='vsa.{0}'.format(obj.machineid))
-        return Response(task.id, status=status.HTTP_200_OK)
-
-    @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
     @validate(VMachine)
     def add_vpool(self, request, obj):
@@ -324,12 +310,49 @@ class VMachineViewSet(viewsets.ViewSet):
 
         fields = ['vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_dfs', 'mountpoint_md',
-                  'mountpoint_cache', 'storage_ip', 'vrouter_port', 'vsa_password']
+                  'mountpoint_cache', 'storage_ip', 'vrouter_port']
         parameters = {'vsa_ip': obj.ip}
         for field in fields:
             if field not in request.DATA:
-                raise NotAcceptable('Invalid data passed')
+                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = request.DATA[field]
+            if not parameters[field] is int:
+                parameters[field] = str(parameters[field])
+
+        task = VMachineController.add_vpool.s(parameters).apply_async(routing_key='vsa.{0}'.format(obj.machineid))
+        return Response(task.id, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'create'])
+    @validate(VMachine)
+    def vsa_to_vpool(self, request, obj):
+        """
+        Adds a vpool to a VSA, given a VSR
+        """
+
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+        if 'vsr_guid' not in request.DATA:
+            raise NotAcceptable('No VSR guid passed')
+
+        vsr = VolumeStorageRouter(request.DATA['vsr_guid'])
+        vpool = vsr.vpool
+        parameters = {'vsa_ip':              obj.ip,
+                      'vpool_name':          vpool.name,
+                      'backend_type':        vpool.backend_type,
+                      'connection_host':     vpool.backend_connection.split(':')[0],
+                      'connection_port':     int(vpool.backend_connection.split(':')[1]),
+                      'connection_timeout':  0,  # Not in use anyway
+                      'connection_username': vpool.backend_login,
+                      'connection_password': vpool.backend_password,
+                      'mountpoint_temp':     vsr.mountpoint_temp,
+                      'mountpoint_dfs':      vsr.mountpoint_dfs,
+                      'mountpoint_md':       vsr.mountpoint_md,
+                      'mountpoint_cache':    vsr.mountpoint_cache,
+                      'storage_ip':          vsr.storage_ip,
+                      'vrouter_port':        vsr.port}
+        for field in parameters:
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 

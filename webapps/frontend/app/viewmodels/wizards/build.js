@@ -25,6 +25,10 @@ define([
         parent.steps       = ko.observableArray([]);
         parent.loadingNext = ko.observable(false);
 
+        // Deferreds
+        parent.closing   = $.Deferred();
+        parent.finishing = $.Deferred();
+
         // Builded variable
         parent.activeStep = activator.create();
 
@@ -43,7 +47,7 @@ define([
                 return false;
             }
             if (parent.step() < parent.stepsLength() - 1 && parent.stepsLength() > 1) {
-                return parent.canContinue().value;
+                return parent.canContinue().value === true;
             }
             return false;
         });
@@ -52,7 +56,7 @@ define([
                 return false;
             }
             if (parent.step() === parent.stepsLength() - 1) {
-                return parent.canContinue().value;
+                return parent.canContinue().value === true;
             }
             return false;
         });
@@ -61,7 +65,7 @@ define([
             if (step !== undefined) {
                 return step.canContinue();
             }
-            return { value: true, reasons: [] };
+            return { value: true, reasons: [], fields: [] };
         });
 
         // Functions
@@ -107,6 +111,7 @@ define([
                 success: success,
                 data: success ? {} : undefined
             });
+            parent.closing.resolve(success);
         };
         parent.finish = function() {
             parent.running(true);
@@ -117,12 +122,14 @@ define([
                         success: true,
                         data: data
                     });
+                    parent.finishing.resolve(true);
                 })
                 .fail(function(data) {
                     dialog.close(parent, {
                         success: false,
                         data: data
                     });
+                    parent.finishing.resolve(false);
                 })
                 .always(function() {
                     window.setTimeout(function() { parent.running(false); }, 500);

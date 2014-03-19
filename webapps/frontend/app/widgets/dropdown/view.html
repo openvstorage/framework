@@ -25,7 +25,7 @@ limitations under the License.
             <!-- /ko -->
             <!-- ko if: !multi() -->
                 <span data-part="selected-item"></span>&nbsp;
-                <!-- ko if: free() && $.inArray(target(), items()) === -1 -->
+                <!-- ko if: free() && ($.inArray(target(), items()) === -1 || useFree()) -->
                     <span style="position: relative;">
                         <span data-i18n="ovs:generic.customvalue"></span>
                         <input type="text" data-bind="value: freeValue, valueUpdate: 'afterkeydown', click: function() { }, clickBubble: false"
@@ -33,7 +33,7 @@ limitations under the License.
                     </span>
                     <span style="width: 178px; display: inline-block;">&nbsp;</span>
                 <!-- /ko -->
-                <!-- ko if: !free() || $.inArray(target(), items()) !== -1 -->
+                <!-- ko if: !free() || ($.inArray(target(), items()) !== -1 && !useFree()) -->
                     <span data-bind="text: text(target())"></span>
                 <!-- /ko -->
             <!-- /ko -->
@@ -42,14 +42,14 @@ limitations under the License.
         <ul class="dropdown-menu" role="menu" style="max-height: 250px; overflow: auto; z-index: 6000;" data-bind="visible: items().length > 0">
             <!-- ko foreach: items -->
                 <li data-bind="css: {
-                                   active: $parent.multi() ? false : (
+                                   active: $parent.multi() ? false : !$parent.useFree() && (
                                        $parent.key() !== undefined ? (
                                            $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
                                                                      $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
                                        ) : $parent.target() === $data
                                    )
                                },
-                               click: function() { $parent.set($data); }" class="hand">
+                               click: function() { $parent.useFree(false); $parent.set($data); }" class="hand">
                     <a style="white-space: nowrap;">
                         <span data-bind="visible: $parent.multi()">
                             <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>
@@ -62,8 +62,8 @@ limitations under the License.
                 </li>
             <!-- /ko -->
             <!-- ko if: free() && !multi() -->
-                <li data-bind="css: { active: $.inArray(target(), items()) === -1 },
-                               click: function() { set(freeValue()); }" class="hand">
+                <li data-bind="css: { active: $.inArray(target(), items()) === -1 && useFree() },
+                               click: function() { useFree(true); set(freeValue()); }" class="hand">
                     <a style="white-space: nowrap;">
                         <i><span data-i18n="ovs:generic.customvalue"></span>&nbsp;<span data-bind="text: freeValue()"></span></i>
                     </a>

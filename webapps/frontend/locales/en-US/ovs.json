@@ -167,7 +167,8 @@
                 "errormsg": "moving away all vDisks from __what__"
             },
             "vsavpoollink": "vPools served by this VSA",
-            "updateserving": "Save changes"
+            "updateserving": "Save changes",
+            "localvpool": "This is a local vPool which can not be shared across multiple VSAs"
         }
     },
     "vpools" : {
@@ -183,7 +184,8 @@
             "introduction": "Below an overview of the vPool properties.",
             "sync": "Sync vPool with reality",
             "vsavpoollink": "VSAs serving this vPool",
-            "updateserving": "Save changes"
+            "updateserving": "Save changes",
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple VSAs."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -349,7 +351,26 @@
                 "started": "Creation started",
                 "inprogress": "Creation of vPool __what__ is started.",
                 "creating": "creating the vPool",
-                "success": "Creation of vPool __what__ finished."
+                "success": "Creation of vPool __what__ finished.",
+                "ceph": "Make sure the Ceph configuration files are installed on selected VSA:<ul><li>CEPH_SERVER:/etc/ceph/ceph.conf -&gt; /etc/ceph/ceph.conf</li><li>CEPH_SERVER:/etc/ceph/ceph.client.admin.keyring -&gt; /etc/ceph/ceph.keyring</li></ul>"
+            }
+        },
+        "vsatovpool": {
+            "title": "Add vPool to VSAs",
+            "confirm": {
+                "errorvalidating": "Error while validating. Try again.",
+                "validating": "Validating...",
+                "valid": "The vPool can be added to this VSA.",
+                "noselection": "No VSAs were selected.",
+                "mtptnotavailable": "The location __what__ is not available on this VSA",
+                "ipnotavailable": "The IP __what__ is not available on this VSA",
+                "started": "Adding",
+                "inprogress": "The vPool is being added to the validated VSAs",
+                "adding": "adding the vPool",
+                "complete": "Adding vPool complete",
+                "success": "The vPool was added to the selected VSAs with success",
+                "somefailed": "The vPool was added to some the selected VSAs. Some tasks failed.",
+                "allfailed": "The vPool could not be added to any of the selected VSAs"
             }
         },
         "createft": {

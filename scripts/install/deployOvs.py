@@ -506,7 +506,6 @@ if __name__ == '__main__':
         print InstallHelper.boxed_message(['Unable to find ISO', imagefile])
         sys.exit(1)
 
-
     # Warning
     print InstallHelper.boxed_message(['WARNING. Use with caution.',
                                        'This script assumes it is executed on an ESXi hypervisor',

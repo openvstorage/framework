@@ -25,7 +25,6 @@ limitations under the License.
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.port"></b> <span data-bind="text: data.port"></span></li>
                     <li data-bind="visible: data.backend() === 'REST'"><b data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></b> <span data-bind="text: data.timeout"></span></li>
                     <li data-bind="visible: data.backend().match(/^.+_S3$/) !== null"><b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span></li>
-                    <li data-bind="visible: data.backend().match(/^.+_S3$/) !== null"><b data-i18n="ovs:wizards.addvpool.gathervpool.secretkey"></b> <span data-bind="text: data.secretkey"></span></li>
                 </ul>
             </li>
         </ul>
@@ -42,6 +41,7 @@ limitations under the License.
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></b> <span data-bind="text: data.storageIP"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.port"></b> <span data-bind="text: data.vRouterPort"></span></li>
         </ul>
+        <p data-bind="visible: data.backend() === 'CEPH_S3'" data-i18n="[html]ovs:wizards.addvpool.confirm.ceph"></p>
         <p data-i18n="[html]ovs:wizards.addvpool.confirm.extra"></p>
     </form>
 </div>
