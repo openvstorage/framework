@@ -232,6 +232,7 @@ class Manager(object):
         private_key_filename = '{0}/id_rsa'
         public_key_filename = '{0}/id_rsa.pub'
         authorized_keys_filename = '{0}/authorized_keys'
+        known_hosts_filename = '{0}/known_hosts'
         # Generate keys for root
         client.dir_ensure(root_ssh_folder)
         client.run("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename.format(root_ssh_folder)))
@@ -249,6 +250,12 @@ class Manager(object):
             else:
                 node_password = local_password
             node_client = Client.load(node, node_password)
+            for user, folder in [('root', root_ssh_folder), ('ovs', ovs_ssh_folder)]:
+                node_client.run('su - {0} -c "touch {1}"'.format(user, known_hosts_filename.format(folder)))
+                node_client.run('su - {0} -c "chmod 600 {1}; chown {0}:{0} {1}"'.format(user, known_hosts_filename.format(folder)))
+                node_client.run('su - {0} -c "echo \'\' > {1}"'.format(user, known_hosts_filename.format(folder)))
+                for subnode in nodes:
+                    node_client.run('su - {0} -c "ssh-keyscan -H {1} >> {2}"'.format(user, subnode, known_hosts_filename.format(folder)))
             root_authorized_keys += node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_authorized_keys += node_client.file_read(public_key_filename.format(ovs_ssh_folder))
             # Root keys
