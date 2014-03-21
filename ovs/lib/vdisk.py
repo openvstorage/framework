@@ -46,12 +46,12 @@ class VDiskController(object):
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
-            vsr_client = VolumeStorageRouterClient().load(vpool=vpool)
+            vsr_client = VolumeStorageRouterClient().load(vpool)
             response = vsr_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                vsr_client = VolumeStorageRouterClient().load(vpool=vpool)
+                vsr_client = VolumeStorageRouterClient().load(vpool)
                 response.extend(vsr_client.list_volumes())
         return response
 
@@ -250,10 +250,9 @@ class VDiskController(object):
             raise RuntimeError('The given disk does not belong to a template')
 
         if vsrguid is not None:
-            vsr = VolumeStorageRouter(vsrguid)
-            vsr_client = VolumeStorageRouterClient().load(vsr.vpool, vsr_guid=vsr.guid)
+            vsrid = VolumeStorageRouter(vsrguid).vsrid
         else:
-            vsr_client = disk.vsr_client
+            vsrid = disk.vsrid
 
         new_disk = VDisk()
         new_disk.copy_blueprint(disk, include=properties_to_clone)
@@ -269,7 +268,7 @@ class VDiskController(object):
             disk.name, new_disk.name, disk_path
         ))
         try:
-            volumeid = vsr_client.create_clone_from_template(disk_path, str(disk.volumeid))
+            volumeid = disk.vsr_client.create_clone_from_template(disk_path, str(disk.volumeid), node_id=str(vsrid))
             new_disk.volumeid = volumeid
             new_disk.save()
         except Exception as ex:

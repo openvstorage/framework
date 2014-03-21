@@ -54,25 +54,17 @@ class VolumeStorageRouterClient(object):
                           'data_transferred': ['data_written', 'data_read']}
         self.stat_keys = self.stat_counters + self.stat_sums.keys()
 
-    def load(self, vpool, vsr_guid=None):
+    def load(self, vpool):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding vsr
         Loads and returns the client
         """
 
-        key = '{0}_{1}'.format(vpool.guid, vsr_guid if vsr_guid is not None else '')
+        key = vpool.guid
         if key not in client_vpool_cache:
-            vsr_data = {}
-            for vsr in vpool.vsrs:
-                vsr_data[vsr.guid] = (str(vsr.cluster_ip), vsr.port)
             cluster_contacts = []
-            if vsr_guid is not None and vsr_guid in vsr_data:
-                cluster_contacts = [ClusterContact(vsr_data[vsr_guid][0], vsr_data[vsr_guid][1])]
-                print 'Added preferred contact for VSR {0}: {1}'.format(vsr_guid, vsr_data[vsr_guid])
-            for guid, item in vsr_data.iteritems():
-                if guid != vsr_guid:
-                    cluster_contacts.append(ClusterContact(item[0], item[1]))
-                    print 'Added contact for VSR {0}: {1}'.format(guid, item)
+            for vsr in vpool.vsrs[:3]:
+                cluster_contacts.append(ClusterContact(str(vsr.cluster_ip), vsr.port))
             client = StorageRouterClient(str(vpool.name), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
