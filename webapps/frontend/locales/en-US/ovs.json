@@ -402,7 +402,7 @@
             "title": "Rollback",
             "gather": {
                 "title": "Please provide the required information",
-                "selectsnapshots": "Select the Snapshots to which you want to Rollback:",
+                "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
                 "novmachine": "No machine loaded",
                 "novdisk": "No disk loaded",
                 "noname": "No name was entered",
@@ -424,7 +424,7 @@
                 "basicinfo": "Enter basic information",
                 "name": "Clone name",
                 "amount": "Number of clones",
-                "selectsnapshots": "Select the Snapshots from which you want to clone:",
+                "selectsnapshots": "Select the Snapshot from which you want to clone:",
                 "nomachine": "No machine loaded",
                 "noname": "No name was entered",
                 "nosnapshots": "Not all disks have Snapshots",

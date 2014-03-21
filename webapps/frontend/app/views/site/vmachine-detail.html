@@ -186,7 +186,7 @@ limitations under the License.
                             <td><span data-bind="text: (new Date(timestamp * 1000)).toLocaleDateString() + ' ' + (new Date(timestamp * 1000)).toLocaleTimeString()"></span></td>
                             <td><span data-bind="text: $parents[2].formatBytes(stored)"></span></td>
                             <td><span data-bind="text: (is_automatic ? 'Automatic' : 'Manual')"></span></td>
-                            <td><span class="fa pointer" data-bind="icon: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent'),
+                            <td><span class="fa pointer" data-bind="translate: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent'),
                                                                     tooltip: (is_consistent ? 'ovs:generic.consistentss' : 'ovs:generic.inconsistentss')"></span></td>
                         </tr>
                     </table>

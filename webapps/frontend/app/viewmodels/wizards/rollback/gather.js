@@ -37,7 +37,7 @@ define([
                 fields.push('snapshots');
                 reasons.push($.t('ovs:wizards.rollback.gather.nosnapshots'));
             }
-            return { value: valid, reason: reasons, fields: fields };
+            return { value: valid, reasons: reasons, fields: fields };
         });
 
         // Functions
