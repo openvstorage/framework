@@ -461,6 +461,33 @@ class VMachineController(object):
             VMachineController.update_vmachine_config(vmachine, vm_object)
 
     @staticmethod
+    @celery.task(name='ovs.machine.update_from_voldrv')
+    def update_from_voldrv(name, vsrid):
+        """
+        This method will update a vmachine based on a given vmx/xml file
+        """
+        pmachine = PMachineList.get_by_vsrid(vsrid)
+        hypervisor = Factory.get(pmachine)
+        name = hypervisor.clean_vmachine_filename(name)
+
+        if pmachine.hvtype in ['VMWARE', 'KVM']:
+            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+            pmachine = PMachineList.get_by_vsrid(vsrid)
+            vmachine = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
+            if not vmachine:
+                print "VMachine with devicename not yet modelled - update ignored".format(name)
+                return
+            vmachine.devicename = name
+            vmachine.save()
+        if pmachine.hvtype == 'KVM':
+            try:
+                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
+                vmachine.status = 'SYNC'
+            except:
+                vmachine.status = 'SYNC_NOK'
+            vmachine.save()
+
+    @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_config')
     def update_vmachine_config(vmachine, vm_object, pmachine=None):
         """
