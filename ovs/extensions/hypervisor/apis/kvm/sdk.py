@@ -69,7 +69,7 @@ class Sdk(object):
 
         print 'Init complete'
 
-    def _reconnect(self, attempt = 0):
+    def _reconnect(self, attempt=0):
         # Host always comes as ip so we need to ssh-copy-id our own key to ourself
         # @TODO: get local ips
         print('init conn', self.host, self.login, os.getgid(), os.getuid())
@@ -118,8 +118,8 @@ class Sdk(object):
         cmd = ['qemu-img', 'info', filename]
         try:
             out = subprocess.check_output(' '.join(cmd),
-                                          stderr = subprocess.STDOUT,
-                                          shell = True)
+                                          stderr=subprocess.STDOUT,
+                                          shell=True)
         except subprocess.CalledProcessError as cpe:
             return cpe.output.strip()
 
@@ -186,9 +186,8 @@ class Sdk(object):
             mountpoints.append(mountpoint)
 
         vm_filename = self.ssh_client.run("grep '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
-        vm_filename = vm_filename.split(':')[0].strip()
-        vm_location = sorted(self.ssh_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0]
-
+        vm_filename = vm_filename.split(':')[0].strip().split('/')[-1]
+        vm_location = sorted(self.ssh_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
         vm_datastore = None
         possible_datastores = self.ssh_client.run("find /mnt -name '{0}/{1}'".format(vm_location, vm_filename)).split('\n')
         for datastore in possible_datastores:
@@ -270,8 +269,8 @@ class Sdk(object):
         similar to create_vm_from template (?)
         """
         source_vm = self.get_vm_object(vmid)
-        #TODO:
-        ## copy nics
+        # TODO:
+        # copy nics
         return self.create_vm_from_template(name, source_vm, disks)
 
     def create_vm_from_template(self, name, source_vm, disks):
@@ -337,7 +336,7 @@ class Sdk(object):
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
-                   network = ('network=default', 'mac=RANDOM', 'model=e1000')):
+                   network=('network=default', 'mac=RANDOM', 'model=e1000')):
         """
         disks = list of tuples [(disk_name, disk_size_GB, bus ENUM(virtio, ide, sata)]
         #e.g [(/vms/vm1.vmdk,10,virtio), ]
@@ -371,7 +370,7 @@ class Sdk(object):
         print(' '.join(options))
         try:
             return subprocess.check_output('{} {}'.format(command, ' '.join(options)),
-                                           stderr = subprocess.STDOUT,
-                                           shell = True)
+                                           stderr=subprocess.STDOUT,
+                                           shell=True)
         except subprocess.CalledProcessError as cpe:
             return cpe.output.strip()
