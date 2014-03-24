@@ -32,7 +32,10 @@ class Ovs():
         if not Ovs.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
             rcode, output = Ovs.execute_command(cmd, catch_output=False)
-            Ovs.my_machine_id = output[0].strip().split('\n')[0].strip()
+            for id in output[0].strip().split('\n'):
+                if id != '000000000000':
+                    Ovs.my_machine_id = id.strip()
+                    break
         return Ovs.my_machine_id
 
     @staticmethod
