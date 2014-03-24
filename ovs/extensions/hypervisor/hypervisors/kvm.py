@@ -30,7 +30,7 @@ class KVM(Hypervisor):
         Initializes the object with credentials and connection information
         """
         super(KVM, self).__init__(ip, username, password)
-        self.sdk = Sdk(self._ip, self._username, self._password)
+        self.sdk = Sdk(self._ip, self._username)
 
     def _connect(self):
         """
@@ -76,17 +76,19 @@ class KVM(Hypervisor):
         """
         Gets a list of agnostic vm objects for a given ip and mountpoint
         """
-        _ = ip, mountpoint  # @TODO: These should be used to only fetch the correct vMachines
+        _ = ip
         for vm in self.sdk.get_vms():
-            yield self.sdk.make_agnostic_config(vm)
+            config = self.sdk.make_agnostic_config(vm)
+            if mountpoint in config['datastores']:
+                yield config
 
     @Hypervisor.connected
     def is_datastore_available(self, ip, mountpoint):
         """
         Check whether a given datastore is in use on the hypervisor
         """
-        _ = ip, mountpoint  # @TODO: Check whether the mountpoint is available
-        return True
+        _ = ip
+        return self.sdk.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
 
     @Hypervisor.connected
     def clone_vm(self, vmid, name, disks, wait=False):

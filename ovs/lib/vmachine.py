@@ -172,6 +172,7 @@ class VMachineController(object):
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
         if pmachine.hvtype in ['VMWARE', 'KVM']:
+            # @TODO: Don't take vpool in account on KVM
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
             pmachine = PMachineList.get_by_vsrid(vsrid)
             vmachine = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)

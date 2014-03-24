@@ -24,10 +24,11 @@ import os
 import re
 import time
 
-ROOT_PATH = "/etc/libvirt/qemu/" #get static info from here, or use dom.XMLDesc(0)
-RUN_PATH = "/var/run/libvirt/qemu/" #get live info from here
+ROOT_PATH = '/etc/libvirt/qemu/'  # Get static info from here, or use dom.XMLDesc(0)
+RUN_PATH = '/var/run/libvirt/qemu/'  # Get live info from here
 
-#Helpers
+
+# Helpers
 def _recurse(treeitem):
     result = {}
     for key, item in treeitem.items():
@@ -44,10 +45,10 @@ class Sdk(object):
     This class contains all SDK related methods
     """
 
-    def __init__(self, host='localhost', login='root', passwd=None):
-        print('init libvirt')
-        import libvirt  #required
-        self.STATES = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
+    def __init__(self, host='localhost', login='root'):
+        print('Init libvirt')
+        import libvirt
+        self.states = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
                        libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
                        libvirt.VIR_DOMAIN_BLOCKED:  'BLOCKED',
                        libvirt.VIR_DOMAIN_PAUSED:   'PAUSED',
@@ -55,23 +56,28 @@ class Sdk(object):
                        libvirt.VIR_DOMAIN_SHUTOFF:  'TURNEDOFF',
                        libvirt.VIR_DOMAIN_CRASHED:  'CRASHED'}
 
-        #password is not used, must set up SSH keys (passwordless login)
-        # see ssh-copy-id ...
         self.libvirt = libvirt
         self.host = host
         self.login = login
+        self._conn = None
         self._reconnect()
-        print('init complete')
+
+        print 'Init SSH client'
+        from ovs.plugin.provider.remote import Remote
+        self.ssh_client = Remote.cuisine.api
+        self.ssh_client.connect(self.host)
+
+        print 'Init complete'
 
     def _reconnect(self, attempt = 0):
-        # host always comes as ip so we need to ssh-copy-id our own key to ourself (!)
-        #TODO: get local ips
+        # Host always comes as ip so we need to ssh-copy-id our own key to ourself
+        # @TODO: get local ips
         print('init conn', self.host, self.login, os.getgid(), os.getuid())
         try:
-            if self.host == 'localhost': #or host in (localips...):
-                self._conn = self.libvirt.open("qemu:///system") #only local connection
+            if self.host == 'localhost':  # Or host in (localips...):
+                self._conn = self.libvirt.open('qemu:///system')  # Only local connection
             else:
-                self._conn = self.libvirt.open("qemu+ssh://{0}@{1}/system".format(self.login, self.host))
+                self._conn = self.libvirt.open('qemu+ssh://{0}@{1}/system'.format(self.login, self.host))
         except self.libvirt.libvirtError as le:
             print(str(le), le.get_error_code())
             if attempt < 5:
@@ -80,20 +86,23 @@ class Sdk(object):
             else:
                 raise
 
-    def _get_disks(self, vm_object):
-        tree=ElementTree.fromstring(vm_object.XMLDesc(0))
-        return [_recurse(item) for item in tree.findall("devices/disk")]
+    @staticmethod
+    def _get_disks(vm_object):
+        tree = ElementTree.fromstring(vm_object.XMLDesc(0))
+        return [_recurse(item) for item in tree.findall('devices/disk')]
 
-    def _get_nics(self, vm_object):
-        tree=ElementTree.fromstring(vm_object.XMLDesc(0))
-        return [_recurse(item) for item in tree.findall("devices/interface")]
+    @staticmethod
+    def _get_nics(vm_object):
+        tree = ElementTree.fromstring(vm_object.XMLDesc(0))
+        return [_recurse(item) for item in tree.findall('devices/interface')]
 
-    def _get_ram(self, vm_object):
+    @staticmethod
+    def _get_ram(vm_object):
         """
         returns RAM size in MiB
         MUST BE INTEGER! not float
         """
-        tree=ElementTree.fromstring(vm_object.XMLDesc(0))
+        tree = ElementTree.fromstring(vm_object.XMLDesc(0))
         mem = tree.findall('memory')[0]
         unit = mem.items()[0][1]
         value = mem.text
@@ -104,10 +113,11 @@ class Sdk(object):
         elif unit == 'GiB':
             return int(value) * 1024
 
-    def _get_disk_size(self, filename):
+    @staticmethod
+    def _get_disk_size(filename):
         cmd = ['qemu-img', 'info', filename]
         try:
-            out = subprocess.check_output(" ".join(cmd),
+            out = subprocess.check_output(' '.join(cmd),
                                           stderr = subprocess.STDOUT,
                                           shell = True)
         except subprocess.CalledProcessError as cpe:
@@ -131,42 +141,66 @@ class Sdk(object):
                     pid = pid_file.read()
                 return int(pid)
             except IOError:
-                #vmachine is running but no run file?
+                # vMachine is running but no run file?
                 return '-1'
-        return '-2' #no pid, machine is halted
+        return '-2'  # No pid, machine is halted
 
     def make_agnostic_config(self, vm_object):
         """
         return an agnostic config (no hypervisor specific type or structure)
         """
-        storage_ip = '127.0.0.1' #TODO : make sure vsr.storage_ip is set to 127.0.0.1 !ALWAYS
+        storage_ip = '127.0.0.1'
         regex = '/mnt/([^/]+)/(.+$)'
-        config = {}
-        config['disks'] = []
-        mountpoint = 'UNKNOWN'
+        config = {'disks': []}
+        mountpoints = []
 
         order = 0
-        for disk in self._get_disks(vm_object):
-            if disk['device'] == 'cdrom': #skip cdrom/iso
+        for disk in Sdk._get_disks(vm_object):
+            # Skip cdrom/iso
+            if disk['device'] == 'cdrom':
                 continue
+
+            # Load backing filename
             backingfilename = disk['source']['file']
             match = re.search(regex, backingfilename)
-            if match:
-                mountpoint = os.path.join('/mnt', match.group(1))
-            config['disks'].append({'filename': os.path.basename(backingfilename),
-                                    'backingfilename': backingfilename.replace(mountpoint, '').strip('/'),
+            if match is None:
+                continue
+
+            # Cleaning up
+            mountpoint = '/mnt/{0}'.format(match.group(1))
+            filename = backingfilename.replace(mountpoint, '').strip('/')
+            if 'alias' in disk:
+                # A diskname was specified
+                diskname = disk['alias'].get('name', 'unknown')
+            else:
+                # No diskname specified. Using the .raw filename
+                diskname = filename.split('/')[-1].split('.')[0]
+
+            # Collecting data
+            config['disks'].append({'filename': filename,
+                                    'backingfilename': filename,
                                     'datastore': mountpoint,
-                                    'name': disk.get('alias', {}).get('name', 'UNKNOWN'),
+                                    'name': diskname,
                                     'order': order})
             order += 1
+            mountpoints.append(mountpoint)
 
-        datastore = "{}:{}".format(storage_ip, mountpoint) #this is "storageIP:/mnt/vpool_X"
+        vm_filename = self.ssh_client.run("grep '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
+        vm_filename = vm_filename.split(':')[0].strip()
+        vm_location = sorted(self.ssh_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0]
 
-        config['name'] =  vm_object.name()
+        vm_datastore = None
+        possible_datastores = self.ssh_client.run("find /mnt -name '{0}/{1}'".format(vm_location, vm_filename)).split('\n')
+        for datastore in possible_datastores:
+            for mountpoint in mountpoints:
+                if mountpoint in datastore.strip():
+                    vm_datastore = mountpoint
+
+        config['name'] = vm_object.name()
         config['id'] = str(vm_object.UUIDString())
-        config['backing'] = {'filename': vm_object.name() + '.xml',
-                             'datastore': mountpoint}
-        config['datastores'] =  {mountpoint: datastore}
+        config['backing'] = {'filename': '{0}/{1}'.format(vm_location, vm_filename),
+                             'datastore': vm_datastore}
+        config['datastores'] = dict((mountpoint, '{}:{}'.format(storage_ip, mountpoint)) for mountpoint in mountpoints)
 
         return config
 
@@ -177,7 +211,7 @@ class Sdk(object):
         """
         vm = self.get_vm_object(vmid)
         state = vm.info()[0]
-        return self.STATES.get(state, 'UNKNOWN')
+        return self.states.get(state, 'UNKNOWN')
 
     def get_vm_object(self, vmid):
         """
@@ -185,12 +219,12 @@ class Sdk(object):
         vmid is the name or the uuid
         cannot use ID, since for a stopped vm id is always -1
         """
-        func = "lookupByUUIDString"
+        func = 'lookupByUUIDString'
         try:
             import uuid
             uuid.UUID(vmid)
         except ValueError:
-            func = "lookupByName"
+            func = 'lookupByName'
         try:
             return getattr(self._conn, func)(vmid)
         except self.libvirt.libvirtError as le:
@@ -255,8 +289,8 @@ class Sdk(object):
         """
         vm_disks = []
 
-        #get the datastore from the new disks
-        #we need the full path of the disk images to be able to create vmachine
+        # Get the datastore from the new disks
+        # We need the full path of the disk images to be able to create vmachine
         from ovs.dal.hybrids.vdisk import VDisk
         datastore = None
         for disk in disks:
@@ -265,21 +299,21 @@ class Sdk(object):
                 if vsr.serving_vmachine.name == socket.gethostname():
                     datastore = vsr.mountpoint
         if datastore is None:
-            raise RuntimeError('Cannot identify volumedriverfs mountpoint for vmachine {}'.format(vmid))
+            raise RuntimeError('Cannot identify volumedriverfs mountpoint for vmachine {}'.format(name))
 
-        #get agnostic config of source vm
+        # Get agnostic config of source vm
         if hasattr(source_vm, 'config'):
             vcpus = source_vm.config.hardware.numCPU
             ram = source_vm.config.hardware.memoryMB
         elif isinstance(source_vm, self.libvirt.virDomain):
             vcpus = source_vm.info()[3]
-            ram = self._get_ram(source_vm)
+            ram = Sdk._get_ram(source_vm)
         else:
             raise ValueError('Unexpected object type {} {}'.format(source_vm, type(source_vm)))
 
-        #assume disks are raw
+        # Assume disks are raw
         for disk in disks:
-            vm_disks.append(("{}/{}".format(datastore, disk['backingdevice']), 'virtio'))
+            vm_disks.append(('{}/{}'.format(datastore, disk['backingdevice']), 'virtio'))
 
         out = self._vm_create(name, vcpus, int(ram), vm_disks)
         print(out)
@@ -289,10 +323,7 @@ class Sdk(object):
         if 'error' in out:
             msg = out.split('error:')[-1].strip()
             raise RuntimeError(msg)
-        source_xml = '{}{}.xml'.format(ROOT_PATH, name)
-        dest_xml = '{}/{}.xml'.format(datastore, name)
-        shutil.move(source_xml, dest_xml)
-        os.symlink(dest_xml, source_xml)
+
         try:
             return self.get_vm_object(name).UUIDString()
         except self.libvirt.libvirtError as le:
@@ -302,7 +333,7 @@ class Sdk(object):
                 return self.get_vm_object(name).UUIDString()
             except self.libvirt.libvirtError as le:
                 print(str(le))
-                raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(vmid))
+                raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(name))
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
@@ -319,7 +350,7 @@ class Sdk(object):
                    '--name {}'.format(name),
                    '--vcpus {}'.format(vcpus),
                    '--ram {}'.format(ram),
-                   '--graphics vnc,listen={}'.format(vnc_listen)] #have to specify 0.0.0.0 else it will listen on 127.0.0.1 only
+                   '--graphics vnc,listen={}'.format(vnc_listen)]  # Have to specify 0.0.0.0 else it will listen on 127.0.0.1 only
         for disk in disks:
             if len(disk) == 2:
                 options.append('--disk {},device=disk,bus={}'.format(*disk))
@@ -339,9 +370,8 @@ class Sdk(object):
             options.append('--network {}'.format(','.join(network)))
         print(' '.join(options))
         try:
-            return subprocess.check_output("{} {}".format(command, " ".join(options)),
+            return subprocess.check_output('{} {}'.format(command, ' '.join(options)),
                                            stderr = subprocess.STDOUT,
                                            shell = True)
         except subprocess.CalledProcessError as cpe:
             return cpe.output.strip()
-

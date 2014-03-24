@@ -191,7 +191,8 @@ class Manager(object):
         Manager._install_jscore(client, install_branch)
 
         # Install extra packages
-        client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
+        if hypervisor == 'KVM':
+            client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
 
         # Install Open vStorage
         print 'Installing Open vStorage...'
@@ -744,7 +745,10 @@ for directory in {0}:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
             raise RuntimeError('No available ip addresses found suitable for volumerouter storage ip')
-        volumedriver_storageip = parameters.get('storage_ip') or Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
+        if vsa.pmachine.hvtype == 'KVM':
+            volumedriver_storageip = '127.0.0.1'
+        else:
+            volumedriver_storageip = parameters.get('storage_ip') or Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
 
         vrouter_config = {'vrouter_id': vrouter_id,
