@@ -158,7 +158,7 @@ class KVM(Hypervisor):
         Builds the path for the file representing a given vmachine
         """
         machinename = machinename.replace(' ', '_')
-        return '/vms/{}/{}.xml'.format(vsa_machineid, machinename)
+        return '/{}/{}.xml'.format(vsa_machineid, machinename)
 
     def get_rename_scenario(self, old_name, new_name):
         """
