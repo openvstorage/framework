@@ -16,6 +16,7 @@
 This module contains all code for using the KVM libvirt api
 """
 
+from ovs.extensions.generic.system import Ovs
 from xml.etree import ElementTree
 import subprocess
 import socket
@@ -187,7 +188,7 @@ class Sdk(object):
 
         vm_filename = self.ssh_client.run("grep '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.split(':')[0].strip().split('/')[-1]
-        vm_location = sorted(self.ssh_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
+        vm_location = Ovs.get_my_machine_id()
         vm_datastore = None
         possible_datastores = self.ssh_client.run("find /mnt -name '{0}/{1}'".format(vm_location, vm_filename)).split('\n')
         for datastore in possible_datastores:

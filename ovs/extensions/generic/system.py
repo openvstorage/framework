@@ -29,17 +29,23 @@ class Ovs():
 
     @staticmethod
     def get_my_machine_id():
+        """
+        Returns unique machine id based on mac address
+        """
         if not Ovs.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
             rcode, output = Ovs.execute_command(cmd, catch_output=False)
             for id in output[0].strip().split('\n'):
-                if id != '000000000000':
+                if id.strip() != '000000000000':
                     Ovs.my_machine_id = id.strip()
                     break
         return Ovs.my_machine_id
 
     @staticmethod
     def get_my_vsa():
+        """
+        Returns unique machine vsa id
+        """
         if not Ovs.my_vsa_guid:
             for vm in VMachineList().get_vmachines():
                 if vm.is_internal and vm.machineid == Ovs.get_my_machine_id():
@@ -48,6 +54,7 @@ class Ovs():
 
     @staticmethod
     def get_my_vsr_id(vpool_name):
-        if not Ovs.my_vsr_id:
-            Ovs.my_vsr_id = vpool_name + Ovs.get_my_machine_id()
-        return Ovs.my_vsr_id
+        """
+        Returns unique machine vsrid based on vpool_name and machineid
+        """
+        return vpool_name + Ovs.get_my_machine_id()

@@ -16,8 +16,6 @@
 Hypervisor factory module
 """
 
-from hypervisors.vmware import VMware
-from hypervisors.kvm import KVM
 from ovs.extensions.generic.filemutex import FileMutex
 
 
@@ -33,8 +31,8 @@ class Factory(object):
         """
         Returns the appropriate hypervisor client class for a given VMachine
         """
-        hvtype   = node.hvtype
-        ip       = node.ip
+        hvtype = node.hvtype
+        ip = node.ip
         username = node.username
         password = node.password
         key = '{0}_{1}'.format(ip, username)
@@ -44,8 +42,10 @@ class Factory(object):
                 mutex.acquire(30)
                 if key not in Factory.hypervisors:
                     if hvtype == 'VMWARE':
+                        from hypervisors.vmware import VMware
                         hypervisor = VMware(ip, username, password)
                     elif hvtype == 'KVM':
+                        from hypervisors.kvm import KVM
                         hypervisor = KVM(ip, username, password)
                     else:
                         raise NotImplementedError('Hypervisor {0} is not yet supported'.format(hvtype))
