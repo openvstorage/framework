@@ -1110,35 +1110,10 @@ print Configuration.get('{0}')
         mounted = [device.strip() for device in client.run("mount | cut -d ' ' -f 1").strip().split('\n')]
         root_partition = client.run("mount | grep 'on / ' | cut -d ' ' -f 1").strip()
 
-        # Create partitions on SSD
-        ssds = [drive for drive, info in drives.iteritems() if info['ssd'] is True and root_partition not in info['partitions']]
-        if len(ssds) == 0:
-            print 'No SSD was found. At least one SSD is required'
-            sys.exit(1)
-        if len(ssds) > 1:
-            ssd = Helper.ask_choice(ssds, question='Choose the SSD to use for Open vStorage')
-        else:
-            ssd = ssds[0]
-        print 'Using {0} as SSD'.format(ssd)
-        for partition in drives[ssd]['partitions']:
-            if partition in mounted:
-                client.run('umount {0}'.format(partition))
-        client.run('parted {0} -s mklabel gpt'.format(ssd))
-        client.run('parted {0} -s mkpart cache 2MB 50%'.format(ssd))
-        client.run('parted {0} -s mkpart db 50% 75%'.format(ssd))
-        client.run('parted {0} -s mkpart mdpath 75% 100%'.format(ssd))
-        client.run('mkfs.ext4 -q {0}1 -L cache'.format(ssd))
-        client.run('mkfs.ext4 -q {0}2 -L db'.format(ssd))
-        client.run('mkfs.ext4 -q {0}3 -L mdpath'.format(ssd))
-
-        client.run('mkdir -p /mnt/db')
-        client.run('mkdir -p /mnt/cache')
-        client.run('mkdir -p /mnt/md')
-
         extra_mountpoints = ''
+        hdds = [drive for drive, info in drives.iteritems() if info['ssd'] is False and root_partition not in info['partitions']]
         if create_extra:
             # Create partitions on HDD
-            hdds = [drive for drive, info in drives.iteritems() if info['ssd'] is False and root_partition not in info['partitions']]
             if len(hdds) == 0:
                 print 'No HDD was found. At least one HDD is required when creating extra filesystems'
                 sys.exit(1)
@@ -1147,6 +1122,7 @@ print Configuration.get('{0}')
             else:
                 hdd = hdds[0]
             print 'Using {0} as extra HDD'.format(hdd)
+            hdds.remove(hdd)
             for partition in drives[hdd]['partitions']:
                 if partition in mounted:
                     client.run('umount {0}'.format(partition))
@@ -1166,6 +1142,40 @@ LABEL=tempfs    /var/tmp         ext4    defaults,nobootwait,noatime,discard    
 
             client.run('mkdir -p /mnt/bfs')
             client.run('mkdir -p /mnt/dfs/local')
+
+        # Create partitions on SSD
+        ssds = [drive for drive, info in drives.iteritems() if info['ssd'] is True and root_partition not in info['partitions']]
+        if len(ssds) == 0:
+            if len(hdds) > 0:
+                print 'No SSD found, but one or more HDDs are found that can be used instead.'
+                print 'However, using a HDD instead of an SSD will cause severe performance loss.'
+                continue_install = Helper.ask_yesno('Are you sure you want to continue?', default_value=False)
+                if continue_install:
+                    ssd = Helper.ask_choice(hdds, question='Choose the HDD to use as SSD replacement')
+                else:
+                    sys.exit(1)
+            else:
+                print 'No SSD found. At least one SSD (or replacing HDD) is required.'
+                sys.exit(1)
+        elif len(ssds) > 1:
+            ssd = Helper.ask_choice(ssds, question='Choose the SSD to use for Open vStorage')
+        else:
+            ssd = ssds[0]
+        print 'Using {0} as SSD'.format(ssd)
+        for partition in drives[ssd]['partitions']:
+            if partition in mounted:
+                client.run('umount {0}'.format(partition))
+        client.run('parted {0} -s mklabel gpt'.format(ssd))
+        client.run('parted {0} -s mkpart cache 2MB 50%'.format(ssd))
+        client.run('parted {0} -s mkpart db 50% 75%'.format(ssd))
+        client.run('parted {0} -s mkpart mdpath 75% 100%'.format(ssd))
+        client.run('mkfs.ext4 -q {0}1 -L cache'.format(ssd))
+        client.run('mkfs.ext4 -q {0}2 -L db'.format(ssd))
+        client.run('mkfs.ext4 -q {0}3 -L mdpath'.format(ssd))
+
+        client.run('mkdir -p /mnt/db')
+        client.run('mkdir -p /mnt/cache')
+        client.run('mkdir -p /mnt/md')
 
         # Add content to fstab
         new_filesystems = """
