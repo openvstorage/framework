@@ -73,8 +73,11 @@ class VMachineController(object):
         target_pm = PMachine(pmachineguid)
         target_hypervisor = Factory.get(target_pm)
 
-        vpool = template_vm.vpool
-        vpool_guids = set([vpool.guid])
+        vpool = None
+        vpool_guids = set()
+        if template_vm.vpool is not None:
+            vpool = template_vm.vpool
+            vpool_guids.add(vpool.guid)
         for disk in template_vm.vdisks:
             vpool = disk.vpool
             vpool_guids.add(vpool.guid)
@@ -83,6 +86,10 @@ class VMachineController(object):
 
         if not template_vm.pmachine.hvtype == target_pm.hvtype:
             raise RuntimeError('Source and target hypervisor not identical')
+
+        # Currently, only one vPool is supported, so we can just use whatever the `vpool` variable above
+        # was set to as 'the' vPool for the code below. This obviously will have to change once vPool mixes
+        # are supported.
 
         target_vsr = None
         source_vsr = None
@@ -122,10 +129,9 @@ class VMachineController(object):
         new_vm.status = 'CREATED'
         new_vm.save()
 
-        vsrs = [vsr for vsr in template_vm.vpool.vsrs
-                if vsr.serving_vmachine.pmachine_guid == new_vm.pmachine_guid]
+        vsrs = [vsr for vsr in vpool.vsrs if vsr.serving_vmachine.pmachine_guid == new_vm.pmachine_guid]
         if len(vsrs) == 0:
-            raise RuntimeError('Cannot find VSR serving {0} on {1}'.format(new_vm.vpool.name,
+            raise RuntimeError('Cannot find VSR serving {0} on {1}'.format(vpool.name,
                                                                            new_vm.pmachine.name))
         vsrguid = vsrs[0].guid
 

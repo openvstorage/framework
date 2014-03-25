@@ -260,9 +260,28 @@ class VMachineViewSet(viewsets.ViewSet):
         _ = request
         if not obj.is_vtemplate:
             raise NotAcceptable('vMachine is not a vTemplate')
-        pmachine_guids = set()
-        for vsr in obj.vpool.vsrs:
-            pmachine_guids.add(vsr.serving_vmachine.pmachine_guid)
+        # Collect all vPools used by the given template
+        vpool_guids = []
+        vpools = []
+        if obj.vpool is not None:
+            if obj.vpool_guid not in vpool_guids:
+                vpools.append(obj.vpool)
+                vpool_guids.append(obj.vpool_guid)
+        for vdisk in obj.vdisks:
+            if vdisk.vpool_guid not in vpool_guids:
+                vpools.append(vdisk.vpool)
+                vpool_guids.append(vdisk.vpool_guid)
+        # Find pMachines which have all above vPools available.
+        pmachine_guids = None
+        for vpool in vpools:
+            this_pmachine_guids = set()
+            for vsr in vpool.vsrs:
+                this_pmachine_guids.add(vsr.serving_vmachine.pmachine_guid)
+            if pmachine_guids is None:
+                pmachine_guids = list(this_pmachine_guids)
+            else:
+                pmachine_guids = list(this_pmachine_guids & set(pmachine_guids))
+        # Return them
         guids = [{'guid': guid} for guid in pmachine_guids]
         return Response(guids, status=status.HTTP_200_OK)
 
