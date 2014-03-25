@@ -55,8 +55,9 @@ class VPoolController(object):
             pmachine = vsr.serving_vmachine.pmachine
             hypervisor = Factory.get(pmachine)
             for vm_object in hypervisor.get_vms_by_nfs_mountinfo(vsr.storage_ip, vsr.mountpoint):
+                search_vpool = None if pmachine.hvtype == 'KVM' else vpool
                 vmachine = VMachineList.get_by_devicename_and_vpool(
                     devicename=vm_object['backing']['filename'],
-                    vpool=vpool
+                    vpool=search_vpool
                 )
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)

@@ -56,14 +56,17 @@ def process(queue, body):
                                   '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileCreate:
                    {'property': 'file_create',
-                    'task': VMachineController.create_from_voldrv,
+                    'task': VMachineController.update_from_voldrv,
                     'arguments': {'path': 'name',
                                   '[NODE_ID]': 'vsrid'}},
                    EventMessages.EventMessage.FileWrite:
                    {'property': 'file_write',
                     'task': VMachineController.update_from_voldrv,
                     'arguments': {'path': 'name',
-                                  '[NODE_ID]': 'vsrid'}},
+                                  '[NODE_ID]': 'vsrid'},
+                    'options': {'delay': 3,
+                                'dedupe': True,
+                                'dedupe_key': 'name'}},
                    EventMessages.EventMessage.FileDelete:
                    {'property': 'file_delete',
                     'task': VMachineController.delete_from_voldrv,

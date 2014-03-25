@@ -186,9 +186,9 @@ class Sdk(object):
             order += 1
             mountpoints.append(mountpoint)
 
-        vm_filename = self.ssh_client.run("grep '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
-        vm_filename = vm_filename.split(':')[0].strip().split('/')[-1]
-        vm_location = Ovs.get_my_machine_id()
+        vm_filename = self.ssh_client.run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
+        vm_filename = vm_filename.strip().split('/')[-1]
+        vm_location = self._get_unique_id()
         vm_datastore = None
         possible_datastores = self.ssh_client.run("find /mnt -name '{0}/{1}'".format(vm_location, vm_filename)).split('\n')
         for datastore in possible_datastores:
@@ -375,3 +375,14 @@ class Sdk(object):
                                            shell=True)
         except subprocess.CalledProcessError as cpe:
             return cpe.output.strip()
+
+    def _get_unique_id(self):
+        """
+        Gets the unique identifier from the KVM node connected to
+        """
+        # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
+        # on the machine running the code
+        output = self.ssh_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
+        for mac in output.strip().split('\n'):
+            if mac.strip() != '000000000000':
+                return mac.strip()

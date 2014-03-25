@@ -56,13 +56,12 @@ class VMachineList(object):
         """
         Returns a list of all VDisks based on a given volumeid
         """
-        # pylint: disable=line-too-long
+        vpool_guid = None if vpool is None else vpool.guid
         vms = DataList({'object': VMachine,
                         'data': DataList.select.DESCRIPTOR,
                         'query': {'type': DataList.where_operator.AND,
                                   'items': [('devicename', DataList.operator.EQUALS, devicename),
-                                            ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]}}).data  # noqa
-        # pylint: enable=line-too-long
+                                            ('vpool_guid', DataList.operator.EQUALS, vpool_guid)]}}).data
         if vms:
             if len(vms) != 1:
                 raise RuntimeError('Invalid amount of vMachines found: {0}'.format(len(vms)))

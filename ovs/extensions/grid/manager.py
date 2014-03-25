@@ -190,9 +190,7 @@ class Manager(object):
         install_branch, ovs_version = Manager._prepare_jscore(client, is_local)
         Manager._install_jscore(client, install_branch)
 
-        # Install extra packages
-        if hypervisor == 'KVM':
-            client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
+        client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
 
         # Install Open vStorage
         print 'Installing Open vStorage...'

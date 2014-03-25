@@ -163,35 +163,6 @@ class VMachineController(object):
         return new_vm.guid
 
     @staticmethod
-    @celery.task(name='ovs.machine.create_from_voldrv')
-    def create_from_voldrv(name, vsrid):
-        """
-        This method will create a vmachine based on a given vmx/xml file
-        """
-        pmachine = PMachineList.get_by_vsrid(vsrid)
-        hypervisor = Factory.get(pmachine)
-        name = hypervisor.clean_vmachine_filename(name)
-        if pmachine.hvtype in ['VMWARE', 'KVM']:
-            # @TODO: Don't take vpool in account on KVM
-            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            pmachine = PMachineList.get_by_vsrid(vsrid)
-            vmachine = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
-            if not vmachine:
-                vmachine = VMachine()
-                vmachine.vpool = vsr.vpool
-                vmachine.pmachine = pmachine
-                vmachine.status = 'CREATED'
-            vmachine.devicename = name
-            vmachine.save()
-        if pmachine.hvtype == 'KVM':
-            try:
-                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
-                vmachine.status = 'SYNC'
-            except:
-                vmachine.status = 'SYNC_NOK'
-            vmachine.save()
-
-    @staticmethod
     @celery.task(name='ovs.machine.clone')
     def clone(machineguid, timestamp, name, **kwargs):
         """
@@ -270,15 +241,21 @@ class VMachineController(object):
         This method will delete a vmachine based on the name of the vmx given
         """
         pmachine = PMachineList.get_by_vsrid(vsrid)
+        if pmachine.hvtype not in ['VMWARE', 'KVM']:
+            return
+
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
-        if pmachine.hvtype in ['VMWARE', 'KVM']:
+        if pmachine.hvtype == 'VMWARE':
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            vm = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
-            if vm is not None:
-                MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
-                                                                      'metadata': {'name': vm.name}})
-                vm.delete(abandon=True)
+            vpool = vsr.vpool
+        else:
+            vpool = None
+        vm = VMachineList.get_by_devicename_and_vpool(name, vpool)
+        if vm is not None:
+            MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
+                                                                  'metadata': {'name': vm.name}})
+            vm.delete(abandon=True)
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
@@ -287,25 +264,32 @@ class VMachineController(object):
         This machine will handle the rename of a vmx file
         """
         pmachine = PMachineList.get_by_vsrid(vsrid)
+        if pmachine.hvtype not in ['VMWARE', 'KVM']:
+            return
+
         hypervisor = Factory.get(pmachine)
-        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+        if pmachine.hvtype == 'VMWARE':
+            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+            vpool = vsr.vpool
+        else:
+            vpool = None
 
         old_name = hypervisor.clean_vmachine_filename(old_name)
         new_name = hypervisor.clean_vmachine_filename(new_name)
         scenario = hypervisor.get_rename_scenario(old_name, new_name)
         if scenario == 'RENAME':
             # Most likely a change from path. Updaing path
-            vm = VMachineList.get_by_devicename_and_vpool(old_name, vsr.vpool)
+            vm = VMachineList.get_by_devicename_and_vpool(old_name, vpool)
             if vm is not None:
                 vm.devicename = new_name
                 vm.save()
         elif scenario == 'UPDATE':
-            vm = VMachineList.get_by_devicename_and_vpool(new_name, vsr.vpool)
+            vm = VMachineList.get_by_devicename_and_vpool(new_name, vpool)
             if vm is None:
                 # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
                 # Let's create it anyway
                 VMachineController.create_from_voldrv(new_name, vsrid)
-            vm = VMachineList.get_by_devicename_and_vpool(new_name, vsr.vpool)
+            vm = VMachineList.get_by_devicename_and_vpool(new_name, vpool)
             if vm is None:
                 raise RuntimeError('Could not create vMachine on rename. Aborting.')
             try:
@@ -464,21 +448,28 @@ class VMachineController(object):
     @celery.task(name='ovs.machine.update_from_voldrv')
     def update_from_voldrv(name, vsrid):
         """
-        This method will update a vmachine based on a given vmx/xml file
+        This method will update/create a vmachine based on a given vmx/xml file
         """
         pmachine = PMachineList.get_by_vsrid(vsrid)
+        if pmachine.hvtype not in ['VMWARE', 'KVM']:
+            return
+
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
-
-        if pmachine.hvtype in ['VMWARE', 'KVM']:
+        if pmachine.hvtype == 'VMWARE':
             vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            pmachine = PMachineList.get_by_vsrid(vsrid)
-            vmachine = VMachineList.get_by_devicename_and_vpool(name, vsr.vpool)
-            if not vmachine:
-                print "VMachine with devicename not yet modelled - update ignored".format(name)
-                return
-            vmachine.devicename = name
-            vmachine.save()
+            vpool = vsr.vpool
+        else:
+            vpool = None
+        pmachine = PMachineList.get_by_vsrid(vsrid)
+        vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
+        if not vmachine:
+            vmachine = VMachine()
+            vmachine.vpool = vpool
+            vmachine.pmachine = pmachine
+            vmachine.status = 'CREATED'
+        vmachine.devicename = name
+        vmachine.save()
         if pmachine.hvtype == 'KVM':
             try:
                 VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
