@@ -16,11 +16,9 @@
 This module contains all code for using the KVM libvirt api
 """
 
-from ovs.extensions.generic.system import Ovs
 from xml.etree import ElementTree
 import subprocess
 import socket
-import shutil
 import os
 import re
 import time
@@ -61,13 +59,8 @@ class Sdk(object):
         self.host = host
         self.login = login
         self._conn = None
+        self._ssh_client = None
         self._reconnect()
-
-        print 'Init SSH client'
-        from ovs.plugin.provider.remote import Remote
-        self.ssh_client = Remote.cuisine.api
-        self.ssh_client.connect(self.host)
-
         print 'Init complete'
 
     def _reconnect(self, attempt=0):
@@ -386,3 +379,12 @@ class Sdk(object):
         for mac in output.strip().split('\n'):
             if mac.strip() != '000000000000':
                 return mac.strip()
+
+    @property
+    def ssh_client(self):
+        if self._ssh_client is None:
+            print 'Init SSH client'
+            from ovs.plugin.provider.remote import Remote
+            self._ssh_client = Remote.cuisine.api
+            self._ssh_client.connect(self.host)
+        return self._ssh_client

@@ -102,7 +102,8 @@ limitations under the License.
                 </div>
                 <div class="panel-body" data-bind="foreach: topVMachines">
                     <div class="row">
-                        <div class="col-md-8"><span data-bind="text: name"></span></div>
+                        <div class="col-md-8"><a data-bind="attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: guid }) },
+                                                            text: name"></a></div>
                         <div class="col-md-4">
                             <span data-bind="visible: $parent.topVmachineMode() === 'topstoreddata', text: storedData"></span>
                             <span data-bind="visible: $parent.topVmachineMode() === 'topbandwidth', text: bandwidth"></span>
