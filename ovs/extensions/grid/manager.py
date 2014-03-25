@@ -299,12 +299,15 @@ class Manager(object):
             join_masters = True
         clusters = arakoon_management.listClusters()
 
-        all_services = ['arakoon_ovsdb', 'arakoon_voldrv', 'memcached', 'rabbitmq', 'ovs_consumer_volumerouter',
-                        'ovs_flower', 'ovs_scheduled_tasks', 'webapp_api', 'nginx', 'ovs_workers']
+        model_services = ['arakoon_ovsdb', 'memcached', 'arakoon_voldrv']
+        master_services = ['rabbitmq', 'ovs_consumer_volumerouter', 'ovs_flower', 'ovs_scheduled_tasks']
+        extra_services = ['webapp_api', 'nginx', 'ovs_workers']
+        all_services = model_services + master_services + extra_services
         arakoon_clientconfigfiles = [ARAKOON_CLIENTCONFIG_TAG.format(cluster) for cluster in clusters]
         generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                                '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
 
+        start_master_services = False
         if join_masters:
             print 'Joining master nodes, services going down.'
 
@@ -461,9 +464,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             # Restart services
             for node in nodes:
                 node_client = Client.load(node)
-                for service in all_services:
+                for service in model_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
+            start_master_services = True
 
             # If this is first node we need to load default model values.
             # @TODO: Think about better detection algorithm.
@@ -473,15 +477,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
         else:
             client = Client.load(ip)
-            # Disable master services
-            client.run('jsprocess disable -n arakoon_ovsdb')
-            client.run('jsprocess disable -n arakoon_voldrv')
-            client.run('jsprocess disable -n memcached')
-            client.run('jsprocess disable -n rabbitmq')
-            client.run('jsprocess disable -n ovs_consumer_volumerouter')
-            client.run('jsprocess disable -n ovs_flower')
-            client.run('jsprocess disable -n ovs_scheduled_tasks')
-
+            # Disable master and model services
+            for service in master_services + model_services:
+                client.run('jsprocess disable -n {0}'.format(service))
             # Stop services
             for service in all_services:
                 client.run('jsprocess stop -n {0}'.format(service))
@@ -492,9 +490,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             Manager._configure_nginx(client)
 
             # Start other services
-            client.run('jsprocess start -n webapp_api')
-            client.run('jsprocess start -n nginx')
-            client.run('jsprocess start -n ovs_workers')
+            for service in extra_services:
+                client.run('jsprocess start -n {0}'.format(service))
 
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
@@ -507,14 +504,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     print "Arakoon master not yet determined for {0}".format(cluster)
                     time.sleep(1)
 
-        # Make sure the process manager is started
-        client = Client.load(ip)
-        try:
-            client.run('service processmanager start')
-        except:
-            pass
-
         # Add VSA and pMachine in the model, if they don't yet exist
+        client = Client.load(ip)
         pmachine = None
         pmachine_ip = Manager._read_remote_config(client, 'ovs.host.ip')
         pmachine_hvtype = Manager._read_remote_config(client, 'ovs.host.hypervisor')
@@ -545,6 +536,20 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vsa.save()
         vsa.pmachine = pmachine
         vsa.save()
+
+        if start_master_services is True:
+            for node in nodes:
+                node_client = Client.load(node)
+                for service in master_services + extra_services:
+                    node_client.run('jsprocess enable -n {0}'.format(service))
+                    node_client.run('jsprocess start -n {0}'.format(service))
+
+        # Make sure the process manager is started
+        client = Client.load(ip)
+        try:
+            client.run('service processmanager start')
+        except:
+            pass
 
         for node in nodes:
             node_client = Client.load(node)

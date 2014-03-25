@@ -33,7 +33,7 @@ KVM_ETC = '/etc/libvirt/qemu/'
 
 
 def is_kvm_available():
-    return PMachine(Ovs.get_my_vsa().pmachine_guid).hvtype == 'KVM'
+    return Ovs.get_my_vsa().pmachine.hvtype == 'KVM'
 
 
 def callback(ch, method, properties, body):
