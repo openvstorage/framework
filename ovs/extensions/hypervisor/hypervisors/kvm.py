@@ -167,3 +167,10 @@ class KVM(Hypervisor):
         if old_name.endswith('.xml') and new_name.endswith('.xml'):
             return 'RENAME'
         return 'UNSUPPORTED'
+
+    def should_process(self, devicename):
+        """
+        Checks whether a given device should be processed
+        """
+        _ = devicename
+        return devicename.strip('/') not in ['vmcasts/rss.xml']

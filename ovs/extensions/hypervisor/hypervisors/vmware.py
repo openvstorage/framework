@@ -195,3 +195,10 @@ class VMware(Hypervisor):
         elif old_name.endswith('.vmx~') and new_name.endswith('.vmx'):
             return 'UPDATE'
         return 'UNSUPPORTED'
+
+    def should_process(self, devicename):
+        """
+        Checks whether a given device should be processed
+        """
+        _ = devicename
+        return True

@@ -173,3 +173,10 @@ class Hypervisor(object):
         Gets the rename scenario based on the old and new name
         """
         pass
+
+    @abc.abstractmethod
+    def should_process(self, devicename):
+        """
+        Checks whether a given device should be processed
+        """
+        pass

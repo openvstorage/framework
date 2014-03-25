@@ -456,27 +456,28 @@ class VMachineController(object):
 
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
-        if pmachine.hvtype == 'VMWARE':
-            vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-            vpool = vsr.vpool
-        else:
-            vpool = None
-        pmachine = PMachineList.get_by_vsrid(vsrid)
-        vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
-        if not vmachine:
-            vmachine = VMachine()
-            vmachine.vpool = vpool
-            vmachine.pmachine = pmachine
-            vmachine.status = 'CREATED'
-        vmachine.devicename = name
-        vmachine.save()
-        if pmachine.hvtype == 'KVM':
-            try:
-                VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
-                vmachine.status = 'SYNC'
-            except:
-                vmachine.status = 'SYNC_NOK'
+        if hypervisor.should_process(name):
+            if pmachine.hvtype == 'VMWARE':
+                vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+                vpool = vsr.vpool
+            else:
+                vpool = None
+            pmachine = PMachineList.get_by_vsrid(vsrid)
+            vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
+            if not vmachine:
+                vmachine = VMachine()
+                vmachine.vpool = vpool
+                vmachine.pmachine = pmachine
+                vmachine.status = 'CREATED'
+            vmachine.devicename = name
             vmachine.save()
+            if pmachine.hvtype == 'KVM':
+                try:
+                    VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
+                    vmachine.status = 'SYNC'
+                except:
+                    vmachine.status = 'SYNC_NOK'
+                vmachine.save()
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_config')
