@@ -35,7 +35,7 @@ define([
         };
         self.vTemplateHeaders = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
-            { key: undefined,      value: $.t('ovs:generic.disks'),      width: 60        },
+            { key: undefined,      value: $.t('ovs:generic.vdisks'),      width: 60        },
             { key: 'children',     value: $.t('ovs:generic.children'),   width: 110       },
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80        }
         ];
