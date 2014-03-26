@@ -55,7 +55,7 @@ define([
                     var options = {
                         sort: 'name',
                         full: true,
-                        contents: ''
+                        contents: 'vdisks'
                     };
                     self.loadVTemplatesHandle = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {
@@ -91,7 +91,7 @@ define([
                         sort: 'name',
                         full: true,
                         page: page,
-                        contents: ''
+                        contents: 'vdisks'
                     };
                     self.refreshVTemplatesHandle[page] = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {
