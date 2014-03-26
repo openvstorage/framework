@@ -80,12 +80,21 @@ define([
         self.cacheRatio.raw = ko.computed(function() {
             return self._cacheRatio().raw;
         });
-        self.iops = ko.computed(function() {
+        self._iops = ko.computed(function() {
             var total = 0;
             $.each(self.vPools(), function(index, vpool) {
                 total += (vpool.iops.raw() || 0);
             });
-            return generic.formatNumber(total);
+            return {
+                value: generic.formatNumber(total),
+                raw: total
+            };
+        });
+        self.iops = ko.computed(function() {
+            return self._iops().value;
+        });
+        self.iops.raw = ko.computed(function() {
+            return self._iops().raw;
         });
         self.readSpeed = ko.computed(function() {
             var total = 0;

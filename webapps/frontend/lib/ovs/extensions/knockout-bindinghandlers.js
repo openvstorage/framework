@@ -105,7 +105,7 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 d3.select('#' + id).select('.primary-text')
                     .text(value.primary());
             }
-            if (!isNaN(value.secondary())) {
+            if (!isNaN(value.secondary.raw())) {
                 d3.select('#' + id).select('.secondary-text')
                     .text(value.secondary() + ' ' + $.t('ovs:generic.iops'));
             }
