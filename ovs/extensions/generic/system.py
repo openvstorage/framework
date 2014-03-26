@@ -65,7 +65,7 @@ class Ovs():
         Returns unique machine vsa id
         """
         if not Ovs.my_vsa_guid:
-            for vm in VMachineList().get_vmachines():
+            for vm in VMachineList.get_vmachines():
                 if vm.is_internal and vm.machineid == Ovs.get_my_machine_id():
                     Ovs.my_vsa_guid = vm.guid
         return VMachine(Ovs.my_vsa_guid)

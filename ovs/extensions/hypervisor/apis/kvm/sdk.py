@@ -183,11 +183,13 @@ class Sdk(object):
         vm_filename = vm_filename.strip().split('/')[-1]
         vm_location = self._get_unique_id()
         vm_datastore = None
-        possible_datastores = self.ssh_client.run("find /mnt -name '{0}/{1}'".format(vm_location, vm_filename)).split('\n')
+        possible_datastores = self.ssh_client.run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
         for datastore in possible_datastores:
-            for mountpoint in mountpoints:
-                if mountpoint in datastore.strip():
-                    vm_datastore = mountpoint
+            # Filter results so only the correct machineid/xml combinations are left over
+            if '{0}/{1}'.format(vm_location, vm_filename) in datastore.strip():
+                for mountpoint in mountpoints:
+                    if mountpoint in datastore.strip():
+                        vm_datastore = mountpoint
 
         config['name'] = vm_object.name()
         config['id'] = str(vm_object.UUIDString())
