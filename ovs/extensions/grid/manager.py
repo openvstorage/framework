@@ -59,6 +59,7 @@ class Manager(object):
             password = getpass.getpass()
 
         client = Client.load(ip, password, bypass_local=True)
+        client.run('apt-get update')
         client.run('apt-get install lsscsi')
 
         if clean:
