@@ -294,7 +294,7 @@ class VMachineController(object):
             if vm is None:
                 # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
                 # Let's create it anyway
-                VMachineController.create_from_voldrv(new_name, vsrid)
+                VMachineController.update_from_voldrv(new_name, vsrid)
             vm = VMachineList.get_by_devicename_and_vpool(new_name, vpool)
             if vm is None:
                 raise RuntimeError('Could not create vMachine on rename. Aborting.')
