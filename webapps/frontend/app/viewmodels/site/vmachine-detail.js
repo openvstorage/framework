@@ -175,7 +175,6 @@ define([
                                 api.post('vmachines/' + vm.guid() + '/set_as_template')
                                     .then(self.shared.tasks.wait)
                                     .done(function() {
-                                        self.vMachines.destroy(vm);
                                         generic.alertSuccess(
                                             $.t('ovs:vmachines.setastemplate.done'),
                                             $.t('ovs:vmachines.setastemplate.donemsg', { what: vm.name() })

@@ -20,7 +20,7 @@ limitations under the License.
                data-bind="text: name,
                           attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
         </li>
-	    <li class="active" data-bind="text: name"></li>
+	    <li class="active" data-bind="lazyloader: { item: name, loadedObservable: 'loaded' }"></li>
 	</ol>
     <div>
         <ul class="nav nav-tabs">
@@ -35,20 +35,21 @@ limitations under the License.
                 <button type="button" class="btn btn-mini btn-default"
                         style="color: #428bca;"
                         data-bind="click: function() { $root.snapshot(); },
+                                   enable: loaded(),
                                    tooltip: 'ovs:vmachines.detail.snapshot'">
                     <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $root.setAsTemplate(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: !isRunning(),
+                                   enable: !isRunning() && loaded(),
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate'">
                     <span class="fa" data-i18n="[html]ovs:icons.setastemplate"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: !isRunning(),
+                                   enable: !isRunning() && loaded(),
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback'">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
@@ -67,33 +68,33 @@ limitations under the License.
                         <tr>
                             <td data-i18n="ovs:generic.host"></td>
                             <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded' }">
                                     <span data-part="lazy-entry" data-bind="text: item().name()"></span>
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td><span data-bind="lazyloader: { item: cacheRatio, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:vsas.detail.hostip"></td>
                             <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded' }">
                                     <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td><span data-bind="lazyloader: { item: iops, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.type"></td>
                             <td>
-                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded' }">
                                     <span data-part="lazy-entry" class="pointer"
                                           data-bind="text: $.t('ovs:generic.hypervisors.' + item().hvtype())"></span>
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td><span data-bind="lazyloader: { item: readSpeed, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.vsas"></td>
@@ -103,7 +104,7 @@ limitations under the License.
                                               attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
                             </td>
                             <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td><span data-bind="lazyloader: { item: writeSpeed, loadedObservable: 'loaded' }"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.vpools"></td>
