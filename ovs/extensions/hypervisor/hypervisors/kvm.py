@@ -54,7 +54,7 @@ class KVM(Hypervisor):
         but on kvm vsr.storage_ip is 127.0.0.1
         """
         _ = wait  # For compatibility purposes only
-        return self.sdk.create_vm_from_template(name, source_vm, disks)
+        return self.sdk.create_vm_from_template(name, source_vm, disks, mountpoint)
 
     @Hypervisor.connected
     def delete_vm(self, vmid, wait=True):

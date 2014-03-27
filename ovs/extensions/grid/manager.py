@@ -917,6 +917,7 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
             client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, vsr.mountpoint))
             client.run('virsh pool-build {0}'.format(vpool_name))
             client.run('virsh pool-start {0}'.format(vpool_name))
+            client.run('virsh pool-autostart {0}'.format(vpool_name))
 
         # Start services
         for node in nodes:

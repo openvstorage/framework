@@ -270,7 +270,7 @@ class Sdk(object):
         # copy nics
         return self.create_vm_from_template(name, source_vm, disks)
 
-    def create_vm_from_template(self, name, source_vm, disks):
+    def create_vm_from_template(self, name, source_vm, disks, mountpoint):
         """
         Create a vm based on an existing template on specified hypervisor
         #source_vm might be an esx machine object or a libvirt.VirDomain object
@@ -285,18 +285,6 @@ class Sdk(object):
         """
         vm_disks = []
 
-        # Get the datastore from the new disks
-        # We need the full path of the disk images to be able to create vmachine
-        from ovs.dal.hybrids.vdisk import VDisk
-        datastore = None
-        for disk in disks:
-            disk_object = VDisk(disk['diskguid'])
-            for vsr in disk_object.vpool.vsrs:
-                if vsr.serving_vmachine.name == socket.gethostname():
-                    datastore = vsr.mountpoint
-        if datastore is None:
-            raise RuntimeError('Cannot identify volumedriverfs mountpoint for vmachine {}'.format(name))
-
         # Get agnostic config of source vm
         if hasattr(source_vm, 'config'):
             vcpus = source_vm.config.hardware.numCPU
@@ -309,17 +297,9 @@ class Sdk(object):
 
         # Assume disks are raw
         for disk in disks:
-            vm_disks.append(('{}/{}'.format(datastore, disk['backingdevice']), 'virtio'))
+            vm_disks.append(('/{}/{}'.format(mountpoint.strip('/'), disk['backingdevice'].strip('/')), 'virtio'))
 
-        out = self._vm_create(name, vcpus, int(ram), vm_disks)
-        print(out)
-        if 'ERROR' in out:
-            msg = out.replace('ERROR', '').strip().split('\n')[0]
-            raise RuntimeError(msg)
-        if 'error' in out:
-            msg = out.split('error:')[-1].strip()
-            raise RuntimeError(msg)
-
+        self._vm_create(name, vcpus, int(ram), vm_disks)
         try:
             return self.get_vm_object(name).UUIDString()
         except self.libvirt.libvirtError as le:
@@ -364,13 +344,7 @@ class Sdk(object):
             options.append('--nonetworks')
         else:
             options.append('--network {}'.format(','.join(network)))
-        print(' '.join(options))
-        try:
-            return subprocess.check_output('{} {}'.format(command, ' '.join(options)),
-                                           stderr=subprocess.STDOUT,
-                                           shell=True)
-        except subprocess.CalledProcessError as cpe:
-            return cpe.output.strip()
+        self.ssh_run('{} {}'.format(command, ' '.join(options)))
 
     def _get_unique_id(self):
         """
