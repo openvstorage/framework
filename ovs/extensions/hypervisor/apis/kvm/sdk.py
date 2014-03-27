@@ -180,11 +180,11 @@ class Sdk(object):
             order += 1
             mountpoints.append(mountpoint)
 
-        vm_filename = self._ssh_run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
+        vm_filename = self.ssh_run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.strip().split('/')[-1]
         vm_location = self._get_unique_id()
         vm_datastore = None
-        possible_datastores = self._ssh_run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
+        possible_datastores = self.ssh_run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
         for datastore in possible_datastores:
             # Filter results so only the correct machineid/xml combinations are left over
             if '{0}/{1}'.format(vm_location, vm_filename) in datastore.strip():
@@ -378,12 +378,12 @@ class Sdk(object):
         """
         # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
         # on the machine running the code
-        output = self._ssh_run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
+        output = self.ssh_run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
         for mac in output.strip().split('\n'):
             if mac.strip() != '000000000000':
                 return mac.strip()
 
-    def _ssh_run(self, command):
+    def ssh_run(self, command):
         """
         Executes an SSH command in a locked context. Since the ssh client is shared in between processes,
         the client should be reconnected before each new call, since another SDK instance running in the same process

@@ -88,7 +88,7 @@ class KVM(Hypervisor):
         Check whether a given datastore is in use on the hypervisor
         """
         _ = ip
-        return self.sdk.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
+        return self.sdk.ssh_run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
 
     @Hypervisor.connected
     def clone_vm(self, vmid, name, disks, wait=False):
