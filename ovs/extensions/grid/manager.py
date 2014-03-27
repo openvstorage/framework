@@ -287,6 +287,8 @@ class Manager(object):
 
         arakoon_management = ArakoonManagement()
         arakoon_nodes = arakoon_management.getCluster('ovsdb').listNodes()
+        if unique_id in arakoon_nodes:
+            arakoon_nodes.remove(unique_id)
         client = Client.load(ip)
         new_node_hostname = client.run('hostname')
         if is_local and Configuration.get('grid.node.id') != '1':
