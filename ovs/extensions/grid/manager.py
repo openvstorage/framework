@@ -303,14 +303,14 @@ class Manager(object):
         clusters = arakoon_management.listClusters()
 
         model_services = ['arakoon_ovsdb', 'memcached', 'arakoon_voldrv']
-        master_services = ['rabbitmq', 'ovs_consumer_volumerouter', 'ovs_flower', 'ovs_scheduled_tasks']
-        extra_services = ['webapp_api', 'nginx', 'ovs_workers']
+        master_services = ['rabbitmq', 'ovs_flower', 'ovs_scheduled_tasks']
+        extra_services = ['webapp_api', 'nginx', 'ovs_workers', 'ovs_consumer_volumerouter']
         all_services = model_services + master_services + extra_services
         arakoon_clientconfigfiles = [ARAKOON_CLIENTCONFIG_TAG.format(cluster) for cluster in clusters]
         generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                                '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
 
-        start_master_services = False
+        is_master = False
         if join_masters:
             print 'Joining master nodes, services going down.'
 
@@ -470,7 +470,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in model_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
-            start_master_services = True
+            is_master = True
 
             # If this is first node we need to load default model values.
             # @TODO: Think about better detection algorithm.
@@ -491,10 +491,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                 client.file_upload(config, config)
             Manager._configure_nginx(client)
-
-            # Start other services
-            for service in extra_services:
-                client.run('jsprocess start -n {0}'.format(service))
 
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
@@ -540,10 +536,16 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         vsa.pmachine = pmachine
         vsa.save()
 
-        if start_master_services is True:
+        if is_master is True:
             for node in nodes:
                 node_client = Client.load(node)
                 for service in master_services + extra_services:
+                    node_client.run('jsprocess enable -n {0}'.format(service))
+                    node_client.run('jsprocess start -n {0}'.format(service))
+        else:
+            for node in nodes:
+                node_client = Client.load(node)
+                for service in extra_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
 
