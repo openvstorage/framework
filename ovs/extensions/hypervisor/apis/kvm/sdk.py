@@ -17,6 +17,7 @@ This module contains all code for using the KVM libvirt api
 """
 
 from xml.etree import ElementTree
+from threading import Lock
 import subprocess
 import socket
 import os
@@ -179,11 +180,11 @@ class Sdk(object):
             order += 1
             mountpoints.append(mountpoint)
 
-        vm_filename = self.ssh_client.run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
+        vm_filename = self._ssh_run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.strip().split('/')[-1]
         vm_location = self._get_unique_id()
         vm_datastore = None
-        possible_datastores = self.ssh_client.run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
+        possible_datastores = self._ssh_run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
         for datastore in possible_datastores:
             # Filter results so only the correct machineid/xml combinations are left over
             if '{0}/{1}'.format(vm_location, vm_filename) in datastore.strip():
@@ -377,16 +378,26 @@ class Sdk(object):
         """
         # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
         # on the machine running the code
-        output = self.ssh_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
+        output = self._ssh_run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
         for mac in output.strip().split('\n'):
             if mac.strip() != '000000000000':
                 return mac.strip()
 
-    @property
-    def ssh_client(self):
+    def _ssh_run(self, command):
+        """
+        Executes an SSH command in a locked context. Since the ssh client is shared in between processes,
+        the client should be reconnected before each new call, since another SDK instance running in the same process
+        could have connected the client to another node. By adding the connect and run in a locking context,
+        it is ensure that within a process the connect and run are executed sequentially.
+        """
         if self._ssh_client is None:
             print 'Init SSH client'
             from ovs.plugin.provider.remote import Remote
             self._ssh_client = Remote.cuisine.api
+            self._ssh_client.lock = Lock()
+        try:
+            self._ssh_client.lock.acquire()
             self._ssh_client.connect(self.host)
-        return self._ssh_client
+            return self._ssh_client.run(command)
+        finally:
+            self._ssh_client.lock.release()
