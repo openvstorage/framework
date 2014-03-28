@@ -1092,6 +1092,7 @@ print Configuration.get('{0}')
         """
         Creates filesystems on the first two additional disks
         """
+        # Scan scsi-ish block devices
         drive_lines = client.run("ls -l /dev/sd* | sed 's/\s\s*/ /g' | cut -d ' ' -f 10").split('\n')
         drives = {}
         for drive in drive_lines:
@@ -1116,9 +1117,19 @@ print Configuration.get('{0}')
                                      'partitions': []}
             if drive in drives:
                 drives[drive]['partitions'].append(partition)
+        # Scan for fusionIO drives
+        drive_lines = client.run("ls -l /dev/fio* | sed 's/\s\s*/ /g' | cut -d ' ' -f 10").split('\n')
+        for drive in drive_lines:
+            partition = drive.strip()
+            if partition == '':
+                continue
+            drive = partition.translate(None, digits)
+            if drive not in drives:
+                drives[drive] = {'ssd': True, 'partitions': []}
+            drives[drive]['partitions'].append(partition)
         mounted = [device.strip() for device in client.run("mount | cut -d ' ' -f 1").strip().split('\n')]
         root_partition = client.run("mount | grep 'on / ' | cut -d ' ' -f 1").strip()
-
+        # Start preparing partitions
         extra_mountpoints = ''
         hdds = [drive for drive, info in drives.iteritems() if info['ssd'] is False and root_partition not in info['partitions']]
         if create_extra:
