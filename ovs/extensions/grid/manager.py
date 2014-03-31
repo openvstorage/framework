@@ -1092,41 +1092,36 @@ print Configuration.get('{0}')
         """
         Creates filesystems on the first two additional disks
         """
-        # Scan scsi-ish block devices
-        drive_lines = client.run("ls -l /dev/sd* | sed 's/\s\s*/ /g' | cut -d ' ' -f 10").split('\n')
+        # Scan block devices
+        drive_lines = client.run("ls -l /dev/* | grep -E '/dev/(sd..?|fio..?)' | sed 's/\s\s*/ /g' | cut -d ' ' -f 10").split('\n')
         drives = {}
         for drive in drive_lines:
             partition = drive.strip()
             if partition == '':
                 continue
             drive = partition.translate(None, digits)
-            if drive not in drives:
-                identifier = drive.replace('/dev/', '')
-                if client.run('cat /sys/block/{0}/device/type'.format(identifier)).strip() == '0' \
-                        and client.run('cat /sys/block/{0}/removable'.format(identifier)).strip() == '0':
-                    ssd_output = ''
-                    try:
-                        ssd_output = client.run("/usr/bin/lsscsi | grep 'FUSIONIO' | grep {0}".format(drive)).strip()
-                    except:
-                        pass
-                    try:
-                        ssd_output += str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State'".format(drive)).strip())
-                    except:
-                        pass
-                    drives[drive] = {'ssd': ('Solid State' in ssd_output or 'FUSIONIO' in ssd_output),
-                                     'partitions': []}
-            if drive in drives:
+            if '/dev/sd' in drive:
+                if drive not in drives:
+                    identifier = drive.replace('/dev/', '')
+                    if client.run('cat /sys/block/{0}/device/type'.format(identifier)).strip() == '0' \
+                            and client.run('cat /sys/block/{0}/removable'.format(identifier)).strip() == '0':
+                        ssd_output = ''
+                        try:
+                            ssd_output = client.run("/usr/bin/lsscsi | grep 'FUSIONIO' | grep {0}".format(drive)).strip()
+                        except:
+                            pass
+                        try:
+                            ssd_output += str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State'".format(drive)).strip())
+                        except:
+                            pass
+                        drives[drive] = {'ssd': ('Solid State' in ssd_output or 'FUSIONIO' in ssd_output),
+                                         'partitions': []}
+                if drive in drives:
+                    drives[drive]['partitions'].append(partition)
+            else:
+                if drive not in drives:
+                    drives[drive] = {'ssd': True, 'partitions': []}
                 drives[drive]['partitions'].append(partition)
-        # Scan for fusionIO drives
-        drive_lines = client.run("ls -l /dev/fio* | sed 's/\s\s*/ /g' | cut -d ' ' -f 10").split('\n')
-        for drive in drive_lines:
-            partition = drive.strip()
-            if partition == '':
-                continue
-            drive = partition.translate(None, digits)
-            if drive not in drives:
-                drives[drive] = {'ssd': True, 'partitions': []}
-            drives[drive]['partitions'].append(partition)
         mounted = [device.strip() for device in client.run("mount | cut -d ' ' -f 1").strip().split('\n')]
         root_partition = client.run("mount | grep 'on / ' | cut -d ' ' -f 1").strip()
         # Start preparing partitions
