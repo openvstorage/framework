@@ -63,7 +63,7 @@ class Sdk(object):
         self._ssh_client = None
         print 'Init complete'
 
-    def _connect(self):
+    def _connect(self, attempt = 0):
         # Host always comes as ip so we need to ssh-copy-id our own key to ourself
         # @TODO: get local ips
         if self._conn:
@@ -78,7 +78,7 @@ class Sdk(object):
             print(str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
-                self._connect()
+                self._connect(attempt + 1)
             else:
                 raise
         return True
