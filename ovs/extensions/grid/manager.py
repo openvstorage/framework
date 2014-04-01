@@ -1225,7 +1225,7 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
 
         # Quality mapping
         # Tese mappings were ['unstable', 'default'] and ['default', 'default'] before
-        quality_mapping = {'unstable': ['stable', 'stable', '1.0.2'],
+        quality_mapping = {'unstable': ['stable', 'stable', '1.0.3'],
                            'test': ['stable', 'stable', '1.0.2'],
                            'stable': ['stable', 'stable', '1.0.2']}
 
