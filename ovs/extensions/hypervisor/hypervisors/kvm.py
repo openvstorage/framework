@@ -36,13 +36,13 @@ class KVM(Hypervisor):
         """
         Internal method to initialize the sdk connection
         """
-        return self.sdk._connect()
+        return self.sdk.connect()
 
     def _disconnect(self):
         """
         Internal method to clean up the sdk connection
         """
-        return self.sdk._disconnect()
+        return self.sdk.disconnect()
 
     @Hypervisor.connected
     def get_state(self, vmid):

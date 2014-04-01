@@ -46,9 +46,9 @@ class Hypervisor(object):
                 self._connect()
                 self._connected = True
             try:
-                result = function(self, *args, **kwargs)
+                return function(self, *args, **kwargs)
             finally:
-                #always disconnect, we don't care about the exception
+                # Always disconnect, we don't care about the exception
                 self._disconnect()
                 self._connected = False
 
