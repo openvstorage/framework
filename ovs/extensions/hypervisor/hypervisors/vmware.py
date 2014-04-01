@@ -42,6 +42,12 @@ class VMware(Hypervisor):
         """
         return True
 
+    def _disconnect(self):
+        """
+        Dummy connect implementation, SDK handles connection internally
+        """
+        return True
+
     @Hypervisor.connected
     def get_state(self, vmid):
         """

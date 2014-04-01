@@ -34,9 +34,15 @@ class KVM(Hypervisor):
 
     def _connect(self):
         """
-        Dummy connect implementation, SDK handles connection internally
+        Internal method to initialize the sdk connection
         """
-        return True
+        return self.sdk._connect()
+
+    def _disconnect(self):
+        """
+        Internal method to clean up the sdk connection
+        """
+        return self.sdk._disconnect()
 
     @Hypervisor.connected
     def get_state(self, vmid):

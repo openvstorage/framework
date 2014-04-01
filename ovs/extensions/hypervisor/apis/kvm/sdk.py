@@ -61,12 +61,13 @@ class Sdk(object):
         self.login = login
         self._conn = None
         self._ssh_client = None
-        self._reconnect()
         print 'Init complete'
 
-    def _reconnect(self, attempt=0):
+    def _connect(self):
         # Host always comes as ip so we need to ssh-copy-id our own key to ourself
         # @TODO: get local ips
+        if self._conn:
+            self._disconnect() #clean up existing conn
         print('init conn', self.host, self.login, os.getgid(), os.getuid())
         try:
             if self.host == 'localhost':  # Or host in (localips...):
@@ -80,6 +81,18 @@ class Sdk(object):
                 self._reconnect(attempt + 1)
             else:
                 raise
+        return True
+
+    def _disconnect(self):
+        print('disconnecting libvirt')
+        if self._conn:
+            try:
+                self._conn.close()
+            except self.libvirt.libvirtError as le:
+                print(str(le), le.get_error_code()) #ignore error, connection might be already closed
+
+        self._conn = None
+        return True
 
     @staticmethod
     def _get_disks(vm_object):

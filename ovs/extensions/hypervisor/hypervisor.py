@@ -45,11 +45,24 @@ class Hypervisor(object):
             if not self._connected:
                 self._connect()
                 self._connected = True
-            return function(self, *args, **kwargs)
+            try:
+                result = function(self, *args, **kwargs)
+            finally:
+                #always disconnect, we don't care about the exception
+                self._disconnect()
+                self._connected = False
+
         return new_function
 
     @abc.abstractmethod
     def _connect(self):
+        """
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def _disconnect(self):
         """
         Abstract method
         """
