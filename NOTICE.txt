@@ -1,0 +1,5 @@
+Open vStorage
+Copyright [2013-2014] CloudFounders NV
+
+This product includes software developed at
+CloudFounders NV (http://www.cloudfounders.com/).
