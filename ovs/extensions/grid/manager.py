@@ -1226,8 +1226,8 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
         # Quality mapping
         # Tese mappings were ['unstable', 'default'] and ['default', 'default'] before
         quality_mapping = {'unstable': ['stable', 'stable', '1.0.2'],
-                           'test': ['stable', 'stable', '1.0.1'],
-                           'stable': ['stable', 'stable', '1.0.1']}
+                           'test': ['stable', 'stable', '1.0.2'],
+                           'stable': ['stable', 'stable', '1.0.2']}
 
         if not is_local:
             if os.path.exists('/opt/jumpscale/cfg/jpackages/sources.cfg'):
