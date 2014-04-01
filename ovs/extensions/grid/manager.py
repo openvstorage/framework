@@ -405,7 +405,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
             # Join rabbitMQ clusters
             client = Client.load(ip)
-            client.run('rabbitmqctl set_policy ha-all "volumerouter" \'{"ha-mode":"all"}\'')
             client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
             if not is_local:
                 # Copy rabbitmq cookie
@@ -549,6 +548,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in extra_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
+
+        # Enable HA for the rabbitMQ queues
+        client = Client.load(ip)
+        client.run('rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
         # Make sure the process manager is started
         client = Client.load(ip)
