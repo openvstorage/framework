@@ -78,7 +78,7 @@ class Sdk(object):
             print(str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
-                self._reconnect(attempt + 1)
+                self._connect()
             else:
                 raise
         return True
@@ -239,7 +239,7 @@ class Sdk(object):
         except self.libvirt.libvirtError as le:
             print(str(le))
             try:
-                self._reconnect()
+                self._connect()
                 return getattr(self._conn, func)(vmid)
             except self.libvirt.libvirtError as le:
                 print(str(le))
@@ -318,7 +318,7 @@ class Sdk(object):
         except self.libvirt.libvirtError as le:
             print(str(le))
             try:
-                self._reconnect()
+                self._connect()
                 return self.get_vm_object(name).UUIDString()
             except self.libvirt.libvirtError as le:
                 print(str(le))
