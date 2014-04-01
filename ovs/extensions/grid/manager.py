@@ -405,6 +405,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
             # Join rabbitMQ clusters
             client = Client.load(ip)
+            client.run('rabbitmqctl set_policy ha-all "volumerouter" \'{"ha-mode":"all"}\'')
             client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
             if not is_local:
                 # Copy rabbitmq cookie

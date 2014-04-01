@@ -116,8 +116,13 @@ if __name__ == '__main__':
             # We need to keep the process running
             print 'To exit press CTRL+C'
             while True:
-                time.sleep(60)
+                time.sleep(3600)
 
     except KeyboardInterrupt:
         if run_kvm_watcher() and notifier is not None:
             notifier.stop()
+    except Exception as exception:
+        print 'Unexpected exception: {0}'.format(str(exception))
+        if run_kvm_watcher() and notifier is not None:
+            notifier.stop()
+        sys.exit(1)
