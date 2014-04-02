@@ -34,9 +34,15 @@ class KVM(Hypervisor):
 
     def _connect(self):
         """
-        Dummy connect implementation, SDK handles connection internally
+        Internal method to initialize the sdk connection
         """
-        return True
+        return self.sdk.connect()
+
+    def _disconnect(self):
+        """
+        Internal method to clean up the sdk connection
+        """
+        return self.sdk.disconnect()
 
     @Hypervisor.connected
     def get_state(self, vmid):
@@ -77,10 +83,12 @@ class KVM(Hypervisor):
         Gets a list of agnostic vm objects for a given ip and mountpoint
         """
         _ = ip
+        vms = []
         for vm in self.sdk.get_vms():
             config = self.sdk.make_agnostic_config(vm)
             if mountpoint in config['datastores']:
-                yield config
+                vms.append(config)
+        return vms
 
     @Hypervisor.connected
     def is_datastore_available(self, ip, mountpoint):

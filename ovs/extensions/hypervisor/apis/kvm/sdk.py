@@ -19,7 +19,6 @@ This module contains all code for using the KVM libvirt api
 from xml.etree import ElementTree
 from threading import Lock
 import subprocess
-import socket
 import os
 import re
 import time
@@ -61,13 +60,12 @@ class Sdk(object):
         self.login = login
         self._conn = None
         self._ssh_client = None
-        self._reconnect()
         print 'Init complete'
 
-    def _reconnect(self, attempt=0):
-        # Host always comes as ip so we need to ssh-copy-id our own key to ourself
-        # @TODO: get local ips
-        print('init conn', self.host, self.login, os.getgid(), os.getuid())
+    def connect(self, attempt = 0):
+        if self._conn:
+            self.disconnect()  # Clean up existing conn
+        print('Init connection', self.host, self.login, os.getgid(), os.getuid())
         try:
             if self.host == 'localhost':  # Or host in (localips...):
                 self._conn = self.libvirt.open('qemu:///system')  # Only local connection
@@ -77,9 +75,21 @@ class Sdk(object):
             print(str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
-                self._reconnect(attempt + 1)
+                self.connect(attempt + 1)
             else:
                 raise
+        return True
+
+    def disconnect(self):
+        print('Disconnecting libvirt')
+        if self._conn:
+            try:
+                self._conn.close()
+            except self.libvirt.libvirtError as le:
+                print(str(le), le.get_error_code())  # Ignore error, connection might be already closed
+
+        self._conn = None
+        return True
 
     @staticmethod
     def _get_disks(vm_object):
@@ -226,7 +236,7 @@ class Sdk(object):
         except self.libvirt.libvirtError as le:
             print(str(le))
             try:
-                self._reconnect()
+                self.connect()
                 return getattr(self._conn, func)(vmid)
             except self.libvirt.libvirtError as le:
                 print(str(le))
@@ -265,10 +275,7 @@ class Sdk(object):
         create a clone vm
         similar to create_vm_from template (?)
         """
-        source_vm = self.get_vm_object(vmid)
-        # TODO:
-        # copy nics
-        return self.create_vm_from_template(name, source_vm, disks)
+        raise NotImplementedError()
 
     def create_vm_from_template(self, name, source_vm, disks, mountpoint):
         """
@@ -305,7 +312,7 @@ class Sdk(object):
         except self.libvirt.libvirtError as le:
             print(str(le))
             try:
-                self._reconnect()
+                self.connect()
                 return self.get_vm_object(name).UUIDString()
             except self.libvirt.libvirtError as le:
                 print(str(le))
