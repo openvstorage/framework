@@ -542,16 +542,15 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in master_services + extra_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
+            # Enable HA for the rabbitMQ queues
+            client = Client.load(ip)
+            client.run('rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
         else:
             for node in nodes:
                 node_client = Client.load(node)
                 for service in extra_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
-
-        # Enable HA for the rabbitMQ queues
-        client = Client.load(ip)
-        client.run('rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
         # Make sure the process manager is started
         client = Client.load(ip)
