@@ -320,13 +320,14 @@ class Sdk(object):
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
-                   network=('network=default', 'mac=RANDOM', 'model=e1000')):
+                   network=('network=default', 'mac=RANDOM', 'model=e1000'), start = False):
         """
         disks = list of tuples [(disk_name, disk_size_GB, bus ENUM(virtio, ide, sata)]
         #e.g [(/vms/vm1.vmdk,10,virtio), ]
         #when using existing storage, size can be ommited
         #e.g [(/vms/vm1.raw,raw,virtio), ]
         #network: (network name: "default", specific mac or RANDOM, nic model as seen inside vmachine: e1000
+        @param start: should the guest be started after create
         """
         command = 'virt-install'
         options = ['--connect qemu+ssh://{}@{}/system'.format(self.login, self.host),
@@ -352,6 +353,8 @@ class Sdk(object):
         else:
             options.append('--network {}'.format(','.join(network)))
         self.ssh_run('{} {}'.format(command, ' '.join(options)))
+        if start == False:
+            self.ssh_run('virsh destroy {}'.format(name))
 
     def _get_unique_id(self):
         """
