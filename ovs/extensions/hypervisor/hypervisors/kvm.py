@@ -83,10 +83,12 @@ class KVM(Hypervisor):
         Gets a list of agnostic vm objects for a given ip and mountpoint
         """
         _ = ip
+        vms = []
         for vm in self.sdk.get_vms():
             config = self.sdk.make_agnostic_config(vm)
             if mountpoint in config['datastores']:
-                yield config
+                vms.append(config)
+        return vms
 
     @Hypervisor.connected
     def is_datastore_available(self, ip, mountpoint):
