@@ -59,6 +59,22 @@ class Manager(object):
             password = getpass.getpass()
 
         client = Client.load(ip, password, bypass_local=True)
+
+        sshd_config_path = '/etc/ssh/sshd_config'
+        if client.file_exists(sshd_config_path):
+            sshd_config = client.file_read(sshd_config_path)
+            sshd_config = sshd_config.replace('AcceptEnv', '# AcceptEnv')
+            if 'UseDNS no' in sshd_config:
+                pass
+            elif 'UseDNS yes' in sshd_config:
+                sshd_config = sshd_config.replace('UseDNS yes', 'UseDNS no')
+            else:
+                sshd_config += 'UseDNS no\n'
+            client.file_write(sshd_config_path, sshd_config)
+            client.run('service ssh restart')
+
+            client = Client.load(ip, password, bypass_local=True)
+
         client.run('apt-get update')
         client.run('apt-get install lsscsi')
 
