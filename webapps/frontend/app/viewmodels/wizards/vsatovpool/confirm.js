@@ -162,56 +162,45 @@ define([
         });
 
         // Functions
-        self._join = function(vsaGuid, vsrGuid) {
-            return $.Deferred(function(deferred) {
-                api.post('vmachines/' + vsaGuid + '/vsa_to_vpool', { vsr_guid: vsrGuid })
-                    .then(self.shared.tasks.wait)
-                    .done(function() {
-                        deferred.resolve(true);
-                    })
-                    .fail(function() {
-                        generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.vsatovpool.confirm.adding') }));
-                        deferred.resolve(false);
-                    });
-            }).promise();
-        };
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                var calls = [];
+                var vsaGuids = [];
                 $.each(self.validations(), function(vsaGuid, validation) {
                     if (validation.validationState().valid === true) {
-                        calls.push(self._join(vsaGuid, self.vsr().guid()));
+                        vsaGuids.push(vsaGuid);
                     }
                 });
-                generic.alertInfo($.t('ovs:wizards.vsatovpool.confirm.started'), $.t('ovs:wizards.vsatovpool.confirm.inprogress'));
-                deferred.resolve();
-                $.when.apply($, calls)
-                    .done(function() {
-                        var i, args = Array.prototype.slice.call(arguments),
-                            success = 0;
-                        for (i = 0; i < args.length; i += 1) {
-                            success += (args[i] ? 1 : 0);
-                        }
-                        if (success === args.length) {
+                api.post('vpools/' + self.data.vPool().guid() + '/vsas_to_vpool', {
+                    vsr_guid: self.vsr().guid(),
+                    vsa_guids: vsaGuids.join(',')
+                })
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        if (data === true) {
                             generic.alertSuccess(
                                 $.t('ovs:wizards.vsatovpool.confirm.complete'),
                                 $.t('ovs:wizards.vsatovpool.confirm.success')
                             );
-                        } else if (success > 0) {
+                        } else {
                             generic.alert(
                                 $.t('ovs:wizards.vsatovpool.confirm.complete'),
                                 $.t('ovs:wizards.vsatovpool.confirm.somefailed')
                             );
-                        } else if (self.data.amount() > 2) {
-                            generic.alertError(
-                                $.t('ovs:generic.error'),
-                                $.t('ovs:wizards.vsatovpool.confirm.allfailed')
-                            );
                         }
+                    })
+                    .fail(function() {
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:wizards.vsatovpool.confirm.allfailed')
+                        );
+                    })
+                    .always(function() {
                         if (self.data.completed !== undefined) {
                             self.data.completed.resolve(true);
                         }
                     });
+                generic.alertInfo($.t('ovs:wizards.vsatovpool.confirm.started'), $.t('ovs:wizards.vsatovpool.confirm.inprogress'));
+                deferred.resolve();
             }).promise();
         };
 

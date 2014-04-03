@@ -18,6 +18,7 @@ VMachine module
 
 import time
 import logging
+import copy
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -29,6 +30,7 @@ from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.generic.system import Ovs
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.plugin.provider.configuration import Configuration
@@ -582,3 +584,33 @@ class VMachineController(object):
         from ovs.extensions.grid.manager import Manager
 
         Manager.init_vpool(parameters['vsa_ip'], parameters['vpool_name'], parameters=parameters)
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.add_vpools')
+    def add_vpools(vsas, parameters):
+        """
+        Add multiple vPools
+        """
+        success = True
+        for vsa_ip, vsa_machineid in vsas:
+            try:
+                new_parameters = copy.copy(parameters)
+                new_parameters['vsa_ip'] = vsa_ip
+                local_machineid = Ovs.get_my_machine_id()
+                if local_machineid == vsa_machineid:
+                    # Inline execution, since it's on the same node (preventing deadlocks)
+                    VMachineController.add_vpool(new_parameters)
+                else:
+                    # Async execution, since it has to be executed on another node
+                    # @TODO: Will break in Celery 3.2, need to find another solution
+                    # Requirements:
+                    # - This code cannot continue until this new task is completed (as all these VSAs need to be
+                    #   handled sequentially
+                    # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
+                    result = VMachineController.add_vpool.s(new_parameters).apply_async(
+                        routing_key='vsa.{0}'.format(vsa_machineid)
+                    )
+                    result.wait()
+            except:
+                success = False
+        return success
