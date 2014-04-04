@@ -302,11 +302,24 @@ class Sdk(object):
         else:
             raise ValueError('Unexpected object type {} {}'.format(source_vm, type(source_vm)))
 
+        # Get nics of source ram - for now only KVM
+        networks = []
+        for nic in Sdk._get_nics(source_vm):
+            if nic.get('type', None) == 'network':
+                source = nic.get('source', {}).get('network', 'default')
+                model = nic.get('model', {}).get('type', 'e1000')
+                networks.append(('network={0}'.format(source), 'mac=RANDOM', 'model={0}'.format(model)))
+                # MAC is always RANDOM
+
         # Assume disks are raw
         for disk in disks:
             vm_disks.append(('/{}/{}'.format(mountpoint.strip('/'), disk['backingdevice'].strip('/')), 'virtio'))
 
-        self._vm_create(name, vcpus, int(ram), vm_disks)
+        self._vm_create(name = name,
+                        vcpus = vcpus,
+                        ram = int(ram),
+                        disks = vm_disks,
+                        networks = networks)
         try:
             return self.get_vm_object(name).UUIDString()
         except self.libvirt.libvirtError as le:
@@ -320,7 +333,7 @@ class Sdk(object):
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
-                   network=('network=default', 'mac=RANDOM', 'model=e1000'), start = False):
+                   networks=[('network=default', 'mac=RANDOM', 'model=e1000')], start = False):
         """
         disks = list of tuples [(disk_name, disk_size_GB, bus ENUM(virtio, ide, sata)]
         #e.g [(/vms/vm1.vmdk,10,virtio), ]
@@ -348,10 +361,11 @@ class Sdk(object):
             options.append('--os-type {}'.format(os_type))
         if os_variant is not None:
             options.append('-- os-variant {}'.format(os_variant))
-        if network is None:
+        if networks is None or networks == []:
             options.append('--nonetworks')
         else:
-            options.append('--network {}'.format(','.join(network)))
+            for network in networks:
+                options.append('--network {}'.format(','.join(network)))
         self.ssh_run('{} {}'.format(command, ' '.join(options)))
         if start == False:
             self.ssh_run('virsh destroy {}'.format(name))
