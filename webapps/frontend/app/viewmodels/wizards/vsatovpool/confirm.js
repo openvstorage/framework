@@ -172,19 +172,21 @@ define([
         };
 
         // Variables
-        self.data = data;
+        self.data               = data;
+        self._addValidations    = {};
+        self._removeValidations = {};
 
         // Computed
         self.addValidations = ko.computed(function() {
-            var validations = {};
             $.each(self.data.pendingVSAs(), function(index, vsa) {
-                validations[vsa.guid()] = new self.AddValidation(self.vsr, vsa, self.vSRLoading, self.data);
-                validations[vsa.guid()].validate();
+                if (!self._addValidations.hasOwnProperty(vsa.guid())) {
+                    self._addValidations[vsa.guid()] = new self.AddValidation(self.vsr, vsa, self.vSRLoading, self.data);
+                    self._addValidations[vsa.guid()].validate();
+                }
             });
-            return validations;
+            return self._addValidations;
         });
         self.removeValidations = ko.computed(function() {
-            var validations = {};
             $.each(self.data.removingVSAs(), function(index, vsa) {
                 var vsrGuid;
                 $.each(vsa.servedVSRGuids, function(vsrIndex, servedVSRGuid) {
@@ -196,10 +198,12 @@ define([
                         return true;
                     });
                 });
-                validations[vsa.guid()] = new self.RemoveValidation(vsrGuid);
-                validations[vsa.guid()].validate();
+                if (!self._removeValidations.hasOwnProperty(vsa.guid())) {
+                    self._removeValidations[vsa.guid()] = new self.RemoveValidation(vsrGuid);
+                    self._removeValidations[vsa.guid()].validate();
+                }
             });
-            return validations;
+            return self._removeValidations;
         });
         self.canContinue = ko.computed(function() {
             var valid = true, hasValid = false;
