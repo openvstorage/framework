@@ -94,12 +94,29 @@ limitations under the License.
                         <tr>
                             <td data-i18n="ovs:generic.nrofvmachines"></td>
                             <td><span data-bind="text: vMachines().length"></span></td>
-                            <td colspan="2">&nbsp;</td>
+                            <th data-i18n="ovs:generic.usedports" colspan="2"></th>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
+                            <td data-i18n="ovs:generic.xmlrpcport"></td>
+                            <td data-bind="lazylist: { items: VSRs, loadedObservable: 'loaded' }">
+                                <span data-part="entry" data-bind="text: port()"></span>
+                            </td>
+                        </tr>
+                        <tr>
                             <td colspan="2">&nbsp;</td>
+                            <td data-i18n="ovs:generic.focport"></td>
+                            <td data-bind="lazylist: { items: VSRs, loadedObservable: 'loaded' }">
+                                <span data-part="entry" data-bind="text: port() + 1"></span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2">&nbsp;</td>
+                            <td data-i18n="ovs:generic.mgmtport"></td>
+                            <td data-bind="lazylist: { items: VSRs, loadedObservable: 'loaded' }">
+                                <span data-part="entry" data-bind="text: port() - 1"></span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>

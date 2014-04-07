@@ -146,7 +146,11 @@
         "dfs": "DFS",
         "tempfs": "Temporary",
         "mdfs": "Metadata",
-        "management": "Management actions"
+        "management": "Management actions",
+        "usedports": "Used Ports",
+        "xmlrpcport": "XML-RPC",
+        "focport": "FOC",
+        "mgmtport": "Management"
     },
     "vsas": {
         "title": "VSAs",
