@@ -97,9 +97,15 @@ limitations under the License.
     </div>
     <div>
         <ul class="nav nav-tabs">
-            <li class="active"><a href="#vmachines" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vmachines"></a></li>
-            <li><a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a></li>
-            <li><a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a></li>
+            <li class="active" data-bind="tooltip: 'ovs:generic.vmachines'">
+                <a href="#vmachines" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vmachines"></a>
+            </li>
+            <li data-bind="tooltip: 'ovs:generic.vdisks'">
+                <a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a>
+            </li>
+            <li data-bind="tooltip: 'ovs:generic.vmachines'">
+                <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
+            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="vmachines" style="padding: 15px;">

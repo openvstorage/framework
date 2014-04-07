@@ -145,7 +145,8 @@
         "cachefs": "Cache",
         "dfs": "DFS",
         "tempfs": "Temporary",
-        "mdfs": "Metadata"
+        "mdfs": "Metadata",
+        "management": "Management actions"
     },
     "vsas": {
         "title": "VSAs",

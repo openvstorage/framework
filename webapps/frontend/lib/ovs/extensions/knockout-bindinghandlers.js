@@ -141,7 +141,7 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto left',
+                    placement: 'auto top',
                     title: title
                 });
             }
@@ -153,7 +153,7 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto left',
+                    placement: 'auto top',
                     title: title
                 });
             }
