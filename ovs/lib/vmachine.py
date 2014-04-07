@@ -582,16 +582,29 @@ class VMachineController(object):
         Add a vPool to the machine this task is running on
         """
         from ovs.extensions.grid.manager import Manager
-
         Manager.init_vpool(parameters['vsa_ip'], parameters['vpool_name'], parameters=parameters)
 
     @staticmethod
-    @celery.task(name='ovs.vsa.add_vpools')
-    def add_vpools(vsas, parameters):
+    @celery.task(name='ovs.vsa.remove_vsr')
+    def remove_vsr(vsr_guid):
         """
-        Add multiple vPools
+        Removes a VSR (and, if it was the last VSR for a vPool, the vPool is removed as well)
+        """
+        from ovs.extensions.grid.manager import Manager
+
+        Manager.remove_vpool(vsr_guid)
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.update_vsrs')
+    def update_vsrs(vsr_guids, vsas, parameters):
+        """
+        Add/remove multiple vPools
+        @param vsr_guids: VSRs to be removed
+        @param vsas: VSA's on which to add a new link
+        @param parameters: Settings for new links
         """
         success = True
+        # Add VSRs
         for vsa_ip, vsa_machineid in vsas:
             try:
                 new_parameters = copy.copy(parameters)
@@ -611,6 +624,12 @@ class VMachineController(object):
                         routing_key='vsa.{0}'.format(vsa_machineid)
                     )
                     result.wait()
+            except:
+                success = False
+        # Remove VSRs
+        for vsr_guid in vsr_guids:
+            try:
+                VMachineController.remove_vsr(vsr_guid)
             except:
                 success = False
         return success

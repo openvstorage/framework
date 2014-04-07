@@ -64,7 +64,7 @@ def validate(object_type):
                 try:
                     obj = object_type(pk)
                 except ObjectNotFoundException:
-                    raise Http404
+                    raise Http404('Given object not found')
                 return f(self, request=request, obj=obj)
         return new_function
     return wrap

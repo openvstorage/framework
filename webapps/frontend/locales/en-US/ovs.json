@@ -356,21 +356,23 @@
             }
         },
         "vsatovpool": {
-            "title": "Add vPool to VSAs",
+            "title": "Change links between vPool and VSAs",
             "confirm": {
                 "errorvalidating": "Error while validating. Try again.",
                 "validating": "Validating...",
-                "valid": "The vPool can be added to this VSA.",
+                "addvalid": "The vPool can be added to this VSA.",
+                "removevalid": "The vPool can be removed from this VSA.",
                 "noselection": "No VSAs were selected.",
                 "mtptnotavailable": "The location __what__ is not available on this VSA",
                 "ipnotavailable": "The IP __what__ is not available on this VSA",
-                "started": "Adding",
-                "inprogress": "The vPool is being added to the validated VSAs",
-                "adding": "adding the vPool",
-                "complete": "Adding vPool complete",
-                "success": "The vPool was added to the selected VSAs with success",
-                "somefailed": "The vPool was added to some the selected VSAs. Some tasks failed.",
-                "allfailed": "The vPool could not be added to any of the selected VSAs"
+                "started": "Adding/removing",
+                "inprogress": "The vPool is being added to or removed from the validated VSAs",
+                "working": "adding/removing the vPool",
+                "complete": "Add/remove vPool complete",
+                "success": "The vPool was added/removed to the selected VSAs with success",
+                "somefailed": "The vPool was added to or removed from some the selected VSAs. Some tasks failed.",
+                "allfailed": "The vPool could not be added to or removed from any of the selected VSAs",
+                "inuse": "The vPool is in use at this VSA"
             }
         },
         "createft": {

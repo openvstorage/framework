@@ -89,20 +89,28 @@ class VPoolViewSet(viewsets.ViewSet):
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
     @validate(VPool)
-    def vsas_to_vpool(self, request, obj):
+    def update_vsrs(self, request, obj):
         """
-        Adds a vpool to a VSA, given a VSR
+        Update VSRs for a given vPool (both adding and removing VSRs)
         """
-
         vsas = []
         if 'vsa_guids' in request.DATA:
-            for vsa_guid in request.DATA['vsa_guids'].split(','):
-                vsa = VMachine(vsa_guid)
-                if vsa.is_internal is not True:
-                    raise NotAcceptable('vMachine is not a VSA')
-                vsas.append((vsa.ip, vsa.machineid))
+            if request.DATA['vsa_guids'].strip() != '':
+                for vsa_guid in request.DATA['vsa_guids'].strip().split(','):
+                    vsa = VMachine(vsa_guid)
+                    if vsa.is_internal is not True:
+                        raise NotAcceptable('vMachine is not a VSA')
+                    vsas.append((vsa.ip, vsa.machineid))
         if 'vsr_guid' not in request.DATA:
             raise NotAcceptable('No VSR guid passed')
+        vsr_guids = []
+        if 'vsr_guids' in request.DATA:
+            if request.DATA['vsr_guids'].strip() != '':
+                for vsr_guid in request.DATA['vsr_guids'].strip().split(','):
+                    vsr = VolumeStorageRouter(vsr_guid)
+                    if vsr.vpool_guid != obj.guid:
+                        raise NotAcceptable('Given VSR does not belong to this vPool')
+                    vsr_guids.append(vsr.guid)
 
         vsr = VolumeStorageRouter(request.DATA['vsr_guid'])
         parameters = {'vpool_name':          obj.name,
@@ -122,5 +130,5 @@ class VPoolViewSet(viewsets.ViewSet):
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        task = VMachineController.add_vpools.delay(vsas, parameters)
+        task = VMachineController.update_vsrs.delay(vsr_guids, vsas, parameters)
         return Response(task.id, status=status.HTTP_200_OK)

@@ -29,7 +29,8 @@ define([
         self.modal(generic.tryGet(options, 'modal', false));
         self.data.completed = options.completed;
         self.data.vPool(options.vPool);
-        self.data.vSAs(options.vSAs());
+        self.data.pendingVSAs(options.pendingVSAs());
+        self.data.removingVSAs(options.removingVSAs());
         self.steps([new Confirm(self)]);
         self.activateStep();
     };

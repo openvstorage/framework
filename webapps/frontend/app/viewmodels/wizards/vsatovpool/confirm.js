@@ -30,7 +30,44 @@ define([
         self.vsr = ko.observable();
 
         // Objects
-        self.Validation = function(vsr, vsa, vsrDeferred, data) {
+        self.RemoveValidation = function(vsrGuid) {
+            var self = this;
+
+            // Variables
+            self.vsrGuid = vsrGuid;
+
+            // Observables
+            self.loaded = ko.observable(false);
+            self.inUse  = ko.observable(false);
+
+            // Computed
+            self.validationState = ko.computed(function() {
+                var valid = true, reasons = [];
+                if (self.loaded() === false) {
+                    valid = undefined;
+                } else if (self.loaded() === undefined) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.vsatovpool.confirm.errorvalidating'));
+                } else if (self.inUse() === false) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.vsatovpool.confirm.inuse'));
+                }
+                return { valid: valid, reasons: reasons, fields: [] };
+            });
+
+            // Functions
+            self.validate = function() {
+                api.post('volumestoragerouters/' + self.vsrGuid + '/can_be_deleted')
+                    .done(function(data) {
+                        self.loaded(true);
+                        self.inUse(data);
+                    })
+                    .fail(function() {
+                        self.loaded(undefined);
+                    });
+            };
+        };
+        self.AddValidation = function(vsr, vsa, vsrDeferred, data) {
             var self = this;
 
             // Variables
@@ -90,7 +127,7 @@ define([
                         reasons.push($.t('ovs:wizards.vsatovpool.confirm.ipnotavailable', { what: self.vsr().storageIP() }));
                     }
                 }
-                return { valid: valid, reasons: reasons };
+                return { valid: valid, reasons: reasons, fields: fields };
             });
 
             // Functions
@@ -138,17 +175,45 @@ define([
         self.data = data;
 
         // Computed
-        self.validations = ko.computed(function() {
+        self.addValidations = ko.computed(function() {
             var validations = {};
-            $.each(self.data.vSAs(), function(index, vsa) {
-                validations[vsa.guid()] = new self.Validation(self.vsr, vsa, self.vSRLoading, self.data);
+            $.each(self.data.pendingVSAs(), function(index, vsa) {
+                validations[vsa.guid()] = new self.AddValidation(self.vsr, vsa, self.vSRLoading, self.data);
+                validations[vsa.guid()].validate();
+            });
+            return validations;
+        });
+        self.removeValidations = ko.computed(function() {
+            var validations = {};
+            $.each(self.data.removingVSAs(), function(index, vsa) {
+                var vsrGuid;
+                $.each(vsa.servedVSRGuids, function(vsrIndex, servedVSRGuid) {
+                    $.each(self.data.vPool().vSRGuids(), function(pIndex, pVSRGuid) {
+                        if (pVSRGuid === servedVSRGuid) {
+                            vsrGuid = servedVSRGuid;
+                            return false;
+                        }
+                        return true;
+                    });
+                });
+                validations[vsa.guid()] = new self.RemoveValidation(vsrGuid);
                 validations[vsa.guid()].validate();
             });
             return validations;
         });
         self.canContinue = ko.computed(function() {
             var valid = true, hasValid = false;
-            $.each(self.validations(), function(index, validation) {
+            $.each(self.addValidations(), function(index, validation) {
+                if (validation.validationState().valid === undefined) {
+                    valid = false;
+                    return false;
+                }
+                if (validation.validationState().valid === true) {
+                    hasValid = true;
+                }
+                return true;
+            });
+            $.each(self.removeValidations(), function(index, validation) {
                 if (validation.validationState().valid === undefined) {
                     valid = false;
                     return false;
@@ -164,15 +229,21 @@ define([
         // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                var vsaGuids = [];
-                $.each(self.validations(), function(vsaGuid, validation) {
+                var vsaGuids = [], vsrGuids = [];
+                $.each(self.addValidations(), function(vsaGuid, validation) {
                     if (validation.validationState().valid === true) {
                         vsaGuids.push(vsaGuid);
                     }
                 });
-                api.post('vpools/' + self.data.vPool().guid() + '/vsas_to_vpool', {
+                $.each(self.removeValidations(), function(vsaGuid, validation) {
+                    if (validation.validationState().valid === true) {
+                        vsrGuids.push(validation.vsrGuid);
+                    }
+                });
+                api.post('vpools/' + self.data.vPool().guid() + '/update_vsrs', {
                     vsr_guid: self.vsr().guid(),
-                    vsa_guids: vsaGuids.join(',')
+                    vsa_guids: vsaGuids.join(','),
+                    vsr_guids: vsrGuids.join(',')
                 })
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
@@ -206,16 +277,22 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.vsr(new VolumeStorageRouter(self.data.vPool().vSRGuids()[0]));
-            api.get('volumestoragerouters/' + self.vsr().guid())
-                .done(function(vsrData) {
-                    self.vsr().fillData(vsrData);
-                    self.vSRLoading.resolve();
-                })
-                .fail(self.vSRLoading.reject);
+            self.data.vPool().load('vsrs', { skipDisks: true })
+                .then(function() {
+                    self.vsr(new VolumeStorageRouter(self.data.vPool().vSRGuids()[0]));
+                    api.get('volumestoragerouters/' + self.vsr().guid())
+                        .done(function(vsrData) {
+                            self.vsr().fillData(vsrData);
+                            self.vSRLoading.resolve();
+                        })
+                        .fail(self.vSRLoading.reject);
+                });
             self.refresher.init(function() {
-                $.each(self.data.vSAs(), function(index, vsa) {
-                    self.validations()[vsa.guid()].validate();
+                $.each(self.data.pendingVSAs(), function(index, vsa) {
+                    self.addValidations()[vsa.guid()].validate();
+                });
+                $.each(self.data.removingVSAs(), function(index, vsa) {
+                    self.removeValidations()[vsa.guid()].validate();
                 });
             }, 5000);
             self.refresher.run();

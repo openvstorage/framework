@@ -192,22 +192,34 @@ limitations under the License.
                                 <span class="fa fa-spin" data-bind="visible: !$root.vSAsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
                                 <div data-bind="foreach: $root.vSAs">
                                     <div>
-                                        <input type="checkbox" data-bind="attr: { id: 'vsa_' + guid() }, checkedValue: guid(),
-                                                                          checked: $root.checkedVSAGuids,
-                                                                          disable: $parent.backendType() === 'LOCAL' || $.inArray(guid(), $parent.servingVSAGuids()) !== -1"
-                                                style="vertical-align: text-bottom;">
-                                        <label data-bind="attr: { for: 'vsa_' + guid() }" style="font-weight: normal; margin-left: 7px;">
-                                            <span data-bind="text: name"></span>
-                                        </label>
+                                        <span class="alert" data-bind="css: {
+                                                                           'alert-danger': $.inArray(guid(), $parent.servingVSAGuids()) !== -1 && $.inArray(guid(), $root.checkedVSAGuids()) === -1,
+                                                                           'alert-success': $.inArray(guid(), $parent.servingVSAGuids()) === -1 && $.inArray(guid(), $root.checkedVSAGuids()) !== -1
+                                                                       }"
+                                              style="padding: 2px 5px 3px 5px;">
+                                            <input type="checkbox" data-bind="attr: { id: 'vsa_' + guid() }, checkedValue: guid(),
+                                                                              checked: $root.checkedVSAGuids,
+                                                                              disable: $parent.backendType() === 'LOCAL'"
+                                                    style="vertical-align: text-bottom;">
+                                            <label data-bind="attr: { for: 'vsa_' + guid() }" style="font-weight: normal; margin-left: 7px;">
+                                                <span data-bind="text: name"></span>
+                                            </label>
+                                            <span data-bind="visible: $.inArray(guid(), $parent.servingVSAGuids()) !== -1 && $.inArray(guid(), $root.checkedVSAGuids()) === -1"
+                                                  class="fa" data-i18n="[html]ovs:icons.delete" style="margin-left: 7px;"></span>
+                                            <span data-bind="visible: $.inArray(guid(), $parent.servingVSAGuids()) === -1 && $.inArray(guid(), $root.checkedVSAGuids()) !== -1"
+                                                  class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: 7px;"></span>
+                                        </span>
                                         <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin-left: 10px;"
-                                              data-bind="visible: $root.addingVSAs() && $.inArray(guid(), $root.checkedVSAGuids()) !== -1 &&
-                                                                  $parent.backendType() !== 'LOCAL' && $.inArray(guid(), $parent.servingVSAGuids()) === -1" ></span>
+                                              data-bind="visible: $root.updatingVSAs() && $parent.backendType() !== 'LOCAL' && (
+                                                             ($.inArray(guid(), $root.checkedVSAGuids()) !== -1 && $.inArray(guid(), $parent.servingVSAGuids()) === -1) ||
+                                                             ($.inArray(guid(), $root.checkedVSAGuids()) === -1 && $.inArray(guid(), $parent.servingVSAGuids()) !== -1)
+                                                         )" ></span>
                                     </div>
                                 </div>
                                 <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
                                 <button class="btn btn-default" data-bind="click: $root.updateVSAServing,
-                                                                           enable: $root.pendingVSAs().length > 0
+                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0,
                                                                            visible: backendType() !== 'LOCAL'"
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vpools.detail.updateserving"></span>

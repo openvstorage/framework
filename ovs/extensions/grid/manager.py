@@ -949,6 +949,123 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 node_client.run('jsprocess start -n {0}'.format(service))
 
     @staticmethod
+    def remove_vpool(vsr_guid):
+        """
+        Removes a VSA-vPool link (VSR). If it's the last VSR for the vPool, the vPool will be completely removed
+        """
+        from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
+        from ovs.dal.lists.vmachinelist import VMachineList
+        from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+
+        # Get objects & Make some checks
+        vsr = VolumeStorageRouter(vsr_guid)
+        vmachine = vsr.serving_vmachine
+        pmachine = vmachine.pmachine
+        vmachines = VMachineList.get_customer_vmachines()
+        pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
+        vpool = vsr.vpool
+        if pmachine.guid in pmachine_guids:
+            raise RuntimeError('There are still vMachines served from the given VSR')
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == vsr.vsrid):
+            raise RuntimeError('There are still vDisks served from the given VSR')
+
+        services = ['volumedriver_{0}'.format(vpool.name),
+                    'failovercache_{0}'.format(vpool.name)]
+        vsrs_left = False
+        ip = vmachine.ip
+
+        # Stop services
+        for current_vsr in vpool.vsrs:
+            if current_vsr.guid != vsr_guid:
+                vsrs_left = True
+            client = Client.load(current_vsr.serving_vmachine.ip)
+            for service in services:
+                client.run('jsprocess disable -n {0}'.format(service))
+                client.run('jsprocess stop -n {0}'.format(service))
+
+        # Unexporting vPool (VMware) and deleting KVM pool
+        client = Client.load(ip)
+        nfs_script = """
+from ovs.extensions.fs.exportfs import Nfsexports
+Nfsexports().remove('{0}')""".format('/mnt/{0}'.format(vpool.name))
+        Manager._exec_python(client, nfs_script)
+        client.run('service nfs-kernel-server restart')
+        if pmachine.hvtype == 'KVM':
+            if vpool.name in client.run('virsh pool-list'):
+                client.run('virsh pool-destroy {0}'.format(vpool.name))
+            client.run('virsh pool-undefine {0}'.format(vpool.name))
+
+        # Remove services
+        client = Client.load(ip)
+        service_script = """
+from ovs.plugin.provider.service import Service
+Service.remove_service(domain='openvstorage', name='{1}{0}')
+Service.remove_service(domain='openvstorage', name='{2}{0}')""".format(
+            vpool.name, 'volumedriver_', 'failovercache_'
+        )
+        Manager._exec_python(client, service_script)
+
+        if vpool.backend_type == 'CEPH_S3':
+            client = Client.load(ip)
+            fstab_script_add = """
+from ovs.extensions.fs.fstab import Fstab
+fstab = Fstab()
+fstab.remove_config_by_directory('{0}')
+"""
+            fstab_script = fstab_script_add.format(vsr.mountpoint_dfs)
+            Manager._exec_python(client, fstab_script)
+            if client.file_exists(vsr.mountpoint_dfs):
+                client.run('umount {0}'.format(vsr.mountpoint_dfs), pty=False)
+                client.run('rm -rf {0}'.format(vsr.mountpoint_dfs))
+
+        # Reconfigure volumedriver
+        if vsrs_left:
+            voldrv_arakoon_cluster_id = str(Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid'))
+            voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+            voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+            arakoon_node_configs = []
+            for arakoon_node in voldrv_arakoon_client_config.keys():
+                arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
+                                                              voldrv_arakoon_client_config[arakoon_node][0][0],
+                                                              voldrv_arakoon_client_config[arakoon_node][1]))
+            vrouter_clusterregistry = ClusterRegistry(str(vpool.name), voldrv_arakoon_cluster_id, arakoon_node_configs)
+            node_configs = []
+            for current_vsr in vpool.vsrs:
+                if current_vsr.guid != vsr_guid:
+                    node_configs.append(ClusterNodeConfig(str(current_vsr.vsrid), str(current_vsr.cluster_ip),
+                                                          current_vsr.port - 1, current_vsr.port, current_vsr.port + 1))
+            vrouter_clusterregistry.set_node_configs(node_configs)
+
+        # Remove directories
+        client = Client.load(ip)
+        client.run('rm -rf {}/sco_{}'.format(vsr.mountpoint_cache, vpool.name))
+        client.run('rm -rf {}/foc_{}'.format(vsr.mountpoint_cache, vpool.name))
+        client.run('rm -rf {}/metadata_{}'.format(vsr.mountpoint_md, vpool.name))
+        client.run('rm -rf {}/tlogs_{}'.format(vsr.mountpoint_md, vpool.name))
+
+        # Remove files
+        client = Client.load(ip)
+        client.run('rm -f {}/read_{}'.format(vsr.mountpoint_cache, vpool.name))
+        configuration_dir = Manager._read_remote_config(client, 'ovs.core.cfgdir')
+        client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
+
+        # First model cleanup
+        vsr.delete()
+
+        if vsrs_left:
+            # Restart leftover services
+            for current_vsr in vpool.vsrs:
+                if current_vsr.guid != vsr_guid:
+                    client = Client.load(current_vsr.serving_vmachine.ip)
+                    for service in services:
+                        client.run('jsprocess enable -n {0}'.format(service))
+                        client.run('jsprocess start -n {0}'.format(service))
+        else:
+            # Final model cleanup
+            vpool.delete()
+
+    @staticmethod
     def _check_ceph(client):
         ceph_config_dir = '/etc/ceph'
         if not client.dir_exists(ceph_config_dir):
