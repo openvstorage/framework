@@ -208,6 +208,7 @@ class Manager(object):
         Manager._install_jscore(client, install_branch)
 
         client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
+        client.run("if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 * * * * /usr/sbin/ntpdate pool.ntp.org'; } | crontab -; fi")
 
         # Install Open vStorage
         print 'Installing Open vStorage...'
