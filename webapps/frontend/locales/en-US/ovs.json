@@ -150,7 +150,9 @@
         "usedports": "Used Ports",
         "xmlrpcport": "XML-RPC",
         "focport": "FOC",
-        "mgmtport": "Management"
+        "mgmtport": "Management",
+        "templatehaschildren": "This vTemplate does have children",
+        "clone": "Create clones"
     },
     "vsas": {
         "title": "VSAs",
