@@ -15,8 +15,13 @@
 """
 Volatile mutex module
 """
+
 import time
+
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', 'volatile mutex')
 
 
 class VolatileMutex(object):
@@ -46,10 +51,11 @@ class VolatileMutex(object):
             time.sleep(0.005)
             passed = time.time() - self._start
             if wait is not None and passed > wait:
+                logger.error('Lock for {0} could not be aquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
                 raise RuntimeError('Could not aquire lock %s' % self.key())
         passed = time.time() - self._start
         if passed > 0.025:  # More than 25 ms is a long time to wait!
-            VolatileMutex._log('Waited %s seconds for lock %s' % (passed, self.key()))
+            logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
         self._start = time.time()
         self._has_lock = True
         return True
@@ -62,7 +68,7 @@ class VolatileMutex(object):
             self._volatile.delete(self.key())
             passed = time.time() - self._start
             if passed > 0.25:  # More than 250 ms is a long time to hold a lock
-                VolatileMutex._log('A lock on %s was kept for %s seconds' % (self.key(), passed))
+                logger.warning('A lock on {0} was kept for {1} sec'.format(self.key(), passed))
             self._has_lock = False
 
     def key(self):
@@ -76,10 +82,3 @@ class VolatileMutex(object):
         __del__ hook, releasing the lock
         """
         self.release()
-
-    @staticmethod
-    def _log(entry):
-        """
-        Logs towards a logging endpoint
-        """
-        print entry

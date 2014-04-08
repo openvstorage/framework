@@ -20,6 +20,9 @@ Migration module
 import ConfigParser
 from model import Model
 from brander import Brander
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', name='migrations')
 
 
 class Migration(object):
@@ -41,7 +44,7 @@ class Migration(object):
             version = function(start)
             if version > end:
                 end = version
-            print 'Migrated %s.%s from %s to %s' % (function.__module__, function.__name__, start, end)
+            logger.debug('Migrated %s.%s from %s to %s' % (function.__module__, function.__name__, start, end))
             return end
 
         filename = '/opt/OpenvStorage/config/main.cfg'
@@ -53,7 +56,7 @@ class Migration(object):
 
         new_version = execute(Model.migrate, base_version, new_version)
         new_version = execute(Brander.migrate, base_version, new_version)
-        print 'Migration from %s to %s completed' % (base_version, new_version)
+        logger.debug('Migration from %s to %s completed' % (base_version, new_version))
 
         parser.set('migration', 'version', str(new_version))
 

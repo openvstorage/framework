@@ -15,7 +15,6 @@
 """
 Module for VDiskController
 """
-import logging
 import pickle
 import uuid
 
@@ -31,6 +30,9 @@ from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.lib', name='vdisk')
 
 
 class VDiskController(object):
@@ -65,7 +67,7 @@ class VDiskController(object):
         """
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
         if disk is not None:
-            logging.info('Delete disk {}'.format(disk.name))
+            logger.info('Delete disk {}'.format(disk.name))
             disk.delete()
 
     @staticmethod
@@ -111,9 +113,9 @@ class VDiskController(object):
         volume_new_path = hypervisor.clean_backing_disk_filename(volume_new_path)
         disk = VDiskList.get_vdisk_by_volumeid(volumename)
         if disk:
-            logging.info('Move disk {} from {} to {}'.format(disk.name,
-                                                             volume_old_path,
-                                                             volume_new_path))
+            logger.info('Move disk {} from {} to {}'.format(disk.name,
+                                                            volume_old_path,
+                                                            volume_new_path))
             disk.devicename = volume_new_path
             disk.save()
 
@@ -142,7 +144,7 @@ class VDiskController(object):
         _location = hypervisor.get_backing_disk_path(machinename, devicename)
         _id = '{}'.format(disk.volumeid)
         _snap = '{}'.format(snapshotid)
-        logging.info(_log.format(_snap, disk.name, _location))
+        logger.info(_log.format(_snap, disk.name, _location))
         volumeid = disk.vsr_client.create_clone(_location, _id, _snap)
         new_disk.copy_blueprint(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
@@ -167,7 +169,7 @@ class VDiskController(object):
         @param metadata: dict of metadata
         """
         disk = VDisk(diskguid)
-        logging.info('Create snapshot for disk {}'.format(disk.name))
+        logger.info('Create snapshot for disk {}'.format(disk.name))
         if snapshotid is None:
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
@@ -193,7 +195,7 @@ class VDiskController(object):
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
-        logging.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
+        logger.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
         disk.vsr_client.delete_snapshot(str(disk.volumeid), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])
 
@@ -264,7 +266,7 @@ class VDiskController(object):
         new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
         new_disk.save()
 
-        logging.info('Create disk from template {} to new disk {} to location {}'.format(
+        logger.info('Create disk from template {} to new disk {} to location {}'.format(
             disk.name, new_disk.name, disk_path
         ))
         try:
@@ -272,7 +274,7 @@ class VDiskController(object):
             new_disk.volumeid = volumeid
             new_disk.save()
         except Exception as ex:
-            logging.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
+            logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
             new_disk.delete()
             raise
 

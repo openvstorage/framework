@@ -18,12 +18,15 @@ KVM XML watcher
 
 from ovs.extensions.generic.system import Ovs
 from xml.etree import ElementTree
+from ovs.log.logHandler import LogHandler
 
 import glob
 import pyinotify
 import os
 import re
 import shutil
+
+logger = LogHandler('ovs.extensions', name='xml processor')
 
 
 class Kxp(pyinotify.ProcessEvent):
@@ -70,37 +73,37 @@ class Kxp(pyinotify.ProcessEvent):
 
     def process_IN_CLOSE_WRITE(self, event):
 
-        print 'path: {0} - name: {1} - close after write'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - close after write'.format(event.path, event.name))
 
     def process_IN_CREATE(self, event):
 
-        print 'path: {0} - name: {1} - create'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - create'.format(event.path, event.name))
 
     def process_IN_DELETE(self, event):
 
-        print 'path: {0} - name: {1} - deleted'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
         file_matcher = '/mnt/*/{0}/{1}'.format(Ovs.get_my_machine_id(), event.name)
         for found_file in glob.glob(file_matcher):
             if os.path.exists(found_file) and os.path.isfile(found_file):
                 os.remove(found_file)
-                print 'File on vpool deleted: {0}'.format(found_file)
+                logger.info('File on vpool deleted: {0}'.format(found_file))
 
     def process_IN_MODIFY(self, event):
 
-        print 'path: {0} - name: {1} - modified'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - modified'.format(event.path, event.name))
 
     def process_IN_MOVED_FROM(self, event):
 
-        print 'path: {0} - name: {1} - moved from'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - moved from'.format(event.path, event.name))
 
     def process_IN_MOVED_TO(self, event):
         """
         Trigger to move vm.xml to matching vpool
         """
-        print 'path: {0} - name: {1} - moved to'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - moved to'.format(event.path, event.name))
         vpool_path = '/mnt/' + self.get_vpool_for_vm(event.pathname)
         if vpool_path == '/mnt/':
-            print 'Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname)
+            logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
 
         if os.path.exists(vpool_path):
             machine_id = Ovs.get_my_machine_id()
@@ -114,8 +117,8 @@ class Kxp(pyinotify.ProcessEvent):
         """
         Trigger to cleanup vm on target
         """
-        print 'path: {0} - name: {1} - fs unmounted!'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - fs unmounted!'.format(event.path, event.name))
 
     def process_default(self, event):
 
-        print 'path: {0} - name: {1} - default'.format(event.path, event.name)
+        logger.debug('path: {0} - name: {1} - default'.format(event.path, event.name))

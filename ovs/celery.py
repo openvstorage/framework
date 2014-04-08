@@ -28,7 +28,7 @@ from celery import current_app  # Do not remove, need these in celery_beat.py
 from celery.schedules import crontab
 from celery.signals import task_postrun, worker_process_init
 from ovs.lib.messaging import MessageController
-from ovs.logging.logHandler import LogHandler
+from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
@@ -95,7 +95,7 @@ celery.conf.CELERYBEAT_SCHEDULE = {
     }
 }
 
-loghandler = LogHandler('celery.log')
+loghandler = LogHandler('ovs.celery', name='celery')
 
 
 @task_postrun.connect

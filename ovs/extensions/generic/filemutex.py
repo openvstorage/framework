@@ -20,6 +20,10 @@ import fcntl
 import os
 import stat
 
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', 'file mutex')
+
 
 class FileMutex(object):
     """
@@ -60,6 +64,7 @@ class FileMutex(object):
             while True:
                 passed = time.time() - self._start
                 if passed > wait:
+                    logger.error('Lock for {0} could not be aquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
                     raise RuntimeError('Could not aquire lock %s' % self.key())
                 try:
                     fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -67,7 +72,7 @@ class FileMutex(object):
                 except IOError:
                     time.sleep(0.005)
         if passed > 1:  # More than 1 s is a long time to wait!
-            print 'Waited %s seconds for lock %s' % (passed, self.key())
+            logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
         self._start = time.time()
         self._has_lock = True
         return True
@@ -80,7 +85,7 @@ class FileMutex(object):
             fcntl.flock(self._handle, fcntl.LOCK_UN)
             passed = time.time() - self._start
             if passed > 2.5:  # More than 2.5 s is a long time to hold a lock
-                print 'A lock on %s was kept for %s seconds' % (self.key(), passed)
+                logger.warning('A lock on {0} was kept for {1} sec'.format(self.key(), passed))
             self._has_lock = False
 
     def key(self):

@@ -17,7 +17,6 @@ VMachine module
 """
 
 import time
-import logging
 import copy
 
 from subprocess import check_output
@@ -34,6 +33,9 @@ from ovs.extensions.generic.system import Ovs
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.plugin.provider.configuration import Configuration
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.lib', name='vmachine')
 
 
 class VMachineController(object):
@@ -151,7 +153,7 @@ class VMachineController(object):
                     vsrguid=vsrguid
                 )
                 disks.append(result)
-                print 'disk appended: {0}'.format(result)
+                logger.debug('Disk appended: {0}'.format(result))
         except Exception:
             # @TODO cleanup strategy to be defined
             new_vm.delete()
@@ -387,7 +389,7 @@ class VMachineController(object):
                 message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}'.format(
                     disk.guid, machine.guid
                 )
-                logging.info('Error: {0}'.format(message))
+                logger.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
 
         snapshots = {}
@@ -397,12 +399,12 @@ class VMachineController(object):
                 snapshots[disk.guid] = VDiskController.create_snapshot(diskguid=disk.guid,
                                                                        metadata=metadata)
         except Exception as ex:
-            logging.info('Error snapshotting disk {0}: {1}'.format(disk.name, str(ex)))
+            logger.info('Error snapshotting disk {0}: {1}'.format(disk.name, str(ex)))
             success = False
             for diskguid, snapshotid in snapshots.iteritems():
                 VDiskController.delete_snapshot(diskguid=diskguid,
                                                 snapshotid=snapshotid)
-        logging.info('Create snapshot for vMachine {0}: {1}'.format(
+        logger.info('Create snapshot for vMachine {0}: {1}'.format(
             machine.name, 'Success' if success else 'Failure'
         ))
         machine.invalidate_dynamics(['snapshots'])
@@ -420,7 +422,7 @@ class VMachineController(object):
             if vsrid is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
                 # Only the vmachine was received, so base the sync on hypervisorid and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
-                logging.info('Syncing vMachine (name {})'.format(vmachine.name))
+                logger.info('Syncing vMachine (name {})'.format(vmachine.name))
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
             elif vsrid is not None and vmachine.devicename is not None:
                 # VSR id was given, using the devicename instead (to allow hypervisorid updates
@@ -431,23 +433,23 @@ class VMachineController(object):
                 vmachine.pmachine = pmachine
                 vmachine.save()
 
-                logging.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
-                                                                                   vsr.storage_ip,
-                                                                                   vsr.mountpoint))
+                logger.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
+                                                                                  vsr.storage_ip,
+                                                                                  vsr.mountpoint))
                 vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
                                                                    ip=vsr.storage_ip,
                                                                    mountpoint=vsr.mountpoint)
             else:
                 message = 'Not enough information to sync vmachine'
-                logging.info('Error: {0}'.format(message))
+                logger.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
         except Exception as ex:
-            logging.info('Error while fetching vMachine info: {0}'.format(str(ex)))
+            logger.info('Error while fetching vMachine info: {0}'.format(str(ex)))
             raise
 
         if vm_object is None:
             message = 'Could not retreive hypervisor vmachine object'
-            logging.info('Error: {0}'.format(message))
+            logger.info('Error: {0}'.format(message))
             raise RuntimeError(message)
         else:
             VMachineController.update_vmachine_config(vmachine, vm_object)
@@ -550,11 +552,11 @@ class VMachineController(object):
                     vdisk.vmachine = None
                     vdisk.save()
 
-            logging.info('Updating vMachine finished (name {}, {} vdisks (re)linked)'.format(
+            logger.info('Updating vMachine finished (name {}, {} vdisks (re)linked)'.format(
                 vmachine.name, vdisks_synced
             ))
         except Exception as ex:
-            logging.info('Error during vMachine update: {0}'.format(str(ex)))
+            logger.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
 
     @staticmethod
