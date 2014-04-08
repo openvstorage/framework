@@ -214,6 +214,8 @@ class Manager(object):
         print 'Installing Open vStorage...'
         client.run('apt-get -y -q install python-dev')
         client.run('jpackage_install -n openvstorage -v {0}'.format(ovs_version))
+        client.run('source /opt/OpenvStorage/bin/activate; pip install amqp==1.4.1')
+        client.run('source /opt/OpenvStorage/bin/activate; pip install suds-jurko==0.5')
 
     @staticmethod
     def init_node(ip, join_masters=False):
