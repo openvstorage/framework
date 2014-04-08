@@ -19,6 +19,9 @@ Contains the loghandler module
 import logging
 import logging.handlers
 import ConfigParser
+import pwd
+import grp
+import os
 
 
 class LogHandler(object):
@@ -48,6 +51,12 @@ class LogHandler(object):
             parser.get('logging', 'path'),
             LogHandler.targets[source] if source in LogHandler.targets else parser.get('logging', 'default_file')
         )
+
+        uid = pwd.getpwnam('ovs').pw_uid
+        gid = grp.getgrnam('ovs').gr_gid
+        if not os.path.exists(log_filename):
+            open(log_filename, 'a').close()
+        os.chown(log_filename, uid, gid)
 
         formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [%(name)s] %(message)s')
         max_bytes = parser.getint('logging', 'maxbytes')
