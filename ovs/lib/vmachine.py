@@ -34,6 +34,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler('ovs.lib', name='vmachine')
 
@@ -473,12 +474,17 @@ class VMachineController(object):
             else:
                 vpool = None
             pmachine = PMachineList.get_by_vsrid(vsrid)
-            vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
-            if not vmachine:
-                vmachine = VMachine()
-                vmachine.vpool = vpool
-                vmachine.pmachine = pmachine
-                vmachine.status = 'CREATED'
+            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid))
+            try:
+                mutex.acquire(wait=5)
+                vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
+                if not vmachine:
+                    vmachine = VMachine()
+                    vmachine.vpool = vpool
+                    vmachine.pmachine = pmachine
+                    vmachine.status = 'CREATED'
+            finally:
+                mutex.release()
             vmachine.devicename = name
             vmachine.save()
             if pmachine.hvtype == 'KVM':
