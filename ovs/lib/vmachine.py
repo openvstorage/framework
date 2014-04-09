@@ -483,10 +483,11 @@ class VMachineController(object):
                     vmachine.vpool = vpool
                     vmachine.pmachine = pmachine
                     vmachine.status = 'CREATED'
+                vmachine.devicename = name
+                vmachine.save()
             finally:
                 mutex.release()
-            vmachine.devicename = name
-            vmachine.save()
+
             if pmachine.hvtype == 'KVM':
                 try:
                     VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
