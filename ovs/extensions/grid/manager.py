@@ -51,6 +51,14 @@ class Manager(object):
             print 'Please run this script as root'
             sys.exit(1)
 
+        if Manager._validate_ip(ip) is False:
+            print 'The entered ip address is invalid'
+            sys.exit(1)
+
+        if isinstance(create_extra_filesystems, bool) is False or isinstance(clean, bool) is False:
+            print 'Some arguments contain invalid data'
+            sys.exit(1)
+
         # Load client, local or remote
         is_local = Client.is_local(ip)
         password = None
@@ -237,6 +245,14 @@ class Manager(object):
 
         if ip == '127.0.0.1':
             print 'Do not use 127.0.0.1 as ip address, use the public grid ip instead.'
+            sys.exit(1)
+
+        if Manager._validate_ip(ip) is False:
+            print 'The entered ip address is invalid'
+            sys.exit(1)
+
+        if isinstance(join_masters, bool) is False:
+            print 'Some arguments contain invalid data'
             sys.exit(1)
 
         nodes = Manager._get_cluster_nodes()  # All nodes, including the local and the new one
@@ -597,6 +613,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 
         parameters = {} if parameters is None else parameters
+
+        if Manager._validate_ip(ip) is False:
+            print 'The entered ip address is invalid'
+            sys.exit(1)
+
+        if isinstance(parameters, dict) is False:
+            print 'Some arguments contain invalid data'
+            sys.exit(1)
 
         while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
             print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
@@ -1484,6 +1508,12 @@ blobstorlocal = jpackages_local
         client.run('jpackage_update')
         client.run('jpackage_install -n core')
         print 'Done'
+
+    @staticmethod
+    def _validate_ip(ip):
+        regex = '^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$'
+        match = re.search(regex, ip)
+        return match is not None
 
 
 class Client(object):
