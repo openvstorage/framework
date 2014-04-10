@@ -12,6 +12,11 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+Changes applied by CloudFounders NV
+* Adapted code to use configuration format from OpenvStorage
+* PEP8 code cleanup
+* Remove imports that are incompatible with OpenvStorage - This breaks some methods
 """
 
 import os
@@ -26,6 +31,7 @@ import logging
 
 import Arakoon
 from ovs.extensions.db.arakoon import ArakoonRemoteControl
+from ovs.extensions.db.arakoon.ArakoonExceptions import *
 from configobj import ConfigObj
 
 cfgDir = '/opt/OpenvStorage/config'
@@ -504,7 +510,7 @@ class ArakoonCluster:
         @param nodes List of node names
         @param compressor one of 'bz2', 'snappy', 'none'
         """
-        self._changeTlogCompression(nodes, 'bz2')
+        self._changeTlogCompression(nodes, compressor)
 
     def disableTlogCompression(self, nodes=None):
         """
