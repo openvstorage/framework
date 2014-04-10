@@ -978,6 +978,11 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 node_client.run('jsprocess enable -n {0}'.format(service))
                 node_client.run('jsprocess start -n {0}'.format(service))
 
+        # Fill vPool size
+        vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
+        vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
+        vpool.save()
+
     @staticmethod
     def remove_vpool(vsr_guid):
         """

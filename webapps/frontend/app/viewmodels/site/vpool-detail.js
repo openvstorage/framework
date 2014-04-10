@@ -96,7 +96,7 @@ define([
                 self.vDisksInitialLoad(false);
                 self.vMachinesInitialLoad(false);
                 $.when.apply($, [
-                    vpool.load('vsrs', { skipDisks: true }),
+                    vpool.load('vsrs,_dynamics', { skipDisks: true }),
                     vpool.loadServingVSAs()
                         .then(function() {
                             if (self.checksInit === false) {
