@@ -23,6 +23,7 @@ from ovs.plugin.provider.logger import Logger
 
 
 class EnsureArakoonError(Exception):
+
     def __init__(self, message):
         self.message = message
 
@@ -31,6 +32,7 @@ class EnsureArakoonError(Exception):
 
 
 class EnsureArakoonWorks():
+
     """
     Wait for the following operation to be possible:
     1) Set a value
@@ -144,10 +146,12 @@ class EnsureArakoonWorks():
                 if len(arakoonbudirs) > 0:
                     arakoonbudirs.sort()
                     latesttokeep = arakoonbudirs.pop()
-                    self._speak("Waiting {0} seconds and then removing any extraneous backup directories".format(waitseconds))
+                    self._speak(
+                        "Waiting {0} seconds and then removing any extraneous backup directories".format(waitseconds))
                     time.sleep(waitseconds)
                     for arakoonbudir in arakoonbudirs:
                         shutil.rmtree(arakoonbudir)
-                        self._speak("Arakoon startup backup dir removed: {0}".format(arakoonbudir))
+                        self._speak(
+                            "Arakoon startup backup dir removed: {0}".format(arakoonbudir))
                     self._speak("Kept last backup of {0}".format(latesttokeep))
                 break

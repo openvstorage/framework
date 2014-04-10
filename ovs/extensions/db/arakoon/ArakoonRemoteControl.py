@@ -1,28 +1,24 @@
 """
-This file is part of Arakoon, a distributed key-value store. Copyright
-(C) 2010 Incubaid BVBA
+Copyright (2010-2014) INCUBAID BVBA
 
-Licensees holding a valid Incubaid license may use this file in
-accordance with Incubaid's Arakoon commercial license agreement. For
-more information on how to enter into this agreement, please contact
-Incubaid (contact details can be found on www.arakoon.org/licensing).
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-Alternatively, this file may be redistributed and/or modified under
-the terms of the GNU Affero General Public License version 3, as
-published by the Free Software Foundation. Under this license, this
-file is distributed in the hope that it will be useful, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-See the GNU Affero General Public License for more details.
-You should have received a copy of the
-GNU Affero General Public License along with this program (file "COPYING").
-If not, see <http://www.gnu.org/licenses/>.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 """
+
 import socket
 import logging
 
 import RemoteControlProtocol as RCP
+
 
 def collapse(ip, port, clusterId, n):
     """
@@ -39,7 +35,7 @@ def collapse(ip, port, clusterId, n):
 
     try:
         RCP._prologue(clusterId, s)
-        cmd  = RCP._int_to(RCP._COLLAPSE_TLOGS | RCP._MAGIC)
+        cmd = RCP._int_to(RCP._COLLAPSE_TLOGS | RCP._MAGIC)
         cmd += RCP._int_to(n)
         s.send(cmd)
         RCP.check_error_code(s)
@@ -53,49 +49,74 @@ def collapse(ip, port, clusterId, n):
     finally:
         s.close()
 
+
 def downloadDb(ip, port, clusterId, location):
     s = RCP.make_socket(ip, port)
 
     try:
-        with open(location,'w+b') as db_file:
+        with open(location, 'w+b') as db_file:
             RCP._prologue(clusterId, s)
-            cmd  = RCP._int_to(RCP._DOWNLOAD_DB | RCP._MAGIC)
+            cmd = RCP._int_to(RCP._DOWNLOAD_DB | RCP._MAGIC)
             s.send(cmd)
             RCP.check_error_code(s)
             db_size = RCP._receive_int64(s)
-            while (db_size > 0 ) :
-                chunkSize = min(4*1024, db_size)
+            while (db_size > 0):
+                chunkSize = min(4 * 1024, db_size)
                 chunk = RCP._receive_all(s, chunkSize)
                 db_size -= len(chunk)
                 db_file.write(chunk)
     finally:
         s.close()
 
-def _simple_cmd(ip,port,clusterId, code):
-   s = RCP.make_socket(ip, port)
-   RCP._prologue(clusterId, s)
-   cmd = RCP._int_to(code | RCP._MAGIC)
-   s.send(cmd)
-   RCP.check_error_code(s)
+
+def copyDbToHead(ip, port, clusterId, tlogsToKeep):
+    s = RCP.make_socket(ip, port)
+    try:
+        RCP._prologue(clusterId, s)
+        cmd = RCP._int_to(RCP._COPY_DB_TO_HEAD | RCP._MAGIC)
+        cmd += RCP._int_to(tlogsToKeep)
+        s.send(cmd)
+        RCP.check_error_code(s)
+    finally:
+        s.close()
+
+
+def _simple_cmd(ip, port, clusterId, code):
+    s = RCP.make_socket(ip, port)
+    try:
+        RCP._prologue(clusterId, s)
+        cmd = RCP._int_to(code | RCP._MAGIC)
+        s.send(cmd)
+        RCP.check_error_code(s)
+    finally:
+        s.close()
+
 
 def optimizeDb(ip, port, clusterId):
-    _simple_cmd(ip,port,clusterId, RCP._OPTIMIZE_DB)
+    _simple_cmd(ip, port, clusterId, RCP._OPTIMIZE_DB)
 
-def defragDb(ip,port,clusterId):
-    _simple_cmd(ip,port,clusterId, RCP._DEFRAG_DB)
 
-def dropMaster(ip,port,clusterId):
-    _simple_cmd(ip,port,clusterId, RCP._DROP_MASTER)
+def defragDb(ip, port, clusterId):
+    _simple_cmd(ip, port, clusterId, RCP._DEFRAG_DB)
+
+
+def dropMaster(ip, port, clusterId):
+    _simple_cmd(ip, port, clusterId, RCP._DROP_MASTER)
+
+
+def flushStore(ip, port, clusterId):
+    _simple_cmd(ip, port, clusterId, RCP._FLUSH_STORE)
+
 
 def setInterval(cluster_id, ip, port, pub_start, pub_end, priv_start, priv_end):
-    s = RCP.make_socket(ip,port)
+    s = RCP.make_socket(ip, port)
     try:
         RCP._prologue(cluster_id, s)
-        cmd = RCP._int_to(RCP._COLLAPSE_TLOGS | RCP._MAGIC)
-        cmd += RCP._string_option_to (pub_start)
-        cmd += RCP._string_option_to (pub_end)
-        cmd += RCP._string_option_to (priv_start)
-        cmd += RCP._string_option_to (priv_end)
+        cmd = RCP._int_to(RCP._SET_INTERVAL | RCP._MAGIC)
+        cmd += RCP._string_option_to(pub_start)
+        cmd += RCP._string_option_to(pub_end)
+        cmd += RCP._string_option_to(priv_start)
+        cmd += RCP._string_option_to(priv_end)
         s.send(cmd)
         RCP.check_error_code(s)
     finally:

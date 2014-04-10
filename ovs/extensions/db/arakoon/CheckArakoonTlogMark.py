@@ -28,6 +28,7 @@ ensurearakoonworks = EnsureArakoonWorks()
 
 
 class CheckArakoonError(Exception):
+
     def __init__(self, message):
         self.message = message
 
@@ -36,6 +37,7 @@ class CheckArakoonError(Exception):
 
 
 class CheckArakoonTlogMark():
+
     """
     check if tlogs need marking
     mark tlogs that are unmarked
@@ -80,7 +82,8 @@ class CheckArakoonTlogMark():
         self._marklength = 26  # Including the newline
         self._dumpcount = 0
         self._finalmessage = "Node {0} Good Status"
-        self._stoplockfile = os.path.join(os.sep, 'opt', 'OpenvStorage', '.startupfaillock')
+        self._stoplockfile = os.path.join(
+            os.sep, 'opt', 'OpenvStorage', '.startupfaillock')
 
     def _speak(self, message):
         """ log to standard output """
@@ -108,7 +111,8 @@ class CheckArakoonTlogMark():
         """
 
         extensionstatus = cluster._getStatusOne(localnode)
-        self._speak("Arakoon getStatusOne for Localnode {1}: {0}".format(extensionstatus, localnode))
+        self._speak(
+            "Arakoon getStatusOne for Localnode {1}: {0}".format(extensionstatus, localnode))
         if extensionstatus is True:
             processstatus = Process.checkProcess('arakoon')
             if processstatus:
@@ -134,7 +138,8 @@ class CheckArakoonTlogMark():
             if arakoonstatus:
                 continue
             else:
-                self._speak("Remaining Wait Duration: {0} Seconds".format(duration))
+                self._speak(
+                    "Remaining Wait Duration: {0} Seconds".format(duration))
                 self._wait()
                 arakoonstatus = self._checkarakoonstatus(localnode, cluster)
 
@@ -157,9 +162,11 @@ class CheckArakoonTlogMark():
     def _gettlogdir(self, localnode, cluster):
         """ get tlog dir and return """
 
-        self._localnodesfiles[localnode]['tlogdir'] = cluster.getNodeConfig(localnode)['tlog_dir']
+        self._localnodesfiles[localnode][
+            'tlogdir'] = cluster.getNodeConfig(localnode)['tlog_dir']
         tlogdirmessage = "Tlog directory for {0} is {1}"
-        self._speak(tlogdirmessage.format(localnode, self._localnodesfiles[localnode]['tlogdir']))
+        self._speak(tlogdirmessage.format(
+            localnode, self._localnodesfiles[localnode]['tlogdir']))
 
     def _gettlogfile(self, tlogfilelist, localnode):
         """ get tlogfile and return """
@@ -167,20 +174,24 @@ class CheckArakoonTlogMark():
         tlogfilelist.sort(reverse=True)
         self._localnodesfiles[localnode]['tlogfile'] = tlogfilelist[0]
         tlogfilemessage = "Tlogfile for {0} is {1}"
-        self._speak(tlogfilemessage.format(localnode, self._localnodesfiles[localnode]['tlogfile']))
+        self._speak(tlogfilemessage.format(
+            localnode, self._localnodesfiles[localnode]['tlogfile']))
 
     def _getdbdir(self, localnode, cluster):
         """ get db dir and return """
 
-        self._localnodesfiles[localnode]['dbdir'] = cluster.getNodeConfig(localnode)['home']
+        self._localnodesfiles[localnode][
+            'dbdir'] = cluster.getNodeConfig(localnode)['home']
         dbdirmessage = "Db directory for {0} is {1}"
-        self._speak(dbdirmessage.format(localnode, self._localnodesfiles[localnode]['dbdir']))
+        self._speak(dbdirmessage.format(
+            localnode, self._localnodesfiles[localnode]['dbdir']))
 
     def _truncatetlog(self, localnode, cluster):
         """ truncate possibly corrupted tlog and try dump again """
 
         tlogfile = self._localnodesfiles[localnode]['tlogfile']
-        self._speak("Truncating tlog file {0} for localnode {1}".format(tlogfile, localnode))
+        self._speak(
+            "Truncating tlog file {0} for localnode {1}".format(tlogfile, localnode))
         tlogtruncatecommand = ['arakoon', '--truncate-tlog', tlogfile]
         try:
             subprocess.check_call(tlogtruncatecommand)
@@ -193,7 +204,8 @@ class CheckArakoonTlogMark():
 
         _ = cluster
         tlogfile = self._localnodesfiles[localnode]['tlogfile']
-        self._speak("Dumping tlog file {0} for localnode {1}".format(tlogfile, localnode))
+        self._speak(
+            "Dumping tlog file {0} for localnode {1}".format(tlogfile, localnode))
         tlogdumpcommand = ['arakoon', '--dump-tlog', tlogfile]
         try:
             tlogdump = subprocess.check_output(tlogdumpcommand)
@@ -207,15 +219,18 @@ class CheckArakoonTlogMark():
         displaylength = self._marklength * 4
         tlogdumplength = len(tlogdump)
         tlogdumpsnippet = tlogdump[tlogdumplength - displaylength:]
-        self._speak("Got tlog dump - last {1} chars:\n{0}".format(tlogdumpsnippet, displaylength))
+        self._speak(
+            "Got tlog dump - last {1} chars:\n{0}".format(tlogdumpsnippet, displaylength))
 
         return True
 
     def _marktlogfile(self, localnode, cluster):
         """ mark tlog file for a local localnode """
         tlogfile = self._localnodesfiles[localnode]['tlogfile']
-        self._speak("Marking tlog file {0} for localnode {1}".format(tlogfile, localnode))
-        markcommand = "arakoon --mark-tlog {0} 'closed:{1}'".format(tlogfile, localnode)
+        self._speak(
+            "Marking tlog file {0} for localnode {1}".format(tlogfile, localnode))
+        markcommand = "arakoon --mark-tlog {0} 'closed:{1}'".format(
+            tlogfile, localnode)
         try:
             subprocess.call(markcommand, shell=True)
         except subprocess.CalledProcessError as e:
@@ -242,7 +257,8 @@ class CheckArakoonTlogMark():
             return False
 
         foundmark = tlogdump[(tlogdumplength - self._marklength):]
-        self._speak("Tlog file {0} for localnode {1} has mark {2}".format(tlogfile, localnode, foundmark))
+        self._speak(
+            "Tlog file {0} for localnode {1} has mark {2}".format(tlogfile, localnode, foundmark))
         return True
 
     def _movearakoondb(self, localnode, cluster, headdb=False, failover=False):
@@ -255,7 +271,8 @@ class CheckArakoonTlogMark():
         os.makedirs(budir)
         dbfiles = [f for f in os.listdir(dbdir) if os.path.isfile(f)]
         if dbfiles:
-            self._speak("Moving db files to temporary directory {0}".format(budir))
+            self._speak(
+                "Moving db files to temporary directory {0}".format(budir))
             for dbfile in dbfiles:
                 os.rename(dbfile, budir)
         else:
@@ -264,16 +281,19 @@ class CheckArakoonTlogMark():
         if headdb:
             headdb = os.path.join(tlogdir, 'head.db')
             if os.path.exists(headdb):
-                self._speak("head.db Exists, Moving to replace {0}.db".format(localnode))
+                self._speak(
+                    "head.db Exists, Moving to replace {0}.db".format(localnode))
                 shutil.copy(headdb, nodedb)
-                self._speak("Copied Head db Starting Arakoon Node {0}".format(localnode))
+                self._speak(
+                    "Copied Head db Starting Arakoon Node {0}".format(localnode))
             else:
                 self._speak("head.db Does Not Exist".format(localnode))
 
         if failover:
             tlogfiles = [f for f in os.listdir(tlogdir) if os.path.isfile(f)]
             if tlogfiles:
-                self._speak("Moving tlog files to temporary directory {0}".format(budir))
+                self._speak(
+                    "Moving tlog files to temporary directory {0}".format(budir))
                 for tlogfile in tlogfiles:
                     os.rename(tlogfile, budir)
             else:
@@ -292,16 +312,16 @@ class CheckArakoonTlogMark():
     def _catchuparakoondb(self, localnode, cluster):
         """ run catchup on this local node """
 
-        #self._speak("Waiting for catchup on node {0}".format(localnode))
+        # self._speak("Waiting for catchup on node {0}".format(localnode))
         #
-        #catchup = cluster.catchupOnly(localnode)
+        # catchup = cluster.catchupOnly(localnode)
         #!!! ArakoonCluster instance has no attribute 'catchupOnly'
         #
-        #self._speak("Waiting for catchup to settle")
-        #self._wait(duration=15)
-        #if catchup:
+        # self._speak("Waiting for catchup to settle")
+        # self._wait(duration=15)
+        # if catchup:
         #    return False
-        #else:
+        # else:
         return True
 
     def _failover(self, localnode, cluster):
@@ -319,7 +339,8 @@ class CheckArakoonTlogMark():
             self._speak(failmessage.format(localnode))
             return False
 
-        self._speak("Cluster Failover: Starting Arakoon Node {0}".format(localnode))
+        self._speak(
+            "Cluster Failover: Starting Arakoon Node {0}".format(localnode))
         status = self._startreturnstatus(localnode, cluster)
         if status:
             ensurearakoonworks.runtest()
@@ -343,16 +364,19 @@ class CheckArakoonTlogMark():
             if not self._marktlogfile(localnode, cluster):
                 self._truncatetlog(localnode, cluster)
                 if not self._dumptlog(localnode, cluster):
-                    self._speak("Dumping tlog {0} failed during mark even after truncate".format(tlogfile))
+                    self._speak(
+                        "Dumping tlog {0} failed during mark even after truncate".format(tlogfile))
                     if not self._marktlogfile(localnode, cluster):
-                        self._speak("Marking tlog {0} failed even after truncate".format(tlogfile))
+                        self._speak(
+                            "Marking tlog {0} failed even after truncate".format(tlogfile))
                         if not self._failover(localnode, cluster):
                             failednode.append(localnode)
             if not self._dumptlog(localnode, cluster):
                 if not self._failover(localnode, cluster):
                     failednode.append(localnode)
             elif not self._checkmark(localnode, cluster):
-                self._speak("Tlog {0} failed even after marking".format(tlogfile))
+                self._speak(
+                    "Tlog {0} failed even after marking".format(tlogfile))
                 if not self._failover(localnode, cluster):
                     failednode.append(localnode)
 
@@ -373,7 +397,8 @@ class CheckArakoonTlogMark():
 
             self._movearakoondb(localnode, cluster)
 
-            self._speak("Tlog Replay: Catching up on Arakoon Node {0}".format(localnode))
+            self._speak(
+                "Tlog Replay: Catching up on Arakoon Node {0}".format(localnode))
             catchup = self._catchuparakoondb(localnode, cluster)
             if catchup:
                 self._managetlog(localnode, cluster)
@@ -382,7 +407,8 @@ class CheckArakoonTlogMark():
                     failednode.append(localnode)
                     return failednode
 
-            self._speak("Tlog Replay: Starting Arakoon Node {0}".format(localnode))
+            self._speak(
+                "Tlog Replay: Starting Arakoon Node {0}".format(localnode))
             status = self._startreturnstatus(localnode, cluster)
             if status:
                 self._speak("Tlog Replay: " + finalmessage.format(localnode))
@@ -402,6 +428,7 @@ class CheckArakoonTlogMark():
                     if not self._failover(localnode, cluster):
                         failednode.append(localnode)
                         return failednode
+
     def checksetmarkedtlog(self):
         """
         retrieve information about arakoon and check all tlogs for marking
@@ -415,7 +442,8 @@ class CheckArakoonTlogMark():
         failednodesset = set(failednodes)
         if failednodesset:
             self._lockfile()
-            raise CheckArakoonError("Starting Arakoon Failed on these Nodes:\n * {0}".format("\n * ".join(failednodesset)))
+            raise CheckArakoonError(
+                "Starting Arakoon Failed on these Nodes:\n * {0}".format("\n * ".join(failednodesset)))
 
     def fixtlogs(self, clustername):
         """
@@ -437,16 +465,19 @@ class CheckArakoonTlogMark():
             cluster = self._localnodesfiles[localnode]['cluster']
             initstatus = self._checkarakoonstatus(localnode, cluster)
             if initstatus:
-                self._speak("{0} already running, not checking for marked tlog".format(localnode))
+                self._speak(
+                    "{0} already running, not checking for marked tlog".format(localnode))
                 continue
             else:
                 self._gettlogdir(localnode, cluster)
                 self._getdbdir(localnode, cluster)
                 tlogdir = self._localnodesfiles[localnode]['tlogdir']
-                self._speak("Localnode {1}, Tlogdir: {0}".format(tlogdir, localnode))
+                self._speak(
+                    "Localnode {1}, Tlogdir: {0}".format(tlogdir, localnode))
                 # there can be many .tlog files for each localnode
                 # but only the last one is relevant for checking
-                tlogfilelist = [os.path.join(tlogdir, f) for f in os.listdir(tlogdir) if os.path.isfile(os.path.join(tlogdir,f)) and f.endswith('.tlog')]
+                tlogfilelist = [os.path.join(tlogdir, f)
+                                for f in os.listdir(tlogdir) if os.path.isfile(os.path.join(tlogdir, f)) and f.endswith('.tlog')]
                 if not tlogfilelist:
                     failmessage = "Tlogs are missing - now attempting failover"
                     self._speak(failmessage)
