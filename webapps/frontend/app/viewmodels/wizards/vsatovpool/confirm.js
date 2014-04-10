@@ -80,7 +80,6 @@ define([
             // Observables
             self.loaded      = ko.observable(false);
             self.vRouterPort = ko.observable();
-            self.files       = ko.observable();
             self.vsrs        = ko.observableArray([]);
             self.mountpoints = ko.observableArray([]);
             self.ipAddresses = ko.observableArray([]);
@@ -127,13 +126,6 @@ define([
                         fields.push('ip');
                         reasons.push($.t('ovs:wizards.vsatovpool.confirm.ipnotavailable', { what: self.vsr().storageIP() }));
                     }
-                    if (self.data.vPool().backendType() === 'CEPH_S3' && self.files() !== undefined && (
-                            (self.files().hasOwnProperty('/etc/ceph/ceph.conf') && !self.files()['/etc/ceph/ceph.conf']) ||
-                            (self.files().hasOwnProperty('/etc/ceph/ceph.keyring') && !self.files()['/etc/ceph/ceph.keyring']))) {
-                        valid = false;
-                        fields.push('ceph_files');
-                        reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.cephfilesmissing'));
-                    }
                 }
                 return { valid: valid, reasons: reasons, fields: fields };
             });
@@ -142,17 +134,12 @@ define([
             self.validate = function() {
                 var calls = [
                     $.Deferred(function(physicalDeferred) {
-                        var post_data = {};
-                        if (self.data.vPool().backendType() === 'CEPH_S3') {
-                            post_data.files = '/etc/ceph/ceph.conf,/etc/ceph/ceph.keyring';
-                        }
-                        api.post('vmachines/' + self.vsa.guid() + '/get_physical_metadata', post_data)
+                        api.post('vmachines/' + self.vsa.guid() + '/get_physical_metadata')
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
                                 self.ipAddresses(data.ipaddresses);
                                 self.vRouterPort(data.xmlrpcport);
-                                self.files(data.files);
                             })
                             .done(physicalDeferred.resolve)
                             .fail(physicalDeferred.reject);
