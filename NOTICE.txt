@@ -18,9 +18,6 @@ INCLUDED AND/OR USED SOFTWARE
         Copyright (c) 2009, 2010, 2011, 2012 Ask Solem, and individual contributors. All Rights Reserved.
         Copyright (c) 2012-2013 GoPivotal, Inc. All rights reserved.
 
-    Celery Flower               BSD 3
-        Copyright (c) 2012, Mher Movsisyan and individual contributors. All rights reserved.
-
     Gevent/Gunicorn             MIT
         Except when otherwise stated (look at the beginning of each file) the software
         and the documentation in this project are copyrighted by:

@@ -341,7 +341,7 @@ class Manager(object):
         clusters = arakoon_management.listClusters()
 
         model_services = ['arakoon_ovsdb', 'memcached', 'arakoon_voldrv']
-        master_services = ['rabbitmq', 'ovs_flower', 'ovs_scheduled_tasks']
+        master_services = ['rabbitmq', 'ovs_scheduled_tasks']
         extra_services = ['webapp_api', 'nginx', 'ovs_workers', 'ovs_consumer_volumerouter']
         all_services = model_services + master_services + extra_services
         arakoon_clientconfigfiles = [ARAKOON_CLIENTCONFIG_TAG.format(cluster) for cluster in clusters]
