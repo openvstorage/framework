@@ -18,6 +18,7 @@ VMachine module
 
 import time
 import copy
+import os
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -568,7 +569,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.vsa.get_physical_metadata')
-    def get_physical_metadata():
+    def get_physical_metadata(files):
         """
         Gets physical information about the machine this task is running on
         """
@@ -580,9 +581,13 @@ class VMachineController(object):
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
         ipaddresses = [ip.strip() for ip in ipaddresses]
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
+        file_existence = {}
+        for check_file in files:
+            file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
-                'xmlrpcport': xmlrpcport}
+                'xmlrpcport': xmlrpcport,
+                'files': file_existence}
 
     @staticmethod
     @celery.task(name='ovs.vsa.add_vpool')

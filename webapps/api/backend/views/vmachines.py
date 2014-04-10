@@ -300,7 +300,7 @@ class VMachineViewSet(viewsets.ViewSet):
                 actions.append('MOVE_AWAY')
         return Response(actions, status=status.HTTP_200_OK)
 
-    @link()
+    @action()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
     @validate(VMachine)
@@ -308,11 +308,16 @@ class VMachineViewSet(viewsets.ViewSet):
         """
         Returns a list of mountpoints on the given VSA
         """
-        _ = request
         if not obj.is_internal:
             raise NotAcceptable('vMachine is not a VSA')
 
-        task = VMachineController.get_physical_metadata.s().apply_async(routing_key='vsa.{0}'.format(obj.machineid))
+        files = []
+        if 'files' in request.DATA:
+            files = request.DATA['files'].strip().split(',')
+
+        task = VMachineController.get_physical_metadata.s(files).apply_async(
+            routing_key='vsa.{0}'.format(obj.machineid)
+        )
         return Response(task.id, status=status.HTTP_200_OK)
 
     @action()

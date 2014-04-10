@@ -348,7 +348,8 @@
                 "portsinuse": "Ports in use:",
                 "dfsexclusive": "The DFS mountpoint must have exclusive use",
                 "dfsnotshared": "The DFS mountpoint should not be shared between vPools",
-                "portinuse": "The given port is already in use"
+                "portinuse": "The given port is already in use",
+                "cephfilesmissing": "One or more of the required ceph files are missing (/etc/ceph/ceph.conf and/or /etc/ceph/ceph.keyring)"
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
@@ -358,8 +359,7 @@
                 "started": "Creation started",
                 "inprogress": "Creation of vPool __what__ is started.",
                 "creating": "creating the vPool",
-                "success": "Creation of vPool __what__ finished.",
-                "ceph": "Make sure the Ceph configuration files are installed on selected VSA:<ul><li>CEPH_SERVER:/etc/ceph/ceph.conf -&gt; /etc/ceph/ceph.conf</li><li>CEPH_SERVER:/etc/ceph/ceph.client.admin.keyring -&gt; /etc/ceph/ceph.keyring</li></ul>"
+                "success": "Creation of vPool __what__ finished."
             }
         },
         "vsatovpool": {

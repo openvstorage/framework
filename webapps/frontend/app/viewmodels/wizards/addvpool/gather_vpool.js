@@ -58,12 +58,17 @@ define([
                 var calls = [
                     $.Deferred(function(mtptDeferred) {
                         generic.xhrAbort(self.loadVSAHandle);
-                        self.loadVSAHandle = api.get('vmachines/' + self.data.target().guid() + '/get_physical_metadata')
+                        var post_data = {};
+                        if (self.data.backend() === 'CEPH_S3') {
+                            post_data.files = '/etc/ceph/ceph.conf,/etc/ceph/ceph.keyring';
+                        }
+                        self.loadVSAHandle = api.post('vmachines/' + self.data.target().guid() + '/get_physical_metadata', post_data)
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
                                 self.data.ipAddresses(data.ipaddresses);
                                 self.data.vRouterPort(data.xmlrpcport);
+                                self.data.files(data.files);
                             })
                             .done(function() {
                                 mtptDeferred.resolve();

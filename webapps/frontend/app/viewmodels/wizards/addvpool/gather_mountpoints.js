@@ -89,6 +89,13 @@ define([
                 fields.push('dfs');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.dfsnotshared'));
             }
+            if (self.data.backend() === 'CEPH_S3' && self.data.files() !== undefined && (
+                    (self.data.files().hasOwnProperty('/etc/ceph/ceph.conf') && !self.data.files()['/etc/ceph/ceph.conf']) ||
+                    (self.data.files().hasOwnProperty('/etc/ceph/ceph.keyring') && !self.data.files()['/etc/ceph/ceph.keyring']))) {
+                valid = false;
+                fields.push('ceph_files');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.cephfilesmissing'));
+            }
             return { value: valid, reasons: reasons, fields: fields };
         });
 
