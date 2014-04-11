@@ -23,6 +23,9 @@ from ovs.lib.vmachine import VMachineController
 from ovs.lib.vpool import VPoolController
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', name='processor')
 
 
 def process(queue, body):
@@ -151,16 +154,15 @@ def process(queue, body):
             else:
                 async_result = task.delay(**kwargs)
                 new_task_id = async_result.id
-            print '[{0}] {1}({2}) started on {3} with taskid {4}. Delay: {5}s'.format(
+            logger.info('[{0}] {1}({2}) started on {3} with taskid {4}. Delay: {5}s'.format(
                 queue,
                 task.__name__,
                 json.dumps(kwargs),
                 routing_key,
                 new_task_id,
                 delay
-            )
+            ))
         else:
             raise RuntimeError('Type %s is not yet supported' % str(data.type))
     else:
-        raise NotImplementedError(
-            'Queue {} is not yet implemented'.format(queue))
+        raise NotImplementedError('Queue {} is not yet implemented'.format(queue))

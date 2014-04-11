@@ -16,6 +16,9 @@
 Generic persistent factory.
 """
 from ovs.plugin.provider.configuration import Configuration
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', name='persistent factory')
 
 
 class PersistentFactory(object):
@@ -30,7 +33,7 @@ class PersistentFactory(object):
         """
 
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
-            print 'Loading new persistent client'
+            logger.debug('Loading new persistent client')
 
             if client_type is None:
                 client_type = Configuration.get('ovs.core.storage.persistent')

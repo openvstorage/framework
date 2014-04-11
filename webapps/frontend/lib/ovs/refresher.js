@@ -11,17 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define(function(){
     "use strict";
     return function() {
         var self = this;
+
+        self.refreshTimeout = undefined;
 
         self.init = function(load, interval) {
             self.load = load;
             self.interval = interval;
         };
         self.start = function() {
+            self.stop();
             self.refreshTimeout = window.setInterval(function() {
                 self.load();
             }, self.interval);

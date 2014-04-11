@@ -18,19 +18,20 @@ Consumes messages from rabbitmq, dispatching them to the process method and ackn
 """
 
 import pika
-import logging
 import os
 import time
 import sys
+import logging
 from configobj import ConfigObj
 import pyinotify
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import Ovs
 from ovs.plugin.provider.configuration import Configuration
+from ovs.log.logHandler import LogHandler
 
-logging.basicConfig(level='ERROR')
-
+logger = LogHandler('ovs.extensions', name='consumer')
+logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 
 
@@ -59,7 +60,7 @@ def callback(ch, method, properties, body):
     try:
         process(queue, body)
     except Exception as e:
-        print 'Error processing message: %s' % e
+        logger.exception('Error processing message: {0}'.format(e))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
@@ -82,7 +83,7 @@ if __name__ == '__main__':
             notifier.start()
 
             wdd = wm.add_watch(KVM_ETC, MASK_EVENTS_TO_WATCH, rec=True)
-            print "Watching {0}...".format(KVM_ETC)
+            logger.info('Watching {0}...'.format(KVM_ETC), print_msg=True)
 
             vpool_mountpoints = set()
             for vpool in VPoolList().get_vpools():
@@ -90,34 +91,37 @@ if __name__ == '__main__':
                     vsrid = Ovs.get_my_vsr_id(vpool.name)
                     if vsrid == vsr.vsrid:
                         vpool_mountpoints.add(vsr.mountpoint)
-            print "KVM xml processor active..."
+            logger.info('KVM xml processor active...', print_msg=True)
 
         if run_event_consumer():
             connection = pika.BlockingConnection(
                 pika.ConnectionParameters(host=Configuration.get('ovs.grid.ip'),
-                                          port=int(
-                                              Configuration.get(
-                                                  'ovs.core.broker.port')),
+                                          port=int(Configuration.get('ovs.core.broker.port')),
                                           credentials=pika.PlainCredentials(
-                                              Configuration.get(
-                                                  'ovs.core.broker.login'),
-                                              Configuration.get('ovs.core.broker.password'))))
+                                              Configuration.get('ovs.core.broker.login'),
+                                              Configuration.get('ovs.core.broker.password')
+                                          )))
             channel = connection.channel()
 
             queue = sys.argv[1] if len(sys.argv) == 2 else 'default'
             channel.queue_declare(queue=queue, durable=True)
-            print 'Waiting for messages on %s...' % queue
-            print 'To exit press CTRL+C'
+            logger.info('Waiting for messages on {0}...'.format(queue), print_msg=True)
+            logger.info('To exit press CTRL+C', print_msg=True)
 
             channel.basic_qos(prefetch_count=1)
             channel.basic_consume(callback, queue=queue)
             channel.start_consuming()
         else:
             # We need to keep the process running
-            print 'To exit press CTRL+C'
+            logger.info('To exit press CTRL+C', print_msg=True)
             while True:
-                time.sleep(60)
+                time.sleep(3600)
 
     except KeyboardInterrupt:
         if run_kvm_watcher() and notifier is not None:
             notifier.stop()
+    except Exception as exception:
+        logger.error('Unexpected exception: {0}'.format(str(exception)), print_msg=True)
+        if run_kvm_watcher() and notifier is not None:
+            notifier.stop()
+        sys.exit(1)

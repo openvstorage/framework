@@ -15,6 +15,7 @@
 """
 This module contains all code for using the VMware SOAP API/SDK
 """
+
 from time import sleep
 import datetime
 import re
@@ -23,6 +24,9 @@ from suds.client import Client, WebFault
 from suds.cache import ObjectCache
 from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', name='vmware sdk')
 
 
 class NotAuthenticatedException(BaseException):
@@ -40,12 +44,12 @@ def authenticated(function):
             return function(self, *args, **kwargs)
         except WebFault as fault:
             if 'The session is not authenticated' in str(fault):
-                print 'Received WebFault authentication failure, logging in...'
+                logger.debug('Received WebFault authentication failure, logging in...')
                 self._login()
                 return function(self, *args, **kwargs)
             raise
         except NotAuthenticatedException:
-            print 'Received NotAuthenticatedException, logging in...'
+            logger.debug('Received NotAuthenticatedException, logging in...')
             self._login()
             return function(self, *args, **kwargs)
 

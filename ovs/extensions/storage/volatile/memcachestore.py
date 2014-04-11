@@ -17,9 +17,11 @@ Memcache store module
 """
 import memcache
 import re
-import os
 
 from threading import Lock
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', 'memcache store')
 
 
 def locked():
@@ -77,8 +79,7 @@ class MemcacheStore(object):
             if data['key'] == key:
                 return data['value']
             error = 'Invalid data received'
-            os.system("echo '" + error + "' >> /var/log/ovs/memcache.log")
-            os.system("echo '" + 'Got key {0}, requested key {1}'.format(data['key'], key) + "' >> /var/log/ovs/memcache.log")
+            logger.exception('Invalid data received: Got key {0} instead of {1}'.format(data['key'], key))
             raise RuntimeError(error)
         else:
             return data

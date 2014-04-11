@@ -17,7 +17,8 @@ VMachine module
 """
 
 import time
-import logging
+import copy
+import os
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -29,9 +30,14 @@ from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.generic.system import Ovs
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.plugin.provider.configuration import Configuration
+from ovs.log.logHandler import LogHandler
+from ovs.extensions.generic.volatilemutex import VolatileMutex
+
+logger = LogHandler('ovs.lib', name='vmachine')
 
 
 class VMachineController(object):
@@ -149,7 +155,7 @@ class VMachineController(object):
                     vsrguid=vsrguid
                 )
                 disks.append(result)
-                print 'disk appended: {0}'.format(result)
+                logger.debug('Disk appended: {0}'.format(result))
         except Exception:
             # @TODO cleanup strategy to be defined
             new_vm.delete()
@@ -385,7 +391,7 @@ class VMachineController(object):
                 message = 'Missing volumeid on disk {0} - unable to create snapshot for vm {1}'.format(
                     disk.guid, machine.guid
                 )
-                logging.info('Error: {0}'.format(message))
+                logger.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
 
         snapshots = {}
@@ -395,12 +401,12 @@ class VMachineController(object):
                 snapshots[disk.guid] = VDiskController.create_snapshot(diskguid=disk.guid,
                                                                        metadata=metadata)
         except Exception as ex:
-            logging.info('Error snapshotting disk {0}: {1}'.format(disk.name, str(ex)))
+            logger.info('Error snapshotting disk {0}: {1}'.format(disk.name, str(ex)))
             success = False
             for diskguid, snapshotid in snapshots.iteritems():
                 VDiskController.delete_snapshot(diskguid=diskguid,
                                                 snapshotid=snapshotid)
-        logging.info('Create snapshot for vMachine {0}: {1}'.format(
+        logger.info('Create snapshot for vMachine {0}: {1}'.format(
             machine.name, 'Success' if success else 'Failure'
         ))
         machine.invalidate_dynamics(['snapshots'])
@@ -418,7 +424,7 @@ class VMachineController(object):
             if vsrid is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
                 # Only the vmachine was received, so base the sync on hypervisorid and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
-                logging.info('Syncing vMachine (name {})'.format(vmachine.name))
+                logger.info('Syncing vMachine (name {})'.format(vmachine.name))
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
             elif vsrid is not None and vmachine.devicename is not None:
                 # VSR id was given, using the devicename instead (to allow hypervisorid updates
@@ -429,23 +435,23 @@ class VMachineController(object):
                 vmachine.pmachine = pmachine
                 vmachine.save()
 
-                logging.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
-                                                                                   vsr.storage_ip,
-                                                                                   vsr.mountpoint))
+                logger.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
+                                                                                  vsr.storage_ip,
+                                                                                  vsr.mountpoint))
                 vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
                                                                    ip=vsr.storage_ip,
                                                                    mountpoint=vsr.mountpoint)
             else:
                 message = 'Not enough information to sync vmachine'
-                logging.info('Error: {0}'.format(message))
+                logger.info('Error: {0}'.format(message))
                 raise RuntimeError(message)
         except Exception as ex:
-            logging.info('Error while fetching vMachine info: {0}'.format(str(ex)))
+            logger.info('Error while fetching vMachine info: {0}'.format(str(ex)))
             raise
 
         if vm_object is None:
             message = 'Could not retreive hypervisor vmachine object'
-            logging.info('Error: {0}'.format(message))
+            logger.info('Error: {0}'.format(message))
             raise RuntimeError(message)
         else:
             VMachineController.update_vmachine_config(vmachine, vm_object)
@@ -469,14 +475,20 @@ class VMachineController(object):
             else:
                 vpool = None
             pmachine = PMachineList.get_by_vsrid(vsrid)
-            vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
-            if not vmachine:
-                vmachine = VMachine()
-                vmachine.vpool = vpool
-                vmachine.pmachine = pmachine
-                vmachine.status = 'CREATED'
-            vmachine.devicename = name
-            vmachine.save()
+            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid))
+            try:
+                mutex.acquire(wait=5)
+                vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
+                if not vmachine:
+                    vmachine = VMachine()
+                    vmachine.vpool = vpool
+                    vmachine.pmachine = pmachine
+                    vmachine.status = 'CREATED'
+                vmachine.devicename = name
+                vmachine.save()
+            finally:
+                mutex.release()
+
             if pmachine.hvtype == 'KVM':
                 try:
                     VMachineController.sync_with_hypervisor(vmachine.guid, vsrid)
@@ -548,16 +560,16 @@ class VMachineController(object):
                     vdisk.vmachine = None
                     vdisk.save()
 
-            logging.info('Updating vMachine finished (name {}, {} vdisks (re)linked)'.format(
+            logger.info('Updating vMachine finished (name {}, {} vdisks (re)linked)'.format(
                 vmachine.name, vdisks_synced
             ))
         except Exception as ex:
-            logging.info('Error during vMachine update: {0}'.format(str(ex)))
+            logger.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
 
     @staticmethod
     @celery.task(name='ovs.vsa.get_physical_metadata')
-    def get_physical_metadata():
+    def get_physical_metadata(files):
         """
         Gets physical information about the machine this task is running on
         """
@@ -569,9 +581,13 @@ class VMachineController(object):
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
         ipaddresses = [ip.strip() for ip in ipaddresses]
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
+        file_existence = {}
+        for check_file in files:
+            file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
-                'xmlrpcport': xmlrpcport}
+                'xmlrpcport': xmlrpcport,
+                'files': file_existence}
 
     @staticmethod
     @celery.task(name='ovs.vsa.add_vpool')
@@ -580,5 +596,54 @@ class VMachineController(object):
         Add a vPool to the machine this task is running on
         """
         from ovs.extensions.grid.manager import Manager
-
         Manager.init_vpool(parameters['vsa_ip'], parameters['vpool_name'], parameters=parameters)
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.remove_vsr')
+    def remove_vsr(vsr_guid):
+        """
+        Removes a VSR (and, if it was the last VSR for a vPool, the vPool is removed as well)
+        """
+        from ovs.extensions.grid.manager import Manager
+
+        Manager.remove_vpool(vsr_guid)
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.update_vsrs')
+    def update_vsrs(vsr_guids, vsas, parameters):
+        """
+        Add/remove multiple vPools
+        @param vsr_guids: VSRs to be removed
+        @param vsas: VSA's on which to add a new link
+        @param parameters: Settings for new links
+        """
+        success = True
+        # Add VSRs
+        for vsa_ip, vsa_machineid in vsas:
+            try:
+                new_parameters = copy.copy(parameters)
+                new_parameters['vsa_ip'] = vsa_ip
+                local_machineid = Ovs.get_my_machine_id()
+                if local_machineid == vsa_machineid:
+                    # Inline execution, since it's on the same node (preventing deadlocks)
+                    VMachineController.add_vpool(new_parameters)
+                else:
+                    # Async execution, since it has to be executed on another node
+                    # @TODO: Will break in Celery 3.2, need to find another solution
+                    # Requirements:
+                    # - This code cannot continue until this new task is completed (as all these VSAs need to be
+                    #   handled sequentially
+                    # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
+                    result = VMachineController.add_vpool.s(new_parameters).apply_async(
+                        routing_key='vsa.{0}'.format(vsa_machineid)
+                    )
+                    result.wait()
+            except:
+                success = False
+        # Remove VSRs
+        for vsr_guid in vsr_guids:
+            try:
+                VMachineController.remove_vsr(vsr_guid)
+            except:
+                success = False
+        return success

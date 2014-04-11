@@ -22,10 +22,10 @@ from ovs.dal.lists.userlist import UserList
 from ovs.dal.exceptions import ObjectNotFoundException
 from rest_framework.authentication import BaseAuthentication
 from rest_framework import exceptions, HTTP_HEADER_ENCODING
-import logging
+from ovs.log.logHandler import LogHandler
 import hashlib
 
-logger = logging.getLogger('default')
+logger = LogHandler('ovs.api', name='authentication middleware')
 
 
 class UPAuthenticationBackend(object):

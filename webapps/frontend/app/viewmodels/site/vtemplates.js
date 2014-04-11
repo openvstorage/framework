@@ -116,7 +116,7 @@ define([
         };
         self.deleteVT = function(guid) {
             $.each(self.vTemplates(), function(index, vm) {
-                if (vm.guid() === guid) {
+                if (vm.guid() === guid && vm.templateChildrenGuids().length === 0) {
                     app.showMessage(
                             $.t('ovs:vmachines.delete.warning', { what: vm.name() }),
                             $.t('ovs:generic.areyousure'),

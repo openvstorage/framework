@@ -18,7 +18,9 @@ PMachine module
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from backend.serializers.serializers import FullSerializer
 from backend.decorators import required_roles, expose, validate
@@ -52,3 +54,23 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
         """
         contents = Toolbox.handle_retrieve(request)
         return Response(FullSerializer(VolumeStorageRouter, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True)
+    @validate(VolumeStorageRouter)
+    def can_be_deleted(self, request, obj):
+        """
+        Checks whether a VSR can be deleted
+        """
+        _ = request
+        result = True
+        vmachine = obj.serving_vmachine
+        pmachine = vmachine.pmachine
+        vmachines = VMachineList.get_customer_vmachines()
+        pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
+        vpool = obj.vpool
+        if pmachine.guid in pmachine_guids:
+            result = False
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == obj.vsrid):
+            result = False
+        return Response(result, status=status.HTTP_200_OK)

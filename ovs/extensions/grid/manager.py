@@ -51,6 +51,14 @@ class Manager(object):
             print 'Please run this script as root'
             sys.exit(1)
 
+        if Manager._validate_ip(ip) is False:
+            print 'The entered ip address is invalid'
+            sys.exit(1)
+
+        if isinstance(create_extra_filesystems, bool) is False or isinstance(clean, bool) is False:
+            print 'Some arguments contain invalid data'
+            sys.exit(1)
+
         # Load client, local or remote
         is_local = Client.is_local(ip)
         password = None
@@ -59,6 +67,22 @@ class Manager(object):
             password = getpass.getpass()
 
         client = Client.load(ip, password, bypass_local=True)
+
+        sshd_config_path = '/etc/ssh/sshd_config'
+        if client.file_exists(sshd_config_path):
+            sshd_config = client.file_read(sshd_config_path)
+            sshd_config = sshd_config.replace('AcceptEnv', '# AcceptEnv')
+            if 'UseDNS no' in sshd_config:
+                pass
+            elif 'UseDNS yes' in sshd_config:
+                sshd_config = sshd_config.replace('UseDNS yes', 'UseDNS no')
+            else:
+                sshd_config += 'UseDNS no\n'
+            client.file_write(sshd_config_path, sshd_config)
+            client.run('service ssh restart')
+
+            client = Client.load(ip, password, bypass_local=True)
+
         client.run('apt-get update')
         client.run('apt-get install lsscsi')
 
@@ -192,11 +216,17 @@ class Manager(object):
         Manager._install_jscore(client, install_branch)
 
         client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
+        client.run("if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 * * * * /usr/sbin/ntpdate pool.ntp.org'; } | crontab -; fi")
 
         # Install Open vStorage
         print 'Installing Open vStorage...'
         client.run('apt-get -y -q install python-dev')
         client.run('jpackage_install -n openvstorage -v {0}'.format(ovs_version))
+        client.run('. /opt/OpenvStorage/bin/activate; pip install amqp==1.4.1')
+        client.run('. /opt/OpenvStorage/bin/activate; pip install suds-jurko==0.5')
+
+        client.run('apt-get -y -q install libev4')
+        client.run('jpackage_install -n arakoon -v 1.7.2')
 
     @staticmethod
     def init_node(ip, join_masters=False):
@@ -218,6 +248,14 @@ class Manager(object):
 
         if ip == '127.0.0.1':
             print 'Do not use 127.0.0.1 as ip address, use the public grid ip instead.'
+            sys.exit(1)
+
+        if Manager._validate_ip(ip) is False:
+            print 'The entered ip address is invalid'
+            sys.exit(1)
+
+        if isinstance(join_masters, bool) is False:
+            print 'Some arguments contain invalid data'
             sys.exit(1)
 
         nodes = Manager._get_cluster_nodes()  # All nodes, including the local and the new one
@@ -303,7 +341,7 @@ class Manager(object):
         clusters = arakoon_management.listClusters()
 
         model_services = ['arakoon_ovsdb', 'memcached', 'arakoon_voldrv']
-        master_services = ['rabbitmq', 'ovs_flower', 'ovs_scheduled_tasks']
+        master_services = ['rabbitmq', 'ovs_scheduled_tasks']
         extra_services = ['webapp_api', 'nginx', 'ovs_workers', 'ovs_consumer_volumerouter']
         all_services = model_services + master_services + extra_services
         arakoon_clientconfigfiles = [ARAKOON_CLIENTCONFIG_TAG.format(cluster) for cluster in clusters]
@@ -542,6 +580,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in master_services + extra_services:
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
+            # Enable HA for the rabbitMQ queues
+            client = Client.load(ip)
+            client.run('rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
         else:
             for node in nodes:
                 node_client = Client.load(node)
@@ -575,6 +616,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 
         parameters = {} if parameters is None else parameters
+
+        if Manager._validate_ip(ip) is False:
+            print 'The entered ip address is invalid'
+            sys.exit(1)
+
+        if isinstance(parameters, dict) is False:
+            print 'Some arguments contain invalid data'
+            sys.exit(1)
 
         while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
             print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
@@ -837,7 +886,10 @@ for filename in {1}:
         config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
         log_file = '/var/log/{0}.log'.format(vpool_name)
         vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(config_file, vsr.mountpoint, log_file)
-        vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
+        if vsa.pmachine.hvtype == 'KVM':
+            vd_stopcmd = 'umount {0}'.format(vsr.mountpoint)
+        else:
+            vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
         vd_name = 'volumedriver_{}'.format(vpool_name)
 
         log_file = os.path.join(os.sep, 'var', 'log', 'foc_{0}.log'.format(vpool_name))
@@ -925,6 +977,128 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
             for service in services:
                 node_client.run('jsprocess enable -n {0}'.format(service))
                 node_client.run('jsprocess start -n {0}'.format(service))
+
+        # Fill vPool size
+        vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
+        vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
+        vpool.save()
+
+    @staticmethod
+    def remove_vpool(vsr_guid):
+        """
+        Removes a VSA-vPool link (VSR). If it's the last VSR for the vPool, the vPool will be completely removed
+        """
+        from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
+        from ovs.dal.lists.vmachinelist import VMachineList
+        from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+
+        # Get objects & Make some checks
+        vsr = VolumeStorageRouter(vsr_guid)
+        vmachine = vsr.serving_vmachine
+        pmachine = vmachine.pmachine
+        vmachines = VMachineList.get_customer_vmachines()
+        pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
+        vpool = vsr.vpool
+        if pmachine.guid in pmachine_guids:
+            raise RuntimeError('There are still vMachines served from the given VSR')
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == vsr.vsrid):
+            raise RuntimeError('There are still vDisks served from the given VSR')
+
+        services = ['volumedriver_{0}'.format(vpool.name),
+                    'failovercache_{0}'.format(vpool.name)]
+        vsrs_left = False
+        ip = vmachine.ip
+
+        # Stop services
+        for current_vsr in vpool.vsrs:
+            if current_vsr.guid != vsr_guid:
+                vsrs_left = True
+            client = Client.load(current_vsr.serving_vmachine.ip)
+            for service in services:
+                client.run('jsprocess disable -n {0}'.format(service))
+                client.run('jsprocess stop -n {0}'.format(service))
+
+        # Unexporting vPool (VMware) and deleting KVM pool
+        client = Client.load(ip)
+        nfs_script = """
+from ovs.extensions.fs.exportfs import Nfsexports
+Nfsexports().remove('{0}')""".format('/mnt/{0}'.format(vpool.name))
+        Manager._exec_python(client, nfs_script)
+        client.run('service nfs-kernel-server restart')
+        if pmachine.hvtype == 'KVM':
+            if vpool.name in client.run('virsh pool-list'):
+                client.run('virsh pool-destroy {0}'.format(vpool.name))
+            client.run('virsh pool-undefine {0}'.format(vpool.name))
+
+        # Remove services
+        client = Client.load(ip)
+        service_script = """
+from ovs.plugin.provider.service import Service
+Service.remove_service(domain='openvstorage', name='{1}{0}')
+Service.remove_service(domain='openvstorage', name='{2}{0}')""".format(
+            vpool.name, 'volumedriver_', 'failovercache_'
+        )
+        Manager._exec_python(client, service_script)
+
+        if vpool.backend_type == 'CEPH_S3':
+            client = Client.load(ip)
+            fstab_script_add = """
+from ovs.extensions.fs.fstab import Fstab
+fstab = Fstab()
+fstab.remove_config_by_directory('{0}')
+"""
+            fstab_script = fstab_script_add.format(vsr.mountpoint_dfs)
+            Manager._exec_python(client, fstab_script)
+            if client.file_exists(vsr.mountpoint_dfs):
+                client.run('umount {0}'.format(vsr.mountpoint_dfs), pty=False)
+                client.run('rm -rf {0}'.format(vsr.mountpoint_dfs))
+
+        # Reconfigure volumedriver
+        if vsrs_left:
+            voldrv_arakoon_cluster_id = str(Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid'))
+            voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+            voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+            arakoon_node_configs = []
+            for arakoon_node in voldrv_arakoon_client_config.keys():
+                arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
+                                                              voldrv_arakoon_client_config[arakoon_node][0][0],
+                                                              voldrv_arakoon_client_config[arakoon_node][1]))
+            vrouter_clusterregistry = ClusterRegistry(str(vpool.name), voldrv_arakoon_cluster_id, arakoon_node_configs)
+            node_configs = []
+            for current_vsr in vpool.vsrs:
+                if current_vsr.guid != vsr_guid:
+                    node_configs.append(ClusterNodeConfig(str(current_vsr.vsrid), str(current_vsr.cluster_ip),
+                                                          current_vsr.port - 1, current_vsr.port, current_vsr.port + 1))
+            vrouter_clusterregistry.set_node_configs(node_configs)
+
+        # Remove directories
+        client = Client.load(ip)
+        client.run('rm -rf {}/sco_{}'.format(vsr.mountpoint_cache, vpool.name))
+        client.run('rm -rf {}/foc_{}'.format(vsr.mountpoint_cache, vpool.name))
+        client.run('rm -rf {}/metadata_{}'.format(vsr.mountpoint_md, vpool.name))
+        client.run('rm -rf {}/tlogs_{}'.format(vsr.mountpoint_md, vpool.name))
+
+        # Remove files
+        client = Client.load(ip)
+        client.run('rm -f {}/read_{}'.format(vsr.mountpoint_cache, vpool.name))
+        configuration_dir = Manager._read_remote_config(client, 'ovs.core.cfgdir')
+        client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
+
+        # First model cleanup
+        vsr.delete()
+
+        if vsrs_left:
+            # Restart leftover services
+            for current_vsr in vpool.vsrs:
+                if current_vsr.guid != vsr_guid:
+                    client = Client.load(current_vsr.serving_vmachine.ip)
+                    for service in services:
+                        client.run('jsprocess enable -n {0}'.format(service))
+                        client.run('jsprocess start -n {0}'.format(service))
+        else:
+            # Final model cleanup
+            vpool.delete()
 
     @staticmethod
     def _check_ceph(client):
@@ -1225,8 +1399,8 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
 
         # Quality mapping
         # Tese mappings were ['unstable', 'default'] and ['default', 'default'] before
-        quality_mapping = {'unstable': ['stable', 'stable', '1.0.2'],
-                           'test': ['stable', 'stable', '1.0.2'],
+        quality_mapping = {'unstable': ['stable', 'stable', '1.1.0'],
+                           'test': ['stable', 'stable', '1.0.3'],
                            'stable': ['stable', 'stable', '1.0.2']}
 
         if not is_local:
@@ -1342,6 +1516,12 @@ blobstorlocal = jpackages_local
         client.run('jpackage_update')
         client.run('jpackage_install -n core')
         print 'Done'
+
+    @staticmethod
+    def _validate_ip(ip):
+        regex = '^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$'
+        match = re.search(regex, ip)
+        return match is not None
 
 
 class Client(object):

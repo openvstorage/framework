@@ -62,7 +62,7 @@ define([
                     var options = {
                         sort: 'name',
                         full: true,
-                        contents: ''
+                        contents: 'stored_data'
                     };
                     self.loadVSAsHandle = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {
@@ -98,7 +98,7 @@ define([
                         sort: 'name',
                         full: true,
                         page: page,
-                        contents: '_relations,statistics'
+                        contents: '_relations,statistics,stored_data'
                     };
                     self.refreshVSAsHandle[page] = api.post('vmachines/filter', self.query, options)
                         .done(function(data) {

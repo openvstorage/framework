@@ -26,15 +26,16 @@ from time import mktime
 from datetime import datetime
 from ovs.plugin.provider.configuration import Configuration
 from ovs.celery import celery
-from ovs.celery import loghandler
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from volumedriver.scrubber.scrubber import Scrubber
+from ovs.log.logHandler import LogHandler
 
 _vsr_scrubber = Scrubber()
+logger = LogHandler('ovs.lib', name='scheduled tasks')
 
 
 def ensure_single(tasknames):
@@ -93,9 +94,9 @@ def ensure_single(tasknames):
             if can_run():
                 return function(*args, **kwargs)
             else:
-                print 'Execution of task {0}[{1}] discarded'.format(
+                logger.debug('Execution of task {0}[{1}] discarded'.format(
                     self.name, self.request.id
-                )
+                ))
                 return None
 
         return wrapped
@@ -115,7 +116,7 @@ class ScheduledTaskController(object):
         """
         Snapshots all VMachines
         """
-        loghandler.logger.info('[SSA] started')
+        logger.info('[SSA] started')
         success = []
         fail = []
         machines = VMachineList.get_customer_vmachines()
@@ -128,7 +129,7 @@ class ScheduledTaskController(object):
                 success.append(machine.guid)
             except:
                 fail.append(machine.guid)
-        loghandler.logger.info('[SSA] {0} vMachines were snapshotted, {1} failed.'.format(
+        logger.info('[SSA] {0} vMachines were snapshotted, {1} failed.'.format(
             len(success), len(fail)
         ))
 
@@ -146,7 +147,7 @@ class ScheduledTaskController(object):
         > 1m | delete
         """
 
-        loghandler.logger.info('Delete snapshots started')
+        logger.info('Delete snapshots started')
 
         day = 60 * 60 * 24
         week = day * 7
@@ -240,8 +241,8 @@ class ScheduledTaskController(object):
                     VDiskController.delete_snapshot(diskguid=snapshot['diskguid'],
                                                     snapshotid=snapshot['snapshotid'])
 
-        loghandler.logger.info('Delete snapshots finished')
-        loghandler.logger.info('Scrubbing started')
+        logger.info('Delete snapshots finished')
+        logger.info('Scrubbing started')
 
         vdisks = []
         for vmachine in VMachineList.get_customer_vmachines():
@@ -263,11 +264,11 @@ class ScheduledTaskController(object):
                     vdisk.vsr_client.apply_scrubbing_result(scrubbing_result)
                 except:
                     failed += 1
-                    loghandler.logger.info('Failed scrubbing work unit for volume {}'.format(
+                    logger.info('Failed scrubbing work unit for volume {}'.format(
                         vdisk.volumeid
                     ))
 
-        loghandler.logger.info('Scrubbing finished. {} out of {} items failed.'.format(
+        logger.info('Scrubbing finished. {} out of {} items failed.'.format(
             failed, total
         ))
 
@@ -275,21 +276,21 @@ class ScheduledTaskController(object):
     @celery.task(name='ovs.scheduled.collapse_arakoon', bind=True)
     @ensure_single(['ovs.scheduled.collapse_arakoon'])
     def collapse_arakoon():
-        loghandler.logger.info('Starting arakoon collapse')
+        logger.info('Starting arakoon collapse')
         arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
         arakoon_clusters = map(lambda directory: os.path.basename(directory.rstrip(os.path.sep)),
                                os.walk(arakoon_dir).next()[1])
         for cluster in arakoon_clusters:
-            loghandler.logger.info('  Collapsing cluster: {}'.format(cluster))
+            logger.info('  Collapsing cluster: {}'.format(cluster))
             cluster_instance = ArakoonManagement().getCluster(cluster)
             for node in cluster_instance.listNodes():
-                loghandler.logger.info('    Collapsing node: {}'.format(node))
+                logger.info('    Collapsing node: {}'.format(node))
                 try:
                     cluster_instance.remoteCollapse(node, 2)  # Keep 2 tlogs
                 except Exception as e:
-                    loghandler.logger.info(
+                    logger.info(
                         'Error during collapsing cluster {} node {}: {}\n{}'.format(
                             cluster, node, str(e), traceback.format_exc()
                         )
                     )
-        loghandler.logger.info('Arakoon collapse finished')
+        logger.info('Arakoon collapse finished')

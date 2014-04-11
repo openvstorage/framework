@@ -22,7 +22,9 @@ import subprocess
 import os
 import re
 import time
+from ovs.log.logHandler import LogHandler
 
+logger = LogHandler('ovs.extensions', name='kvm sdk')
 ROOT_PATH = '/etc/libvirt/qemu/'  # Get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = '/var/run/libvirt/qemu/'  # Get live info from here
 
@@ -45,7 +47,7 @@ class Sdk(object):
     """
 
     def __init__(self, host='localhost', login='root'):
-        print('Init libvirt')
+        logger.debug('Init libvirt')
         import libvirt
         self.states = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
                        libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
@@ -60,19 +62,19 @@ class Sdk(object):
         self.login = login
         self._conn = None
         self._ssh_client = None
-        print 'Init complete'
+        logger.debug('Init complete')
 
     def connect(self, attempt = 0):
         if self._conn:
             self.disconnect()  # Clean up existing conn
-        print('Init connection', self.host, self.login, os.getgid(), os.getuid())
+        logger.debug('Init connection', self.host, self.login, os.getgid(), os.getuid())
         try:
             if self.host == 'localhost':  # Or host in (localips...):
                 self._conn = self.libvirt.open('qemu:///system')  # Only local connection
             else:
                 self._conn = self.libvirt.open('qemu+ssh://{0}@{1}/system'.format(self.login, self.host))
         except self.libvirt.libvirtError as le:
-            print(str(le), le.get_error_code())
+            logger.error(str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
                 self.connect(attempt + 1)
@@ -81,12 +83,12 @@ class Sdk(object):
         return True
 
     def disconnect(self):
-        print('Disconnecting libvirt')
+        logger.debug('Disconnecting libvirt')
         if self._conn:
             try:
                 self._conn.close()
             except self.libvirt.libvirtError as le:
-                print(str(le), le.get_error_code())  # Ignore error, connection might be already closed
+                logger.error(str(le), le.get_error_code())  # Ignore error, connection might be already closed
 
         self._conn = None
         return True
@@ -234,12 +236,12 @@ class Sdk(object):
         try:
             return getattr(self._conn, func)(vmid)
         except self.libvirt.libvirtError as le:
-            print(str(le))
+            logger.error(str(le))
             try:
                 self.connect()
                 return getattr(self._conn, func)(vmid)
             except self.libvirt.libvirtError as le:
-                print(str(le))
+                logger.error(str(le))
                 raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(vmid))
 
     def get_vm_object_by_filename(self, filename):
@@ -302,31 +304,45 @@ class Sdk(object):
         else:
             raise ValueError('Unexpected object type {} {}'.format(source_vm, type(source_vm)))
 
+        # Get nics of source ram - for now only KVM
+        networks = []
+        for nic in Sdk._get_nics(source_vm):
+            if nic.get('type', None) == 'network':
+                source = nic.get('source', {}).get('network', 'default')
+                model = nic.get('model', {}).get('type', 'e1000')
+                networks.append(('network={0}'.format(source), 'mac=RANDOM', 'model={0}'.format(model)))
+                # MAC is always RANDOM
+
         # Assume disks are raw
         for disk in disks:
             vm_disks.append(('/{}/{}'.format(mountpoint.strip('/'), disk['backingdevice'].strip('/')), 'virtio'))
 
-        self._vm_create(name, vcpus, int(ram), vm_disks)
+        self._vm_create(name = name,
+                        vcpus = vcpus,
+                        ram = int(ram),
+                        disks = vm_disks,
+                        networks = networks)
         try:
             return self.get_vm_object(name).UUIDString()
         except self.libvirt.libvirtError as le:
-            print(str(le))
+            logger.error(str(le))
             try:
                 self.connect()
                 return self.get_vm_object(name).UUIDString()
             except self.libvirt.libvirtError as le:
-                print(str(le))
+                logger.error(str(le))
                 raise RuntimeError('Virtual Machine with id/name {} could not be found.'.format(name))
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
-                   network=('network=default', 'mac=RANDOM', 'model=e1000')):
+                   networks=[('network=default', 'mac=RANDOM', 'model=e1000')], start = False):
         """
         disks = list of tuples [(disk_name, disk_size_GB, bus ENUM(virtio, ide, sata)]
         #e.g [(/vms/vm1.vmdk,10,virtio), ]
         #when using existing storage, size can be ommited
         #e.g [(/vms/vm1.raw,raw,virtio), ]
         #network: (network name: "default", specific mac or RANDOM, nic model as seen inside vmachine: e1000
+        @param start: should the guest be started after create
         """
         command = 'virt-install'
         options = ['--connect qemu+ssh://{}@{}/system'.format(self.login, self.host),
@@ -347,11 +363,14 @@ class Sdk(object):
             options.append('--os-type {}'.format(os_type))
         if os_variant is not None:
             options.append('-- os-variant {}'.format(os_variant))
-        if network is None:
+        if networks is None or networks == []:
             options.append('--nonetworks')
         else:
-            options.append('--network {}'.format(','.join(network)))
+            for network in networks:
+                options.append('--network {}'.format(','.join(network)))
         self.ssh_run('{} {}'.format(command, ' '.join(options)))
+        if start == False:
+            self.ssh_run('virsh destroy {}'.format(name))
 
     def _get_unique_id(self):
         """
@@ -372,7 +391,7 @@ class Sdk(object):
         it is ensure that within a process the connect and run are executed sequentially.
         """
         if self._ssh_client is None:
-            print 'Init SSH client'
+            logger.debug('Init SSH client')
             from ovs.plugin.provider.remote import Remote
             self._ssh_client = Remote.cuisine.api
             self._ssh_client.lock = Lock()

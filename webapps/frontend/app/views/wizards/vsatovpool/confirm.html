@@ -16,10 +16,11 @@ limitations under the License.
 <div>
     <form role="form form-horizontal" class="form-horizontal">
         <p data-i18n="ovs:wizards.vsatovpool.confirm.basicinfo"></p>
-        <ul data-bind="foreach: data.vSAs()">
+        <ul data-bind="foreach: data.pendingVSAs()" style="list-style-type: none;">
             <li>
+                <span class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: -20px; margin-right: 5px;"></span>
                 <span data-bind="text: name"></span>
-                <!-- ko with: $root.validations()[guid()] -->
+                <!-- ko with: $root.addValidations()[guid()] -->
                     <div data-bind="visible: validationState().valid === false" class="alert alert-danger" style="margin-top: 5px;">
                         <p data-bind="visible: validationState().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
                         <p data-bind="visible: validationState().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
@@ -28,7 +29,7 @@ limitations under the License.
                         </ul>
                     </div>
                     <div data-bind="visible: validationState().valid === true" class="alert alert-success" style="margin-top: 5px;">
-                        <span data-i18n="ovs:wizards.vsatovpool.confirm.valid"></span>
+                        <span data-i18n="ovs:wizards.vsatovpool.confirm.addvalid"></span>
                     </div>
                     <div data-bind="visible: validationState().valid === undefined" class="alert alert-info" style="margin-top: 5px;">
                         <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
@@ -37,7 +38,29 @@ limitations under the License.
                 <!-- /ko -->
             </li>
         </ul>
-        <div data-bind="visible: data.vSAs().length === 0" class="alert alert-danger" style="margin-top: 5px;">
+        <ul data-bind="foreach: data.removingVSAs()" style="list-style-type: none;">
+            <li>
+                <span class="fa" data-i18n="[html]ovs:icons.delete" style="margin-left: -20px; margin-right: 5px;"></span>
+                <span data-bind="text: name"></span>
+                <!-- ko with: $root.removeValidations()[guid()] -->
+                    <div data-bind="visible: validationState().valid === false" class="alert alert-danger" style="margin-top: 5px;">
+                        <p data-bind="visible: validationState().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+                        <p data-bind="visible: validationState().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+                        <ul data-bind="visible: validationState().reasons.length > 0, foreach: validationState().reasons">
+                            <li data-bind="text: $data"></li>
+                        </ul>
+                    </div>
+                    <div data-bind="visible: validationState().valid === true" class="alert alert-success" style="margin-top: 5px;">
+                        <span data-i18n="ovs:wizards.vsatovpool.confirm.removevalid"></span>
+                    </div>
+                    <div data-bind="visible: validationState().valid === undefined" class="alert alert-info" style="margin-top: 5px;">
+                        <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+                        <span data-i18n="ovs:wizards.vsatovpool.confirm.validating"></span>
+                    </div>
+                <!-- /ko -->
+            </li>
+        </ul>
+        <div data-bind="visible: data.pendingVSAs().length === 0 && data.removingVSAs().length === 0" class="alert alert-danger" style="margin-top: 5px;">
             <span data-i18n="ovs:wizards.vsatovpool.confirm.noselection"></span>
         </div>
     </form>

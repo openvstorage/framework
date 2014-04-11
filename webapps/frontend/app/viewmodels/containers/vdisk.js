@@ -82,10 +82,10 @@ define([
                 self.cacheMisses(stats.sco_cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
                 self.writeSpeed(stats.data_written_ps);
-                self.backendWritten(stats.data_written);
-                self.backendRead(stats.data_read);
-                self.backendReads(stats.backend_read_operations);
-                self.bandwidthSaved(stats.data_read - stats.backend_data_read);
+                self.backendWritten(stats.backend_data_written);
+                self.backendRead(stats.backend_data_read);
+                self.backendReads(stats.sco_cache_hits + stats.cluster_cache_hits);
+                self.bandwidthSaved(Math.max(0, stats.data_read - stats.backend_data_read));
             }
 
             self.snapshots.sort(function(a, b) {

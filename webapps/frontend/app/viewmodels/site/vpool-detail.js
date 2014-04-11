@@ -29,6 +29,7 @@ define([
         self.widgets         = [];
         self.vSACache        = {};
         self.vMachineCache   = {};
+        self.checksInit      = false;
         self.vDiskHeaders    = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
             { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),   width: 110       },
@@ -63,7 +64,7 @@ define([
         self.vDisksInitialLoad    = ko.observable(true);
         self.vMachinesInitialLoad = ko.observable(true);
         self.vSAsLoaded           = ko.observable(false);
-        self.addingVSAs           = ko.observable(false);
+        self.updatingVSAs         = ko.observable(false);
         self.vPool                = ko.observable();
         self.vSAs                 = ko.observableArray([]);
         self.checkedVSAGuids      = ko.observableArray([]);
@@ -78,25 +79,34 @@ define([
             });
             return vsas;
         });
+        self.removingVSAs = ko.computed(function() {
+            var vsas = [];
+            $.each(self.vSAs(), function(index, vsa) {
+                if ($.inArray(vsa.guid(), self.checkedVSAGuids()) === -1 && $.inArray(vsa.guid(), self.vPool().servingVSAGuids()) !== -1) {
+                    vsas.push(vsa);
+                }
+            });
+            return vsas;
+        });
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
-                vpool.load('vsrs', { skipDisks: true })
-                    .then(function() {
-                        self.vDisksInitialLoad(false);
-                        self.vMachinesInitialLoad(false);
-                    })
-                    .then(vpool.loadVDisks)
-                    .then(vpool.loadServingVSAs)
-                    .then(self.loadVSAs)
-                    .then(function() {
-                        if (self.checkedVSAGuids().length === 0) {
-                            self.checkedVSAGuids(self.vPool().servingVSAGuids());
-                        }
-                    })
-                    .always(deferred.resolve);
+                self.vDisksInitialLoad(false);
+                self.vMachinesInitialLoad(false);
+                $.when.apply($, [
+                    vpool.load('vsrs,_dynamics', { skipDisks: true }),
+                    vpool.loadServingVSAs()
+                        .then(function() {
+                            if (self.checksInit === false) {
+                                self.checkedVSAGuids(self.vPool().servingVSAGuids().slice());
+                                self.checksInit = true;
+                            }
+                        }),
+                    vpool.loadVDisks(),
+                    self.loadVSAs()
+                ]).always(deferred.resolve);
             }).promise();
         };
         self.loadVSAs = function() {
@@ -112,7 +122,7 @@ define([
                     options = {
                         sort: 'name',
                         full: true,
-                        contents: ''
+                        contents: 'served_vsrs'
                     };
                     self.loadVSAsHandle = api.post('vmachines/filter', query, options)
                         .done(function(data) {
@@ -124,11 +134,14 @@ define([
                             generic.crossFiller(
                                 guids, self.vSAs,
                                 function(guid) {
-                                    var vmachine = new VMachine(guid);
-                                    vmachine.fillData(vsadata[guid]);
-                                    return vmachine;
+                                    return new VMachine(guid);
                                 }, 'guid'
                             );
+                            $.each(self.vSAs(), function(index, vsa) {
+                                if (vsadata.hasOwnProperty(vsa.guid())) {
+                                    vsa.fillData(vsadata[vsa.guid()]);
+                                }
+                            });
                             self.vSAsLoaded(true);
                             deferred.resolve();
                         })
@@ -258,20 +271,22 @@ define([
             }
         };
         self.updateVSAServing = function() {
-            self.addingVSAs(true);
+            self.updatingVSAs(true);
             var deferred = $.Deferred(), wizard;
             wizard = new VSAToVPoolWizard({
                 modal: true,
                 completed: deferred,
                 vPool: self.vPool(),
-                vSAs: self.pendingVSAs
+                pendingVSAs: self.pendingVSAs,
+                removingVSAs: self.removingVSAs
             });
             wizard.closing.always(function() {
+                self.load();
                 deferred.resolve();
             });
             dialog.show(wizard);
             deferred.always(function() {
-                self.addingVSAs(false);
+                self.updatingVSAs(false);
             });
         };
 

@@ -13,6 +13,9 @@
 # limitations under the License.
 
 import re
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', name='fstab')
 
 
 class Fstab(object):
@@ -48,7 +51,7 @@ class Fstab(object):
         """
         l = self._slurp()
         for i in l:
-            print "%s %s %s %s %s %s" % (i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck'])
+            logger.debug("%s %s %s %s %s %s" % (i['device'], i['directory'], i['fstype'], i['options'], i['dump'], i['fsck']))
 
     def add_config(self, fs_spec, fs_file, fs_vfstype, fs_mntops='defaults', fs_freq='0', fs_passno='0'):
         """
@@ -61,8 +64,10 @@ class Fstab(object):
         @param fs_freq: dump value
         @param fs_passno: fsck value
         """
-        print "/etc/fstab: appending entry %s %s %s %s %s %s to %s" % \
-              (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
+        logger.debug(
+            "/etc/fstab: appending entry %s %s %s %s %s %s to %s" % \
+            (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
+        )
         f = open(self.fstab_file, 'a')
         f.write('%s %s %s %s %s %s\n' % (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno))
         f.close()
@@ -78,8 +83,10 @@ class Fstab(object):
         @param fs_freq: dump value
         @param fs_passno: fsck value
         """
-        print "%s: modifying entry %s to %s %s %s %s %s to %s" % \
-              (self.fstab_file, device, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
+        logger.debug(
+            "%s: modifying entry %s to %s %s %s %s %s to %s" % \
+            (self.fstab_file, device, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
+        )
 
         def x_if_x_else_key(x, dictionary, key):
             """ Small helper function """
@@ -130,4 +137,4 @@ class Fstab(object):
                     fstab_file.write("%s %s %s %s %s %s\n" %
                                      (line['device'], line['directory'], line['fstype'], line['options'], line['dump'], line['fsck']))
         else:
-            print "%s: no such entry %s found" % (self.fstab_file, match_value)
+            logger.debug("%s: no such entry %s found" % (self.fstab_file, match_value))

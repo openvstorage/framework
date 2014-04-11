@@ -14,6 +14,9 @@
 
 import re
 import subprocess
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.extensions', name='exportfs')
 
 
 class Nfsexports(object):
@@ -52,7 +55,7 @@ class Nfsexports(object):
         l = self._slurp()
         for i in l:
             if i['dir'] == directory:
-                print 'Directory already exported, to export with different params please first remove'
+                logger.info('Directory already exported, to export with different params please first remove')
                 return
         f = open(self._exportsFile, 'a')
         f.write('%s %s(%s)\n' % (directory, network, params))
@@ -89,9 +92,9 @@ class Nfsexports(object):
         cmd = list(self._cmd)
         exports = self.list_exported()
         if not directory in exports.keys():
-            print 'Directory %s currently not exported' % directory
+            logger.info('Directory %s currently not exported' % directory)
             return
-        print 'Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory)
+            logger.info('Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory))
         cmd.extend(['-u', '{}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory)])
         subprocess.call(cmd)
 
@@ -102,8 +105,8 @@ class Nfsexports(object):
         cmd = list(self._cmd)
         exports = self.list_exported()
         if directory in exports.keys():
-            print 'Directory already exported with options %s' % exports[directory]
+            logger.info('Directory already exported with options %s' % exports[directory])
             return
-        print 'Exporting {}:{}'.format(network, directory)
+        logger.info('Exporting {}:{}'.format(network, directory))
         cmd.extend(['-v', '{}:{}'.format(network, directory)])
         subprocess.call(cmd)

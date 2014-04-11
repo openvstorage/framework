@@ -19,9 +19,13 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
+from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.vmachine import VMachine
 from ovs.lib.vpool import VPoolController
+from ovs.lib.vmachine import VMachineController
+from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from backend.serializers.serializers import FullSerializer
 from backend.decorators import required_roles, expose, validate
 from backend.toolbox import Toolbox
@@ -80,3 +84,51 @@ class VPoolViewSet(viewsets.ViewSet):
         for vsr in obj.vsrs:
             vsa_guids.append(vsr.serving_vmachine_guid)
         return Response(vsa_guids, status=status.HTTP_200_OK)
+
+    @action()
+    @expose(internal=True, customer=True)
+    @required_roles(['view', 'create'])
+    @validate(VPool)
+    def update_vsrs(self, request, obj):
+        """
+        Update VSRs for a given vPool (both adding and removing VSRs)
+        """
+        vsas = []
+        if 'vsa_guids' in request.DATA:
+            if request.DATA['vsa_guids'].strip() != '':
+                for vsa_guid in request.DATA['vsa_guids'].strip().split(','):
+                    vsa = VMachine(vsa_guid)
+                    if vsa.is_internal is not True:
+                        raise NotAcceptable('vMachine is not a VSA')
+                    vsas.append((vsa.ip, vsa.machineid))
+        if 'vsr_guid' not in request.DATA:
+            raise NotAcceptable('No VSR guid passed')
+        vsr_guids = []
+        if 'vsr_guids' in request.DATA:
+            if request.DATA['vsr_guids'].strip() != '':
+                for vsr_guid in request.DATA['vsr_guids'].strip().split(','):
+                    vsr = VolumeStorageRouter(vsr_guid)
+                    if vsr.vpool_guid != obj.guid:
+                        raise NotAcceptable('Given VSR does not belong to this vPool')
+                    vsr_guids.append(vsr.guid)
+
+        vsr = VolumeStorageRouter(request.DATA['vsr_guid'])
+        parameters = {'vpool_name':          obj.name,
+                      'backend_type':        obj.backend_type,
+                      'connection_host':     obj.backend_connection.split(':')[0],
+                      'connection_port':     int(obj.backend_connection.split(':')[1]),
+                      'connection_timeout':  0,  # Not in use anyway
+                      'connection_username': obj.backend_login,
+                      'connection_password': obj.backend_password,
+                      'mountpoint_temp':     vsr.mountpoint_temp,
+                      'mountpoint_dfs':      vsr.mountpoint_dfs,
+                      'mountpoint_md':       vsr.mountpoint_md,
+                      'mountpoint_cache':    vsr.mountpoint_cache,
+                      'storage_ip':          vsr.storage_ip,
+                      'vrouter_port':        vsr.port}
+        for field in parameters:
+            if not parameters[field] is int:
+                parameters[field] = str(parameters[field])
+
+        task = VMachineController.update_vsrs.delay(vsr_guids, vsas, parameters)
+        return Response(task.id, status=status.HTTP_200_OK)

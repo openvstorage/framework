@@ -93,7 +93,11 @@ class Injector(object):
                     return processDef.isRunning()
             return None
 
+        def remove_service(domain, name):
+            j.tools.startupmanager.removeProcess(domain=domain, name=name)
+
         provider.add_service = staticmethod(add_service)
+        provider.remove_service = staticmethod(remove_service)
         provider.get_status = staticmethod(get_service_status)
         return provider
 

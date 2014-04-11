@@ -27,8 +27,8 @@ BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = os.path.join(Configuration.get('ovs.core.basedir'), Configuration.get('ovs.webapps.dir'), APP_NAME)
 
-BASE_LOG_DIR = Configuration.get('ovs.webapps.logging.dir')
-LOG_FILENAME = Configuration.get('ovs.webapps.logging.file')
+BASE_LOG_DIR = '/var/log/ovs'
+LOG_FILENAME = '/django.log'
 
 FRONTEND_ROOT = '/' + UI_NAME
 STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash

@@ -15,19 +15,21 @@
 """
 Error middleware module
 """
-import traceback
-import os
+
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.api', 'error middleware')
 
 
 class ExceptionMiddleware(object):
     """
     Error middleware object
     """
+
     def process_exception(self, request, exception):
         """
         Logs information about the given error to a plain logfile
         """
-        _ = request, exception
-        # @TODO: Use a real logger instead of raw dumping to a file
-        os.system("echo '" + traceback.format_exc() + "' >> /var/log/ovs/django.log")
+        _ = request
+        logger.exception('An unhandled exception occurred: {0}'.format(exception))
 

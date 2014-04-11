@@ -21,7 +21,9 @@ from rest_framework.routers import DefaultRouter
 from rest_framework import views
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
+from ovs.log.logHandler import LogHandler
 
+logger = LogHandler('ovs.api', name='router')
 Route = namedtuple('Route', ['url', 'mapping', 'name', 'initkwargs'])
 
 
@@ -102,7 +104,7 @@ class OVSRouter(DefaultRouter):
                 if self.api_mode in api_mode:
                     bound_methods[method] = action
                     # To debug the loaded/exposed methods:
-                    # print '[%s] %s.%s' % (self.api_mode, viewset.__name__, action)
+                    # logger.debug('[%s] %s.%s' % (self.api_mode, viewset.__name__, action))
         return bound_methods
 
     def get_api_root_view(self):

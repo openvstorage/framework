@@ -22,6 +22,7 @@ define(['knockout'], function(ko){
     singleton = function() {
         return {
             target:         ko.observable(),
+            files:          ko.observable(),
             accesskey:      ko.observable(''),
             secretkey:      ko.observable(''),
             backend:        ko.observable('LOCAL'),

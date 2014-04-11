@@ -23,6 +23,9 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.plugin.provider.configuration import Configuration
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('ovs.celery', name='celery beat')
 
 
 class DistributedScheduler(Scheduler):
@@ -41,17 +44,17 @@ class DistributedScheduler(Scheduler):
         self._mutex = VolatileMutex('celery_beat')
         self._has_lock = False
         super(DistributedScheduler, self).__init__(*args, **kwargs)
-        print 'DS init'
+        logger.debug('DS init')
 
     def setup_schedule(self):
         """
         Setups the schedule
         """
-        print 'DS setting up schedule'
+        logger.debug('DS setting up schedule')
         self._load_schedule()
         self.merge_inplace(self.app.conf.CELERYBEAT_SCHEDULE)
         self.install_default_entries(self.schedule)
-        print 'DS setting up schedule - done'
+        logger.debug('DS setting up schedule - done')
 
     def _load_schedule(self):
         """
@@ -59,7 +62,7 @@ class DistributedScheduler(Scheduler):
         """
         self.schedule = {}
         try:
-            print 'DS loading schedule entries'
+            logger.debug('DS loading schedule entries')
             self._mutex.acquire(wait=10)
             try:
                 self.schedule = cPickle.loads(str(self._persistent.get('{0}_entries'.format(self._namespace))))
@@ -73,13 +76,13 @@ class DistributedScheduler(Scheduler):
     def sync(self):
         if self._has_lock is True:
             try:
-                print 'DS syncing schedule entries'
+                logger.debug('DS syncing schedule entries')
                 self._mutex.acquire(wait=10)
                 self._persistent.set('{0}_entries'.format(self._namespace), cPickle.dumps(self.schedule))
             finally:
                 self._mutex.release()
         else:
-            print 'DS skipping sync: lock is not ours'
+            logger.debug('DS skipping sync: lock is not ours')
 
     def tick(self):
         """
@@ -87,7 +90,7 @@ class DistributedScheduler(Scheduler):
         """
         self._has_lock = False
         try:
-            print 'DS executing tick'
+            logger.debug('DS executing tick')
             self._mutex.acquire(wait=10)
             node_now = current_app._get_current_object().now()
             node_timestamp = time.mktime(node_now.timetuple())
@@ -99,30 +102,30 @@ class DistributedScheduler(Scheduler):
             if lock is None:
                 # There is no lock yet, so the lock is acquired
                 self._has_lock = True
-                print 'DS there was no lock in tick'
+                logger.debug('DS there was no lock in tick')
             else:
                 if lock['name'] == node_name:
                     # The current node holds the lock
-                    print 'DS keeps own lock'
+                    logger.debug('DS keeps own lock')
                     self._has_lock = True
                 elif node_timestamp - lock['timestamp'] > DistributedScheduler.TIMEOUT:
                     # The current lock is timed out, so the lock is stolen
-                    print 'DS last lock refresh is {0}s old'.format(node_timestamp - lock['timestamp'])
-                    print 'DS stealing lock from {0}'.format(lock['name'])
+                    logger.debug('DS last lock refresh is {0}s old'.format(node_timestamp - lock['timestamp']))
+                    logger.debug('DS stealing lock from {0}'.format(lock['name']))
                     self._load_schedule()
                     self._has_lock = True
                 else:
-                    print 'DS lock is not ours'
+                    logger.debug('DS lock is not ours')
             if self._has_lock is True:
                 lock = {'name': node_name,
                         'timestamp': node_timestamp}
-                print 'DS refreshing lock'
+                logger.debug('DS refreshing lock')
                 self._persistent.set('{0}_lock'.format(self._namespace), lock)
         finally:
             self._mutex.release()
 
         if self._has_lock is True:
-            print 'DS executing tick workload'
+            logger.debug('DS executing tick workload')
             remaining_times = []
             try:
                 for entry in self.schedule.itervalues():
@@ -131,7 +134,7 @@ class DistributedScheduler(Scheduler):
                         remaining_times.append(next_time_to_run)
             except RuntimeError:
                 pass
-            print 'DS executing tick workload - done'
+            logger.debug('DS executing tick workload - done')
             return min(remaining_times + [self.max_interval])
         else:
             return self.max_interval
