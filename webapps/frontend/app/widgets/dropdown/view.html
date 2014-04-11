@@ -1,0 +1,76 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section>
+    <div class="btn-group">
+        <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown">
+            <!-- ko if: multi() -->
+                <span data-bind="visible: target().length === 0"><i data-i18n="ovs:generic.nothingselected"></i></span>
+                <span data-bind="foreach: target">
+                    <span data-part="selected-items"></span>&nbsp;
+                    <span data-bind="shortText: $parent.text($data), maxLength: 25"></span><span data-bind="visible: $index() < $parent.target().length - 1">,</span>
+                </span>
+            <!-- /ko -->
+            <!-- ko if: !multi() -->
+                <span data-part="selected-item"></span>&nbsp;
+                <!-- ko if: free() && ($.inArray(target(), items()) === -1 || useFree()) -->
+                    <span style="position: relative;">
+                        <span data-i18n="ovs:generic.customvalue"></span>
+                        <input type="text" data-bind="value: freeValue, valueUpdate: 'afterkeydown', click: function() { }, clickBubble: false"
+                               style="position: absolute; top: -5px; padding-left: 3px;" />
+                    </span>
+                    <span style="width: 178px; display: inline-block;">&nbsp;</span>
+                <!-- /ko -->
+                <!-- ko if: !free() || ($.inArray(target(), items()) !== -1 && !useFree()) -->
+                    <span data-bind="text: text(target())"></span>
+                <!-- /ko -->
+            <!-- /ko -->
+            &nbsp; <span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu" role="menu" style="max-height: 250px; overflow: auto; z-index: 6000;" data-bind="visible: items().length > 0">
+            <!-- ko foreach: items -->
+                <li data-bind="css: {
+                                   active: $parent.multi() ? false : !$parent.useFree() && (
+                                       $parent.key() !== undefined ? (
+                                           $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
+                                                                     $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
+                                       ) : $parent.target() === $data
+                                   )
+                               },
+                               click: function() { $parent.useFree(false); $parent.set($data); }" class="hand">
+                    <a style="white-space: nowrap;">
+                        <span data-bind="visible: $parent.multi()">
+                            <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>
+                            <span data-bind="visible: !$parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.notchecked"></span>
+                            &nbsp;
+                        </span>
+                        <span data-part="list-item"></span>
+                        <span data-bind="text: $parent.text($data)"></span>
+                    </a>
+                </li>
+            <!-- /ko -->
+            <!-- ko if: free() && !multi() -->
+                <li data-bind="css: { active: $.inArray(target(), items()) === -1 && useFree() },
+                               click: function() { useFree(true); set(freeValue()); }" class="hand">
+                    <a style="white-space: nowrap;">
+                        <i><span data-i18n="ovs:generic.customvalue"></span>&nbsp;<span data-bind="text: freeValue()"></span></i>
+                    </a>
+                </li>
+            <!-- /ko -->
+        </ul>
+        <span data-bind="visible: items().length === 0" class="fa fa-spin" data-i18n="[html]ovs:icons.loading"
+              style="margin: 10px 0 0 10px;"></span>
+    </div>
+</section>
