@@ -1,0 +1,6 @@
+grid.useavahi=1
+grid.master.ip=MASTER_IP
+grid.master.port=5651
+grid.id=GRID_ID
+grid.node.roles=node
+grid.node.machineguid=HOST_NAME
