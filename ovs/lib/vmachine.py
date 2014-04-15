@@ -475,7 +475,7 @@ class VMachineController(object):
             else:
                 vpool = None
             pmachine = PMachineList.get_by_vsrid(vsrid)
-            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid))
+            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
                 mutex.acquire(wait=5)
                 vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
