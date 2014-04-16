@@ -52,33 +52,28 @@ limitations under the License.
                             <td style="width: 35%;"><span data-bind="translate: 'ovs:generic.backendtypes.' + backendType()"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:vpools.freespace"></td>
-                            <td><span data-bind="text: freeSpace"></span></td>
+                            <td data-i18n="ovs:generic.cache"></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
                             <td data-i18n="ovs:vpools.backendconnection"></td>
                             <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
                             <td data-i18n="ovs:vpools.backendlogin"></td>
                             <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.iops"></td>
-                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: backendReadSpeed"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.readspeed"></td>
-                            <td><span data-bind="text: readSpeed"></span></td>
-                            <td data-i18n="ovs:generic.writespeed"></td>
-                            <td><span data-bind="text: backendWriteSpeed"></span></td>
-                        </tr>
-                        <tr>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
-                            <td colspan="2">&nbsp;</td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: backendWriteSpeed"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvmachines"></td>

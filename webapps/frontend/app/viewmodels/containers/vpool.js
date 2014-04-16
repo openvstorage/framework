@@ -61,12 +61,6 @@ define([
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
-        self.freeSpace = ko.computed(function() {
-            if ((self.size.raw() || 0) === 0) {
-                return generic.formatRatio(0);
-            }
-            return generic.formatRatio((self.size.raw() - (self.storedData.raw() || 0)) / self.size.raw() * 100);
-        });
         self.bandwidth = ko.computed(function() {
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
