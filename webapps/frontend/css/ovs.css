@@ -82,6 +82,7 @@ div[data-view]:not(.modal-dialog) {
 .nav .actions {
     margin-top: 9px;
     margin-left: 20px;
+    width: 300px;
 }
 
 .btn-mini {
