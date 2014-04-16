@@ -320,6 +320,23 @@ class VMachineViewSet(viewsets.ViewSet):
         )
         return Response(task.id, status=status.HTTP_200_OK)
 
+    @link()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    def get_version_info(self, request, obj):
+        """
+        Gets version information of a given VSA
+        """
+        _ = request
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+
+        task = VMachineController.get_version_info.s(obj.guid).apply_async(
+            routing_key='vsa.{0}'.format(obj.machineid)
+        )
+        return Response(task.id, status=status.HTTP_200_OK)
+
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])

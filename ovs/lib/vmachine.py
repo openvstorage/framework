@@ -19,6 +19,8 @@ VMachine module
 import time
 import copy
 import os
+import glob
+import ConfigParser
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -647,3 +649,23 @@ class VMachineController(object):
             except:
                 success = False
         return success
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.get_version_info')
+    def get_version_info(vsa_guid):
+        """
+        Returns version information regarding a given VSA
+        """
+        version_data = {'vsa_guid': vsa_guid,
+                        'versions': {}}
+        # Currently, we're parsing JumpScale files
+        # @TODO: Replace with better code after the Age of Enlightenment
+        for filename in glob.glob('/opt/jumpscale/cfg/jpackages/state/openvstorage_*.cfg'):
+            parser = ConfigParser.RawConfigParser()
+            parser.read(filename)
+            buildnumber = parser.getint('main', 'lastinstalledbuildnr')
+            if buildnumber > -1:
+                _, package, version = filename.split('/')[-1].split('_')
+                version = version.replace('.cfg', '')
+                version_data['versions'][package] = '{0}.{1}'.format(version, buildnumber)
+        return version_data

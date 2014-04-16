@@ -32,7 +32,8 @@ define(['jquery', 'ovs/generic'], function($, generic){
         { route: 'vdisk/:guid',    moduleId: 'vdisk-detail',    title: $.t('ovs:vdisks.detail.title'),    titlecode: 'ovs:vdisks.detail.title',    nav: false },
         { route: 'vtemplates',     moduleId: 'vtemplates',      title: $.t('ovs:vtemplates.title'),       titlecode: 'ovs:vtemplates.title',       nav: true  },
         { route: 'statistics',     moduleId: 'statistics',      title: $.t('ovs:statistics.title'),       titlecode: 'ovs:statistics.title',       nav: false },
-        { route: 'login',          moduleId: 'login',           title: $.t('ovs:login.title'),            titlecode: 'ovs:login.title',            nav: false }
+        { route: 'login',          moduleId: 'login',           title: $.t('ovs:login.title'),            titlecode: 'ovs:login.title',            nav: false },
+        { route: 'about',          moduleId: 'about',           title: $.t('ovs:about.title'),            titlecode: 'ovs:about.title',            nav: false }
     ];
 
     buildSiteRoutes = function(mode) {

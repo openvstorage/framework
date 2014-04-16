@@ -39,6 +39,8 @@ limitations under the License.
                         <ul class="dropdown-menu">
                             <li><a class="hand" data-bind="click: changePassword" data-i18n="ovs:generic.changepassword"></a></li>
                             <li><a class="hand" href="/api/customer" data-i18n="ovs:generic.customerapi"></a></li>
+                            <li><a class="hand" data-bind="attr: { href: shared.routing.loadHash('about') }"
+                                   data-i18n="ovs:generic.about"></a></li>
                             <li class="divider"></li>
                             <li><a class="hand" data-bind="click: shared.authentication.logout" data-i18n="ovs:generic.logout"></a></li>
                         </ul>

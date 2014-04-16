@@ -152,7 +152,8 @@
         "focport": "FOC",
         "mgmtport": "Management",
         "templatehaschildren": "This vTemplate does have children",
-        "clone": "Create clones"
+        "clone": "Create clones",
+        "about": "About"
     },
     "vsas": {
         "title": "VSRs",
@@ -302,6 +303,22 @@
                 "title": "vPools"
             }
         }
+    },
+    "about": {
+        "title": "About",
+        "product": "Open vStorage",
+        "installedproducts": "Installed Packages",
+        "importantwebsites": "Important Websites",
+        "projectwebsite": "Project Website:",
+        "projectwebsiteurl": "http://www.openvstorage.com",
+        "sourcecode": "Source Code:",
+        "sourcecodeurl": "https://bitbucket.org/openvstorage/openvstorage",
+        "companywebsite": "Company Website:",
+        "companywebsiteurl": "http://www.cloudfounders.com",
+        "openvstorage": "Open vStorage:",
+        "openvstoragecore": "Open vStorage - Core:",
+        "openvstoragewebapps": "Open vStorage - Webapps:",
+        "volumedriver": "vStorage Driver:"
     },
     "login": {
         "title": "Login",
