@@ -96,8 +96,8 @@
         "machines": "Machines",
         "vpool": "vPool",
         "vpools": "vPools",
-        "vsa": "VSA",
-        "vsas": "VSAs",
+        "vsa": "VSR",
+        "vsas": "VSRs",
         "children": "Children",
         "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
@@ -155,27 +155,27 @@
         "clone": "Create clones"
     },
     "vsas": {
-        "title": "VSAs",
-        "details": "VSA Details",
+        "title": "VSRs",
+        "details": "VSR Details",
         "detail": {
-            "title": "VSA",
+            "title": "VSR",
             "hostip": "Host IP",
             "moveawaytitle": "Move all vDisks",
-            "moveawaymsg": "Move all vDisks away from this VSA and start them on other VSAs.",
+            "moveawaymsg": "Move all vDisks away from this VSR and start them on other VSRs.",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
                 "no": "Cancel",
                 "yes": "Move away",
                 "marked": "Moving away started",
-                "markedmsg": "All vDisks will be moved away from this VSA",
+                "markedmsg": "All vDisks will be moved away from this VSR",
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
             },
-            "vsavpoollink": "vPools served by this VSA",
+            "vsavpoollink": "vPools served by this VSR",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple VSAs"
+            "localvpool": "This is a local vPool which can not be shared across multiple VSRs"
         }
     },
     "vpools" : {
@@ -190,9 +190,9 @@
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
             "sync": "Sync vPool with reality",
-            "vsavpoollink": "VSAs serving this vPool",
+            "vsavpoollink": "VSRs serving this vPool",
             "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple VSAs."
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple VSRs."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -277,9 +277,9 @@
         "title": "Dashboard",
         "panels": {
             "vsa": {
-                "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Cluster. For each VSA the status, name, IP address and amount of vDisks is displayed.",
-                "helptitle": "Help - VSA",
-                "title": "VSA"
+                "helpcontent": "The VSR (Volume Storage Router) panel list all the VSRs registered in the Open vStorage Cluster. For each VSR the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - VSR",
+                "title": "VSR"
             },
             "cache": {
                 "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
@@ -332,17 +332,17 @@
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "nocredentials": "No credentials were entered",
                 "extendedinfo": "Extended vPool information",
-                "initialvsa": "Initial VSA:",
+                "initialvsa": "Initial VSR:",
                 "vsarootpassword": "Root password:",
-                "invalidpassword": "Invalid VSA root password"
+                "invalidpassword": "Invalid VSR root password"
             },
             "gathermountpoints": {
-                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all VSAs serving this vPool. Please also set the vPool connection info.",
+                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all VSRs serving this vPool. Please also set the vPool connection info.",
                 "tempfs": "Temporary FS:",
                 "dfs": "Distributed FS:",
                 "md": "Metadata:",
                 "cache": "Cache location:",
-                "mtptinuse": "The given __what__ location is already in use on this VSA",
+                "mtptinuse": "The given __what__ location is already in use on this VSR",
                 "ipaddress": "Storage IP:",
                 "port": "vRouter port:",
                 "portsinuse": "Ports in use:",
@@ -353,7 +353,7 @@
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
-                "vsainfo": "Validate whether the correct VSA was selected.",
+                "vsainfo": "Validate whether the correct VSR was selected.",
                 "mountpoints": "Validate whether mountpoints and connection information are correct.",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
                 "started": "Creation started",
@@ -363,23 +363,23 @@
             }
         },
         "vsatovpool": {
-            "title": "Change links between vPool and VSAs",
+            "title": "Change links between vPool and VSRs",
             "confirm": {
                 "errorvalidating": "Error while validating. Try again.",
                 "validating": "Validating...",
-                "addvalid": "The vPool can be added to this VSA.",
-                "removevalid": "The vPool can be removed from this VSA.",
-                "noselection": "No VSAs were selected.",
-                "mtptnotavailable": "The location __what__ is not available on this VSA",
-                "ipnotavailable": "The IP __what__ is not available on this VSA",
+                "addvalid": "The vPool can be added to this VSR.",
+                "removevalid": "The vPool can be removed from this VSR.",
+                "noselection": "No VSRs were selected.",
+                "mtptnotavailable": "The location __what__ is not available on this VSR",
+                "ipnotavailable": "The IP __what__ is not available on this VSR",
                 "started": "Adding/removing",
-                "inprogress": "The vPool is being added to or removed from the validated VSAs",
+                "inprogress": "The vPool is being added to or removed from the validated VSRs",
                 "working": "adding/removing the vPool",
                 "complete": "Add/remove vPool complete",
-                "success": "The vPool was added/removed to the selected VSAs with success",
-                "somefailed": "The vPool was added to or removed from some the selected VSAs. Some tasks failed.",
-                "allfailed": "The vPool could not be added to or removed from any of the selected VSAs",
-                "inuse": "The vPool is in use at this VSA"
+                "success": "The vPool was added/removed to the selected VSRs with success",
+                "somefailed": "The vPool was added to or removed from some the selected VSRs. Some tasks failed.",
+                "allfailed": "The vPool could not be added to or removed from any of the selected VSRs",
+                "inuse": "The vPool is in use at this VSR"
             }
         },
         "createft": {
