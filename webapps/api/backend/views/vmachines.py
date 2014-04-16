@@ -356,7 +356,7 @@ class VMachineViewSet(viewsets.ViewSet):
             if field not in request.DATA:
                 raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = request.DATA[field]
-            if not parameters[field] is int:
+            if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
 
         task = VMachineController.add_vpool.s(parameters).apply_async(routing_key='vsa.{0}'.format(obj.machineid))

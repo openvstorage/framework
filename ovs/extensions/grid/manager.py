@@ -789,12 +789,13 @@ for directory in {0}:
             ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vsa.guid)]
             vrouter_port_in_hrd = int(Manager._read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
             if vrouter_port_in_hrd in ports_used_in_model:
-                vrouter_port = parameters.get('vrouter_port') or Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
+                vrouter_port = int(parameters.get('vrouter_port')) or Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
                                                                                     min_value=1024, max_value=max(ports_used_in_model) + 3)
             else:
-                vrouter_port = vrouter_port_in_hrd
+                vrouter_port = int(vrouter_port_in_hrd)
         else:
-            vrouter_port = vsr.port
+            vrouter_port = int(vsr.port)
+
         ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
         ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
         grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
