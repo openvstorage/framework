@@ -67,14 +67,14 @@ class Sdk(object):
     def connect(self, attempt = 0):
         if self._conn:
             self.disconnect()  # Clean up existing conn
-        logger.debug('Init connection', self.host, self.login, os.getgid(), os.getuid())
+        logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
         try:
             if self.host == 'localhost':  # Or host in (localips...):
                 self._conn = self.libvirt.open('qemu:///system')  # Only local connection
             else:
                 self._conn = self.libvirt.open('qemu+ssh://{0}@{1}/system'.format(self.login, self.host))
         except self.libvirt.libvirtError as le:
-            logger.error(str(le), le.get_error_code())
+            logger.error('Error during connect: %s (%s)', str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
                 self.connect(attempt + 1)
@@ -88,7 +88,8 @@ class Sdk(object):
             try:
                 self._conn.close()
             except self.libvirt.libvirtError as le:
-                logger.error(str(le), le.get_error_code())  # Ignore error, connection might be already closed
+                # Ignore error, connection might be already closed
+                logger.error('Error during disconnect: %s (%s)', str(le), le.get_error_code())
 
         self._conn = None
         return True
