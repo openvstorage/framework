@@ -54,7 +54,6 @@ define([
             return $.Deferred(function(deferred) {
                 var options = {
                     sort: 'name',
-                    full: true,
                     contents: ''
                 };
                 api.post('vmachines/filter', self.query, options)

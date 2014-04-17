@@ -73,7 +73,6 @@ define([
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
                     self.loadVPoolsHandle = api.get('vpools', undefined, {
                         sort: 'name',
-                        full: true,
                         contents: ''
                     })
                         .done(function(data) {

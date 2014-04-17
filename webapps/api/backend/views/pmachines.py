@@ -15,14 +15,12 @@
 """
 PMachine module
 """
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.hybrids.pmachine import PMachine
-from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose, validate
-from backend.toolbox import Toolbox
+from backend.decorators import required_roles, expose, validate, get_object, get_list
 
 
 class PMachineViewSet(viewsets.ViewSet):
@@ -33,22 +31,21 @@ class PMachineViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    def list(self, request, format=None):
+    @get_list(PMachine)
+    def list(self, request, format=None, hints=None):
         """
         Overview of all pMachines
         """
-        _ = format
-        pmachines = PMachineList.get_pmachines()
-        pmachines, serializer, contents = Toolbox.handle_list(pmachines, request)
-        serialized = serializer(PMachine, contents=contents, instance=pmachines, many=True)
-        return Response(serialized.data, status=status.HTTP_200_OK)
+        _ = request, format, hints
+        return PMachineList.get_pmachines()
 
     @expose(internal=True)
     @required_roles(['view'])
     @validate(PMachine)
+    @get_object(PMachine)
     def retrieve(self, request, obj):
         """
         Load information about a given pMachine
         """
-        contents = Toolbox.handle_retrieve(request)
-        return Response(FullSerializer(PMachine, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+        _ = request
+        return obj

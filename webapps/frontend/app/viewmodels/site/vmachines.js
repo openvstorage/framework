@@ -63,7 +63,6 @@ define([
                 if (generic.xhrCompleted(self.loadVMachinesHandle)) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         contents: ''
                     };
                     self.loadVMachinesHandle = api.post('vmachines/filter', self.query, options)
@@ -98,7 +97,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: '_dynamics,_relations,-snapshots,-hypervisor_status'
                     };

@@ -15,6 +15,7 @@
 """
 Statistics module
 """
+
 import re
 import datetime
 import memcache

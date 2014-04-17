@@ -51,7 +51,6 @@ define([
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         contents: ''
                     };
                     self.loadVPoolsHandle = api.get('vpools', undefined, options)
@@ -86,7 +85,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVPoolsHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: '_dynamics'
                     };

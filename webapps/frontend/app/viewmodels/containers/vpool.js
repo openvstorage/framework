@@ -133,7 +133,6 @@ define([
                         if (generic.xhrCompleted(self.machineHandle)) {
                             var options = {
                                 sort: 'name',
-                                full: true,
                                 vpoolguid: self.guid(),
                                 contents: ''
                             };
@@ -177,7 +176,6 @@ define([
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.diskHandle)) {
                     var options = {
-                        full: true,
                         sort: 'devicename',
                         vpoolguid: self.guid(),
                         contents: ''

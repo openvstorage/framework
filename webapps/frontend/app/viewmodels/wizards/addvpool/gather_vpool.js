@@ -108,7 +108,6 @@ define([
                 }
             };
             self.loadVSASHandle = api.post('vmachines/filter', query, {
-                full: true,
                 contents: 'served_vsrs',
                 sort: 'name'
             })

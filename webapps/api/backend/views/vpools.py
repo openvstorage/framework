@@ -15,6 +15,7 @@
 """
 VPool module
 """
+
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -26,9 +27,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.lib.vpool import VPoolController
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
-from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose, validate
-from backend.toolbox import Toolbox
+from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -39,56 +38,60 @@ class VPoolViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def list(self, request, format=None):
+    @get_list(VPool, 'name')
+    def list(self, request, format=None, hints=None):
         """
         Overview of all vPools
         """
-        _ = format
-        vpools = VPoolList.get_vpools()
-        vpools, serializer, contents = Toolbox.handle_list(vpools, request, default_sort='name')
-        serialized = serializer(VPool, contents=contents, instance=vpools, many=True)
-        return Response(serialized.data, status=status.HTTP_200_OK)
+        _ = request, format, hints
+        return VPoolList.get_vpools()
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
     @validate(VPool)
+    @get_object(VPool)
     def retrieve(self, request, obj):
         """
         Load information about a given vPool
         """
-        contents = Toolbox.handle_retrieve(request)
-        return Response(FullSerializer(VPool, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+        _ = request
+        return obj
 
     @action()
     @expose(internal=True)
     @required_roles(['view', 'create'])
     @validate(VPool)
+    @celery_task()
     def sync_vmachines(self, request, obj):
         """
         Syncs the vMachine of this vPool
         """
         _ = request
-        task = VPoolController.sync_with_hypervisor.delay(obj.guid)
-        return Response(task.id, status=status.HTTP_200_OK)
+        return VPoolController.sync_with_hypervisor.delay(obj.guid)
 
     @link()
     @expose(internal=True)
     @required_roles(['view'])
     @validate(VPool)
-    def serving_vsas(self, request, obj):
+    @get_list(VMachine)
+    def serving_vsas(self, request, obj, hints):
         """
         Retreives a list of VSA guids, serving a given vPool
         """
         _ = request
         vsa_guids = []
+        vsas = []
         for vsr in obj.vsrs:
             vsa_guids.append(vsr.serving_vmachine_guid)
-        return Response(vsa_guids, status=status.HTTP_200_OK)
+            if hints['full'] is True:
+                vsas.append(vsr.serving_vmachine)
+        return vsas if hints['full'] is True else vsa_guids
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
     @validate(VPool)
+    @celery_task()
     def update_vsrs(self, request, obj):
         """
         Update VSRs for a given vPool (both adding and removing VSRs)
@@ -130,5 +133,4 @@ class VPoolViewSet(viewsets.ViewSet):
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        task = VMachineController.update_vsrs.delay(vsr_guids, vsas, parameters)
-        return Response(task.id, status=status.HTTP_200_OK)
+        return VMachineController.update_vsrs.delay(vsr_guids, vsas, parameters)

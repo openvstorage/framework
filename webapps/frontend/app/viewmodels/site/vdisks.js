@@ -56,7 +56,6 @@ define([
                 if (generic.xhrCompleted(self.loadVDisksHandle)) {
                     var options = {
                         sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
-                        full: true,
                         contents: ''
                     };
                     self.loadVDisksHandle = api.get('vdisks', undefined, options)
@@ -91,7 +90,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVDisksHandle[page])) {
                     var options = {
                         sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
-                        full: true,
                         page: page,
                         contents: '_dynamics,_relations,-snapshots'
                     };
@@ -150,7 +148,7 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vDisks);
 
-            api.get('vmachines', {}, { full: true, contents: ''})
+            api.get('vmachines', {}, { contents: ''})
                 .done(function(data) {
                     $.each(data, function(index, item) {
                         if (!self.vMachineCache.hasOwnProperty(item.guid)) {

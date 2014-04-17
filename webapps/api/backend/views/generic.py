@@ -15,6 +15,7 @@
 """
 Module for generic functionality
 """
+
 from backend.decorators import expose
 from rest_framework import status, viewsets
 from rest_framework.response import Response

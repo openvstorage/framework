@@ -154,17 +154,21 @@ define([
                 self.data.selectedPMachines([]);
             }
             generic.xhrAbort(self.loadPMachinesHandle);
-            self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines')
+            self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines', undefined, {
+                contents: '',
+                sort: 'name'
+            })
                 .done(function(data) {
-                    var i, guids = [];
-                    for (i = 0; i < data.length; i += 1) {
-                        guids.push(data[i].guid);
-                    }
+                    var guids = [], vmdata = {};
+                    $.each(data, function(index, item) {
+                        guids.push(item.guid);
+                        vmdata[item.guid] = item;
+                    });
                     generic.crossFiller(
                         guids, self.data.pMachines,
                         function(guid) {
                             var pm = new PMachine(guid);
-                            pm.load();
+                            pm.fillData(vmdata[guid]);
                             return pm;
                         }, 'guid'
                     );

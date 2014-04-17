@@ -15,10 +15,8 @@
 """
 Contains various helping classes
 """
+
 import re
-import math
-from backend.serializers.serializers import SimpleSerializer, FullSerializer
-from ovs.dal.dataobjectlist import DataObjectList
 
 
 class Toolbox:
@@ -81,47 +79,3 @@ class Toolbox:
         value = '' if value is None else str(value)
         sorting_key = tuple(clean_list(regex.split(value)))
         return sorting_key
-
-    @staticmethod
-    def handle_list(dataobjectlist, request, default_sort=None):
-        """
-        Processes/prepares a data object list based on request parameters.
-        """
-        # Sorting
-        sort = request.QUERY_PARAMS.get('sort')
-        if sort is None and default_sort is not None:
-            sort = default_sort
-        if sort:
-            for sort_item in reversed(sort.split(',')):
-                desc = sort_item[0] == '-'
-                field = sort_item[1 if desc else 0:]
-                dataobjectlist.sort(key=lambda e: Toolbox.extract_key(e, field), reverse=desc)
-        # Paging
-        page = request.QUERY_PARAMS.get('page')
-        if page is not None and page.isdigit():
-            page = int(page)
-            max_page = int(math.ceil(len(dataobjectlist) / 10.0))
-            if page > max_page:
-                page = max_page
-            page -= 1
-            dataobjectlist = dataobjectlist[page * 10: (page + 1) * 10]
-        # Preparing data
-        full = request.QUERY_PARAMS.get('full')
-        contents = request.QUERY_PARAMS.get('contents')
-        contents = None if contents is None else contents.split(',')
-        if full is not None:
-            serializer = FullSerializer
-        else:
-            if isinstance(dataobjectlist, DataObjectList):
-                dataobjectlist = dataobjectlist.reduced
-            serializer = SimpleSerializer
-        return dataobjectlist, serializer, contents
-
-    @staticmethod
-    def handle_retrieve(request):
-        """
-        Extracts request parameters used to retrieve single object
-        """
-        contents = request.QUERY_PARAMS.get('contents')
-        contents = None if contents is None else contents.split(',')
-        return contents

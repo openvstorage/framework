@@ -19,29 +19,7 @@ from ovs.dal.relations.relations import RelationMapper
 from rest_framework import serializers
 
 
-class SimpleSerializer(serializers.Serializer):
-    """
-    Serializes only the guid of a hybrid object
-    """
-
-    def __init__(self, hybrid, contents=None, *args, **kwargs):
-        """
-        Initializes the serializer
-        """
-        _ = hybrid, contents
-        super(SimpleSerializer, self).__init__(*args, **kwargs)
-
-    guid = serializers.Field()
-
-    class Meta:
-        """
-        Meta class
-        """
-        fields = ('guid',)
-        read_only_fields = ('guid',)
-
-
-class FullSerializer(SimpleSerializer):
+class FullSerializer(serializers.Serializer):
     """
     Serializes the persistent and dynamic stack of a hybrid object
     """
@@ -49,7 +27,7 @@ class FullSerializer(SimpleSerializer):
         """
         Initializes the serializer, mapping field types
         """
-        super(FullSerializer, self).__init__(hybrid, contents, *args, **kwargs)
+        super(FullSerializer, self).__init__(*args, **kwargs)
         self.hybrid = hybrid
         for key, default in self.hybrid._blueprint.iteritems():
             if not 'password' in key:
@@ -68,6 +46,8 @@ class FullSerializer(SimpleSerializer):
                 if contents is None or (('_relations' in contents or key in contents)
                                         and '-{0}'.format(key) not in contents):
                     self.fields['%s_guids' % key] = serializers.Field()
+
+    guid = serializers.Field()
 
     def get_identity(self, data):
         """
@@ -99,3 +79,10 @@ class FullSerializer(SimpleSerializer):
         if field_type is bool:
             return serializers.BooleanField()
         return serializers.Field()
+
+    class Meta:
+        """
+        Meta class
+        """
+        fields = ('guid',)
+        read_only_fields = ('guid',)

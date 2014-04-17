@@ -15,13 +15,11 @@
 """
 Contains the BrandingViewSet
 """
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+
+from rest_framework import viewsets
 from ovs.dal.lists.brandinglist import BrandingList
 from ovs.dal.hybrids.branding import Branding
-from backend.serializers.serializers import FullSerializer
-from backend.decorators import expose, validate
-from backend.toolbox import Toolbox
+from backend.decorators import expose, validate, get_object, get_list
 
 
 class BrandingViewSet(viewsets.ViewSet):
@@ -30,21 +28,20 @@ class BrandingViewSet(viewsets.ViewSet):
     """
 
     @expose(internal=True)
-    def list(self, request, format=None):
+    @get_list(Branding)
+    def list(self, request, format=None, hints=None):
         """
         Overview of all brandings
         """
-        _ = format
-        brands = BrandingList.get_brandings()
-        pmachines, serializer, contents = Toolbox.handle_list(brands, request)
-        serialized = serializer(Branding, contents=contents, instance=brands, many=True)
-        return Response(serialized.data, status=status.HTTP_200_OK)
+        _ = request, format
+        return BrandingList.get_brandings()
 
     @expose(internal=True)
     @validate(Branding)
+    @get_object(Branding)
     def retrieve(self, request, obj):
         """
         Load information about a given branding
         """
-        contents = Toolbox.handle_retrieve(request)
-        return Response(FullSerializer(Branding, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+        _ = request
+        return obj

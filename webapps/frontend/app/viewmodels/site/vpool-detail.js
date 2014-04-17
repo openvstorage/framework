@@ -121,7 +121,6 @@ define([
                     };
                     options = {
                         sort: 'name',
-                        full: true,
                         contents: 'served_vsrs'
                     };
                     self.loadVSAsHandle = api.post('vmachines/filter', query, options)
@@ -156,7 +155,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVDisksHandle[page])) {
                     var options = {
                         sort: 'devicename',
-                        full: true,
                         page: page,
                         contents: '_dynamics,_relations,-snapshots',
                         vpoolguid: self.vPool().guid()
@@ -195,7 +193,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: '_dynamics,-snapshots,-hypervisor_status',
                         vpoolguid: self.vPool().guid()

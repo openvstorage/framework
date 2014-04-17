@@ -54,7 +54,6 @@ define([
                 if (generic.xhrCompleted(self.loadVTemplatesHandle)) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         contents: 'vdisks'
                     };
                     self.loadVTemplatesHandle = api.post('vmachines/filter', self.query, options)
@@ -89,7 +88,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVTemplatesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: 'vdisks'
                     };
