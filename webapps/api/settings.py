@@ -85,6 +85,7 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.csrf.CsrfViewMiddleware',
     APP_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
     APP_NAME + '.backend.error_middleware.ExceptionMiddleware',
+    APP_NAME + '.backend.cors_middleware.CORSMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware'
 )

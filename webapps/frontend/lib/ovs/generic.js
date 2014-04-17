@@ -304,10 +304,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function validate(nodes) {
         var i, node, check, checkAndRedirect;
         check = function(node) {
-            return $.ajax(node + '/api/internal/generic/0/?format=jsonp&timestamp=' + (new Date().getTime()), {
+            return $.ajax(node + '/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
                 type: 'GET',
-                contentType: 'application/jsonp',
-                dataType: 'jsonp',
+                contentType: 'application/json',
+                dataType: 'json',
                 timeout: 60000
             });
         };
