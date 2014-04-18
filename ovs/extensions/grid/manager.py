@@ -694,7 +694,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 supported_backends.remove('REST')  # REST is not supported for now
             vpool.backend_type = parameters.get('backend_type') or Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
             connection_host = connection_port = connection_username = connection_password = None
-            if vpool.backend_type == 'LOCAL':
+            if vpool.backend_type in ['LOCAL', 'DISTRIBUTED']:
                 vpool.backend_metadata = {'backend_type': 'LOCAL'}
             if vpool.backend_type == 'REST':
                 connection_host = parameters.get('connection_host') or Helper.ask_string('Provide REST ip address')
@@ -762,12 +762,20 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         if mountpoint_cache in mountpoints:
             mountpoints.remove(mountpoint_cache)
 
+        directories_to_create = [mountpoint_temp, mountpoint_md, mountpoint_cache]
+        if vpool.backend_type == 'DISTRIBUTED':
+            volumes_directory = '{0}/bfs'.format(mountpoint_dfs)
+            vpool.backend_metadata['local_connection_path'] = volumes_directory
+            directories_to_create.append(volumes_directory)
+            mountpoint_dfs = '{0}/dfs'.format(mountpoint_dfs)
+        directories_to_create.append(mountpoint_dfs)
+
         client = Client.load(ip)
         dir_create_script = """
 import os
 for directory in {0}:
     if not os.path.exists(directory):
-        os.makedirs(directory)""".format([mountpoint_temp, mountpoint_dfs, mountpoint_md, mountpoint_cache])
+        os.makedirs(directory)""".format(directories_to_create)
         Manager._exec_python(client, dir_create_script)
 
         cache_fs = os.statvfs(mountpoint_cache)

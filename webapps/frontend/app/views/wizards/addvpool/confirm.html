@@ -20,7 +20,7 @@ limitations under the License.
             <li><b data-i18n="ovs:wizards.addvpool.gathervpool.name"></b> <span data-bind="text: data.name"></span></li>
             <li>
                 <b data-i18n="ovs:wizards.addvpool.gathervpool.backendtype"></b> <span data-bind="translate: 'ovs:generic.backendtypes.' + data.backend()"></span>
-                <ul data-bind="visible: data.backend() !== 'LOCAL'">
+                <ul data-bind="visible: data.backend() !== 'LOCAL' && data.backend() !== 'DISTRIBUTED'">
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.host"></b> <span data-bind="text: data.host"></span></li>
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.port"></b> <span data-bind="text: data.port"></span></li>
                     <li data-bind="visible: data.backend() === 'REST'"><b data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></b> <span data-bind="text: data.timeout"></span></li>

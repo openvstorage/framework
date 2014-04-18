@@ -48,7 +48,8 @@
             "CEPH_S3": "Ceph S3",
             "SWIFT_S3": "Swift S3",
             "LOCAL": "Local FS",
-            "REST": "REST backend"
+            "REST": "REST backend",
+            "DISTRIBUTED": "Distributed FS"
         },
         "username": "Username",
         "password": "Password",

@@ -116,15 +116,18 @@ class VPoolViewSet(viewsets.ViewSet):
                     vsr_guids.append(vsr.guid)
 
         vsr = VolumeStorageRouter(request.DATA['vsr_guid'])
+        mountpoint_dfs = vsr.mountpoint_dfs
+        if obj.backend_type == 'DISTRIBUTED' and mountpoint_dfs.endswith('/dfs'):
+            mountpoint_dfs = mountpoint_dfs[:-4]  # Strip dfs/bfs folders, the base folder is required.
         parameters = {'vpool_name':          obj.name,
                       'backend_type':        obj.backend_type,
-                      'connection_host':     obj.backend_connection.split(':')[0],
-                      'connection_port':     int(obj.backend_connection.split(':')[1]),
+                      'connection_host':     None if obj.backend_connection is None else obj.backend_connection.split(':')[0],
+                      'connection_port':     None if obj.backend_connection is None else int(obj.backend_connection.split(':')[1]),
                       'connection_timeout':  0,  # Not in use anyway
                       'connection_username': obj.backend_login,
                       'connection_password': obj.backend_password,
                       'mountpoint_temp':     vsr.mountpoint_temp,
-                      'mountpoint_dfs':      vsr.mountpoint_dfs,
+                      'mountpoint_dfs':      mountpoint_dfs,
                       'mountpoint_md':       vsr.mountpoint_md,
                       'mountpoint_cache':    vsr.mountpoint_cache,
                       'storage_ip':          vsr.storage_ip,

@@ -28,11 +28,11 @@ define([
         self.refresher    = new Refresher();
         self.widgets      = [];
         self.vPoolHeaders = [
-            { key: 'name',              value: $.t('ovs:generic.name'),             width: 250       },
+            { key: 'name',              value: $.t('ovs:generic.name'),             width: 200       },
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 150       },
             { key: 'cacheRatio',        value: $.t('ovs:generic.cache'),            width: 100       },
             { key: 'iops',              value: $.t('ovs:generic.iops'),             width: 100       },
-            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 100       },
+            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 150       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100       },
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined }
         ];
