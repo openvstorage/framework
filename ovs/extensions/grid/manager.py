@@ -42,7 +42,7 @@ class Manager(object):
     """
 
     @staticmethod
-    def install_node(ip, create_extra_filesystems=False, clean=False):
+    def install_node(ip, create_extra_filesystems=False, clean=False, version=None):
         """
         Installs the Open vStorage software on a (remote) node.
         """
@@ -50,14 +50,14 @@ class Manager(object):
         if not os.geteuid() == 0:
             print 'Please run this script as root'
             sys.exit(1)
-
         if Manager._validate_ip(ip) is False:
             print 'The entered ip address is invalid'
             sys.exit(1)
-
         if isinstance(create_extra_filesystems, bool) is False or isinstance(clean, bool) is False:
             print 'Some arguments contain invalid data'
             sys.exit(1)
+        if version is not None and not isinstance(version, basestring):
+            print 'Illegal version specified'
 
         # Load client, local or remote
         is_local = Client.is_local(ip)
@@ -214,6 +214,9 @@ class Manager(object):
         # Install base framework, JumpScale in this case
         install_branch, ovs_version = Manager._prepare_jscore(client, is_local)
         Manager._install_jscore(client, install_branch)
+
+        if version is not None:
+            ovs_version = version
 
         client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
         client.run("if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 * * * * /usr/sbin/ntpdate pool.ntp.org'; } | crontab -; fi")
@@ -1765,9 +1768,14 @@ if __name__ == '__main__':
                       help="Create extra filesystems on third disk for backend-, distributed- and temporary FS")
     parser.add_option('-c', '--clean', dest='clean', action='store_true', default=False,
                       help='Try to clean environment before reinstalling')
+    parser.add_option('-v', '--version', dest='version',
+                      help='Specify a version to install.')
     (options, args) = parser.parse_args()
 
     try:
-        Manager.install_node('127.0.0.1', create_extra_filesystems=options.filesystems, clean=options.clean)
+        Manager.install_node('127.0.0.1',
+                             create_extra_filesystems=options.filesystems,
+                             clean=options.clean,
+                             version=options.version)
     except KeyboardInterrupt:
         print '\nAborting'
