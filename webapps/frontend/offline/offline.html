@@ -33,7 +33,7 @@
                         (function(node) {
                             $.ajax('https://' + node + '/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
                                         type: 'GET',
-                                        contentType: 'application/jsonp',
+                                        contentType: 'application/json',
                                         timeout: 5000
                                     })
                                     .done(function() {
