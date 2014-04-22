@@ -129,6 +129,51 @@ class Sdk(object):
         else:
             self._esxHost = None
 
+    def _refresh_vcenter_info(self):
+        """
+        reload vCenter info (host name and summary)
+        """
+        if not self._is_vcenter:
+            raise RuntimeError('Must be connected to a vCenter Server API.')
+        self._login()
+        datacenter_info = self._get_object(
+                self._serviceContent.rootFolder,
+                prop_type='HostSystem',
+                traversal={'name': 'FolderTraversalSpec',
+                           'type': 'Folder',
+                           'path': 'childEntity',
+                           'traversal': {'name': 'DatacenterTraversalSpec',
+                                         'type': 'Datacenter',
+                                         'path': 'hostFolder',
+                                         'traversal': {'name': 'DFolderTraversalSpec',
+                                                       'type': 'Folder',
+                                                       'path': 'childEntity',
+                                                       'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                     'type': 'ComputeResource',
+                                                                     'path': 'host'}}}},
+                properties=['name', 'summary']
+            )
+        return datacenter_info
+
+    def get_host_status(self, host_name):
+        """
+        return host status by name, from vcenter info
+        must be connected to a vcenter server api
+        """
+        datacenter_info = self._refresh_vcenter_info()
+        for host in datacenter_info:
+            if host.name == host_name:
+                return host.summary.runtime.powerState
+        raise RuntimeError('Host {0} not found in datacenter info'.format(host_name))
+
+    def list_hosts_in_datacenter(self):
+        """
+        return a list of registered host names in vCenter
+        must be connected to a vcenter server api
+        """
+        datacenter_info = self._refresh_vcenter_info()
+        return [host.name for host in datacenter_info]
+
     def validate_result(self, result, message=None):
         """
         Validates a given result. Returning True if the task succeeded, raising an error if not
