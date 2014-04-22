@@ -16,6 +16,7 @@
 PMachine module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 
 
 class PMachine(DataObject):
@@ -30,6 +31,24 @@ class PMachine(DataObject):
                   'password':    (None, str, 'Password of the pMachine.'),
                   'ip':          (None, str, 'IP address of the pMachine.'),
                   'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.')}
-    _relations = {}
+    _relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
     _expiry = {}
     # pylint: enable=line-too-long
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initializes a Pmachine, setting up its additional helpers
+        """
+        DataObject.__init__(self, *args, **kwargs)
+        if self.hvtype and self.hvtype == 'VMWARE':
+            if self.mgmtcenter:
+                try:
+                    from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
+                    self._frozen = False
+                    self.mgmtcentersdk = Sdk(self.mgmtcenter.ip, self.mgmtcenter.username, self.mgmtcenter.password)
+                    self.hoststatus = lambda : self.mgmtcentersdk.get_host_status(self.ip)
+                except Exception as ex:
+                    pass #  Could not initialize mgmtcentersdk
+                finally:
+                    self._frozen = True
+
