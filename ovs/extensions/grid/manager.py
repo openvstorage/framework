@@ -896,7 +896,7 @@ for filename in {1}:
         Manager._exec_python(client, file_create_script)
 
         config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
-        log_file = '/var/log/{0}.log'.format(vpool_name)
+        log_file = '/var/log/volumedriver/{0}.log'.format(vpool_name)
         vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(config_file, vsr.mountpoint, log_file)
         if vsa.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(vsr.mountpoint)
@@ -904,7 +904,7 @@ for filename in {1}:
             vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
         vd_name = 'volumedriver_{}'.format(vpool_name)
 
-        log_file = os.path.join(os.sep, 'var', 'log', 'foc_{0}.log'.format(vpool_name))
+        log_file = '/var/log/volumedriver/foc_{0}.log'.format(vpool_name)
         fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(config_file, log_file)
         fc_name = 'failovercache_{0}'.format(vpool_name)
 

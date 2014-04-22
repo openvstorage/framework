@@ -95,7 +95,7 @@ celery.conf.CELERYBEAT_SCHEDULE = {
     }
 }
 
-loghandler = LogHandler('ovs.celery', name='celery')
+loghandler = LogHandler('celery', name='celery')
 
 
 @task_postrun.connect

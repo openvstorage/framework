@@ -26,7 +26,7 @@ import os
 import re
 import shutil
 
-logger = LogHandler('ovs.extensions', name='xml processor')
+logger = LogHandler('extensions', name='xml processor')
 
 
 class Kxp(pyinotify.ProcessEvent):

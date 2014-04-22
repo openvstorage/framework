@@ -25,7 +25,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='processor')
+logger = LogHandler('extensions', name='processor')
 
 
 def process(queue, body):

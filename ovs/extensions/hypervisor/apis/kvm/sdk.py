@@ -24,7 +24,7 @@ import re
 import time
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='kvm sdk')
+logger = LogHandler('extensions', name='kvm sdk')
 ROOT_PATH = '/etc/libvirt/qemu/'  # Get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = '/var/run/libvirt/qemu/'  # Get live info from here
 

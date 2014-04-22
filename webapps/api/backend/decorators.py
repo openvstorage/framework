@@ -28,7 +28,7 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.api')
+logger = LogHandler('api')
 
 
 def required_roles(roles):

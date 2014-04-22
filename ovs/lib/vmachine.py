@@ -39,7 +39,7 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-logger = LogHandler('ovs.lib', name='vmachine')
+logger = LogHandler('lib', name='vmachine')
 
 
 class VMachineController(object):

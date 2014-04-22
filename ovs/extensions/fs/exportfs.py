@@ -16,7 +16,7 @@ import re
 import subprocess
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='exportfs')
+logger = LogHandler('extensions', name='exportfs')
 
 
 class Nfsexports(object):

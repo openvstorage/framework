@@ -30,7 +30,7 @@ from ovs.extensions.generic.system import Ovs
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='consumer')
+logger = LogHandler('extensions', name='consumer')
 logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 

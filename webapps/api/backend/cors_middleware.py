@@ -20,7 +20,7 @@ from django import http
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.api', 'CORS middleware')
+logger = LogHandler('api', 'CORS middleware')
 
 
 class CORSMiddleware(object):

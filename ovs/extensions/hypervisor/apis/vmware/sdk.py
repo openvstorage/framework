@@ -26,7 +26,7 @@ from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='vmware sdk')
+logger = LogHandler('extensions', name='vmware sdk')
 
 
 class NotAuthenticatedException(BaseException):

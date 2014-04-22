@@ -53,11 +53,11 @@ class LogHandler(object):
     Log handler
     """
 
-    targets = {'ovs.lib': 'lib',
-               'ovs.api': 'api',
-               'ovs.extensions': 'extensions',
-               'ovs.dal': 'dal',
-               'ovs.celery': 'celery'}
+    targets = {'lib': 'lib',
+               'api': 'api',
+               'extensions': 'extensions',
+               'dal': 'dal',
+               'celery': 'celery'}
 
     def __init__(self, source, name=None):
         """
@@ -82,7 +82,7 @@ class LogHandler(object):
             open(log_filename, 'a').close()
         os.chown(log_filename, uid, gid)
 
-        formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [%(name)s] %(message)s')
+        formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
         max_bytes = parser.getint('logging', 'maxbytes')
         backup_count = parser.getint('logging', 'backupcount')
         handler = logging.handlers.RotatingFileHandler(log_filename, maxBytes=max_bytes, backupCount=backup_count)
