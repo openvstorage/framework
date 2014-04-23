@@ -17,7 +17,7 @@ PMachine module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
-
+from ovs.extensions.hypervisor.factory import Factory as hvFactory
 
 class PMachine(DataObject):
     """
@@ -32,23 +32,17 @@ class PMachine(DataObject):
                   'ip':          (None, str, 'IP address of the pMachine.'),
                   'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.')}
     _relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
-    _expiry = {}
+    _expiry = {'host_status': (60, str)}
     # pylint: enable=line-too-long
 
-    def __init__(self, *args, **kwargs):
+    def _host_status(self):
         """
-        Initializes a Pmachine, setting up its additional helpers
+        Returns the host status as reported by the management center (e.g. vCenter Server)
         """
-        DataObject.__init__(self, *args, **kwargs)
-        if self.hvtype and self.hvtype == 'VMWARE':
-            if self.mgmtcenter:
-                try:
-                    from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
-                    self._frozen = False
-                    self.mgmtcentersdk = Sdk(self.mgmtcenter.ip, self.mgmtcenter.username, self.mgmtcenter.password)
-                    self.hoststatus = lambda : self.mgmtcentersdk.get_host_status(self.ip)
-                except Exception as ex:
-                    pass #  Could not initialize mgmtcentersdk
-                finally:
-                    self._frozen = True
+        mgmtcentersdk = hvFactory.get_mgmtcenter(self)
+        if mgmtcentersdk:
+            return mgmtcentersdk.get_host_status(self.ip)
+        return 'UNKNOWN'
+
+
 

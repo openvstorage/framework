@@ -25,6 +25,7 @@ class Factory(object):
     """
 
     hypervisors = {}
+    mgmtcenters = {}
 
     @staticmethod
     def get(node):
@@ -53,3 +54,31 @@ class Factory(object):
             finally:
                 mutex.release()
         return Factory.hypervisors[key]
+
+    @staticmethod
+    def get_mgmtcenter(node):
+        """
+        Returns the appropriate sdk client for the management center of the node
+        Implemented only for VMWare / vCenter Server
+        TODO: KVM
+        """
+        if node.hvtype and node.mgmtcenter:
+            hvtype = node.hvtype
+            ip = node.mgmtcenter.ip
+            username = node.mgmtcenter.username
+            password = node.mgmtcenter.password
+            key = '{0}_{1}'.format(ip, username)
+            if key not in Factory.mgmtcenters:
+                mutex = FileMutex('mgmtcenter_{0}'.format(key))
+                try:
+                    mutex.acquire(30)
+                    if key not in Factory.mgmtcenters:
+                        if hvtype == 'VMWARE':
+                            from hypervisors.vmware import VMware
+                            mgmtcenter = VMware(ip, username, password)
+                        else:
+                            raise NotImplementedError('Management center for {0} is not yet supported'.format(hvtype))
+                        Factory.mgmtcenters[key] = mgmtcenter
+                finally:
+                    mutex.release()
+            return Factory.mgmtcenters[key]
