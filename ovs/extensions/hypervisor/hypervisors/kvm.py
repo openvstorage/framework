@@ -137,6 +137,13 @@ class KVM(Hypervisor):
         """
         raise NotImplementedError()
 
+    @Hypervisor.connected
+    def is_management_center(self):
+        """
+        Checks whether this is a Management node
+        """
+        return False
+
     def clean_backing_disk_filename(self, path):
         """
         Cleans a backing disk filename to the corresponding disk filename

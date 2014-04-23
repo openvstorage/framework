@@ -167,6 +167,13 @@ class VMware(Hypervisor):
         """
         return self.sdk.mount_nfs_datastore(name, remote_host, remote_path)
 
+    @Hypervisor.connected
+    def is_management_center(self):
+        """
+        Checks whether this node is a vCenter
+        """
+        return self.sdk.is_management_center()
+
     def clean_backing_disk_filename(self, path):
         """
         Cleans a backing disk filename to the corresponding disk filename

@@ -24,29 +24,29 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.loading        = ko.observable(false);
-        self.loaded         = ko.observable(false);
-        self.guid           = ko.observable(guid);
-        self.name           = ko.observable();
-        self.ipAddress      = ko.observable();
-        self.hvtype         = ko.observable();
-        self.mgmtCenterGuid = ko.observable();
+        self.loading   = ko.observable(false);
+        self.loaded    = ko.observable(false);
+        self.guid      = ko.observable(guid);
+        self.name      = ko.observable();
+        self.ipAddress = ko.observable();
+        self.username  = ko.observable();
+        self.port      = ko.observable();
+        self.type      = ko.observable();
 
         // Functions
         self.fillData = function(data) {
             self.name(data.name);
-            self.hvtype(data.hvtype);
+            self.type(data.type);
+            self.username(data.username);
+            self.port(data.port);
             self.ipAddress(data.ip);
-            if (data.hasOwnProperty('mgmtcenter_guid')) {
-                self.mgmtCenterGuid(data.mgmtcenter_guid);
-            }
             self.loaded(true);
             self.loading(false);
         };
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
-                api.get('pmachines/' + self.guid())
+                api.get('mgmtcenters/' + self.guid())
                     .done(function(data) {
                         self.fillData(data);
                         deferred.resolve();

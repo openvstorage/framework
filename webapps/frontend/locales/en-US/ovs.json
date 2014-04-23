@@ -154,7 +154,11 @@
         "mgmtport": "Management",
         "templatehaschildren": "This vTemplate does have children",
         "clone": "Create clones",
-        "about": "About"
+        "about": "About",
+        "administration": "Administration",
+        "mgmtcenter": "Mgmt. Center",
+        "port": "Port",
+        "noentries": "No entries available"
     },
     "vsas": {
         "title": "VSRs",
@@ -306,7 +310,7 @@
         }
     },
     "about": {
-        "title": "About",
+        "title": "About Open vStorage",
         "product": "Open vStorage",
         "installedproducts": "Installed Packages",
         "importantwebsites": "Important Websites",
@@ -320,6 +324,17 @@
         "openvstoragecore": "Open vStorage - Core:",
         "openvstoragewebapps": "Open vStorage - Webapps:",
         "volumedriver": "vStorage Driver:"
+    },
+    "pmachines": {
+        "title": "Hypervisor Mgmt.",
+        "mgmtcenter": {
+            "title": "Hypervisor Management Center",
+            "add": "Add new Center",
+            "hosts": "OVS Hosts/Total"
+        },
+        "pmachines": {
+            "title": "Managed Hosts"
+        }
     },
     "login": {
         "title": "Login",

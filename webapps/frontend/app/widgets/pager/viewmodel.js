@@ -73,7 +73,7 @@ define([
             return self.current() > 1;
         });
         self.pageFirst = ko.computed(function() {
-            return (self.current() - 1) * 10 + 1;
+            return Math.min((self.current() - 1) * 10 + 1, self.items().length);
         });
         self.pageLast = ko.computed(function() {
             return Math.min(self.pageFirst() + 9, self.items().length);

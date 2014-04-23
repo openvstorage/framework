@@ -19,6 +19,7 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 from ovs.extensions.hypervisor.factory import Factory as hvFactory
 
+
 class PMachine(DataObject):
     """
     The PMachine class represents a pMachine. A pMachine is the physical machine

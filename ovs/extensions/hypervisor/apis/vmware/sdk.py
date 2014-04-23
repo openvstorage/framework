@@ -137,22 +137,22 @@ class Sdk(object):
             raise RuntimeError('Must be connected to a vCenter Server API.')
         self._login()
         datacenter_info = self._get_object(
-                self._serviceContent.rootFolder,
-                prop_type='HostSystem',
-                traversal={'name': 'FolderTraversalSpec',
-                           'type': 'Folder',
-                           'path': 'childEntity',
-                           'traversal': {'name': 'DatacenterTraversalSpec',
-                                         'type': 'Datacenter',
-                                         'path': 'hostFolder',
-                                         'traversal': {'name': 'DFolderTraversalSpec',
-                                                       'type': 'Folder',
-                                                       'path': 'childEntity',
-                                                       'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
-                                                                     'type': 'ComputeResource',
-                                                                     'path': 'host'}}}},
-                properties=['name', 'summary']
-            )
+            self._serviceContent.rootFolder,
+            prop_type='HostSystem',
+            traversal={'name': 'FolderTraversalSpec',
+                       'type': 'Folder',
+                       'path': 'childEntity',
+                       'traversal': {'name': 'DatacenterTraversalSpec',
+                                     'type': 'Datacenter',
+                                     'path': 'hostFolder',
+                                     'traversal': {'name': 'DFolderTraversalSpec',
+                                                   'type': 'Folder',
+                                                   'path': 'childEntity',
+                                                   'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                 'type': 'ComputeResource',
+                                                                 'path': 'host'}}}},
+            properties=['name', 'summary']
+        )
         return datacenter_info
 
     def get_host_status(self, host_name):
@@ -1189,6 +1189,13 @@ class Sdk(object):
                 if filename in mapping[datastore.name]:
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
+
+    @authenticated
+    def is_management_center(self):
+        """
+        Connects to the server and checks whether it's a vCenter server or not.
+        """
+        return self._is_vcenter
 
     def _get_vm_datastore_mapping(self, vm):
         """

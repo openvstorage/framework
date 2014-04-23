@@ -141,55 +141,62 @@ class Hypervisor(object):
     @abc.abstractmethod
     def mount_nfs_datastore(self, name, remote_host, remote_path):
         """
-        Mounts a given NFS export as a datastore
+        Abstract method
+        """
+        pass
+
+    @abc.abstractmethod
+    def is_management_center(self):
+        """
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def clean_backing_disk_filename(self, path):
         """
-        Cleans a backing disk filename to the corresponding disk filename
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def get_backing_disk_path(self, machinename, devicename):
         """
-        Builds the path for the file backing a given device/disk
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def get_disk_path(self, machinename, devicename):
         """
-        Builds the path for the file representing a given device/disk
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def clean_vmachine_filename(self, path):
         """
-        Cleans a VM filename
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def get_vmachine_path(self, machinename, vsa_machineid):
         """
-        Builds the path for the file representing a given vmachine
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def get_rename_scenario(self, old_name, new_name):
         """
-        Gets the rename scenario based on the old and new name
+        Abstract method
         """
         pass
 
     @abc.abstractmethod
     def should_process(self, devicename):
         """
-        Checks whether a given device should be processed
+        Abstract method
         """
         pass

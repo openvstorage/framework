@@ -28,20 +28,25 @@ limitations under the License.
             </div>
             <div class="collapse navbar-collapse navbar-ex1-collapse">
                 <ul class="nav navbar-nav" data-bind="foreach: router.navigationModel">
-                    <li data-bind="css: { active: isActive }">
+                    <li data-bind="if: main, css: { active: isActive }">
                         <a data-bind="attr: { href: hash, 'data-i18n': titlecode }, text: title"></a>
                     </li>
                 </ul>
                 <!-- below: navbar-right has float: right behavior -->
                 <ul class="nav navbar-nav navbar-right" data-bind="visible: shared.authentication.loggedIn">
                     <li class="dropdown">
-                        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span data-i18n="ovs:generic.user"></span>: <i><span data-bind="text: shared.authentication.username"></span></i> <b class="caret"></b></a>
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span data-i18n="ovs:generic.administration"></span> <b class="caret"></b></a>
                         <ul class="dropdown-menu">
-                            <li><a class="hand" data-bind="click: changePassword" data-i18n="ovs:generic.changepassword"></a></li>
-                            <li><a class="hand" href="/api/customer" data-i18n="ovs:generic.customerapi"></a></li>
-                            <li><a class="hand" data-bind="attr: { href: shared.routing.loadHash('about') }"
-                                   data-i18n="ovs:generic.about"></a></li>
+                            <!-- ko foreach: router.navigationModel -->
+                                <li data-bind="if: !main, css: { active: isActive }">
+                                    <a data-bind="attr: { href: hash, 'data-i18n': titlecode }, text: title"></a>
+                                </li>
+                            <!-- /ko -->
                             <li class="divider"></li>
+                            <li><a class="hand" href="/api/customer" data-i18n="ovs:generic.customerapi"></a></li>
+                            <li class="divider"></li>
+                            <li><a><span data-i18n="ovs:generic.user"></span>: <i><span data-bind="text: shared.authentication.username"></span></i></a></li>
+                            <li><a class="hand" data-bind="click: changePassword" data-i18n="ovs:generic.changepassword"></a></li>
                             <li><a class="hand" data-bind="click: shared.authentication.logout" data-i18n="ovs:generic.logout"></a></li>
                         </ul>
                     </li>

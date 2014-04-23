@@ -27,7 +27,8 @@ class MgmtCenter(DataObject):
                   'username':    (None, str, 'Username of the Management Center.'),
                   'password':    (None, str, 'Password of the Management Center.'),
                   'ip':          (None, str, 'IP address of the Management Center.'),
-                  'port':        (None, int, 'IP address of the Management Center.')}
+                  'port':        (None, int, 'Port of the Management Center.'),
+                  'type':        (None, ['VCENTER'], 'Management Center type.')}
     _relations = {}
     _expiry = {}
     # pylint: enable=line-too-long
