@@ -20,6 +20,7 @@ from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
 
 class VCenter():
+
     """
     Represents the management center for vcenter server
     """
@@ -29,20 +30,23 @@ class VCenter():
         Initializes the object with credentials and connection information
         """
         self.sdk = Sdk(ip, username, password)
+        self.STATE_MAPPING = {'poweredOn' : 'RUNNING',
+                              'poweredOff': 'HALTED',
+                              'suspended' : 'PAUSED'}
 
     def get_host_status_by_ip(self, host_ip):
         """
         Return host status from vCenter Server
         Must be connected to vCenter
         """
-        return self.sdk.get_host_status_by_ip(host_ip)
+        return self.STATE_MAPPING.get(self.sdk.get_host_status_by_ip(host_ip), 'UNKNOWN')
 
     def get_host_status_by_pk(self, pk):
         """
         Return host status from vCenter Server
         Must be connected to vCenter
         """
-        return self.sdk.get_host_status_by_pk(pk)
+        return self.STATE_MAPPING.get(self.sdk.get_host_status_by_pk(pk), 'UNKNOWN')
 
     def get_host_primary_key(self, host_ip):
         """
@@ -57,3 +61,4 @@ class VCenter():
          Should always be True (depends on ip)
         """
         return self.sdk.test_connection()
+
