@@ -15,8 +15,9 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/pmachine', '../containers/mgmtcenter'
-], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, MgmtCenter) {
+    '../containers/pmachine', '../containers/mgmtcenter',
+    '../wizards/addmgmtcenter/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, MgmtCenter, AddMgmtCenterWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -29,11 +30,11 @@ define([
         self.mgmtCenterHeaders = [
             { key: 'name',      value: $.t('ovs:generic.name'),               width: 250       },
             { key: 'ipAddress', value: $.t('ovs:generic.ip'),                 width: 150       },
-            { key: 'port',      value: $.t('ovs:generic.port'),               width: 50        },
-            { key: 'type',      value: $.t('ovs:generic.type'),               width: 100       },
+            { key: 'port',      value: $.t('ovs:generic.port'),               width: 60        },
+            { key: 'type',      value: $.t('ovs:generic.type'),               width: 150       },
             { key: 'username',  value: $.t('ovs:generic.username'),           width: 150       },
-            { key: undefined,   value: $.t('ovs:pmachines.mgmtcenter.hosts'), width: 200       },
-            { key: undefined,   value: $.t('ovs:generic.actions'),            width: undefined }
+            { key: undefined,   value: $.t('ovs:pmachines.mgmtcenter.hosts'), width: undefined },
+            { key: undefined,   value: $.t('ovs:generic.actions'),            width: 60        }
         ];
         self.pMachineHeaders   = [
             { key: 'name',            value: $.t('ovs:generic.name'),       width: 250       },
@@ -133,9 +134,50 @@ define([
             }).promise();
         };
         self.addMgmtCenter = function() {
-            //dialog.show(new AddVPoolWizard({
-            //    modal: true
-            //}));
+            dialog.show(new AddMgmtCenterWizard({
+                modal: true
+            }));
+        };
+        self.deleteMgmtCenter = function(guid) {
+            var mgmtCenter;
+            $.each(self.mgmtCenters(), function(index, mc) {
+                if (mc.guid() === guid) {
+                    mgmtCenter = mc;
+                }
+            });
+            if (mgmtCenter !== undefined) {
+                app.showMessage(
+                        $.t('ovs:pmachines.delete.warning', { what: mgmtCenter.name() }),
+                        $.t('ovs:generic.areyousure'),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            self.mgmtCenters.destroy(mgmtCenter);
+                            generic.alertInfo(
+                                $.t('ovs:pmachines.delete.marked'),
+                                $.t('ovs:pmachines.delete.markedmsg', { what: mgmtCenter.name() })
+                            );
+                            api.del('mgmtcenters/' + mgmtCenter.guid())
+                                .done(function() {
+                                    generic.alertSuccess(
+                                        $.t('ovs:pmachines.delete.done'),
+                                        $.t('ovs:pmachines.delete.donemsg', { what: mgmtCenter.name() })
+                                    );
+                                })
+                                .fail(function(error) {
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:generic.messages.errorwhile', {
+                                            context: 'error',
+                                            what: $.t('ovs:pmachines.delete.errormsg', { what: mgmtCenter.name() }),
+                                            error: error
+                                        })
+                                    );
+                                });
+                        }
+                    });
+            }
         };
 
         // Durandal

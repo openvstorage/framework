@@ -28,14 +28,14 @@ class Factory(object):
     mgmtcenters = {}
 
     @staticmethod
-    def get(node):
+    def get(pmachine):
         """
-        Returns the appropriate hypervisor client class for a given VMachine
+        Returns the appropriate hypervisor client class for a given PMachine
         """
-        hvtype = node.hvtype
-        ip = node.ip
-        username = node.username
-        password = node.password
+        hvtype = pmachine.hvtype
+        ip = pmachine.ip
+        username = pmachine.username
+        password = pmachine.password
         key = '{0}_{1}'.format(ip, username)
         if key not in Factory.hypervisors:
             mutex = FileMutex('hypervisor_{0}'.format(key))
@@ -56,30 +56,37 @@ class Factory(object):
         return Factory.hypervisors[key]
 
     @staticmethod
-    def get_mgmtcenter(node):
+    def get_mgmtcenter(pmachine=None, mgmt_center=None):
         """
-        @param node: pmachine hybrid from dal
+        @param pmachine: pmachine hybrid from DAL
+		@param mgmt_center: mgmtcenter hybrid from DAL
         Returns the appropriate sdk client for the management center of the node
         Implemented only for VMWare / vCenter Server
         TODO: KVM
         """
-        if node.mgmtcenter:
-            mgmtcenter_type = node.mgmtcenter.type
-            ip = node.mgmtcenter.ip
-            username = node.mgmtcenter.username
-            password = node.mgmtcenter.password
-            key = '{0}_{1}'.format(ip, username)
-            if key not in Factory.mgmtcenters:
-                mutex = FileMutex('mgmtcenter_{0}'.format(key))
-                try:
-                    mutex.acquire(30)
-                    if key not in Factory.mgmtcenters:
-                        if mgmtcenter_type == 'VCENTER':
-                            from mgmtcenters.vcenter import VCenter
-                            mgmtcenter = VCenter(ip, username, password)
-                        else:
-                            raise NotImplementedError('Management center for {0} is not yet supported'.format(mgmtcenter_type))
-                        Factory.mgmtcenters[key] = mgmtcenter
-                finally:
-                    mutex.release()
-            return Factory.mgmtcenters[key]
+        if not ((pmachine is None) ^ (mgmt_center is None)):
+            raise ValueError('Either a pMachine or a Management center should be passed')
+        if pmachine is not None:
+            mgmt_center = pmachine.mgmtcenter
+            if mgmt_center is None:
+                raise ValueError('The given pMachine should have a Management center linked')
+
+        mgmtcenter_type = mgmt_center.type
+        ip = mgmt_center.ip
+        username = mgmt_center.username
+        password = mgmt_center.password
+        key = '{0}_{1}'.format(ip, username)
+        if key not in Factory.mgmtcenters:
+            mutex = FileMutex('mgmtcenter_{0}'.format(key))
+            try:
+                mutex.acquire(30)
+                if key not in Factory.mgmtcenters:
+                    if mgmtcenter_type == 'VCENTER':
+                        from mgmtcenters.vcenter import VCenter
+                        mgmtcenter = VCenter(ip, username, password)
+                    else:
+                        raise NotImplementedError('Management center for {0} is not yet supported'.format(mgmtcenter_type))
+                    Factory.mgmtcenters[key] = mgmtcenter
+            finally:
+                mutex.release()
+        return Factory.mgmtcenters[key]

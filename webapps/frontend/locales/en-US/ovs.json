@@ -51,6 +51,9 @@
             "REST": "REST backend",
             "DISTRIBUTED": "Distributed FS"
         },
+        "mgmtcentertypes": {
+            "VCENTER": "VMware vCenter"
+        },
         "username": "Username",
         "password": "Password",
         "logout": "Log out",
@@ -334,6 +337,14 @@
         },
         "pmachines": {
             "title": "Managed Hosts"
+        },
+        "delete": {
+            "warning": "Are you sure you want to delete __what__?",
+            "marked": "Marked for deletion",
+            "markedmsg": "Management center __what__ is marked for deletion...",
+            "done": "Deleted",
+            "donemsg": "Management center __what__ deleted",
+            "errormsg": "deleting __what__"
         }
     },
     "login": {
@@ -520,6 +531,27 @@
                 "enternew": "Enter new password",
                 "shouldmatch": "New passwords should match",
                 "updatingpassword": "updating the password"
+            }
+        },
+        "addmgmtcenter": {
+            "title": "Add Hypervisor Management Center",
+            "gather": {
+                "noname": "No name was given",
+                "nousername": "No username was given",
+                "nopassword": "No password was given",
+                "started": "Started",
+                "inprogress": "Adding Management Center __what__ started.",
+                "complete": "Complete",
+                "success": "Adding __what__ completed.",
+                "failed": "Adding __what__ failed: __why__",
+                "basicinfo": "Enter the required information to add the Hypervisor Management Center",
+                "type": "Type:",
+                "ip": "IP Address:",
+                "name": "Name:",
+                "port": "Port:",
+                "username": "Username:",
+                "password": "Password:",
+                "invalidip": "The IP Address entered is invalid"
             }
         }
     },

@@ -211,13 +211,6 @@ class Sdk(object):
         datacenter_info = self._refresh_vcenter_info()
         return [host.name for host in datacenter_info]
 
-    @authenticated
-    def is_management_center(self):
-        """
-        Connects to the server and checks whether it's a vCenter server or not.
-        """
-        return self._is_vcenter
-
     def validate_result(self, result, message=None):
         """
         Validates a given result. Returning True if the task succeeded, raising an error if not
@@ -1233,6 +1226,13 @@ class Sdk(object):
                 if filename in mapping[datastore.name]:
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
+
+    def is_management_center(self):
+        """
+        Connects to the server and checks whether it's a vCenter server or not.
+        """
+        self._login()
+        return self._is_vcenter
 
     def _get_vm_datastore_mapping(self, vm):
         """

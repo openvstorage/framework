@@ -27,10 +27,14 @@ class FullSerializer(serializers.Serializer):
         """
         Initializes the serializer, mapping field types
         """
+        allow_passwords = False
+        if 'allow_passwords' in kwargs:
+            allow_passwords = kwargs['allow_passwords']
+            del kwargs['allow_passwords']
         super(FullSerializer, self).__init__(*args, **kwargs)
         self.hybrid = hybrid
         for key, default in self.hybrid._blueprint.iteritems():
-            if not 'password' in key:
+            if not 'password' in key or allow_passwords:
                 self.fields[key] = FullSerializer._map_type_to_field(default[1])
         for key in self.hybrid._expiry:
             if contents is None or (('_dynamics' in contents or key in contents)
@@ -39,7 +43,7 @@ class FullSerializer(serializers.Serializer):
         for key in self.hybrid._relations:
             if contents is None or (('_relations' in contents or key in contents)
                                     and '-{0}'.format(key) not in contents):
-                self.fields['%s_guid' % key] = serializers.Field()
+                self.fields['%s_guid' % key] = serializers.CharField(required=False)
         relations = RelationMapper.load_foreign_relations(hybrid)
         if relations is not None:
             for key, info in relations.iteritems():
@@ -73,11 +77,11 @@ class FullSerializer(serializers.Serializer):
         if isinstance(field_type, list):
             field_type = type(field_type[0])
         if field_type is str:
-            return serializers.CharField()
+            return serializers.CharField(required=False)
         if field_type is int:
-            return serializers.IntegerField()
+            return serializers.IntegerField(required=False)
         if field_type is bool:
-            return serializers.BooleanField()
+            return serializers.BooleanField(required=False)
         return serializers.Field()
 
     class Meta:

@@ -24,19 +24,19 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.loading   = ko.observable(false);
-        self.loaded    = ko.observable(false);
-        self.guid      = ko.observable(guid);
-        self.name      = ko.observable();
-        self.ipAddress = ko.observable();
-        self.username  = ko.observable();
-        self.port      = ko.observable();
-        self.type      = ko.observable();
+        self.loading    = ko.observable(false);
+        self.loaded     = ko.observable(false);
+        self.guid       = ko.observable(guid);
+        self.name       = ko.observable();
+        self.ipAddress  = ko.observable();
+        self.username   = ko.observable();
+        self.port       = ko.observable();
+        self.centerType = ko.observable();
 
         // Functions
         self.fillData = function(data) {
             self.name(data.name);
-            self.type(data.type);
+            self.centerType(data.type);
             self.username(data.username);
             self.port(data.port);
             self.ipAddress(data.ip);

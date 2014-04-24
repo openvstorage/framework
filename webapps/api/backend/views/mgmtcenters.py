@@ -20,7 +20,15 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
+from ovs.extensions.hypervisor.factory import Factory
+from backend.serializers.serializers import FullSerializer
+from rest_framework.exceptions import NotAcceptable
+from rest_framework.response import Response
+from rest_framework import status
 from backend.decorators import required_roles, expose, validate, get_object, get_list
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('api', 'mgmtcenters')
 
 
 class MgmtCenterViewSet(viewsets.ViewSet):
@@ -49,3 +57,41 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         _ = request
         return obj
+
+    @expose(internal=True, customer=True)
+    @required_roles(['delete'])
+    @validate(MgmtCenter)
+    def destroy(self, request, obj):
+        """
+        Deletes a Management center
+        """
+        _ = request
+        obj.delete(abandon=True)
+        return Response({}, status=status.HTTP_200_OK)
+
+    @expose(internal=True)
+    @required_roles(['view', 'create', 'system'])
+    def create(self, request, format=None):
+        """
+        Creates a Management Center
+        """
+        _ = format
+        serializer = FullSerializer(MgmtCenter, instance=MgmtCenter(), data=request.DATA, allow_passwords=True)
+        if serializer.is_valid():
+            mgmt_center = serializer.object
+            duplicate = MgmtCenterList.get_by_ip(mgmt_center.ip)
+            if duplicate is None:
+                mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
+                try:
+                    is_mgmt_center = mgmt_center_client.is_management_center()
+                except Exception as ex:
+                    logger.debug('Management center testing: {0}'.format(ex))
+                    raise NotAcceptable('The given information is invalid.')
+                if not is_mgmt_center:
+                    raise NotAcceptable('The given information is not for a Management center.')
+                mgmt_center.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            else:
+                raise NotAcceptable('A Mangement Center with this ip already exists.')
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
