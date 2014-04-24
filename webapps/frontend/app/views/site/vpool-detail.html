@@ -1,0 +1,235 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section data-bind="with: vPool()">
+	<ol class="breadcrumb">
+	    <li class="active" data-bind="text: name"></li>
+	</ol>
+    <div>
+        <ul class="nav nav-tabs">
+            <li class="active">
+                <a href="#information" data-toggle="tab" >
+                    <span class="fa" data-i18n="[html]ovs:icons.information"></span>
+                    <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
+                </a>
+            </li>
+            <li class="actions">
+                <span data-i18n="ovs:generic.actions"></span>:
+                <button type="button" class="btn btn-mini btn-default"
+                        data-bind="click: function() { $root.sync(); },
+                                   style: { color: '#428bca' },
+                                   tooltip: 'ovs:vpools.detail.sync'">
+                    <span class="fa" data-i18n="[html]ovs:icons.sync"></span>
+                </button>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane active" id="information" style="padding: 15px;">
+                <table style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th data-i18n="ovs:vpools.statistics" colspan="2"></th>
+                            <th data-i18n="ovs:vpools.backend" colspan="2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
+                            <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
+                            <td style="width: 15%;" data-i18n="ovs:vpools.backendtype"></td>
+                            <td style="width: 35%;"><span data-bind="translate: 'ovs:generic.backendtypes.' + backendType()"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.cache"></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td data-i18n="ovs:vpools.backendconnection"></td>
+                            <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.iops"></td>
+                            <td><span data-bind="text: iops"></span></td>
+                            <td data-i18n="ovs:vpools.backendlogin"></td>
+                            <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td data-i18n="ovs:generic.readspeed"></td>
+                            <td><span data-bind="text: backendReadSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td data-i18n="ovs:generic.writespeed"></td>
+                            <td><span data-bind="text: backendWriteSpeed"></span></td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvmachines"></td>
+                            <td><span data-bind="text: vMachines().length"></span></td>
+                            <td colspan="2">&nbsp;</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.nrofvdisks"></td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td colspan="2">&nbsp;</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div>
+        <ul class="nav nav-tabs">
+            <li class="active" data-bind="tooltip: 'ovs:generic.vmachines'">
+                <a href="#vmachines" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vmachines"></a>
+            </li>
+            <li data-bind="tooltip: 'ovs:generic.vdisks'">
+                <a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a>
+            </li>
+            <li data-bind="tooltip: 'ovs:generic.vmachines'">
+                <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane active" id="vmachines" style="padding: 15px;">
+                <h4 data-i18n="ovs:vmachines.title"></h4>
+                <div data-bind="pager: { items: vMachines, headers: $parent.vMachineHeaders, initialLoad: $parent.vMachinesInitialLoad,
+                                         viewportRefresh: $parent.refreshVMachines, viewportRefreshInterval: 5000, controls: true }">
+                    <table data-dummy="dummy">
+                        <tr data-part="vitem" data-bind="attr: { id: 'vmachine_' + guid() }">
+                            <td>
+                                <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                                   class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                                <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
+                                              attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: guid }) }"></a>
+                            </td>
+                            <td data-bind="lazylist: { items: vSAs, loadedObservable: 'loaded' }">
+                                <a data-part="entry"
+                                   data-bind="text: name,
+                                              attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
+                            </td>
+                            <td><span data-bind="text: vDisks().length"></span></td>
+                            <td><span data-bind="text: storedData"></span></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td><span data-bind="text: iops"></span></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td>
+                                <span data-bind="status: {
+                                                     colors: {
+                                                         green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                                         yellow: failoverMode() == 'catch_up',
+                                                         red: failoverMode() == 'degraded'
+                                                     },
+                                                     defaultColor: 'lightgrey'
+                                                 }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane" id="vdisks" style="padding: 15px;">
+                <h4 data-i18n="ovs:vdisks.title"></h4>
+                <div data-bind="pager: { items: vDisks, headers: $parent.vDiskHeaders, initialLoad: $parent.vDisksInitialLoad,
+                                         viewportRefresh: $parent.refreshVDisks, viewportRefreshInterval: 5000, controls: true }">
+                    <table data-dummy="dummy">
+                        <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
+                            <td>
+                                <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                                   class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                                <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
+                                              attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
+                            </td>
+                            <td>
+                                <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <a data-part="lazy-entry"
+                                       data-bind="text: item().name,
+                                                  attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
+                                </span>
+                            </td>
+                            <td><span data-bind="text: size"></span></td>
+                            <td><span data-bind="text: storedData"></span></td>
+                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td><span data-bind="text: iops"></span></td>
+                            <td><span data-bind="text: readSpeed"></span></td>
+                            <td><span data-bind="text: writeSpeed"></span></td>
+                            <td>
+                                <span data-bind="status: {
+                                                     colors: {
+                                                         green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                                         yellow: failoverMode() == 'catch_up',
+                                                         red: failoverMode() == 'degraded'
+                                                     },
+                                                     defaultColor: 'lightgrey'
+                                                 }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane" id="management" style="padding: 15px;">
+                <table class="table table-noborder" style="width: 100%;">
+                    <tbody>
+                        <tr>
+                            <td style="width: 90px; vertical-align: middle; padding: 0;">
+                                <button type="button" class="btn btn-lg" data-bind="enable: false">
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.vsavpoollink"></span>
+                                </button>
+                            </td>
+                            <td style="padding: 0;">
+                                <h4 data-i18n="ovs:vpools.detail.vsavpoollink"></h4>
+                                <span class="fa fa-spin" data-bind="visible: !$root.vSAsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
+                                <div data-bind="foreach: $root.vSAs">
+                                    <div>
+                                        <span class="alert" data-bind="css: {
+                                                                           'alert-danger': $.inArray(guid(), $parent.servingVSAGuids()) !== -1 && $.inArray(guid(), $root.checkedVSAGuids()) === -1,
+                                                                           'alert-success': $.inArray(guid(), $parent.servingVSAGuids()) === -1 && $.inArray(guid(), $root.checkedVSAGuids()) !== -1
+                                                                       }"
+                                              style="padding: 2px 5px 3px 5px;">
+                                            <input type="checkbox" data-bind="attr: { id: 'vsa_' + guid() }, checkedValue: guid(),
+                                                                              checked: $root.checkedVSAGuids,
+                                                                              disable: $parent.backendType() === 'LOCAL'"
+                                                    style="vertical-align: text-bottom;">
+                                            <label data-bind="attr: { for: 'vsa_' + guid() }" style="font-weight: normal; margin-left: 7px;">
+                                                <span data-bind="text: name"></span>
+                                            </label>
+                                            <span data-bind="visible: $.inArray(guid(), $parent.servingVSAGuids()) !== -1 && $.inArray(guid(), $root.checkedVSAGuids()) === -1"
+                                                  class="fa" data-i18n="[html]ovs:icons.delete" style="margin-left: 7px;"></span>
+                                            <span data-bind="visible: $.inArray(guid(), $parent.servingVSAGuids()) === -1 && $.inArray(guid(), $root.checkedVSAGuids()) !== -1"
+                                                  class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: 7px;"></span>
+                                        </span>
+                                        <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin-left: 10px;"
+                                              data-bind="visible: $root.updatingVSAs() && $parent.backendType() !== 'LOCAL' && (
+                                                             ($.inArray(guid(), $root.checkedVSAGuids()) !== -1 && $.inArray(guid(), $parent.servingVSAGuids()) === -1) ||
+                                                             ($.inArray(guid(), $root.checkedVSAGuids()) === -1 && $.inArray(guid(), $parent.servingVSAGuids()) !== -1)
+                                                         )" ></span>
+                                    </div>
+                                </div>
+                                <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
+                                     data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
+                                <button class="btn btn-default" data-bind="click: $root.updateVSAServing,
+                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0,
+                                                                           visible: backendType() !== 'LOCAL'"
+                                        style="margin-top: 10px;">
+                                    <span data-i18n="ovs:vpools.detail.updateserving"></span>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
