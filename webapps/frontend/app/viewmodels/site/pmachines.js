@@ -54,6 +54,35 @@ define([
         self.loadPMachinesHandle      = undefined;
         self.loadMgmtCentersHandle    = undefined;
 
+        // Computed
+        self.hostMapping = ko.computed(function() {
+           var pMachineIPs = [], mapping = {}, match = false;
+            $.each(self.pMachines(), function(pindex, pMachine) {
+                pMachineIPs.push(pMachine.ipAddress());
+            });
+            $.each(self.mgmtCenters(), function(mindex, mgmtCenter) {
+                mapping[mgmtCenter.guid()] = {
+                    ovs: 0,
+                    total: 0
+                };
+                $.each(mgmtCenter.hosts(), function(hindex, host) {
+                    mapping[mgmtCenter.guid()].total += 1;
+                    match = false;
+                    $.each(host.ips, function(iindex, ip) {
+                        if ($.inArray(ip, pMachineIPs) !== -1) {
+                            match = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (match) {
+                        mapping[mgmtCenter.guid()].ovs += 1;
+                    }
+                });
+            });
+            return mapping;
+        });
+
         // Functions
         self.loadPMachines = function(page) {
             return $.Deferred(function(deferred) {
@@ -97,7 +126,7 @@ define([
                 if (generic.xhrCompleted(self.loadMgmtCentersHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: ''
+                        contents: 'hosts'
                     };
                     if (page !== undefined) {
                         options.page = page;

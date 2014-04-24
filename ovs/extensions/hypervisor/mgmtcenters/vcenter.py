@@ -62,3 +62,8 @@ class VCenter():
         """
         return self.sdk.test_connection()
 
+    def get_hosts(self):
+        """
+        Gets a list of all hosts/hypervisors
+        """
+        return self.sdk.get_hosts()

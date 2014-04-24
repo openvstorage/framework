@@ -32,6 +32,7 @@ define([
         self.username   = ko.observable();
         self.port       = ko.observable();
         self.centerType = ko.observable();
+        self.hosts      = ko.observable({});
 
         // Functions
         self.fillData = function(data) {
@@ -40,6 +41,9 @@ define([
             self.username(data.username);
             self.port(data.port);
             self.ipAddress(data.ip);
+            if (data.hasOwnProperty('hosts')) {
+                self.hosts(data.hosts);
+            }
             self.loaded(true);
             self.loading(false);
         };

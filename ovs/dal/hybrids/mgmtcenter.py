@@ -15,6 +15,7 @@
 Management center module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.extensions.hypervisor.factory import Factory
 
 
 class MgmtCenter(DataObject):
@@ -30,5 +31,12 @@ class MgmtCenter(DataObject):
                   'port':        (None, int, 'Port of the Management Center.'),
                   'type':        (None, ['VCENTER'], 'Management Center type.')}
     _relations = {}
-    _expiry = {}
+    _expiry = {'hosts': (60, dict)}
     # pylint: enable=line-too-long
+
+    def _hosts(self):
+        """
+        Returns all hosts (not only those known to OVS) managed by the Management center
+        """
+        mgmt_center = Factory.get_mgmtcenter(mgmt_center=self)
+        return mgmt_center.get_hosts()

@@ -35,7 +35,10 @@ limitations under the License.
                 <td><span data-bind="text: port"></span></td>
                 <td><span data-bind="translate: 'ovs:generic.mgmtcentertypes.' + centerType()"></span></td>
                 <td><span data-bind="text: username"></span></td>
-                <td>-</td>
+                <td>
+                    <span data-bind="text: $root.hostMapping()[guid()].ovs"></span> /
+                    <span data-bind="text: $root.hostMapping()[guid()].total"></span>
+                </td>
                 <td>
                     <i data-bind="click: function() { $root.deleteMgmtCenter($data.guid()); }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
