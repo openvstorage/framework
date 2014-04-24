@@ -103,7 +103,7 @@ def process(queue, body):
                     'arguments': {'mountpoint': 'mountpoint',
                                   '[NODE_ID]': 'vsrid'},
                     'options': {'execonvsa': True}},
-                   EventMessages.EventMessage.RedirectTimeoutWhileOnlineMessage:
+                   EventMessages.EventMessage.RedirectTimeoutWhileOnline:
                    {'property': 'redirect_timeout_while_online',
                     'task': VolumeStorageRouterController.update_status,
                     'arguments': {'remote_node_id': 'vsrid'},
