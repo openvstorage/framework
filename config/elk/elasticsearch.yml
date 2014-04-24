@@ -44,11 +44,11 @@ node.name: <NODE_NAME>
 #
 # Allow this node to be eligible as a master node (enabled by default):
 #
-# node.master: true
+node.master: <IS_POTENTIAL_MASTER>
 #
 # Allow this node to store data (enabled by default):
 #
-# node.data: true
+node.data: <IS_DATASTORE>
 
 # You can exploit these settings to design advanced cluster topologies.
 #
