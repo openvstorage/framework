@@ -40,6 +40,8 @@ def authenticated(function):
     def new_function(self, *args, **kwargs):
         self.__doc__ = function.__doc__
         try:
+            if self._sessionID is None:
+                self._login()
             return function(self, *args, **kwargs)
         except WebFault as fault:
             if 'The session is not authenticated' in str(fault):
@@ -128,29 +130,29 @@ class Sdk(object):
             self._esxHost = None
 
     @authenticated
-    def _refresh_vcenter_info(self):
+    def _get_vcenter_hosts(self):
         """
         reload vCenter info (host name and summary)
         """
         if not self._is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
         datacenter_info = self._get_object(
-                self._serviceContent.rootFolder,
-                prop_type='HostSystem',
-                traversal={'name': 'FolderTraversalSpec',
-                           'type': 'Folder',
-                           'path': 'childEntity',
-                           'traversal': {'name': 'DatacenterTraversalSpec',
-                                         'type': 'Datacenter',
-                                         'path': 'hostFolder',
-                                         'traversal': {'name': 'DFolderTraversalSpec',
-                                                       'type': 'Folder',
-                                                       'path': 'childEntity',
-                                                       'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
-                                                                     'type': 'ComputeResource',
-                                                                     'path': 'host'}}}},
-                properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
-            )
+            self._serviceContent.rootFolder,
+            prop_type='HostSystem',
+            traversal={'name': 'FolderTraversalSpec',
+                       'type': 'Folder',
+                       'path': 'childEntity',
+                       'traversal': {'name': 'DatacenterTraversalSpec',
+                                     'type': 'Datacenter',
+                                     'path': 'hostFolder',
+                                     'traversal': {'name': 'DFolderTraversalSpec',
+                                                   'type': 'Folder',
+                                                   'path': 'childEntity',
+                                                   'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                 'type': 'ComputeResource',
+                                                                 'path': 'host'}}}},
+            properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
+        )
         return datacenter_info
 
     def get_host_status_by_ip(self, host_ip):
@@ -182,7 +184,7 @@ class Sdk(object):
         Return HostSystem object by ip, from vcenter info
         Must be connected to a vcenter server api
         """
-        datacenter_info = self._refresh_vcenter_info()
+        datacenter_info = self._get_vcenter_hosts()
         for host in datacenter_info:
             for nic in host.config.virtualNicManagerInfo.netConfig.VirtualNicManagerNetConfig:
                 if nic.nicType == 'management':
@@ -196,10 +198,27 @@ class Sdk(object):
         Return HostSystem object by pk, from vcenter info
         Must be connected to a vcenter server api
         """
-        datacenter_info = self._refresh_vcenter_info()
+        datacenter_info = self._get_vcenter_hosts()
         for host in datacenter_info:
             if host.obj_identifier.value == pk:
                 return host
+
+    def get_hosts(self):
+        """
+        Gets a neutral list of all hosts available
+        """
+        host_data = self._get_vcenter_hosts()
+        host_data = [] if host_data is None else host_data
+        hosts = {}
+        for host in host_data:
+            ips = []
+            for nic in host.config.virtualNicManagerInfo.netConfig.VirtualNicManagerNetConfig:
+                if nic.nicType == 'management':
+                    for vnic in nic.candidateVnic:
+                        ips.append(vnic.spec.ip.ipAddress)
+            hosts[host.obj_identifier.value] = {'name': host.name,
+                                                'ips': ips}
+        return hosts
 
     def test_connection(self):
         """
@@ -213,7 +232,7 @@ class Sdk(object):
         return a list of registered host names in vCenter
         must be connected to a vcenter server api
         """
-        datacenter_info = self._refresh_vcenter_info()
+        datacenter_info = self._get_vcenter_hosts()
         return [host.name for host in datacenter_info]
 
     def validate_result(self, result, message=None):
