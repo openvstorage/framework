@@ -59,7 +59,7 @@ class Factory(object):
     def get_mgmtcenter(pmachine=None, mgmt_center=None):
         """
         @param pmachine: pmachine hybrid from DAL
-		@param mgmt_center: mgmtcenter hybrid from DAL
+        @param mgmt_center: mgmtcenter hybrid from DAL
         Returns the appropriate sdk client for the management center of the node
         Implemented only for VMWare / vCenter Server
         TODO: KVM
@@ -69,7 +69,7 @@ class Factory(object):
         if pmachine is not None:
             mgmt_center = pmachine.mgmtcenter
             if mgmt_center is None:
-                raise ValueError('The given pMachine should have a Management center linked')
+                return None
 
         mgmtcenter_type = mgmt_center.type
         ip = mgmt_center.ip

@@ -37,7 +37,6 @@ def authenticated(function):
     """
     Decorator to make that a login is executed in case the current session isn't valid anymore
     """
-
     def new_function(self, *args, **kwargs):
         self.__doc__ = function.__doc__
         try:
@@ -52,7 +51,6 @@ def authenticated(function):
             logger.debug('Received NotAuthenticatedException, logging in...')
             self._login()
             return function(self, *args, **kwargs)
-
     return new_function
 
 
@@ -129,13 +127,13 @@ class Sdk(object):
         else:
             self._esxHost = None
 
+    @authenticated
     def _refresh_vcenter_info(self):
         """
         reload vCenter info (host name and summary)
         """
         if not self._is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
-        self._login()
         datacenter_info = self._get_object(
                 self._serviceContent.rootFolder,
                 prop_type='HostSystem',
@@ -202,6 +200,13 @@ class Sdk(object):
         for host in datacenter_info:
             if host.obj_identifier.value == pk:
                 return host
+
+    def test_connection(self):
+        """
+        Tests the connection
+        """
+        self._login()
+        return True
 
     def list_hosts_in_datacenter(self):
         """
@@ -1226,13 +1231,6 @@ class Sdk(object):
                 if filename in mapping[datastore.name]:
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
-
-    def is_management_center(self):
-        """
-        Connects to the server and checks whether it's a vCenter server or not.
-        """
-        self._login()
-        return self._is_vcenter
 
     def _get_vm_datastore_mapping(self, vm):
         """

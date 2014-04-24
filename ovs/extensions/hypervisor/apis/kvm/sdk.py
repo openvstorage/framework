@@ -41,6 +41,24 @@ def _recurse(treeitem):
     return result
 
 
+def authenticated(function):
+    """
+    Decorator that make sure all required calls are running onto a connected SDK
+    """
+    def new_function(self, *args, **kwargs):
+        self.__doc__ = function.__doc__
+        try:
+            if self._conn is None:
+                self._connect()
+            return function(self, *args, **kwargs)
+        finally:
+            try:
+                self._disconnect()
+            except:
+                pass
+    return new_function
+
+
 class Sdk(object):
     """
     This class contains all SDK related methods
@@ -64,9 +82,9 @@ class Sdk(object):
         self._ssh_client = None
         logger.debug('Init complete')
 
-    def connect(self, attempt = 0):
+    def _connect(self, attempt = 0):
         if self._conn:
-            self.disconnect()  # Clean up existing conn
+            self._disconnect()  # Clean up existing conn
         logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
         try:
             if self.host == 'localhost':  # Or host in (localips...):
@@ -77,12 +95,12 @@ class Sdk(object):
             logger.error('Error during connect: %s (%s)', str(le), le.get_error_code())
             if attempt < 5:
                 time.sleep(1)
-                self.connect(attempt + 1)
+                self._connect(attempt + 1)
             else:
                 raise
         return True
 
-    def disconnect(self):
+    def _disconnect(self):
         logger.debug('Disconnecting libvirt')
         if self._conn:
             try:
@@ -92,6 +110,14 @@ class Sdk(object):
                 logger.error('Error during disconnect: %s (%s)', str(le), le.get_error_code())
 
         self._conn = None
+        return True
+
+    @authenticated
+    def test_connection(self):
+        """
+        Tests the connection
+        """
+        _ = self
         return True
 
     @staticmethod
@@ -153,6 +179,7 @@ class Sdk(object):
                 return '-1'
         return '-2'  # No pid, machine is halted
 
+    @authenticated
     def make_agnostic_config(self, vm_object):
         """
         return an agnostic config (no hypervisor specific type or structure)
@@ -213,6 +240,7 @@ class Sdk(object):
 
         return config
 
+    @authenticated
     def get_power_state(self, vmid):
         """
         return vmachine state
@@ -222,6 +250,7 @@ class Sdk(object):
         state = vm.info()[0]
         return self.states.get(state, 'UNKNOWN')
 
+    @authenticated
     def get_vm_object(self, vmid):
         """
         return virDomain object representing virtual machine
@@ -239,7 +268,7 @@ class Sdk(object):
         except self.libvirt.libvirtError as le:
             logger.error(str(le))
             try:
-                self.connect()
+                self._connect()
                 return getattr(self._conn, func)(vmid)
             except self.libvirt.libvirtError as le:
                 logger.error(str(le))
@@ -252,6 +281,7 @@ class Sdk(object):
         vmid = filename.split('/')[-1].replace('.xml', '')
         return self.get_vm_object(vmid)
 
+    @authenticated
     def get_vms(self):
         """
         return a list of virDomain objects, representing virtual machines
@@ -263,6 +293,7 @@ class Sdk(object):
         vm_object.shutdown()
         return self.get_power_state(vmid)
 
+    @authenticated
     def delete_vm(self, vmid):
         vm_object = self.get_vm_object(vmid)
         vm_object.undefine()
@@ -273,6 +304,7 @@ class Sdk(object):
         vm_object.create()
         return self.get_power_state(vmid)
 
+    @authenticated
     def clone_vm(self, vmid, name, disks):
         """
         create a clone vm
@@ -280,6 +312,7 @@ class Sdk(object):
         """
         raise NotImplementedError()
 
+    @authenticated
     def create_vm_from_template(self, name, source_vm, disks, mountpoint):
         """
         Create a vm based on an existing template on specified hypervisor
@@ -328,7 +361,7 @@ class Sdk(object):
         except self.libvirt.libvirtError as le:
             logger.error(str(le))
             try:
-                self.connect()
+                self._connect()
                 return self.get_vm_object(name).UUIDString()
             except self.libvirt.libvirtError as le:
                 logger.error(str(le))
@@ -336,7 +369,7 @@ class Sdk(object):
 
     def _vm_create(self, name, vcpus, ram, disks,
                    cdrom_iso=None, os_type=None, os_variant=None, vnc_listen='0.0.0.0',
-                   networks=[('network=default', 'mac=RANDOM', 'model=e1000')], start = False):
+                   networks=None, start = False):
         """
         disks = list of tuples [(disk_name, disk_size_GB, bus ENUM(virtio, ide, sata)]
         #e.g [(/vms/vm1.vmdk,10,virtio), ]
@@ -345,6 +378,8 @@ class Sdk(object):
         #network: (network name: "default", specific mac or RANDOM, nic model as seen inside vmachine: e1000
         @param start: should the guest be started after create
         """
+        if networks is None:
+            networks = [('network=default', 'mac=RANDOM', 'model=e1000')]
         command = 'virt-install'
         options = ['--connect qemu+ssh://{}@{}/system'.format(self.login, self.host),
                    '--name {}'.format(name),
@@ -370,7 +405,7 @@ class Sdk(object):
             for network in networks:
                 options.append('--network {}'.format(','.join(network)))
         self.ssh_run('{} {}'.format(command, ' '.join(options)))
-        if start == False:
+        if start is False:
             self.ssh_run('virsh destroy {}'.format(name))
 
     def _get_unique_id(self):

@@ -20,7 +20,6 @@ from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
 
 class VCenter():
-
     """
     Represents the management center for vcenter server
     """
@@ -52,10 +51,9 @@ class VCenter():
         """
         return self.sdk.get_host_primary_key(host_ip)
 
-    def is_management_center(self):
+    def test_connection(self):
         """
         Checks whether this node is a vCenter
          Should always be True (depends on ip)
         """
-        return self.sdk.is_management_center()
-
+        return self.sdk.test_connection()

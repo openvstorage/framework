@@ -83,7 +83,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
             if duplicate is None:
                 mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
                 try:
-                    is_mgmt_center = mgmt_center_client.is_management_center()
+                    is_mgmt_center = mgmt_center_client.test_connection()
                 except Exception as ex:
                     logger.debug('Management center testing: {0}'.format(ex))
                     raise NotAcceptable('The given information is invalid.')
