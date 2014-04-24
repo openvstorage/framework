@@ -137,34 +137,71 @@ class Sdk(object):
             raise RuntimeError('Must be connected to a vCenter Server API.')
         self._login()
         datacenter_info = self._get_object(
-            self._serviceContent.rootFolder,
-            prop_type='HostSystem',
-            traversal={'name': 'FolderTraversalSpec',
-                       'type': 'Folder',
-                       'path': 'childEntity',
-                       'traversal': {'name': 'DatacenterTraversalSpec',
-                                     'type': 'Datacenter',
-                                     'path': 'hostFolder',
-                                     'traversal': {'name': 'DFolderTraversalSpec',
-                                                   'type': 'Folder',
-                                                   'path': 'childEntity',
-                                                   'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
-                                                                 'type': 'ComputeResource',
-                                                                 'path': 'host'}}}},
-            properties=['name', 'summary']
-        )
+                self._serviceContent.rootFolder,
+                prop_type='HostSystem',
+                traversal={'name': 'FolderTraversalSpec',
+                           'type': 'Folder',
+                           'path': 'childEntity',
+                           'traversal': {'name': 'DatacenterTraversalSpec',
+                                         'type': 'Datacenter',
+                                         'path': 'hostFolder',
+                                         'traversal': {'name': 'DFolderTraversalSpec',
+                                                       'type': 'Folder',
+                                                       'path': 'childEntity',
+                                                       'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                     'type': 'ComputeResource',
+                                                                     'path': 'host'}}}},
+                properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
+            )
         return datacenter_info
 
-    def get_host_status(self, host_name):
+    def get_host_status_by_ip(self, host_ip):
         """
-        return host status by name, from vcenter info
-        must be connected to a vcenter server api
+        Return host status by ip, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        host = self._get_host_info_by_ip(host_ip)
+        return host.summary.runtime.powerState
+
+    def get_host_status_by_pk(self, pk):
+        """
+        Return host status by pk, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        host = self._get_host_info_by_pk(pk)
+        return host.summary.runtime.powerState
+
+    def get_host_primary_key(self, host_ip):
+        """
+        Return host primary key, based on current ip
+        Must be connected to a vcenter server api
+        """
+        host = self._get_host_info_by_ip(host_ip)
+        return host.obj_identifier.value
+
+    def _get_host_info_by_ip(self, host_ip):
+        """
+        Return HostSystem object by ip, from vcenter info
+        Must be connected to a vcenter server api
         """
         datacenter_info = self._refresh_vcenter_info()
         for host in datacenter_info:
-            if host.name == host_name:
-                return host.summary.runtime.powerState
-        raise RuntimeError('Host {0} not found in datacenter info'.format(host_name))
+            for nic in host.config.virtualNicManagerInfo.netConfig.VirtualNicManagerNetConfig:
+                if nic.nicType == 'management':
+                    for vnic in nic.candidateVnic:
+                        if vnic.spec.ip.ipAddress == host_ip:
+                            return host
+        raise RuntimeError('Host with ip {0} not found in datacenter info'.format(host_ip))
+
+    def _get_host_info_by_pk(self, pk):
+        """
+        Return HostSystem object by pk, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        datacenter_info = self._refresh_vcenter_info()
+        for host in datacenter_info:
+            if host.obj_identifier.value == pk:
+                return host
 
     def list_hosts_in_datacenter(self):
         """
@@ -173,6 +210,13 @@ class Sdk(object):
         """
         datacenter_info = self._refresh_vcenter_info()
         return [host.name for host in datacenter_info]
+
+    @authenticated
+    def is_management_center(self):
+        """
+        Connects to the server and checks whether it's a vCenter server or not.
+        """
+        return self._is_vcenter
 
     def validate_result(self, result, message=None):
         """
@@ -1189,13 +1233,6 @@ class Sdk(object):
                 if filename in mapping[datastore.name]:
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
-
-    @authenticated
-    def is_management_center(self):
-        """
-        Connects to the server and checks whether it's a vCenter server or not.
-        """
-        return self._is_vcenter
 
     def _get_vm_datastore_mapping(self, vm):
         """

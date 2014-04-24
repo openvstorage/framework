@@ -48,13 +48,6 @@ class VMware(Hypervisor):
         """
         return True
 
-    def get_host_status(self, host):
-        """
-        Return host status from vCenter Server
-        Must be connected to vCenter
-        """
-        return self.sdk.get_host_status(host)
-
     @Hypervisor.connected
     def get_state(self, vmid):
         """

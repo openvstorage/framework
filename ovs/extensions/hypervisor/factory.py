@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Hypervisor factory module
+Hypervisor/ManagementCenter factory module
 """
 
 from ovs.extensions.generic.filemutex import FileMutex
@@ -58,12 +58,13 @@ class Factory(object):
     @staticmethod
     def get_mgmtcenter(node):
         """
+        @param node: pmachine hybrid from dal
         Returns the appropriate sdk client for the management center of the node
         Implemented only for VMWare / vCenter Server
         TODO: KVM
         """
-        if node.hvtype and node.mgmtcenter:
-            hvtype = node.hvtype
+        if node.mgmtcenter:
+            mgmtcenter_type = node.mgmtcenter.type
             ip = node.mgmtcenter.ip
             username = node.mgmtcenter.username
             password = node.mgmtcenter.password
@@ -73,11 +74,11 @@ class Factory(object):
                 try:
                     mutex.acquire(30)
                     if key not in Factory.mgmtcenters:
-                        if hvtype == 'VMWARE':
-                            from hypervisors.vmware import VMware
-                            mgmtcenter = VMware(ip, username, password)
+                        if mgmtcenter_type == 'VCENTER':
+                            from mgmtcenters.vcenter import VCenter
+                            mgmtcenter = VCenter(ip, username, password)
                         else:
-                            raise NotImplementedError('Management center for {0} is not yet supported'.format(hvtype))
+                            raise NotImplementedError('Management center for {0} is not yet supported'.format(mgmtcenter_type))
                         Factory.mgmtcenters[key] = mgmtcenter
                 finally:
                     mutex.release()

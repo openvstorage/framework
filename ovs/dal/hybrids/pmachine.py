@@ -31,7 +31,8 @@ class PMachine(DataObject):
                   'username':    (None, str, 'Username of the pMachine.'),
                   'password':    (None, str, 'Password of the pMachine.'),
                   'ip':          (None, str, 'IP address of the pMachine.'),
-                  'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.')}
+                  'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.'),
+                  'hypervisorid': (None, str, 'Hypervisor id - primary key on Management Center')}
     _relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
     _expiry = {'host_status': (60, str)}
     # pylint: enable=line-too-long
@@ -42,7 +43,10 @@ class PMachine(DataObject):
         """
         mgmtcentersdk = hvFactory.get_mgmtcenter(self)
         if mgmtcentersdk:
-            return mgmtcentersdk.get_host_status(self.ip)
+            if self.hypervisorid:
+                return mgmtcentersdk.get_host_status_by_pk(self.hypervisorid)
+            if self.ip:
+                return mgmtcentersdk.get_host_status_by_ip(self.ip)
         return 'UNKNOWN'
 
 

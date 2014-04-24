@@ -21,6 +21,7 @@ from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vpool import VPoolController
+from ovs.lib.volumestoragerouter import VolumeStorageRouterController
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
@@ -101,7 +102,14 @@ def process(queue, body):
                     'task': VPoolController.mountpoint_available_from_voldrv,
                     'arguments': {'mountpoint': 'mountpoint',
                                   '[NODE_ID]': 'vsrid'},
-                    'options': {'execonvsa': True}}}
+                    'options': {'execonvsa': True}},
+                   EventMessages.EventMessage.RedirectTimeoutWhileOnlineMessage:
+                   {'property': 'redirect_timeout_while_online',
+                    'task': VolumeStorageRouterController.update_status,
+                    'arguments': {'remote_node_id': 'vsrid'},
+                    'options': {'dedupe': True,
+                                'dedupe_key': '[TASK_NAME]_[vsrid]'}}
+                   }
 
         if data.type in mapping:
             task = mapping[data.type]['task']

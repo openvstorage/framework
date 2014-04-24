@@ -18,6 +18,8 @@ VolumeStorageRouter module
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.lists.pmachinelist import PMachineList
+from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 
 
@@ -37,3 +39,27 @@ class VolumeStorageRouterController(object):
             vsr_client = VolumeStorageRouterClient().load(served_vsrs[0].vpool)
             for vsr in served_vsrs:
                 vsr_client.mark_node_offline(str(vsr.vsrid))
+
+    @staticmethod
+    @celery.task(name='ovs.vsr.update_status')
+    def update_status(vsrid):
+        """
+        Sets volumerouter offline in case hypervisor management Center
+         reports the hypervisor pmachine related to this volumestoragerouter
+         as unavailable.
+        """
+        pmachine = PMachineList.get_by_vsrid(vsrid)
+        if pmachine.mgmtcenter:
+            # Update status
+            host_status = pmachine.host_status
+            if host_status == 'UNKNOWN':
+                raise RuntimeError('Could not determine host status for {}'.format(pmachine.name))
+            if host_status != 'poweredOn':
+                # Host is stopped
+                vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
+                vsr_client = VolumeStorageRouterClient().load(vsr.vpool)
+                vsr_client.mark_node_offline(str(vsr.vsrid))
+        else:
+            # No management Center, cannot update status via api
+            #TODO: should we try manually (ping, ssh)?
+            pass
