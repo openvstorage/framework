@@ -53,8 +53,6 @@ class VolumeStorageRouterController(object):
             # Update status
             pmachine.invalidate_dynamics(['host_status'])
             host_status = pmachine.host_status
-            if host_status == 'UNKNOWN':
-                raise RuntimeError('Could not determine host status for {}'.format(pmachine.name))
             if host_status != 'RUNNING':
                 # Host is stopped
                 vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
