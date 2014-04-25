@@ -124,39 +124,6 @@ define([
                 deferred.resolve();
             }).promise();
         };
-        self.moveAway = function() {
-            app.showMessage(
-                    $.t('ovs:vsas.detail.moveaway.warning'),
-                    $.t('ovs:vsas.detail.moveaway.title'),
-                    [$.t('ovs:vsas.detail.moveaway.no'), $.t('ovs:vsas.detail.moveaway.yes')]
-                )
-                .done(function(answer) {
-                    if (answer === $.t('ovs:vsas.detail.moveaway.yes')) {
-                        generic.alertInfo(
-                            $.t('ovs:vsas.detail.moveaway.marked'),
-                            $.t('ovs:vsas.detail.moveaway.markedmsg')
-                        );
-                        api.post('vmachines/' + self.VSA().guid() + '/move_away')
-                            .then(self.shared.tasks.wait)
-                            .done(function() {
-                                generic.alertSuccess(
-                                    $.t('ovs:vsas.detail.moveaway.done'),
-                                    $.t('ovs:vsas.detail.moveaway.donemsg', { what: self.VSA().name() })
-                                );
-                            })
-                            .fail(function(error) {
-                                generic.alertError(
-                                    $.t('ovs:generic.error'),
-                                    $.t('ovs:generic.messages.errorwhile', {
-                                        context: 'error',
-                                        what: $.t('ovs:vsas.detail.moveaway.errormsg', { what: self.VSA().name() }),
-                                        error: (typeof error !== 'object' ? error : 'Unknown error')
-                                    })
-                                );
-                            });
-                    }
-                });
-        };
         self.updateVSAServing = function() {
             generic.alertError('Not implemented', 'This functionality is not implemented.');
         };

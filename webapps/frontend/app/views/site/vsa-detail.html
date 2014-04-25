@@ -27,16 +27,6 @@ limitations under the License.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
-            <li class="actions">
-                <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default"
-                        data-bind="click: function() { $parent.moveAway(); },
-                                   style: { color: ($.inArray('MOVE_AWAY', availableActions()) !== -1 ? '#428bca' : 'grey') },
-                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1,
-                                   tooltip: 'ovs:vsas.detail.moveawaymsg'">
-                    <span class="fa" data-i18n="[html]ovs:icons.moveaway"></span>
-                </button>
-            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
