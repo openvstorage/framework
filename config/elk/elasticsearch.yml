@@ -203,11 +203,11 @@ path.logs: /var/log/elasticsearch
 # Set the address other nodes will use to communicate with this node. If not
 # set, it is automatically derived. It must point to an actual IP address.
 #
-# network.publish_host: 192.168.0.1
+network.publish_host: <NETWORK_PUBLISH>
 
 # Set both 'bind_host' and 'publish_host':
 #
-network.host: <NETWORK_HOST>
+# network.host: <NETWORK_HOST>
 
 # Set a custom port for the node to node communication (9300 by default):
 #
