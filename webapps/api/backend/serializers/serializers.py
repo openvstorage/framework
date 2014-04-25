@@ -66,6 +66,10 @@ class FullSerializer(serializers.Serializer):
         if instance is not None:
             for key in self.hybrid._blueprint:
                 setattr(instance, key, attrs.get(key, getattr(instance, key)))
+            for key, relation in self.hybrid._relations.iteritems():
+                guid_key = '{0}_guid'.format(key)
+                if guid_key in attrs and attrs[guid_key] != getattr(instance, guid_key):
+                    setattr(instance, key, None if attrs[guid_key] is None else relation[0](attrs[guid_key]))
             return instance
         return self.hybrid(data=attrs)
 

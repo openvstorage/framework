@@ -81,8 +81,8 @@ class MgmtCenterViewSet(viewsets.ViewSet):
             mgmt_center = serializer.object
             duplicate = MgmtCenterList.get_by_ip(mgmt_center.ip)
             if duplicate is None:
-                mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
                 try:
+                    mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
                     is_mgmt_center = mgmt_center_client.test_connection()
                 except Exception as ex:
                     logger.debug('Management center testing: {0}'.format(ex))

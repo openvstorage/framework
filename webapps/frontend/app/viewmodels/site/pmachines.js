@@ -40,15 +40,16 @@ define([
             { key: 'name',            value: $.t('ovs:generic.name'),       width: 250       },
             { key: 'ipAddress',       value: $.t('ovs:generic.ip'),         width: 150       },
             { key: 'hvtype',          value: $.t('ovs:generic.type'),       width: 150       },
-            { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined }
+            { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined },
+            { key: undefined,         value: '',                            width: 30        }
         ];
-        self.mgmtCenterMapping = {};
 
         // Observables
         self.pMachines              = ko.observableArray([]);
         self.mgmtCenters            = ko.observableArray([]);
         self.pMachinesInitialLoad   = ko.observable(true);
         self.mgmtCentersInitialLoad = ko.observable(true);
+        self.mgmtCenterMapping      = ko.observable({});
 
         // Handles
         self.loadPMachinesHandle      = undefined;
@@ -82,6 +83,11 @@ define([
             });
             return mapping;
         });
+        self.mgmtCenterChoices = ko.computed(function() {
+            var centers = self.mgmtCenters().slice();
+            centers.push(undefined);
+            return centers;
+        });
 
         // Functions
         self.loadPMachines = function(page) {
@@ -104,7 +110,50 @@ define([
                             generic.crossFiller(
                                 guids, self.pMachines,
                                 function(guid) {
-                                    return new PMachine(guid);
+                                    var pm = new PMachine(guid);
+                                    pm.mgmtCenter = ko.computed({
+                                        write: function(mgmtCenter) {
+                                            if (mgmtCenter === undefined) {
+                                                this.mgmtCenterGuid(undefined);
+                                            } else {
+                                                this.mgmtCenterGuid(mgmtCenter.guid());
+                                            }
+                                        },
+                                        read: function() {
+                                            if (self.mgmtCenterMapping().hasOwnProperty(this.mgmtCenterGuid())) {
+                                                return self.mgmtCenterMapping()[this.mgmtCenterGuid()];
+                                            }
+                                            return undefined;
+                                        },
+                                        owner: pm
+                                    });
+                                    pm.mgmtCenterValid = ko.computed({
+                                        read: function() {
+                                            // Currently, matching is based on ip address
+                                            // TODO: Replace this by hypervisorid matching
+                                            var mgmtCenterGuid, pmachine = this,
+                                                currentMgmtCenterGuid = pmachine.mgmtCenterGuid();
+                                            $.each(self.mgmtCenters(), function(mcindex, mgmtCenter) {
+                                                $.each(mgmtCenter.hosts(), function(hindex, host) {
+                                                    $.each(host.ips, function(iindex, ip) {
+                                                        if (ip === pmachine.ipAddress()) {
+                                                            mgmtCenterGuid = mgmtCenter.guid();
+                                                            return false;
+                                                        }
+                                                        return true;
+                                                    });
+                                                    return mgmtCenterGuid === undefined;
+                                                });
+                                                return mgmtCenterGuid === undefined;
+                                            });
+                                            if (mgmtCenterGuid === undefined && (currentMgmtCenterGuid === null || currentMgmtCenterGuid === undefined)) {
+                                                return true;
+                                            }
+                                            return mgmtCenterGuid === pmachine.mgmtCenterGuid();
+                                        },
+                                        owner: pm
+                                    });
+                                    return pm;
                                 }, 'guid'
                             );
                             $.each(self.pMachines(), function(index, pmachine) {
@@ -141,9 +190,12 @@ define([
                             generic.crossFiller(
                                 guids, self.mgmtCenters,
                                 function(guid) {
-                                    var mc = new MgmtCenter(guid);
-                                    if (!self.mgmtCenterMapping.hasOwnProperty(guid)) {
-                                        self.mgmtCenterMapping[guid] = mc;
+                                    var mc = new MgmtCenter(guid),
+                                        mapping = self.mgmtCenterMapping();
+
+                                    if (!mapping.hasOwnProperty(guid)) {
+                                        mapping[guid] = mc;
+                                        self.mgmtCenterMapping(mapping);
                                     }
                                     return mc;
                                 }, 'guid'

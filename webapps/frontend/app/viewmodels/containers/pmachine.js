@@ -21,9 +21,10 @@ define([
         var self = this;
 
         // Handles
-        self.loadHandle = undefined;
+        self.loadHandle  = undefined;
 
         // Observables
+        self.edit           = ko.observable(false);
         self.loading        = ko.observable(false);
         self.loaded         = ko.observable(false);
         self.guid           = ko.observable(guid);
@@ -31,14 +32,17 @@ define([
         self.ipAddress      = ko.observable();
         self.hvtype         = ko.observable();
         self.mgmtCenterGuid = ko.observable();
+        self.backupValue    = ko.observable();
 
         // Functions
         self.fillData = function(data) {
-            self.name(data.name);
-            self.hvtype(data.hvtype);
-            self.ipAddress(data.ip);
-            if (data.hasOwnProperty('mgmtcenter_guid')) {
-                self.mgmtCenterGuid(data.mgmtcenter_guid);
+            if (!self.edit()) {
+                self.name(data.name);
+                self.hvtype(data.hvtype);
+                self.ipAddress(data.ip);
+                if (data.hasOwnProperty('mgmtcenter_guid')) {
+                    self.mgmtCenterGuid(data.mgmtcenter_guid);
+                }
             }
             self.loaded(true);
             self.loading(false);
@@ -56,6 +60,39 @@ define([
                         self.loading(false);
                     });
             }).promise();
-        }
+        };
+        self.save = function() {
+            return $.Deferred(function(deferred) {
+                self.loading(true);
+                api.patch('pmachines/' + self.guid(), {
+                        name: self.name(),
+                        mgmtcenter_guid: self.mgmtCenterGuid() === undefined ? null : self.mgmtCenterGuid(),
+                        ip: self.ipAddress(),
+                        hvtype: self.hvtype()
+                    }, {
+                        contents: 'mgmtcenter'
+                    })
+                    .done(function() {
+                        generic.alertSuccess(
+                            $.t('ovs:pmachines.save.complete'),
+                            $.t('ovs:pmachines.save.success', { what: self.name() })
+                        );
+                        self.loading(false);
+                        deferred.resolve();
+                    })
+                    .fail(function(error) {
+                        error = $.parseJSON(error.responseText);
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:pmachines.save.failed', {
+                                what: self.name(),
+                                why: error.detail
+                            })
+                        );
+                        self.loading(false);
+                        deferred.reject();
+                    });
+            }).promise();
+        };
     };
 });

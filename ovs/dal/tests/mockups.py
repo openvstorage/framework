@@ -243,12 +243,20 @@ class Factory():
         pass
 
     @staticmethod
-    def get(hypervisor):
+    def get(pmachine):
         """
-        Always returns 'unittest'
+        Dummy
         """
-        _ = hypervisor
-        return
+        _ = pmachine
+        return None
+
+    @staticmethod
+    def get_mgmtcenter(pmachine=None, mgmt_center=None):
+        """
+        Dummy
+        """
+        _ = pmachine, mgmt_center
+        return None
 
 
 class FactoryModule():

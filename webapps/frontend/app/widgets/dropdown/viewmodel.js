@@ -27,6 +27,7 @@ define([
         // Observables
         self.key           = ko.observable();
         self.keyIsFunction = ko.observable(false);
+        self.small         = ko.observable(false);
         self.multi         = ko.observable(false);
         self.free          = ko.observable(false);
         self.items         = ko.observableArray([]);
@@ -82,6 +83,7 @@ define([
                 throw 'Target should be specified';
             }
             self.key(generic.tryGet(settings, 'key', undefined));
+            self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));
             self.free(generic.tryGet(settings, 'free', false));
             if (self.free()) {
@@ -97,16 +99,19 @@ define([
                 self.multi(true);
             } else if (self.target() === undefined && self.items().length > 0) {
                 var foundDefault = false;
-                if (settings.hasOwnProperty('defaultRegex')) {
-                    $.each(self.items(), function(index, item) {
+                $.each(self.items(), function(index, item) {
+                    if (settings.hasOwnProperty('defaultRegex')) {
                         if (self.text(item).match(settings.defaultRegex) !== null) {
                             self.target(item);
                             foundDefault = true;
                             return false;
                         }
                         return true;
-                    });
-                }
+                    }
+                    if (item === undefined) {
+                        foundDefault = true;
+                    }
+                });
                 if (!foundDefault) {
                     self.target(self.items()[0]);
                 }

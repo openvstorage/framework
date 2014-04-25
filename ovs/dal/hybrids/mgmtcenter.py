@@ -39,4 +39,7 @@ class MgmtCenter(DataObject):
         Returns all hosts (not only those known to OVS) managed by the Management center
         """
         mgmt_center = Factory.get_mgmtcenter(mgmt_center=self)
-        return mgmt_center.get_hosts()
+        if mgmt_center is not None:
+            return mgmt_center.get_hosts()
+        else:
+            return {}

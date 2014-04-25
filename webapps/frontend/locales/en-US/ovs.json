@@ -336,7 +336,8 @@
             "hosts": "OVS Hosts/Total"
         },
         "pmachines": {
-            "title": "Managed Hosts"
+            "title": "Managed Hosts",
+            "incorrectmgmtcenter": "The selected Management center might be incorrect."
         },
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
@@ -345,6 +346,11 @@
             "done": "Deleted",
             "donemsg": "Management center __what__ deleted",
             "errormsg": "deleting __what__"
+        },
+        "save": {
+            "complete": "Save completed",
+            "success": "PMachine __what__ updated.",
+            "failed": "Updating __what__ failed: __why__"
         }
     },
     "login": {
@@ -595,6 +601,10 @@
         "vdisks": "&#xf0a0;",
         "add": "&#xf067;",
         "vmachines": "&#xf0e8;",
-        "vsavpoollink": "&#xf07c;"
+        "vsavpoollink": "&#xf07c;",
+        "edit": "&#xf040;",
+        "save": "&#xf00c;",
+        "warning": "&#xf071;",
+        "cancel": "&#xf00d;"
     }
 }

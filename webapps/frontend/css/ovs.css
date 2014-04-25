@@ -88,3 +88,7 @@ div[data-view]:not(.modal-dialog) {
 .btn-mini {
     padding: 2px 6px 2px 6px !important;
 }
+
+.edit-container:hover .edit-button {
+    display: inline !important;
+}

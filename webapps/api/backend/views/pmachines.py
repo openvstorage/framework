@@ -20,6 +20,9 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.hybrids.pmachine import PMachine
+from backend.serializers.serializers import FullSerializer
+from rest_framework.response import Response
+from rest_framework import status
 from backend.decorators import required_roles, expose, validate, get_object, get_list
 
 
@@ -49,3 +52,19 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         _ = request
         return obj
+
+    @expose(internal=True)
+    @required_roles(['view', 'update', 'system'])
+    @validate(PMachine)
+    def partial_update(self, request, obj):
+        """
+        Update a pMachine
+        """
+        contents = request.QUERY_PARAMS.get('contents')
+        contents = None if contents is None else contents.split(',')
+        serializer = FullSerializer(PMachine, contents=contents, instance=obj, data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

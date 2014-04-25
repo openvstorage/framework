@@ -34,7 +34,7 @@ define(['jquery'], function($) {
         { route: 'statistics',     moduleId: 'statistics',      title: $.t('ovs:statistics.title'),       titlecode: 'ovs:statistics.title',       nav: false, main: false },
         { route: 'login',          moduleId: 'login',           title: $.t('ovs:login.title'),            titlecode: 'ovs:login.title',            nav: false, main: false },
         { route: 'about',          moduleId: 'about',           title: $.t('ovs:about.title'),            titlecode: 'ovs:about.title',            nav: true,  main: false },
-        { route: 'pmachines',      moduleId: 'pmachines',       title: $.t('ovs:pmachines.title'),        titlecode: 'ovs:pmachines.title',        nav: true,  main: false }
+        { route: 'hmc',            moduleId: 'pmachines',       title: $.t('ovs:pmachines.title'),        titlecode: 'ovs:pmachines.title',        nav: true,  main: false }
     ];
 
     buildSiteRoutes = function(mode) {
