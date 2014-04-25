@@ -241,3 +241,7 @@ run_command('radosgw-admin user create --uid=johndoe --display-name="John Doe" -
 run_command('ceph status')
 
 run_command('touch /var/lib/ceph/radosgw/ceph-radosgw.gateway/done')
+
+print 'To use this Ceph server with OVS nodes, please copy the following files:'
+print '/etc/ceph/ceph.conf -> ovs_node:/etc/ceph/ceph.conf'
+print '/etc/ceph/ceph.client.admin.keyring -> ovs_node:/etc/ceph/ceph.keyring'
