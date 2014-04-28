@@ -930,7 +930,7 @@ for directory in {0}:
 
         vrouter_config = {'vrouter_id': vrouter_id,
                           'vrouter_redirect_timeout_ms': '5000',
-                          'vrouter_migrate_timeout_ms': '5000',
+                          'vrouter_routing_retries': 10,
                           'vrouter_write_threshold': 1024}
         voldrv_arakoon_cluster_id = str(Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
