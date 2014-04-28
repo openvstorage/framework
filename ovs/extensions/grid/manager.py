@@ -35,11 +35,34 @@ from subprocess import check_output
 ARAKOON_CONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
 ARAKOON_CLIENTCONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
 
+ELASTICSEARCH_DEB = 'elasticsearch-1.1.1.deb'
+ELASTICSEARCH_URL = 'https://download.elasticsearch.org/elasticsearch/elasticsearch/{0}'.format(ELASTICSEARCH_DEB)
+
+KIBANA_VERSION = 'kibana-3.0.1'
+KIBANA_URL = 'https://download.elasticsearch.org/kibana/kibana/{0}.tar.gz'.format(KIBANA_VERSION)
+
+LOGSTASH_DEB = 'logstash_1.4.0-1-c82dc09_all.deb'
+LOGSTASH_URL = 'https://download.elasticsearch.org/logstash/logstash/packages/debian/{0}'.format(LOGSTASH_DEB)
+
 
 class Manager(object):
     """
     Contains grid management functionality
     """
+
+    @staticmethod
+    def replace_param_in_config(client, config_file, old_value, new_value, add=False):
+        if client.file_exists(config_file):
+            contents = client.file_read(config_file)
+            if new_value in contents and new_value.find(old_value) > 0:
+                pass
+            elif old_value in contents:
+                contents = contents.replace(old_value, new_value)
+            else:
+                if add:
+                    contents += new_value + '\n'
+            client.file_write(config_file, contents)
+
 
     @staticmethod
     def install_node(ip, create_extra_filesystems=False, clean=False, version=None):
@@ -68,20 +91,18 @@ class Manager(object):
 
         client = Client.load(ip, password, bypass_local=True)
 
-        sshd_config_path = '/etc/ssh/sshd_config'
-        if client.file_exists(sshd_config_path):
-            sshd_config = client.file_read(sshd_config_path)
-            sshd_config = sshd_config.replace('AcceptEnv', '# AcceptEnv')
-            if 'UseDNS no' in sshd_config:
-                pass
-            elif 'UseDNS yes' in sshd_config:
-                sshd_config = sshd_config.replace('UseDNS yes', 'UseDNS no')
-            else:
-                sshd_config += 'UseDNS no\n'
-            client.file_write(sshd_config_path, sshd_config)
-            client.run('service ssh restart')
+        Manager.replace_param_in_config(client,
+                                        '/etc/ssh/sshd_config',
+                                        'AcceptEnv',
+                                        '#AcceptEnv')
+        Manager.replace_param_in_config(client,
+                                        '/etc/ssh/sshd_config',
+                                        'UseDNS yes',
+                                        'UseDNS no',
+                                        add=True)
+        client.run('service ssh restart')
 
-            client = Client.load(ip, password, bypass_local=True)
+        client = Client.load(ip, password, bypass_local=True)
 
         client.run('apt-get update')
         client.run('apt-get install lsscsi')
@@ -230,6 +251,52 @@ class Manager(object):
 
         client.run('apt-get -y -q install libev4')
         client.run('jpackage_install -n arakoon -v 1.7.2')
+
+        # update elasticsearch
+        client.run('apt-get -y -q install openjdk-7-jre')
+        client.run('jsprocess -n elasticsearch disable')
+        client.run('jsprocess -n elasticsearch stop')
+        client.run('mv /etc/elasticsearch/elasticsearch.yml /var/tmp/')
+        client.run('cd /root/; rm -f {0}; wget -c {1}'.format(ELASTICSEARCH_DEB, ELASTICSEARCH_URL))
+        client.run('dpkg -i /root/{0}'.format(ELASTICSEARCH_DEB))
+        client.run('mv /var/tmp/elasticsearch.yml /etc/elasticsearch/')
+        Manager.replace_param_in_config(client,
+                                        '/opt/jumpscale/cfg/startup/jumpscale__elasticsearch.hrd',
+                                        'process.cmd=/opt/jumpscale/apps/elasticsearch/bin/elasticsearch',
+                                        'process.cmd=/usr/share/elasticsearch/bin/elasticsearch')
+        client.run('jsprocess -n elasticsearch disable')
+        client.run('jsprocess -n elasticsearch stop')
+        client.run('mkdir -p /opt/data/elasticsearch/work')
+        client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
+
+        config_file = '/etc/elasticsearch/elasticsearch.yml'
+        Manager.replace_param_in_config(client,
+                                        config_file,
+                                        '<CLUSTER_NAME>',
+                                        es_cluster_name,
+                                        add=False)
+        Manager.replace_param_in_config(client,
+                                        config_file,
+                                        '<NODE_NAME>',
+                                        client.run('hostname'))
+        public_ip = configuration['openvstorage-core']['ovs.grid.ip']
+        Manager.replace_param_in_config(client,
+                                        config_file,
+                                        '<NETWORK_PUBLISH>',
+                                        public_ip)
+        client.run('service elasticsearch restart')
+
+        client.run('cd /root; rm -f {0}; wget -c {1}'.format(LOGSTASH_DEB, LOGSTASH_URL))
+        client.run('dpkg -i /root/{0}'.format(LOGSTASH_DEB))
+        Manager.replace_param_in_config(client,
+                                        '/etc/logstash/conf.d/indexer.conf',
+                                        '<CLUSTER_NAME>',
+                                        es_cluster_name)
+
+        client.run('cd /root; wget -c {0}'.format(KIBANA_URL))
+        client.run('cd /root; gunzip /root/{0}.tar.gz'.format(KIBANA_VERSION))
+        client.run('cd /root; tar xvf /root/{0}.tar'.format(KIBANA_VERSION))
+
 
     @staticmethod
     def init_node(ip, join_masters=False):
@@ -518,6 +585,24 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             if len(nodes) == 1:
                 from ovs.extensions.migration.migration import Migration
                 Migration.migrate()
+            else:
+                # we might need to disable running logstash-web on 2+ node
+                # client.run('rm /etc/init/logstash-web.conf')
+                pass
+
+            # update elasticsearch configuration
+            config_file = '/etc/elasticsearch/elasticsearch.yml'
+            client.run('service elasticsearch stop')
+            Manager.replace_param_in_config(client,
+                                            config_file,
+                                            '<IS_POTENTIAL_MASTER>',
+                                            'true')
+            Manager.replace_param_in_config(client,
+                                            config_file,
+                                            '<IS_DATASTORE>',
+                                            'true')
+            client.run('service elasticsearch start')
+            client.run('service logstash restart')
 
         else:
             client = Client.load(ip)
@@ -532,6 +617,37 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                 client.file_upload(config, config)
             Manager._configure_nginx(client)
+
+            # update elasticsearch configuration
+            config_file = '/etc/elasticsearch/elasticsearch.yml'
+            client.run('service elasticsearch stop')
+            Manager.replace_param_in_config(client,
+                                            config_file,
+                                            '<IS_POTENTIAL_MASTER>',
+                                            'false')
+            Manager.replace_param_in_config(client,
+                                            config_file,
+                                            '<IS_DATASTORE>',
+                                            'false')
+            client.run('service elasticsearch start')
+            client.run('service logstash restart')
+
+        client = Client.load(ip)
+        client.run('mkdir -p /opt/OpenvStorage/webapps/frontend/logging')
+        node_id = Configuration.get('grid.node.id')
+        if int(node_id) < 4 or is_local:
+            kibana_ip = ip
+            client.run('service logstash-web restart')
+        else:
+            kibana_ip = Configuration.get('grid.master.ip')
+            client.run('rm -f /etc/init/logstash-web.conf')
+
+        Manager.replace_param_in_config(client,
+                                        '/root/{0}/config.js'.format(KIBANA_VERSION),
+                                        'http://"+window.location.hostname+":9200',
+                                        'http://' + kibana_ip + ':9200')
+        client.run('cp -R /root/{0}/* /opt/OpenvStorage/webapps/frontend/logging'.format(KIBANA_VERSION))
+        client.run('chown -R ovs:ovs /opt/OpenvStorage/webapps/frontend/logging')
 
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
