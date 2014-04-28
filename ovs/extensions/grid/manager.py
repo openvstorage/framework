@@ -308,6 +308,21 @@ class Manager(object):
         master nodes regardless of the given parameter.
         """
 
+        def _update_es_configuration(client, value):
+            # update elasticsearch configuration
+            config_file = '/etc/elasticsearch/elasticsearch.yml'
+            client.run('service elasticsearch stop')
+            Manager.replace_param_in_config(client,
+                                            config_file,
+                                            '<IS_POTENTIAL_MASTER>',
+                                            value)
+            Manager.replace_param_in_config(client,
+                                            config_file,
+                                            '<IS_DATASTORE>',
+                                            value)
+            client.run('service elasticsearch start')
+            client.run('service logstash restart')
+
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
@@ -589,20 +604,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 # we might need to disable running logstash-web on 2+ node
                 # client.run('rm /etc/init/logstash-web.conf')
                 pass
-
-            # update elasticsearch configuration
-            config_file = '/etc/elasticsearch/elasticsearch.yml'
-            client.run('service elasticsearch stop')
-            Manager.replace_param_in_config(client,
-                                            config_file,
-                                            '<IS_POTENTIAL_MASTER>',
-                                            'true')
-            Manager.replace_param_in_config(client,
-                                            config_file,
-                                            '<IS_DATASTORE>',
-                                            'true')
-            client.run('service elasticsearch start')
-            client.run('service logstash restart')
+            client = Client.load(ip)
+            _update_es_configuration(client, 'true')
 
         else:
             client = Client.load(ip)
@@ -618,19 +621,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 client.file_upload(config, config)
             Manager._configure_nginx(client)
 
-            # update elasticsearch configuration
-            config_file = '/etc/elasticsearch/elasticsearch.yml'
-            client.run('service elasticsearch stop')
-            Manager.replace_param_in_config(client,
-                                            config_file,
-                                            '<IS_POTENTIAL_MASTER>',
-                                            'false')
-            Manager.replace_param_in_config(client,
-                                            config_file,
-                                            '<IS_DATASTORE>',
-                                            'false')
-            client.run('service elasticsearch start')
-            client.run('service logstash restart')
+            client = Client.load(ip)
+            _update_es_configuration(client, 'false')
 
         client = Client.load(ip)
         client.run('mkdir -p /opt/OpenvStorage/webapps/frontend/logging')
