@@ -33,6 +33,7 @@ from ovs.log.logHandler import LogHandler
 logger = LogHandler('extensions', name='consumer')
 logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
+KVM_RUN = '/run/libvirt/qemu/'
 
 
 def run_kvm_watcher():
@@ -71,7 +72,7 @@ if __name__ == '__main__':
 
             wm = pyinotify.WatchManager()
 
-            MASK_EVENTS_TO_WATCH = pyinotify.IN_CLOSE_WRITE | \
+            ETC_MASK_EVENTS_TO_WATCH = pyinotify.IN_CLOSE_WRITE | \
                 pyinotify.IN_CREATE | \
                 pyinotify.IN_DELETE | \
                 pyinotify.IN_MODIFY | \
@@ -79,11 +80,16 @@ if __name__ == '__main__':
                 pyinotify.IN_MOVED_TO | \
                 pyinotify.IN_UNMOUNT
 
+            RUN_MASK_EVENTS_TO_WATCH = pyinotify.IN_DELETE | \
+                pyinotify.IN_MOVED_TO
+
             notifier = pyinotify.ThreadedNotifier(wm, Kxp())
             notifier.start()
 
-            wdd = wm.add_watch(KVM_ETC, MASK_EVENTS_TO_WATCH, rec=True)
+            _ = wm.add_watch(KVM_ETC, ETC_MASK_EVENTS_TO_WATCH, rec=True)
             logger.info('Watching {0}...'.format(KVM_ETC), print_msg=True)
+            _ = wm.add_watch(KVM_RUN, RUN_MASK_EVENTS_TO_WATCH, rec=True)
+            logger.info('Watching {0}...'.format(KVM_RUN), print_msg=True)
 
             vpool_mountpoints = set()
             for vpool in VPoolList().get_vpools():

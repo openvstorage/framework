@@ -19,6 +19,7 @@ KVM XML watcher
 from ovs.extensions.generic.system import Ovs
 from xml.etree import ElementTree
 from ovs.log.logHandler import LogHandler
+from ovs.dal.lists.vmachinelist import VMachineList
 
 import glob
 import pyinotify
@@ -47,6 +48,12 @@ class Kxp(pyinotify.ProcessEvent):
                 result[child.tag][key] = item
         return result
 
+    def _is_etc_watcher(self, pathname):
+        return '/etc/libvirt/qemu' in pathname
+
+    def _is_run_watcher(self, pathname):
+        return '/run/libvirt/qemu' in pathname
+
     def is_valid_regular_file(self, pathname):
         return os.path.isfile(pathname) and \
             not os.path.islink(pathname) and \
@@ -71,6 +78,15 @@ class Kxp(pyinotify.ProcessEvent):
                     return match.group(1)
         return ''
 
+    def invalidate_vmachine_status(self, name):
+        if not name.endswith('.xml'):
+            return
+        devicename = '{0}/{1}'.format(Ovs.get_my_machine_id(), name)
+        vm = VMachineList().get_by_devicename_and_vpool(devicename, None)
+        if vm:
+            vm.invalidate_dynamics()
+            logger.debug('Hypervisor status invalidated for: {0}'.format(name))
+
     def process_IN_CLOSE_WRITE(self, event):
 
         logger.debug('path: {0} - name: {1} - close after write'.format(event.path, event.name))
@@ -82,11 +98,15 @@ class Kxp(pyinotify.ProcessEvent):
     def process_IN_DELETE(self, event):
 
         logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
-        file_matcher = '/mnt/*/{0}/{1}'.format(Ovs.get_my_machine_id(), event.name)
-        for found_file in glob.glob(file_matcher):
-            if os.path.exists(found_file) and os.path.isfile(found_file):
-                os.remove(found_file)
-                logger.info('File on vpool deleted: {0}'.format(found_file))
+        if self._is_etc_watcher(event.path):
+            file_matcher = '/mnt/*/{0}/{1}'.format(Ovs.get_my_machine_id(), event.name)
+            for found_file in glob.glob(file_matcher):
+                if os.path.exists(found_file) and os.path.isfile(found_file):
+                    os.remove(found_file)
+                    logger.info('File on vpool deleted: {0}'.format(found_file))
+
+        if self._is_run_watcher(event.path):
+            self.invalidate_vmachine_status(event.name)
 
     def process_IN_MODIFY(self, event):
 
@@ -97,10 +117,13 @@ class Kxp(pyinotify.ProcessEvent):
         logger.debug('path: {0} - name: {1} - moved from'.format(event.path, event.name))
 
     def process_IN_MOVED_TO(self, event):
-        """
-        Trigger to move vm.xml to matching vpool
-        """
+
         logger.debug('path: {0} - name: {1} - moved to'.format(event.path, event.name))
+
+        if self._is_run_watcher(event.path):
+            self.invalidate_vmachine_status(event.name)
+            return
+
         vpool_path = '/mnt/' + self.get_vpool_for_vm(event.pathname)
         if vpool_path == '/mnt/':
             logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
