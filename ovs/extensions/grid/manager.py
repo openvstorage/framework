@@ -288,6 +288,8 @@ class Manager(object):
 
         client.run('cd /root; rm -f {0}; wget -c {1}'.format(LOGSTASH_DEB, LOGSTASH_URL))
         client.run('dpkg -i /root/{0}'.format(LOGSTASH_DEB))
+        client.run('usermod -a -G adm logstash')
+        client.run("echo 'manual' >/etc/init/logstash-web.override")
         Manager.replace_param_in_config(client,
                                         '/etc/logstash/conf.d/indexer.conf',
                                         '<CLUSTER_NAME>',
@@ -296,6 +298,7 @@ class Manager(object):
         client.run('cd /root; wget -c {0}'.format(KIBANA_URL))
         client.run('cd /root; gunzip /root/{0}.tar.gz'.format(KIBANA_VERSION))
         client.run('cd /root; tar xvf /root/{0}.tar'.format(KIBANA_VERSION))
+        client.run('service logstash restart')
 
 
     @staticmethod
@@ -626,18 +629,13 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
         client = Client.load(ip)
         client.run('mkdir -p /opt/OpenvStorage/webapps/frontend/logging')
-        node_id = Configuration.get('grid.node.id')
-        if int(node_id) < 4 or is_local:
-            kibana_ip = ip
-            client.run('service logstash-web restart')
-        else:
-            kibana_ip = Configuration.get('grid.master.ip')
-            client.run('rm -f /etc/init/logstash-web.conf')
+        client.run('service logstash restart')
 
         Manager.replace_param_in_config(client,
                                         '/root/{0}/config.js'.format(KIBANA_VERSION),
                                         'http://"+window.location.hostname+":9200',
-                                        'http://' + kibana_ip + ':9200')
+                                        'http://' + ip + ':9200')
+        client.run('cp /root/{0}/app/dashboards/guided.json /root/{0}/app/dashboards/default.json'.format(KIBANA_VERSION, KIBANA_VERSION))
         client.run('cp -R /root/{0}/* /opt/OpenvStorage/webapps/frontend/logging'.format(KIBANA_VERSION))
         client.run('chown -R ovs:ovs /opt/OpenvStorage/webapps/frontend/logging')
 
