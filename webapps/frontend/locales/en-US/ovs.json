@@ -161,7 +161,8 @@
         "administration": "Administration",
         "mgmtcenter": "Mgmt. Center",
         "port": "Port",
-        "noentries": "No entries available"
+        "noentries": "No entries available",
+        "logging": "Kibana logging"
     },
     "vsas": {
         "title": "GSRs",
@@ -184,7 +185,11 @@
             },
             "vsavpoollink": "vPools served by this GSR",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple GSRs"
+            "localvpool": "This is a local vPool which can not be shared across multiple GSRs",
+            "logging": "GSR logs",
+            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
+            "logginginfo2": "Open Kibana",
+            "logginginfo3": "to view this GSR's logs."
         }
     },
     "vpools" : {
@@ -201,7 +206,11 @@
             "sync": "Sync vPool with reality",
             "vsavpoollink": "GSRs serving this vPool",
             "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple GSRs."
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple GSRs.",
+            "logging": "vPool logs",
+            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
+            "logginginfo2": "Open Kibana",
+            "logginginfo3": "to view this vPool's logs."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -605,6 +614,8 @@
         "edit": "&#xf040;",
         "save": "&#xf00c;",
         "warning": "&#xf071;",
-        "cancel": "&#xf00d;"
+        "cancel": "&#xf00d;",
+        "logs": "&#xf02d;",
+        "externallink": "&#xf08e;"
     }
 }
