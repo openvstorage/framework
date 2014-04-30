@@ -97,16 +97,19 @@ class Kxp(pyinotify.ProcessEvent):
 
     def process_IN_DELETE(self, event):
 
-        logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
-        if self._is_etc_watcher(event.path):
-            file_matcher = '/mnt/*/{0}/{1}'.format(Ovs.get_my_machine_id(), event.name)
-            for found_file in glob.glob(file_matcher):
-                if os.path.exists(found_file) and os.path.isfile(found_file):
-                    os.remove(found_file)
-                    logger.info('File on vpool deleted: {0}'.format(found_file))
+        try:
+            logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
+            if self._is_etc_watcher(event.path):
+                file_matcher = '/mnt/*/{0}/{1}'.format(Ovs.get_my_machine_id(), event.name)
+                for found_file in glob.glob(file_matcher):
+                    if os.path.exists(found_file) and os.path.isfile(found_file):
+                        os.remove(found_file)
+                        logger.info('File on vpool deleted: {0}'.format(found_file))
 
-        if self._is_run_watcher(event.path):
-            self.invalidate_vmachine_status(event.name)
+            if self._is_run_watcher(event.path):
+                self.invalidate_vmachine_status(event.name)
+        except Exception as exception:
+            logger.error('Exception during process_IN_DELETE: {0}'.format(str(exception)), print_msg=True)
 
     def process_IN_MODIFY(self, event):
 
@@ -118,23 +121,27 @@ class Kxp(pyinotify.ProcessEvent):
 
     def process_IN_MOVED_TO(self, event):
 
-        logger.debug('path: {0} - name: {1} - moved to'.format(event.path, event.name))
+        try:
+            logger.debug('path: {0} - name: {1} - moved to'.format(event.path, event.name))
 
-        if self._is_run_watcher(event.path):
-            self.invalidate_vmachine_status(event.name)
-            return
+            if self._is_run_watcher(event.path):
+                self.invalidate_vmachine_status(event.name)
+                return
 
-        vpool_path = '/mnt/' + self.get_vpool_for_vm(event.pathname)
-        if vpool_path == '/mnt/':
-            logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
+            vpool_path = '/mnt/' + self.get_vpool_for_vm(event.pathname)
+            if vpool_path == '/mnt/':
+                logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
 
-        if os.path.exists(vpool_path):
-            machine_id = Ovs.get_my_machine_id()
-            target_path = vpool_path + '/' + machine_id + '/'
-            target_xml = target_path + event.name
-            if not os.path.exists(target_path):
-                os.mkdir(target_path)
-            shutil.copy2(event.pathname, target_xml)
+            if os.path.exists(vpool_path):
+                machine_id = Ovs.get_my_machine_id()
+                target_path = vpool_path + '/' + machine_id + '/'
+                target_xml = target_path + event.name
+                if not os.path.exists(target_path):
+                    os.mkdir(target_path)
+                shutil.copy2(event.pathname, target_xml)
+        except Exception as exception:
+            logger.error('Exception during process_IN_MOVED_TO: {0}'.format(str(exception)), print_msg=True)
+
 
     def process_IN_UNMOUNT(self, event):
         """

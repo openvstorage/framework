@@ -90,13 +90,6 @@ if __name__ == '__main__':
             logger.info('Watching {0}...'.format(KVM_ETC), print_msg=True)
             _ = wm.add_watch(KVM_RUN, RUN_MASK_EVENTS_TO_WATCH, rec=True)
             logger.info('Watching {0}...'.format(KVM_RUN), print_msg=True)
-
-            vpool_mountpoints = set()
-            for vpool in VPoolList().get_vpools():
-                for vsr in vpool.vsrs:
-                    vsrid = Ovs.get_my_vsr_id(vpool.name)
-                    if vsrid == vsr.vsrid:
-                        vpool_mountpoints.add(vsr.mountpoint)
             logger.info('KVM xml processor active...', print_msg=True)
 
         if run_event_consumer():
