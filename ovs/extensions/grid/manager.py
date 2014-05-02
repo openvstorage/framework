@@ -509,28 +509,6 @@ Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
                         client = Client.load(ip)
                         Manager._exec_python(client, update_hosts_file)
 
-            # Update arakoon cluster configuration in voldrv configuration files
-            for node in nodes:
-                client_node = Client.load(node)
-                update_voldrv = """
-import os
-from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
-voldrv_arakoon_cluster_id = 'voldrv'
-voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
-voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
-configuration_dir = Configuration.get('ovs.core.cfgdir')
-if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
-    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
-for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
-    if json_file.endswith('.json'):
-        vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
-        vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
-"""
-                Manager._exec_python(client_node, update_voldrv)
-
             # Join rabbitMQ clusters
             client = Client.load(ip)
             client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
@@ -581,6 +559,28 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 node_client = Client.load(node)
                 for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                     node_client.file_upload(config, config)
+
+            # Update arakoon cluster configuration in voldrv configuration files
+            for node in nodes:
+                client_node = Client.load(node)
+                update_voldrv = """
+import os
+from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+arakoon_management = ArakoonManagement()
+voldrv_arakoon_cluster_id = 'voldrv'
+voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
+voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+configuration_dir = Configuration.get('ovs.core.cfgdir')
+if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
+    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
+for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
+    if json_file.endswith('.json'):
+        vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
+        vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+"""
+                Manager._exec_python(client_node, update_voldrv)
 
             # Update possible volumedrivers with new amqp configuration.
             # On each node, it will loop trough all already configured vpools and update their amqp connection
