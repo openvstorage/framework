@@ -63,7 +63,6 @@ class Manager(object):
                     contents += new_value + '\n'
             client.file_write(config_file, contents)
 
-
     @staticmethod
     def install_node(ip, create_extra_filesystems=False, clean=False, version=None):
         """
@@ -298,8 +297,11 @@ class Manager(object):
         client.run('cd /root; wget -c {0}'.format(KIBANA_URL))
         client.run('cd /root; gunzip /root/{0}.tar.gz'.format(KIBANA_VERSION))
         client.run('cd /root; tar xvf /root/{0}.tar'.format(KIBANA_VERSION))
-        client.run('service logstash restart')
-
+        status = client.run('service logstash status')
+        if 'stop' in status:
+            client.run('service logstash start')
+        else:
+            client.run('service logstash restart')
 
     @staticmethod
     def init_node(ip, join_masters=False):
@@ -311,20 +313,20 @@ class Manager(object):
         master nodes regardless of the given parameter.
         """
 
-        def _update_es_configuration(client, value):
+        def _update_es_configuration(es_client, value):
             # update elasticsearch configuration
             config_file = '/etc/elasticsearch/elasticsearch.yml'
-            client.run('service elasticsearch stop')
-            Manager.replace_param_in_config(client,
+            es_client.run('service elasticsearch stop')
+            Manager.replace_param_in_config(es_client,
                                             config_file,
                                             '<IS_POTENTIAL_MASTER>',
                                             value)
-            Manager.replace_param_in_config(client,
+            Manager.replace_param_in_config(es_client,
                                             config_file,
                                             '<IS_DATASTORE>',
                                             value)
-            client.run('service elasticsearch start')
-            client.run('service logstash restart')
+            es_client.run('service elasticsearch start')
+            es_client.run('service logstash restart')
 
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
