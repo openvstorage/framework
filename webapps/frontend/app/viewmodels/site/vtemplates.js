@@ -35,7 +35,7 @@ define([
         };
         self.vTemplateHeaders = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
-            { key: undefined,      value: $.t('ovs:generic.vdisks'),      width: 60        },
+            { key: undefined,      value: $.t('ovs:generic.vdisks'),     width: 60        },
             { key: 'children',     value: $.t('ovs:generic.children'),   width: 110       },
             { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80        }
         ];
@@ -54,7 +54,6 @@ define([
                 if (generic.xhrCompleted(self.loadVTemplatesHandle)) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         contents: 'vdisks'
                     };
                     self.loadVTemplatesHandle = api.post('vmachines/filter', self.query, options)
@@ -89,7 +88,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVTemplatesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: 'vdisks'
                     };

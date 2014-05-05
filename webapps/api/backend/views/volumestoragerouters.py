@@ -15,6 +15,7 @@
 """
 PMachine module
 """
+
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -22,9 +23,7 @@ from rest_framework.decorators import action
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
-from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose, validate
-from backend.toolbox import Toolbox
+from backend.decorators import required_roles, expose, validate, get_list, get_object
 
 
 class VolumeStorageRouterViewSet(viewsets.ViewSet):
@@ -35,25 +34,24 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    def list(self, request, format=None):
+    @get_list(VolumeStorageRouter)
+    def list(self, request, format=None, hints=None):
         """
         Overview of all VolumeStorageRouters
         """
-        _ = format
-        vsrs = VolumeStorageRouterList.get_volumestoragerouters()
-        vsrs, serializer, contents = Toolbox.handle_list(vsrs, request)
-        serialized = serializer(VolumeStorageRouter, contents=contents, instance=vsrs, many=True)
-        return Response(serialized.data, status=status.HTTP_200_OK)
+        _ = request, format, hints
+        return VolumeStorageRouterList.get_volumestoragerouters()
 
     @expose(internal=True)
     @required_roles(['view'])
     @validate(VolumeStorageRouter)
+    @get_object(VolumeStorageRouter)
     def retrieve(self, request, obj):
         """
         Load information about a given VolumeStorageRouter
         """
-        contents = Toolbox.handle_retrieve(request)
-        return Response(FullSerializer(VolumeStorageRouter, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
+        _ = request
+        return obj
 
     @action()
     @expose(internal=True)

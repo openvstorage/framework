@@ -15,7 +15,7 @@
 import re
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='fstab')
+logger = LogHandler('extensions', name='fstab')
 
 
 class Fstab(object):

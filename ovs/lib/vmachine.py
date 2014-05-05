@@ -19,6 +19,8 @@ VMachine module
 import time
 import copy
 import os
+import glob
+import ConfigParser
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -37,7 +39,7 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-logger = LogHandler('ovs.lib', name='vmachine')
+logger = LogHandler('lib', name='vmachine')
 
 
 class VMachineController(object):
@@ -126,6 +128,7 @@ class VMachineController(object):
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
+        new_vm.hypervisorid = ''
         new_vm.vpool = template_vm.vpool
         new_vm.pmachine = target_pm
         new_vm.name = name
@@ -156,7 +159,8 @@ class VMachineController(object):
                 )
                 disks.append(result)
                 logger.debug('Disk appended: {0}'.format(result))
-        except Exception:
+        except Exception as exception:
+            logger.error('Creation of disk {0} failed: {1}'.format(disk.name, str(exception)), print_msg=True)
             # @TODO cleanup strategy to be defined
             new_vm.delete()
             raise
@@ -165,7 +169,8 @@ class VMachineController(object):
             result = target_hv.create_vm_from_template(
                 name, source_vm, disks, target_vsr.storage_ip, target_vsr.mountpoint, wait=True
             )
-        except:
+        except Exception as exception:
+            logger.error('Creation of vm {0} on hypervisor failed: {1}'.format(new_vm.name, str(exception)), print_msg=True)
             VMachineController.delete(machineguid=new_vm.guid)
             raise
 
@@ -238,12 +243,17 @@ class VMachineController(object):
         _ = kwargs
         machine = VMachine(machineguid)
 
-        if machine.pmachine:
-            hv = Factory.get(machine.pmachine)
-            hv.delete_vm(machine.hypervisorid, True)
+        if machine.pmachine and machine.hypervisorid:
+            try:
+                hv = Factory.get(machine.pmachine)
+                hv.delete_vm(machine.hypervisorid, True)
+            except Exception as exception:
+                logger.error('Deletion of vm on hypervisor failed: {0}'.format(str(exception)), print_msg=True)
 
         for disk in machine.vdisks:
+            logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
             disk.delete()
+        logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
 
     @staticmethod
@@ -475,7 +485,7 @@ class VMachineController(object):
             else:
                 vpool = None
             pmachine = PMachineList.get_by_vsrid(vsrid)
-            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid))
+            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
                 mutex.acquire(wait=5)
                 vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
@@ -647,3 +657,23 @@ class VMachineController(object):
             except:
                 success = False
         return success
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.get_version_info')
+    def get_version_info(vsa_guid):
+        """
+        Returns version information regarding a given VSA
+        """
+        version_data = {'vsa_guid': vsa_guid,
+                        'versions': {}}
+        # Currently, we're parsing JumpScale files
+        # @TODO: Replace with better code after the Age of Enlightenment
+        for filename in glob.glob('/opt/jumpscale/cfg/jpackages/state/openvstorage_*.cfg'):
+            parser = ConfigParser.RawConfigParser()
+            parser.read(filename)
+            buildnumber = parser.getint('main', 'lastinstalledbuildnr')
+            if buildnumber > -1:
+                _, package, version = filename.split('/')[-1].split('_')
+                version = version.replace('.cfg', '')
+                version_data['versions'][package] = '{0}.{1}'.format(version, buildnumber)
+        return version_data

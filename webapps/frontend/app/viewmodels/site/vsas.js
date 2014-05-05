@@ -61,7 +61,6 @@ define([
                 if (generic.xhrCompleted(self.loadVSAsHandle)) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         contents: 'stored_data'
                     };
                     self.loadVSAsHandle = api.post('vmachines/filter', self.query, options)
@@ -96,7 +95,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVSAsHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: '_relations,statistics,stored_data'
                     };

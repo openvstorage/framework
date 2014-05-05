@@ -166,7 +166,7 @@ class VolumeStorageRouterConfiguration(object):
             self._config_file_content['filesystem']['fs_raw_disk_suffix'] = '.raw'
             self._config_file_content['filesystem']['fs_file_event_rules'] = [
                 {'fs_file_event_rule_calls': ['Mknod', 'Unlink', 'Rename', 'Write'],
-                 'fs_file_event_rule_path_regex': '.*.xml'}
+                 'fs_file_event_rule_path_regex': '(?!vmcasts)(.*.xml)'}
             ]
         self.write_config()
 

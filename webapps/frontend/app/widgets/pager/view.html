@@ -30,11 +30,22 @@ limitations under the License.
             </tbody>
         <!-- /ko -->
         <!-- ko if: !initialLoad() -->
-            <tbody data-bind="foreach: viewportItems">
-                <tr data-part="vitem" data-bind="foreach: $parent.headers">
-                    <td data-bind="html: $parent[key]"></td>
+            <!-- ko if: viewportItems().length == 0 -->
+                <tbody>
+                <tr>
+                    <td data-bind="attr: { colspan: headers().length }">
+                        <i data-i18n="ovs:generic.noentries"></i>
+                    </td>
                 </tr>
             </tbody>
+            <!-- /ko -->
+            <!-- ko if: viewportItems().length > 0 -->
+                <tbody data-bind="foreach: viewportItems">
+                    <tr data-part="vitem" data-bind="foreach: $parent.headers">
+                        <td data-bind="html: $parent[key]"></td>
+                    </tr>
+                </tbody>
+            <!-- /ko -->
         <!-- /ko -->
     </table>
     <div data-bind="if: showControls()">

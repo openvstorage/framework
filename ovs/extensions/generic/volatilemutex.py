@@ -21,7 +21,7 @@ import time
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', 'volatile mutex')
+logger = LogHandler('extensions', 'volatile mutex')
 
 
 class VolatileMutex(object):

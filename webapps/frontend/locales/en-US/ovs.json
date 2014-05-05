@@ -48,7 +48,11 @@
             "CEPH_S3": "Ceph S3",
             "SWIFT_S3": "Swift S3",
             "LOCAL": "Local FS",
-            "REST": "REST backend"
+            "REST": "REST backend",
+            "DISTRIBUTED": "Distributed FS"
+        },
+        "mgmtcentertypes": {
+            "VCENTER": "VMware vCenter"
         },
         "username": "Username",
         "password": "Password",
@@ -96,8 +100,8 @@
         "machines": "Machines",
         "vpool": "vPool",
         "vpools": "vPools",
-        "vsa": "VSA",
-        "vsas": "VSAs",
+        "vsa": "GSR",
+        "vsas": "GSRs",
         "children": "Children",
         "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
@@ -152,30 +156,40 @@
         "focport": "FOC",
         "mgmtport": "Management",
         "templatehaschildren": "This vTemplate does have children",
-        "clone": "Create clones"
+        "clone": "Create clones",
+        "about": "About",
+        "administration": "Administration",
+        "mgmtcenter": "Mgmt. Center",
+        "port": "Port",
+        "noentries": "No entries available",
+        "logging": "Kibana logging"
     },
     "vsas": {
-        "title": "VSAs",
-        "details": "VSA Details",
+        "title": "GSRs",
+        "details": "GSR Details",
         "detail": {
-            "title": "VSA",
+            "title": "GSR",
             "hostip": "Host IP",
             "moveawaytitle": "Move all vDisks",
-            "moveawaymsg": "Move all vDisks away from this VSA and start them on other VSAs.",
+            "moveawaymsg": "Move all vDisks away from this GSR and start them on other GSRs.",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
                 "no": "Cancel",
                 "yes": "Move away",
                 "marked": "Moving away started",
-                "markedmsg": "All vDisks will be moved away from this VSA",
+                "markedmsg": "All vDisks will be moved away from this GSR",
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
             },
-            "vsavpoollink": "vPools served by this VSA",
+            "vsavpoollink": "vPools served by this GSR",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple VSAs"
+            "localvpool": "This is a local vPool which can not be shared across multiple GSRs",
+            "logging": "GSR logs",
+            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
+            "logginginfo2": "Open Kibana",
+            "logginginfo3": "to view this GSR's logs."
         }
     },
     "vpools" : {
@@ -190,9 +204,13 @@
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
             "sync": "Sync vPool with reality",
-            "vsavpoollink": "VSAs serving this vPool",
+            "vsavpoollink": "GSRs serving this vPool",
             "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple VSAs."
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple GSRs.",
+            "logging": "vPool logs",
+            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
+            "logginginfo2": "Open Kibana",
+            "logginginfo3": "to view this vPool's logs."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -277,9 +295,9 @@
         "title": "Dashboard",
         "panels": {
             "vsa": {
-                "helpcontent": "The VSA (Virtual Storage Appliance) panel list all the VSAs registered in the Open vStorage Cluster. For each VSA the status, name, IP address and amount of vDisks is displayed.",
-                "helptitle": "Help - VSA",
-                "title": "VSA"
+                "helpcontent": "The GSR (Grid Storage Router) panel list all the GSRs registered in the Open vStorage Cluster. For each GSR the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - GSR",
+                "title": "GSR"
             },
             "cache": {
                 "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
@@ -301,6 +319,47 @@
                 "helptitle": "Help - vPools",
                 "title": "vPools"
             }
+        }
+    },
+    "about": {
+        "title": "About Open vStorage",
+        "product": "Open vStorage",
+        "installedproducts": "Installed Packages",
+        "importantwebsites": "Important Websites",
+        "projectwebsite": "Project Website:",
+        "projectwebsiteurl": "http://www.openvstorage.com",
+        "sourcecode": "Source Code:",
+        "sourcecodeurl": "https://bitbucket.org/openvstorage/openvstorage",
+        "companywebsite": "Company Website:",
+        "companywebsiteurl": "http://www.cloudfounders.com",
+        "openvstorage": "Open vStorage:",
+        "openvstoragecore": "Open vStorage - Core:",
+        "openvstoragewebapps": "Open vStorage - Webapps:",
+        "volumedriver": "vStorage Driver:"
+    },
+    "pmachines": {
+        "title": "Hypervisor Mgmt.",
+        "mgmtcenter": {
+            "title": "Hypervisor Management Center",
+            "add": "Add new Center",
+            "hosts": "OVS Hosts/Total"
+        },
+        "pmachines": {
+            "title": "Managed Hosts",
+            "incorrectmgmtcenter": "The selected Management center might be incorrect."
+        },
+        "delete": {
+            "warning": "Are you sure you want to delete __what__?",
+            "marked": "Marked for deletion",
+            "markedmsg": "Management center __what__ is marked for deletion...",
+            "done": "Deleted",
+            "donemsg": "Management center __what__ deleted",
+            "errormsg": "deleting __what__"
+        },
+        "save": {
+            "complete": "Save completed",
+            "success": "PMachine __what__ updated.",
+            "failed": "Updating __what__ failed: __why__"
         }
     },
     "login": {
@@ -332,17 +391,17 @@
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "nocredentials": "No credentials were entered",
                 "extendedinfo": "Extended vPool information",
-                "initialvsa": "Initial VSA:",
+                "initialvsa": "Initial GSR:",
                 "vsarootpassword": "Root password:",
-                "invalidpassword": "Invalid VSA root password"
+                "invalidpassword": "Invalid GSR root password"
             },
             "gathermountpoints": {
-                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all VSAs serving this vPool. Please also set the vPool connection info.",
+                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all GSRs serving this vPool. Please also set the vPool connection info.",
                 "tempfs": "Temporary FS:",
                 "dfs": "Distributed FS:",
                 "md": "Metadata:",
                 "cache": "Cache location:",
-                "mtptinuse": "The given __what__ location is already in use on this VSA",
+                "mtptinuse": "The given __what__ location is already in use on this GSR",
                 "ipaddress": "Storage IP:",
                 "port": "vRouter port:",
                 "portsinuse": "Ports in use:",
@@ -353,7 +412,7 @@
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
-                "vsainfo": "Validate whether the correct VSA was selected.",
+                "vsainfo": "Validate whether the correct GSR was selected.",
                 "mountpoints": "Validate whether mountpoints and connection information are correct.",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
                 "started": "Creation started",
@@ -363,23 +422,23 @@
             }
         },
         "vsatovpool": {
-            "title": "Change links between vPool and VSAs",
+            "title": "Change links between vPool and GSRs",
             "confirm": {
                 "errorvalidating": "Error while validating. Try again.",
                 "validating": "Validating...",
-                "addvalid": "The vPool can be added to this VSA.",
-                "removevalid": "The vPool can be removed from this VSA.",
-                "noselection": "No VSAs were selected.",
-                "mtptnotavailable": "The location __what__ is not available on this VSA",
-                "ipnotavailable": "The IP __what__ is not available on this VSA",
+                "addvalid": "The vPool can be added to this GSR.",
+                "removevalid": "The vPool can be removed from this GSR.",
+                "noselection": "No GSRs were selected.",
+                "mtptnotavailable": "The location __what__ is not available on this GSR",
+                "ipnotavailable": "The IP __what__ is not available on this GSR",
                 "started": "Adding/removing",
-                "inprogress": "The vPool is being added to or removed from the validated VSAs",
+                "inprogress": "The vPool is being added to or removed from the validated GSRs",
                 "working": "adding/removing the vPool",
                 "complete": "Add/remove vPool complete",
-                "success": "The vPool was added/removed to the selected VSAs with success",
-                "somefailed": "The vPool was added to or removed from some the selected VSAs. Some tasks failed.",
-                "allfailed": "The vPool could not be added to or removed from any of the selected VSAs",
-                "inuse": "The vPool is in use at this VSA"
+                "success": "The vPool was added/removed to the selected GSRs with success",
+                "somefailed": "The vPool was added to or removed from some the selected GSRs. Some tasks failed.",
+                "allfailed": "The vPool could not be added to or removed from any of the selected GSRs",
+                "inuse": "The vPool is in use at this GSR"
             }
         },
         "createft": {
@@ -488,6 +547,27 @@
                 "shouldmatch": "New passwords should match",
                 "updatingpassword": "updating the password"
             }
+        },
+        "addmgmtcenter": {
+            "title": "Add Hypervisor Management Center",
+            "gather": {
+                "noname": "No name was given",
+                "nousername": "No username was given",
+                "nopassword": "No password was given",
+                "started": "Started",
+                "inprogress": "Adding Management Center __what__ started.",
+                "complete": "Complete",
+                "success": "Adding __what__ completed.",
+                "failed": "Adding __what__ failed: __why__",
+                "basicinfo": "Enter the required information to add the Hypervisor Management Center",
+                "type": "Type:",
+                "ip": "IP Address:",
+                "name": "Name:",
+                "port": "Port:",
+                "username": "Username:",
+                "password": "Password:",
+                "invalidip": "The IP Address entered is invalid"
+            }
         }
     },
     "footer" : {
@@ -530,6 +610,12 @@
         "vdisks": "&#xf0a0;",
         "add": "&#xf067;",
         "vmachines": "&#xf0e8;",
-        "vsavpoollink": "&#xf07c;"
+        "vsavpoollink": "&#xf07c;",
+        "edit": "&#xf040;",
+        "save": "&#xf00c;",
+        "warning": "&#xf071;",
+        "cancel": "&#xf00d;",
+        "logs": "&#xf02d;",
+        "externallink": "&#xf08e;"
     }
 }

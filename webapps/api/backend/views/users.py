@@ -15,11 +15,13 @@
 """
 Module for users
 """
+
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose
+from backend.decorators import required_roles, expose, validate, get_object, get_list
 from backend.toolbox import Toolbox
 from rest_framework import status, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -48,32 +50,29 @@ class UserViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view', 'system'])
-    def list(self, request, format=None):
+    @get_list(User)
+    def list(self, request, format=None, hints=None):
         """
         Lists all available Users
         """
-        _ = format
-        users = UserList.get_users()
-        users, serializer, contents = Toolbox.handle_list(users, request)
-        serialized = serializer(User, instance=users, many=True)
-        return Response(serialized.data)
+        _ = request, format, hints
+        return UserList.get_users()
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @validate(User)
+    @get_object(User)
+    def retrieve(self, request, obj):
         """
         Load information about a given User
         Only the currently logged in User is accessible, or all if the logged in User has a
         system role
         """
         _ = format
-        user = UserViewSet._get_object(pk)
         loggedin_user = UserList.get_user_by_username(request.user.username)
-        if user.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['system']):
-            contents = Toolbox.handle_retrieve(request)
-            serializer = FullSerializer(User, contents=contents, instance=user)
-            return Response(serializer.data)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        if obj.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['system']):
+            return obj
+        raise PermissionDenied('Fetching user information not allowed')
 
     @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
@@ -106,19 +105,19 @@ class UserViewSet(viewsets.ViewSet):
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def set_password(self, request, pk=None, format=None):
+    @validate(User)
+    def set_password(self, request, obj):
         """
         Sets the password of a given User. A logged in User can only changes its own password,
         or all passwords if the logged in User has a system role
         """
-        _ = format
-        user = UserViewSet._get_object(pk)
         loggedin_user = UserList.get_user_by_username(request.user.username)
-        if user.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['update', 'system']):
+        if obj.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['update', 'system']):
             serializer = PasswordSerializer(data=request.DATA)
             if serializer.is_valid():
-                if user.password == hashlib.sha256(str(serializer.data['current_password'])).hexdigest():
-                    user.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
-                    user.save()
-                    return Response(FullSerializer(User, user).data, status=status.HTTP_202_ACCEPTED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                if obj.password == hashlib.sha256(str(serializer.data['current_password'])).hexdigest():
+                    obj.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
+                    obj.save()
+                    return obj
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        raise PermissionDenied('Updating password not allowed')

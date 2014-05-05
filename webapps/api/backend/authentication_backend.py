@@ -25,7 +25,7 @@ from rest_framework import exceptions, HTTP_HEADER_ENCODING
 from ovs.log.logHandler import LogHandler
 import hashlib
 
-logger = LogHandler('ovs.api', name='authentication middleware')
+logger = LogHandler('api', name='authentication middleware')
 
 
 class UPAuthenticationBackend(object):

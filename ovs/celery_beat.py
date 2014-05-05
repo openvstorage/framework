@@ -25,7 +25,7 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.celery', name='celery beat')
+logger = LogHandler('celery', name='celery beat')
 
 
 class DistributedScheduler(Scheduler):

@@ -140,12 +140,8 @@ define([
                 if (generic.xhrCompleted(self.loadVDisksHandle)) {
                     self.loadVDisksHandle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
                         .done(function(data) {
-                            var guids = [];
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                            });
                             generic.crossFiller(
-                                guids, self.vDisks,
+                                data, self.vDisks,
                                 function(guid) {
                                     return new VDisk(guid);
                                 }, 'guid'

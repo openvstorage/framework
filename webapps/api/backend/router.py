@@ -23,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.api', name='router')
+logger = LogHandler('api', name='router')
 Route = namedtuple('Route', ['url', 'mapping', 'name', 'initkwargs'])
 
 

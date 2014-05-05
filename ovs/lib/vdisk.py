@@ -32,7 +32,7 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.lib', name='vdisk')
+logger = LogHandler('lib', name='vdisk')
 
 
 class VDiskController(object):

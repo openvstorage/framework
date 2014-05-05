@@ -22,7 +22,7 @@ from model import Model
 from brander import Brander
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='migrations')
+logger = LogHandler('extensions', name='migrations')
 
 
 class Migration(object):

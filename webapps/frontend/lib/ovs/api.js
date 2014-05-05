@@ -68,10 +68,18 @@ define([
     function post(api, data, filter) {
         return call(api, data, filter, 'POST');
     }
+    function put(api, data, filter) {
+        return call(api, data, filter, 'PUT');
+    }
+    function patch(api, data, filter) {
+        return call(api, data, filter, 'PATCH');
+    }
 
     return {
-        get : get,
-        del : del,
-        post: post
+        get  : get,
+        del  : del,
+        post : post,
+        put  : put,
+        patch: patch
     };
 });

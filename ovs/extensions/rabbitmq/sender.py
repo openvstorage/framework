@@ -23,7 +23,7 @@ import pika
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='sender')
+logger = LogHandler('extensions', name='sender')
 
 if __name__ == '__main__':
     data = sys.argv[1] if len(sys.argv) >= 2 else '{}'

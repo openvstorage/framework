@@ -35,7 +35,7 @@ from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
 _vsr_scrubber = Scrubber()
-logger = LogHandler('ovs.lib', name='scheduled tasks')
+logger = LogHandler('lib', name='scheduled tasks')
 
 
 def ensure_single(tasknames):

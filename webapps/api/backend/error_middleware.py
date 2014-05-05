@@ -18,7 +18,7 @@ Error middleware module
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.api', 'error middleware')
+logger = LogHandler('api', 'error middleware')
 
 
 class ExceptionMiddleware(object):

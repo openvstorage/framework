@@ -108,7 +108,6 @@ define([
                 if (generic.xhrCompleted(self.refreshVDisksHandle[page])) {
                     var options = {
                         sort: 'name',
-                        full: true,
                         page: page,
                         contents: '_dynamics,-snapshots',
                         vmachineguid: self.vMachine().guid()

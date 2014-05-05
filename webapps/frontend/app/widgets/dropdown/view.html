@@ -13,9 +13,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<section>
+<section style="display: inline-block;">
     <div class="btn-group">
-        <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown">
+        <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown"
+                data-bind="style: {
+                               'paddingTop': small() ? '2px' : '6px',
+                               'paddingBottom': small() ? '2px' : '6px'
+                           }">
             <!-- ko if: multi() -->
                 <span data-bind="visible: target().length === 0"><i data-i18n="ovs:generic.nothingselected"></i></span>
                 <span data-bind="foreach: target">
@@ -43,7 +47,7 @@ limitations under the License.
             <!-- ko foreach: items -->
                 <li data-bind="css: {
                                    active: $parent.multi() ? false : !$parent.useFree() && (
-                                       $parent.key() !== undefined ? (
+                                       $data !== undefined && $parent.target() !== undefined && $parent.key() !== undefined ? (
                                            $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
                                                                      $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
                                        ) : $parent.target() === $data

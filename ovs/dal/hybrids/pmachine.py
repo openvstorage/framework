@@ -16,6 +16,8 @@
 PMachine module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.hybrids.mgmtcenter import MgmtCenter
+from ovs.extensions.hypervisor.factory import Factory as hvFactory
 
 
 class PMachine(DataObject):
@@ -29,7 +31,23 @@ class PMachine(DataObject):
                   'username':    (None, str, 'Username of the pMachine.'),
                   'password':    (None, str, 'Password of the pMachine.'),
                   'ip':          (None, str, 'IP address of the pMachine.'),
-                  'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.')}
-    _relations = {}
-    _expiry = {}
+                  'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.'),
+                  'hypervisorid': (None, str, 'Hypervisor id - primary key on Management Center')}
+    _relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
+    _expiry = {'host_status': (60, str)}
     # pylint: enable=line-too-long
+
+    def _host_status(self):
+        """
+        Returns the host status as reported by the management center (e.g. vCenter Server)
+        """
+        mgmtcentersdk = hvFactory.get_mgmtcenter(self)
+        if mgmtcentersdk:
+            if self.hypervisorid:
+                return mgmtcentersdk.get_host_status_by_pk(self.hypervisorid)
+            if self.ip:
+                return mgmtcentersdk.get_host_status_by_ip(self.ip)
+        return 'UNKNOWN'
+
+
+

@@ -22,7 +22,7 @@ import stat
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', 'file mutex')
+logger = LogHandler('extensions', 'file mutex')
 
 
 class FileMutex(object):

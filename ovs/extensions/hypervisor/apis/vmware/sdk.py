@@ -26,34 +26,37 @@ from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('ovs.extensions', name='vmware sdk')
+logger = LogHandler('extensions', name='vmware sdk')
 
 
 class NotAuthenticatedException(BaseException):
     pass
 
 
-def authenticated(function):
+def authenticated(force=False):
     """
     Decorator to make that a login is executed in case the current session isn't valid anymore
+    @param force: Force a (re)login, as some methods also work when not logged in
     """
-
-    def new_function(self, *args, **kwargs):
-        self.__doc__ = function.__doc__
-        try:
-            return function(self, *args, **kwargs)
-        except WebFault as fault:
-            if 'The session is not authenticated' in str(fault):
-                logger.debug('Received WebFault authentication failure, logging in...')
+    def wrapper(function):
+        def new_function(self, *args, **kwargs):
+            self.__doc__ = function.__doc__
+            try:
+                if force:
+                    self._login()
+                return function(self, *args, **kwargs)
+            except WebFault as fault:
+                if 'The session is not authenticated' in str(fault):
+                    logger.debug('Received WebFault authentication failure, logging in...')
+                    self._login()
+                    return function(self, *args, **kwargs)
+                raise
+            except NotAuthenticatedException:
+                logger.debug('Received NotAuthenticatedException, logging in...')
                 self._login()
                 return function(self, *args, **kwargs)
-            raise
-        except NotAuthenticatedException:
-            logger.debug('Received NotAuthenticatedException, logging in...')
-            self._login()
-            return function(self, *args, **kwargs)
-
-    return new_function
+        return new_function
+    return wrapper
 
 
 class ValueExtender(MessagePlugin):
@@ -129,6 +132,112 @@ class Sdk(object):
         else:
             self._esxHost = None
 
+    @authenticated(force=True)
+    def _get_vcenter_hosts(self):
+        """
+        reload vCenter info (host name and summary)
+        """
+        if not self._is_vcenter:
+            raise RuntimeError('Must be connected to a vCenter Server API.')
+        datacenter_info = self._get_object(
+            self._serviceContent.rootFolder,
+            prop_type='HostSystem',
+            traversal={'name': 'FolderTraversalSpec',
+                       'type': 'Folder',
+                       'path': 'childEntity',
+                       'traversal': {'name': 'DatacenterTraversalSpec',
+                                     'type': 'Datacenter',
+                                     'path': 'hostFolder',
+                                     'traversal': {'name': 'DFolderTraversalSpec',
+                                                   'type': 'Folder',
+                                                   'path': 'childEntity',
+                                                   'traversal': {'name': 'ComputeResourceTravelSpec',  # noqa
+                                                                 'type': 'ComputeResource',
+                                                                 'path': 'host'}}}},
+            properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
+        )
+        return datacenter_info
+
+    def get_host_status_by_ip(self, host_ip):
+        """
+        Return host status by ip, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        host = self._get_host_info_by_ip(host_ip)
+        return host.summary.runtime.powerState
+
+    def get_host_status_by_pk(self, pk):
+        """
+        Return host status by pk, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        host = self._get_host_info_by_pk(pk)
+        return host.summary.runtime.powerState
+
+    def get_host_primary_key(self, host_ip):
+        """
+        Return host primary key, based on current ip
+        Must be connected to a vcenter server api
+        """
+        host = self._get_host_info_by_ip(host_ip)
+        return host.obj_identifier.value
+
+    def _get_host_info_by_ip(self, host_ip):
+        """
+        Return HostSystem object by ip, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        datacenter_info = self._get_vcenter_hosts()
+        for host in datacenter_info:
+            for nic in host.config.virtualNicManagerInfo.netConfig.VirtualNicManagerNetConfig:
+                if nic.nicType == 'management':
+                    for vnic in nic.candidateVnic:
+                        if vnic.spec.ip.ipAddress == host_ip:
+                            return host
+        raise RuntimeError('Host with ip {0} not found in datacenter info'.format(host_ip))
+
+    def _get_host_info_by_pk(self, pk):
+        """
+        Return HostSystem object by pk, from vcenter info
+        Must be connected to a vcenter server api
+        """
+        datacenter_info = self._get_vcenter_hosts()
+        for host in datacenter_info:
+            if host.obj_identifier.value == pk:
+                return host
+
+    def get_hosts(self):
+        """
+        Gets a neutral list of all hosts available
+        """
+        host_data = self._get_vcenter_hosts()
+        host_data = [] if host_data is None else host_data
+        hosts = {}
+        for host in host_data:
+            ips = []
+            for nic in host.config.virtualNicManagerInfo.netConfig.VirtualNicManagerNetConfig:
+                if nic.nicType == 'management':
+                    for vnic in nic.candidateVnic:
+                        ips.append(vnic.spec.ip.ipAddress)
+            hosts[host.obj_identifier.value] = {'name': host.name,
+                                                'ips': ips}
+        return hosts
+
+    def test_connection(self):
+        """
+        Tests the connection
+        """
+        self._login()
+        return True
+
+    def list_hosts_in_datacenter(self):
+        """
+        return a list of registered host names in vCenter
+        must be connected to a vcenter server api
+        """
+        datacenter_info = self._get_vcenter_hosts()
+        return [host.name for host in datacenter_info]
+
     def validate_result(self, result, message=None):
         """
         Validates a given result. Returning True if the task succeeded, raising an error if not
@@ -144,14 +253,14 @@ class Sdk(object):
         raise Exception(('%s: %s' % (message, 'Unexpected result'))
                         if message else 'Unexpected result')
 
-    @authenticated
+    @authenticated()
     def get_task_info(self, task):
         """
         Loads the task details
         """
         return self._get_object(task)
 
-    @authenticated
+    @authenticated()
     def get_vm_ip_information(self):
         """
         Get the IP information for all vms on a given esxi host
@@ -177,7 +286,7 @@ class Sdk(object):
             configuration.append(vmi)
         return configuration
 
-    @authenticated
+    @authenticated()
     def exists(self, name=None, key=None):
         """
         Checks whether a vm with a given name or key exists on a given esxi host
@@ -206,7 +315,7 @@ class Sdk(object):
         else:
             raise Exception('A name or key should be passed.')
 
-    @authenticated
+    @authenticated()
     def get_vm(self, key):
         """
         Retreives a vm object, based on its key
@@ -217,7 +326,7 @@ class Sdk(object):
         vm = self._get_object(vmid)
         return vm
 
-    @authenticated
+    @authenticated()
     def get_vms(self, ip, mountpoint):
         """
         Get all vMachines using a given nfs share
@@ -237,7 +346,7 @@ class Sdk(object):
                 filtered_vms.append(vm)
         return filtered_vms
 
-    @authenticated
+    @authenticated()
     def add_physical_disk(self, vmname, devicename, disklabel, filename, wait=False):
         """
         Adds a physical disk to a vm on a given esxi host. It tries to place the disk in the
@@ -338,7 +447,7 @@ class Sdk(object):
         raise Exception(
             'Could not find a virtual machine with name %s' % vmname)
 
-    @authenticated
+    @authenticated()
     def set_disk_mode(self, vmid, disks, mode, wait=True):
         """
         Sets the disk mode for a set of disks
@@ -371,7 +480,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def remove_disk(self, vm, disk, wait=True):
         """
         Removes a disk from a given vm
@@ -492,7 +601,7 @@ class Sdk(object):
         option.value = value
         return option
 
-    @authenticated
+    @authenticated()
     def copy_file(self, source, destination, wait=True):
         """
         Copies a file on the datastore
@@ -506,7 +615,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def update_vm(self, vm, name, os, disks, kvmport, wait=True):
         """
         Update a existing vm
@@ -595,7 +704,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def create_vm(self, name, cpus, memory, os, disks, nics, kvmport, datastore, wait=False):
         """
         Create a vm with a given set of settings
@@ -673,7 +782,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
@@ -735,7 +844,7 @@ class Sdk(object):
 
         return task
 
-    @authenticated
+    @authenticated()
     def clone_vm(self, vmid, name, disks, wait=True):
         """
         Clone a existing VM configuration
@@ -813,7 +922,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def get_vm(self, key):
         vmid = self.exists(key=key)
         if vmid is None:
@@ -821,7 +930,7 @@ class Sdk(object):
         vm = self._get_object(vmid)
         return vm
 
-    @authenticated
+    @authenticated()
     def get_datastore(self, ip, mountpoint):
         """
         @param ip : hypervisor ip to query for datastore presence
@@ -841,7 +950,7 @@ class Sdk(object):
 
         return datastore
 
-    @authenticated
+    @authenticated()
     def is_datastore_available(self, ip, mountpoint):
         """
         @param ip : hypervisor ip to query for datastore presence
@@ -891,7 +1000,7 @@ class Sdk(object):
 
         return config
 
-    @authenticated
+    @authenticated()
     def register_vm(self, vmxpath, wait=False):
         """
         Register a vm with a given esxhost
@@ -907,7 +1016,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def get_vm_guest_info(self, vmid):
         """
         Get guest information about a given vm
@@ -917,7 +1026,7 @@ class Sdk(object):
         setattr(info.guest, 'guestHeartbeatStatus', info.guestHeartbeatStatus)
         return info.guest
 
-    @authenticated
+    @authenticated()
     def delete_vm(self, vmid, wait=False):
         """
         Delete a given vm
@@ -929,7 +1038,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def unregister_vm(self, vmid):
         """
         Unregister a given vm
@@ -937,7 +1046,7 @@ class Sdk(object):
         machine = self._build_property('VirtualMachine', vmid)
         self._client.service.UnregisterVM(machine)
 
-    @authenticated
+    @authenticated()
     def power_on(self, vmid, wait=False):
         """
         Power on a given vm
@@ -949,7 +1058,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def power_off(self, vmid, wait=False):
         """
         Power off a given vm
@@ -961,7 +1070,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def shutdown(self, vmid):
         """
         Shut down a given vm
@@ -969,7 +1078,7 @@ class Sdk(object):
         machine = self._build_property('VirtualMachine', vmid)
         self._client.service.ShutdownGuest(machine)
 
-    @authenticated
+    @authenticated()
     def suspend(self, vmid, wait=False):
         """
         Suspend a given vm
@@ -981,7 +1090,7 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    @authenticated
+    @authenticated()
     def get_power_state(self, vmid):
         """
         Get the power state of a given vm
@@ -989,7 +1098,7 @@ class Sdk(object):
         return self._get_object(self._build_property('VirtualMachine', vmid),
                                 properties=['runtime.powerState']).runtime.powerState
 
-    @authenticated
+    @authenticated()
     def mount_nfs_datastore(self, name, remote_host, remote_path):
         """
         Mounts a given NFS export as a datastore
@@ -1022,7 +1131,7 @@ class Sdk(object):
         spec.type = 'nfs'
         return self._client.service.CreateNasDatastore(host.configManager.datastoreSystem, spec)
 
-    @authenticated
+    @authenticated()
     def register_extension(self, description, xmlurl, company, company_email, key, version):
         """
         Register an extension to the vcenter host we're talking to. In case the extension
@@ -1087,7 +1196,7 @@ class Sdk(object):
                 extension
             )
 
-    @authenticated
+    @authenticated()
     def find_extension(self, key):
         """
         Finds/checks for a extension with a given key
@@ -1096,7 +1205,7 @@ class Sdk(object):
             raise Exception('An extension can only be registered to a vCenter Server')
         return self._client.service.FindExtension(self._serviceContent.extensionManager, key)
 
-    @authenticated
+    @authenticated()
     def wait_for_task(self, task):
         """
         Wait for a task to be completed
@@ -1106,7 +1215,7 @@ class Sdk(object):
             sleep(1)
             state = self.get_task_info(task).info.state
 
-    @authenticated
+    @authenticated()
     def get_nfs_datastore_object(self, ip, mountpoint, filename):
         """
         ip : "10.130.12.200", string

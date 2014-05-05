@@ -35,6 +35,15 @@ from subprocess import check_output
 ARAKOON_CONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
 ARAKOON_CLIENTCONFIG_TAG = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
 
+ELASTICSEARCH_DEB = 'elasticsearch-1.1.1.deb'
+ELASTICSEARCH_URL = 'https://download.elasticsearch.org/elasticsearch/elasticsearch/{0}'.format(ELASTICSEARCH_DEB)
+
+KIBANA_VERSION = 'kibana-3.0.1'
+KIBANA_URL = 'https://download.elasticsearch.org/kibana/kibana/{0}.tar.gz'.format(KIBANA_VERSION)
+
+LOGSTASH_DEB = 'logstash_1.4.0-1-c82dc09_all.deb'
+LOGSTASH_URL = 'https://download.elasticsearch.org/logstash/logstash/packages/debian/{0}'.format(LOGSTASH_DEB)
+
 
 class Manager(object):
     """
@@ -42,7 +51,20 @@ class Manager(object):
     """
 
     @staticmethod
-    def install_node(ip, create_extra_filesystems=False, clean=False):
+    def replace_param_in_config(client, config_file, old_value, new_value, add=False):
+        if client.file_exists(config_file):
+            contents = client.file_read(config_file)
+            if new_value in contents and new_value.find(old_value) > 0:
+                pass
+            elif old_value in contents:
+                contents = contents.replace(old_value, new_value)
+            else:
+                if add:
+                    contents += new_value + '\n'
+            client.file_write(config_file, contents)
+
+    @staticmethod
+    def install_node(ip, create_extra_filesystems=False, clean=False, version=None):
         """
         Installs the Open vStorage software on a (remote) node.
         """
@@ -50,14 +72,14 @@ class Manager(object):
         if not os.geteuid() == 0:
             print 'Please run this script as root'
             sys.exit(1)
-
         if Manager._validate_ip(ip) is False:
             print 'The entered ip address is invalid'
             sys.exit(1)
-
         if isinstance(create_extra_filesystems, bool) is False or isinstance(clean, bool) is False:
             print 'Some arguments contain invalid data'
             sys.exit(1)
+        if version is not None and not isinstance(version, basestring):
+            print 'Illegal version specified'
 
         # Load client, local or remote
         is_local = Client.is_local(ip)
@@ -68,20 +90,18 @@ class Manager(object):
 
         client = Client.load(ip, password, bypass_local=True)
 
-        sshd_config_path = '/etc/ssh/sshd_config'
-        if client.file_exists(sshd_config_path):
-            sshd_config = client.file_read(sshd_config_path)
-            sshd_config = sshd_config.replace('AcceptEnv', '# AcceptEnv')
-            if 'UseDNS no' in sshd_config:
-                pass
-            elif 'UseDNS yes' in sshd_config:
-                sshd_config = sshd_config.replace('UseDNS yes', 'UseDNS no')
-            else:
-                sshd_config += 'UseDNS no\n'
-            client.file_write(sshd_config_path, sshd_config)
-            client.run('service ssh restart')
+        Manager.replace_param_in_config(client,
+                                        '/etc/ssh/sshd_config',
+                                        'AcceptEnv',
+                                        '#AcceptEnv')
+        Manager.replace_param_in_config(client,
+                                        '/etc/ssh/sshd_config',
+                                        'UseDNS yes',
+                                        'UseDNS no',
+                                        add=True)
+        client.run('service ssh restart')
 
-            client = Client.load(ip, password, bypass_local=True)
+        client = Client.load(ip, password, bypass_local=True)
 
         client.run('apt-get update')
         client.run('apt-get install lsscsi')
@@ -215,6 +235,9 @@ class Manager(object):
         install_branch, ovs_version = Manager._prepare_jscore(client, is_local)
         Manager._install_jscore(client, install_branch)
 
+        if version is not None:
+            ovs_version = version
+
         client.run('apt-get -y -q install libvirt0 python-libvirt virtinst')
         client.run("if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 * * * * /usr/sbin/ntpdate pool.ntp.org'; } | crontab -; fi")
 
@@ -228,6 +251,58 @@ class Manager(object):
         client.run('apt-get -y -q install libev4')
         client.run('jpackage_install -n arakoon -v 1.7.2')
 
+        # update elasticsearch
+        client.run('apt-get -y -q install openjdk-7-jre')
+        client.run('jsprocess -n elasticsearch disable')
+        client.run('jsprocess -n elasticsearch stop')
+        client.run('mv /etc/elasticsearch/elasticsearch.yml /var/tmp/')
+        client.run('cd /root/; rm -f {0}; wget -c {1}'.format(ELASTICSEARCH_DEB, ELASTICSEARCH_URL))
+        client.run('dpkg -i /root/{0}'.format(ELASTICSEARCH_DEB))
+        client.run('mv /var/tmp/elasticsearch.yml /etc/elasticsearch/')
+        Manager.replace_param_in_config(client,
+                                        '/opt/jumpscale/cfg/startup/jumpscale__elasticsearch.hrd',
+                                        'process.cmd=/opt/jumpscale/apps/elasticsearch/bin/elasticsearch',
+                                        'process.cmd=/usr/share/elasticsearch/bin/elasticsearch')
+        client.run('jsprocess -n elasticsearch disable')
+        client.run('jsprocess -n elasticsearch stop')
+        client.run('mkdir -p /opt/data/elasticsearch/work')
+        client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
+
+        config_file = '/etc/elasticsearch/elasticsearch.yml'
+        Manager.replace_param_in_config(client,
+                                        config_file,
+                                        '<CLUSTER_NAME>',
+                                        es_cluster_name,
+                                        add=False)
+        Manager.replace_param_in_config(client,
+                                        config_file,
+                                        '<NODE_NAME>',
+                                        client.run('hostname'))
+        public_ip = configuration['openvstorage-core']['ovs.grid.ip']
+        Manager.replace_param_in_config(client,
+                                        config_file,
+                                        '<NETWORK_PUBLISH>',
+                                        public_ip)
+        client.run('service elasticsearch restart')
+
+        client.run('cd /root; rm -f {0}; wget -c {1}'.format(LOGSTASH_DEB, LOGSTASH_URL))
+        client.run('dpkg -i /root/{0}'.format(LOGSTASH_DEB))
+        client.run('usermod -a -G adm logstash')
+        client.run("echo 'manual' >/etc/init/logstash-web.override")
+        Manager.replace_param_in_config(client,
+                                        '/etc/logstash/conf.d/indexer.conf',
+                                        '<CLUSTER_NAME>',
+                                        es_cluster_name)
+
+        client.run('cd /root; wget -c {0}'.format(KIBANA_URL))
+        client.run('cd /root; gunzip /root/{0}.tar.gz'.format(KIBANA_VERSION))
+        client.run('cd /root; tar xvf /root/{0}.tar'.format(KIBANA_VERSION))
+        status = client.run('service logstash status')
+        if 'stop' in status:
+            client.run('service logstash start')
+        else:
+            client.run('service logstash restart')
+
     @staticmethod
     def init_node(ip, join_masters=False):
         """
@@ -237,6 +312,21 @@ class Manager(object):
         Please note that initializing a node, joining a grid with < 3 nodes, will result in joining the
         master nodes regardless of the given parameter.
         """
+
+        def _update_es_configuration(es_client, value):
+            # update elasticsearch configuration
+            config_file = '/etc/elasticsearch/elasticsearch.yml'
+            es_client.run('service elasticsearch stop')
+            Manager.replace_param_in_config(es_client,
+                                            config_file,
+                                            '<IS_POTENTIAL_MASTER>',
+                                            value)
+            Manager.replace_param_in_config(es_client,
+                                            config_file,
+                                            '<IS_DATASTORE>',
+                                            value)
+            es_client.run('service elasticsearch start')
+            es_client.run('service logstash restart')
 
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
@@ -348,6 +438,19 @@ class Manager(object):
         generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                                '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
 
+        # Workaround for JumpScale process manager issue where the processmanager will restart
+        # processes even when they are disabled.
+        for node in nodes:
+            node_client = Client.load(node)
+            processes = node_client.run("ps aux | grep jumpscale | grep process").split('\n')
+            if len(processes) > 0:
+                for process in processes:
+                    if 'processmanager' in process:
+                        while '  ' in process:
+                            process = process.replace('  ', ' ')
+                        pid = process.split(' ')[1]
+                        node_client.run('kill -9 {0}'.format(pid))
+
         is_master = False
         if join_masters:
             print 'Joining master nodes, services going down.'
@@ -419,28 +522,6 @@ Net.updateHostsFile(hostsfile='/etc/hosts', ip='%(ip)s', hostname='%(host)s')
                         client = Client.load(ip)
                         Manager._exec_python(client, update_hosts_file)
 
-            # Update arakoon cluster configuration in voldrv configuration files
-            for node in nodes:
-                client_node = Client.load(node)
-                update_voldrv = """
-import os
-from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
-voldrv_arakoon_cluster_id = 'voldrv'
-voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
-voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
-configuration_dir = Configuration.get('ovs.core.cfgdir')
-if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
-    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
-for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
-    if json_file.endswith('.json'):
-        vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
-        vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
-"""
-                Manager._exec_python(client_node, update_voldrv)
-
             # Join rabbitMQ clusters
             client = Client.load(ip)
             client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
@@ -492,6 +573,28 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                     node_client.file_upload(config, config)
 
+            # Update arakoon cluster configuration in voldrv configuration files
+            for node in nodes:
+                client_node = Client.load(node)
+                update_voldrv = """
+import os
+from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+arakoon_management = ArakoonManagement()
+voldrv_arakoon_cluster_id = 'voldrv'
+voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
+voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+configuration_dir = Configuration.get('ovs.core.cfgdir')
+if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
+    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
+for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
+    if json_file.endswith('.json'):
+        vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
+        vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+"""
+                Manager._exec_python(client_node, update_voldrv)
+
             # Update possible volumedrivers with new amqp configuration.
             # On each node, it will loop trough all already configured vpools and update their amqp connection
             # info with those of the new rabbitmq client configuration file.
@@ -515,6 +618,12 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             if len(nodes) == 1:
                 from ovs.extensions.migration.migration import Migration
                 Migration.migrate()
+            else:
+                # we might need to disable running logstash-web on 2+ node
+                # client.run('rm /etc/init/logstash-web.conf')
+                pass
+            client = Client.load(ip)
+            _update_es_configuration(client, 'true')
 
         else:
             client = Client.load(ip)
@@ -529,6 +638,21 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for config in arakoon_clientconfigfiles + generic_configfiles.keys():
                 client.file_upload(config, config)
             Manager._configure_nginx(client)
+
+            client = Client.load(ip)
+            _update_es_configuration(client, 'false')
+
+        client = Client.load(ip)
+        client.run('mkdir -p /opt/OpenvStorage/webapps/frontend/logging')
+        client.run('service logstash restart')
+
+        Manager.replace_param_in_config(client,
+                                        '/root/{0}/config.js'.format(KIBANA_VERSION),
+                                        'http://"+window.location.hostname+":9200',
+                                        'http://' + ip + ':9200')
+        client.run('cp /root/{0}/app/dashboards/guided.json /root/{0}/app/dashboards/default.json'.format(KIBANA_VERSION, KIBANA_VERSION))
+        client.run('cp -R /root/{0}/* /opt/OpenvStorage/webapps/frontend/logging'.format(KIBANA_VERSION))
+        client.run('chown -R ovs:ovs /opt/OpenvStorage/webapps/frontend/logging')
 
         for cluster in ['ovsdb', 'voldrv']:
             master_elected = False
@@ -590,15 +714,12 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
 
-        # Make sure the process manager is started
-        client = Client.load(ip)
-        try:
-            client.run('service processmanager start')
-        except:
-            pass
-
         for node in nodes:
             node_client = Client.load(node)
+            try:
+                node_client.run('service processmanager start')
+            except:
+                pass
             node_client.run('jsprocess restart -n ovs_workers')
 
     @staticmethod
@@ -694,7 +815,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 supported_backends.remove('REST')  # REST is not supported for now
             vpool.backend_type = parameters.get('backend_type') or Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
             connection_host = connection_port = connection_username = connection_password = None
-            if vpool.backend_type == 'LOCAL':
+            if vpool.backend_type in ['LOCAL', 'DISTRIBUTED']:
                 vpool.backend_metadata = {'backend_type': 'LOCAL'}
             if vpool.backend_type == 'REST':
                 connection_host = parameters.get('connection_host') or Helper.ask_string('Provide REST ip address')
@@ -762,12 +883,20 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         if mountpoint_cache in mountpoints:
             mountpoints.remove(mountpoint_cache)
 
+        directories_to_create = [mountpoint_temp, mountpoint_md, mountpoint_cache]
+        if vpool.backend_type == 'DISTRIBUTED':
+            volumes_directory = '{0}/bfs'.format(mountpoint_dfs)
+            vpool.backend_metadata['local_connection_path'] = volumes_directory
+            directories_to_create.append(volumes_directory)
+            mountpoint_dfs = '{0}/dfs'.format(mountpoint_dfs)
+        directories_to_create.append(mountpoint_dfs)
+
         client = Client.load(ip)
         dir_create_script = """
 import os
 for directory in {0}:
     if not os.path.exists(directory):
-        os.makedirs(directory)""".format([mountpoint_temp, mountpoint_dfs, mountpoint_md, mountpoint_cache])
+        os.makedirs(directory)""".format(directories_to_create)
         Manager._exec_python(client, dir_create_script)
 
         cache_fs = os.statvfs(mountpoint_cache)
@@ -786,15 +915,16 @@ for directory in {0}:
         scocache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
         readcache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
         if new_vsr:
-            ports_used_in_model = [vsr.port for vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vsa.guid)]
+            ports_used_in_model = [port_vsr.port for port_vsr in VolumeStorageRouterList.get_volumestoragerouters_by_vsa(vsa.guid)]
             vrouter_port_in_hrd = int(Manager._read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
             if vrouter_port_in_hrd in ports_used_in_model:
-                vrouter_port = parameters.get('vrouter_port') or Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
+                vrouter_port = int(parameters.get('vrouter_port')) or Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
                                                                                     min_value=1024, max_value=max(ports_used_in_model) + 3)
             else:
-                vrouter_port = vrouter_port_in_hrd
+                vrouter_port = int(vrouter_port_in_hrd)
         else:
-            vrouter_port = vsr.port
+            vrouter_port = int(vsr.port)
+
         ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
         ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
         grid_ip = Manager._read_remote_config(client, 'ovs.grid.ip')
@@ -810,7 +940,7 @@ for directory in {0}:
 
         vrouter_config = {'vrouter_id': vrouter_id,
                           'vrouter_redirect_timeout_ms': '5000',
-                          'vrouter_migrate_timeout_ms': '5000',
+                          'vrouter_routing_retries': 10,
                           'vrouter_write_threshold': 1024}
         voldrv_arakoon_cluster_id = str(Manager._read_remote_config(client, 'volumedriver.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
@@ -884,7 +1014,7 @@ for filename in {1}:
         Manager._exec_python(client, file_create_script)
 
         config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
-        log_file = '/var/log/{0}.log'.format(vpool_name)
+        log_file = '/var/log/volumedriver/{0}.log'.format(vpool_name)
         vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(config_file, vsr.mountpoint, log_file)
         if vsa.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(vsr.mountpoint)
@@ -892,7 +1022,7 @@ for filename in {1}:
             vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
         vd_name = 'volumedriver_{}'.format(vpool_name)
 
-        log_file = os.path.join(os.sep, 'var', 'log', 'foc_{0}.log'.format(vpool_name))
+        log_file = '/var/log/volumedriver/foc_{0}.log'.format(vpool_name)
         fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(config_file, log_file)
         fc_name = 'failovercache_{0}'.format(vpool_name)
 
@@ -1756,9 +1886,14 @@ if __name__ == '__main__':
                       help="Create extra filesystems on third disk for backend-, distributed- and temporary FS")
     parser.add_option('-c', '--clean', dest='clean', action='store_true', default=False,
                       help='Try to clean environment before reinstalling')
+    parser.add_option('-v', '--version', dest='version',
+                      help='Specify a version to install.')
     (options, args) = parser.parse_args()
 
     try:
-        Manager.install_node('127.0.0.1', create_extra_filesystems=options.filesystems, clean=options.clean)
+        Manager.install_node('127.0.0.1',
+                             create_extra_filesystems=options.filesystems,
+                             clean=options.clean,
+                             version=options.version)
     except KeyboardInterrupt:
         print '\nAborting'

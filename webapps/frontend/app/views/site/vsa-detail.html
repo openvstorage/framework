@@ -27,16 +27,6 @@ limitations under the License.
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>
-            <li class="actions">
-                <span data-i18n="ovs:generic.actions"></span>:
-                <button type="button" class="btn btn-mini btn-default"
-                        data-bind="click: function() { $parent.moveAway(); },
-                                   style: { color: ($.inArray('MOVE_AWAY', availableActions()) !== -1 ? '#428bca' : 'grey') },
-                                   enable: $.inArray('MOVE_AWAY', availableActions()) !== -1,
-                                   tooltip: 'ovs:vsas.detail.moveawaymsg'">
-                    <span class="fa" data-i18n="[html]ovs:icons.moveaway"></span>
-                </button>
-            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="information" style="padding: 15px;">
@@ -134,12 +124,12 @@ limitations under the License.
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
-                            <td style="width: 90px; vertical-align: middle; padding: 0;">
+                            <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
                                 <button type="button" class="btn btn-lg" data-bind="enable: false">
                                     <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.vsavpoollink"></span>
                                 </button>
                             </td>
-                            <td style="padding: 0;">
+                            <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:vsas.detail.vsavpoollink"></h4>
                                 <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
                                 <div data-bind="foreach: $root.vPools">
@@ -159,6 +149,21 @@ limitations under the License.
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vsas.detail.updateserving"></span>
                                 </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="width: 90px; vertical-align: middle; padding: 0;">
+                                <button type="button" class="btn btn-lg" data-bind="enable: false">
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.logs"></span>
+                                </button>
+                            </td>
+                            <td style="padding: 0;">
+                                <h4 data-i18n="ovs:vsas.detail.logging"></h4>
+                                <p>
+                                    <span data-i18n="ovs:vsas.detail.logginginfo1"></span>
+                                    <a class="hand" data-bind="attr: { href: '/logging/index.html#/dashboard/file/logstash.json?query=host:' + name()  }"><span data-i18n="ovs:vsas.detail.logginginfo2"></span><i style="color: lightgrey; padding-left: 5px; padding-right: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a>
+                                    <span data-i18n="ovs:vsas.detail.logginginfo3"></span>
+                                </p>
                             </td>
                         </tr>
                     </tbody>

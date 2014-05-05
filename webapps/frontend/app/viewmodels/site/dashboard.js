@@ -130,7 +130,6 @@ define([
                         $.Deferred(function(vms_dfr) {
                             if (generic.xhrCompleted(self.loadVMachinesHandle)) {
                                 var filter = {
-                                    full: true,
                                     contents: 'statistics,stored_data',
                                     sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
                                     page: 1
@@ -155,11 +154,7 @@ define([
                             if (generic.xhrCompleted(self.loadVMachineGuidsHandle)) {
                                 self.loadVMachineGuidsHandle = api.post('vmachines/filter', self.query)
                                     .done(function(data) {
-                                        var guids = [];
-                                        $.each(data, function(index, item) {
-                                            guids.push(item.guid);
-                                        });
-                                        self.vMachineGuids(guids);
+                                        self.vMachineGuids(data);
                                         vmg_dfr.resolve();
                                     })
                                     .fail(vmg_dfr.reject);
@@ -180,7 +175,6 @@ define([
                 self.vPoolsLoading(true);
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
                     var filter = {
-                        full: true,
                         contents: 'statistics,stored_data',
                         sort: (self.topVPoolMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name')
                     };
@@ -215,7 +209,6 @@ define([
                         }
                     };
                     self.loadVsasHandle = api.post('vmachines/filter', query, {
-                        full: true,
                         contents: '',
                         sort: 'name'
                     })
