@@ -438,6 +438,19 @@ class Manager(object):
         generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                                '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
 
+        # Workaround for JumpScale process manager issue where the processmanager will restart
+        # processes even when they are disabled.
+        for node in nodes:
+            node_client = Client.load(node)
+            processes = node_client.run("ps aux | grep jumpscale | grep process").split('\n')
+            if len(processes) > 0:
+                for process in processes:
+                    if 'processmanager' in process:
+                        while '  ' in process:
+                            process = process.replace('  ', ' ')
+                        pid = process.split(' ')[1]
+                        node_client.run('kill -9 {0}'.format(pid))
+
         is_master = False
         if join_masters:
             print 'Joining master nodes, services going down.'
@@ -701,15 +714,12 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     node_client.run('jsprocess enable -n {0}'.format(service))
                     node_client.run('jsprocess start -n {0}'.format(service))
 
-        # Make sure the process manager is started
-        client = Client.load(ip)
-        try:
-            client.run('service processmanager start')
-        except:
-            pass
-
         for node in nodes:
             node_client = Client.load(node)
+            try:
+                node_client.run('service processmanager start')
+            except:
+                pass
             node_client.run('jsprocess restart -n ovs_workers')
 
     @staticmethod
