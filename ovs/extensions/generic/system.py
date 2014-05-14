@@ -16,7 +16,6 @@
 Generic system module, executing statements on local node
 """
 
-from ovs.lib.vmachine import VMachine
 from ovs.dal.lists.vmachinelist import VMachineList
 
 import subprocess
@@ -64,6 +63,7 @@ class Ovs():
         """
         Returns unique machine vsa id
         """
+        from ovs.lib.vmachine import VMachine  # recursive dependency trying to import Ovs
         if not Ovs.my_vsa_guid:
             for vm in VMachineList.get_vmachines():
                 if vm.is_internal and vm.machineid == Ovs.get_my_machine_id():

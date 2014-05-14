@@ -247,6 +247,7 @@ class Manager(object):
         client.run('jpackage_install -n openvstorage -v {0}'.format(ovs_version))
         client.run('. /opt/OpenvStorage/bin/activate; pip install amqp==1.4.1')
         client.run('. /opt/OpenvStorage/bin/activate; pip install suds-jurko==0.5')
+        client.run('. /opt/OpenvStorage/bin/activate; pip install pysnmp==0.5')
 
         client.run('apt-get -y -q install libev4')
         client.run('jpackage_install -n arakoon -v 1.7.2')
