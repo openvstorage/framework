@@ -141,6 +141,7 @@ class SNMPServer():
         """
         if not class_oid in self.ASSIGNED:
             self.ASSIGNED[class_oid] = {}
+            self.instance_oid = 0
 
         if not self.instance_oid in self.ASSIGNED[class_oid]:
             self.ASSIGNED[class_oid][self.instance_oid] = {}
@@ -162,7 +163,7 @@ class SNMPServer():
                     self.ASSIGNED[class_oid][self.instance_oid][self.attrb_oid] = (model_object, attribute)
                     self.attrb_oid += 1
 
-                    self._add_user_permission(oid)
+                    self._add_user_permission(DAL_NAMING_SCHEME.replace('.%s', ''))
                     return_type = v2c.OctetString
                     OID = tuple(int(x) for x in oid.split('.'))
                     print('Registering OID %s for %s %s' % (str(OID), type(model_object), attribute))
@@ -170,21 +171,25 @@ class SNMPServer():
                         class DALScalar(self.MibScalarInstance):
                             def getValue(class_, name, idx): #@NoSelf
                                 try:
-                                    dal_oid = '.'.join([str(x) for x in name])
-                                    mo, attr = self.ASSIGNED[dal_oid]
+                                    c_oid = name[-3]
+                                    i_oid = name[-2]
+                                    a_oid = name[-1]
+                                    mo, attr = self.ASSIGNED[c_oid][i_oid][a_oid]
                                     if callable(attr): #lambda:
                                         value = attr(mo)
                                     else:
                                         value = getattr(mo, attr)
+                                except KeyError:
+                                    value = "KEY NOT ASSIGNED"
                                 except Exception as ex:
                                     value = str(ex)
                                 print('MibScalar getValue %s %s, return %s' % (name, idx, value))
-                                return class_.getSyntax().clone(str(value))
+                                return class_.getSyntax().clone(value)
 
                         return DALScalar
-                #export mib
-                self.mibBuilder.exportSymbols(oid, self.MibScalar(OID[:-1], return_type()),
-                                              _class()(OID[:-1], (OID[-1],), return_type()))
+                    #export mib
+                    self.mibBuilder.exportSymbols(oid, self.MibScalar(OID[:-1], return_type()),
+                                                  _class()(OID[:-1], (OID[-1],), return_type()))
 
                 self.attrb_oid = 0
                 self.instance_oid += 1
