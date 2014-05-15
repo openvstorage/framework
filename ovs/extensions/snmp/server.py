@@ -21,7 +21,7 @@ from pysnmp.entity.rfc3413 import cmdrsp, context
 from pysnmp.carrier.asynsock.dgram import udp
 from pysnmp.proto.api import v2c
 
-DAL_NAMING_SCHEME = "1.3.6.1.4.1.0.%s.%s.%s"
+
 
 class SNMPServer():
     """
@@ -30,16 +30,14 @@ class SNMPServer():
     standard oids implemented by pysnmp
     custom oids implemented either in custom class or by browsing dal/model
     """
-    def __init__(self, host, port, users, assigned_oids):
+    def __init__(self, host, port, users, naming_scheme):
         """
         host = public ip to listen on
         port = port to listen on (usually 161)
         users = list of ('username', 'password', 'privatekey', 'authPriv') #authentication method for snmp v3
         if users is None, authentication will be snmp v1 public community string, read only
         """
-        self.instance_oid = 0
-        self.attrb_oid = 0
-        self.ASSIGNED = assigned_oids
+        self.naming_scheme = naming_scheme
 
         self.run = True
         self.users = users
@@ -75,7 +73,7 @@ class SNMPServer():
                                           (0,),
                                           sysDescr.syntax.clone("PySNMP engine - OVS 1.2.0 SNMP Agent")) # Get from config?
         self.snmpEngine.msgAndPduDsp.mibInstrumController.mibBuilder.exportSymbols('SNMPv2-MIB', sysDescr)
-
+        self._add_user_permission(self.naming_scheme.replace('.%s', ''))
 
     def start(self):
         """
@@ -135,84 +133,31 @@ class SNMPServer():
                    'noAuthNoPriv', OID)
 
 
-    def register_custom_oid_for_model(self, class_oid, model_object, attributes):
+    def register_custom_oid(self, class_oid, instance_oid, attribute_oid, get_function, atype = str):
         """
-        Register a model object's attributes as oids
+        Register a custom oid - agnostic
         """
-        if not class_oid in self.ASSIGNED:
-            self.ASSIGNED[class_oid] = {}
-            self.instance_oid = 0
+        return_types = {str: v2c.OctetString,
+                        int: v2c.Unsigned32}
 
-        if not self.instance_oid in self.ASSIGNED[class_oid]:
-            self.ASSIGNED[class_oid][self.instance_oid] = {}
+        oid = self.naming_scheme % (class_oid, instance_oid, attribute_oid)
+        return_type = return_types.get(atype, v2c.OctetString)
+        OID = tuple(int(x) for x in oid.split('.'))
 
-        while True:
-            existing = self.ASSIGNED[class_oid][self.instance_oid].get(self.attrb_oid, None)
-            if existing:
-                if existing == (model_object, attribute):
-                    #  Already modeled correctly
-                    return
-                else:
-                    #  Something is present here but not the expected model_object
-                    self.instance_oid += 1
-                    self.attrb_oid = 0
-            else:
-                # Nothing exists, so we add here
-                for attribute in attributes:
-                    oid = DAL_NAMING_SCHEME % (class_oid, self.instance_oid, self.attrb_oid)
-                    self.ASSIGNED[class_oid][self.instance_oid][self.attrb_oid] = (model_object, attribute)
-                    self.attrb_oid += 1
+        print('Registering OID %s for %s' % (str(OID), get_function))
+        def _class():
+            class CustomScalar(self.MibScalarInstance):
+                def getValue(class_, name, idx): #@NoSelf
+                    _, _ = name, idx
+                    try:
+                        value = get_function()
+                    except Exception as ex:
+                        value = str(ex)
+                    print('MibScalar getValue %s %s, return %s' % (name, idx, value))
+                    return class_.getSyntax().clone(value)
 
-                    self._add_user_permission(DAL_NAMING_SCHEME.replace('.%s', ''))
-                    return_type = v2c.OctetString
-                    OID = tuple(int(x) for x in oid.split('.'))
-                    print('Registering OID %s for %s %s' % (str(OID), type(model_object), attribute))
-                    def _class():
-                        class DALScalar(self.MibScalarInstance):
-                            def getValue(class_, name, idx): #@NoSelf
-                                try:
-                                    c_oid = name[-3]
-                                    i_oid = name[-2]
-                                    a_oid = name[-1]
-                                    mo, attr = self.ASSIGNED[c_oid][i_oid][a_oid]
-                                    if callable(attr): #lambda:
-                                        value = attr(mo)
-                                    else:
-                                        value = getattr(mo, attr)
-                                except KeyError:
-                                    value = "KEY NOT ASSIGNED"
-                                except Exception as ex:
-                                    value = str(ex)
-                                print('MibScalar getValue %s %s, return %s' % (name, idx, value))
-                                return class_.getSyntax().clone(value)
-
-                        return DALScalar
-                    #export mib
-                    self.mibBuilder.exportSymbols(oid, self.MibScalar(OID[:-1], return_type()),
-                                                  _class()(OID[:-1], (OID[-1],), return_type()))
-
-                self.attrb_oid = 0
-                self.instance_oid += 1
-                return
-
-    def register_custom_oid(self, oid):
-        """
-        Register a custom class as OID, must implemented static method get
-        """
-        self._add_user_permission(oid.OID)
-        return_type = getattr(v2c, oid.RETURN)
-        OID = tuple(int(x) for x in oid.OID.split('.'))
-        print('Registering OID %s' % str(OID))
-        if oid.TYPE == 'MibScalar':
-            print('creating class %s' % oid.__name__)
-            def _class():
-                class MyStaticMibScalarInstance(self.MibScalarInstance):
-                    def getValue(self, name, idx):
-                        _, _ = name, idx
-                        value = oid.get()
-                        print('MibScalar getValue %s %s, return %s' % (name, idx, value))
-                        return self.getSyntax().clone(value)
-                return MyStaticMibScalarInstance
-            #export mib
-            self.mibBuilder.exportSymbols(oid.NAME, self.MibScalar(OID[:-1], return_type()),
-                                          _class()(OID[:-1], (OID[-1],), return_type()))
+            return CustomScalar
+        #export mib
+        self.mibBuilder.exportSymbols(oid, self.MibScalar(OID[:-1], return_type()),
+                                      _class()(OID[:-1], (OID[-1],), return_type()))
+        return oid
