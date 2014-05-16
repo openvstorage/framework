@@ -723,6 +723,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 pass
             node_client.run('jsprocess restart -n ovs_workers')
 
+            node_client.run('jsprocess enable -n ovs_snmp_server')
+            node_client.run('jsprocess start -n ovs_snmp_server')
+
     @staticmethod
     def init_vpool(ip, vpool_name, parameters=None):
         """

@@ -138,7 +138,7 @@ class SNMPServer():
         Register a custom oid - agnostic
         """
         return_types = {str: v2c.OctetString,
-                        int: v2c.Unsigned32}
+                        int: v2c.Counter64}
 
         oid = self.naming_scheme % (class_oid, instance_oid, attribute_oid)
         return_type = return_types.get(atype, v2c.OctetString)

@@ -88,7 +88,7 @@ class OVSSNMPServer():
         except KeyNotFoundException:
             return None
 
-    def _get_mappings(self, guid):
+    def get_mappings(self, guid):
         """
         Return the oids and the attributes - dict
         """
@@ -144,6 +144,8 @@ class OVSSNMPServer():
                 else:
                     #  Something is present here but not the expected model_object
                     self.instance_oid += 1
+                    if not self.instance_oid in self.assigned_oids[class_id]:
+                        self.assigned_oids[class_id][self.instance_oid] = {}
                     self.attrb_oid = 0
             else:
                 # Nothing exists, so we add here
@@ -170,14 +172,13 @@ class OVSSNMPServer():
         try:
             enabled = self.persistent.get(enabled_key)
         except KeyNotFoundException:
-            enabled = False
+            enabled = True # Enabled by default, can be disabled by setting the key
         if enabled:
             from ovs.dal.lists.vdisklist import VDiskList
             from ovs.dal.lists.vmachinelist import VMachineList
             from ovs.dal.lists.pmachinelist import PMachineList
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
-            from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
 
             # TODO: extend with required properties
             # TODO: implement dal decorator to mark properties to be exposed
@@ -200,15 +201,20 @@ class OVSSNMPServer():
                 self.instance_oid += 1
 
             for pm in PMachineList.get_pmachines():
-                pass
+                self._register_dal_model(2, pm, 'name')
+                self._register_dal_model(2, pm, 'host_status')
+                self.instance_oid += 1
 
             for vp in VPoolList.get_vpools():
                 self._register_dal_model(3, vp, 'name')
                 for key in vp.statistics.keys():
                     self._register_dal_model(3, vp, 'statistics', key, atype = int)
+                self.instance_oid += 1
+
             for vsr in VolumeStorageRouterList.get_volumestoragerouters():
                 self._register_dal_model(4, vsr, 'name')
                 self._register_dal_model(4, vsr, 'stored_data', atype = int)
+                self.instance_oid += 1
 
     def start(self):
         """
