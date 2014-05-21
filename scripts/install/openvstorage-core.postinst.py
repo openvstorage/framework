@@ -12,11 +12,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from subprocess import check_output
-
-check_output('mkdir -p /var/log/ovs', shell=True)
-check_output('chown ovs:ovs /var/log/ovs', shell=True)
-
-check_output('pip install amqp==1.4.1', shell=True)
-check_output('pip install suds-jurko==0.5', shell=True)

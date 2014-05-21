@@ -629,8 +629,12 @@ EOF
 """.format(cluster_name, node_name))
             SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
-            print Interactive.boxed_message(['Installation complete.',
-                                             'Point your browser to http://{0} to start using Open vStorage'.format(cluster_ip)])
+            if join_cluster:
+                print Interactive.boxed_message(['Setup complete.',
+                                                 'Point your browser to http://{0} to use Open vStorage'.format(master_ip)])
+            else:
+                print Interactive.boxed_message(['Setup complete.',
+                                                 'Point your browser to http://{0} to start using Open vStorage'.format(cluster_ip)])
 
         except Exception as exception:
             print ''  # Spacing
