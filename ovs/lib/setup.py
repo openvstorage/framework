@@ -999,7 +999,7 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
         status = SetupController._get_service_status(client, name)
         if status is False and state in ['start', 'restart']:
             SetupController._start_service(client, name)
-            action = '{0}ed'.format(state)
+            action = 'started'
         elif status is True and state in ['stop']:
             SetupController._stop_service(client, name)
             action = 'stopped'
