@@ -188,6 +188,7 @@ class SetupController(object):
                 cluster_ip = Interactive.ask_choice(ipaddresses, 'Select the public ip address of {0}'.format(node_name))
             if cluster_ip not in nodes:
                 nodes.append(cluster_ip)
+            ip = cluster_ip
             # Collecting hypervisor data
             possible_hypervisor = SetupController._discover_hypervisor(target_client)
             if not hypervisor_type:
@@ -484,7 +485,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     node_client = SSHClient.load(node)
                     SetupController._configure_amqp_to_volumedriver(node_client)
 
-                print 'Starting services'
+                print 'Starting model services'
                 for node in nodes:
                     node_client = SSHClient.load(node)
                     for service in model_services:
@@ -494,6 +495,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     print 'Start model migration'
                     from ovs.extensions.migration.migration import Migration
                     Migration.migrate()
+
                 client = SSHClient.load(ip)
                 SetupController._update_es_configuration(client, 'true')
 
@@ -630,6 +632,7 @@ EOF
 """.format(cluster_name, node_name))
             SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
+            print ''
             if join_cluster:
                 print Interactive.boxed_message(['Setup complete.',
                                                  'Point your browser to http://{0} to use Open vStorage'.format(master_ip)])
@@ -992,21 +995,28 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
         Starts/stops/restarts a service
         """
 
+        action = None
         status = SetupController._get_service_status(client, name)
-        current_status = status
         if status is False and state in ['start', 'restart']:
             SetupController._start_service(client, name)
+            action = '{0}ed'.format(state)
         elif status is True and state in ['stop']:
             SetupController._stop_service(client, name)
+            action = 'stopped'
         elif status is True and state in ['restart']:
             SetupController._restart_service(client, name)
+            action = 'restarted'
         status = SetupController._get_service_status(client, name)
-        if current_status != status:
-            print '  [{0} {1} status {2} to {3}'.format(client.ip, name,
-                                                        'running' if current_status is True else 'halted',
-                                                        'running' if status is True else 'halted')
-        else:
+
+        if status is True and state == 'stop':
+            raise RuntimeError('Service {0} could not be stopped on node {1}'.format(name, client.ip))
+        if status is False and state in ['restart', 'start']:
+            raise RuntimeError('Service {0} could not be {1}ed on node {2}'.format(name, state, client.ip))
+
+        if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
+        else:
+            print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
     def _update_es_configuration(es_client, value):
