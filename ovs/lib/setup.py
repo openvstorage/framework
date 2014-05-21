@@ -305,10 +305,9 @@ class SetupController(object):
                 )
 
             # Define services
-            model_services = ['arakoon-ovsdb', 'memcached', 'arakoon-voldrv']
+            model_services = ['memcached', 'arakoon-ovsdb', 'arakoon-voldrv']
             master_services = ['rabbitmq', 'scheduled-tasks', 'snmp']
             extra_services = ['webapp-api', 'nginx', 'workers', 'volumerouter-consumer']
-            all_services = model_services + master_services + extra_services
 
             arakoon_client_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
             arakoon_server_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
@@ -337,7 +336,7 @@ class SetupController(object):
             params = {'<ARAKOON_NODE_ID>' : unique_id,
                       '<MEMCACHE_NODE_IP>': cluster_ip,
                       '<WORKER_QUEUE>': unique_id}
-            for service in all_services:
+            for service in model_services + master_services + extra_services:
                 SetupController._add_service(target_client, service, params)
 
             if join_masters:
@@ -346,7 +345,7 @@ class SetupController(object):
                 print 'Stopping services'
                 for node in nodes:
                     node_client = SSHClient.load(node)
-                    for service in all_services:
+                    for service in sorted(extra_services, reverse=True) + sorted(master_services, reverse=True) + sorted(model_services, reverse=True):
                         SetupController._change_service_state(node_client, service, 'stop')
 
                 if join_cluster:
@@ -515,7 +514,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in master_services + model_services:
                     SetupController._disable_service(client, service)
                 # Stop services
-                for service in all_services:
+                for service in sorted(extra_services, reverse=True) + sorted(master_services, reverse=True) + sorted(model_services, reverse=True):
                     SetupController._change_service_state(client, service, 'stop')
 
                 print 'Configuring services'
@@ -1000,22 +999,25 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
         if status is False and state in ['start', 'restart']:
             SetupController._start_service(client, name)
             action = 'started'
-        elif status is True and state in ['stop']:
+        elif status is True and state == 'stop':
             SetupController._stop_service(client, name)
             action = 'stopped'
-        elif status is True and state in ['restart']:
+        elif status is True and state == 'restart':
             SetupController._restart_service(client, name)
             action = 'restarted'
-        status = SetupController._get_service_status(client, name)
-
-        if status is True and state == 'stop':
-            raise RuntimeError('Service {0} could not be stopped on node {1}'.format(name, client.ip))
-        if status is False and state in ['restart', 'start']:
-            raise RuntimeError('Service {0} could not be {1}ed on node {2}'.format(name, state, client.ip))
 
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
+            safetycounter = 0
+            while safetycounter < 10:
+                status = SetupController._get_service_status(client, name)
+                if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
+                    break
+                safetycounter += 1
+                time.sleep(1)
+            if safetycounter == 10:
+                raise RuntimeError('Service {0} could not be {1} on node {2}'.format(name, action, client.ip))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
