@@ -172,12 +172,13 @@ class SetupController(object):
             print '\n+++ Creating filesystems +++\n'
             if extra_hdd_storage == '' or extra_hdd_storage is None:
                 extra_hdd_storage = Interactive.ask_yesno('Do you want to configure an additional HDD for data storage?', default_value=False)
-#             else:
-#                 extra_hdd_storage = extra_hdd_storage
             SetupController._create_filesystems(target_client, extra_hdd_storage, extra_hdd_mountpoint, use_hdd_io_ssd, ssd_mountpoint)
 
             # Get target grid ip
             print '\n+++ Collecting generic information +++\n'
+            if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):
+                raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
+
             ovs_config = SetupController._remote_config_read(target_client, '/opt/OpenvStorage/config/ovs.cfg')
             ipaddresses = target_client.run(
                 "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
@@ -1001,9 +1002,11 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
             SetupController._restart_service(client, name)
         status = SetupController._get_service_status(client, name)
         if current_status != status:
-            print '  {0} status {1} to {2}'.format(name,
-                                                   'running' if current_status is True else 'halted',
-                                                   'running' if status is True else 'halted')
+            print '  [{0} {1} status {2} to {3}'.format(client.ip, name,
+                                                        'running' if current_status is True else 'halted',
+                                                        'running' if status is True else 'halted')
+        else:
+            print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
 
     @staticmethod
     def _update_es_configuration(es_client, value):

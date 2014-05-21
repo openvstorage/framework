@@ -33,4 +33,5 @@ class SSHClient(object):
         Remote.cuisine.fabric.output['stdout'] = False
         Remote.cuisine.fabric.output['running'] = False
         client.connect(ip)
+        client.ip = ip
         return client
