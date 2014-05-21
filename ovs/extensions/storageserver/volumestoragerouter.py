@@ -18,7 +18,7 @@ Wrapper class for the storagerouterclient of the voldrv team
 
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient, ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.net import Net
+from ovs.extensions.generic.system import Ovs
 import json
 import os
 
@@ -76,7 +76,7 @@ class VolumeStorageRouterConfiguration(object):
     """
     def __init__(self, vpool_name):
         self._vpool = vpool_name
-        self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'specs', 'volumedriverfs.json')
+        self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'volumedriverfs.json')
         if not os.path.exists(os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools')):
             os.makedirs(os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools'))
         self._config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools', '{}.json'.format(vpool_name))
@@ -194,10 +194,7 @@ class VolumeStorageRouterConfiguration(object):
         Configures volume storage router
         @param vrouter_config: dictionary of key/value pairs
         """
-        nics = Net.getNics()
-        nics.remove('lo')
-        mac_addresses = sorted(map(lambda n: Net.getMacAddress(n).replace(':', ''), nics))
-        unique_machine_id = mac_addresses[0]
+        unique_machine_id = Ovs.get_my_machine_id()
         self.load_config()
         if vrouter_config['vrouter_id'] == '{}{}'.format(self._vpool, unique_machine_id):
             for key, value in vrouter_config.iteritems():

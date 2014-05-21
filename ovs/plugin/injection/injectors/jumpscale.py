@@ -17,7 +17,7 @@ JumpScale Injector module
 """
 from JumpScale import j
 from JumpScale import grid
-
+from subprocess import check_output
 
 class Injector(object):
     """
@@ -35,14 +35,6 @@ class Injector(object):
         """ Injects the Config module """
         provider.get = j.application.config.get
         provider.getInt = j.application.config.getInt
-        provider.getHRD = j.core.hrd.getHRD
-        return provider
-
-    @staticmethod
-    def inject_tools(provider):
-        """ Injects the Tools module """
-        provider.inifile = j.tools.inifile
-        provider.expect = j.tools.expect
         return provider
 
     @staticmethod
@@ -79,7 +71,8 @@ class Injector(object):
     @staticmethod
     def inject_service(provider):
         """ Injects the Service module """
-        def add_service(package, name, command, stop_command):
+        def add_service(package, name, command, stop_command, params=None):
+            _ = params
             package = j.packages.find(domain=package[0], name=package[1])[0]
             j.tools.startupmanager.addProcess(
                 name=name, cmd=command, args='', env={}, numprocesses=1, priority=21,
@@ -96,21 +89,33 @@ class Injector(object):
         def remove_service(domain, name):
             j.tools.startupmanager.removeProcess(domain=domain, name=name)
 
+        def disable_service(name):
+            check_output('jsprocess -n {0} disable'.format(name))
+
+        def enable_service(name):
+            check_output('jsprocess -n {0} enable'.format(name))
+
+        def start_service(name):
+            check_output('jsprocess -n {0} start'.format(name))
+
+        def stop_service(name):
+            check_output('jsprocess -n {0} stop'.format(name))
+
+        def restart_service(name):
+            check_output('jsprocess -n {0} restart'.format(name))
+
+        def service_exists(name):
+            return name in check_output('jsprocess list | grep {0} || true'.format(name))
+
         provider.add_service = staticmethod(add_service)
         provider.remove_service = staticmethod(remove_service)
         provider.get_status = staticmethod(get_service_status)
-        return provider
-
-    @staticmethod
-    def inject_console(provider):
-        """ Injects the Console module """
-        _ = provider
-        return j.console
-
-    @staticmethod
-    def inject_logger(provider):
-        """ Injects the Logger module """
-        provider.log = j.logger.log
+        provider.disable_service = staticmethod(disable_service)
+        provider.enable_service = staticmethod(enable_service)
+        provider.start_service = staticmethod(start_service)
+        provider.stop_service = staticmethod(stop_service)
+        provider.restart_service = staticmethod(restart_service)
+        provider.service_exists = staticmethod(service_exists)
         return provider
 
     @staticmethod

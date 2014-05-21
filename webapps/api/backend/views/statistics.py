@@ -19,6 +19,7 @@ Statistics module
 import re
 import datetime
 import memcache
+from configobj import ConfigObj
 import os
 from backend.serializers.memcached import MemcacheSerializer
 from backend.decorators import required_roles, expose
@@ -27,7 +28,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.tools import Tools
 
 
 class MemcacheViewSet(viewsets.ViewSet):
@@ -41,10 +41,10 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         Get the memcache nodes
         """
-        memcache_ini = Tools.inifile.open(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-        nodes = memcache_ini.getValue('main', 'nodes').split(',')
+        memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+        nodes = memcache_ini['main']['nodes'].split(',')
         nodes = [node.strip() for node in nodes]
-        return [memcache_ini.getValue(node, 'location') for node in nodes]
+        return [memcache_ini[node]['location'] for node in nodes]
 
     @staticmethod
     def _node_stats(host):

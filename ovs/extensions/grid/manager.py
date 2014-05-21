@@ -802,8 +802,16 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         for node in nodes:
             node_client = Client.load(node)
             for service in services:
-                node_client.run('jsprocess disable -n {0}'.format(service))
-                node_client.run('jsprocess stop -n {0}'.format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+if Service.service_exists('{0}'):
+    Service.disable_service('{0}')
+""".format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+if Service.service_exists('{0}'):
+    Service.stop_service('{0}')
+""".format(service))
 
         # Keep in mind that if the VSR exists, the vPool does as well
 
@@ -1030,12 +1038,20 @@ for filename in {1}:
         fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(config_file, log_file)
         fc_name = 'failovercache_{0}'.format(vpool_name)
 
+        params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
+                  '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
+                  '<VPOOL_NAME>': vpool_name}
+
+        if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
+
         service_script = """
 from ovs.plugin.provider.service import Service
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}')
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', command='{4}', stop_command=None)""".format(
+Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}', params={5})
+Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
             vd_name, vd_cmd, vd_stopcmd,
-            fc_name, fc_cmd
+            fc_name, fc_cmd, params
         )
         Manager._exec_python(client, service_script)
 
@@ -1109,8 +1125,14 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
         for node in nodes:
             node_client = Client.load(node)
             for service in services:
-                node_client.run('jsprocess enable -n {0}'.format(service))
-                node_client.run('jsprocess start -n {0}'.format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+print Service.enable_service('{0}')
+""".format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+print Service.start_service('{0}')
+""".format(service))
 
         # Fill vPool size
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
@@ -1150,8 +1172,16 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 vsrs_left = True
             client = Client.load(current_vsr.serving_vmachine.ip)
             for service in services:
-                client.run('jsprocess disable -n {0}'.format(service))
-                client.run('jsprocess stop -n {0}'.format(service))
+                Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.service_exists('{0}'):
+    Service.disable_service('{0}')
+""".format(service))
+                Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.service_exists('{0}'):
+    Service.stop_service('{0}')
+""".format(service))
 
         # Unexporting vPool (VMware) and deleting KVM pool
         client = Client.load(ip)
@@ -1228,8 +1258,14 @@ fstab.remove_config_by_directory('{0}')
                 if current_vsr.guid != vsr_guid:
                     client = Client.load(current_vsr.serving_vmachine.ip)
                     for service in services:
-                        client.run('jsprocess enable -n {0}'.format(service))
-                        client.run('jsprocess start -n {0}'.format(service))
+                        Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+print Service.enable_service('{0}')
+""".format(service))
+                        Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+print Service.start_service('{0}')
+""".format(service))
         else:
             # Final model cleanup
             vpool.delete()
@@ -1307,7 +1343,10 @@ print Configuration.get('{0}')
         """
         Executes a python script on the client inside the OVS virtualenv
         """
-        return client.run('source /opt/OpenvStorage/bin/activate; python -c """{0}"""'.format(script))
+        if client.file_exists('/opt/OpenvStorage/bin/activate'):
+            return client.run('source /opt/OpenvStorage/bin/activate; python -c """{0}"""'.format(script))
+        else:
+            return client.run('python -c """{0}"""'.format(script))
 
     @staticmethod
     def _get_cluster_nodes():

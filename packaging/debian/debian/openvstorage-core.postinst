@@ -1,0 +1,15 @@
+#!/bin/bash
+
+easy_install -U cuisine
+pip install pysnmp==4.2.5
+
+# activate kibana
+SOURCE=/root/kibana
+TARGET=/opt/OpenvStorage/webapps/frontend/logging
+
+mkdir -p ${TARGET}
+mv ${SOURCE}/* ${TARGET}
+chown -R ovs:ovs ${TARGET}
+cp ${TARGET}/app/dashboards/guided.json ${TARGET}/app/dashboards/default.json
+
+#python /opt/OpenvStorage/scripts/install/openvstorage-core.postinst.py "__NEW_VERSION__" "$@"
