@@ -36,6 +36,7 @@ from ovs.extensions.generic.system import Ovs
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.plugin.provider.configuration import Configuration
+from ovs.plugin.provider.package import Package
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
@@ -664,16 +665,5 @@ class VMachineController(object):
         """
         Returns version information regarding a given VSA
         """
-        version_data = {'vsa_guid': vsa_guid,
-                        'versions': {}}
-        # Currently, we're parsing JumpScale files
-        # @TODO: Replace with better code after the Age of Enlightenment
-        for filename in glob.glob('/opt/jumpscale/cfg/jpackages/state/openvstorage_*.cfg'):
-            parser = ConfigParser.RawConfigParser()
-            parser.read(filename)
-            buildnumber = parser.getint('main', 'lastinstalledbuildnr')
-            if buildnumber > -1:
-                _, package, version = filename.split('/')[-1].split('_')
-                version = version.replace('.cfg', '')
-                version_data['versions'][package] = '{0}.{1}'.format(version, buildnumber)
-        return version_data
+        return {'vsa_guid': vsa_guid,
+                'versions': Package.get_versions()}

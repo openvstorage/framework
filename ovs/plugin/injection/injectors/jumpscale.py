@@ -62,10 +62,26 @@ class Injector(object):
             core_package = j.packages.find(domain=namespace, name=name)[0]
             return j.tools.startupmanager.getStatus4JPackage(core_package)
 
+        def get_versions():
+            import glob
+            import ConfigParser
+            versions = {}
+            for filename in glob.glob('/opt/jumpscale/cfg/jpackages/state/openvstorage_*.cfg'):
+                parser = ConfigParser.RawConfigParser()
+                parser.read(filename)
+                buildnumber = parser.getint('main', 'lastinstalledbuildnr')
+                if buildnumber > -1:
+                    _, package, version = filename.split('/')[-1].split('_')
+                    version = version.replace('.cfg', '')
+                    versions[package] = '{0}.{1}'.format(version, buildnumber)
+            return versions
+
+
         provider.is_running = staticmethod(is_running)
         provider.start = staticmethod(start)
         provider.stop = staticmethod(stop)
         provider.get_status = staticmethod(get_status)
+        provider.get_versions = staticmethod(get_versions)
         return provider
 
     @staticmethod

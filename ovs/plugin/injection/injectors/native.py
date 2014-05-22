@@ -171,3 +171,19 @@ class Injector(object):
 
         provider.checkProcess = staticmethod(check_process)
         return provider
+
+    @staticmethod
+    def inject_package(provider):
+        """ Injects the Package module """
+
+        def _get_version(package):
+            return check_output("aptitude show {0} | grep Version | cut -d ' ' -f 2".format(package), shell=True).strip()
+
+        def get_versions():
+            return {'openvstorage': _get_version('openvstorage'),
+                    'openvstorage-webapps': _get_version('openvstorage-webapps'),
+                    'openvstorage-core': _get_version('openvstorage-core'),
+                    'volumedriver': _get_version('volumedriver-server')}
+
+        provider.get_versions = staticmethod(get_versions)
+        return provider
