@@ -608,14 +608,13 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
             else:
                 for service in some_services:
-                    for node in nodes:
-                        node_client = SSHClient.load(node)
-                        SetupController._enable_service(node_client, service)
-                        SetupController._change_service_state(node_client, service, 'start')
+                    target_client = SSHClient.load(ip)
+                    SetupController._enable_service(target_client, service)
+                    SetupController._change_service_state(target_client, service, 'start')
 
             for node in nodes:
                 node_client = SSHClient.load(node)
-                SetupController._enable_service(node_client, service)
+                SetupController._enable_service(node_client, 'workers')
                 SetupController._change_service_state(node_client, 'workers', 'restart')
 
             print '\n+++ Announcing service +++\n'
