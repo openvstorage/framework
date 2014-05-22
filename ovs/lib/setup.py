@@ -343,9 +343,10 @@ class SetupController(object):
                 print '\n+++ Joining master node +++\n'
 
                 print 'Stopping services'
-                for node in nodes:
-                    node_client = SSHClient.load(node)
-                    for service in sorted(extra_services, reverse=True) + sorted(master_services, reverse=True) + sorted(model_services, reverse=True):
+                for service in sorted(extra_services, reverse=True) + sorted(master_services, reverse=True) + sorted(model_services, reverse=True):
+                    for node in nodes:
+                        node_client = SSHClient.load(node)
+                        SetupController._disable_service(node_client, service)
                         SetupController._change_service_state(node_client, service, 'stop')
 
                 if join_cluster:
@@ -485,9 +486,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     SetupController._configure_amqp_to_volumedriver(node_client)
 
                 print 'Starting model services'
-                for node in nodes:
-                    node_client = SSHClient.load(node)
-                    for service in model_services:
+                for service in model_services:
+                    for node in nodes:
+                        node_client = SSHClient.load(node)
+                        SetupController._enable_service(node_client, service)
                         SetupController._change_service_state(node_client, service, 'start')
 
                 if not join_cluster:
@@ -596,17 +598,17 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             some_services = [s for s in extra_services if s != 'workers']
             print 'Starting services'
             if join_masters is True:
-                for node in nodes:
-                    node_client = SSHClient.load(node)
-                    for service in master_services + some_services:
+                for service in master_services + some_services:
+                    for node in nodes:
+                        node_client = SSHClient.load(node)
                         SetupController._change_service_state(node_client, service, 'start')
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
                 client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
             else:
-                for node in nodes:
-                    node_client = SSHClient.load(node)
-                    for service in some_services:
+                for service in some_services:
+                    for node in nodes:
+                        node_client = SSHClient.load(node)
                         SetupController._change_service_state(node_client, service, 'start')
 
             for node in nodes:
