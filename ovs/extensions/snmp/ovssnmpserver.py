@@ -99,12 +99,10 @@ class OVSSNMPServer():
             attr_name = key.replace(STORAGE_PREFIX, '').replace('_dal2oid_', '')
             guid = attr_name.split('_')[0]
             attr_name = attr_name.replace('{}_'.format(guid), '')
-            if not guid in mapping:
-                mapping[guid] = {}
-            mapping[guid][oid] = attr_name
+            mapping[oid] = attr_name
         return mapping
 
-    def _register_dal_model(self, class_id, model_object, attribute, attrb_oid, key=None, atype=str):
+    def _register_dal_model(self, class_id, model_object, attribute, attrb_oid, key=None, func=None, atype=str):
         """
         Register a DAL model as OID
         class_id is the unique id of the type
@@ -131,12 +129,29 @@ class OVSSNMPServer():
         self.assigned_oids[class_id][self.instance_oid][attrb_oid] = (model_object, attribute + str(key))
         def get_function():
             print('[DEBUG] Get function for %s %s %s' % (model_object.guid, attribute, str(key)))
-            value = getattr(model_object, attribute)
-            if key and isinstance(value, dict):
-                return value[key]
-            elif key:
-                return getattr(value, key)
-            return value
+            if func:
+                print('[DEBUG] Calling lambda function %s' % func)
+                return func(model_object)
+
+            try:
+                value = getattr(model_object, attribute)
+                if key and isinstance(value, dict):
+                    value = value[key]
+                elif key:
+                    value = getattr(value, key)
+                elif not key and hasattr(value, '__len__'):
+                    value = len(value)
+            except Exception as ex:
+                print('[EXCEPTION] %s' % (str(ex)))
+                if atype == int:
+                    value = -1
+                elif atype == str:
+                    value = 'N/A'
+            try:
+                return atype(value)
+            except Exception as ex:
+                print('[EXCEPTION 2] %s' % (str(ex)))
+                return 0
 
         oid = self.server.register_custom_oid(class_id, self.instance_oid, attrb_oid, get_function, atype)
         self._save_model_oid(model_object.guid, oid, "{}_{}".format(attribute, key) if key else attribute)
@@ -160,15 +175,48 @@ class OVSSNMPServer():
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 
-            for vm in VMachineList.get_vmachines():
+            for vm in VMachineList.get_vsas():
                 if vm.is_internal:
+                    self._register_dal_model(10, vm, 'guid', "0")
                     self._register_dal_model(10, vm, 'name', "1")
                     self._register_dal_model(10, vm, 'hypervisor_status', "2")
                     self._register_dal_model(10, vm, 'pmachine', "3", key = 'host_status')
+                    self._register_dal_model(10, vm, 'description', "4")
+                    self._register_dal_model(10, vm, 'devicename', "5")
+                    self._register_dal_model(10, vm, 'failover_mode', "6")
+                    self._register_dal_model(10, vm, 'hypervisorid', "7")
+                    self._register_dal_model(10, vm, 'ip', "8")
+                    self._register_dal_model(10, vm, 'machineid', "9")
+                    self._register_dal_model(10, vm, 'status', "10")
+                    self._register_dal_model(10, vm, '#vdisks', "11",
+                                             func = lambda gsr: len([vdisk for vpool_vdisks in [vsr.vpool.vdisks for vsr in gsr.served_vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
+                                             atype = int)
+                    self._register_dal_model(10, vm, '#vmachines', "12",
+                                             func = lambda gsr: len(set([vdisk.vmachine.guid for vpool_vdisks in [vsr.vpool.vdisks for vsr in gsr.served_vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid])),
+                                             atype = int)
+                    self._register_dal_model(10, vm, '#stored_data', "13",
+                                             func = lambda gsr: sum([vdisk.vmachine.stored_data for vpool_vdisks in [vsr.vpool.vdisks for vsr in gsr.served_vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
+                                             atype = int)
                     self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
-                if not vm.is_internal:
+                if vm.is_vtemplate:
+                    self._register_dal_model(11, vm, 'guid', "0")
+                    self._register_dal_model(11, vm, 'name', "1")
+                    def _children(vmt):
+                        children = 0
+                        disks = [vd.guid for vd in vmt.vdisks]
+                        for vdisk in [vdisk.parent_vdisk_guid for item in [vm.vdisks for vm in VMachineList.get_vmachines() if not vm.is_internal and not vm.is_vtemplate] for vdisk in item]:
+                            for disk in disks:
+                                if vdisk == disk:
+                                    children += 1
+                        return children
+                    self._register_dal_model(11, vm, '#children', 2, func = _children, atype = int)
+                    self.instance_oid += 1
+
+            for vm in VMachineList.get_vmachines():
+                if not vm.is_internal and not vm.is_vtemplate:
+                    self._register_dal_model(0, vm, 'guid', "0")
                     self._register_dal_model(0, vm, 'name', "1")
                     self._register_dal_model(0, vm, 'statistics', "2.0", key = "operations", atype = int)
                     self._register_dal_model(0, vm, 'statistics', "2.1", key = "cluster_cache_misses_ps", atype = int)
@@ -206,9 +254,22 @@ class OVSSNMPServer():
                     self._register_dal_model(0, vm, 'statistics', "2.33", key = "write_operations_ps", atype = int)
                     self._register_dal_model(0, vm, 'statistics', "2.34", key = "data_transferred", atype = int)
                     self._register_dal_model(0, vm, 'stored_data', "3", atype = int)
+                    self._register_dal_model(0, vm, 'description', "4")
+                    self._register_dal_model(0, vm, 'devicename', "5")
+                    self._register_dal_model(0, vm, 'failover_mode', "6")
+                    self._register_dal_model(0, vm, 'hypervisorid', "7")
+                    self._register_dal_model(0, vm, 'ip', "8")
+                    self._register_dal_model(0, vm, 'machineid', "9")
+                    self._register_dal_model(0, vm, 'status', "10")
+                    self._register_dal_model(0, vm, 'stored_data', "10", atype = int)
+                    self._register_dal_model(0, vm, 'snapshots', "11", atype = int)
+                    self._register_dal_model(0, vm, 'vdisks', "12", atype = int)
+                    self._register_dal_model(0, vm, 'FOC', '13',
+                                             func = lambda vm: 'DEGRADED' if all(item == 'DEGRADED' for item in [vd.info['failover_mode'] for vd in vm.vdisks]) else 'OK')
                 self.instance_oid += 1
 
             for vd in VDiskList.get_vdisks():
+                self._register_dal_model(1, vd, 'guid', "0")
                 self._register_dal_model(1, vd, 'name', "1")
                 self._register_dal_model(1, vd, 'statistics', "2.0", key = "operations", atype = int)
                 self._register_dal_model(1, vd, 'statistics', "2.1", key = "data_written_ps", atype = int)
@@ -245,14 +306,19 @@ class OVSSNMPServer():
                 self._register_dal_model(1, vd, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
                 self._register_dal_model(1, vd, 'statistics', "2.33", key = "write_operations_ps", atype = int)
                 self._register_dal_model(1, vd, 'statistics', "2.34", key = "data_transferred", atype = int)
+                self._register_dal_model(1, vd, 'info', "3", key = 'stored', atype = int)
+                self._register_dal_model(1, vd, 'info', "4", key = 'failover_mode', atype = int)
+                self._register_dal_model(1, vd, 'snapshots', "5", atype = int)
                 self.instance_oid += 1
 
             for pm in PMachineList.get_pmachines():
+                self._register_dal_model(2, pm, 'guid', "0")
                 self._register_dal_model(2, pm, 'name', "1")
                 self._register_dal_model(2, pm, 'host_status', "2")
                 self.instance_oid += 1
 
             for vp in VPoolList.get_vpools():
+                self._register_dal_model(3, vm, 'guid', "0")
                 self._register_dal_model(3, vp, 'name', "1")
                 self._register_dal_model(3, vp, 'statistics', "2.0", key = "operations", atype = int)
                 self._register_dal_model(3, vp, 'statistics', "2.1", key = "cluster_cache_misses_ps", atype = int)
@@ -289,9 +355,16 @@ class OVSSNMPServer():
                 self._register_dal_model(3, vp, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
                 self._register_dal_model(3, vp, 'statistics', "2.33", key = "write_operations_ps", atype = int)
                 self._register_dal_model(3, vp, 'statistics', "2.34", key = "data_transferred", atype = int)
+                self._register_dal_model(3, vp, 'status', "3")
+                self._register_dal_model(3, vp, 'description', "4")
+                self._register_dal_model(3, vp, 'vdisks', "5", atype = int)
+                self._register_dal_model(3, vp, '#vmachines', "6",
+                                         func = lambda vp: len(set([vd.vmachine.guid for vd in vp.vdisks])),
+                                         atype = int)
                 self.instance_oid += 1
 
             for vsr in VolumeStorageRouterList.get_volumestoragerouters():
+                self._register_dal_model(4, vsr, 'guid', "0")
                 self._register_dal_model(4, vsr, 'name', "1")
                 self._register_dal_model(4, vsr, 'stored_data', "2", atype = int)
                 self.instance_oid += 1
