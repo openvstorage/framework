@@ -601,6 +601,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in master_services + some_services:
                     for node in nodes:
                         node_client = SSHClient.load(node)
+                        SetupController._enable_service(node_client, service)
                         SetupController._change_service_state(node_client, service, 'start')
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
@@ -609,10 +610,12 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in some_services:
                     for node in nodes:
                         node_client = SSHClient.load(node)
+                        SetupController._enable_service(node_client, service)
                         SetupController._change_service_state(node_client, service, 'start')
 
             for node in nodes:
                 node_client = SSHClient.load(node)
+                SetupController._enable_service(node_client, service)
                 SetupController._change_service_state(node_client, 'workers', 'restart')
 
             print '\n+++ Announcing service +++\n'
