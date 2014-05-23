@@ -21,6 +21,7 @@ import copy
 import os
 import glob
 import ConfigParser
+import shutil
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -250,12 +251,27 @@ class VMachineController(object):
                 hv.delete_vm(machine.hypervisorid, True)
             except Exception as exception:
                 logger.error('Deletion of vm on hypervisor failed: {0}'.format(str(exception)), print_msg=True)
+        try:
+            vsr_mountpoint = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0].mountpoint
+        except Exception as ex:
+            logger.debug('No mountpoint could be retrieved. Reason: {0}'.format(str(ex)))
+            vsr_mountpoint = None
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
+        if vsr_mountpoint:
+            vmx_path = os.path.join(vsr_mountpoint, machine.devicename)
+            if os.path.exists(vmx_path):
+                dir_name = os.path.dirname(vmx_path)
+                logger.debug('Removing leftover files in {0}'.format(dir_name))
+                try:
+                    shutil.rmtree(dir_name)
+                except Exception as exception:
+                    logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
+
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
