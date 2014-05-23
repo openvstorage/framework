@@ -90,6 +90,7 @@ class LogHandler(object):
         handler.setFormatter(formatter)
 
         self.logger = logging.getLogger(name)
+        self.logger.propagate = False
         self.logger.setLevel(getattr(logging, parser.get('logging', 'level')))
         self.logger.addHandler(handler)
 
