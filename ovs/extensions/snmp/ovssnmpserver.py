@@ -19,6 +19,7 @@ from ovs.extensions.snmp.server import SNMPServer
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.plugin.provider.configuration import Configuration
+from ovs.dal.dataobjectlist import DataObjectList
 
 import signal
 
@@ -139,7 +140,7 @@ class OVSSNMPServer():
                     value = value[key]
                 elif key:
                     value = getattr(value, key)
-                elif not key and hasattr(value, '__len__'):
+                elif not key and (isinstance(value, list) or isinstance(value, DataObjectList)):
                     value = len(value)
             except Exception as ex:
                 print('[EXCEPTION] %s' % (str(ex)))
