@@ -1,0 +1,96 @@
+﻿<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:pmachines.mgmtcenter.title"></h2>
+        <button class="btn btn-default pull-right" data-bind="click: addMgmtCenter"
+                style="margin-top: 20px; margin-bottom: 10px;">
+            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+            <span data-i18n="ovs:pmachines.mgmtcenter.add"></span>
+        </button>
+    </div>
+    <div data-bind="pager: { items: mgmtCenters, headers: mgmtCenterHeaders, initialLoad: mgmtCentersInitialLoad,
+                             viewportRefresh: loadMgmtCenters, viewportRefreshInterval: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td><span data-bind="text: ipAddress"></span></td>
+                <td><span data-bind="text: port"></span></td>
+                <td><span data-bind="translate: 'ovs:generic.mgmtcentertypes.' + centerType()"></span></td>
+                <td><span data-bind="text: username"></span></td>
+                <td>
+                    <span data-bind="text: $root.hostMapping()[guid()].ovs"></span> /
+                    <span data-bind="text: $root.hostMapping()[guid()].total"></span>
+                </td>
+                <td>
+                    <i data-bind="click: function() { $root.deleteMgmtCenter($data.guid()); }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <h2 class="pull-left" data-i18n="ovs:pmachines.pmachines.title"></h2>
+    <div data-bind="pager: { items: pMachines, headers: pMachineHeaders, initialLoad: pMachinesInitialLoad,
+                             viewportRefresh: loadPMachines, viewportRefreshInterval: 5000, controls: true }">
+        <table data-dummy="dummy">
+            <tr data-part="vitem" data-bind="css: { 'danger': !mgmtCenterValid() }">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td><span data-bind="text: ipAddress"></span></td>
+                <td><span data-bind="text: hvtype"></span></td>
+                <td data-bind="style: { 'paddingBottom': edit() ? '5px' : '8px', 'paddingTop': edit() ? '5px' : '8px' }" class="edit-container">
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: mgmtCenter() !== undefined ? mgmtCenter().name() : '-'"></span>
+                        <i class="hand fa fa-fw edit-button" data-i18n="[html]ovs:icons.edit" style="padding-left: 10px; display: none;"
+                           data-bind="click: function() {
+                                          if (!$root.mgmtCentersInitialLoad()) {
+                                              backupValue(mgmtCenterGuid());
+                                              edit(true);
+                                          }
+                                      },
+                                      style: { color: !$root.mgmtCentersInitialLoad() ? 'black' : 'lightgrey' },"></i>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <span data-bind="dropdown: {
+                                             items: $root.mgmtCenterChoices, target: mgmtCenter,
+                                             text: function(item) {
+                                                 if (item === undefined) {
+                                                     return '-';
+                                                 }
+                                                 return item.name();
+                                             }, key: 'guid', keyisfunction: true, small: true
+                                         }"></span>
+                        <i class="hand fa fa-fw" data-i18n="[html]ovs:icons.save" style="padding-left: 10px;"
+                           data-bind="click: function() { save(); edit(false); }"></i>
+                        <i class="hand fa fa-fw" data-i18n="[html]ovs:icons.cancel" style="padding-left: 10px;"
+                           data-bind="click: function() { mgmtCenterGuid(backupValue()); edit(false); }"></i>
+                    </span>
+                </td>
+                <td>
+                    <i class="fa fa-fw pointer" data-i18n="[html]ovs:icons.warning"
+                       data-bind="visible: !mgmtCenterValid(), tooltip: 'ovs:pmachines.pmachines.incorrectmgmtcenter'"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>
