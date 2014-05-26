@@ -552,38 +552,42 @@ if __name__ == '__main__':
 
     nic_config = VMwareSystem.build_nic_config([private_pg, public_pg])
 
-    print '------'
-    rdms_in_use = vm_sys.get_rdms_in_use()
-    if rdms_in_use:
-        print 'RDM mappings currently in use:'
-        for disk, rdm in vm_sys.get_rdms_in_use().iteritems():
-            print 'vmdk: {0}, rdm: {1}'.format(disk, rdm)
-    else:
-        print 'No RDM mapping are currently in use'
-    print '------'
+    size = InstallHelper.ask_integer('Specify the size in GB (min: 50)', 50, 9999, default_value=100)
+    disk_config = ''
+    disk_config = vm_sys.create_vdisk(vm_name, 0, '{0}G'.format(size), disk_config)
 
     # RDM
+    rdms = [rdm for disk, rdm in vm_sys.get_rdms_in_use().iteritems()]
     print 'Creating Raw Device Mappings'
     ssds, hdds = [], []
     vm_sys.enable_vmware_ssd_option()
     all_disks = vm_sys.list_disks()
     for disk in all_disks:
-        if disk['IsSSD']:
-            ssds.append(disk)
+        if not any(rdm for rdm in rdms if rdm in disk['DevfsPath']):
+            if disk['IsSSD']:
+                ssds.append(disk)
+            else:
+                hdds.append(disk)
+    if len(ssds) == 0:
+        if len(hdds) > 0:
+            print InstallHelper.boxed_message(['Not enough SSD devices available, but a HDD device might be used instead of an SSD device in a test setup.',
+                                               'This will however have a severe decrease in performance.'])
+            if not InstallHelper.ask_yesno('Do you want to continue?', default_value=False):
+                print InstallHelper.boxed_message(['Not enough SSD devices available to continue the install. Min: 1'])
+                sys.exit(1)
         else:
-            hdds.append(disk)
-    if not ssds:
-        print InstallHelper.boxed_message(['Not enough SSD devices available to continue the install. Min: 1'])
-        sys.exit(1)
-    size = InstallHelper.ask_integer('Specify the size in GB (min: 50)', 50, 9999, default_value=100)
+            print InstallHelper.boxed_message(['Not enough SSD devices available to continue the install. Min: 1'])
+            sys.exit(1)
 
-    disk_config = ''
-    disk_config = vm_sys.create_vdisk(vm_name, 0, '{0}G'.format(size), disk_config)
-
-    ssd = InstallHelper.ask_choice(ssds, columns=['Vendor', 'Model', 'DevfsPath'])
+    print 'Select an SSD device'
+    ssd = InstallHelper.ask_choice(ssds if len(ssds) > 0 else hdds,
+                                   columns=['Vendor', 'Model', 'DevfsPath'])
     disk_config = vm_sys.create_vdisk_mapping(vm_name, 1, ssd, disk_config)
+    if ssd in hdds:
+        hdds.remove(ssd)
 
     if len(hdds) > 0 and options.skip is False:
+        print 'Select an HDD device'
         hdd = InstallHelper.ask_choice(hdds, columns=['Vendor', 'Model', 'DevfsPath'])
         disk_config = vm_sys.create_vdisk_mapping(vm_name, 2, hdd, disk_config)
 
