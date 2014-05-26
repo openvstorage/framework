@@ -168,8 +168,8 @@ class SetupController(object):
                     else:
                         cluster_name = None
                         logger.debug('No cluster will be joined')
-                elif force_type != 'master':
-                    raise RuntimeError('No clusters were found. Only a Master node can be setup.')
+                elif force_type is not None and force_type != 'master':
+                    raise RuntimeError('No clusters were found. Only a Master node can be set up.')
 
                 if join_cluster is False and cluster_name is None:
                     while True:
