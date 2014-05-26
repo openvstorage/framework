@@ -32,7 +32,6 @@ from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('lib', name='setup')
 
-# @TODO: Add logging everywhere
 # @TODO: Make the setup_node idempotent
 # @TODO: Make it possible to run as a non-privileged user
 # @TODO: Node password identical for all nodes
@@ -61,7 +60,6 @@ class SetupController(object):
             cluster_name = None
             cluster_ip = ''
             master_ip = None
-            master_password = None
             node_type = None  # in ['master', 'extra']
             nodes = []
             extra_hdd_storage = ''
@@ -93,7 +91,6 @@ class SetupController(object):
                 cluster_name = str(config.get('setup', 'cluster_name'))
                 join_cluster = config.getboolean('setup', 'join_cluster')
                 master_ip = config.get('setup', 'master_ip')
-                master_password = config.get('setup', 'master_password')
                 extra_hdd_storage = config.getboolean('setup', 'extra_hdd_storage')
                 extra_hdd_mountpoint = config.get('setup', 'extra_hdd_mountpoint')
                 use_hdd_io_ssd = config.get('setup', 'use_hdd_io_ssd')
@@ -261,33 +258,6 @@ class SetupController(object):
 
             print '\n+++ Adding basic configuration +++\n'
             logger.info('Adding basic configuration')
-            # Elastic search setup
-            print 'Configuring elastic search'
-            SetupController._add_service(target_client, 'elasticsearch')
-            config_file = '/etc/elasticsearch/elasticsearch.yml'
-            SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-            target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-            target_client.run('mkdir -p /opt/data/elasticsearch/work')
-            target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-            SetupController._replace_param_in_config(target_client,
-                                                     config_file,
-                                                     '<CLUSTER_NAME>',
-                                                     'ovses_{0}'.format(cluster_name),
-                                                     add=False)
-            SetupController._replace_param_in_config(target_client,
-                                                     config_file,
-                                                     '<NODE_NAME>',
-                                                     node_name)
-            SetupController._replace_param_in_config(target_client,
-                                                     config_file,
-                                                     '<NETWORK_PUBLISH>',
-                                                     cluster_ip)
-            SetupController._change_service_state(target_client, 'elasticsearch', 'start')
-            SetupController._replace_param_in_config(target_client,
-                                                     '/etc/logstash/conf.d/indexer.conf',
-                                                     '<CLUSTER_NAME>',
-                                                     'ovses_{0}'.format(cluster_name))
-            SetupController._change_service_state(target_client, 'logstash', 'restart')
 
             # Exchange ssh keys
             print 'Exchanging SSH keys'
@@ -338,8 +308,8 @@ class SetupController(object):
 
             # Define services
             model_services = ['memcached', 'arakoon-ovsdb', 'arakoon-voldrv']
-            master_services = ['rabbitmq', 'scheduled-tasks', 'snmp']
-            extra_services = ['webapp-api', 'nginx', 'workers', 'volumerouter-consumer']
+            master_services = ['rabbitmq', 'scheduled-tasks', 'snmp', 'webapp-api', 'nginx']
+            extra_services = ['workers', 'volumerouter-consumer']
 
             arakoon_client_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
             arakoon_server_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
@@ -348,15 +318,15 @@ class SetupController(object):
             generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                                    '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
 
-            # Setting up Arakoon
-            print 'Setting up persistent datastore'
-            logger.info('Setting up persistent datastore')
+            # Deciding master/extra
+            print 'Analyzing cluster layout'
+            logger.info('Analyzing cluster layout')
             unique_id = ovs_config.get('core', 'uniqueid')
             join_masters = False
             if join_cluster:
                 # Updating configuration files and copy them around
                 for cluster in arakoon_clusters.keys():
-                    master_client = SSHClient.load(master_ip, master_password)
+                    master_client = SSHClient.load(master_ip)
                     config = SetupController._remote_config_read(master_client, arakoon_client_config.format(cluster))
                     cluster_nodes = [node.strip() for node in config.get('global', 'cluster').split(',')]
                     logger.debug('{0} nodes for cluster {1} found'.format(len(cluster_nodes), cluster))
@@ -364,8 +334,37 @@ class SetupController(object):
                         join_masters = True
             else:
                 join_masters = True
-            if join_masters is True and node_type is None:
-                node_type = 'master'
+            if node_type is None:
+                node_type = 'master' if join_masters is True else 'extra'
+
+            # Elastic search setup
+            print 'Configuring logstash{0}'.format(' and elastic search' if join_masters else '')
+            if join_masters:
+                SetupController._add_service(target_client, 'elasticsearch')
+                config_file = '/etc/elasticsearch/elasticsearch.yml'
+                SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
+                target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
+                target_client.run('mkdir -p /opt/data/elasticsearch/work')
+                target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
+                SetupController._replace_param_in_config(target_client,
+                                                         config_file,
+                                                         '<CLUSTER_NAME>',
+                                                         'ovses_{0}'.format(cluster_name),
+                                                         add=False)
+                SetupController._replace_param_in_config(target_client,
+                                                         config_file,
+                                                         '<NODE_NAME>',
+                                                         node_name)
+                SetupController._replace_param_in_config(target_client,
+                                                         config_file,
+                                                         '<NETWORK_PUBLISH>',
+                                                         cluster_ip)
+                SetupController._change_service_state(target_client, 'elasticsearch', 'start')
+            SetupController._replace_param_in_config(target_client,
+                                                     '/etc/logstash/conf.d/indexer.conf',
+                                                     '<CLUSTER_NAME>',
+                                                     'ovses_{0}'.format(cluster_name))
+            SetupController._change_service_state(target_client, 'logstash', 'restart')
 
             print 'Adding services'
             logger.info('Adding services')
@@ -392,7 +391,7 @@ class SetupController(object):
                     print 'Joining arakoon cluster'
                     logger.info('Joining arakoon cluster')
                     for cluster in arakoon_clusters.keys():
-                        master_client = SSHClient.load(master_ip, master_password)
+                        master_client = SSHClient.load(master_ip)
                         client_config = SetupController._remote_config_read(master_client, arakoon_client_config.format(cluster))
                         server_config = SetupController._remote_config_read(master_client, arakoon_server_config.format(cluster))
                         for node in nodes:
@@ -578,10 +577,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     client_config = SetupController._remote_config_read(master_client, config)
                     target_client = SSHClient.load(ip)
                     SetupController._remote_config_write(target_client, config, client_config)
-
-                client = SSHClient.load(ip)
-                logger.info('Update ES configuration')
-                SetupController._update_es_configuration(client, 'false')
 
             print '\n+++ Finalizing setup +++\n'
             logger.info('Finalizing setup')
