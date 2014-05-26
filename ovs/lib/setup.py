@@ -187,7 +187,7 @@ class SetupController(object):
             else:  # Automated install
                 logger.debug('Automated installation')
                 if cluster_name in discovery_result:
-                    nodes = discovery_result[cluster_name].values()
+                    nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
 
             # Creating filesystems
             print '\n+++ Creating filesystems +++\n'
