@@ -96,6 +96,11 @@ define([
                 fields.push('ceph_files');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.cephfilesmissing'));
             }
+            if (!self.data.allowVPool() && $.inArray('vpool', fields) === -1) {
+                valid = false;
+                fields.push('vpool');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.vpoolnotallowed'));
+            }
             return { value: valid, reasons: reasons, fields: fields };
         });
 

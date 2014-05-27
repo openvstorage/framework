@@ -61,3 +61,12 @@ class VPoolController(object):
                     vpool=search_vpool
                 )
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
+
+    @staticmethod
+    def can_be_served_on(vsa_guid):
+        """
+        temporary check to avoid creating 2 ganesha nfs exported vpools
+        as this is not yet supported on volumedriverlevel
+        """
+        _ = vsa_guid
+        return True  # @TODO to be completed

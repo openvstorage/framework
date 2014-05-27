@@ -19,8 +19,6 @@ VMachine module
 import time
 import copy
 import os
-import glob
-import ConfigParser
 import shutil
 
 from subprocess import check_output
@@ -596,10 +594,12 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.vsa.get_physical_metadata')
-    def get_physical_metadata(files):
+    def get_physical_metadata(files, vsa_guid):
         """
         Gets physical information about the machine this task is running on
         """
+        from ovs.lib.vpool import VPoolController
+
         mountpoints = check_output('mount -v', shell=True).strip().split('\n')
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
@@ -608,13 +608,15 @@ class VMachineController(object):
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
         ipaddresses = [ip.strip() for ip in ipaddresses]
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
+        allow_vpool = VPoolController.can_be_served_on(vsa_guid)
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
                 'xmlrpcport': xmlrpcport,
-                'files': file_existence}
+                'files': file_existence,
+                'allow_vpool': allow_vpool}
 
     @staticmethod
     @celery.task(name='ovs.vsa.add_vpool')

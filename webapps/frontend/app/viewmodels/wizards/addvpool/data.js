@@ -25,6 +25,7 @@ define(['knockout'], function(ko){
             files:          ko.observable(),
             accesskey:      ko.observable(''),
             secretkey:      ko.observable(''),
+            allowVPool:     ko.observable(true),
             backend:        ko.observable('LOCAL'),
             mtptTemp:       ko.observable().extend({ regex: mountpointRegex }),
             mtptDFS:        ko.observable().extend({ regex: mountpointRegex }),
