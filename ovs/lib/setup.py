@@ -201,7 +201,12 @@ class SetupController(object):
             if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
 
-            ovs_config = SetupController._remote_config_read(target_client, '/opt/OpenvStorage/config/ovs.cfg')
+            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
+            unique_id = sorted(target_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0]
+            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            ovs_config.set('core', 'uniqueid', unique_id)
+            SetupController._remote_config_write(target_client, config_filename, ovs_config)
+
             ipaddresses = target_client.run(
                 "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
             ).strip().split('\n')
