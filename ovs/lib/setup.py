@@ -204,7 +204,7 @@ class SetupController(object):
             config_filename = '/opt/OpenvStorage/config/ovs.cfg'
             unique_id = sorted(target_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0]
             ovs_config = SetupController._remote_config_read(target_client, config_filename)
-            ovs_config.set('core', 'uniqueid', unique_id)
+            ovs_config.set('core', 'uniqueid', unique_id[:12])
             SetupController._remote_config_write(target_client, config_filename, ovs_config)
 
             ipaddresses = target_client.run(
