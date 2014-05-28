@@ -1089,7 +1089,7 @@ ganesha.generate_config('{0}', {1})
             '<NFS_FILESYSTEM_ID>' : '666.666',
             '<NFS_ALTERNATE_TAG>' : vsr.mountpoint.split('/')[-1]
             })
-        Manager._exec_python(client, ganesha_config_script)
+            Manager._exec_python(client, ganesha_config_script)
 
         fstab_script_remove = """
 from ovs.extensions.fs.fstab import Fstab
