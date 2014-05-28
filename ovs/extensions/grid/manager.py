@@ -795,8 +795,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 nodes.add(vpool_vsr.serving_vmachine.ip)
         nodes = list(nodes)
 
-        services = ['volumedriver_{0}'.format(vpool_name),
-                    'failovercache_{0}'.format(vpool_name)]
+        if vsa.pmachine.hvtype == 'VMWARE':
+            services = ['ganesha']
+        else:
+            services = ['volumedriver_{0}'.format(vpool_name)]
+        services.append('failovercache_{0}'.format(vpool_name))
 
         # Stop services
         for node in nodes:
@@ -1025,35 +1028,68 @@ for filename in {1}:
         open(filename, 'a').close()""".format(dirs2create, files2create)
         Manager._exec_python(client, file_create_script)
 
-        config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
+        voldrv_config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
         log_file = '/var/log/volumedriver/{0}.log'.format(vpool_name)
-        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(config_file, vsr.mountpoint, log_file)
+        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(voldrv_config_file, vsr.mountpoint, log_file)
         if vsa.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(vsr.mountpoint)
         else:
-            vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
-        vd_name = 'volumedriver_{}'.format(vpool_name)
+            vd_stopcmd = ''
+        if vsa.pmachine.hvtype == 'VMWARE':
+            vd_name = 'ganesha'
+        else:
+            vd_name = 'volumedriver_{}'.format(vpool_name)
 
         log_file = '/var/log/volumedriver/foc_{0}.log'.format(vpool_name)
-        fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(config_file, log_file)
+        fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(voldrv_config_file, log_file)
         fc_name = 'failovercache_{0}'.format(vpool_name)
 
         params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
                   '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name}
 
-        if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
-            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
-            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
-
         service_script = """
-from ovs.plugin.provider.service import Service
+from ovs.plugin.provider.service import Service"""
+
+        if vsa.pmachine.hvtype == 'KVM' and client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
+            service_script += """
 Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}', params={5})
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
+Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
             vd_name, vd_cmd, vd_stopcmd,
             fc_name, fc_cmd, params
         )
+
+        elif vsa.pmachine.hvtype == 'VMWARE' and client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-ganesha.conf'):
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-ganesha.conf /opt/OpenvStorage/config/templates/upstart/ovs-ganesha_{0}.conf'.format(vpool_name))
+            service_script += """
+Service.add_service(package=('openvstorage', 'ganesha'), name='{0}', command='{1}', stop_command='{2}', params={5})
+Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
+            vd_name, vd_cmd, vd_stopcmd,
+            fc_name, fc_cmd, params
+        )
+        else:
+            raise RuntimeError('Unsupported hypervisor platform or missing template')
+
+        if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf'):
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
+
         Manager._exec_python(client, service_script)
+
+        if vsa.pmachine.hvtype == 'VMWARE':
+            ganesha_config_script = """
+from ovs.extensions.storageserver.volumestoragerouter import GaneshaConfiguration
+ganesha = GaneshaConfiguration()
+ganesha.generate_config('{0}', {1})
+""".format(os.path.join('/opt/OpenvStorage/config', 'voldrv_vpools', 'ganesha-cf.conf'),
+           {'<VOLDRV_JSON>'       : voldrv_config_file,
+            '<NFS_EXPORT_ID>'     : '1',
+            '<NFS_EXPORT_PATH>'   : vsr.mountpoint,
+            '<NFS_PSEUDO_PATH>'   : '/posix_fs',
+            '<NFS_FILESYSTEM_ID>' : '666.666',
+            '<NFS_ALTERNATE_TAG>' : vsr.mountpoint.split('/')[-1]
+            })
+        Manager._exec_python(client, ganesha_config_script)
 
         fstab_script_remove = """
 from ovs.extensions.fs.fstab import Fstab
@@ -1775,6 +1811,8 @@ class Client(object):
             from ovs.plugin.provider.remote import Remote
             client = Remote.cuisine.api
             Remote.cuisine.fabric.env['password'] = password
+            Remote.cuisine.fabric.output['stdout'] = True
+            Remote.cuisine.fabric.output['running'] = True
             client.connect(ip)
             return client
 

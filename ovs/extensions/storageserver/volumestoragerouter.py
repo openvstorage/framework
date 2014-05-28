@@ -234,3 +234,23 @@ class VolumeStorageRouterConfiguration(object):
         for key, value in queue_config.iteritems():
             self._config_file_content["event_publisher"][key] = value
         self.write_config()
+
+
+class GaneshaConfiguration:
+
+    def __init__(self):
+        self._config_corefile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'ganesha-core.conf')
+        self._config_exportfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'ganesha-export.conf')
+
+    def generate_config(self, target_file, params):
+        with open(self._config_corefile, 'r') as core_config_file:
+            config = core_config_file.read()
+        with open(self._config_exportfile, 'r') as export_section_file:
+            config += export_section_file.read()
+
+        for key, value in params.iteritems():
+            print 'replacing {0} by {1}'.format(key, value)
+            config = config.replace(key, value)
+
+        with open(target_file, 'wb') as config_out:
+            config_out.write(config)

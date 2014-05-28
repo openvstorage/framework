@@ -20,4 +20,11 @@ update-rc.d nginx disable
 service memcached stop
 update-rc.d memcached disable
 
+# Disable nfs kernel server as it's replaced by ganesha user-space nfs server
+service nfs-kernel-server stop
+update-rc.d nfs-kernel-server disable
+
+# ganesha/volumedriver logpath
+mkdir -p /var/log/volumedriver
+
 python /opt/OpenvStorage/scripts/install/openvstorage-core.postinst.py "__NEW_VERSION__" "$@"
