@@ -1148,9 +1148,6 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
             client.run('mount {0}'.format(vsr.mountpoint_dfs), pty=False)
 
-        if vsa.pmachine.hvtype == 'VMWARE':
-            Manager.init_exportfs(client, vpool.name)
-
         if vsa.pmachine.hvtype == 'KVM':
             client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, vsr.mountpoint))
             client.run('virsh pool-build {0}'.format(vpool_name))
@@ -1221,11 +1218,6 @@ if Service.service_exists('{0}'):
 
         # Unexporting vPool (VMware) and deleting KVM pool
         client = Client.load(ip)
-        nfs_script = """
-from ovs.extensions.fs.exportfs import Nfsexports
-Nfsexports().remove('{0}')""".format('/mnt/{0}'.format(vpool.name))
-        Manager._exec_python(client, nfs_script)
-        client.run('service nfs-kernel-server restart')
         if pmachine.hvtype == 'KVM':
             if vpool.name in client.run('virsh pool-list'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
@@ -1345,23 +1337,6 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         vsr_configuration = VolumeStorageRouterConfiguration(this_vpool_name)
         vsr_configuration.configure_event_publisher(queue_config)"""
         Manager._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
-
-    @staticmethod
-    def init_exportfs(client, vpool_name):
-        """
-        Configure nfs
-        """
-        import uuid
-
-        vpool_mountpoint = '/mnt/{0}'.format(vpool_name)
-        client.dir_ensure(vpool_mountpoint, True)
-        nfs_script = """
-from ovs.extensions.fs.exportfs import Nfsexports
-Nfsexports().add('{0}', '*', 'rw,fsid={1},async,no_root_squash,no_subtree_check')""".format(
-            vpool_mountpoint, uuid.uuid4()
-        )
-        Manager._exec_python(client, nfs_script)
-        client.run('service nfs-kernel-server start')
 
     @staticmethod
     def _read_remote_config(client, key):
