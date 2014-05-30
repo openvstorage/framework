@@ -31,6 +31,7 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('lib', name='setup')
+logger.logger.propagate = False
 
 # @TODO: Make the setup_node idempotent
 # @TODO: Make it possible to run as a non-privileged user
@@ -345,6 +346,7 @@ class SetupController(object):
             # Elastic search setup
             print 'Configuring logstash{0}'.format(' and elastic search' if join_masters else '')
             if join_masters:
+                target_client = SSHClient.load(cluster_ip)
                 SetupController._add_service(target_client, 'elasticsearch')
                 config_file = '/etc/elasticsearch/elasticsearch.yml'
                 SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
