@@ -313,9 +313,10 @@ class SetupController(object):
                 )
 
             # Define services
-            model_services = ['memcached', 'arakoon-ovsdb', 'arakoon-voldrv']
-            master_services = ['rabbitmq', 'scheduled-tasks', 'snmp', 'webapp-api', 'nginx']
-            extra_services = ['workers', 'volumerouter-consumer', 'watcher']
+            model_services = ['memcached', 'arakoon-ovsdb']
+            master_services = model_services + ['rabbitmq', 'arakoon-voldrv']
+            extra_node_services = ['workers', 'volumerouter-consumer']
+            master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx', 'volumerouter-consumer'] + extra_node_services
 
             arakoon_client_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
             arakoon_server_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
@@ -379,20 +380,29 @@ class SetupController(object):
             params = {'<ARAKOON_NODE_ID>' : unique_id,
                       '<MEMCACHE_NODE_IP>': cluster_ip,
                       '<WORKER_QUEUE>': unique_id}
-            for service in model_services + master_services + extra_services:
-                logger.debug('Adding service {0}'.format(service))
-                SetupController._add_service(target_client, service, params)
+            if join_masters:
+                for service in master_node_services + ['watcher']:
+                    logger.debug('Adding service {0}'.format(service))
+                    SetupController._add_service(target_client, service, params)
+            else:
+                for service in extra_node_services + ['watcher']:
+                    logger.debug('Adding service {0}'.format(service))
+                    SetupController._add_service(target_client, service, params)
 
             if join_masters:
                 print '\n+++ Joining master node +++\n'
                 logger.info('Joining master node')
 
                 print 'Stopping services'
-                for service in sorted(extra_services, reverse=True) + sorted(master_services, reverse=True) + sorted(model_services, reverse=True):
+                for service in master_services:
                     for node in nodes:
-                        node_client = SSHClient.load(node)
-                        SetupController._disable_service(node_client, service)
-                        SetupController._change_service_state(node_client, service, 'stop')
+                        try:
+                            node_client = SSHClient.load(node)
+                            SetupController._disable_service(node_client, service)
+                            SetupController._change_service_state(node_client, service, 'stop')
+                        except ValueError:
+                            # The master services don't run on all nodes
+                            pass
 
                 if join_cluster:
                     print 'Joining arakoon cluster'
@@ -568,15 +578,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/voldrv', True)
                     SetupController._remote_config_write(target_client, arakoon_client_config.format(cluster), client_config)
 
-                print 'Stopping services'
-                client = SSHClient.load(ip)
-                # Disable master and model services
-                for service in master_services + model_services:
-                    SetupController._disable_service(client, service)
-                # Stop services
-                for service in sorted(extra_services, reverse=True) + sorted(master_services, reverse=True) + sorted(model_services, reverse=True):
-                    SetupController._change_service_state(client, service, 'stop')
-
                 print 'Configuring services'
                 logger.info('Copying client configurations')
                 for config in generic_configfiles.keys():
@@ -594,24 +595,6 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                                      '/opt/OpenvStorage/webapps/frontend/logging/config.js',
                                                      'http://"+window.location.hostname+":9200',
                                                      'http://' + cluster_ip + ':9200')
-
-            logger.debug('Determing arakoon master')
-            arakoon_management = ArakoonManagement()
-            counter = 0
-            for cluster in arakoon_clusters.keys():
-                master_elected = False
-                while not master_elected:
-                    client = arakoon_management.getCluster(cluster).getClient()
-                    try:
-                        client.whoMaster()
-                        master_elected = True
-                    except:
-                        print "Arakoon master not yet determined for {0}".format(cluster)
-                        counter = 1 if counter == 0 else (counter * 2)
-                        if counter > 10:
-                            raise RuntimeError('Arakoon could not be started')
-                        time.sleep(counter)
-            logger.debug('Took {0} tries'.format(counter + 1))
 
             # Imports, not earlier then here, as all required config files should be in place.
             from ovs.dal.hybrids.pmachine import PMachine
@@ -656,11 +639,10 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             target_client = SSHClient.load(ip)
             SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
 
-            some_services = [s for s in extra_services if s != 'workers']
             print 'Starting services'
             if join_masters is True:
                 logger.info('Starting services for join master')
-                for service in master_services + some_services:
+                for service in master_services:
                     for node in nodes:
                         node_client = SSHClient.load(node)
                         SetupController._enable_service(node_client, service)
@@ -668,12 +650,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
                 client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
-            else:
-                logger.info('Starting services for extra node')
-                for service in some_services:
-                    target_client = SSHClient.load(ip)
-                    SetupController._enable_service(target_client, service)
-                    SetupController._change_service_state(target_client, service, 'start')
+            target_client = SSHClient.load(ip)
+            SetupController._enable_service(target_client, 'watcher')
+            SetupController._change_service_state(target_client, 'watcher', 'start')
 
             logger.debug('Restarting workers')
             for node in nodes:
@@ -1091,7 +1070,7 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
             safetycounter = 0
-            while safetycounter < 10:
+            while safetycounter < 120:
                 status = SetupController._get_service_status(client, name)
                 if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
                     break

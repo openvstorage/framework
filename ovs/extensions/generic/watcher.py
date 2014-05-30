@@ -76,15 +76,16 @@ def services_running():
         rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
         rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
         rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
-        connection_string = ';'.join(['{0}://{1}:{2}@{3}/%2F'.format(Configuration.get('ovs.core.broker.protocol'),
-                                                                   Configuration.get('ovs.core.broker.login'),
-                                                                   Configuration.get('ovs.core.broker.password'),
-                                                                   server)
-                                      for server in rmq_servers])
-        connection = pika.BlockingConnection(pika.URLParameters(connection_string))
-        channel = connection.channel()
-        channel.basic_publish('ovs-watcher', 'ovs-watcher', str(time.time()),
-                              pika.BasicProperties(content_type='text/plain', delivery_mode=1))
+        for server in rmq_servers:
+            connection_string = '{0}://{1}:{2}@{3}/%2F'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                               Configuration.get('ovs.core.broker.login'),
+                                                               Configuration.get('ovs.core.broker.password'),
+                                                               server)
+            connection = pika.BlockingConnection(pika.URLParameters(connection_string))
+            channel = connection.channel()
+            channel.basic_publish('', 'ovs-watcher', str(time.time()),
+                                  pika.BasicProperties(content_type='text/plain', delivery_mode=1))
+            connection.close()
         print '  RabbitMQ test OK'
     except Exception as message:
         print '  Error during rabbitMQ test: {0}'.format(message)
