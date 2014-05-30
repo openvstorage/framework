@@ -1046,7 +1046,9 @@ for filename in {1}:
 
         params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
                   '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
-                  '<VPOOL_NAME>': vpool_name}
+                  '<VPOOL_NAME>': vpool_name,
+                  '<DFS_MOUNTPOINT>': mountpoint_dfs,
+                  '<CEPH_CONF>': '/etc/ceph/ceph.conf'}
 
         service_script = """
 from ovs.plugin.provider.service import Service"""
@@ -1097,13 +1099,6 @@ fstab = Fstab()
 fstab.remove_config_by_directory('{0}')
 """
 
-        fstab_script_add = """
-from ovs.extensions.fs.fstab import Fstab
-fstab = Fstab()
-fstab.remove_config_by_directory('{0}')
-fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
-"""
-
         if mountpoint_dfs_default and mountpoint_dfs_default != vsr.mountpoint_dfs:
             client.run('umount {0}'.format(mountpoint_dfs_default))
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
@@ -1142,11 +1137,7 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 ceph_ok = Manager._check_ceph(client)
                 if not ceph_ok:
                     raise RuntimeError('Ceph config still not ok, exiting initialization')
-            fstab_script = fstab_script_add.format(vsr.mountpoint_dfs, 'id=admin,conf=/etc/ceph/ceph.conf',
-                                                   'fuse.ceph', 'defaults,noatime', '0', '2')
-            Manager._exec_python(client, fstab_script)
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
-            client.run('mount {0}'.format(vsr.mountpoint_dfs), pty=False)
 
         if vsa.pmachine.hvtype == 'KVM':
             client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, vsr.mountpoint))
