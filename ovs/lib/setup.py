@@ -314,7 +314,7 @@ class SetupController(object):
             # Define services
             model_services = ['memcached', 'arakoon-ovsdb', 'arakoon-voldrv']
             master_services = ['rabbitmq', 'scheduled-tasks', 'snmp', 'webapp-api', 'nginx']
-            extra_services = ['workers', 'volumerouter-consumer']
+            extra_services = ['workers', 'volumerouter-consumer', 'watcher']
 
             arakoon_client_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
             arakoon_server_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
