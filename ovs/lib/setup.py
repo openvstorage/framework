@@ -1069,14 +1069,15 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
+            timeout = 300
             safetycounter = 0
-            while safetycounter < 120:
+            while safetycounter < timeout:
                 status = SetupController._get_service_status(client, name)
                 if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
                     break
                 safetycounter += 1
                 time.sleep(1)
-            if safetycounter == 10:
+            if safetycounter == timeout:
                 raise RuntimeError('Service {0} could not be {1} on node {2}'.format(name, action, client.ip))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
