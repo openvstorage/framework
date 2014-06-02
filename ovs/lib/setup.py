@@ -396,13 +396,10 @@ class SetupController(object):
                 print 'Stopping services'
                 for service in master_services:
                     for node in nodes:
-                        try:
-                            node_client = SSHClient.load(node)
+                        node_client = SSHClient.load(node)
+                        if SetupController._has_service(node_client, service):
                             SetupController._disable_service(node_client, service)
                             SetupController._change_service_state(node_client, service, 'stop')
-                        except ValueError:
-                            # The master services don't run on all nodes
-                            pass
 
                 if join_cluster:
                     print 'Joining arakoon cluster'
@@ -455,7 +452,8 @@ Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
        'host': node_name}
                     SetupController._exec_python(client_node, update_hosts_file)
                     if node != ip:
-                        SetupController._change_service_state(client_node, 'rabbitmq', 'start')
+                        if SetupController._has_service(client_node, 'rabbitmq'):
+                            SetupController._change_service_state(client_node, 'rabbitmq', 'start')
                     else:
                         for subnode in nodes:
                             client_node = SSHClient.load(subnode)
@@ -734,6 +732,18 @@ Service.enable_service('{0}')
 """
         _ = SetupController._exec_python(client,
                                          run_service_script.format(name))
+
+    @staticmethod
+    def _has_service(client, name):
+        has_service_script = """
+from ovs.plugin.provider.service import Service
+print Service.has_service('{0}')
+"""
+        status = SetupController._exec_python(client,
+                                              has_service_script.format(name))
+        if status == 'True':
+            return True
+        return False
 
     @staticmethod
     def _get_service_status(client, name):

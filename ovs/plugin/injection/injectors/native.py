@@ -144,6 +144,13 @@ class Injector(object):
                 output = cpe.output
             return output
 
+        def has_service(name):
+            try:
+                _get_name(name)
+                return True
+            except ValueError:
+                return False
+
         def service_exists(name, path=None):
             if path is None:
                 path = '/etc/init/'
@@ -158,6 +165,7 @@ class Injector(object):
         provider.stop_service = staticmethod(stop_service)
         provider.restart_service = staticmethod(restart_service)
         provider.service_exists = staticmethod(service_exists)
+        provider.has_service = staticmethod(has_service)
         return provider
 
     @staticmethod
