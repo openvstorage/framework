@@ -27,7 +27,6 @@ from string import digits
 
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('lib', name='setup')
@@ -552,8 +551,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in model_services:
                     for node in nodes:
                         node_client = SSHClient.load(node)
-                        SetupController._enable_service(node_client, service)
-                        SetupController._change_service_state(node_client, service, 'start')
+                        if SetupController._has_service(node_client, service):
+                            SetupController._enable_service(node_client, service)
+                            SetupController._change_service_state(node_client, service, 'start')
 
                 if not join_cluster:
                     print 'Start model migration'
@@ -643,8 +643,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 for service in master_services:
                     for node in nodes:
                         node_client = SSHClient.load(node)
-                        SetupController._enable_service(node_client, service)
-                        SetupController._change_service_state(node_client, service, 'start')
+                        if SetupController._has_service(node_client, service):
+                            SetupController._enable_service(node_client, service)
+                            SetupController._change_service_state(node_client, service, 'start')
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
                 client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
