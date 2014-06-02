@@ -1176,11 +1176,14 @@ print Service.start_service('{0}')
         # Get objects & Make some checks
         vsr = VolumeStorageRouter(vsr_guid)
         vmachine = vsr.serving_vmachine
+        ip = vmachine.ip
         pmachine = vmachine.pmachine
         vmachines = VMachineList.get_customer_vmachines()
-        pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
+        pmachine_guids = [vm.pmachine_guid for vm in vmachines]
+        vpools_guids = [vm.vpool.guid for vm in vmachines]
+
         vpool = vsr.vpool
-        if pmachine.guid in pmachine_guids:
+        if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             raise RuntimeError('There are still vMachines served from the given VSR')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == vsr.vsrid):
             raise RuntimeError('There are still vDisks served from the given VSR')
@@ -1188,7 +1191,6 @@ print Service.start_service('{0}')
         services = ['volumedriver_{0}'.format(vpool.name),
                     'failovercache_{0}'.format(vpool.name)]
         vsrs_left = False
-        ip = vmachine.ip
 
         # Stop services
         for current_vsr in vpool.vsrs:

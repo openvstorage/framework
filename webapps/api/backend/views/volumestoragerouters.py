@@ -65,9 +65,11 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
         vmachine = obj.serving_vmachine
         pmachine = vmachine.pmachine
         vmachines = VMachineList.get_customer_vmachines()
+        vpools_guids = [vmachine.vpool.guid for vmachine in vmachines]
         pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
         vpool = obj.vpool
-        if pmachine.guid in pmachine_guids:
+
+        if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             result = False
         if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == obj.vsrid):
             result = False
