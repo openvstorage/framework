@@ -32,12 +32,21 @@ def services_running():
     print 'Testing volatile store...'
     try:
         from ovs.extensions.storage.volatilefactory import VolatileFactory
-        volatile = VolatileFactory.get_client()
-        volatile.set(key, value)
-        if volatile.get(key) != value:
+        # Try a few times, as the memcache failover scenario is allowed
+        # to return invalid (empty) values a few times.
+        max_tries = 5
+        tries = 0
+        while tries < max_tries:
+            volatile = VolatileFactory.get_client()
+            volatile.set(key, value)
+            if volatile.get(key) == value:
+                break
+            key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+            tries += 1
+        if tries == max_tries:
             print '  Volatile store not working correctly'
             return False
-        print '  Volatile store OK'
+        print '  Volatile store OK after {0} tries'.format(tries)
     except Exception as message:
         print '  Error during volatile store test: {0}'.format(message)
         return False
@@ -70,15 +79,15 @@ def services_running():
         return False
     # 4. RabbitMQ
     print 'Test rabbitMQ...'
+    import pika
+    from configobj import ConfigObj
+    from ovs.plugin.provider.configuration import Configuration
+    rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+    rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
+    rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
     good_node = False
-    try:
-        import pika
-        from configobj import ConfigObj
-        from ovs.plugin.provider.configuration import Configuration
-        rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-        rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
-        rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
-        for server in rmq_servers:
+    for server in rmq_servers:
+        try:
             connection_string = '{0}://{1}:{2}@{3}/%2F'.format(Configuration.get('ovs.core.broker.protocol'),
                                                                Configuration.get('ovs.core.broker.login'),
                                                                Configuration.get('ovs.core.broker.password'),
@@ -89,11 +98,12 @@ def services_running():
                                   pika.BasicProperties(content_type='text/plain', delivery_mode=1))
             connection.close()
             good_node = True
-        print '  RabbitMQ test OK'
-    except Exception as message:
-        if good_node is False:
-            print '  Error during rabbitMQ test: {0}'.format(message)
-            return False
+        except Exception as message:
+            print '  Error during rabbitMQ test on node {0}: {1}'.format(server, message)
+    if good_node is False:
+        print '  No working rabbitMQ node could be found'
+        return False
+    print '  RabbitMQ test OK'
     print 'All tests OK'
     return True
 
