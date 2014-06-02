@@ -120,7 +120,7 @@ class Injector(object):
         def restart_service(name):
             check_output('jsprocess -n {0} restart'.format(name))
 
-        def service_exists(name):
+        def has_service(name):
             return name in check_output('jsprocess list | grep {0} || true'.format(name))
 
         provider.add_service = staticmethod(add_service)
@@ -131,7 +131,7 @@ class Injector(object):
         provider.start_service = staticmethod(start_service)
         provider.stop_service = staticmethod(stop_service)
         provider.restart_service = staticmethod(restart_service)
-        provider.service_exists = staticmethod(service_exists)
+        provider.has_service = staticmethod(has_service)
         return provider
 
     @staticmethod

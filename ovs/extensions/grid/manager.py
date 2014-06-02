@@ -807,12 +807,12 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for service in services:
                 Manager._exec_python(node_client, """
 from ovs.plugin.provider.service import Service
-if Service.service_exists('{0}'):
+if Service.has_service('{0}'):
     Service.disable_service('{0}')
 """.format(service))
                 Manager._exec_python(node_client, """
 from ovs.plugin.provider.service import Service
-if Service.service_exists('{0}'):
+if Service.has_service('{0}'):
     Service.stop_service('{0}')
 """.format(service))
 
@@ -1100,14 +1100,14 @@ fstab.remove_config_by_directory('{0}')
 """
 
         if mountpoint_dfs_default and mountpoint_dfs_default != vsr.mountpoint_dfs:
-            client.run('umount {0}'.format(mountpoint_dfs_default))
+            client.run('umount {0} || true'.format(mountpoint_dfs_default))
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
             fstab_script = fstab_script_remove.format(mountpoint_dfs_default)
             Manager._exec_python(client, fstab_script)
         if vpool.backend_type == 'CEPH_S3':
             # If using CEPH_S3, then help setting up the ceph connection - for now
             if Helper.find_in_list(mountpoints, vsr.mountpoint_dfs):
-                client.run('umount {0}'.format(vsr.mountpoint_dfs))
+                client.run('umount {0} || true'.format(vsr.mountpoint_dfs))
             ceph_ok = Manager._check_ceph(client)
             if not ceph_ok:
                 # First, try to copy them over
@@ -1198,12 +1198,12 @@ print Service.start_service('{0}')
             for service in services:
                 Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
-if Service.service_exists('{0}'):
+if Service.has_service('{0}'):
     Service.disable_service('{0}')
 """.format(service))
                 Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
-if Service.service_exists('{0}'):
+if Service.has_service('{0}'):
     Service.stop_service('{0}')
 """.format(service))
 
@@ -1212,14 +1212,19 @@ if Service.service_exists('{0}'):
         if pmachine.hvtype == 'KVM':
             if vpool.name in client.run('virsh pool-list'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
-            client.run('virsh pool-undefine {0}'.format(vpool.name))
+            try:
+                client.run('virsh pool-undefine {0}'.format(vpool.name))
+            except:
+                pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
         client = Client.load(ip)
         service_script = """
 from ovs.plugin.provider.service import Service
-Service.remove_service(domain='openvstorage', name='{1}{0}')
-Service.remove_service(domain='openvstorage', name='{2}{0}')""".format(
+if Service.has_service('{1}{0}'):
+    Service.remove_service(domain='openvstorage', name='{1}{0}')
+if Service.has_service('{2}{0}'):
+    Service.remove_service(domain='openvstorage', name='{2}{0}')""".format(
             vpool.name, 'volumedriver_', 'failovercache_'
         )
         Manager._exec_python(client, service_script)
@@ -1234,7 +1239,7 @@ fstab.remove_config_by_directory('{0}')
             fstab_script = fstab_script_add.format(vsr.mountpoint_dfs)
             Manager._exec_python(client, fstab_script)
             if client.file_exists(vsr.mountpoint_dfs):
-                client.run('umount {0}'.format(vsr.mountpoint_dfs), pty=False)
+                client.run('umount {0} || true'.format(vsr.mountpoint_dfs), pty=False)
                 client.run('rm -rf {0}'.format(vsr.mountpoint_dfs))
 
         # Reconfigure volumedriver
@@ -1279,11 +1284,13 @@ fstab.remove_config_by_directory('{0}')
                     for service in services:
                         Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
-print Service.enable_service('{0}')
+if Service.has_service('{0}'):
+    Service.enable_service('{0}')
 """.format(service))
                         Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
-print Service.start_service('{0}')
+if Service.has_service('{0}'):
+    Service.start_service('{0}')
 """.format(service))
         else:
             # Final model cleanup

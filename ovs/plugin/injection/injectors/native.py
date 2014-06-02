@@ -67,11 +67,16 @@ class Injector(object):
     def inject_service(provider):
         """ Injects the Service module """
 
+        def _service_exists(name, path=None):
+            if path is None:
+                path = '/etc/init/'
+            return os.path.exists('{0}{1}.conf'.format(path, name))
+
         def _get_name(name, path=None):
-            if service_exists(name, path):
+            if _service_exists(name, path):
                 return name
             name = 'ovs-{0}'.format(name)
-            if service_exists(name, path):
+            if _service_exists(name, path):
                 return name
             raise ValueError('Service {0} could not be found.'.format(name))
 
@@ -107,7 +112,8 @@ class Injector(object):
                 pass
             return None
 
-        def remove_service(_, name):
+        def remove_service(domain, name):
+            _ = domain
             # remove upstart.conf file
             name = _get_name(name)
             check_output('rm -rf /etc/init/{0}.conf'.format(name), shell=True)
@@ -151,11 +157,6 @@ class Injector(object):
             except ValueError:
                 return False
 
-        def service_exists(name, path=None):
-            if path is None:
-                path = '/etc/init/'
-            return os.path.exists('{0}{1}.conf'.format(path, name))
-
         provider.add_service = staticmethod(add_service)
         provider.remove_service = staticmethod(remove_service)
         provider.get_service_status = staticmethod(get_service_status)
@@ -164,7 +165,6 @@ class Injector(object):
         provider.start_service = staticmethod(start_service)
         provider.stop_service = staticmethod(stop_service)
         provider.restart_service = staticmethod(restart_service)
-        provider.service_exists = staticmethod(service_exists)
         provider.has_service = staticmethod(has_service)
         return provider
 
