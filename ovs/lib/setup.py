@@ -76,8 +76,7 @@ class SetupController(object):
 [
    {rabbit, [{tcp_listeners, [%(broker_port)s]},
              {default_user, <<"%(broker_username)s">>},
-             {default_pass, <<"%(broker_password)s">>},
-             {cluster_nodes, {[], disc}}]}
+             {default_pass, <<"%(broker_password)s">>}]}
 ].
 """
             # Support non-interactive setup

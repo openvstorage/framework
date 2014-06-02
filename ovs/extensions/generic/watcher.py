@@ -30,53 +30,65 @@ def services_running():
 
     # 1. Volatile
     print 'Testing volatile store...'
-    try:
-        from ovs.extensions.storage.volatilefactory import VolatileFactory
-        # Try a few times, as the memcache failover scenario is allowed
-        # to return invalid (empty) values a few times.
-        max_tries = 5
-        tries = 0
-        while tries < max_tries:
+    max_tries = 5
+    tries = 0
+    while tries < max_tries:
+        try:
+            from ovs.extensions.storage.volatilefactory import VolatileFactory
             volatile = VolatileFactory.get_client()
             volatile.set(key, value)
             if volatile.get(key) == value:
                 break
-            key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
-            tries += 1
-        if tries == max_tries:
-            print '  Volatile store not working correctly'
-            return False
-        print '  Volatile store OK after {0} tries'.format(tries)
-    except Exception as message:
-        print '  Error during volatile store test: {0}'.format(message)
+        except Exception as message:
+            print '  Error during volatile store test: {0}'.format(message)
+        key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+        tries += 1
+    if tries == max_tries:
+        print '  Volatile store not working correctly'
         return False
+    print '  Volatile store OK after {0} tries'.format(tries)
+
     # 2. Persistent
     print 'Testing persistent store...'
-    try:
-        from ovs.extensions.storage.persistentfactory import PersistentFactory
-        persistent = PersistentFactory.get_client()
-        persistent.set(key, value)
-        if persistent.get(key) != value:
-            print '  Persistent store not working correctly'
-            return False
-        print '  Persistent store OK'
-    except Exception as message:
-        print '  Error during persistent store test: {0}'.format(message)
+    max_tries = 5
+    tries = 0
+    while tries < max_tries:
+        try:
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+            persistent = PersistentFactory.get_client()
+            persistent.set(key, value)
+            if persistent.get(key) == value:
+                break
+        except Exception as message:
+            print '  Error during persistent store test: {0}'.format(message)
+        key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+        tries += 1
+    if tries == max_tries:
+        print '  Persistent store not working correctly'
         return False
+    print '  Persistent store OK after {0} tries'.format(tries)
+
     # 3. Arakoon, voldrv cluster
     print 'Testing arakoon (voldrv)...'
-    try:
-        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-        cluster = ArakoonManagement().getCluster('voldrv')
-        client = cluster.getClient()
-        client.set(key, value)
-        if client.get(key) != value:
-            print '  Arakoon (voldrv) not working correctly'
-            return False
-        print '  Arakoon (voldrv) OK'
-    except Exception as message:
-        print '  Error during arakoon (voldrv) test: {0}'.format(message)
+    max_tries = 5
+    tries = 0
+    while tries < max_tries:
+        try:
+            from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+            cluster = ArakoonManagement().getCluster('voldrv')
+            client = cluster.getClient()
+            client.set(key, value)
+            if client.get(key) == value:
+                break
+        except Exception as message:
+            print '  Error during arakoon (voldrv) test: {0}'.format(message)
+        key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+        tries += 1
+    if tries == max_tries:
+        print '  Arakoon (voldrv) not working correctly'
         return False
+    print '  Arakoon (voldrv) OK'
+
     # 4. RabbitMQ
     print 'Test rabbitMQ...'
     import pika
