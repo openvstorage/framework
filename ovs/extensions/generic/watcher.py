@@ -15,6 +15,7 @@
 
 import sys
 import time
+import uuid
 import os
 import logging
 from ovs.log.logHandler import LogHandler
@@ -24,14 +25,16 @@ logger = LogHandler('extensions', name='watcher')
 
 
 def services_running():
+    key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))
+    value = str(time.time())
+
     # 1. Volatile
     print 'Testing volatile store...'
     try:
         from ovs.extensions.storage.volatilefactory import VolatileFactory
         volatile = VolatileFactory.get_client()
-        value = time.time()
-        volatile.set('ovs-watcher', value)
-        if volatile.get('ovs-watcher') != value:
+        volatile.set(key, value)
+        if volatile.get(key) != value:
             print '  Volatile store not working correctly'
             return False
         print '  Volatile store OK'
@@ -43,9 +46,8 @@ def services_running():
     try:
         from ovs.extensions.storage.persistentfactory import PersistentFactory
         persistent = PersistentFactory.get_client()
-        value = time.time()
-        persistent.set('ovs-watcher', value)
-        if persistent.get('ovs-watcher') != value:
+        persistent.set(key, value)
+        if persistent.get(key) != value:
             print '  Persistent store not working correctly'
             return False
         print '  Persistent store OK'
@@ -58,9 +60,8 @@ def services_running():
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
         cluster = ArakoonManagement().getCluster('voldrv')
         client = cluster.getClient()
-        value = str(time.time())
-        client.set('ovs-watcher', value)
-        if client.get('ovs-watcher') != value:
+        client.set(key, value)
+        if client.get(key) != value:
             print '  Arakoon (voldrv) not working correctly'
             return False
         print '  Arakoon (voldrv) OK'
@@ -69,6 +70,7 @@ def services_running():
         return False
     # 4. RabbitMQ
     print 'Test rabbitMQ...'
+    good_node = False
     try:
         import pika
         from configobj import ConfigObj
@@ -86,10 +88,12 @@ def services_running():
             channel.basic_publish('', 'ovs-watcher', str(time.time()),
                                   pika.BasicProperties(content_type='text/plain', delivery_mode=1))
             connection.close()
+            good_node = True
         print '  RabbitMQ test OK'
     except Exception as message:
-        print '  Error during rabbitMQ test: {0}'.format(message)
-        return False
+        if good_node is False:
+            print '  Error during rabbitMQ test: {0}'.format(message)
+            return False
     print 'All tests OK'
     return True
 
