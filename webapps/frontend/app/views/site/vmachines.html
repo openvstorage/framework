@@ -41,14 +41,15 @@ limitations under the License.
                 <td><span data-bind="text: readSpeed"></span></td>
                 <td><span data-bind="text: writeSpeed"></span></td>
                 <td>
-                    <span data-bind="status: {
-                                         colors: {
-                                             green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                             yellow: failoverMode() == 'catch_up',
-                                             red: failoverMode() == 'degraded'
-                                         },
-                                         defaultColor: 'lightgrey'
-                                     }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
+                    <div data-bind="status: {
+                                        colors: {
+                                            green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                            yellow: failoverMode() == 'catch_up',
+                                            red: failoverMode() == 'degraded'
+                                        },
+                                        defaultColor: 'lightgrey'
+                                    }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"
+                         style="width: 14px; height: 14px;"></div>
                 </td>
             </tr>
         </table>
