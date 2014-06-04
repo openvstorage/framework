@@ -794,12 +794,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for vpool_vsr in vpool.vsrs:
                 nodes.add(vpool_vsr.serving_vmachine.ip)
         nodes = list(nodes)
-
-        if vsa.pmachine.hvtype == 'VMWARE':
-            services = ['ganesha']
-        else:
-            services = ['volumedriver_{0}'.format(vpool_name)]
-        services.append('failovercache_{0}'.format(vpool_name))
+        services = ['ganesha',
+                    'volumedriver_{0}'.format(vpool_name),
+                    'failovercache_{0}'.format(vpool_name)]
 
         # Stop services
         for node in nodes:
@@ -1058,18 +1055,18 @@ from ovs.plugin.provider.service import Service"""
             service_script += """
 Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}', params={5})
 Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
-            vd_name, vd_cmd, vd_stopcmd,
-            fc_name, fc_cmd, params
-        )
+                vd_name, vd_cmd, vd_stopcmd,
+                fc_name, fc_cmd, params
+            )
 
         elif vsa.pmachine.hvtype == 'VMWARE' and client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-ganesha.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-ganesha.conf /opt/OpenvStorage/config/templates/upstart/ovs-ganesha_{0}.conf'.format(vpool_name))
             service_script += """
 Service.add_service(package=('openvstorage', 'ganesha'), name='{0}', command='{1}', stop_command='{2}', params={5})
 Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
-            vd_name, vd_cmd, vd_stopcmd,
-            fc_name, fc_cmd, params
-        )
+                vd_name, vd_cmd, vd_stopcmd,
+                fc_name, fc_cmd, params
+            )
         else:
             raise RuntimeError('Unsupported hypervisor platform or missing template')
 
@@ -1089,8 +1086,7 @@ ganesha.generate_config('{0}', {1})
             '<NFS_EXPORT_PATH>'   : vsr.mountpoint,
             '<NFS_PSEUDO_PATH>'   : '/posix_fs',
             '<NFS_FILESYSTEM_ID>' : '666.666',
-            '<NFS_ALTERNATE_TAG>' : vsr.mountpoint.split('/')[-1]
-            })
+            '<NFS_ALTERNATE_TAG>' : vsr.mountpoint.split('/')[-1]})
             Manager._exec_python(client, ganesha_config_script)
 
         fstab_script_remove = """
@@ -1151,11 +1147,13 @@ fstab.remove_config_by_directory('{0}')
             for service in services:
                 Manager._exec_python(node_client, """
 from ovs.plugin.provider.service import Service
-print Service.enable_service('{0}')
+if Service.has_service('{0}'):
+    Service.enable_service('{0}')
 """.format(service))
                 Manager._exec_python(node_client, """
 from ovs.plugin.provider.service import Service
-print Service.start_service('{0}')
+if Service.has_service('{0}'):
+    Service.start_service('{0}')
 """.format(service))
 
         # Fill vPool size
@@ -1188,7 +1186,8 @@ print Service.start_service('{0}')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == vsr.vsrid):
             raise RuntimeError('There are still vDisks served from the given VSR')
 
-        services = ['volumedriver_{0}'.format(vpool.name),
+        services = ['ganesha',
+                    'volumedriver_{0}'.format(vpool.name),
                     'failovercache_{0}'.format(vpool.name)]
         vsrs_left = False
 
@@ -1221,15 +1220,12 @@ if Service.has_service('{0}'):
 
         # Remove services
         client = Client.load(ip)
-        service_script = """
+        for service in services:
+            Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
-if Service.has_service('{1}{0}'):
-    Service.remove_service(domain='openvstorage', name='{1}{0}')
-if Service.has_service('{2}{0}'):
-    Service.remove_service(domain='openvstorage', name='{2}{0}')""".format(
-            vpool.name, 'volumedriver_', 'failovercache_'
-        )
-        Manager._exec_python(client, service_script)
+if Service.has_service('{0}'):
+    Service.remove_service(domain='openvstorage', name='{0}')
+""".format(service))
 
         if vpool.backend_type == 'CEPH_S3':
             client = Client.load(ip)
