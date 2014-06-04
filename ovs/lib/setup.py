@@ -402,7 +402,7 @@ class SetupController(object):
                 local_config = ConfigParser.ConfigParser()
                 local_config.add_section('global')
                 local_config.set('global', 'cluster', unique_id)
-                target_client = SSHClient.load('127.0.0.1')
+                target_client = SSHClient.load(cluster_ip)
                 SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
 
                 if join_cluster:
@@ -417,7 +417,7 @@ class SetupController(object):
                             node_client.dir_ensure('/opt/OpenvStorage/config/arakoon/{0}'.format(cluster), True)
                             SetupController._configure_arakoon((client_config, server_config), unique_id, cluster, cluster_ip,
                                                                arakoon_clusters[cluster], node_client,
-                                                               (arakoon_client_config, arakoon_server_config, arakoon_local_nodes),
+                                                               (arakoon_client_config, arakoon_server_config),
                                                                arakoon_mountpoint)
                 else:
                     print 'Setting up first arakoon node'
@@ -431,7 +431,7 @@ class SetupController(object):
                         SetupController._configure_arakoon((client_config, server_config), unique_id, cluster,
                                                            cluster_ip,
                                                            arakoon_clusters[cluster], target_client,
-                                                           (arakoon_client_config, arakoon_server_config, arakoon_local_nodes),
+                                                           (arakoon_client_config, arakoon_server_config),
                                                            arakoon_mountpoint)
 
                 logger.debug('Creating arakoon directories')
@@ -797,7 +797,7 @@ print Service.stop_service('{0}')
 
     @staticmethod
     def _configure_arakoon(configs, unique_id, cluster, ip, port, target_client, arakoon_configs, arakoon_mountpoint):
-        arakoon_client_config, arakoon_server_config, arakoon_local_nodes = arakoon_configs
+        arakoon_client_config, arakoon_server_config = arakoon_configs
         client_config, server_config = configs
 
         if not client_config.has_section('global'):
