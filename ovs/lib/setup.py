@@ -399,6 +399,12 @@ class SetupController(object):
                             SetupController._disable_service(node_client, service)
                             SetupController._change_service_state(node_client, service, 'stop')
 
+                local_config = ConfigParser.ConfigParser()
+                local_config.add_section('global')
+                local_config.set('global', 'cluster', unique_id)
+                target_client = SSHClient.load('127.0.0.1')
+                SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
+
                 if join_cluster:
                     print 'Joining arakoon cluster'
                     logger.info('Joining arakoon cluster')
@@ -831,11 +837,6 @@ print Service.stop_service('{0}')
             server_config.set(unique_id, 'tlog_dir', '{0}/tlogs/{1}'.format(arakoon_mountpoint, cluster))
             server_config.set(unique_id, 'fsync', 'true')
         SetupController._remote_config_write(target_client, arakoon_server_config.format(cluster), server_config)
-
-        local_config = ConfigParser.ConfigParser()
-        local_config.add_section('global')
-        local_config.set('global', 'cluster', unique_id)
-        SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
 
     @staticmethod
     def _create_filesystems(fs_client, create_extra, extra_hdd_mountpoint, use_hdd_io_ssd, ssd_mountpoint):

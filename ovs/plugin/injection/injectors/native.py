@@ -173,7 +173,7 @@ class Injector(object):
         """ Injects the Process module """
 
         def check_process(name):
-            output = check_output('ps aux | grep -v grep | grep {0} || true'.format(name))
+            output = check_output('ps aux | grep -v grep | grep {0} || true'.format(name), shell = True)
             # It returns 1 if the process is not running, else it returns 0. Don't ask questions...
             return 1 if name not in output else 0
 
