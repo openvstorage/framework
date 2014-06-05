@@ -38,7 +38,9 @@ def services_running():
             volatile = VolatileFactory.get_client()
             volatile.set(key, value)
             if volatile.get(key) == value:
+                volatile.delete(key)
                 break
+            volatile.delete(key)
         except Exception as message:
             print '  Error during volatile store test: {0}'.format(message)
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
@@ -58,7 +60,9 @@ def services_running():
             persistent = PersistentFactory.get_client()
             persistent.set(key, value)
             if persistent.get(key) == value:
+                persistent.delete(key)
                 break
+            persistent.delete(key)
         except Exception as message:
             print '  Error during persistent store test: {0}'.format(message)
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
@@ -79,7 +83,9 @@ def services_running():
             client = cluster.getClient()
             client.set(key, value)
             if client.get(key) == value:
+                client.delete(key)
                 break
+            client.delete(key)
         except Exception as message:
             print '  Error during arakoon (voldrv) test: {0}'.format(message)
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
