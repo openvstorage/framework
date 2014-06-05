@@ -16,13 +16,15 @@
 VPool module
 """
 
+from ovs.celery import celery
 from ovs.dal.hybrids.vpool import VPool
-from ovs.extensions.hypervisor.factory import Factory
+from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
-from ovs.celery import celery
-from ovs.lib.vmachine import VMachineController
 from ovs.extensions.fs.exportfs import Nfsexports
+from ovs.extensions.hypervisor.factory import Factory
+from ovs.lib.vmachine import VMachineController
 
 
 class VPoolController(object):
@@ -68,5 +70,5 @@ class VPoolController(object):
         temporary check to avoid creating 2 ganesha nfs exported vpools
         as this is not yet supported on volumedriverlevel
         """
-        _ = vsa_guid
-        return True  # @TODO to be completed
+        vsa = VMachine(vsa_guid)
+        return len(vsa.vpools_guids) == 0 or PMachine(vsa.pmachine_guid).hvtype != 'VMWARE'
