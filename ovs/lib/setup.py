@@ -399,16 +399,20 @@ class SetupController(object):
                             SetupController._disable_service(node_client, service)
                             SetupController._change_service_state(node_client, service, 'stop')
 
-                local_config = ConfigParser.ConfigParser()
-                local_config.add_section('global')
-                local_config.set('global', 'cluster', unique_id)
-                target_client = SSHClient.load(cluster_ip)
-                SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
-
                 if join_cluster:
                     print 'Joining arakoon cluster'
                     logger.info('Joining arakoon cluster')
                     for cluster in arakoon_clusters.keys():
+                        local_config = ConfigParser.ConfigParser()
+                        local_config.add_section('global')
+                        local_config.set('global', 'cluster', unique_id)
+                        target_client = SSHClient.load(cluster_ip)
+                        target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/ovsdb', True)
+                        target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/voldrv', True)
+
+                        SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
+
+
                         master_client = SSHClient.load(master_ip)
                         client_config = SetupController._remote_config_read(master_client, arakoon_client_config.format(cluster))
                         server_config = SetupController._remote_config_read(master_client, arakoon_server_config.format(cluster))
@@ -426,6 +430,12 @@ class SetupController(object):
                     target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/ovsdb', True)
                     target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/voldrv', True)
                     for cluster in arakoon_clusters.keys():
+                        local_config = ConfigParser.ConfigParser()
+                        local_config.add_section('global')
+                        local_config.set('global', 'cluster', unique_id)
+                        target_client = SSHClient.load(cluster_ip)
+                        SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
+
                         client_config = ConfigParser.ConfigParser()
                         server_config = ConfigParser.ConfigParser()
                         SetupController._configure_arakoon((client_config, server_config), unique_id, cluster,
