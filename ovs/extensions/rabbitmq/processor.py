@@ -16,9 +16,6 @@
 Contains the process method for processing rabbitmq messages
 """
 
-import os
-import imp
-import inspect
 from celery.task.control import revoke
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -28,7 +25,7 @@ from ovs.log.logHandler import LogHandler
 logger = LogHandler('extensions', name='processor')
 
 
-def process(queue, body):
+def process(queue, body, mapping):
     """
     Processes the actual received body
     """
@@ -46,22 +43,6 @@ def process(queue, body):
         # - [EVENT_NAME]: The name of the eventmessage type
         # - [TASK_NAME]: Task method name
         # - [<argument value>]: Any value of the `arguments` dictionary.
-
-        mapping = {}
-        path = os.path.join(os.path.dirname(__file__), 'mappings')
-        for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
-                for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        this_mapping = member[1].mapping
-                        for key in this_mapping.keys():
-                            if key not in mapping:
-                                mapping[key] = []
-                            mapping[key] += this_mapping[key]
 
         if data.type in mapping:
             for current_map in mapping[data.type]:
