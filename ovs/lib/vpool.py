@@ -70,5 +70,5 @@ class VPoolController(object):
         temporary check to avoid creating 2 ganesha nfs exported vpools
         as this is not yet supported on volumedriverlevel
         """
-        vsa = VMachine(vsa_guid)
-        return len(vsa.vpools_guids) == 0 or PMachine(vsa.pmachine_guid).hvtype != 'VMWARE'
+        _ = vsa_guid
+        return True
