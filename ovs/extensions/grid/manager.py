@@ -1051,7 +1051,7 @@ for filename in {1}:
         service_script = """
 from ovs.plugin.provider.service import Service
 Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}', params={5})
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
+Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
             vd_name, vd_cmd, vd_stopcmd,
             fc_name, fc_cmd, params
         )
@@ -1129,13 +1129,11 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
             for service in services:
                 Manager._exec_python(node_client, """
 from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.enable_service('{0}')
+Service.enable_service('{0}')
 """.format(service))
                 Manager._exec_python(node_client, """
 from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.start_service('{0}')
+Service.start_service('{0}')
 """.format(service))
 
         # Fill vPool size
