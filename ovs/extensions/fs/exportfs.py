@@ -26,6 +26,7 @@ class Nfsexports(object):
     def __init__(self):
         self._exportsFile = '/etc/exports'
         self._cmd = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs']
+        self._restart = ['/usr/bin/sudo', '-u', 'root', '/etc/init.d/nfs-kernel-server', 'restart']
 
     def _slurp(self):
         """
@@ -110,3 +111,4 @@ class Nfsexports(object):
         logger.info('Exporting {}:{}'.format(network, directory))
         cmd.extend(['-v', '{}:{}'.format(network, directory)])
         subprocess.call(cmd)
+        subprocess.call(self._restart)
