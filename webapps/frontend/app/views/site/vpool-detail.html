@@ -222,8 +222,7 @@ limitations under the License.
                                 <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
                                 <button class="btn btn-default" data-bind="click: $root.updateVSAServing,
-                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0,
-                                                                           visible: backendType() !== 'LOCAL'"
+                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0"
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vpools.detail.updateserving"></span>
                                 </button>
