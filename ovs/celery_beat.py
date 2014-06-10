@@ -29,6 +29,7 @@ logger = LogHandler('celery', name='celery beat')
 
 
 class DistributedScheduler(Scheduler):
+
     """
     Distributed scheduler that can run on multiple nodes at the same time.
     """
@@ -65,7 +66,8 @@ class DistributedScheduler(Scheduler):
             logger.debug('DS loading schedule entries')
             self._mutex.acquire(wait=10)
             try:
-                self.schedule = cPickle.loads(str(self._persistent.get('{0}_entries'.format(self._namespace))))
+                self.schedule = cPickle.loads(
+                    str(self._persistent.get('{0}_entries'.format(self._namespace))))
             except:
                 # In case an exception occurs during loading the schedule, it is ignored and the default schedule
                 # will be used/restored.
@@ -78,7 +80,8 @@ class DistributedScheduler(Scheduler):
             try:
                 logger.debug('DS syncing schedule entries')
                 self._mutex.acquire(wait=10)
-                self._persistent.set('{0}_entries'.format(self._namespace), cPickle.dumps(self.schedule))
+                self._persistent.set('{0}_entries'.format(
+                    self._namespace), cPickle.dumps(self.schedule))
             finally:
                 self._mutex.release()
         else:
@@ -110,8 +113,10 @@ class DistributedScheduler(Scheduler):
                     self._has_lock = True
                 elif node_timestamp - lock['timestamp'] > DistributedScheduler.TIMEOUT:
                     # The current lock is timed out, so the lock is stolen
-                    logger.debug('DS last lock refresh is {0}s old'.format(node_timestamp - lock['timestamp']))
-                    logger.debug('DS stealing lock from {0}'.format(lock['name']))
+                    logger.debug('DS last lock refresh is {0}s old'.format(
+                        node_timestamp - lock['timestamp']))
+                    logger.debug(
+                        'DS stealing lock from {0}'.format(lock['name']))
                     self._load_schedule()
                     self._has_lock = True
                 else:

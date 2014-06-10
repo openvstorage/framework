@@ -12,26 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This module contains console logic
-"""
+import os
+from subprocess import check_output
 
 
-class Console(object):
+class SSHClient(object):
     """
-    Console class
+    Remote/local client
     """
 
-    def __init__(self):
+    @staticmethod
+    def load(ip, password=None):
         """
-        Console should be a complete static class
+        Opens a client connection to a remote or local system
         """
-        raise RuntimeError('This class should not be instantiated.')
 
-    askChoice = None
-    askString = None
-    askInteger = None
-    askYesNo = None
-
-from ovs.plugin.injection.injector import Injector
-Console = Injector.inject(Console)
+        from ovs.plugin.provider.remote import Remote
+        client = Remote.cuisine.api
+        Remote.cuisine.fabric.env['password'] = password
+        Remote.cuisine.fabric.output['stdout'] = False
+        Remote.cuisine.fabric.output['running'] = False
+        client.connect(ip)
+        client.ip = ip
+        return client

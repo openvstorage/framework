@@ -44,7 +44,7 @@
         },
         "backendtypes": {
             "S3": "S3",
-            "AMAZON_S3": "Amazon S3",
+            "AMAZON_S3": "S3 compatible",
             "CEPH_S3": "Ceph S3",
             "SWIFT_S3": "Swift S3",
             "LOCAL": "Local FS",
@@ -408,7 +408,8 @@
                 "dfsexclusive": "The DFS mountpoint must have exclusive use",
                 "dfsnotshared": "The DFS mountpoint should not be shared between vPools",
                 "portinuse": "The given port is already in use",
-                "cephfilesmissing": "One or more of the required ceph files are missing (/etc/ceph/ceph.conf and/or /etc/ceph/ceph.keyring)"
+                "cephfilesmissing": "One or more of the required ceph files are missing (/etc/ceph/ceph.conf and/or /etc/ceph/ceph.keyring)",
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
@@ -438,7 +439,8 @@
                 "success": "The vPool was added/removed to the selected GSRs with success",
                 "somefailed": "The vPool was added to or removed from some the selected GSRs. Some tasks failed.",
                 "allfailed": "The vPool could not be added to or removed from any of the selected GSRs",
-                "inuse": "The vPool is in use at this GSR"
+                "inuse": "The vPool is in use at this GSR",
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met."
             }
         },
         "createft": {

@@ -16,9 +16,6 @@
 Generic system module, executing statements on local node
 """
 
-from ovs.lib.vmachine import VMachine
-from ovs.dal.lists.vmachinelist import VMachineList
-
 import subprocess
 
 
@@ -64,6 +61,10 @@ class Ovs():
         """
         Returns unique machine vsa id
         """
+
+        from ovs.lib.vmachine import VMachine
+        from ovs.dal.lists.vmachinelist import VMachineList
+
         if not Ovs.my_vsa_guid:
             for vm in VMachineList.get_vmachines():
                 if vm.is_internal and vm.machineid == Ovs.get_my_machine_id():
@@ -76,3 +77,27 @@ class Ovs():
         Returns unique machine vsrid based on vpool_name and machineid
         """
         return vpool_name + Ovs.get_my_machine_id()
+
+    @staticmethod
+    def update_hosts_file(hostname, ip):
+        """
+        Update/add entry for hostname ip in /etc/hosts
+        """
+        import re
+
+        with open('/etc/hosts', 'r') as hosts_file:
+            contents = hosts_file.read()
+
+        if isinstance(hostname, list):
+            hostnames = ' '.join(hostname)
+        else:
+            hostnames = hostname
+
+        result = re.search('^{0}\s.*\n'.format(ip), contents, re.MULTILINE)
+        if result:
+            contents = contents.replace(result.group(0), '{0} {1}\n'.format(ip, hostnames))
+        else:
+            contents += '{0} {1}\n'.format(ip, hostnames)
+
+        with open('/etc/hosts', 'wb') as hosts_file:
+            hosts_file.write(contents)

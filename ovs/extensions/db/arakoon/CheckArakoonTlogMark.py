@@ -20,11 +20,12 @@ import subprocess
 import shutil
 from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.plugin.provider.logger import Logger
+from ovs.log.logHandler import LogHandler
 from ovs.plugin.provider.process import Process
 
 manager = ArakoonManagement()
 ensurearakoonworks = EnsureArakoonWorks()
+logger = LogHandler('arakoon', name='tlogchcker')
 
 
 class CheckArakoonError(Exception):
@@ -90,7 +91,7 @@ class CheckArakoonTlogMark():
         leader = "[arakoon_startup]:"
         logmessage = "{0} {1}".format(leader, message)
         print(logmessage)
-        Logger.log(logmessage, 1)
+        logger.debug(logmessage)
         sys.stdout.flush()
 
     def _wait(self, duration=None):

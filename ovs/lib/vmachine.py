@@ -19,8 +19,7 @@ VMachine module
 import time
 import copy
 import os
-import glob
-import ConfigParser
+import shutil
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -36,6 +35,7 @@ from ovs.extensions.generic.system import Ovs
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
 from ovs.plugin.provider.configuration import Configuration
+from ovs.plugin.provider.package import Package
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
@@ -249,12 +249,27 @@ class VMachineController(object):
                 hv.delete_vm(machine.hypervisorid, True)
             except Exception as exception:
                 logger.error('Deletion of vm on hypervisor failed: {0}'.format(str(exception)), print_msg=True)
+        try:
+            vsr_mountpoint = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0].mountpoint
+        except Exception as ex:
+            logger.debug('No mountpoint could be retrieved. Reason: {0}'.format(str(ex)))
+            vsr_mountpoint = None
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
+        if vsr_mountpoint:
+            vmx_path = os.path.join(vsr_mountpoint, machine.devicename)
+            if os.path.exists(vmx_path):
+                dir_name = os.path.dirname(vmx_path)
+                logger.debug('Removing leftover files in {0}'.format(dir_name))
+                try:
+                    shutil.rmtree(dir_name)
+                except Exception as exception:
+                    logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
+
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -579,10 +594,12 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.vsa.get_physical_metadata')
-    def get_physical_metadata(files):
+    def get_physical_metadata(files, vsa_guid):
         """
         Gets physical information about the machine this task is running on
         """
+        from ovs.lib.vpool import VPoolController
+
         mountpoints = check_output('mount -v', shell=True).strip().split('\n')
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
@@ -591,13 +608,15 @@ class VMachineController(object):
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
         ipaddresses = [ip.strip() for ip in ipaddresses]
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
+        allow_vpool = VPoolController.can_be_served_on(vsa_guid)
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
                 'xmlrpcport': xmlrpcport,
-                'files': file_existence}
+                'files': file_existence,
+                'allow_vpool': allow_vpool}
 
     @staticmethod
     @celery.task(name='ovs.vsa.add_vpool')
@@ -664,16 +683,5 @@ class VMachineController(object):
         """
         Returns version information regarding a given VSA
         """
-        version_data = {'vsa_guid': vsa_guid,
-                        'versions': {}}
-        # Currently, we're parsing JumpScale files
-        # @TODO: Replace with better code after the Age of Enlightenment
-        for filename in glob.glob('/opt/jumpscale/cfg/jpackages/state/openvstorage_*.cfg'):
-            parser = ConfigParser.RawConfigParser()
-            parser.read(filename)
-            buildnumber = parser.getint('main', 'lastinstalledbuildnr')
-            if buildnumber > -1:
-                _, package, version = filename.split('/')[-1].split('_')
-                version = version.replace('.cfg', '')
-                version_data['versions'][package] = '{0}.{1}'.format(version, buildnumber)
-        return version_data
+        return {'vsa_guid': vsa_guid,
+                'versions': Package.get_versions()}

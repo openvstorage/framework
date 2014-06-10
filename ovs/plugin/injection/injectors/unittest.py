@@ -38,11 +38,6 @@ class Injector(object):
         return provider
 
     @staticmethod
-    def inject_tools(provider):
-        """ Injects the Tools module """
-        return provider
-
-    @staticmethod
     def inject_package(provider):
         """ Injects the Package module """
         return provider
@@ -50,17 +45,6 @@ class Injector(object):
     @staticmethod
     def inject_service(provider):
         """ Injects the Service module """
-        return provider
-
-    @staticmethod
-    def inject_console(provider):
-        """ Injects the Console module """
-        _ = provider
-        return provider
-
-    @staticmethod
-    def inject_logger(provider):
-        """ Injects the Logger module """
         return provider
 
     @staticmethod

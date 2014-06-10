@@ -32,6 +32,7 @@ class Package(object):
     start = None
     stop = None
     get_status = None
+    get_versions = None
 
 from ovs.plugin.injection.injector import Injector
 Package = Injector.inject(Package)

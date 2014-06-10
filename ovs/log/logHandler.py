@@ -57,7 +57,8 @@ class LogHandler(object):
                'api': 'api',
                'extensions': 'extensions',
                'dal': 'dal',
-               'celery': 'celery'}
+               'celery': 'celery',
+               'arakoon': 'arakoon'}
 
     def __init__(self, source, name=None):
         """
@@ -89,6 +90,7 @@ class LogHandler(object):
         handler.setFormatter(formatter)
 
         self.logger = logging.getLogger(name)
+        self.logger.propagate = True
         self.logger.setLevel(getattr(logging, parser.get('logging', 'level')))
         self.logger.addHandler(handler)
 

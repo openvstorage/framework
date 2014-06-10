@@ -328,7 +328,7 @@ class VMachineViewSet(viewsets.ViewSet):
         if 'files' in request.DATA:
             files = request.DATA['files'].strip().split(',')
 
-        return VMachineController.get_physical_metadata.s(files).apply_async(
+        return VMachineController.get_physical_metadata.s(files, obj.guid).apply_async(
             routing_key='vsa.{0}'.format(obj.machineid)
         )
 

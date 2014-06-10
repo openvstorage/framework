@@ -786,6 +786,7 @@ class Sdk(object):
     def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         Create a vm based on an existing vtemplate on specified tgt hypervisor
+        Raises RuntimeError if datastore is not available at (ip, mountpoint)
         """
 
         esxhost = self._validate_host(None)
@@ -944,6 +945,8 @@ class Sdk(object):
         host_system = self._get_object(esxhost, properties=['datastore'])
         for store in host_system.datastore[0]:
             store = self._get_object(store)
+            if not store.summary.accessible:
+                raise RuntimeError('Datastore {0} is not accessible at mountpoint {1}'.format(store.name, mountpoint))
             if hasattr(store.info, 'nas'):
                 if store.info.nas.remoteHost == ip and store.info.nas.remotePath == mountpoint:
                     datastore = store
