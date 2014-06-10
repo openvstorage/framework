@@ -20,6 +20,7 @@ from pysnmp.entity import engine, config
 from pysnmp.entity.rfc3413 import cmdrsp, context
 from pysnmp.carrier.asynsock.dgram import udp
 from pysnmp.proto.api import v2c
+from pysnmp.smi.error import SmiError
 
 
 
@@ -161,6 +162,16 @@ class SNMPServer():
         self.mibBuilder.exportSymbols(oid, self.MibScalar(OID[:-1], return_type()),
                                       _class()(OID[:-1], (OID[-1],), return_type()))
         return oid
+
+    def unregister_custom_oid(self, oid):
+        """
+        Unexport an OID symbol from snmp
+        """
+        try:
+            print('Unexporting symbol %s ' % (oid))
+            self.mibBuilder.unexportSymbols(oid)
+        except SmiError as smie:
+            print('[EXCEPTION] Failed to unexport symbol: %s' % str(smie))
 
     def register_polling_function(self, function, interval_sec):
         """

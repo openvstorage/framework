@@ -46,6 +46,8 @@ class OVSSNMPServer():
         # Load from model
         self.assigned_oids = {}
         self.instance_oid = 0
+        # Book-keeping
+        self.model_oids = set()
 
     def get_users(self):
         """
@@ -111,6 +113,8 @@ class OVSSNMPServer():
         attrb_oid: an unique id for the attribute (hardcoded)
         together they will form oid that will be stored in the model
         """
+        self.model_oids.add(model_object.guid)
+
         if not class_id in self.assigned_oids:
             self.assigned_oids[class_id] = {}
             self.instance_oid = 0
@@ -163,6 +167,8 @@ class OVSSNMPServer():
         """
         Load/hook dal models as snmp oids
         """
+        _guids = set()
+
         enabled_key = "{}_config_dal_enabled".format(STORAGE_PREFIX)
         self.instance_oid = 0
         try:
@@ -177,6 +183,8 @@ class OVSSNMPServer():
             from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 
             for vm in VMachineList.get_vsas():
+                _guids.add(vm.guid)
+
                 if vm.is_internal:
                     self._register_dal_model(10, vm, 'guid', "0")
                     self._register_dal_model(10, vm, 'name', "1")
@@ -201,6 +209,8 @@ class OVSSNMPServer():
                     self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
+                _guids.add(vm.guid)
+
                 if vm.is_vtemplate:
                     self._register_dal_model(11, vm, 'guid', "0")
                     self._register_dal_model(11, vm, 'name', "1")
@@ -216,6 +226,8 @@ class OVSSNMPServer():
                     self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
+                _guids.add(vm.guid)
+
                 if not vm.is_internal and not vm.is_vtemplate:
                     self._register_dal_model(0, vm, 'guid', "0")
                     self._register_dal_model(0, vm, 'name', "1")
@@ -270,6 +282,8 @@ class OVSSNMPServer():
                 self.instance_oid += 1
 
             for vd in VDiskList.get_vdisks():
+                _guids.add(vd.guid)
+
                 self._register_dal_model(1, vd, 'guid', "0")
                 self._register_dal_model(1, vd, 'name', "1")
                 self._register_dal_model(1, vd, 'statistics', "2.0", key = "operations", atype = int)
@@ -313,12 +327,16 @@ class OVSSNMPServer():
                 self.instance_oid += 1
 
             for pm in PMachineList.get_pmachines():
+                _guids.add(pm.guid)
+
                 self._register_dal_model(2, pm, 'guid', "0")
                 self._register_dal_model(2, pm, 'name', "1")
                 self._register_dal_model(2, pm, 'host_status', "2")
                 self.instance_oid += 1
 
             for vp in VPoolList.get_vpools():
+                _guids.add(vp.guid)
+
                 self._register_dal_model(3, vm, 'guid', "0")
                 self._register_dal_model(3, vp, 'name', "1")
                 self._register_dal_model(3, vp, 'statistics', "2.0", key = "operations", atype = int)
@@ -365,18 +383,35 @@ class OVSSNMPServer():
                 self.instance_oid += 1
 
             for vsr in VolumeStorageRouterList.get_volumestoragerouters():
+                _guids.add(vsr.guid)
+
                 self._register_dal_model(4, vsr, 'guid', "0")
                 self._register_dal_model(4, vsr, 'name', "1")
                 self._register_dal_model(4, vsr, 'stored_data', "2", atype = int)
                 self.instance_oid += 1
+
+            reload = False
+            for object_guid in list(self.model_oids):
+                if not object_guid in _guids:
+                    self.model_oids.remove(object_guid)
+                    reload = True
+            if reload:
+                self._reload_snmp()
 
     def _polling_functions(self):
         def _poll(timestamp_float):
             print('[POLLING] %s' % (str(timestamp_float)))
             self._bootstrap_dal_models()
             print('[DONE POLLING]')
-
         self.server.register_polling_function(_poll, 300) #5 minutes
+
+    def _reload_snmp(self):
+        """
+        Restart snmp
+        """
+        print('[SNMP] Reload started')
+        import os
+        os.system('echo "service ovs-snmp restart" | at now')
 
     def start(self):
         """
