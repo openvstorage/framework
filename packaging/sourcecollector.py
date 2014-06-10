@@ -38,7 +38,7 @@ class SourceCollector(object):
     repo = 'openvstorage/openvstorage'
     repo_path_metadata = '/tmp/repo_openvstorage_metadata'
     repo_path_code = '/tmp/repo_openvstorage_code'
-    package_path = '/tmp/packages'
+    package_path = '/tmp/packages/openvstorage'
 
     def __init__(self):
         """

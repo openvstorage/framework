@@ -29,7 +29,7 @@ class DebianPackager(object):
     """
 
     repo_path_code = '/tmp/repo_openvstorage_code'
-    package_path = '/tmp/packages'
+    package_path = '/tmp/packages/openvstorage'
 
     def __init__(self):
         """
