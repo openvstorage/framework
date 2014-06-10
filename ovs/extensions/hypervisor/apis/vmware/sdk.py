@@ -247,7 +247,7 @@ class Sdk(object):
         elif hasattr(result, 'info'):
             if result.info.state == 'success':
                 return True
-            else:
+            elif result.info.state == 'error':
                 error = result.info.error.localizedMessage
                 raise Exception(('%s: %s' % (message, error)) if message else error)
         raise Exception(('%s: %s' % (message, 'Unexpected result'))

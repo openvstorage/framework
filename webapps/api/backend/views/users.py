@@ -83,7 +83,7 @@ class UserViewSet(viewsets.ViewSet):
         Creates a User
         """
         _ = format
-        serializer = FullSerializer(User, User(), request.DATA)
+        serializer = FullSerializer(User, instance=User(), data=request.DATA)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
