@@ -24,7 +24,7 @@ from ovs.dal.dataobjectlist import DataObjectList
 import signal
 
 STORAGE_PREFIX = "ovs_snmp"
-NAMING_SCHEME = "1.3.6.1.4.1.0.%s.%s.%s"
+NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
 
 class OVSSNMPServer():
     """
