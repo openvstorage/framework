@@ -13,23 +13,5 @@
 # limitations under the License.
 
 """
-Error middleware module
+This package contains method mappings
 """
-
-from ovs.log.logHandler import LogHandler
-
-logger = LogHandler('api', 'error middleware')
-
-
-class ExceptionMiddleware(object):
-    """
-    Error middleware object
-    """
-
-    def process_exception(self, request, exception):
-        """
-        Logs information about the given error to a plain logfile
-        """
-        _ = self, request
-        logger.exception('An unhandled exception occurred: {0}'.format(exception))
-

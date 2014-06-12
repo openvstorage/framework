@@ -19,8 +19,7 @@ Module for the vcenter management center client
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
 
-class VCenter():
-
+class VCenter(object):
     """
     Represents the management center for vcenter server
     """

@@ -30,6 +30,8 @@ class MessagingViewSet(viewsets.ViewSet):
     Information about messages
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'messages'
+    base_name = 'messages'
 
     @expose(internal=True)
     @required_roles(['view'])

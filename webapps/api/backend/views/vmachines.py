@@ -39,6 +39,8 @@ class VMachineViewSet(viewsets.ViewSet):
     Information about machines
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'vmachines'
+    base_name = 'vmachines'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

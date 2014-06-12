@@ -26,6 +26,8 @@ class BrandingViewSet(viewsets.ViewSet):
     """
     Information about branding
     """
+    prefix = r'branding'
+    base_name = 'branding'
 
     @expose(internal=True)
     @get_list(Branding)
@@ -33,7 +35,7 @@ class BrandingViewSet(viewsets.ViewSet):
         """
         Overview of all brandings
         """
-        _ = request, format
+        _ = request, format, hints
         return BrandingList.get_brandings()
 
     @expose(internal=True)

@@ -31,6 +31,8 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
     Information about VolumeStorageRouters
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'volumestoragerouters'
+    base_name = 'volumestoragerouters'
 
     @expose(internal=True)
     @required_roles(['view'])

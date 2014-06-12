@@ -31,6 +31,8 @@ class PMachineViewSet(viewsets.ViewSet):
     Information about pMachines
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'pmachines'
+    base_name = 'pmachines'
 
     @expose(internal=True)
     @required_roles(['view'])

@@ -37,6 +37,8 @@ class UserViewSet(viewsets.ViewSet):
     Information about Users
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'users'
+    base_name = 'users'
 
     @staticmethod
     def _get_object(guid):
@@ -81,7 +83,7 @@ class UserViewSet(viewsets.ViewSet):
         Creates a User
         """
         _ = format
-        serializer = FullSerializer(User, User(), request.DATA)
+        serializer = FullSerializer(User, instance=User(), data=request.DATA)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)

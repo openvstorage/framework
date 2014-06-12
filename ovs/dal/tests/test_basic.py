@@ -282,10 +282,14 @@ class Basic(TestCase):
         # Some stuff here to dynamically test all hybrid properties
         for cls in HybridRunner.get_hybrids():
             relation_info = RelationMapper.load_foreign_relations(cls)
-            remote_properties = []
+            remote_properties_n = []
+            remote_properties_1 = []
             if relation_info is not None:
-                for key in relation_info.keys():
-                    remote_properties.append(key)
+                for key, info in relation_info.iteritems():
+                    if info['list'] is True:
+                        remote_properties_n.append(key)
+                    else:
+                        remote_properties_1.append(key)
             # Make sure certain attributes are correctly set
             self.assertIsInstance(cls._blueprint, dict, '_blueprint required: %s' % cls.__name__)
             self.assertIsInstance(cls._relations, dict, '_relations required: %s' % cls.__name__)
@@ -331,8 +335,10 @@ class Basic(TestCase):
                     or prop in cls._relations \
                     or prop in ['%s_guid' % key for key in cls._relations.keys()] \
                     or prop in cls._expiry \
-                    or prop in remote_properties \
-                    or prop in ['%s_guids' % key for key in remote_properties] \
+                    or prop in remote_properties_n \
+                    or prop in remote_properties_1 \
+                    or prop in ['%s_guids' % key for key in remote_properties_n] \
+                    or prop in ['%s_guid' % key for key in remote_properties_1] \
                     or prop == 'guid'
                 if not found:
                     missing_metadata.append(prop)
@@ -1052,3 +1058,27 @@ class Basic(TestCase):
                                    'items': [('machine_guid', DataList.operator.EQUALS, machine.guid)]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 1, 'There should be one disk ({0})'.format(len(disks)))
+
+    def test_1_to_1(self):
+        """
+        Validates whether 1-to-1 relations work correct
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+
+        self.assertIsNone(machine.one, 'The machine should not have a reverse disk relation')
+        self.assertIsNone(machine.one_guid, 'The machine should have an empty disk _guid property')
+
+        disk = TestDisk()
+        disk.name = 'test'
+        disk.one = machine
+        disk.save()
+
+        self.assertIsNotNone(machine.one, 'The machine should have a reverse disk relation')
+        self.assertEqual(machine.one.name, 'test', 'The reverse 1-to-1 relation should work')
+        self.assertEqual(disk.one.name, 'machine', 'The normal 1-to-1 relation should work')
+        self.assertEqual(machine.one_guid, disk.guid, 'The reverse disk should be the correct one')
+
+        with self.assertRaises(RuntimeError):
+            machine.one = disk

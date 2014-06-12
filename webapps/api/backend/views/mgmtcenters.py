@@ -36,6 +36,8 @@ class MgmtCenterViewSet(viewsets.ViewSet):
     Information about mgmtCenters
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'mgmtcenters'
+    base_name = 'mgmtcenters'
 
     @expose(internal=True)
     @required_roles(['view'])

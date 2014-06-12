@@ -29,6 +29,8 @@ class GenericViewSet(viewsets.ViewSet):
     """
     Generic
     """
+    prefix = r'generic'
+    base_name = 'nodes'
 
     @expose(internal=True)
     def list(self, request, format=None):

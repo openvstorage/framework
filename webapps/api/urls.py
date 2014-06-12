@@ -15,22 +15,12 @@
 """
 Django URL module for main API
 """
+import os
+import imp
+import inspect
 from django.conf.urls import patterns, include, url
 from django.views.generic import RedirectView
-
 from views import ObtainAuthToken
-from backend.views.statistics import MemcacheViewSet
-from backend.views.vmachines import VMachineViewSet
-from backend.views.pmachines import PMachineViewSet
-from backend.views.mgmtcenters import MgmtCenterViewSet
-from backend.views.vpools import VPoolViewSet
-from backend.views.vdisks import VDiskViewSet
-from backend.views.users import UserViewSet
-from backend.views.tasks import TaskViewSet
-from backend.views.messaging import MessagingViewSet
-from backend.views.branding import BrandingViewSet
-from backend.views.generic import GenericViewSet
-from backend.views.volumestoragerouters import VolumeStorageRouterViewSet
 from backend.router import OVSRouter
 
 
@@ -38,20 +28,20 @@ def build_router_urls(api_mode, docs):
     """
     Creates a router instance to generate API urls for Customer and Internal API
     """
-    routes = [
-        {'prefix': r'users',                'viewset': UserViewSet,                'base_name': 'users'},
-        {'prefix': r'tasks',                'viewset': TaskViewSet,                'base_name': 'tasks'},
-        {'prefix': r'vpools',               'viewset': VPoolViewSet,               'base_name': 'vpools'},
-        {'prefix': r'vmachines',            'viewset': VMachineViewSet,            'base_name': 'vmachines'},
-        {'prefix': r'pmachines',            'viewset': PMachineViewSet,            'base_name': 'pmachines'},
-        {'prefix': r'mgmtcenters',          'viewset': MgmtCenterViewSet,          'base_name': 'mgmtcenters'},
-        {'prefix': r'volumestoragerouters', 'viewset': VolumeStorageRouterViewSet, 'base_name': 'volumestoragerouters'},
-        {'prefix': r'vdisks',               'viewset': VDiskViewSet,               'base_name': 'vdisks'},
-        {'prefix': r'messages',             'viewset': MessagingViewSet,           'base_name': 'messages'},
-        {'prefix': r'branding',             'viewset': BrandingViewSet,            'base_name': 'branding'},
-        {'prefix': r'generic',              'viewset': GenericViewSet,             'base_name': 'nodes'},
-        {'prefix': r'statistics/memcache',  'viewset': MemcacheViewSet,            'base_name': 'memcache'}
-    ]
+    routes = []
+    path = os.path.join(os.path.dirname(__file__), 'backend', 'views')
+    for filename in os.listdir(path):
+        if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+            name = filename.replace('.py', '')
+            module = imp.load_source(name, os.path.join(path, filename))
+            for member in inspect.getmembers(module):
+                if inspect.isclass(member[1]) \
+                        and member[1].__module__ == name \
+                        and 'ViewSet' in [base.__name__ for base in member[1].__bases__]:
+                    routes.append({'prefix': member[1].prefix,
+                                   'viewset': member[1],
+                                   'base_name': member[1].base_name})
+
     router = OVSRouter(api_mode, docs)
     for route in routes:
         router.register(**route)

@@ -22,6 +22,10 @@ import copy
 import re
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.generic.volatilemutex import VolatileMutex
+
+from ovs.log.logHandler import LogHandler
+logger = LogHandler('api', name='debug')
 
 
 class Descriptor(object):
@@ -112,7 +116,9 @@ class HybridRunner(object):
                 name = filename.replace('.py', '')
                 module = imp.load_source(name, os.path.join(path, filename))
                 for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) and member[1].__module__ == name:
+                    if inspect.isclass(member[1]) \
+                            and member[1].__module__ == name \
+                            and 'DataObject' in [base.__name__ for base in member[1].__bases__]:
                         yield member[1]
 
 
