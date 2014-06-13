@@ -344,8 +344,8 @@ class SetupController(object):
 
             # Elastic search setup
             print 'Configuring logstash{0}'.format(' and elastic search' if join_masters else '')
+            target_client = SSHClient.load(cluster_ip)
             if join_masters:
-                target_client = SSHClient.load(cluster_ip)
                 SetupController._add_service(target_client, 'elasticsearch')
                 config_file = '/etc/elasticsearch/elasticsearch.yml'
                 SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
@@ -366,6 +366,7 @@ class SetupController(object):
                                                          '<NETWORK_PUBLISH>',
                                                          cluster_ip)
                 SetupController._change_service_state(target_client, 'elasticsearch', 'start')
+
             SetupController._replace_param_in_config(target_client,
                                                      '/etc/logstash/conf.d/indexer.conf',
                                                      '<CLUSTER_NAME>',
@@ -374,7 +375,6 @@ class SetupController(object):
 
             print 'Adding services'
             logger.info('Adding services')
-            target_client = SSHClient.load(cluster_ip)
             params = {'<ARAKOON_NODE_ID>' : unique_id,
                       '<MEMCACHE_NODE_IP>': cluster_ip,
                       '<WORKER_QUEUE>': unique_id}
