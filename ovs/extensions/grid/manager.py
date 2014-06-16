@@ -982,6 +982,11 @@ for directory in {0}:
         vsr_config_script = """
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+
+fd_config = {{'fd_cache_path': '{11}/fd_{0}',
+              'fd_extent_cache_capacity': '1024',
+              'fd_namespace' : 'fd-{0}',
+              'fd_policy_id' : ''}}
 vsr_configuration = VolumeStorageRouterConfiguration('{0}')
 vsr_configuration.configure_backend({1})
 vsr_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
@@ -992,9 +997,10 @@ vsr_configuration.configure_volumemanager({6})
 vsr_configuration.configure_volumerouter('{0}', {7})
 vsr_configuration.configure_arakoon_cluster('{8}', {9})
 vsr_configuration.configure_hypervisor('{10}')
+vsr_configuration.configure_filedriver(fd_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           vsa.pmachine.hvtype)
+           vsa.pmachine.hvtype, mountpoint_cache)
         Manager._exec_python(client, vsr_config_script)
         Manager._configure_amqp_to_volumedriver(client, vpool_name)
 
@@ -1015,6 +1021,8 @@ vsr_configuration.configure_hypervisor('{10}')
         vsr.save()
 
         dirs2create.append(vsr.mountpoint)
+        dirs2create.append(mountpoint_cache + '/fd_' + vpool_name)
+
         file_create_script = """
 import os
 for directory in {0}:
