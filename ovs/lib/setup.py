@@ -24,6 +24,7 @@ import ConfigParser
 import urllib2
 import base64
 from string import digits
+from subprocess import check_output
 
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
@@ -125,6 +126,13 @@ class SetupController(object):
                 Remote.cuisine.fabric.output['running'] = True
             logger.debug('Target client loaded')
 
+            # Check whether running local or remote
+            command = "ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'"
+            unique_id = sorted(target_client.run(command).strip().split('\n'))[0][:12]
+            local_unique_id = sorted(check_output(command, shell=True).strip().split('\n'))[0][:12]
+            remote_install = unique_id != local_unique_id
+            logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
+
             # Collect information about the cluster to join
             print '\n+++ Collecting cluster information +++\n'
             current_cluster_names = []
@@ -137,16 +145,36 @@ class SetupController(object):
             else:
                 print 'No existing Open vStorage clusters are found.'
                 logger.debug('No clusters found')
+                if remote_install is True:
+                    raise RuntimeError('A remote install requires to join an existing cluster.')
+
+            avahi_filename = '/etc/avahi/services/ovs_cluster.service'
+            local_cluster_name = None
+            if remote_install is True:
+                if not os.path.exists(avahi_filename):
+                    raise RuntimeError('A remote install can only be executed from a configured node.')
+                with open(avahi_filename, 'r') as avahi_file:
+                    avahi_contents = avahi_file.read()
+                match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
+                if 'cluster' not in match_groups:
+                    raise RuntimeError('Invalid OVS avahi service file on local node.')
+                local_cluster_name = match_groups['cluster']
 
             node_name = target_client.run('hostname')
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
                 if len(clusters) > 0:
                     dont_join = "Don't join any of these clusters."
-                    if force_type in [None, 'master']:
-                        clusters.append(dont_join)
-                    print 'Following Open vStorage clusters are found.'
-                    cluster_name = Interactive.ask_choice(clusters, 'Select a cluster to join')
+                    if local_cluster_name is None:
+                        logger.debug('Manual cluster selection')
+                        if force_type in [None, 'master']:
+                            clusters.append(dont_join)
+                        print 'Following Open vStorage clusters are found.'
+                        cluster_name = Interactive.ask_choice(clusters, 'Select a cluster to join')
+                    else:
+                        logger.debug('Local cluster name selected')
+                        cluster_name = local_cluster_name
+                        print "Selected local cluster '{0}' for remote installation".format(cluster_name)
                     if cluster_name != dont_join:
                         logger.debug('Cluster {0} selected'.format(cluster_name))
                         nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
@@ -201,9 +229,8 @@ class SetupController(object):
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
 
             config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            unique_id = sorted(target_client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0]
             ovs_config = SetupController._remote_config_read(target_client, config_filename)
-            ovs_config.set('core', 'uniqueid', unique_id[:12])
+            ovs_config.set('core', 'uniqueid', unique_id)
             SetupController._remote_config_write(target_client, config_filename, ovs_config)
 
             ipaddresses = target_client.run(
@@ -411,7 +438,6 @@ class SetupController(object):
                         target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/voldrv', True)
 
                         SetupController._remote_config_write(target_client, arakoon_local_nodes.format(cluster), local_config)
-
 
                         master_client = SSHClient.load(master_ip)
                         client_config = SetupController._remote_config_read(master_client, arakoon_client_config.format(cluster))
@@ -677,7 +703,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             print '\n+++ Announcing service +++\n'
             logger.info('Announcing service')
             target_client = SSHClient.load(ip)
-            target_client.run("""cat > /etc/avahi/services/ovs_cluster.service <<EOF
+            target_client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>
 <!--*-nxml-*-->
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
@@ -690,7 +716,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
     </service>
 </service-group>
 EOF
-""".format(cluster_name, node_name, node_type))
+""".format(cluster_name, node_name, node_type, avahi_filename))
             SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
             print ''
@@ -806,7 +832,7 @@ print Service.stop_service('{0}')
         return status
 
     @staticmethod
-    def _configure_arakoon(configs, unique_id, cluster, ip, port, target_client, arakoon_configs, arakoon_mountpoint):
+    def _configure_arakoon(configs, uid, cluster, ip, port, target_client, arakoon_configs, arakoon_mountpoint):
         arakoon_client_config, arakoon_server_config = arakoon_configs
         client_config, server_config = configs
 
@@ -816,14 +842,14 @@ print Service.stop_service('{0}')
         current_cluster = list()
         if client_config.has_option('global', 'cluster'):
             current_cluster = [n.strip() for n in client_config.get('global', 'cluster').split(',')]
-        if unique_id not in current_cluster:
-            current_cluster.append(unique_id)
+        if uid not in current_cluster:
+            current_cluster.append(uid)
         client_config.set('global', 'cluster', ', '.join(current_cluster))
-        if not client_config.has_section(unique_id):
-            client_config.add_section(unique_id)
-            client_config.set(unique_id, 'name', unique_id)
-            client_config.set(unique_id, 'ip', ip)
-            client_config.set(unique_id, 'client_port', port)
+        if not client_config.has_section(uid):
+            client_config.add_section(uid)
+            client_config.set(uid, 'name', uid)
+            client_config.set(uid, 'ip', ip)
+            client_config.set(uid, 'client_port', port)
         SetupController._remote_config_write(target_client, arakoon_client_config.format(cluster), client_config)
 
         if not server_config.has_section('global'):
@@ -832,20 +858,20 @@ print Service.stop_service('{0}')
         current_cluster = list()
         if server_config.has_option('global', 'cluster'):
             current_cluster = [n.strip() for n in server_config.get('global', 'cluster').split(',')]
-        if unique_id not in current_cluster:
-            current_cluster.append(unique_id)
+        if uid not in current_cluster:
+            current_cluster.append(uid)
         server_config.set('global', 'cluster', ', '.join(current_cluster))
-        if not server_config.has_section(unique_id):
-            server_config.add_section(unique_id)
-            server_config.set(unique_id, 'name', unique_id)
-            server_config.set(unique_id, 'ip', ip)
-            server_config.set(unique_id, 'client_port', port)
-            server_config.set(unique_id, 'messaging_port', port + 1)
-            server_config.set(unique_id, 'log_level', 'info')
-            server_config.set(unique_id, 'log_dir', '/var/log/arakoon/{0}'.format(cluster))
-            server_config.set(unique_id, 'home', '{0}/arakoon/{1}'.format(arakoon_mountpoint, cluster))
-            server_config.set(unique_id, 'tlog_dir', '{0}/tlogs/{1}'.format(arakoon_mountpoint, cluster))
-            server_config.set(unique_id, 'fsync', 'true')
+        if not server_config.has_section(uid):
+            server_config.add_section(uid)
+            server_config.set(uid, 'name', uid)
+            server_config.set(uid, 'ip', ip)
+            server_config.set(uid, 'client_port', port)
+            server_config.set(uid, 'messaging_port', port + 1)
+            server_config.set(uid, 'log_level', 'info')
+            server_config.set(uid, 'log_dir', '/var/log/arakoon/{0}'.format(cluster))
+            server_config.set(uid, 'home', '{0}/arakoon/{1}'.format(arakoon_mountpoint, cluster))
+            server_config.set(uid, 'tlog_dir', '{0}/tlogs/{1}'.format(arakoon_mountpoint, cluster))
+            server_config.set(uid, 'fsync', 'true')
         SetupController._remote_config_write(target_client, arakoon_server_config.format(cluster), server_config)
 
     @staticmethod
