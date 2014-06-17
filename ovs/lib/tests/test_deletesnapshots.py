@@ -346,7 +346,7 @@ class StorageRouterClient():
         Info volume mockup
         """
         _ = volumeid
-        return type('Info', (), {'volume_type': 'BASE'})()
+        return type('Info', (), {'object_type': 'BASE'})()
 
     @staticmethod
     def get_scrubbing_workunits(volumeid):
