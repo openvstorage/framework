@@ -19,6 +19,8 @@ This module contains all code for using the VMware SOAP API/SDK
 from time import sleep
 import datetime
 import re
+import os, glob
+import shutil
 
 from suds.client import Client, WebFault
 from suds.cache import ObjectCache
@@ -535,7 +537,6 @@ class Sdk(object):
 
         if wait:
             self.wait_for_task(task)
-
         return task
 
     @authenticated()
@@ -697,15 +698,37 @@ class Sdk(object):
         return config
 
     @authenticated()
-    def delete_vm(self, vmid, wait=False):
+    def delete_vm(self, vmid, vsr_mountpoint, vsr_storage_ip, devicename, wait=False):
         """
         Delete a given vm
         """
-        machine = self._build_property('VirtualMachine', vmid)
-        task = self._client.service.Destroy_Task(machine)
+        machine = None
+        if vmid:
+            try:
+                machine = self._build_property('VirtualMachine', vmid)
+            except Exception as ex:
+                logger.error('SDK domain retrieve failed by vmid: {}'.format(ex))
+        elif vsr_mountpoint and vsr_storage_ip and devicename:
+            try:
+                machine_info = self.get_nfs_datastore_object(vsr_storage_ip, vsr_mountpoint, devicename)[0]
+                machine = self._build_property('VirtualMachine', machine_info.obj_identifier.value)
+            except Exception as ex:
+                logger.error('SDK domain retrieve failed by nfs datastore info: {}'.format(ex))
+        if machine:
+            task = self._client.service.Destroy_Task(machine)
+            if wait:
+                self.wait_for_task(task)
 
-        if wait:
-            self.wait_for_task(task)
+        if vsr_mountpoint and devicename:
+            vmx_path = os.path.join(vsr_mountpoint, devicename)
+            if os.path.exists(vmx_path):
+                dir_name = os.path.dirname(vmx_path)
+                logger.debug('Removing leftover files in {0}'.format(dir_name))
+                try:
+                    shutil.rmtree(dir_name)
+                    logger.debug('Removed dir tree {}'.format(dir_name))
+                except Exception as exception:
+                    logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
         return task
 
     @authenticated()
@@ -1013,3 +1036,13 @@ class Sdk(object):
             self._client.service.Logout(self._serviceContent.sessionManager)
         except:
             pass
+
+    def file_exists(self, devicename):
+        """
+        Check if devicename .vmx exists on any mnt vpool
+        """
+        file_matcher = '/mnt/*/{0}'.format(devicename)
+        for found_file in glob.glob(file_matcher):
+            if os.path.exists(found_file) and os.path.isfile(found_file):
+                return True
+        return False

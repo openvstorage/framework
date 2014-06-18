@@ -19,7 +19,7 @@ This module contains all code for using the KVM libvirt api
 from xml.etree import ElementTree
 from threading import Lock
 import subprocess
-import os
+import os, glob
 import re
 import time
 from ovs.log.logHandler import LogHandler
@@ -294,15 +294,53 @@ class Sdk(object):
         return self.get_power_state(vmid)
 
     @authenticated
-    def delete_vm(self, vmid):
-        vm_object = self.get_vm_object(vmid)
-        vm_object.undefine()
+    def delete_vm(self, vmid, devicename, disks_info):
+        """
+        Delete domain from libvirt
+        Try to delete all files from vpool (xml, .raw)
+        """
+        vm_object = None
+        try:
+            vm_object = self.get_vm_object(vmid)
+        except Exception as ex:
+            logger.error('SDK domain retrieve failed: {}'.format(ex))
+        found_file = self.file_exists(devicename)
+        if found_file:
+            self.ssh_run('rm {0}'.format(found_file))
+            logger.info('File on vpool deleted: {0}'.format(found_file))
+        if vm_object:
+            # VM partially created, most likely we have disks
+            for disk in self._get_disks(vm_object):
+                if disk['device'] == 'cdrom':
+                    continue
+                found_file = disk.get('source', {}).get('file', '')
+                if os.path.exists(found_file) and os.path.isfile(found_file):
+                    self.ssh_run('rm {0}'.format(found_file))
+                    logger.info('File on vpool deleted: {0}'.format(found_file))
+            vm_object.undefine()
+        elif disks_info:
+            # VM not created, we have disks to rollback
+            for path, devicename in disks_info:
+                found_file = '{}/{}'.format(path, devicename)
+                if os.path.exists(found_file) and os.path.isfile(found_file):
+                    self.ssh_run('rm {0}'.format(found_file))
+                    logger.info('File on vpool deleted: {0}'.format(found_file))
         return True
 
     def power_on(self, vmid):
         vm_object = self.get_vm_object(vmid)
         vm_object.create()
         return self.get_power_state(vmid)
+
+    def file_exists(self, devicename):
+        """
+        Check if devicename .xml exists on any mnt vpool
+        """
+        file_matcher = '/mnt/*/{0}'.format(devicename)
+        for found_file in glob.glob(file_matcher):
+            if os.path.exists(found_file) and os.path.isfile(found_file):
+                return found_file
+        return False
 
     @authenticated
     def clone_vm(self, vmid, name, disks):
@@ -356,6 +394,7 @@ class Sdk(object):
                         ram = int(ram),
                         disks = vm_disks,
                         networks = networks)
+
         try:
             return self.get_vm_object(name).UUIDString()
         except self.libvirt.libvirtError as le:
@@ -435,5 +474,9 @@ class Sdk(object):
             self._ssh_client.lock.acquire()
             self._ssh_client.connect(self.host)
             return self._ssh_client.run(command)
+        except SystemExit as sex:
+            # SystemExit kills the worker, WorkerLostError: Worker exited prematurely: exitcode 1.
+            # we need to cleanup but also trigger an exception
+            raise RuntimeError('Command "{}" returned SystemExit({})'.format(command, sex.message))
         finally:
             self._ssh_client.lock.release()

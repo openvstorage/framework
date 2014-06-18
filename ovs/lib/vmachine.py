@@ -19,7 +19,6 @@ VMachine module
 import time
 import copy
 import os
-import shutil
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -40,7 +39,6 @@ from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler('lib', name='vmachine')
-
 
 class VMachineController(object):
     """
@@ -80,6 +78,13 @@ class VMachineController(object):
 
         target_pm = PMachine(pmachineguid)
         target_hypervisor = Factory.get(target_pm)
+
+        vsas = [vsa for vsa in VMachineList.get_vsas() if vsa.pmachine.guid == target_pm.guid]
+        if len(vsas) == 1:
+            target_vsa = vsas[0]
+        else:
+            raise ValueError('Pmachine {} has no VSA assigned to it'.format(pmachineguid))
+        routing_key = "vsa.{0}".format(target_vsa.machineid)
 
         vpool = None
         vpool_guids = set()
@@ -161,8 +166,7 @@ class VMachineController(object):
                 logger.debug('Disk appended: {0}'.format(result))
         except Exception as exception:
             logger.error('Creation of disk {0} failed: {1}'.format(disk.name, str(exception)), print_msg=True)
-            # @TODO cleanup strategy to be defined
-            new_vm.delete()
+            VMachineController.delete.s(machineguid=new_vm.guid).apply_async(routing_key = routing_key)
             raise
 
         try:
@@ -171,7 +175,7 @@ class VMachineController(object):
             )
         except Exception as exception:
             logger.error('Creation of vm {0} on hypervisor failed: {1}'.format(new_vm.name, str(exception)), print_msg=True)
-            VMachineController.delete(machineguid=new_vm.guid)
+            VMachineController.delete.s(machineguid=new_vm.guid).apply_async(routing_key = routing_key)
             raise
 
         new_vm.hypervisorid = result
@@ -242,34 +246,34 @@ class VMachineController(object):
         """
         _ = kwargs
         machine = VMachine(machineguid)
+        vsrid = [vsr for vd in machine.vdisks for vsr in vd.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine.guid][0].vsrid
+        vsr_mountpoint, vsr_storage_ip = None, None
 
-        if machine.pmachine and machine.hypervisorid:
+        try:
+            vsr = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0]
+            vsr_mountpoint = vsr.mountpoint
+            vsr_storage_ip = vsr.storage_ip
+        except Exception as ex:
+            logger.debug('No mountpoint info could be retrieved. Reason: {0}'.format(str(ex)))
+            vsr_mountpoint = None
+
+        hypervisorid = machine.hypervisorid
+        if machine.pmachine.hvtype == 'KVM':
+            hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
+
+        disks_info = [(vsr.mountpoint, vd.devicename) for vsr in vd.vpool.vsrs for vd in machine.vdisks if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid]
+        if machine.pmachine: # Allow hypervisor id node, lookup strategy is hypervisor dependent
             try:
                 hv = Factory.get(machine.pmachine)
-                hv.delete_vm(machine.hypervisorid, True)
+                hv.delete_vm(hypervisorid, vsr_mountpoint, vsr_storage_ip, machine.devicename, disks_info, True)
             except Exception as exception:
                 logger.error('Deletion of vm on hypervisor failed: {0}'.format(str(exception)), print_msg=True)
-        try:
-            vsr_mountpoint = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0].mountpoint
-        except Exception as ex:
-            logger.debug('No mountpoint could be retrieved. Reason: {0}'.format(str(ex)))
-            vsr_mountpoint = None
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
-        if vsr_mountpoint:
-            vmx_path = os.path.join(vsr_mountpoint, machine.devicename)
-            if os.path.exists(vmx_path):
-                dir_name = os.path.dirname(vmx_path)
-                logger.debug('Removing leftover files in {0}'.format(dir_name))
-                try:
-                    shutil.rmtree(dir_name)
-                except Exception as exception:
-                    logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
-
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -457,6 +461,8 @@ class VMachineController(object):
                 pmachine = PMachineList.get_by_vsrid(vsrid)
                 vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
                 hypervisor = Factory.get(pmachine)
+                if not hypervisor.file_exists(hypervisor.clean_vmachine_filename(vmachine.devicename)):
+                    return
                 vmachine.pmachine = pmachine
                 vmachine.save()
 
@@ -487,13 +493,15 @@ class VMachineController(object):
         """
         This method will update/create a vmachine based on a given vmx/xml file
         """
+
         pmachine = PMachineList.get_by_vsrid(vsrid)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
             return
 
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
-        if hypervisor.should_process(name):
+
+        if hypervisor.should_process(name) and hypervisor.file_exists(name):
             if pmachine.hvtype == 'VMWARE':
                 vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
                 vpool = vsr.vpool
@@ -521,6 +529,8 @@ class VMachineController(object):
                 except:
                     vmachine.status = 'SYNC_NOK'
                 vmachine.save()
+            if not hypervisor.file_exists(name):
+                vmachine.delete()
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_config')

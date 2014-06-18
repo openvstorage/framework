@@ -47,12 +47,14 @@ class KVM(object):
         _ = storage_ip, wait  # For compatibility purposes only
         return self.sdk.create_vm_from_template(name, source_vm, disks, mountpoint)
 
-    def delete_vm(self, vmid, wait=True):
+    def delete_vm(self, vmid, vsr_mountpoint=None, vsr_storage_ip=None, devicename=None, disks_info=[], wait=True):
         """
-        Deletes a given VM
+        Deletes a given VM and its disks
         """
         _ = wait  # For compatibility purposes only
-        return self.sdk.delete_vm(vmid)
+        _ = vsr_mountpoint  # No vpool mountpoint on kvm, use different logic
+        _ = vsr_storage_ip  # 127.0.0.1 always
+        return self.sdk.delete_vm(vmid, devicename, disks_info)
 
     def get_vm_agnostic_object(self, vmid):
         """
@@ -170,3 +172,9 @@ class KVM(object):
         """
         _ = self, devicename
         return devicename.strip('/') not in ['vmcasts/rss.xml']
+
+    def file_exists(self, devicename):
+        """
+        Checks whether a file (devicename .xml) exists
+        """
+        return self.sdk.file_exists(devicename)
