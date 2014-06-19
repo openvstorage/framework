@@ -286,6 +286,8 @@ class SetupController(object):
                 arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
                                                             default_value=Interactive.find_in_list(mountpoints, 'db'))
             mountpoints.remove(arakoon_mountpoint)
+            ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
+            SetupController._remote_config_write(target_client, config_filename, ovs_config)
 
             print '\n+++ Adding basic configuration +++\n'
             logger.info('Adding basic configuration')

@@ -615,6 +615,9 @@ class VMachineController(object):
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
                        and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
                        and p.split(' ')[2] != '/']
+        arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
+        if arakoon_mountpoint in mountpoints:
+            mountpoints.remove(arakoon_mountpoint)
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
         ipaddresses = [ip.strip() for ip in ipaddresses]
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
