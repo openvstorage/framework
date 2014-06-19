@@ -695,3 +695,24 @@ class VMachineController(object):
         """
         return {'vsa_guid': vsa_guid,
                 'versions': Package.get_versions()}
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.check_s3')
+    def check_s3(host, port, accesskey, secretkey):
+        """
+        Validates whether connection to a given S3 backend can be made
+        """
+        try:
+            import boto
+            import boto.s3.connection
+            backend = boto.connect_s3(aws_access_key_id=accesskey,
+                                      aws_secret_access_key=secretkey,
+                                      port=port,
+                                      host=host,
+                                      is_secure=(port == 443),
+                                      calling_format=boto.s3.connection.OrdinaryCallingFormat())
+            backend.get_all_buckets()
+            return True
+        except Exception as ex:
+            logger.exception('Error during S3 check: {0}'.format(ex))
+            return False

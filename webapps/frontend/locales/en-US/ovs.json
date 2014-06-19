@@ -393,7 +393,8 @@
                 "extendedinfo": "Extended vPool information",
                 "initialvsa": "Initial GSR:",
                 "vsarootpassword": "Root password:",
-                "invalidpassword": "Invalid GSR root password"
+                "invalidpassword": "Invalid GSR root password",
+                "invalids3info": "Could not connect to the given host/port, or wrong credentials."
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all GSRs serving this vPool. Please also set the vPool connection info.",

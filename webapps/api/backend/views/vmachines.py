@@ -352,6 +352,29 @@ class VMachineViewSet(viewsets.ViewSet):
         )
 
     @action()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    @celery_task()
+    def check_s3(self, request, obj):
+        """
+        Validates whether connection to a given S3 backend can be made
+        """
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+
+        fields = ['host', 'port', 'accesskey', 'secretkey']
+        parameters = {}
+        for field in fields:
+            if field not in request.DATA:
+                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
+            parameters[field] = request.DATA[field]
+            if not isinstance(parameters[field], int):
+                parameters[field] = str(parameters[field])
+
+        return VMachineController.check_s3.delay(**parameters)
+
+    @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
     @validate(VMachine)
