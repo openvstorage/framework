@@ -120,6 +120,6 @@ class UserViewSet(viewsets.ViewSet):
                 if obj.password == hashlib.sha256(str(serializer.data['current_password'])).hexdigest():
                     obj.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
                     obj.save()
-                    return obj
+                    return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         raise PermissionDenied('Updating password not allowed')

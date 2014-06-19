@@ -62,6 +62,7 @@ define([
                     })
                     .done(function() {
                         generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:generic.messages.savesuccessfully', { what: $.t('ovs:generic.password') }));
+                        shared.authentication.password(self.newPassword());
                         deferred.resolve();
                     })
                     .fail(function(error) {
