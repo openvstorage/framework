@@ -1,7 +1,8 @@
-scripts/system/ovs                        usr/bin
-config/env/ovs.sh                         etc/profile.d
-scripts/install/openvstorage.postinst.py  opt/OpenvStorage/scripts/install
-config/ovs.cfg                            opt/OpenvStorage/config
-config/volumedriver.cfg                   opt/OpenvStorage/config
-config/logrotate/openvstorage-logs        etc/logrotate.d/openvstorage-logs
-config/logrotate/openvstorage-upstart     etc/logrotate.d/openvstorage-upstart
+scripts/system/ovs                          usr/bin
+config/env/ovs.sh                           etc/profile.d
+scripts/install/openvstorage.postinst.py    opt/OpenvStorage/scripts/install
+config/ovs.cfg                              opt/OpenvStorage/config
+config/volumedriver.cfg                     opt/OpenvStorage/config
+config/logrotate/openvstorage-logs          etc/logrotate.d/openvstorage-logs
+config/logrotate/openvstorage-upstart       etc/logrotate.d/openvstorage-upstart
+config/logrotate/openvstorage-volumedriver  etc/logrotate.d/openvstorage-volumedriver
