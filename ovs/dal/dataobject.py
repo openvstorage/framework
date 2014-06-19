@@ -191,7 +191,7 @@ class DataObject(object):
             for key, info in relations.iteritems():
                 self._objects[key] = {'info': info,
                                       'data': None}
-                self._add_list_property(key)
+                self._add_list_property(key, info['list'])
 
         # Store original data
         self._original = copy.deepcopy(self._data)
@@ -236,7 +236,7 @@ class DataObject(object):
         setattr(self.__class__, '%s_guid' % attribute, property(gget))
         self._data[attribute] = value
 
-    def _add_list_property(self, attribute):
+    def _add_list_property(self, attribute, list):
         """
         Adds a list (readonly) property to the object
         """
@@ -245,7 +245,7 @@ class DataObject(object):
         gget = lambda s: s._get_list_guid_property(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget))
-        setattr(self.__class__, '%s_guids' % attribute, property(gget))
+        setattr(self.__class__, ('%s_guids' if list else '%s_guid') % attribute, property(gget))
 
     def _add_dynamic_property(self, attribute):
         """
@@ -294,14 +294,22 @@ class DataObject(object):
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
         else:
             self._objects[attribute]['data'].merge(datalist.data)
-        return self._objects[attribute]['data']
+        if info['list'] is True:
+            return self._objects[attribute]['data']
+        else:
+            data = self._objects[attribute]['data']
+            return data[0] if len(data) == 1 else None
 
     def _get_list_guid_property(self, attribute):
         """
         Getter for guid list property
         """
         dataobjectlist = getattr(self, attribute)
-        return dataobjectlist._guids
+        if dataobjectlist is None:
+            return None
+        if hasattr(dataobjectlist, '_guids'):
+            return dataobjectlist._guids
+        return dataobjectlist.guid
 
     def _get_dynamic_property(self, attribute):
         """
@@ -385,8 +393,13 @@ class DataObject(object):
             if relations is not None:
                 for key, info in relations.iteritems():
                     if key != skip:  # machine will be skipped
-                        for item in getattr(self, key).iterloaded():
-                            item.save(recursive=True, skip=info['key'])
+                        if info['list'] is True:
+                            for item in getattr(self, key).iterloaded():
+                                item.save(recursive=True, skip=info['key'])
+                        else:
+                            item = getattr(self, key)
+                            if item is not None:
+                                item.save(recursive=True, skip=info['key'])
 
         try:
             data = self._persistent.get(self._key)
@@ -479,17 +492,29 @@ class DataObject(object):
         if relations is not None:
             for key, info in relations.iteritems():
                 items = getattr(self, key)
-                if len(items) > 0:
+                if info['list'] is True:
+                    if len(items) > 0:
+                        if abandon is True:
+                            for item in items.itersafe():
+                                setattr(item, info['key'], None)
+                                try:
+                                    item.save()
+                                except ObjectNotFoundException:
+                                    pass
+                        else:
+                            raise LinkedObjectException('There are %s items left in self.%s' %
+                                                        (len(items), key))
+                elif items is not None:
+                    # No list (so a 1-to-1 relation), so there should be an object, or None
+                    item = items  # More clear naming
                     if abandon is True:
-                        for item in items.itersafe():
-                            setattr(item, info['key'], None)
-                            try:
-                                item.save()
-                            except ObjectNotFoundException:
-                                pass
+                        setattr(item, info['key'], None)
+                        try:
+                            item.save()
+                        except ObjectNotFoundException:
+                            pass
                     else:
-                        raise LinkedObjectException('There are %s items left in self.%s' %
-                                                    (len(items), key))
+                        raise LinkedObjectException('There is still an item linked in self.%s' % key)
 
         # Invalidate no-filter queries/lists pointing to this object
         try:

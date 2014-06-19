@@ -66,29 +66,32 @@ def ensure_single(tasknames):
             def can_run():
                 """
                 Checks whether a task is running/scheduled/reserved.
-                The check is eecuted in stages, as querying the inspector is a slow call.
+                The check is executed in stages, as querying the inspector is a slow call.
                 """
                 if tasknames:
                     inspector = inspect()
                     active = inspector.active()
-                    for taskname in tasknames:
-                        for worker in active.values():
-                            for task in worker:
-                                if task['id'] != task_id and taskname == task['name']:
-                                    return False
+                    if active:
+                        for taskname in tasknames:
+                            for worker in active.values():
+                                for task in worker:
+                                    if task['id'] != task_id and taskname == task['name']:
+                                        return False
                     scheduled = inspector.scheduled()
-                    for taskname in tasknames:
-                        for worker in scheduled.values():
-                            for task in worker:
-                                request = task['request']
-                                if request['id'] != task_id and taskname == request['name']:
-                                    return False
+                    if scheduled:
+                        for taskname in tasknames:
+                            for worker in scheduled.values():
+                                for task in worker:
+                                    request = task['request']
+                                    if request['id'] != task_id and taskname == request['name']:
+                                        return False
                     reserved = inspector.reserved()
-                    for taskname in tasknames:
-                        for worker in reserved.values():
-                            for task in worker:
-                                if task['id'] != task_id and taskname == task['name']:
-                                    return False
+                    if reserved:
+                        for taskname in tasknames:
+                            for worker in reserved.values():
+                                for task in worker:
+                                    if task['id'] != task_id and taskname == task['name']:
+                                        return False
                 return True
 
             if can_run():
@@ -177,7 +180,7 @@ class ScheduledTaskController(object):
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vmachine in VMachineList.get_customer_vmachines():
-            if any(vd.info['volume_type'] in ['BASE', 'CLONE'] for vd in vmachine.vdisks):
+            if any(vd.info['object_type'] in ['BASE', 'CLONE'] for vd in vmachine.vdisks):
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vmachine.snapshots:
                     timestamp = int(snapshot['timestamp'])
@@ -191,7 +194,7 @@ class ScheduledTaskController(object):
                 bucket_chains.append(bucket_chain)
 
         for vdisk in VDiskList.get_without_vmachine():
-            if vdisk.info['volume_type'] in ['BASE', 'CLONE']:
+            if vdisk.info['object_type'] in ['BASE', 'CLONE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
                     timestamp = int(snapshot['timestamp'])
@@ -247,10 +250,10 @@ class ScheduledTaskController(object):
         vdisks = []
         for vmachine in VMachineList.get_customer_vmachines():
             for vdisk in vmachine.vdisks:
-                if vdisk.info['volume_type'] in ['BASE', 'CLONE']:
+                if vdisk.info['object_type'] in ['BASE', 'CLONE']:
                     vdisks.append(vdisk)
         for vdisk in VDiskList.get_without_vmachine():
-            if vdisk.info['volume_type'] in ['BASE', 'CLONE']:
+            if vdisk.info['object_type'] in ['BASE', 'CLONE']:
                 vdisks.append(vdisk)
 
         total = 0

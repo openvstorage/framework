@@ -247,6 +247,7 @@ class Manager(object):
         client.run('jpackage_install -n openvstorage -v {0}'.format(ovs_version))
         client.run('. /opt/OpenvStorage/bin/activate; pip install amqp==1.4.1')
         client.run('. /opt/OpenvStorage/bin/activate; pip install suds-jurko==0.5')
+        client.run('. /opt/OpenvStorage/bin/activate; pip install pysnmp==4.2.5')
 
         client.run('apt-get -y -q install libev4')
         client.run('jpackage_install -n arakoon -v 1.7.2')
@@ -722,6 +723,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 pass
             node_client.run('jsprocess restart -n ovs_workers')
 
+            node_client.run('jsprocess enable -n ovs_snmp_server')
+            node_client.run('jsprocess start -n ovs_snmp_server')
+
     @staticmethod
     def init_vpool(ip, vpool_name, parameters=None):
         """
@@ -798,8 +802,16 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         for node in nodes:
             node_client = Client.load(node)
             for service in services:
-                node_client.run('jsprocess disable -n {0}'.format(service))
-                node_client.run('jsprocess stop -n {0}'.format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    Service.disable_service('{0}')
+""".format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    Service.stop_service('{0}')
+""".format(service))
 
         # Keep in mind that if the VSR exists, the vPool does as well
 
@@ -970,6 +982,11 @@ for directory in {0}:
         vsr_config_script = """
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+
+fd_config = {{'fd_cache_path': '{11}/fd_{0}',
+              'fd_extent_cache_capacity': '1024',
+              'fd_namespace' : 'fd-{0}',
+              'fd_policy_id' : ''}}
 vsr_configuration = VolumeStorageRouterConfiguration('{0}')
 vsr_configuration.configure_backend({1})
 vsr_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
@@ -980,9 +997,10 @@ vsr_configuration.configure_volumemanager({6})
 vsr_configuration.configure_volumerouter('{0}', {7})
 vsr_configuration.configure_arakoon_cluster('{8}', {9})
 vsr_configuration.configure_hypervisor('{10}')
+vsr_configuration.configure_filedriver(fd_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           vsa.pmachine.hvtype)
+           vsa.pmachine.hvtype, mountpoint_cache)
         Manager._exec_python(client, vsr_config_script)
         Manager._configure_amqp_to_volumedriver(client, vpool_name)
 
@@ -1003,6 +1021,8 @@ vsr_configuration.configure_hypervisor('{10}')
         vsr.save()
 
         dirs2create.append(vsr.mountpoint)
+        dirs2create.append(mountpoint_cache + '/fd_' + vpool_name)
+
         file_create_script = """
 import os
 for directory in {0}:
@@ -1013,25 +1033,35 @@ for filename in {1}:
         open(filename, 'a').close()""".format(dirs2create, files2create)
         Manager._exec_python(client, file_create_script)
 
-        config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
-        log_file = '/var/log/volumedriver/{0}.log'.format(vpool_name)
-        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(config_file, vsr.mountpoint, log_file)
+        voldrv_config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
+        log_file = '/var/log/ovs/volumedriver/{0}.log'.format(vpool_name)
+        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(voldrv_config_file, vsr.mountpoint, log_file)
         if vsa.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(vsr.mountpoint)
         else:
             vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(vsr.mountpoint)
         vd_name = 'volumedriver_{}'.format(vpool_name)
 
-        log_file = '/var/log/volumedriver/foc_{0}.log'.format(vpool_name)
-        fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(config_file, log_file)
+        log_file = '/var/log/ovs/volumedriver/foc_{0}.log'.format(vpool_name)
+        fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(voldrv_config_file, log_file)
         fc_name = 'failovercache_{0}'.format(vpool_name)
+
+        params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
+                  '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
+                  '<VPOOL_NAME>': vpool_name,
+                  '<DFS_MOUNTPOINT>': mountpoint_dfs,
+                  '<CEPH_CONF>': '/etc/ceph/ceph.conf'}
+
+        if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
 
         service_script = """
 from ovs.plugin.provider.service import Service
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}')
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{3}', command='{4}', stop_command=None)""".format(
+Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}', params={5})
+Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})""".format(
             vd_name, vd_cmd, vd_stopcmd,
-            fc_name, fc_cmd
+            fc_name, fc_cmd, params
         )
         Manager._exec_python(client, service_script)
 
@@ -1049,14 +1079,14 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
 """
 
         if mountpoint_dfs_default and mountpoint_dfs_default != vsr.mountpoint_dfs:
-            client.run('umount {0}'.format(mountpoint_dfs_default))
+            client.run('umount {0} || true'.format(mountpoint_dfs_default))
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
             fstab_script = fstab_script_remove.format(mountpoint_dfs_default)
             Manager._exec_python(client, fstab_script)
         if vpool.backend_type == 'CEPH_S3':
             # If using CEPH_S3, then help setting up the ceph connection - for now
             if Helper.find_in_list(mountpoints, vsr.mountpoint_dfs):
-                client.run('umount {0}'.format(vsr.mountpoint_dfs))
+                client.run('umount {0} || true'.format(vsr.mountpoint_dfs))
             ceph_ok = Manager._check_ceph(client)
             if not ceph_ok:
                 # First, try to copy them over
@@ -1105,8 +1135,14 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
         for node in nodes:
             node_client = Client.load(node)
             for service in services:
-                node_client.run('jsprocess enable -n {0}'.format(service))
-                node_client.run('jsprocess start -n {0}'.format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+Service.enable_service('{0}')
+""".format(service))
+                Manager._exec_python(node_client, """
+from ovs.plugin.provider.service import Service
+Service.start_service('{0}')
+""".format(service))
 
         # Fill vPool size
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
@@ -1126,11 +1162,14 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
         # Get objects & Make some checks
         vsr = VolumeStorageRouter(vsr_guid)
         vmachine = vsr.serving_vmachine
+        ip = vmachine.ip
         pmachine = vmachine.pmachine
         vmachines = VMachineList.get_customer_vmachines()
-        pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
+        pmachine_guids = [vm.pmachine_guid for vm in vmachines]
+        vpools_guids = [vm.vpool.guid for vm in vmachines]
+
         vpool = vsr.vpool
-        if pmachine.guid in pmachine_guids:
+        if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             raise RuntimeError('There are still vMachines served from the given VSR')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == vsr.vsrid):
             raise RuntimeError('There are still vDisks served from the given VSR')
@@ -1138,7 +1177,6 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
         services = ['volumedriver_{0}'.format(vpool.name),
                     'failovercache_{0}'.format(vpool.name)]
         vsrs_left = False
-        ip = vmachine.ip
 
         # Stop services
         for current_vsr in vpool.vsrs:
@@ -1146,8 +1184,16 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 vsrs_left = True
             client = Client.load(current_vsr.serving_vmachine.ip)
             for service in services:
-                client.run('jsprocess disable -n {0}'.format(service))
-                client.run('jsprocess stop -n {0}'.format(service))
+                Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    Service.disable_service('{0}')
+""".format(service))
+                Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    Service.stop_service('{0}')
+""".format(service))
 
         # Unexporting vPool (VMware) and deleting KVM pool
         client = Client.load(ip)
@@ -1155,21 +1201,23 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
 from ovs.extensions.fs.exportfs import Nfsexports
 Nfsexports().remove('{0}')""".format('/mnt/{0}'.format(vpool.name))
         Manager._exec_python(client, nfs_script)
-        client.run('service nfs-kernel-server restart')
+        client.run('exportfs -ra')
         if pmachine.hvtype == 'KVM':
             if vpool.name in client.run('virsh pool-list'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
-            client.run('virsh pool-undefine {0}'.format(vpool.name))
+            try:
+                client.run('virsh pool-undefine {0}'.format(vpool.name))
+            except:
+                pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
         client = Client.load(ip)
-        service_script = """
+        for service in services:
+            Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
-Service.remove_service(domain='openvstorage', name='{1}{0}')
-Service.remove_service(domain='openvstorage', name='{2}{0}')""".format(
-            vpool.name, 'volumedriver_', 'failovercache_'
-        )
-        Manager._exec_python(client, service_script)
+if Service.has_service('{0}'):
+    Service.remove_service(domain='openvstorage', name='{0}')
+""".format(service))
 
         if vpool.backend_type == 'CEPH_S3':
             client = Client.load(ip)
@@ -1181,7 +1229,7 @@ fstab.remove_config_by_directory('{0}')
             fstab_script = fstab_script_add.format(vsr.mountpoint_dfs)
             Manager._exec_python(client, fstab_script)
             if client.file_exists(vsr.mountpoint_dfs):
-                client.run('umount {0}'.format(vsr.mountpoint_dfs), pty=False)
+                client.run('umount {0} || true'.format(vsr.mountpoint_dfs), pty=False)
                 client.run('rm -rf {0}'.format(vsr.mountpoint_dfs))
 
         # Reconfigure volumedriver
@@ -1224,8 +1272,16 @@ fstab.remove_config_by_directory('{0}')
                 if current_vsr.guid != vsr_guid:
                     client = Client.load(current_vsr.serving_vmachine.ip)
                     for service in services:
-                        client.run('jsprocess enable -n {0}'.format(service))
-                        client.run('jsprocess start -n {0}'.format(service))
+                        Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    Service.enable_service('{0}')
+""".format(service))
+                        Manager._exec_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    Service.start_service('{0}')
+""".format(service))
         else:
             # Final model cleanup
             vpool.delete()
@@ -1303,7 +1359,10 @@ print Configuration.get('{0}')
         """
         Executes a python script on the client inside the OVS virtualenv
         """
-        return client.run('source /opt/OpenvStorage/bin/activate; python -c """{0}"""'.format(script))
+        if client.file_exists('/opt/OpenvStorage/bin/activate'):
+            return client.run('source /opt/OpenvStorage/bin/activate; python -c """{0}"""'.format(script))
+        else:
+            return client.run('python -c """{0}"""'.format(script))
 
     @staticmethod
     def _get_cluster_nodes():
@@ -1529,8 +1588,8 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
 
         # Quality mapping
         # Tese mappings were ['unstable', 'default'] and ['default', 'default'] before
-        quality_mapping = {'unstable': ['stable', 'stable', '1.1.0'],
-                           'test': ['stable', 'stable', '1.0.3'],
+        quality_mapping = {'unstable': ['stable', 'stable', '1.2.0'],
+                           'test': ['stable', 'stable', '1.1.0'],
                            'stable': ['stable', 'stable', '1.0.2']}
 
         if not is_local:
@@ -1732,6 +1791,8 @@ class Client(object):
             from ovs.plugin.provider.remote import Remote
             client = Remote.cuisine.api
             Remote.cuisine.fabric.env['password'] = password
+            Remote.cuisine.fabric.output['stdout'] = True
+            Remote.cuisine.fabric.output['running'] = True
             client.connect(ip)
             return client
 

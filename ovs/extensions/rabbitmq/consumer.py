@@ -19,12 +19,13 @@ Consumes messages from rabbitmq, dispatching them to the process method and ackn
 
 import pika
 import os
+import imp
+import inspect
 import time
 import sys
 import logging
 from configobj import ConfigObj
 import pyinotify
-from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import Ovs
 from ovs.plugin.provider.configuration import Configuration
@@ -34,6 +35,8 @@ logger = LogHandler('extensions', name='consumer')
 logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 KVM_RUN = '/run/libvirt/qemu/'
+
+mapping = {}
 
 
 def run_kvm_watcher():
@@ -59,7 +62,7 @@ def callback(ch, method, properties, body):
     """
     _ = properties
     try:
-        process(queue, body)
+        process(queue, body, mapping)
     except Exception as e:
         logger.exception('Error processing message: {0}'.format(e))
     ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -93,6 +96,27 @@ if __name__ == '__main__':
             logger.info('KVM xml processor active...', print_msg=True)
 
         if run_event_consumer():
+            # Load mapping
+            mapping = {}
+            path = os.path.join(os.path.dirname(__file__), 'mappings')
+            for filename in os.listdir(path):
+                if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                    name = filename.replace('.py', '')
+                    module = imp.load_source(name, os.path.join(path, filename))
+                    for member in inspect.getmembers(module):
+                        if inspect.isclass(member[1]) \
+                                and member[1].__module__ == name \
+                                and 'object' in [base.__name__ for base in member[1].__bases__]:
+                            this_mapping = member[1].mapping
+                            for key in this_mapping.keys():
+                                if key not in mapping:
+                                    mapping[key] = []
+                                mapping[key] += this_mapping[key]
+            logger.debug('Event map:')
+            for key in mapping:
+                logger.debug('{0}: {1}'.format(mapping[key][0]['property'], [current_map['task'].__name__ for current_map in mapping[key]]))
+
+            # Starting connection and handling
             connection = pika.BlockingConnection(
                 pika.ConnectionParameters(host=Configuration.get('ovs.grid.ip'),
                                           port=int(Configuration.get('ovs.core.broker.port')),

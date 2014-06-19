@@ -39,6 +39,8 @@ class VMachineViewSet(viewsets.ViewSet):
     Information about machines
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'vmachines'
+    base_name = 'vmachines'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
@@ -328,7 +330,7 @@ class VMachineViewSet(viewsets.ViewSet):
         if 'files' in request.DATA:
             files = request.DATA['files'].strip().split(',')
 
-        return VMachineController.get_physical_metadata.s(files).apply_async(
+        return VMachineController.get_physical_metadata.s(files, obj.guid).apply_async(
             routing_key='vsa.{0}'.format(obj.machineid)
         )
 
@@ -348,6 +350,29 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.get_version_info.s(obj.guid).apply_async(
             routing_key='vsa.{0}'.format(obj.machineid)
         )
+
+    @action()
+    @expose(internal=True)
+    @required_roles(['view'])
+    @validate(VMachine)
+    @celery_task()
+    def check_s3(self, request, obj):
+        """
+        Validates whether connection to a given S3 backend can be made
+        """
+        if not obj.is_internal:
+            raise NotAcceptable('vMachine is not a VSA')
+
+        fields = ['host', 'port', 'accesskey', 'secretkey']
+        parameters = {}
+        for field in fields:
+            if field not in request.DATA:
+                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
+            parameters[field] = request.DATA[field]
+            if not isinstance(parameters[field], int):
+                parameters[field] = str(parameters[field])
+
+        return VMachineController.check_s3.delay(**parameters)
 
     @action()
     @expose(internal=True, customer=True)

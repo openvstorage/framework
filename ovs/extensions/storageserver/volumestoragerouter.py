@@ -18,7 +18,7 @@ Wrapper class for the storagerouterclient of the voldrv team
 
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient, ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.net import Net
+from ovs.extensions.generic.system import Ovs
 import json
 import os
 
@@ -76,7 +76,7 @@ class VolumeStorageRouterConfiguration(object):
     """
     def __init__(self, vpool_name):
         self._vpool = vpool_name
-        self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'specs', 'volumedriverfs.json')
+        self._config_specfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'volumedriverfs.json')
         if not os.path.exists(os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools')):
             os.makedirs(os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools'))
         self._config_file = os.path.join(Configuration.get('ovs.core.cfgdir'), 'voldrv_vpools', '{}.json'.format(vpool_name))
@@ -194,10 +194,7 @@ class VolumeStorageRouterConfiguration(object):
         Configures volume storage router
         @param vrouter_config: dictionary of key/value pairs
         """
-        nics = Net.getNics()
-        nics.remove('lo')
-        mac_addresses = sorted(map(lambda n: Net.getMacAddress(n).replace(':', ''), nics))
-        unique_machine_id = mac_addresses[0]
+        unique_machine_id = Ovs.get_my_machine_id()
         self.load_config()
         if vrouter_config['vrouter_id'] == '{}{}'.format(self._vpool, unique_machine_id):
             for key, value in vrouter_config.iteritems():
@@ -237,3 +234,43 @@ class VolumeStorageRouterConfiguration(object):
         for key, value in queue_config.iteritems():
             self._config_file_content["event_publisher"][key] = value
         self.write_config()
+
+    def configure_filedriver(self, fd_config):
+        """
+        Configures cf filedriver component
+        @param queue_config: dictionary of with filedriver configuration key/value
+        """
+        # @todo: http://jira.cloudfounders.com/browse/OVS-987
+
+        self.load_config()
+        if not "file_driver" in self._config_file_content:
+            self._config_file_content["file_driver"] = {}
+
+        for key, value in fd_config.iteritems():
+            self._config_file_content["file_driver"][key] = value
+
+        # remove obsolete entry
+        if "filesystem" in self._config_file_content and "fs_backend_path" in self._config_file_content:
+            self._config_file_content["filesystem"].pop("fs_backend_path")
+
+        self.write_config()
+
+
+class GaneshaConfiguration:
+
+    def __init__(self):
+        self._config_corefile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'ganesha-core.conf')
+        self._config_exportfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'ganesha-export.conf')
+
+    def generate_config(self, target_file, params):
+        with open(self._config_corefile, 'r') as core_config_file:
+            config = core_config_file.read()
+        with open(self._config_exportfile, 'r') as export_section_file:
+            config += export_section_file.read()
+
+        for key, value in params.iteritems():
+            print 'replacing {0} by {1}'.format(key, value)
+            config = config.replace(key, value)
+
+        with open(target_file, 'wb') as config_out:
+            config_out.write(config)

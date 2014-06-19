@@ -31,12 +31,13 @@ BASE_LOG_DIR = '/var/log/ovs'
 LOG_FILENAME = '/django.log'
 
 FRONTEND_ROOT = '/' + UI_NAME
-STATIC_URL    = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
+STATIC_URL = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    (Configuration.get('ovs.webapps.admin.name'), Configuration.get('ovs.webapps.admin.email')),
+    (Configuration.get('ovs.webapps.admin.name'),
+     Configuration.get('ovs.webapps.admin.email')),
 )
 
 MANAGERS = ADMINS

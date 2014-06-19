@@ -67,15 +67,14 @@ class VMware(object):
                 return task_info.info.result.value
         return None
 
-    def delete_vm(self, vmid, wait=False):
+    def delete_vm(self, vmid, vsr_mountpoint, vsr_storage_ip, devicename, disks_info=[], wait=False):
         """
         Remove the vmachine from the hypervisor
 
         @param vmid: hypervisor id of the virtual machine
         @param wait: wait for action to complete
         """
-        if vmid and self.sdk.exists(key=vmid):
-            self.sdk.delete_vm(vmid, wait)
+        self.sdk.delete_vm(vmid, vsr_mountpoint, vsr_storage_ip, devicename, wait)
 
     def get_vm_object(self, vmid):
         """
@@ -187,3 +186,9 @@ class VMware(object):
         """
         _ = self, devicename
         return True
+
+    def file_exists(self, devicename):
+        """
+        Checks whether a file (devicename .xml) exists
+        """
+        return self.sdk.file_exists(devicename)

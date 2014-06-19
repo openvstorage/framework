@@ -30,6 +30,6 @@ class ExceptionMiddleware(object):
         """
         Logs information about the given error to a plain logfile
         """
-        _ = request
+        _ = self, request
         logger.exception('An unhandled exception occurred: {0}'.format(exception))
 

@@ -45,7 +45,8 @@ class RelationMapper(object):
                         itemname = item[0].__name__
                     if itemname == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
-                                                  'key': key}
+                                                  'key': key,
+                                                  'list': item[2] if len(item) == 3 else True}
             volatile.set(relation_key, relation_info)
         else:
             Toolbox.log_cache_hit('relations', True)

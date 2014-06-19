@@ -104,7 +104,7 @@ class VDisk(DataObject):
         for key, value in vdiskinfo.__class__.__dict__.items():
             if type(value) is property:
                 vdiskinfodict[key] = getattr(vdiskinfo, key)
-                if key == 'volume_type':
+                if key == 'object_type':
                     vdiskinfodict[key] = str(vdiskinfodict[key])
         return vdiskinfodict
 

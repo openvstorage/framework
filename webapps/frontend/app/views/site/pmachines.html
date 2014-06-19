@@ -23,7 +23,8 @@ limitations under the License.
         </button>
     </div>
     <div data-bind="pager: { items: mgmtCenters, headers: mgmtCenterHeaders, initialLoad: mgmtCentersInitialLoad,
-                             viewportRefresh: loadMgmtCenters, viewportRefreshInterval: 5000, controls: true }">
+                             viewportRefresh: loadMgmtCenters, viewportRefreshInterval: 5000, controls: true }"
+         style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>
@@ -48,7 +49,8 @@ limitations under the License.
     </div>
     <h2 class="pull-left" data-i18n="ovs:pmachines.pmachines.title"></h2>
     <div data-bind="pager: { items: pMachines, headers: pMachineHeaders, initialLoad: pMachinesInitialLoad,
-                             viewportRefresh: loadPMachines, viewportRefreshInterval: 5000, controls: true }">
+                             viewportRefresh: loadPMachines, viewportRefreshInterval: 5000, controls: true }"
+         style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="css: { 'danger': !mgmtCenterValid() }">
                 <td>

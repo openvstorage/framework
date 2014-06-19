@@ -35,6 +35,8 @@ class VPoolViewSet(viewsets.ViewSet):
     Information about vPools
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'vpools'
+    base_name = 'vpools'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

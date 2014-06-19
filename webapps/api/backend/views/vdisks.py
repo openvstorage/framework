@@ -33,6 +33,8 @@ class VDiskViewSet(viewsets.ViewSet):
     Information about vDisks
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'vdisks'
+    base_name = 'vdisks'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

@@ -26,6 +26,7 @@ class Nfsexports(object):
     def __init__(self):
         self._exportsFile = '/etc/exports'
         self._cmd = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs']
+        self._restart = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs', '-ra']
 
     def _slurp(self):
         """
@@ -94,7 +95,7 @@ class Nfsexports(object):
         if not directory in exports.keys():
             logger.info('Directory %s currently not exported' % directory)
             return
-            logger.info('Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory))
+        logger.info('Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory))
         cmd.extend(['-u', '{}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory)])
         subprocess.call(cmd)
 
@@ -110,3 +111,4 @@ class Nfsexports(object):
         logger.info('Exporting {}:{}'.format(network, directory))
         cmd.extend(['-v', '{}:{}'.format(network, directory)])
         subprocess.call(cmd)
+        subprocess.call(self._restart)

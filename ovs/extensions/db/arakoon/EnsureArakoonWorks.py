@@ -19,7 +19,9 @@ import uuid
 import os
 import shutil
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.plugin.provider.logger import Logger
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('arakoon', name='validator')
 
 
 class EnsureArakoonError(Exception):
@@ -55,7 +57,7 @@ class EnsureArakoonWorks():
 
         leader = "[arakoon_check]:"
         logmessage = "{0} {1}".format(leader, message)
-        Logger.log(logmessage, 1)
+        logger.debug(logmessage)
         sys.stdout.flush()
 
     def _set(self):

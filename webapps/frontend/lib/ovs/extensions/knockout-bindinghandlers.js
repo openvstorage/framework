@@ -25,9 +25,9 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 .attr('height', 14);
             svg.append('circle')
                 .attr('class', 'circle')
-                .attr('cx', 6)
-                .attr('cy', 8)
-                .attr('r', 6)
+                .attr('cx', 7)
+                .attr('cy', 7)
+                .attr('r', 7)
                 .style('fill', 'gray');
         },
         update: function(element, valueAccessor) {

@@ -79,6 +79,7 @@ define([
 
             // Observables
             self.loaded      = ko.observable(false);
+            self.allowVPool  = ko.observable(true);
             self.vRouterPort = ko.observable();
             self.vsrs        = ko.observableArray([]);
             self.mountpoints = ko.observableArray([]);
@@ -126,6 +127,11 @@ define([
                         fields.push('ip');
                         reasons.push($.t('ovs:wizards.vsatovpool.confirm.ipnotavailable', { what: self.vsr().storageIP() }));
                     }
+                    if (!self.allowVPool() && $.inArray('vpool', fields) === -1) {
+                        valid = false;
+                        fields.push('vpool');
+                        reasons.push($.t('ovs:wizards.vsatovpool.confirm.vpoolnotallowed'));
+                    }
                 }
                 return { valid: valid, reasons: reasons, fields: fields };
             });
@@ -140,6 +146,7 @@ define([
                                 self.mountpoints(data.mountpoints);
                                 self.ipAddresses(data.ipaddresses);
                                 self.vRouterPort(data.xmlrpcport);
+                                self.allowVPool(data.allow_vpool);
                             })
                             .done(physicalDeferred.resolve)
                             .fail(physicalDeferred.reject);

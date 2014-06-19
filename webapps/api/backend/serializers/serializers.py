@@ -49,7 +49,10 @@ class FullSerializer(serializers.Serializer):
             for key, info in relations.iteritems():
                 if contents is None or (('_relations' in contents or key in contents)
                                         and '-{0}'.format(key) not in contents):
-                    self.fields['%s_guids' % key] = serializers.Field()
+                    if info['list'] is True:
+                        self.fields['%s_guids' % key] = serializers.Field()
+                    else:
+                        self.fields['%s_guid' % key] = serializers.Field()
 
     guid = serializers.Field()
 

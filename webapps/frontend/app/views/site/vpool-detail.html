@@ -98,7 +98,7 @@ limitations under the License.
             <li data-bind="tooltip: 'ovs:generic.vdisks'">
                 <a href="#vdisks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.vdisks"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.vmachines'">
+            <li data-bind="tooltip: 'ovs:generic.management'">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
@@ -127,14 +127,15 @@ limitations under the License.
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                             <td>
-                                <span data-bind="status: {
-                                                     colors: {
-                                                         green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                                         yellow: failoverMode() == 'catch_up',
-                                                         red: failoverMode() == 'degraded'
-                                                     },
-                                                     defaultColor: 'lightgrey'
-                                                 }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
+                                <div data-bind="status: {
+                                                    colors: {
+                                                        green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                                        yellow: failoverMode() == 'catch_up',
+                                                        red: failoverMode() == 'degraded'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"
+                                     style="width: 14px; height: 14px;"></div>
                             </td>
                         </tr>
                     </table>
@@ -166,14 +167,15 @@ limitations under the License.
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                             <td>
-                                <span data-bind="status: {
-                                                     colors: {
-                                                         green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                                         yellow: failoverMode() == 'catch_up',
-                                                         red: failoverMode() == 'degraded'
-                                                     },
-                                                     defaultColor: 'lightgrey'
-                                                 }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"></span>
+                                <div data-bind="status: {
+                                                    colors: {
+                                                        green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                                        yellow: failoverMode() == 'catch_up',
+                                                        red: failoverMode() == 'degraded'
+                                                    },
+                                                    defaultColor: 'lightgrey'
+                                                }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"
+                                     style="width: 14px; height: 14px;"></div>
                             </td>
                         </tr>
                     </table>
@@ -200,7 +202,7 @@ limitations under the License.
                                               style="padding: 2px 5px 3px 5px;">
                                             <input type="checkbox" data-bind="attr: { id: 'vsa_' + guid() }, checkedValue: guid(),
                                                                               checked: $root.checkedVSAGuids,
-                                                                              disable: $parent.backendType() === 'LOCAL'"
+                                                                              disable: $parent.backendType() === 'LOCAL' && $.inArray(guid(), $parent.servingVSAGuids()) === -1"
                                                     style="vertical-align: text-bottom;">
                                             <label data-bind="attr: { for: 'vsa_' + guid() }" style="font-weight: normal; margin-left: 7px;">
                                                 <span data-bind="text: name"></span>
@@ -220,8 +222,7 @@ limitations under the License.
                                 <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
                                 <button class="btn btn-default" data-bind="click: $root.updateVSAServing,
-                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0,
-                                                                           visible: backendType() !== 'LOCAL'"
+                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0"
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vpools.detail.updateserving"></span>
                                 </button>

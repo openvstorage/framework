@@ -23,6 +23,7 @@ from brander import Brander
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='migrations')
+logger.logger.propagate = False  # No need to propagate this
 
 
 class Migration(object):

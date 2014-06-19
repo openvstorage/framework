@@ -37,6 +37,8 @@ class UserViewSet(viewsets.ViewSet):
     Information about Users
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'users'
+    base_name = 'users'
 
     @staticmethod
     def _get_object(guid):
@@ -81,7 +83,7 @@ class UserViewSet(viewsets.ViewSet):
         Creates a User
         """
         _ = format
-        serializer = FullSerializer(User, User(), request.DATA)
+        serializer = FullSerializer(User, instance=User(), data=request.DATA)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -118,6 +120,6 @@ class UserViewSet(viewsets.ViewSet):
                 if obj.password == hashlib.sha256(str(serializer.data['current_password'])).hexdigest():
                     obj.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
                     obj.save()
-                    return obj
+                    return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         raise PermissionDenied('Updating password not allowed')

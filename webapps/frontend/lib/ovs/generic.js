@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define, window, document */
+/*global define, window, document, location */
 define(['jquery', 'jqp/pnotify'], function($) {
     "use strict";
     function getTimestamp() {
@@ -308,16 +308,13 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 type: 'GET',
                 contentType: 'application/json',
                 dataType: 'json',
-                timeout: 60000
+                timeout: 5000
             });
         };
         checkAndRedirect = function(node) {
             check(node)
                 .done(function() {
                     window.location.href = node;
-                })
-                .fail(function() {
-                    // something
                 });
         };
         check('https://' + window.location.hostname)
@@ -326,6 +323,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
                     node = nodes[i];
                     checkAndRedirect('https://' + node);
                 }
+                window.setTimeout(function() {
+                    location.reload(true);
+                }, 5000);
             });
     }
 

@@ -71,29 +71,26 @@ define([
         // Functions
         parent.next = function() {
             if (parent.step() < parent.stepsLength() ) {
-                var step = parent.steps()[parent.step()], result;
+                var step = parent.steps()[parent.step()],
+                    chainDeferred = $.Deferred(), chainPromise = chainDeferred.promise();
+                parent.loadingNext(true);
                 $.Deferred(function(deferred) {
-                    if (step.hasOwnProperty('next') && step.next && step.next.call) {
-                        result = step.next();
-                        if (result.then) {
-                            parent.loadingNext(true);
-                            result
-                                .done(deferred.resolve)
-                                .fail(deferred.reject)
-                                .always(function() {
-                                    parent.loadingNext(false);
-                                });
-                        } else {
-                            deferred.resolve();
-                        }
-                    } else {
-                        deferred.resolve();
+                    chainDeferred.resolve();
+                    if (step.hasOwnProperty('preValidate') && step.preValidate && step.preValidate.call) {
+                        chainPromise = chainPromise.then(step.preValidate);
                     }
-                })
-                    .promise()
-                    .then(function() {
+                    if (step.hasOwnProperty('next') && step.next && step.next.call) {
+                        chainPromise = chainPromise.then(step.next);
+                    }
+                    chainPromise.done(deferred.resolve)
+                        .fail(deferred.reject);
+                }).promise()
+                    .done(function() {
                         parent.step(parent.step() + 1);
                         parent.activateStep();
+                    })
+                    .always(function() {
+                        parent.loadingNext(false);
                     });
             }
         };
