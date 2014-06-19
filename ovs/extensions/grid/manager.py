@@ -1201,7 +1201,7 @@ if Service.has_service('{0}'):
 from ovs.extensions.fs.exportfs import Nfsexports
 Nfsexports().remove('{0}')""".format('/mnt/{0}'.format(vpool.name))
         Manager._exec_python(client, nfs_script)
-        client.run('service nfs-kernel-server restart')
+        client.run('exportfs -ra')
         if pmachine.hvtype == 'KVM':
             if vpool.name in client.run('virsh pool-list'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
