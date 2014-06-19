@@ -66,29 +66,32 @@ def ensure_single(tasknames):
             def can_run():
                 """
                 Checks whether a task is running/scheduled/reserved.
-                The check is eecuted in stages, as querying the inspector is a slow call.
+                The check is executed in stages, as querying the inspector is a slow call.
                 """
                 if tasknames:
                     inspector = inspect()
                     active = inspector.active()
-                    for taskname in tasknames:
-                        for worker in active.values():
-                            for task in worker:
-                                if task['id'] != task_id and taskname == task['name']:
-                                    return False
+                    if active:
+                        for taskname in tasknames:
+                            for worker in active.values():
+                                for task in worker:
+                                    if task['id'] != task_id and taskname == task['name']:
+                                        return False
                     scheduled = inspector.scheduled()
-                    for taskname in tasknames:
-                        for worker in scheduled.values():
-                            for task in worker:
-                                request = task['request']
-                                if request['id'] != task_id and taskname == request['name']:
-                                    return False
+                    if scheduled:
+                        for taskname in tasknames:
+                            for worker in scheduled.values():
+                                for task in worker:
+                                    request = task['request']
+                                    if request['id'] != task_id and taskname == request['name']:
+                                        return False
                     reserved = inspector.reserved()
-                    for taskname in tasknames:
-                        for worker in reserved.values():
-                            for task in worker:
-                                if task['id'] != task_id and taskname == task['name']:
-                                    return False
+                    if reserved:
+                        for taskname in tasknames:
+                            for worker in reserved.values():
+                                for task in worker:
+                                    if task['id'] != task_id and taskname == task['name']:
+                                        return False
                 return True
 
             if can_run():
