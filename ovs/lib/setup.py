@@ -1020,6 +1020,8 @@ LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
+        SetupController._change_service_state(client, 'dbus', 'start')
+        SetupController._change_service_state(client, 'avahi-daemon', 'start')
         discover_result = client.run('avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         for entry in discover_result.split('\n'):
             entry_parts = entry.split(';')
