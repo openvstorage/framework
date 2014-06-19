@@ -29,8 +29,10 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 if (settings.hasOwnProperty('max')) {
                     parsedValue = Math.min(settings.max, parsedValue);
                 }
-                target(parsedValue);
-                target.notifySubscribers(parsedValue);
+                if ((target() !== undefined ? target().toString() : 'undefined') !== newValue) {
+                    target(parsedValue);
+                    target.notifySubscribers(parsedValue);
+                }
             }
         }).extend({ notify: 'always' });
         computed(target());
