@@ -84,9 +84,7 @@ class LogHandler(object):
         os.chown(log_filename, uid, gid)
 
         formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
-        max_bytes = parser.getint('logging', 'maxbytes')
-        backup_count = parser.getint('logging', 'backupcount')
-        handler = logging.handlers.RotatingFileHandler(log_filename, maxBytes=max_bytes, backupCount=backup_count)
+        handler = logging.FileHandler(log_filename)
         handler.setFormatter(formatter)
 
         self.logger = logging.getLogger(name)
