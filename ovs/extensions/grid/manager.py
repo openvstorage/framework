@@ -1049,38 +1049,10 @@ for filename in {1}:
 
         pre_start_script = ''
         post_stop_ceph = ''
-        if vpool.backend_type == 'CEPH_S3':
-            pre_start_script = """
-pre-start script
-  if [ -f /etc/ceph/ceph.conf ]; then
-    if mount | grep {0}; then
-    echo ceph already mounted ...
-    else
-      ceph-fuse {0} --conf=/etc/ceph/ceph.conf
-      echo ceph mounted ...
-    fi
-  fi
-end script
-""".format(mountpoint_dfs.rstrip('/'))
-
-            post_stop_ceph = """
-  if [ -f /etc/ceph/ceph.conf ]; then
-    echo volumedriver stopped, cleaning up mountpoints ...
-    if mount | grep {0}; then
-      umount {0}
-    fi
-    if mount | grep {1}; then
-      umount {1}
-    fi
-    echo ... done
-  fi
-""".format(mountpoint_dfs.rstrip('/'), vsr.mountpoint.rstrip('/'))
 
         params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
                   '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
-                  '<VPOOL_NAME>': vpool_name,
-                  '<PRE_START_SCRIPT>': pre_start_script,
-                  '<POST_STOP_CEPH>': post_stop_ceph}
+                  '<VPOOL_NAME>': vpool_name}
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
