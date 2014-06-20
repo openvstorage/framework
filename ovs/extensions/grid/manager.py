@@ -1046,11 +1046,41 @@ for filename in {1}:
         fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(voldrv_config_file, log_file)
         fc_name = 'failovercache_{0}'.format(vpool_name)
 
+
+        pre_start_script = ''
+        post_stop_ceph = ''
+        if vpool.backend_type == 'CEPH_S3':
+            pre_start_script = """
+pre-start script
+  if [ -f /etc/ceph/ceph.conf ]; then
+    if mount | grep {0}; then
+    echo "ceph already mounted ..."
+    else
+      ceph-fuse {0} --conf=/etc/ceph/ceph.conf
+      echo "ceph mounted ..."
+    fi
+  fi
+script
+""".format(mountpoint_dfs.rstrip('/'))
+
+            post_stop_ceph = """
+  if [ -f /etc/ceph/ceph.conf ]; then
+    echo "volumedriver stopped, cleaning up mountpoints ..."
+    if mount | grep {0}; then
+      umount {0}
+    fi
+    if mount | grep {1}; then
+      umount {1}
+    fi
+    echo "... done"
+  fi
+""".format(mountpoint_dfs.rstrip('/'), vsr.mountpoint.rstrip('/'))
+
         params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
                   '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
-                  '<DFS_MOUNTPOINT>': mountpoint_dfs,
-                  '<CEPH_CONF>': '/etc/ceph/ceph.conf'}
+                  '<PRE_START_SCRIPT>': pre_start_script,
+                  '<POST_STOP_CEPH>': post_stop_ceph}
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
@@ -1116,8 +1146,7 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 ceph_ok = Manager._check_ceph(client)
                 if not ceph_ok:
                     raise RuntimeError('Ceph config still not ok, exiting initialization')
-            fstab_script = fstab_script_add.format(vsr.mountpoint_dfs, 'id=admin,conf=/etc/ceph/ceph.conf',
-                                                   'fuse.ceph', 'defaults,noatime', '0', '2')
+
             Manager._exec_python(client, fstab_script)
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
             client.run('mount {0}'.format(vsr.mountpoint_dfs), pty=False)
