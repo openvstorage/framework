@@ -750,8 +750,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             print 'Some arguments contain invalid data'
             sys.exit(1)
 
-        while not re.match('^[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*$', vpool_name):
-            print 'Invalid vPool name given. Only 0-9, a-z, A-Z, _ and - are allowed.'
+        while not re.match('^[0-9a-zA-Z]+(\-+[0-9a-zA-Z]+)*$', vpool_name):
+            print 'Invalid vPool name given. Only 0-9, a-z, A-Z and - are allowed.'
             suggestion = re.sub(
                 '^([\-_]*)(?P<correct>[0-9a-zA-Z]+([\-_]+[0-9a-zA-Z]+)*)([\-_]*)$',
                 '\g<correct>',
