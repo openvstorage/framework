@@ -1054,25 +1054,25 @@ for filename in {1}:
 pre-start script
   if [ -f /etc/ceph/ceph.conf ]; then
     if mount | grep {0}; then
-    echo "ceph already mounted ..."
+    echo ceph already mounted ...
     else
       ceph-fuse {0} --conf=/etc/ceph/ceph.conf
-      echo "ceph mounted ..."
+      echo ceph mounted ...
     fi
   fi
-script
+end script
 """.format(mountpoint_dfs.rstrip('/'))
 
             post_stop_ceph = """
   if [ -f /etc/ceph/ceph.conf ]; then
-    echo "volumedriver stopped, cleaning up mountpoints ..."
+    echo volumedriver stopped, cleaning up mountpoints ...
     if mount | grep {0}; then
       umount {0}
     fi
     if mount | grep {1}; then
       umount {1}
     fi
-    echo "... done"
+    echo ... done
   fi
 """.format(mountpoint_dfs.rstrip('/'), vsr.mountpoint.rstrip('/'))
 
@@ -1149,7 +1149,6 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
 
             Manager._exec_python(client, fstab_script)
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
-            client.run('mount {0}'.format(vsr.mountpoint_dfs), pty=False)
 
         if vsa.pmachine.hvtype == 'VMWARE':
             Manager.init_exportfs(client, vpool.name)
