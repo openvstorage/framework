@@ -1147,7 +1147,6 @@ fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
                 if not ceph_ok:
                     raise RuntimeError('Ceph config still not ok, exiting initialization')
 
-            Manager._exec_python(client, fstab_script)
             client.run('mkdir -p {0}'.format(vsr.mountpoint_dfs))
 
         if vsa.pmachine.hvtype == 'VMWARE':
