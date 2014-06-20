@@ -62,12 +62,12 @@ define([
                             $.t('ovs:wizards.rollback.gather.success' + self.data.type, { what: self.data.velement().name() })
                         );
                     })
-                    .fail(function() {
+                    .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:wizards.rollback.gather.failed' + self.data.type, { what: self.data.velement().name() })
                         );
-                        deferred.resolve(false);
+                        deferred.resolve(error);
                     });
             }).promise();
         };

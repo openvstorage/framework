@@ -92,7 +92,7 @@ define([
                             $.t('ovs:generic.messages.errorwhile', {
                                 context: 'error',
                                 what: $.t('ovs:wizards.createft.gather.creating', { what: self.data.vm().name() }),
-                                error: error
+                                error: error.responseText
                             })
                         );
                         deferred.resolve(false);

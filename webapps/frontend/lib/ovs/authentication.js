@@ -66,7 +66,12 @@ define([
                             self.username(undefined);
                             self.password(undefined);
                             self.loggedIn(false);
-                            deferred.reject();
+                            deferred.reject({
+                                status: xmlHttpRequest.status,
+                                statusText: xmlHttpRequest.statusText,
+                                readyState: xmlHttpRequest.readyState,
+                                responseText: xmlHttpRequest.responseText
+                            });
                         } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
                             generic.validate(shared.nodes);
                         }

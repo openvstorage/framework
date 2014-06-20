@@ -63,12 +63,12 @@ define([
                             $.t('ovs:wizards.snapshot.confirm.success', { what: self.data.vm().name() })
                         );
                     })
-                    .fail(function() {
+                    .fail(function(error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
                             $.t('ovs:wizards.snapshot.confirm.failed', { what: self.data.vm().name() })
                         );
-                        deferred.resolve(false);
+                        deferred.resolve(error);
                     });
             }).promise();
         };

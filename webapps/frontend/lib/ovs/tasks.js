@@ -44,8 +44,8 @@ define([
                             deferred.reject(data.result);
                         }
                     })
-                    .fail(function(data) {
-                        deferred.reject(data);
+                    .fail(function(error) {
+                        deferred.reject(error);
                     });
             }).promise();
         };
