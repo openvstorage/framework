@@ -1166,7 +1166,7 @@ Service.start_service('{0}')
         pmachine = vmachine.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         pmachine_guids = [vm.pmachine_guid for vm in vmachines]
-        vpools_guids = [vm.vpool.guid for vm in vmachines]
+        vpools_guids = [vm.vpool_guid for vm in vmachines if vm.vpool_guid is not None]
 
         vpool = vsr.vpool
         if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:

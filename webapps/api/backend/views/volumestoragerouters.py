@@ -67,7 +67,7 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
         vmachine = obj.serving_vmachine
         pmachine = vmachine.pmachine
         vmachines = VMachineList.get_customer_vmachines()
-        vpools_guids = [vmachine.vpool.guid for vmachine in vmachines]
+        vpools_guids = [vmachine.vpool_guid for vmachine in vmachines if vmachine.vpool_guid is not None]
         pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
         vpool = obj.vpool
 
