@@ -28,6 +28,7 @@ limitations under the License.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default"
+                        id="buttonVpoolSync"
                         data-bind="click: function() { $root.sync(); },
                                    style: { color: '#428bca' },
                                    tooltip: 'ovs:vpools.detail.sync'">
@@ -221,7 +222,7 @@ limitations under the License.
                                 </div>
                                 <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
-                                <button class="btn btn-default" data-bind="click: $root.updateVSAServing,
+                                <button class="btn btn-default" id="buttonVpoolSaveChanges" data-bind="click: $root.updateVSAServing,
                                                                            enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0"
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vpools.detail.updateserving"></span>
