@@ -394,7 +394,8 @@
                 "initialvsa": "Initial GSR:",
                 "vsarootpassword": "Root password:",
                 "invalidpassword": "Invalid GSR root password",
-                "invalids3info": "Could not connect to the given host/port, or wrong credentials."
+                "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all GSRs serving this vPool. Please also set the vPool connection info.",
@@ -442,7 +443,8 @@
                 "somefailed": "The vPool was added to or removed from some the selected GSRs. Some tasks failed.",
                 "allfailed": "The vPool could not be added to or removed from any of the selected GSRs",
                 "inuse": "The vPool is in use at this GSR",
-                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met."
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             }
         },
         "createft": {

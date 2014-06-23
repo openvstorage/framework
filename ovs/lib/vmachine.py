@@ -719,3 +719,14 @@ class VMachineController(object):
         except Exception as ex:
             logger.exception('Error during S3 check: {0}'.format(ex))
             return False
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.check_mtpt')
+    def check_mtpt(name):
+        """
+        Checks whether a given mountpoint for vPool is in use
+        """
+        mountpoint = '/mnt/{0}'.format(name)
+        if not os.path.exists(mountpoint):
+            return True
+        return check_output('ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'

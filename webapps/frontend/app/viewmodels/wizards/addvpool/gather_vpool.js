@@ -26,6 +26,7 @@ define([
         self.data             = data;
         self.loadVSASHandle   = undefined;
         self.checkS3Handle    = undefined;
+        self.checkMtptHandle  = undefined;
         self.loadVSAHandle    = undefined;
         self.loadVSRsHandle   = {};
 
@@ -64,34 +65,61 @@ define([
 
         // Functions
         self.preValidate = function() {
-            self.preValidateResult({ valid: true, reasons: [], fields: [] });
+            var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
-                if (self.data.backend().match(/^.+_S3$/)) {
-                    generic.xhrAbort(self.checkS3Handle);
-                    var postData = {
-                        host: self.data.host(),
-                        port: self.data.port(),
-                        accesskey: self.data.accesskey(),
-                        secretkey: self.data.secretkey()
-                    };
-                    self.checkS3Handle = api.post('vmachines/' + self.data.target().guid() + '/check_s3', postData)
-                        .then(self.shared.tasks.wait)
-                        .done(function(data) {
-                            if (!data) {
-                                self.preValidateResult({
-                                    valid: false,
-                                    reasons: [$.t('ovs:wizards.addvpool.gathervpool.invalids3info')],
-                                    fields: ['accesskey', 'secretkey', 'host']
-                                });
-                                deferred.reject();
-                            } else {
-                                deferred.resolve();
-                            }
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.resolve();
-                }
+                $.when.apply($, [
+                    $.Deferred(function(s3deferred) {
+                        if (self.data.backend().match(/^.+_S3$/)) {
+                            generic.xhrAbort(self.checkS3Handle);
+                            var postData = {
+                                host: self.data.host(),
+                                port: self.data.port(),
+                                accesskey: self.data.accesskey(),
+                                secretkey: self.data.secretkey()
+                            };
+                            self.checkS3Handle = api.post('vmachines/' + self.data.target().guid() + '/check_s3', postData)
+                                .then(self.shared.tasks.wait)
+                                .done(function(data) {
+                                    if (!data) {
+                                        validationResult.valid = false;
+                                        validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalids3info'));
+                                        validationResult.fields.push('accesskey');
+                                        validationResult.fields.push('secretkey');
+                                        validationResult.fields.push('host');
+                                    }
+                                    s3deferred.resolve();
+                                })
+                                .fail(s3deferred.reject);
+                        } else {
+                            s3deferred.resolve();
+                        }
+                    }).promise(),
+                    $.Deferred(function(mtptDeferred) {
+                        generic.xhrAbort(self.checkMtptHandle);
+                        var postData = {
+                            name: self.data.name()
+                        };
+                        self.checkMtptHandle = api.post('vmachines/' + self.data.target().guid() + '/check_mtpt', postData)
+                            .then(self.shared.tasks.wait)
+                            .done(function(data) {
+                                if (!data) {
+                                    validationResult.valid = false;
+                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.mtptinuse', { what: self.data.name() }));
+                                    validationResult.fields.push('name');
+                                }
+                                mtptDeferred.resolve();
+                            })
+                            .fail(mtptDeferred.reject);
+                    }).promise()
+                ])
+                    .always(function() {
+                        self.preValidateResult(validationResult);
+                        if (validationResult.valid) {
+                            deferred.resolve();
+                        } else {
+                            deferred.reject();
+                        }
+                    });
             }).promise();
         };
         self.next = function() {
