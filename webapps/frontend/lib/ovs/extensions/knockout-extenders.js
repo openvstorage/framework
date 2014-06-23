@@ -102,4 +102,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         computed.valid = valid;
         return computed;
     };
+    ko.extenders.identifier = function(target, identifier) {
+        target.identifier = identifier;
+        return target;
+    };
 });

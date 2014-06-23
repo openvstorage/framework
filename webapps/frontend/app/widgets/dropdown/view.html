@@ -19,7 +19,8 @@ limitations under the License.
                 data-bind="style: {
                                'paddingTop': small() ? '2px' : '6px',
                                'paddingBottom': small() ? '2px' : '6px'
-                           }">
+                           },
+                           attr: { id: (target.hasOwnProperty('identifier') ? ('dropdown-button-' + target.identifier) : undefined) } ">
             <!-- ko if: multi() -->
                 <span data-bind="visible: target().length === 0"><i data-i18n="ovs:generic.nothingselected"></i></span>
                 <span data-bind="foreach: target">

@@ -410,7 +410,8 @@
                 "dfsnotshared": "The DFS mountpoint should not be shared between vPools",
                 "portinuse": "The given port is already in use",
                 "cephfilesmissing": "One or more of the required ceph files are missing (/etc/ceph/ceph.conf and/or /etc/ceph/ceph.keyring)",
-                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met."
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "invalidmtpt": "The mountpoint __what__ is invalid."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",

@@ -101,6 +101,26 @@ define([
                 fields.push('vpool');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.vpoolnotallowed'));
             }
+            if (!self.data.mtptCache.valid()) {
+                valid = false;
+                fields.push('cache');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
+            }
+            if (!self.data.mtptTemp.valid()) {
+                valid = false;
+                fields.push('temp');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.tempfs') }));
+            }
+            if (!self.data.mtptDFS.valid()) {
+                valid = false;
+                fields.push('dfs');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.dfs') }));
+            }
+            if (!self.data.mtptMD.valid()) {
+                valid = false;
+                fields.push('md');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.mdfs') }));
+            }
             return { value: valid, reasons: reasons, fields: fields };
         });
 

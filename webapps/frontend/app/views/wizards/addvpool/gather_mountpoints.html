@@ -58,7 +58,9 @@ limitations under the License.
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('port', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.port"></label>
             <div class="col-lg-2">
-                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.vRouterPort, valueUpdate: 'afterkeydown'">
+                <input type="text" id="name" class="autofocus form-control"
+                       data-bind="value: data.vRouterPort, valueUpdate: 'afterkeydown',
+                                  attr: { id: (data.vRouterPort.hasOwnProperty('identifier') ? ('gmtptp-' + data.vRouterPort.identifier) : undefined) }">
             </div>
             <div class="col-lg-7" style="margin-top: 7px;" data-bind="visible: data.vsrs().length > 0">
                 <span data-i18n="ovs:wizards.addvpool.gathermountpoints.portsinuse"></span>
