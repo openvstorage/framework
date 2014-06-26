@@ -1,0 +1,627 @@
+{
+    "license": [
+        "Copyright 2014 CloudFounders NV",
+        "",
+        "Licensed under the Apache License, Version 2.0 (the \"License\");",
+        "you may not use this file except in compliance with the License.",
+        "You may obtain a copy of the License at",
+        "",
+        "    http://www.apache.org/licenses/LICENSE-2.0",
+        "",
+        "Unless required by applicable law or agreed to in writing, software",
+        "distributed under the License is distributed on an \"AS IS\" BASIS,",
+        "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.",
+        "See the License for the specific language governing permissions and",
+        "limitations under the License."
+    ],
+    "generic": {
+        "states": {
+            "vsa": {
+                "ok": "Online",
+                "nok": "Offline",
+                "undefined": "Unknown"
+            },
+            "foc": {
+                "ok_standalone": "Healthy (standalone)",
+                "ok_sync": "Healthy (sync)",
+                "catch_up": "Rebuilding",
+                "degraded": "Degraded",
+                "unknown": "Unknown",
+                "undefined": "Unknown"
+            }
+        },
+        "messages": {
+            "savesuccessfully": "__what__ saved successfully.",
+            "errorwhile": "An error occurred while __what__.",
+            "errorwhile_error": "An error occurred while __what__: __error__",
+            "notrunningrequired": "vMachine should be halted."
+        },
+        "hypervisors": {
+            "VMWARE": "VMware",
+            "HYPERV": "HyperV",
+            "XEN": "Xen",
+            "KVM": "KVM"
+        },
+        "backendtypes": {
+            "S3": "S3",
+            "AMAZON_S3": "S3 compatible",
+            "CEPH_S3": "Ceph S3",
+            "SWIFT_S3": "Swift S3",
+            "LOCAL": "Local FS",
+            "REST": "REST backend",
+            "DISTRIBUTED": "Distributed FS"
+        },
+        "mgmtcentertypes": {
+            "VCENTER": "VMware vCenter"
+        },
+        "username": "Username",
+        "password": "Password",
+        "logout": "Log out",
+        "user": "User",
+        "togglenavigation": "Toggle navigation",
+        "changepassword": "Change password",
+        "signin": "Sign in",
+        "welcome": "Welcome",
+        "of": "of",
+        "next": "Next &raquo;",
+        "previous": "&laquo; Previous",
+        "cancel": "Cancel",
+        "finish": "Finish",
+        "ip": "IP",
+        "name": "Name",
+        "ki": "Ki",
+        "mi": "Mi",
+        "gi": "Gi",
+        "ti": "Ti",
+        "k": "k",
+        "m": "M",
+        "g": "G",
+        "t": "T",
+        "ok": "OK",
+        "bs": "B/s",
+        "b": "B",
+        "kibs": "KiB/s",
+        "kib": "KiB",
+        "mibs": "MiB/s",
+        "mib": "MiB",
+        "gibs": "GiB/s",
+        "gib": "GiB",
+        "tibs": "TiB/s",
+        "tib": "TiB",
+        "saved": "Saved",
+        "error": "Error",
+        "vdisk": "vDisk",
+        "disk": "Disk",
+        "vdisks": "vDisks",
+        "disks": "Disks",
+        "vmachine": "vMachine",
+        "machine": "Machine",
+        "vmachines": "vMachines",
+        "machines": "Machines",
+        "vpool": "vPool",
+        "vpools": "vPools",
+        "vsa": "GSR",
+        "vsas": "GSRs",
+        "children": "Children",
+        "storeddata": "Stored Data",
+        "topstoreddata": "Top Stored Data",
+        "cache": "Cache",
+        "cacheratio": "Cache Hit Ratio",
+        "iops": "IOPS",
+        "latency": "Latency",
+        "readspeed": "Read Speed",
+        "writespeed": "Write Speed",
+        "read": "Read",
+        "write": "Write",
+        "actions": "Actions",
+        "showing": "Showing",
+        "from": "from",
+        "results": "results",
+        "areyousure": "Are you sure?",
+        "yes": "Yes",
+        "no": "No",
+        "size": "Size",
+        "customerapi": "Customer API",
+        "focstatus": "FOC",
+        "performance": "Performance",
+        "current": "Current",
+        "bandwidth": "Bandwidth",
+        "topbandwidth": "Top Bandwidth",
+        "thousandseparator": ",",
+        "finished": "Finished",
+        "consistentss": "Consistent snapshots",
+        "inconsistentss": "Inconsistent snapshots",
+        "status": "Status",
+        "host": "Host",
+        "type": "Type",
+        "consistent": "Consistent",
+        "description": "Description",
+        "datetime": "Date / Time",
+        "snapshots": "Snapshots",
+        "nrofsnapshots": "# Snapshots",
+        "nrofvdisks": "# vDisks",
+        "nrofvmachines": "# vMachines",
+        "nrofvpools": "# vPools",
+        "nothingselected": "Nothing selected",
+        "customvalue": "Custom:",
+        "errorsfound": "Errors were found. Please check the contents of all fields.",
+        "followingerrorsfound": "Following errors were found:",
+        "cachefs": "Cache",
+        "dfs": "DFS",
+        "tempfs": "Temporary",
+        "mdfs": "Metadata",
+        "management": "Management actions",
+        "usedports": "Used Ports",
+        "xmlrpcport": "XML-RPC",
+        "focport": "FOC",
+        "mgmtport": "Management",
+        "templatehaschildren": "This vTemplate does have children",
+        "clone": "Create clones",
+        "about": "About",
+        "administration": "Administration",
+        "mgmtcenter": "Mgmt. Center",
+        "port": "Port",
+        "noentries": "No entries available",
+        "logging": "Kibana logging"
+    },
+    "vsas": {
+        "title": "GSRs",
+        "details": "GSR Details",
+        "detail": {
+            "title": "GSR",
+            "hostip": "Host IP",
+            "moveawaytitle": "Move all vDisks",
+            "moveawaymsg": "Move all vDisks away from this GSR and start them on other GSRs.",
+            "moveaway": {
+                "warning": "Are you sure you want to move all vDisks away?",
+                "title": "Are you sure",
+                "no": "Cancel",
+                "yes": "Move away",
+                "marked": "Moving away started",
+                "markedmsg": "All vDisks will be moved away from this GSR",
+                "done": "Move away complete",
+                "donemsg": "All vDisks have been moved away from __what__",
+                "errormsg": "moving away all vDisks from __what__"
+            },
+            "vsavpoollink": "vPools served by this GSR",
+            "updateserving": "Save changes",
+            "localvpool": "This is a local vPool which can not be shared across multiple GSRs",
+            "logging": "GSR logs",
+            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
+            "logginginfo2": "Open Kibana",
+            "logginginfo3": "to view this GSR's logs."
+        }
+    },
+    "vpools" : {
+        "title": "vPools",
+        "backendtype": "Type",
+        "backendconnection": "Connection",
+        "backendlogin": "Login",
+        "statistics": "Statistics",
+        "backend": "Backend",
+        "freespace": "Free space",
+        "detail": {
+            "title": "vPool",
+            "introduction": "Below an overview of the vPool properties.",
+            "sync": "Sync vPool with reality",
+            "vsavpoollink": "GSRs serving this vPool",
+            "updateserving": "Save changes",
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple GSRs.",
+            "logging": "vPool logs",
+            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
+            "logginginfo2": "Open Kibana",
+            "logginginfo3": "to view this vPool's logs."
+        },
+        "sync": {
+            "title": "Sync all vMachines using __what__",
+            "warning": "Are you sure you want to sync all vMachines using the vPool?",
+            "yes": "Start sync",
+            "no": "Close",
+            "marked": "Sync scheduled",
+            "markedmsg": "A sync will be executed",
+            "done": "vPool synced",
+            "donemsg": "All vMachines using vPool __what__ synced",
+            "errormsg": "syncing all vMachines using __what__"
+        },
+        "add": "Add new vPool"
+    },
+    "statistics": {
+        "title": "Statistics",
+        "introduction": "This page contains various system statistics.",
+        "memcache": {
+            "title": "Memcache",
+            "memoryusage": "Memory usage:",
+            "keysincache": "Keys in cache:",
+            "cachehits": "Cache hits:",
+            "cachetraffic": "Cache traffic",
+            "uptime": "Uptime",
+            "rawinfo": "Raw memcached information"
+        },
+        "dal": {
+            "title": "Open vStorage DAL",
+            "relations": "Relation structure loads",
+            "descriptor": "Descriptor loads",
+            "datalist": "Datalist queries",
+            "objectload": "Objects loads",
+            "hitsratio": "Hits and hitratio:",
+            "loadspeed": "Loads per second:"
+        }
+    },
+    "vmachines": {
+        "title": "vMachines",
+        "delete": {
+            "warning": "Are you sure you want to delete __what__?",
+            "marked": "Marked for deletion",
+            "markedmsg": "Machine __what__ is marked for deletion...",
+            "done": "Machine deleted",
+            "donemsg": "Machine __what__ deleted",
+            "errormsg": "deleting __what__"
+        },
+        "setastemplate": {
+            "title": "Set Virtual Machine __what__ as Template",
+            "warning": "Warning: converting a vMachine into a Template will remove it as active Virtual Machine from the Host. The Virtual Machine can no longer actively be used.",
+            "yes": "Set as Template",
+            "no": "Close",
+            "marked": "Marked for setting as template",
+            "markedmsg": "Machine __what__ is marked for setting as template...",
+            "done": "Machine set as template",
+            "donemsg": "Machine __what__ set as template",
+            "errormsg": "setting __what__ as template"
+        },
+        "details": "Details",
+        "performance": "Performance",
+        "detail": {
+            "title": "vMachine",
+            "snapshots": "Snapshots",
+            "rollback": "Rollback",
+            "setastemplate": "Set as vTemplate",
+            "snapshot": "Take snapshot"
+        }
+    },
+    "vdisks": {
+        "title": "vDisks",
+        "details": "Details",
+        "performance": "Performance",
+        "detail": {
+            "title": "vDisk",
+            "snapshots": "Snapshots",
+            "rollback": "Rollback"
+        }
+    },
+    "vtemplates": {
+        "title": "vTemplates"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "panels": {
+            "vsa": {
+                "helpcontent": "The GSR (Grid Storage Router) panel list all the GSRs registered in the Open vStorage Cluster. For each GSR the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - GSR",
+                "title": "GSR"
+            },
+            "cache": {
+                "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
+                "helptitle": "Help - Cache Hit Ratio",
+                "title": "Cache Hit Ratio"
+            },
+            "vmachines": {
+                "helpcontent": "This panels lists the top vMachines according to IOPS and Stored Data. Use the drop-down list to select the property to filter on. Click the number next to the vMachines title to go directly to the list of vMachines.",
+                "helptitle": "Help - vMachines",
+                "title": "vMachines"
+            },
+            "statistics": {
+                "helpcontent": "This panels lists the average on IOPS, Read and Write Speed and Cache Hits over 5 seconds summarized for all vDisks in the Cluster. The values are updated automatically every 5 seconds.",
+                "helptitle": "Help - vDisk Statistics",
+                "title": "vDisk Statistics"
+            },
+            "vpools": {
+                "helpcontent": "This panels lists the top vPools according to Stored Data and Bandwidth. Use the drop-down list to select the property to filter on.",
+                "helptitle": "Help - vPools",
+                "title": "vPools"
+            }
+        }
+    },
+    "about": {
+        "title": "About Open vStorage",
+        "product": "Open vStorage",
+        "installedproducts": "Installed Packages",
+        "importantwebsites": "Important Websites",
+        "projectwebsite": "Project Website:",
+        "projectwebsiteurl": "http://www.openvstorage.com",
+        "sourcecode": "Source Code:",
+        "sourcecodeurl": "https://bitbucket.org/openvstorage/openvstorage",
+        "companywebsite": "Company Website:",
+        "companywebsiteurl": "http://www.cloudfounders.com",
+        "openvstorage": "Open vStorage:",
+        "openvstoragecore": "Open vStorage - Core:",
+        "openvstoragewebapps": "Open vStorage - Webapps:",
+        "volumedriver": "vStorage Driver:"
+    },
+    "pmachines": {
+        "title": "Hypervisor Mgmt.",
+        "mgmtcenter": {
+            "title": "Hypervisor Management Center",
+            "add": "Add new Center",
+            "hosts": "OVS Hosts/Total"
+        },
+        "pmachines": {
+            "title": "Managed Hosts",
+            "incorrectmgmtcenter": "The selected Management center might be incorrect."
+        },
+        "delete": {
+            "warning": "Are you sure you want to delete __what__?",
+            "marked": "Marked for deletion",
+            "markedmsg": "Management center __what__ is marked for deletion...",
+            "done": "Deleted",
+            "donemsg": "Management center __what__ deleted",
+            "errormsg": "deleting __what__"
+        },
+        "save": {
+            "complete": "Save completed",
+            "success": "PMachine __what__ updated.",
+            "failed": "Updating __what__ failed: __why__"
+        }
+    },
+    "login": {
+        "title": "Login",
+        "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
+        "invalidcredentials": "The username/password combination were invalid or could not be validated.",
+        "welcome": "Use the navigation to browse through the interface."
+    },
+    "notfound": {
+        "title": "Page not found",
+        "introduction": "The page you've requested was not found. Please navigate back, and try again or update your bookmarks."
+    },
+    "keywords": {
+        "vpool": "vPool"
+    },
+    "wizards" : {
+        "addvpool": {
+            "title": "Add new vPool",
+            "gathervpool": {
+                "basicinfo": "Add basic vPool information",
+                "name": "Name:",
+                "invalidname": "vPool name is invalid",
+                "backendtype": "Backend:",
+                "host": "Host (FQDN/IP):",
+                "port": "Port:",
+                "timeout": "Timeout:",
+                "accesskey": "Access key:",
+                "secretkey": "Secret key:",
+                "invalidhost": "Invalid host (should be a FQDN or IP address)",
+                "nocredentials": "No credentials were entered",
+                "extendedinfo": "Extended vPool information",
+                "initialvsa": "Initial GSR:",
+                "vsarootpassword": "Root password:",
+                "invalidpassword": "Invalid GSR root password",
+                "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
+            },
+            "gathermountpoints": {
+                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all GSRs serving this vPool. Please also set the vPool connection info.",
+                "tempfs": "Temporary FS:",
+                "dfs": "Distributed FS:",
+                "md": "Metadata:",
+                "cache": "Cache location:",
+                "mtptinuse": "The given __what__ location is already in use on this GSR",
+                "ipaddress": "Storage IP:",
+                "port": "vRouter port:",
+                "portsinuse": "Ports in use:",
+                "dfsexclusive": "The DFS mountpoint must have exclusive use",
+                "dfsnotshared": "The DFS mountpoint should not be shared between vPools",
+                "portinuse": "The given port is already in use",
+                "cephfilesmissing": "One or more of the required ceph files are missing (/etc/ceph/ceph.conf and/or /etc/ceph/ceph.keyring)",
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "invalidmtpt": "The mountpoint __what__ is invalid."
+            },
+            "confirm": {
+                "basicinfo": "Validate the basic vPool information.",
+                "vsainfo": "Validate whether the correct GSR was selected.",
+                "mountpoints": "Validate whether mountpoints and connection information are correct.",
+                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
+                "started": "Creation started",
+                "inprogress": "Creation of vPool __what__ is started.",
+                "creating": "creating the vPool",
+                "success": "Creation of vPool __what__ finished."
+            }
+        },
+        "vsatovpool": {
+            "title": "Change links between vPool and GSRs",
+            "confirm": {
+                "errorvalidating": "Error while validating. Try again.",
+                "validating": "Validating...",
+                "addvalid": "The vPool can be added to this GSR.",
+                "removevalid": "The vPool can be removed from this GSR.",
+                "noselection": "No GSRs were selected.",
+                "mtptnotavailable": "The location __what__ is not available on this GSR",
+                "ipnotavailable": "The IP __what__ is not available on this GSR",
+                "started": "Adding/removing",
+                "inprogress": "The vPool is being added to or removed from the validated GSRs",
+                "working": "adding/removing the vPool",
+                "complete": "Add/remove vPool complete",
+                "success": "The vPool was added/removed to the selected GSRs with success",
+                "somefailed": "The vPool was added to or removed from some the selected GSRs. Some tasks failed.",
+                "allfailed": "The vPool could not be added to or removed from any of the selected GSRs",
+                "inuse": "The vPool is in use at this GSR",
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
+            }
+        },
+        "createft": {
+            "title": "Create from vTemplate",
+            "gather": {
+                "name": "Name:",
+                "description": "Description:",
+                "namehelp": "Will be appended with -{###} in case of multiple vMachines.",
+                "amount": "# of VMs",
+                "startnr": "Start nr.",
+                "hosts": "Hosts:",
+                "Description": "Description",
+                "nopmachinesselected": "Please select at least one host.",
+                "nomachine": "No vTemplate found",
+                "nopmachines": "No pMachines found.",
+                "noname": "No name was given",
+                "amountone": "The name won't be appended with a number",
+                "amountmultiple": "The first machine will be __start__ and the last one will be __end__",
+                "creating": "Creating from vTemplate __what__",
+                "started": "Create started",
+                "inprogress": "Creating from vTemplate __what__ in progress...",
+                "success": "Creating from __what__ successfully",
+                "somefailed": "Create from __what__ finished. However, some of the machines could not be created.",
+                "allfailed": "All create actions from __what__ failed.",
+                "complete": "Create completed"
+            }
+        },
+        "rollback": {
+            "title": "Rollback",
+            "gather": {
+                "title": "Please provide the required information",
+                "selectsnapshots": "Select the Snapshot to which you want to Rollback:",
+                "novmachine": "No machine loaded",
+                "novdisk": "No disk loaded",
+                "noname": "No name was entered",
+                "nosnapshots": "No Snapshots found",
+                "snapshot": "Snapshots",
+                "rollbackstarted": "Rollback started",
+                "inprogressvmachine": "Machine __what__ rollback in progress...",
+                "failedvmachine": "Machine __what__ rollback failed.",
+                "successvmachine": "Machine __what__ rollback successfully.",
+                "inprogressvdisk": "Disk __what__ rollback in progress...",
+                "failedvdisk": "Disk __what__ rollback failed.",
+                "successvdisk": "Disk __what__ rollback successfully."
+            }
+        },
+        "clone": {
+            "title": "Clone",
+            "gather": {
+                "title": "Please provide the required information",
+                "basicinfo": "Enter basic information",
+                "name": "Clone name",
+                "amount": "Number of clones",
+                "selectsnapshots": "Select the Snapshot from which you want to clone:",
+                "nomachine": "No machine loaded",
+                "noname": "No name was entered",
+                "nosnapshots": "Not all disks have Snapshots",
+                "snapshot": "Snapshots"
+            },
+            "confirm": {
+                "title": "Verify the entered information",
+                "clonename": "Name of the clone:",
+                "cloneamount": "Amount of clones:",
+                "verifysnapshots": "Please validate the selected Snapshot below. It will be used for the clone:",
+                "cloning": "cloning __what__",
+                "clonestarted": "Clone started",
+                "inprogress": "Machine __what__ cloning in progress...",
+                "success": "Cloned __what__ successfully",
+                "somefailed": "Machine __what__ cloned. However, some of the clones could not be created.",
+                "allfailed": "All clones for machine __what__ failed.",
+                "complete": "Clones completed",
+                "snapshot": "Snapshot:"
+            }
+        },
+        "snapshot": {
+            "title": "Snapshot",
+            "gather": {
+                "title": "Please provide the required information",
+                "name": "Snapshot name",
+                "consistent": "Label as Consistent Snapshot",
+                "basicinfo": "Enter basic information",
+                "nomachine": "No machine loaded",
+                "noname": "No name was entered"
+            },
+            "confirm": {
+                "title": "Verify the entered information",
+                "snapshotstarted": "Snapshot started",
+                "inprogress": "Machine __what__ Snapshotting in progress...",
+                "failed": "Machine __what__ Snapshot failed.",
+                "success": "Machine __what__ Snapshot successfully.",
+                "name": "Snapshot name",
+                "consistent": "Label as Consistent Snapshot"
+            }
+        },
+        "changepassword": {
+            "title": "Change password",
+            "confirm": {
+                "title": "Please provide the required information",
+                "introduction": "Enter the requested information carefully.",
+                "newpassword": "New password",
+                "currentpassword": "Current password",
+                "retype": "Retype",
+                "entercurrent": "Enter current password",
+                "currentinvalid": "Invalid password",
+                "enternew": "Enter new password",
+                "shouldmatch": "New passwords should match",
+                "updatingpassword": "updating the password"
+            }
+        },
+        "addmgmtcenter": {
+            "title": "Add Hypervisor Management Center",
+            "gather": {
+                "noname": "No name was given",
+                "nousername": "No username was given",
+                "nopassword": "No password was given",
+                "started": "Started",
+                "inprogress": "Adding Management Center __what__ started.",
+                "complete": "Complete",
+                "success": "Adding __what__ completed.",
+                "failed": "Adding __what__ failed: __why__",
+                "basicinfo": "Enter the required information to add the Hypervisor Management Center",
+                "type": "Type:",
+                "ip": "IP Address:",
+                "name": "Name:",
+                "port": "Port:",
+                "username": "Username:",
+                "password": "Password:",
+                "invalidip": "The IP Address entered is invalid"
+            }
+        }
+    },
+    "footer" : {
+        "cachereads": "Reads served from the Cache:",
+        "datawritten": "Data written to the Backend:",
+        "dataread": "Data read from the Backend:",
+        "bandwidthsaved": "Bandwidth Saved:"
+    },
+    "events": {
+        "vmachine_deleted": "vMachine deleted",
+        "vmachine_deleted_content": "vMachine __name__ was deleted.",
+        "vmachine_created": "vMachine created",
+        "vmachine_created_content": "vMachine __name__ was created.",
+        "vmachine_renamed": "vMachine renamed",
+        "vmachine_renamed_content": "vMachine __old_name__ was renamed to __new_name__.",
+        "vdisk_attached": "vDisk attached",
+        "vdisk_attached_content": "vDisk __vdisk_name__ was attached to __vmachine_name__.",
+        "vdisk_detached": "vDisk detached",
+        "vdisk_detached_content": "vDisk __vdisk_name__ was detached from __vmachine_name__"
+    },
+    "title": "Open vStorage",
+    "icons": {
+        "separator": "&#xf101;",
+        "delete": "&#xf014;",
+        "loading": "&#xf110;",
+        "consistent": "&#xf02e;",
+        "inconsistent": "&#xf097;",
+        "help": "&#xf059;",
+        "snapshot": "&#xf030;",
+        "setastemplate": "&#xf023;",
+        "rollback": "&#xf01e;",
+        "vsa": "&#xf0c2;",
+        "fromtemplate": "&#xf045;",
+        "notchecked": "&#xf096;",
+        "checked": "&#xf046;",
+        "sync": "&#xf021;",
+        "management": "&#xf0b1;",
+        "moveaway": "&#xf074;",
+        "information": "&#xf05a;",
+        "vdisks": "&#xf0a0;",
+        "add": "&#xf067;",
+        "vmachines": "&#xf0e8;",
+        "vsavpoollink": "&#xf07c;",
+        "edit": "&#xf040;",
+        "save": "&#xf00c;",
+        "warning": "&#xf071;",
+        "cancel": "&#xf00d;",
+        "logs": "&#xf02d;",
+        "externallink": "&#xf08e;"
+    }
+}
