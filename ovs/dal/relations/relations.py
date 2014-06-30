@@ -37,14 +37,18 @@ class RelationMapper(object):
         if relation_info is None:
             Toolbox.log_cache_hit('relations', False)
             relation_info = {}
-            hybrids = HybridRunner.get_hybrids()
-            for cls in hybrids.values():  # Extended objects
+            hybrid_structure = HybridRunner.get_hybrids()
+            for class_descriptor in hybrid_structure.values():  # Extended objects
+                cls = Descriptor().load(class_descriptor).get_object()
                 for key, item in cls._relations.iteritems():
                     if item[0] is None:
                         remote_class = cls
                     else:
-                        item_name = Toolbox.get_class_fullname(item[0])
-                        remote_class = item[0] if item_name not in hybrids else hybrids[item_name]
+                        identifier = Descriptor(item[0]).descriptor['identifier']
+                        if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+                            remote_class = Descriptor().load(hybrid_structure[identifier]).get_object()
+                        else:
+                            remote_class = item[0]
                     itemname = remote_class.__name__
                     if itemname == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,

@@ -34,6 +34,8 @@ class Descriptor(object):
     It points towards the sourcefile, class name and class type
     """
 
+    object_cache = {}
+
     def __init__(self, object_type=None, guid=None):
         """
         Initializes a descriptor for a given type. Optionally already providing a guid for the
@@ -59,7 +61,7 @@ class Descriptor(object):
                 self._descriptor = {'name': name,
                                     'source': source,
                                     'type': object_type.__name__,
-                                    'identifier': hashlib.sha256(name + source + object_type.__name__).hexdigest()}
+                                    'identifier': name + '_' + hashlib.sha256(name + source + object_type.__name__).hexdigest()}
                 self._volatile.set(key, self._descriptor)
             else:
                 Toolbox.log_cache_hit('descriptor', True)
@@ -90,9 +92,13 @@ class Descriptor(object):
         if not self.initialized:
             raise RuntimeError('Descriptor not yet initialized')
 
-        filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
-        module = imp.load_source(self._descriptor['name'], filename)
-        cls = getattr(module, self._descriptor['type'])
+        if self._descriptor['identifier'] not in Descriptor.object_cache:
+            filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
+            module = imp.load_source(self._descriptor['name'], filename)
+            cls = getattr(module, self._descriptor['type'])
+            Descriptor.object_cache[self._descriptor['identifier']] = cls
+        else:
+            cls = Descriptor.object_cache[self._descriptor['identifier']]
         if instantiate:
             if self._descriptor['guid'] is None:
                 return None
@@ -118,66 +124,69 @@ class HybridRunner(object):
         """
         Yields all hybrid classes
         """
-        base_hybrids = []
-        inherit_table = {}
-        translation_table = {}
-        path = os.path.join(os.path.dirname(__file__), 'hybrids')
-        for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
-                for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name:
-                        current_class = member[1]
-                        current_name = Toolbox.get_class_fullname(current_class)
-                        if current_name not in translation_table:
-                            translation_table[current_name] = current_class
-                        if 'DataObject' in current_class.__base__.__name__:
-                            if current_name not in base_hybrids:
-                                base_hybrids.append(current_name)
-                            else:
-                                raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_name))
-                        elif 'DataObject' not in current_class.__name__:
-                            structure = []
-                            this_class = None
-                            for this_class in current_class.__mro__:
+        key = 'ovs_hybrid_structure'
+        volatile = VolatileFactory.get_client()
+        hybrid_structure = volatile.get(key)
+        if hybrid_structure is None:
+            Toolbox.log_cache_hit('hybrid_structure', False)
+            base_hybrids = []
+            inherit_table = {}
+            translation_table = {}
+            path = os.path.join(os.path.dirname(__file__), 'hybrids')
+            for filename in os.listdir(path):
+                if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                    name = filename.replace('.py', '')
+                    module = imp.load_source(name, os.path.join(path, filename))
+                    for member in inspect.getmembers(module):
+                        if inspect.isclass(member[1]) \
+                                and member[1].__module__ == name:
+                            current_class = member[1]
+                            current_descriptor = Descriptor(current_class).descriptor
+                            current_identifier = current_descriptor['identifier']
+                            if current_identifier not in translation_table:
+                                translation_table[current_identifier] = current_descriptor
+                            if 'DataObject' in current_class.__base__.__name__:
+                                if current_identifier not in base_hybrids:
+                                    base_hybrids.append(current_identifier)
+                                else:
+                                    raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
+                            elif 'DataObject' not in current_class.__name__:
+                                structure = []
+                                this_class = None
+                                for this_class in current_class.__mro__:
+                                    if 'DataObject' in this_class.__name__:
+                                        break
+                                    structure.append(Descriptor(this_class).descriptor['identifier'])
                                 if 'DataObject' in this_class.__name__:
-                                    break
-                                structure.append(Toolbox.get_class_fullname(this_class))
-                            if 'DataObject' in this_class.__name__:
-                                for index in reversed(range(1, len(structure))):
-                                    if structure[index] in inherit_table:
-                                        raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
-                                    inherit_table[structure[index]] = structure[index - 1]
-        items_replaced = True
-        hybrids = {hybrid: None for hybrid in base_hybrids[:]}
-        while items_replaced is True:
-            items_replaced = False
-            for hybrid, replacement in inherit_table.iteritems():
-                if hybrid in hybrids.keys() and hybrids[hybrid] is None:
-                    hybrids[hybrid] = replacement
-                    items_replaced = True
-                if hybrid in hybrids.values():
-                    for item in hybrids.keys():
-                        if hybrids[item] == hybrid:
-                            hybrids[item] = replacement
-                    items_replaced = True
-        return {hybrid: translation_table[replacement] if replacement is not None else translation_table[hybrid]
-                for hybrid, replacement in hybrids.iteritems()}
+                                    for index in reversed(range(1, len(structure))):
+                                        if structure[index] in inherit_table:
+                                            raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
+                                        inherit_table[structure[index]] = structure[index - 1]
+            items_replaced = True
+            hybrids = {hybrid: None for hybrid in base_hybrids[:]}
+            while items_replaced is True:
+                items_replaced = False
+                for hybrid, replacement in inherit_table.iteritems():
+                    if hybrid in hybrids.keys() and hybrids[hybrid] is None:
+                        hybrids[hybrid] = replacement
+                        items_replaced = True
+                    if hybrid in hybrids.values():
+                        for item in hybrids.keys():
+                            if hybrids[item] == hybrid:
+                                hybrids[item] = replacement
+                        items_replaced = True
+            hybrid_structure = {hybrid: translation_table[replacement] if replacement is not None else translation_table[hybrid]
+                                for hybrid, replacement in hybrids.iteritems()}
+            volatile.set(key, hybrid_structure)
+        else:
+            Toolbox.log_cache_hit('hybrid_structure', True)
+        return hybrid_structure
 
 
 class Toolbox(object):
     """
     Generic class for various methods
     """
-
-    @staticmethod
-    def get_class_fullname(hybrid_class):
-        """
-        Returns a full, unique name of a hybrid class
-        """
-        return '{0}.{1}'.format(hybrid_class.__module__.replace('ovs.dal.hybrids.', ''), hybrid_class.__name__)
 
     @staticmethod
     def try_get(key, fallback):

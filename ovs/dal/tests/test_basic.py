@@ -284,7 +284,9 @@ class Basic(TestCase):
         * All dynamic properties should be implemented
         """
         # Some stuff here to dynamically test all hybrid properties
-        for cls in HybridRunner.get_hybrids().values():
+        hybrid_structure = HybridRunner.get_hybrids()
+        for class_descriptor in HybridRunner.get_hybrids().values():
+            cls = Descriptor().load(class_descriptor).get_object()
             relation_info = RelationMapper.load_foreign_relations(cls)
             remote_properties_n = []
             remote_properties_1 = []

@@ -105,8 +105,6 @@ class DataObject(object):
     ## Attributes
     #######################
 
-    hybrids = None
-
     # Properties that needs to be overwritten by implementation
     _blueprint = {}            # Blueprint data of the objec type
     _expiry = {}               # Timeout of readonly object properties cache
@@ -120,13 +118,11 @@ class DataObject(object):
         """
         Initializes the class
         """
-        if DataObject.hybrids is None:
-            DataObject.hybrids = HybridRunner.get_hybrids()
-        class_name = Toolbox.get_class_fullname(cls)
-        if class_name in DataObject.hybrids:
-            new_class = DataObject.hybrids[class_name]
-            if Toolbox.get_class_fullname(new_class) != class_name:
-                return super(cls, new_class).__new__(new_class, *args, **kwargs)
+        hybrid_structure = HybridRunner.get_hybrids()
+        identifier = Descriptor(cls).descriptor['identifier']
+        if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+            new_class = Descriptor().load(hybrid_structure[identifier]).get_object()
+            return super(cls, new_class).__new__(new_class, *args, **kwargs)
         return super(DataObject, cls).__new__(cls, *args, **kwargs)
 
     def __init__(self, guid=None, data=None, datastore_wins=False):
@@ -161,13 +157,12 @@ class DataObject(object):
         self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
         # Rebuild _relation types
-        if DataObject.hybrids is None:
-            DataObject.hybrids = HybridRunner.get_hybrids()
+        hybrid_structure = HybridRunner.get_hybrids()
         for relation in self._relations.iterkeys():
             if self._relations[relation][0] is not None:
-                relation_name = Toolbox.get_class_fullname(self._relations[relation][0])
-                if relation_name in DataObject.hybrids:
-                    new_type = DataObject.hybrids[relation_name]
+                identifier = Descriptor(self._relations[relation][0]).descriptor['identifier']
+                if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+                    new_type = Descriptor().load(hybrid_structure[identifier]).get_object()
                     if len(self._relations[relation]) == 2:
                         self._relations[relation] = (new_type, self._relations[relation][1])
                     else:

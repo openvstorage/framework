@@ -33,8 +33,6 @@ class DataList(object):
     The DataList is a class that provide query functionality for the hybrid DAL
     """
 
-    hybrids = None
-
     class Select(object):
         """
         The Select class provides enum-alike properties for what to select
@@ -73,9 +71,6 @@ class DataList(object):
         """
         # Initialize super class
         super(DataList, self).__init__()
-
-        if DataList.hybrids is None:
-            DataList.hybrids = HybridRunner.get_hybrids()
 
         if key is not None:
             self._key = key
@@ -186,14 +181,15 @@ class DataList(object):
             # in any possible combination
 
             Toolbox.log_cache_hit('datalist', False)
+            hybrid_structure = HybridRunner.get_hybrids()
 
             items = self._query['query']['items']
             query_type = self._query['query']['type']
             query_data = self._query['data']
             query_object = self._query['object']
-            query_object_name = Toolbox.get_class_fullname(query_object)
-            if query_object_name in DataList.hybrids:
-                query_object = DataList.hybrids[query_object_name]
+            query_object_id = Descriptor(query_object).descriptor['identifier']
+            if query_object_id in hybrid_structure and query_object_id != hybrid_structure[query_object_id]['identifier']:
+                query_object = Descriptor().load(hybrid_structure[query_object_id]).get_object()
 
             invalidations = {query_object.__name__.lower(): ['__all']}
             DataList._build_invalidations(invalidations, query_object, items)
