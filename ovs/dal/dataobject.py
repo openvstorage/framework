@@ -65,9 +65,14 @@ class MetaClass(type):
                 )
             for attribute, info in dct['_expiry'].iteritems():
                 if bases[0].__name__ == 'DataObject':
+                    if '_{0}'.format(attribute) not in dct:
+                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(attribute, name))
                     method = dct['_%s' % attribute]
                 else:
-                    method = [getattr(base, '_%s' % attribute) for base in bases if hasattr(base, '_%s' % attribute)][0]
+                    methods = [getattr(base, '_%s' % attribute) for base in bases if hasattr(base, '_%s' % attribute)]
+                    if len(methods) == 0:
+                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(attribute, name))
+                    method = [0]
                 docstring = method.__doc__.strip()
                 if isinstance(info[1], type):
                     itemtype = info[1].__name__
