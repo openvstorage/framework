@@ -17,7 +17,7 @@ VolumeStorageRouter module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import time
 
@@ -39,8 +39,8 @@ class VolumeStorageRouter(DataObject):
                    'mountpoint_dfs':   (None, str, 'Mountpoint for the distributed filesystem (non-vdisk files)'),
                    'mountpoint_md':    (None, str, 'Mountpoint for metadata'),
                    'mountpoint_cache': (None, str, 'Mountpoint for caching')}
-    __relations = {'vpool':            (VPool, 'vsrs'),
-                   'serving_vmachine': (VMachine, 'served_vsrs')}
+    __relations = {'vpool':         (VPool, 'vsrs'),
+                   'storagerouter': (StorageRouter, 'vsrs')}
     __expiry = {'status':        (30, str),
                 'statistics':     (4, dict),
                 'stored_data':   (60, int)}
