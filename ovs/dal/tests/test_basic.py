@@ -1008,3 +1008,26 @@ class Basic(TestCase):
         machine2 = TestEMachine(machine.guid)
         self.assertEqual(machine2.name, 'emachine', 'The name of the extended machine should be correct')
         self.assertEqual(machine2.extended, 'ext', 'The extended property of the extended machine should be correct')
+
+    def test_extended_filter(self):
+        """
+        Validates whether base and extended hybrids behave the same in lists
+        """
+        machine1 = TestMachine()
+        machine1.name = 'basic'
+        machine1.save()
+        machine2 = TestEMachine()
+        machine2.name = 'extended'
+        machine2.save()
+        data = DataList({'object': TestMachine,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist = DataObjectList(data, TestMachine)
+        self.assertEqual(len(datalist), 2, 'There should be two machines if searched for TestMachine ({0})'.format(len(datalist)))
+        data = DataList({'object': TestEMachine,
+                         'data': DataList.select.DESCRIPTOR,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': []}}).data
+        datalist = DataObjectList(data, TestMachine)
+        self.assertEqual(len(datalist), 2, 'There should be two machines if searched for TestEMachine ({0})'.format(len(datalist)))

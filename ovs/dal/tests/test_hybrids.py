@@ -76,8 +76,10 @@ class Basic(TestCase):
         """
         # Some stuff here to dynamically test all hybrid properties
         hybrid_structure = HybridRunner.get_hybrids()
+        print 'Validating hybrids...'
         for class_descriptor in hybrid_structure.values():
             cls = Descriptor().load(class_descriptor).get_object()
+            print '* {0}'.format(cls.__name__)
             relation_info = RelationMapper.load_foreign_relations(cls)
             remote_properties_n = []
             remote_properties_1 = []
