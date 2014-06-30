@@ -53,23 +53,23 @@ class MetaClass(type):
                     itemtype = default[1].__name__
                     extra_info = ''
                 else:
-                    itemtype = 'Enum(%s)' % default[1][0].__class__.__name__
-                    extra_info = '(enum values: %s)' % ', '.join([str(item) for item in default[1]])
+                    itemtype = 'Enum({0})'.format(default[1][0].__class__.__name__)
+                    extra_info = '(enum values: {0})'.format(', '.join([str(item) for item in default[1]]))
                 dct[attribute] = property(
-                    doc='[persistent] %s %s\n@type: %s' % (docstring, extra_info, itemtype)
+                    doc='[persistent] {0} {1}\n@type: {2}'.format(docstring, extra_info, itemtype)
                 )
             for attribute, relation in dct['_relations'].iteritems():
                 itemtype = relation[0].__name__ if relation[0] is not None else name
                 dct[attribute] = property(
-                    doc='[relation] one-to-many relation with %s.%s\n@type: %s' % (itemtype, relation[1], itemtype)
+                    doc='[relation] one-to-many relation with {0}.{1}\n@type: {2}'.format(itemtype, relation[1], itemtype)
                 )
             for attribute, info in dct['_expiry'].iteritems():
                 if bases[0].__name__ == 'DataObject':
                     if '_{0}'.format(attribute) not in dct:
                         raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(attribute, name))
-                    method = dct['_%s' % attribute]
+                    method = dct['_{0}'.format(attribute)]
                 else:
-                    methods = [getattr(base, '_%s' % attribute) for base in bases if hasattr(base, '_%s' % attribute)]
+                    methods = [getattr(base, '_{0}'.format(attribute)) for base in bases if hasattr(base, '_{0}'.format(attribute))]
                     if len(methods) == 0:
                         raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(attribute, name))
                     method = [0]
@@ -78,11 +78,11 @@ class MetaClass(type):
                     itemtype = info[1].__name__
                     extra_info = ''
                 else:
-                    itemtype = 'Enum(%s)' % info[1][0].__class__.__name__
-                    extra_info = '(enum values: %s)' % ', '.join([str(item) for item in info[1]])
+                    itemtype = 'Enum({0})'.format(info[1][0].__class__.__name__)
+                    extra_info = '(enum values: {0})'.format(', '.join([str(item) for item in info[1]]))
                 dct[attribute] = property(
                     fget=method,
-                    doc='[dynamic] (%ds) %s %s\n@rtype: %s' % (info[0], docstring, extra_info, itemtype)
+                    doc='[dynamic] ({0}s) {1} {2}\n@rtype: {3}'.format(info[0], docstring, extra_info, itemtype)
                 )
 
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
@@ -159,7 +159,7 @@ class DataObject(object):
         # Worker fields/objects
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
+        self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._name))
 
         # Rebuild _relation types
         hybrid_structure = HybridRunner.get_hybrids()
@@ -182,7 +182,7 @@ class DataObject(object):
             self._guid = str(guid)
 
         # Build base keys
-        self._key = '%s_%s_%s' % (self._namespace, self._name, self._guid)
+        self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)
 
         # Load data from cache or persistent backend where appropriate
         self._volatile = VolatileFactory.get_client()
@@ -198,8 +198,9 @@ class DataObject(object):
                 try:
                     self._data = self._persistent.get(self._key)
                 except KeyNotFoundException:
-                    raise ObjectNotFoundException('%s with guid \'%s\' could not be found' %
-                                                  (self.__class__.__name__, self._guid))
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
+                        self.__class__.__name__, self._guid
+                    ))
             else:
                 Toolbox.log_cache_hit('object_load', True)
                 self._metadata['cache'] = True
@@ -275,7 +276,7 @@ class DataObject(object):
         gget = lambda s: s._get_guid_property(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget, fset))
-        setattr(self.__class__, '%s_guid' % attribute, property(gget))
+        setattr(self.__class__, '{0}_guid'.format(attribute), property(gget))
         self._data[attribute] = value
 
     def _add_list_property(self, attribute, list):
@@ -287,7 +288,7 @@ class DataObject(object):
         gget = lambda s: s._get_list_guid_property(attribute)
         # pylint: enable=protected-access
         setattr(self.__class__, attribute, property(fget))
-        setattr(self.__class__, ('%s_guids' if list else '%s_guid') % attribute, property(gget))
+        setattr(self.__class__, ('{0}_guids' if list else '{0}_guid').format(attribute), property(gget))
 
     def _add_dynamic_property(self, attribute):
         """
@@ -358,7 +359,7 @@ class DataObject(object):
         Getter for dynamic property, wrapping the internal data loading property
         in a caching layer
         """
-        data_loader = getattr(self, '_%s' % attribute)
+        data_loader = getattr(self, '_{0}'.format(attribute))
         return self._backend_property(data_loader, attribute)
 
     # Helper method supporting property setting
@@ -374,8 +375,9 @@ class DataObject(object):
             if correct:
                 self._data[attribute] = value
             else:
-                raise TypeError('Property %s allows types %s. %s given'
-                                % (attribute, str(allowed_types), given_type))
+                raise TypeError('Property {0} allows types {1}. {2} given'.format(
+                    attribute, str(allowed_types), given_type
+                ))
 
     def _set_relation_property(self, attribute, value):
         """
@@ -411,7 +413,7 @@ class DataObject(object):
         if allowed:
             super(DataObject, self).__setattr__(key, value)
         else:
-            raise RuntimeError('Property %s does not exist on this object.' % key)
+            raise RuntimeError('Property {0} does not exist on this object.'.format(key))
 
     #######################
     ## Saving data to persistent store and invalidating volatile store
@@ -451,8 +453,9 @@ class DataObject(object):
             if self._new:
                 data = {}
             else:
-                raise ObjectNotFoundException('%s with guid \'%s\' was deleted' %
-                                              (self.__class__.__name__, self._guid))
+                raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
+                    self.__class__.__name__, self._guid
+                ))
         changed_fields = []
         data_conflicts = []
         for attribute in self._data.keys():
@@ -474,8 +477,9 @@ class DataObject(object):
             elif attribute not in data:
                 data[attribute] = self._data[attribute]
         if data_conflicts:
-            raise ConcurrencyException('Got field conflicts while saving %s. Conflicts: %s'
-                                       % (self._name, ', '.join(data_conflicts)))
+            raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
+                self._name, ', '.join(data_conflicts)
+            ))
 
         # Save the data
         self._data = copy.deepcopy(data)
@@ -492,18 +496,22 @@ class DataObject(object):
                 else:
                     classname = default[0].__name__.lower()
                 # The field points to another object
-                self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                       classname,
-                                                       self._original[key]['guid'],
-                                                       default[1]))
-                self._volatile.delete('%s_%s_%s_%s' % (DataList.namespace,
-                                                       classname,
-                                                       self._data[key]['guid'],
-                                                       default[1]))
+                self._volatile.delete('{0}_{1}_{2}_{3}'.format(
+                    DataList.namespace,
+                    classname,
+                    self._original[key]['guid'],
+                    default[1]
+                ))
+                self._volatile.delete('{0}_{1}_{2}_{3}'.format(
+                    DataList.namespace,
+                    classname,
+                    self._data[key]['guid'],
+                    default[1]
+                ))
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
-            cache_key = '%s_%s' % (DataList.cachelink, self._name)
+            cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
@@ -546,8 +554,7 @@ class DataObject(object):
                                 except ObjectNotFoundException:
                                     pass
                         else:
-                            raise LinkedObjectException('There are %s items left in self.%s' %
-                                                        (len(items), key))
+                            raise LinkedObjectException('There are {0} items left in self.{1}'.format(len(items), key))
                 elif items is not None:
                     # No list (so a 1-to-1 relation), so there should be an object, or None
                     item = items  # More clear naming
@@ -558,12 +565,12 @@ class DataObject(object):
                         except ObjectNotFoundException:
                             pass
                     else:
-                        raise LinkedObjectException('There is still an item linked in self.%s' % key)
+                        raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
 
         # Invalidate no-filter queries/lists pointing to this object
         try:
             self._mutex_listcache.acquire(60)
-            cache_key = '%s_%s' % (DataList.cachelink, self._name)
+            cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
@@ -601,7 +608,7 @@ class DataObject(object):
         """
         for key in self._expiry.keys():
             if properties is None or key in properties:
-                self._volatile.delete('%s_%s' % (self._key, key))
+                self._volatile.delete('{0}_{1}'.format(self._key, key))
 
     def serialize(self, depth=0):
         """
@@ -610,7 +617,7 @@ class DataObject(object):
         data = {'guid': self.guid}
         for key in self._relations:
             if depth == 0:
-                data['%s_guid' % key] = self._data[key]['guid']
+                data['{0}_guid'.format(key)] = self._data[key]['guid']
             else:
                 instance = getattr(self, key)
                 if instance is not None:
@@ -671,15 +678,16 @@ class DataObject(object):
         """
         Handles the internal caching of dynamic properties
         """
-        cache_key   = '%s_%s' % (self._key, caller_name)
+        cache_key   = '{0}_{1}'.format(self._key, caller_name)
         cached_data = self._volatile.get(cache_key)
         if cached_data is None:
             cached_data = function()  # Load data from backend
             if cached_data is not None:
                 correct, allowed_types, given_type = Toolbox.check_type(cached_data, self._expiry[caller_name][1])
                 if not correct:
-                    raise TypeError('Dynamic property %s allows types %s. %s given'
-                                    % (caller_name, str(allowed_types), given_type))
+                    raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
+                        caller_name, str(allowed_types), given_type
+                    ))
             self._volatile.set(cache_key, cached_data, self._expiry[caller_name][0])
         return cached_data
 

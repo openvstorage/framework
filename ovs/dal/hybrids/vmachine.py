@@ -100,7 +100,7 @@ class VMachine(DataObject):
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
-            vdiskstatsdict['%s_ps' % key] = 0
+            vdiskstatsdict['{0}_ps'.format(key)] = 0
         if self.is_internal:
             vdisks = []
             for vsr in self.served_vsrs:

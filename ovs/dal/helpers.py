@@ -50,7 +50,7 @@ class Descriptor(object):
         else:
             self.initialized = True
 
-            key = 'ovs_descriptor_%s' % re.sub('[\W_]+', '', str(object_type))
+            key = 'ovs_descriptor_{0}'.format(re.sub('[\W_]+', '', str(object_type)))
             self._volatile = VolatileFactory.get_client()
             self._descriptor = self._volatile.get(key)
             if self._descriptor is None:
@@ -246,7 +246,7 @@ class Toolbox(object):
         Registers a cache hit or miss with a specific type
         """
         volatile = VolatileFactory.get_client()
-        key = 'ovs_stats_cache_%s_%s' % (cache_type, 'hit' if hit else 'miss')
+        key = 'ovs_stats_cache_{0}_{1}'.format(cache_type, 'hit' if hit else 'miss')
         try:
             successfull = volatile.incr(key)
             if not successfull:

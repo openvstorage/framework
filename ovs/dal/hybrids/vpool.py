@@ -55,7 +55,7 @@ class VPool(DataObject):
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
-            vdiskstatsdict['%s_ps' % key] = 0
+            vdiskstatsdict['{0}_ps'.format(key)] = 0
         for disk in self.vdisks:
             statistics = disk._statistics()  # Prevent double caching
             for key, value in statistics.iteritems():

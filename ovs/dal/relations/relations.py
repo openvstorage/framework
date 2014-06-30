@@ -31,7 +31,7 @@ class RelationMapper(object):
         This method will return a mapping of all relations towards a certain hybrid object type.
         The resulting mapping will be stored in volatile storage so it can be fetched faster
         """
-        relation_key = 'ovs_relations_%s' % object_type.__name__.lower()
+        relation_key = 'ovs_relations_{0}'.format(object_type.__name__.lower())
         volatile = VolatileFactory.get_client()
         relation_info = volatile.get(relation_key)
         if relation_info is None:

@@ -88,23 +88,25 @@ class Basic(TestCase):
                     else:
                         remote_properties_1.append(key)
             # Make sure certain attributes are correctly set
-            self.assertIsInstance(cls._blueprint, dict, '_blueprint required: %s' % cls.__name__)
-            self.assertIsInstance(cls._relations, dict, '_relations required: %s' % cls.__name__)
-            self.assertIsInstance(cls._expiry, dict, '_expiry required: %s' % cls.__name__)
+            self.assertIsInstance(cls._blueprint, dict, '_blueprint required: {0}'.format(cls.__name__))
+            self.assertIsInstance(cls._relations, dict, '_relations required: {0}'.format(cls.__name__))
+            self.assertIsInstance(cls._expiry, dict, '_expiry required: {0}'.format(cls.__name__))
             # Check types
             allowed_types = [int, float, str, bool, list, dict]
             for key in cls._blueprint:
                 is_allowed_type = cls._blueprint[key][1] in allowed_types \
                     or isinstance(cls._blueprint[key][1], list)
                 self.assertTrue(is_allowed_type,
-                                '_blueprint types in %s should be one of %s'
-                                % (cls.__name__, str(allowed_types)))
+                                '_blueprint types in {0} should be one of {1}'.format(
+                                    cls.__name__, str(allowed_types)
+                                ))
             for key in cls._expiry:
                 is_allowed_type = cls._expiry[key][1] in allowed_types \
                     or isinstance(cls._expiry[key][1], list)
                 self.assertTrue(is_allowed_type,
-                                '_expiry types in %s should be one of %s'
-                                % (cls.__name__, str(allowed_types)))
+                                '_expiry types in {0} should be one of {1}'.format(
+                                    cls.__name__, str(allowed_types)
+                                ))
             instance = cls()
             for key, default in cls._blueprint.iteritems():
                 self.assertEqual(getattr(instance, key), default[0],
@@ -123,23 +125,21 @@ class Basic(TestCase):
                 else:  # ... and should work
                     _ = getattr(instance, attribute)
             self.assertEqual(len(missing_props), 0,
-                             'Missing dynamic properties in %s: %s'
-                             % (cls.__name__, missing_props))
+                             'Missing dynamic properties in {0}: {1}'.format(cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry
             missing_metadata = []
             for prop in properties:
                 found = prop in cls._blueprint \
                     or prop in cls._relations \
-                    or prop in ['%s_guid' % key for key in cls._relations.keys()] \
+                    or prop in ['{0}_guid'.format(key) for key in cls._relations.keys()] \
                     or prop in cls._expiry \
                     or prop in remote_properties_n \
                     or prop in remote_properties_1 \
-                    or prop in ['%s_guids' % key for key in remote_properties_n] \
-                    or prop in ['%s_guid' % key for key in remote_properties_1] \
+                    or prop in ['{0}_guids'.format(key) for key in remote_properties_n] \
+                    or prop in ['{0}_guid'.format(key) for key in remote_properties_1] \
                     or prop == 'guid'
                 if not found:
                     missing_metadata.append(prop)
             self.assertEqual(len(missing_metadata), 0,
-                             'Missing metadata for properties in %s: %s'
-                             % (cls.__name__, missing_metadata))
+                             'Missing metadata for properties in {0}: {1}'.format(cls.__name__, missing_metadata))
             instance.delete()

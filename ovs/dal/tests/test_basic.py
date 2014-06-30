@@ -246,7 +246,7 @@ class Basic(TestCase):
         machine.save()
         for i in xrange(0, 20):
             disk = TestDisk()
-            disk.name = 'test_%d' % i
+            disk.name = 'test_{0}'.format(i)
             disk.size = i
             if i < 10:
                 disk.machine = machine
@@ -350,7 +350,7 @@ class Basic(TestCase):
         disks = []
         for i in xrange(0, 10):
             disk = TestDisk()
-            disk.name = 'test_%d' % i
+            disk.name = 'test_{0}'.format(i)
             if i % 2:
                 disk.machine = machine
             else:
@@ -459,8 +459,8 @@ class Basic(TestCase):
                                          'data': DataList.select.COUNT,
                                          'query': {'type': DataList.where_operator.AND,
                                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
-            self.assertEqual(list_cache.data, 0, 'List should find no entries (mode: %s)' % key)
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: {0})'.format(key))
+            self.assertEqual(list_cache.data, 0, 'List should find no entries (mode: {0})'.format(key))
             machine = TestMachine()
             machine.name = 'machine'
             machine.save()
@@ -472,14 +472,14 @@ class Basic(TestCase):
                                          'data': DataList.select.COUNT,
                                          'query': {'type': DataList.where_operator.AND,
                                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
-            self.assertEqual(list_cache.data, 1, 'List should find one entry (mode: %s)' % key)
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: {0})'.format(key))
+            self.assertEqual(list_cache.data, 1, 'List should find one entry (mode: {0})'.format(key))
             list_cache = DataList(key=key,
                                   query={'object': TestDisk,
                                          'data': DataList.select.COUNT,
                                          'query': {'type': DataList.where_operator.AND,
                                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-            self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: %s)' % key)
+            self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: {0})'.format(key))
             disk2 = TestDisk()
             disk2.machine = machine
             disk2.save()
@@ -488,8 +488,8 @@ class Basic(TestCase):
                                          'data': DataList.select.COUNT,
                                          'query': {'type': DataList.where_operator.AND,
                                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
-            self.assertEqual(list_cache.data, 2, 'List should find two entries (mode: %s)' % key)
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: {0})'.format(key))
+            self.assertEqual(list_cache.data, 2, 'List should find two entries (mode: {0})'.format(key))
             machine.name = 'x'
             machine.save()
             list_cache = DataList(key=key,
@@ -497,8 +497,8 @@ class Basic(TestCase):
                                          'data': DataList.select.COUNT,
                                          'query': {'type': DataList.where_operator.AND,
                                                    'items': [('machine.name', DataList.operator.EQUALS, 'machine')]}})  # noqa
-            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: %s)' % key)
-            self.assertEqual(list_cache.data, 0, 'List should have no matches (mode: %s)' % key)
+            self.assertFalse(list_cache.from_cache, 'List should not be loaded from cache (mode: {0})'.format(key))
+            self.assertEqual(list_cache.data, 0, 'List should have no matches (mode: {0})'.format(key))
 
     def test_emptyquery(self):
         """
@@ -601,7 +601,7 @@ class Basic(TestCase):
         Validates whether the primary keys are kept in sync
         """
         disk = TestDisk()
-        VolatileFactory.store.delete('ovs_primarykeys_%s' % disk._name)
+        VolatileFactory.store.delete('ovs_primarykeys_{0}'.format(disk._name))
         keys = DataList.get_pks(disk._namespace, disk._name)
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
         disk.save()
@@ -620,7 +620,7 @@ class Basic(TestCase):
                          'query': {'type': DataList.where_operator.AND,
                                    'items': []}}).data
         datalist = DataObjectList(data, TestDisk)
-        self.assertEqual(len(datalist), 1, 'There should be only one item (%s)' % len(datalist))
+        self.assertEqual(len(datalist), 1, 'There should be only one item ({0})'.format(len(datalist)))
         item = datalist.reduced[0]
         with self.assertRaises(AttributeError):
             print item.name
@@ -688,7 +688,7 @@ class Basic(TestCase):
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('parent.name', DataList.operator.EQUALS, 'parent')]}}).data
         datalist = DataObjectList(data, TestDisk)
-        self.assertEqual(len(datalist), 2, 'There should be two items (%s)' % len(datalist))
+        self.assertEqual(len(datalist), 2, 'There should be two items ({0})'.format(len(datalist)))
         cdisk2.parent = None
         cdisk2.save()
         data = DataList({'object': TestDisk,
@@ -696,7 +696,7 @@ class Basic(TestCase):
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('parent.name', DataList.operator.EQUALS, 'parent')]}}).data
         datalist = DataObjectList(data, TestDisk)
-        self.assertEqual(len(datalist), 1, 'There should be one item (%s)' % len(datalist))
+        self.assertEqual(len(datalist), 1, 'There should be one item ({0})'.format(len(datalist)))
 
     def test_copy_blueprint(self):
         """
@@ -792,7 +792,7 @@ class Basic(TestCase):
         guids = []
         for i in xrange(0, 10):
             disk = TestDisk()
-            disk.name = 'disk_%d' % i
+            disk.name = 'disk_{0}'.format(i)
             disk.size = sizes[i]
             disk.save()
             guids.append(disk.guid)
