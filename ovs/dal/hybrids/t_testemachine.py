@@ -13,18 +13,19 @@
 # limitations under the License.
 
 """
-ExtendedDisk module
+TestEMachine module
 """
+from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_testdisk import TestDisk
 
 
-class TestExtendedDisk(TestDisk):
+class TestEMachine(TestMachine):
     """
     This ExtendedDisk object is used for running unittests.
     WARNING: These properties should not be changed
     """
     # pylint: disable=line-too-long
     __blueprint = {'extended': (None, str, 'Extended property')}
-    __relations = {}
+    __relations = {'the_disk': (TestDisk, 'the_machines')}
     __expiry = {}
     # pylint: enable=line-too-long

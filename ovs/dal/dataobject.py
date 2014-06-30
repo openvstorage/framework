@@ -160,6 +160,19 @@ class DataObject(object):
         self._namespace = 'ovs_data'   # Namespace of the object
         self._mutex_listcache = VolatileMutex('listcache_%s' % self._name)
 
+        # Rebuild _relation types
+        if DataObject.hybrids is None:
+            DataObject.hybrids = HybridRunner.get_hybrids()
+        for relation in self._relations.iterkeys():
+            if self._relations[relation][0] is not None:
+                relation_name = Toolbox.get_class_fullname(self._relations[relation][0])
+                if relation_name in DataObject.hybrids:
+                    new_type = DataObject.hybrids[relation_name]
+                    if len(self._relations[relation]) == 2:
+                        self._relations[relation] = (new_type, self._relations[relation][1])
+                    else:
+                        self._relations[relation] = (new_type, self._relations[relation][1], self._relations[relation][2])
+
         # Init guid
         self._new = False
         if guid is None:
@@ -374,8 +387,10 @@ class DataObject(object):
             self._data[attribute]['guid'] = None
         else:
             descriptor = Descriptor(value.__class__).descriptor
-            if descriptor['type'] != self._data[attribute]['type']:
-                raise TypeError('An invalid type was given')
+            if descriptor['identifier'] != self._data[attribute]['identifier']:
+                raise TypeError('An invalid type was given: {0} instead of {1}'.format(
+                    descriptor['type'],  self._data[attribute]['type']
+                ))
             self._objects[attribute] = value
             self._data[attribute]['guid'] = value.guid
 

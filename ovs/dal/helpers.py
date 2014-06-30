@@ -20,9 +20,9 @@ import os
 import imp
 import copy
 import re
+import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 from ovs.log.logHandler import LogHandler
 logger = LogHandler('api', name='debug')
@@ -55,9 +55,11 @@ class Descriptor(object):
                 Toolbox.log_cache_hit('descriptor', False)
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
                 name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
+                source = os.path.relpath(filename, os.path.dirname(__file__))
                 self._descriptor = {'name': name,
-                                    'source': os.path.relpath(filename, os.path.dirname(__file__)),
-                                    'type': object_type.__name__}
+                                    'source': source,
+                                    'type': object_type.__name__,
+                                    'identifier': hashlib.sha256(name + source + object_type.__name__).hexdigest()}
                 self._volatile.set(key, self._descriptor)
             else:
                 Toolbox.log_cache_hit('descriptor', True)
@@ -97,6 +99,12 @@ class Descriptor(object):
             return cls(self._descriptor['guid'])
         else:
             return cls
+
+    def __eq__(self, other):
+        """
+        Checks the descriptor identifiers
+        """
+        return self._descriptor['identifier'] == other.descriptor['identifier']
 
 
 class HybridRunner(object):

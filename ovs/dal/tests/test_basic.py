@@ -37,8 +37,8 @@ class Basic(TestCase):
     VDisk = None
     VolatileMutex = None
     TestMachine = None
+    TestEMachine = None
     TestDisk = None
-    TestExtendedDisk = None
     DataList = None
     HybridRunner = None
     Descriptor = None
@@ -72,7 +72,7 @@ class Basic(TestCase):
         from ovs.extensions.generic.volatilemutex import VolatileMutex
         from ovs.dal.hybrids.t_testmachine import TestMachine
         from ovs.dal.hybrids.t_testdisk import TestDisk
-        from ovs.dal.hybrids.t_testextendeddisk import TestExtendedDisk
+        from ovs.dal.hybrids.t_testemachine import TestEMachine
         global RelationMapper
         global HybridRunner
         global Descriptor
@@ -81,8 +81,8 @@ class Basic(TestCase):
         global VolatileMutex
         global TestMachine
         global TestDisk
-        global TestExtendedDisk
-        _ = VDisk, VolatileMutex, TestMachine, TestDisk, TestExtendedDisk, DataList, \
+        global TestEMachine
+        _ = VDisk, VolatileMutex, TestMachine, TestDisk, TestEMachine, DataList, \
             HybridRunner, Descriptor, RelationMapper
 
         # Cleaning storage
@@ -950,10 +950,10 @@ class Basic(TestCase):
         disk_2_2.machine = machine_2
         disk_2_2.save()
         # Load relations
-        disks_1 = DataList.get_relation_set(TestExtendedDisk, 'machine', TestMachine, 'disks', machine_1.guid)
+        disks_1 = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine_1.guid)
         self.assertEqual(len(disks_1.data), 2, 'There should be 2 child disks')
         self.assertFalse(disks_1.from_cache, 'The relation should not be loaded from cache')
-        disks_2 = DataList.get_relation_set(TestExtendedDisk, 'machine', TestMachine, 'disks', machine_2.guid)
+        disks_2 = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine_2.guid)
         self.assertEqual(len(disks_2.data), 2, 'There should be 2 child disks')
         self.assertTrue(disks_2.from_cache, 'The relation should be loaded from cache')
 
@@ -986,7 +986,7 @@ class Basic(TestCase):
             disk_2.name = 'x'
             disk_2.save()
 
-        disk_x = None
+        disk_z = None
         disk_1 = TestDisk()
         disk_1.name = 'test'
         disk_1.save()
@@ -1044,6 +1044,7 @@ class Basic(TestCase):
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 1, 'One disks should be found ({0})'.format(len(disks)))
+        _ = disk_z  # Ignore this object not being used
 
     def test_guid_query(self):
         """
@@ -1086,3 +1087,38 @@ class Basic(TestCase):
 
         with self.assertRaises(RuntimeError):
             machine.one = disk
+
+    def test_auto_inheritance(self):
+        """
+        Validates whether fetching a base hybrid will result in the extended object
+        """
+        machine = TestMachine()
+        self.assertEqual(Descriptor(machine.__class__), Descriptor(TestEMachine), 'The fetched TestMachine should be a TestEMachine')
+
+    def test_relation_inheritance(self):
+        """
+        Validates whether relations on inherited hybrids behave OK
+        """
+        machine = TestMachine()
+        machine.save()
+        disk = TestDisk()
+        disk.machine = machine  # Validates relation acceptance (accepts TestEMachine)
+        disk.save()
+        machine.the_disk = disk  # Validates whether _relations is build correctly
+        machine.save()
+
+        disk2 = TestDisk(disk.guid)
+        self.assertEqual(Descriptor(disk2.machine.__class__), Descriptor(TestEMachine), 'The machine should be a TestEMachine')
+
+    def test_extended_property(self):
+        """
+        Validates whether an inherited object has all properties
+        """
+        machine = TestEMachine()
+        machine.name = 'emachine'
+        machine.extended = 'ext'
+        machine.save()
+
+        machine2 = TestEMachine(machine.guid)
+        self.assertEqual(machine2.name, 'emachine', 'The name of the extended machine should be correct')
+        self.assertEqual(machine2.extended, 'ext', 'The extended property of the extended machine should be correct')
