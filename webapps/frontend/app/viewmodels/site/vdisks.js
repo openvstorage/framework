@@ -33,7 +33,7 @@ define([
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
             { key: 'vmachine',      value: $.t('ovs:generic.vmachine'),      width: 110       },
             { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 110       },
-            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 110       },
+            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
             { key: 'size',          value: $.t('ovs:generic.size'),          width: 100       },
             { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
             { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },

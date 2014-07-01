@@ -24,7 +24,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
-from ovs.lib.vmachine import VMachineController
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
@@ -135,4 +135,4 @@ class VPoolViewSet(viewsets.ViewSet):
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        return VMachineController.update_vsrs.delay(vsr_guids, storagerouters, parameters)
+        return StorageRouterController.update_vsrs.delay(vsr_guids, storagerouters, parameters)

@@ -43,7 +43,7 @@ define([
             return $.Deferred(function (deferred) {
                 var storageRouter = self.storageRouter();
                 $.when.apply($, [
-                        storageRouter.load('_dynamics,_relations,-statistics'),
+                        storageRouter.load('_dynamics,_relations'),
                         storageRouter.getAvailableActions()
                     ])
                     .then(self.loadVSRs)

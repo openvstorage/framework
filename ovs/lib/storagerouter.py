@@ -160,4 +160,4 @@ class StorageRouterController(object):
         mountpoint = '/mnt/{0}'.format(name)
         if not os.path.exists(mountpoint):
             return True
-        return check_output('ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+        return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'

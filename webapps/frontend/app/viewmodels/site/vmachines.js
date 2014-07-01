@@ -38,7 +38,7 @@ define([
         self.vMachineHeaders    = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
             { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 150       },
-            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 100       },
+            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
             { key: undefined,       value: $.t('ovs:generic.vdisks'),        width: 60        },
             { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
             { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },

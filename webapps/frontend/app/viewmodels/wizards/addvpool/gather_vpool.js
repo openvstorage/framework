@@ -28,7 +28,6 @@ define([
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.loadStorageRouterHandle  = undefined;
-        self.loadStorageRoutersHandle = {};
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });

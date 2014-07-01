@@ -99,7 +99,7 @@ class StorageRouter(DataObject):
                         vmachine_guids.add(vdisk.vmachine_guid)
         return list(vmachine_guids)
 
-    def _disks_guids(self):
+    def _vdisks_guids(self):
         """
         Gets the vDisk guids served by this StorageRouter.
         """

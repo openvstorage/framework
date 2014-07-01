@@ -124,7 +124,7 @@ define([
                         sort: 'name',
                         contents: 'vsrs'
                     };
-                    self.loadStorageRoutersHandle = api.post('storagerouters', undefined, options)
+                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
                         .done(function(data) {
                             var guids = [], srdata = {};
                             $.each(data, function(index, item) {

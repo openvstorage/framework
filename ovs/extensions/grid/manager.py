@@ -733,8 +733,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.dal.hybrids.vpool import VPool
         from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
         from ovs.dal.lists.vpoollist import VPoolList
-        from ovs.dal.lists.vmachinelist import VMachineList
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
         from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 
@@ -761,7 +761,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
 
         storagerouter = None
-        for current_storagerouter in VolumeStorageRouterList.get_volumestoragerouters():
+        for current_storagerouter in StorageRouterList.get_storagerouters():
             if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
                 storagerouter = current_storagerouter
                 break

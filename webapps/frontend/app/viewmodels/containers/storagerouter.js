@@ -70,9 +70,6 @@ define([
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
-        self.isRunning = ko.computed(function() {
-            return self.hypervisorStatus() === 'RUNNING';
-        });
         self.bandwidth = ko.computed(function() {
             if (self.readSpeed() === undefined || self.writeSpeed() === undefined) {
                 return undefined;

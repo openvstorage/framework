@@ -119,7 +119,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(VMachine)
+    @validate(StorageRouter)
     @celery_task()
     def get_version_info(self, request, obj):
         """
