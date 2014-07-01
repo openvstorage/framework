@@ -39,13 +39,13 @@ class VMachine(DataObject):
                    'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
     __relations = {'pmachine': (PMachine, 'vmachines'),
                    'vpool':    (VPool, 'vmachines')}
-    __expiry = {'snapshots':          (60, list),
-                'hypervisor_status': (300, str),
-                'statistics':          (5, dict),
-                'stored_data':        (60, int),
-                'failover_mode':      (60, str),
-                'vsas_guids':         (15, list),
-                'vpools_guids':       (15, list)}
+    __expiry = {'snapshots':            (60, list),
+                'hypervisor_status':   (300, str),
+                'statistics':            (5, dict),
+                'stored_data':          (60, int),
+                'failover_mode':        (60, str),
+                'storagerouters_guids': (15, list),
+                'vpools_guids':         (15, list)}
     # pylint: enable=line-too-long
 
     def _snapshots(self):
@@ -125,7 +125,7 @@ class VMachine(DataObject):
                 status_code = current_status_code
         return status
 
-    def _vsas_guids(self):
+    def _storagerouters_guids(self):
         """
         Gets the StorageRouter guids linked to this vMachine
         """

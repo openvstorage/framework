@@ -47,11 +47,11 @@ class VDisk(DataObject):
     __relations = {'vmachine':     (VMachine, 'vdisks'),
                    'vpool':        (VPool, 'vdisks'),
                    'parent_vdisk': (None, 'child_vdisks')}
-    __expiry = {'snapshots':  (60, list),
-                'info':       (60, dict),
-                'statistics':  (5, dict),
-                'vsrid':      (60, str),
-                'vsa_guid':   (15, str)}
+    __expiry = {'snapshots':          (60, list),
+                'info':               (60, dict),
+                'statistics':          (5, dict),
+                'vsrid':              (60, str),
+                'storagerouter_guid': (15, str)}
     # pylint: enable=line-too-long
 
     def __init__(self, *args, **kwargs):
@@ -156,9 +156,9 @@ class VDisk(DataObject):
         """
         return self.info.get('vrouter_id', None)
 
-    def _vsa_guid(self):
+    def _storagerouter_guid(self):
         """
-        Loads the vDisks VSA guid
+        Loads the vDisks StorageRouter guid
         """
         if not self.vsrid:
             return None
@@ -171,5 +171,5 @@ class VDisk(DataObject):
             VolumeStorageRouter
         )
         if len(volumestoragerouters) == 1:
-            return volumestoragerouters[0].serving_vmachine_guid
+            return volumestoragerouters[0].storagerouter_guid
         return None

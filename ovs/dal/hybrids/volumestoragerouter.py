@@ -25,7 +25,7 @@ import time
 class VolumeStorageRouter(DataObject):
     """
     The VolumeStorageRouter class represents a Volume Storage Router (VSR). A VSR is an application
-    on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
+    on a Storage Router to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
     __blueprint = {'name':             (None, str, 'Name of the VSR.'),

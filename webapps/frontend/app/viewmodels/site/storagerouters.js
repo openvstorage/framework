@@ -11,29 +11,23 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define, window */
+/*global define*/
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../containers/pmachine'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine) {
+    '../containers/storagerouter', '../containers/pmachine'
+], function($, ko, shared, generic, Refresher, api, StorageRouter, PMachine) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared        = shared;
-        self.guard         = { authenticated: true };
-        self.refresher     = new Refresher();
-        self.widgets       = [];
-        self.pMachineCache = {};
-        self.query         = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', true]]
-            }
-        };
-        self.vSAsHeaders   = [
+        self.shared                  = shared;
+        self.guard                   = { authenticated: true };
+        self.refresher               = new Refresher();
+        self.widgets                 = [];
+        self.pMachineCache           = {};
+        self.storageRoutersHeaders   = [
             { key: 'status',     value: $.t('ovs:generic.status'),     width: 55  },
             { key: 'name',       value: $.t('ovs:generic.name'),       width: 100 },
             { key: 'ip',         value: $.t('ovs:generic.ip'),         width: 100 },
@@ -48,40 +42,40 @@ define([
         ];
 
         // Observables
-        self.vSAs = ko.observableArray([]);
-        self.vSAsInitialLoad = ko.observable(true);
+        self.storageRouters            = ko.observableArray([]);
+        self.storageRoutersInitialLoad = ko.observable(true);
 
         // Handles
-        self.loadVSAsHandle = undefined;
-        self.refreshVSAsHandle = {};
+        self.loadStorageRoutersHandle    = undefined;
+        self.refreshStorageRoutersHandle = {};
 
         // Functions
-        self.fetchVSAs = function() {
+        self.fetchStorageRouters = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadVSAsHandle)) {
+                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
                         contents: 'stored_data'
                     };
-                    self.loadVSAsHandle = api.post('vmachines/filter', self.query, options)
+                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
                         .done(function(data) {
-                            var guids = [], vsadata = {};
+                            var guids = [], srdata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                vsadata[item.guid] = item;
+                                srdata[item.guid] = item;
                             });
                             generic.crossFiller(
-                                guids, self.vSAs,
+                                guids, self.storageRouters,
                                 function(guid) {
-                                    var vmachine = new VMachine(guid);
+                                    var sr = new StorageRouter(guid);
                                     if ($.inArray(guid, guids) !== -1) {
-                                        vmachine.fillData(vsadata[guid]);
+                                        sr.fillData(srdata[guid]);
                                     }
-                                    vmachine.loading(true);
-                                    return vmachine;
+                                    sr.loading(true);
+                                    return sr;
                                 }, 'guid'
                             );
-                            self.vSAsInitialLoad(false);
+                            self.storageRoutersInitialLoad(false);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -90,33 +84,32 @@ define([
                 }
             }).promise();
         };
-        self.refreshVSAs = function(page) {
+        self.refreshStorageRouters = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVSAsHandle[page])) {
+                if (generic.xhrCompleted(self.refreshStorageRoutersHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_relations,statistics,stored_data'
+                        contents: '_relations,statistics,stored_data,vdisks_guids'
                     };
-                    self.refreshVSAsHandle[page] = api.post('vmachines/filter', self.query, options)
+                    self.refreshStorageRoutersHandle[page] = api.get('storagerouters', undefined, options)
                         .done(function(data) {
-                            var guids = [], vsadata = {};
+                            var guids = [], srdata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                vsadata[item.guid] = item;
+                                srdata[item.guid] = item;
                             });
-                            $.each(self.vSAs(), function(index, vsa) {
-                                if ($.inArray(vsa.guid(), guids) !== -1) {
-                                    vsa.fillData(vsadata[vsa.guid()]);
-                                    vsa.loadDisks();
-                                    var pMachineGuid = vsa.pMachineGuid(), pm;
-                                    if (pMachineGuid && (vsa.pMachine() === undefined || vsa.pMachine().guid() !== pMachineGuid)) {
+                            $.each(self.storageRouters(), function(index, storageRouter) {
+                                if ($.inArray(storageRouter.guid(), guids) !== -1) {
+                                    storageRouter.fillData(srdata[storageRouter.guid()]);
+                                    var pMachineGuid = storageRouter.pMachineGuid(), pm;
+                                    if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
                                         if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
                                             pm = new PMachine(pMachineGuid);
                                             pm.load();
                                             self.pMachineCache[pMachineGuid] = pm;
                                         }
-                                        vsa.pMachine(self.pMachineCache[pMachineGuid]);
+                                        storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
                                     }
                                 }
                             });
@@ -131,12 +124,12 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(self.fetchVSAs, 5000);
+            self.refresher.init(self.fetchStorageRouters, 5000);
             self.refresher.start();
-            self.shared.footerData(self.vSAs);
+            self.shared.footerData(self.storageRouters);
 
-            self.fetchVSAs().then(function() {
-                self.refreshVSAs(1);
+            self.fetchStorageRouters().then(function() {
+                self.refreshStorageRouters(1);
             });
         };
         self.deactivate = function() {

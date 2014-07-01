@@ -32,11 +32,12 @@ class StorageRouter(DataObject):
                    'ip':          (None,  str,  'IP Address of the vMachine, if available'),
                    'status':      ('OK',  ['OK', 'NOK'], 'Internal status of the software stack')}
     __relations = {'pmachine': (PMachine, 'storagerouters')}
-    __expiry = {'statistics':      (5, dict),
-                'stored_data':    (60, int),
-                'failover_mode':  (60, str),
-                'vmachine_guids': (15, list),
-                'vpools_guids':   (15, list)}
+    __expiry = {'statistics':       (5, dict),
+                'stored_data':     (60, int),
+                'failover_mode':   (60, str),
+                'vmachines_guids': (15, list),
+                'vpools_guids':    (15, list),
+                'vdisks_guids':     (15, list)}
     # pylint: enable=line-too-long
 
     def _statistics(self):
@@ -85,7 +86,7 @@ class StorageRouter(DataObject):
                         status_code = current_status_code
         return status
 
-    def _vmachine_guids(self):
+    def _vmachines_guids(self):
         """
         Gets the vMachine guids served by this StorageRouter.
         Definition of "served by": vMachine whose disks are served by a given StorageRouter
@@ -94,8 +95,20 @@ class StorageRouter(DataObject):
         for vsr in self.vsrs:
             for vdisk in vsr.vpool.vdisks:
                 if vdisk.vsrid == vsr.vsrid:
-                    vmachine_guids.add(vdisk.vmachine_guid)
+                    if vdisk.vmachine_guid is not None:
+                        vmachine_guids.add(vdisk.vmachine_guid)
         return list(vmachine_guids)
+
+    def _disks_guids(self):
+        """
+        Gets the vDisk guids served by this StorageRouter.
+        """
+        vdisk_guids = []
+        for vsr in self.vsrs:
+            for vdisk in vsr.vpool.vdisks:
+                if vdisk.vsrid == vsr.vsrid:
+                    vdisk_guids.append(vdisk.guid)
+        return vdisk_guids
 
     def _vpools_guids(self):
         """

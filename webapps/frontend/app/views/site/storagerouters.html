@@ -14,20 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2 data-i18n="ovs:vsas.title"></h2>
-    <div data-bind="pager: { items: vSAs, headers: vSAsHeaders, initialLoad: vSAsInitialLoad,
-                             viewportRefresh: refreshVSAs, viewportRefreshInterval: 5000, controls: true }">
+    <h2 data-i18n="ovs:storagerouters.title"></h2>
+    <div data-bind="pager: { items: storageRouters, headers: storageRoutersHeaders, initialLoad: storageRoutersInitialLoad,
+                             viewportRefresh: refreshStorageRouters, viewportRefreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
-            <tr data-part="vitem" data-bind="attr: { id: 'vsa_' + guid() }">
+            <tr data-part="vitem" data-bind="attr: { id: 'storagerouter_' + guid() }">
                 <td>
                     <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
-                    <span class="fa pointer" data-i18n="[html]ovs:icons.vsa"
-                          data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
+                    <span class="fa pointer" data-i18n="[html]ovs:icons.storagerouter"
+                          data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
                                      style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
                 </td>
                 <td>
-                    <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
+                    <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: ipAddress"></span></td>
                 <td>

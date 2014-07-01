@@ -60,11 +60,11 @@ def process(queue, body, mapping):
                         kwargs[target] = getattr(data_container, field)
                 if 'options' in current_map:
                     options = current_map['options']
-                    if options.get('execonvsa', False):
+                    if options.get('execonstoragerouter', False):
                         vsr = VolumeStorageRouterList.get_by_vsrid(data.node_id)
                         if vsr is not None:
-                            routing_key = 'vsa.{0}'.format(
-                                vsr.serving_vmachine.machineid)
+                            routing_key = 'sr.{0}'.format(
+                                vsr.storagerouter.machineid)
                     delay = options.get('delay', 0)
                     dedupe = options.get('dedupe', False)
                     dedupe_key = options.get('dedupe_key', None)

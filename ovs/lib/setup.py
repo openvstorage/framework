@@ -247,7 +247,7 @@ class SetupController(object):
             possible_hypervisor = SetupController._discover_hypervisor(target_client)
             if not hypervisor_type:
                 hypervisor_type = Interactive.ask_choice(['VMWARE', 'KVM'],
-                                                         question='Which type of hypervisor is this Grid Storage Router (GSR) backing?',
+                                                         question='Which type of hypervisor is this Storage Router backing?',
                                                          default_value=possible_hypervisor)
                 logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
             default_name = 'esxi' if hypervisor_type == 'VMWARE' else 'kvm'
@@ -272,7 +272,7 @@ class SetupController(object):
                         first_request = False
                         print 'Could not connect to {0}: {1}'.format(hypervisor_ip, ex)
             elif hypervisor_type == 'KVM':
-                # In case of KVM, the VSA is the pMachine, so credentials are shared.
+                # In case of KVM, the StorageRouter is the pMachine, so credentials are shared.
                 hypervisor_ip = cluster_ip
                 hypervisor_username = 'root'
                 hypervisor_password = target_node_password
@@ -640,8 +640,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             # Imports, not earlier then here, as all required config files should be in place.
             from ovs.dal.hybrids.pmachine import PMachine
             from ovs.dal.lists.pmachinelist import PMachineList
-            from ovs.dal.hybrids.vmachine import VMachine
-            from ovs.dal.lists.vmachinelist import VMachineList
+            from ovs.dal.hybrids.storagerouter import StorageRouter
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
 
             print 'Configuring/updating model'
             logger.info('Configuring/updating model')
@@ -658,21 +658,19 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 pmachine.hvtype = hypervisor_type
                 pmachine.name = hypervisor_name
                 pmachine.save()
-            vsa = None
-            for current_vsa in VMachineList.get_vsas():
-                if current_vsa.ip == ip and current_vsa.machineid == unique_id:
-                    vsa = current_vsa
+            storagerouter = None
+            for current_storagerouter in StorageRouterList.get_storagerouters():
+                if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
+                    storagerouter = current_storagerouter
                     break
-            if vsa is None:
-                vsa = VMachine()
-                vsa.name = node_name
-                vsa.is_vtemplate = False
-                vsa.is_internal = True
-                vsa.machineid = unique_id
-                vsa.ip = cluster_ip
-                vsa.save()
-            vsa.pmachine = pmachine
-            vsa.save()
+            if storagerouter is None:
+                storagerouter = StorageRouter()
+                storagerouter.name = node_name
+                storagerouter.machineid = unique_id
+                storagerouter.ip = cluster_ip
+                storagerouter.save()
+            storagerouter.pmachine = pmachine
+            storagerouter.save()
 
             print 'Updating configuration files'
             logger.info('Updating configuration files')

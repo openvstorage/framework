@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<section data-bind="with: VSA()">
+<section data-bind="with: storageRouter()">
 	<ol class="breadcrumb">
 	    <li class="active" data-bind="text: name"></li>
 	</ol>
@@ -22,7 +22,7 @@ limitations under the License.
             <li class="active">
                 <a href="#information" data-toggle="tab" >
                     <span class="fa" data-i18n="[html]ovs:icons.information"
-                          data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
+                          data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
                                      style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
@@ -33,8 +33,8 @@ limitations under the License.
                 <table style="width: 100%;">
                     <thead>
                         <tr>
-                            <th data-i18n="ovs:vsas.details" colspan="2"></th>
-                            <th data-i18n="ovs:vsas.statistics" colspan="2"></th>
+                            <th data-i18n="ovs:storagerouters.details" colspan="2"></th>
+                            <th data-i18n="ovs:storagerouters.statistics" colspan="2"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -55,7 +55,7 @@ limitations under the License.
                             <td><span data-bind="text: cacheRatio"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:vsas.detail.hostip"></td>
+                            <td data-i18n="ovs:storagerouters.detail.hostip"></td>
                             <td>
                                 <span data-bind="lazyloader: { item: pMachine, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry" data-bind="text: item().ipAddress()"></span>
@@ -126,11 +126,11 @@ limitations under the License.
                         <tr>
                             <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
                                 <button type="button" class="btn btn-lg" data-bind="enable: false">
-                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.vsavpoollink"></span>
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storageroutervpoollink"></span>
                                 </button>
                             </td>
                             <td style="padding: 0 0 20px 0;">
-                                <h4 data-i18n="ovs:vsas.detail.vsavpoollink"></h4>
+                                <h4 data-i18n="ovs:storagerouters.detail.storageroutervpoollink"></h4>
                                 <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
                                 <div data-bind="foreach: $root.vPools">
                                     <div>
@@ -139,15 +139,15 @@ limitations under the License.
                                                                           disable: true /*backendType() === 'LOCAL' || $.inArray(guid(), $parent.vPoolGuids) !== -1*/"
                                                 style="vertical-align: text-bottom;">
                                         <label data-bind="attr: { for: 'vpool_' + guid() },
-                                                          tooltip: $.inArray(guid(), $root.checkedVPoolGuids()) === -1 && backendType() === 'LOCAL' ? 'ovs:vsas.detail.localvpool' : ''"
+                                                          tooltip: $.inArray(guid(), $root.checkedVPoolGuids()) === -1 && backendType() === 'LOCAL' ? 'ovs:storagerouters.detail.localvpool' : ''"
                                                style="font-weight: normal; margin-left: 7px;">
                                             <span data-bind="text: name"></span>
                                         </label>
                                     </div>
                                 </div>
-                                <button class="btn btn-default" data-bind="visible: false, click: $root.updateVSAServing"
+                                <button class="btn btn-default" data-bind="visible: false, click: $root.updateStorageRouterServing"
                                         style="margin-top: 10px;">
-                                    <span data-i18n="ovs:vsas.detail.updateserving"></span>
+                                    <span data-i18n="ovs:storagerouters.detail.updateserving"></span>
                                 </button>
                             </td>
                         </tr>
@@ -158,11 +158,11 @@ limitations under the License.
                                 </button>
                             </td>
                             <td style="padding: 0;">
-                                <h4 data-i18n="ovs:vsas.detail.logging"></h4>
+                                <h4 data-i18n="ovs:storagerouters.detail.logging"></h4>
                                 <p>
-                                    <span data-i18n="ovs:vsas.detail.logginginfo1"></span>
-                                    <a class="hand" data-bind="attr: { href: '/logging/index.html#/dashboard/file/logstash.json?query=host:' + name()  }"><span data-i18n="ovs:vsas.detail.logginginfo2"></span><i style="color: lightgrey; padding-left: 5px; padding-right: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a>
-                                    <span data-i18n="ovs:vsas.detail.logginginfo3"></span>
+                                    <span data-i18n="ovs:storagerouters.detail.logginginfo1"></span>
+                                    <a class="hand" data-bind="attr: { href: '/logging/index.html#/dashboard/file/logstash.json?query=host:' + name()  }"><span data-i18n="ovs:storagerouters.detail.logginginfo2"></span><i style="color: lightgrey; padding-left: 5px; padding-right: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a>
+                                    <span data-i18n="ovs:storagerouters.detail.logginginfo3"></span>
                                 </p>
                             </td>
                         </tr>

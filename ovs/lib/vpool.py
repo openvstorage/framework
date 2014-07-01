@@ -18,8 +18,6 @@ VPool module
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.pmachine import PMachine
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.fs.exportfs import Nfsexports
@@ -41,7 +39,7 @@ class VPoolController(object):
         vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
         if vsr is None:
             raise RuntimeError('A VSR with id {0} could not be found.'.format(vsrid))
-        if vsr.serving_vmachine.pmachine.hvtype == 'VMWARE':
+        if vsr.storagerouter.pmachine.hvtype == 'VMWARE':
             nfs = Nfsexports()
             nfs.unexport(mountpoint)
             nfs.export(mountpoint)
@@ -54,7 +52,7 @@ class VPoolController(object):
         """
         vpool = VPool(vpool_guid)
         for vsr in vpool.vsrs:
-            pmachine = vsr.serving_vmachine.pmachine
+            pmachine = vsr.storagerouter.pmachine
             hypervisor = Factory.get(pmachine)
             for vm_object in hypervisor.get_vms_by_nfs_mountinfo(vsr.storage_ip, vsr.mountpoint):
                 search_vpool = None if pmachine.hvtype == 'KVM' else vpool
@@ -65,10 +63,10 @@ class VPoolController(object):
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
 
     @staticmethod
-    def can_be_served_on(vsa_guid):
+    def can_be_served_on(storagerouter_guid):
         """
         temporary check to avoid creating 2 ganesha nfs exported vpools
         as this is not yet supported on volumedriverlevel
         """
-        _ = vsa_guid
+        _ = storagerouter_guid
         return True
