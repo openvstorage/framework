@@ -105,6 +105,6 @@ def process(queue, body, mapping):
                     delay
                 ))
         else:
-            raise RuntimeError('Type %s is not yet supported' % str(data.type))
+            logger.info('Message type {0} was received. Skipped.'.format(str(data.type)))
     else:
         raise NotImplementedError('Queue {} is not yet implemented'.format(queue))
