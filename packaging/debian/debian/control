@@ -24,6 +24,6 @@ Description: openvStorage Web Applications
 
 Package: openvstorage
 Architecture: amd64
-Depends: ipython, openvstorage-core (>= 0.1.0), openvstorage-webapps (>= 0.1.0), nfs-kernel-server
+Depends: ipython, openvstorage-core (= ${binary:Version}), openvstorage-webapps (= ${binary:Version}), nfs-kernel-server
 Description: openvStorage
  Open vStorage umbrella package
