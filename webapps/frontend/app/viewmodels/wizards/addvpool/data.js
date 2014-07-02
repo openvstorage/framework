@@ -28,7 +28,7 @@ define(['knockout'], function(ko){
             allowVPool:     ko.observable(true),
             backend:        ko.observable('LOCAL'),
             mtptTemp:       ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
-            mtptDFS:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-dfs' }),
+            mtptBFS:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
             mtptMD:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
             mtptCache:      ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-cache' }),
             storageIP:      ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),

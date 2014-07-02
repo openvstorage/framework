@@ -127,11 +127,7 @@ define([
                 var calls = [
                     $.Deferred(function(mtptDeferred) {
                         generic.xhrAbort(self.loadVSAHandle);
-                        var postData = {};
-                        if (self.data.backend() === 'CEPH_S3') {
-                            postData.files = '/etc/ceph/ceph.conf,/etc/ceph/ceph.keyring';
-                        }
-                        self.loadVSAHandle = api.post('vmachines/' + self.data.target().guid() + '/get_physical_metadata', postData)
+                        self.loadVSAHandle = api.post('vmachines/' + self.data.target().guid() + '/get_physical_metadata', {})
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);

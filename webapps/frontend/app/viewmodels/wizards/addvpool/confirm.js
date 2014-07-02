@@ -41,7 +41,7 @@ define([
                     connection_username: self.data.accesskey(),
                     connection_password: self.data.secretkey(),
                     mountpoint_temp: self.data.mtptTemp(),
-                    mountpoint_dfs: self.data.mtptDFS(),
+                    mountpoint_bfs: self.data.mtptBFS(),
                     mountpoint_md: self.data.mtptMD(),
                     mountpoint_cache: self.data.mtptCache(),
                     storage_ip: self.data.storageIP(),
