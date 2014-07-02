@@ -1,0 +1,13 @@
+#!/bin/sh
+cd /opt/OpenvStorage
+export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
+export DISPLAY=:0
+if [ "$1" = "setup" ] ; then
+  ipython -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
+elif [ "$1" = "monitor" ] ; then
+  if [ "$2" = "services" ] ; then
+    watch -n 1 'initctl list | grep ovs | sort'
+  fi
+else
+  ipython
+fi
