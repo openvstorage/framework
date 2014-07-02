@@ -16,16 +16,15 @@
 VPool module
 """
 
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
-from ovs.lib.vmachine import VMachineController
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
@@ -75,19 +74,19 @@ class VPoolViewSet(viewsets.ViewSet):
     @expose(internal=True)
     @required_roles(['view'])
     @validate(VPool)
-    @get_list(VMachine)
-    def serving_vsas(self, request, obj, hints):
+    @get_list(StorageRouter)
+    def storagerouters(self, request, obj, hints):
         """
-        Retreives a list of VSA guids, serving a given vPool
+        Retreives a list of StorageRouters, serving a given vPool
         """
         _ = request
-        vsa_guids = []
-        vsas = []
+        storagerouter_guids = []
+        storagerouters = []
         for vsr in obj.vsrs:
-            vsa_guids.append(vsr.serving_vmachine_guid)
+            storagerouter_guids.append(vsr.storagerouter_guid)
             if hints['full'] is True:
-                vsas.append(vsr.serving_vmachine)
-        return vsas if hints['full'] is True else vsa_guids
+                storagerouters.append(vsr.storagerouter)
+        return storagerouters if hints['full'] is True else storagerouter_guids
 
     @action()
     @expose(internal=True, customer=True)
@@ -98,14 +97,12 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Update VSRs for a given vPool (both adding and removing VSRs)
         """
-        vsas = []
-        if 'vsa_guids' in request.DATA:
-            if request.DATA['vsa_guids'].strip() != '':
-                for vsa_guid in request.DATA['vsa_guids'].strip().split(','):
-                    vsa = VMachine(vsa_guid)
-                    if vsa.is_internal is not True:
-                        raise NotAcceptable('vMachine is not a VSA')
-                    vsas.append((vsa.ip, vsa.machineid))
+        storagerouters = []
+        if 'storagerouter_guids' in request.DATA:
+            if request.DATA['storagerouter_guids'].strip() != '':
+                for storagerouter_guid in request.DATA['storagerouter_guids'].strip().split(','):
+                    storagerouter = StorageRouter(storagerouter_guid)
+                    storagerouters.append((storagerouter.ip, storagerouter.machineid))
         if 'vsr_guid' not in request.DATA:
             raise NotAcceptable('No VSR guid passed')
         vsr_guids = []
@@ -138,4 +135,4 @@ class VPoolViewSet(viewsets.ViewSet):
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        return VMachineController.update_vsrs.delay(vsr_guids, vsas, parameters)
+        return StorageRouterController.update_vsrs.delay(vsr_guids, storagerouters, parameters)

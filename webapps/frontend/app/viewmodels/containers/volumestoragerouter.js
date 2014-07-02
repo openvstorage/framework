@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api'
-], function($, ko, generic, api) {
+    'ovs/api'
+], function($, ko, api) {
     "use strict";
     return function(guid) {
         var self = this;

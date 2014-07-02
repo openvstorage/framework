@@ -16,13 +16,13 @@
 VDisk module
 """
 
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
@@ -48,13 +48,6 @@ class VDiskViewSet(viewsets.ViewSet):
         vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
         if vmachineguid is not None:
             vmachine = VMachine(vmachineguid)
-            if vmachine.is_internal:
-                vdisks = []
-                for vsr in vmachine.served_vsrs:
-                    for vdisk in vsr.vpool.vdisks:
-                        if vdisk.vsrid == vsr.vsrid:
-                            vdisks.append(vdisk)
-                return vdisks
             return vmachine.vdisks
         elif vpoolguid is not None:
             vpool = VPool(vpoolguid)

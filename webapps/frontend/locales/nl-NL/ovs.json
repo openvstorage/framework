@@ -54,7 +54,7 @@
         "disks": "Disks",
         "vpool": "vPool",
         "name": "Naam",
-        "vsa": "VSA",
+        "storagerouter": "Storage Router",
         "storeddata": "Opgeslagen data",
         "cache": "Cache",
         "iops": "IOPS",

@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    '../../containers/vmachine', './data'
-], function($, ko, VMachine, data) {
+    './data'
+], function($, ko, data) {
     "use strict";
     return function() {
         var self = this;
@@ -117,10 +117,5 @@ define([
             }
             return { value: valid, reasons: reasons, fields: fields };
         });
-
-        // Durandal
-        self.activate = function() {
-
-        };
     };
 });
