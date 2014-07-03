@@ -26,6 +26,7 @@ import sys
 import urllib2
 import re
 import time
+import uuid
 
 from optparse import OptionParser
 from random import choice
@@ -1043,7 +1044,8 @@ for filename in {1}:
 
         params = {'<VPOOL_MOUNTPOINT>': vsr.mountpoint,
                   '<HYPERVISOR_TYPE>': vsa.pmachine.hvtype,
-                  '<VPOOL_NAME>': vpool_name}
+                  '<VPOOL_NAME>': vpool_name,
+                  '<UUID>': str(uuid.uuid4())}
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
@@ -1059,7 +1061,8 @@ Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', comma
         Manager._exec_python(client, service_script)
 
         if vsa.pmachine.hvtype == 'VMWARE':
-            Manager.init_exportfs(client, vpool.name)
+            client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
+            client.run('service nfs-kernel-server start')
 
         if vsa.pmachine.hvtype == 'KVM':
             client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, vsr.mountpoint))
@@ -1131,13 +1134,8 @@ if Service.has_service('{0}'):
     Service.stop_service('{0}')
 """.format(service))
 
-        # Unexporting vPool (VMware) and deleting KVM pool
+        # KVM pool
         client = Client.load(ip)
-        nfs_script = """
-from ovs.extensions.fs.exportfs import Nfsexports
-Nfsexports().remove('{0}')""".format('/mnt/{0}'.format(vpool.name))
-        Manager._exec_python(client, nfs_script)
-        client.run('exportfs -ra')
         if pmachine.hvtype == 'KVM':
             if vpool.name in client.run('virsh pool-list'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
@@ -1237,23 +1235,6 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         vsr_configuration = VolumeStorageRouterConfiguration(this_vpool_name)
         vsr_configuration.configure_event_publisher(queue_config)"""
         Manager._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
-
-    @staticmethod
-    def init_exportfs(client, vpool_name):
-        """
-        Configure nfs
-        """
-        import uuid
-
-        vpool_mountpoint = '/mnt/{0}'.format(vpool_name)
-        client.dir_ensure(vpool_mountpoint, True)
-        nfs_script = """
-from ovs.extensions.fs.exportfs import Nfsexports
-Nfsexports().add('{0}', '*', 'rw,fsid={1},async,no_root_squash,no_subtree_check')""".format(
-            vpool_mountpoint, uuid.uuid4()
-        )
-        Manager._exec_python(client, nfs_script)
-        client.run('service nfs-kernel-server start')
 
     @staticmethod
     def _read_remote_config(client, key):
@@ -1426,8 +1407,6 @@ print Configuration.get('{0}')
 LABEL=backendfs /mnt/bfs         ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=tempfs    /var/tmp         ext4    defaults,nobootwait,noatime,discard    0    2
 """
-
-            client.run('mkdir -p /mnt/bfs')
 
         # Create partitions on SSD
         ssds = [drive for drive, info in drives.iteritems() if info['ssd'] is True and root_partition not in info['partitions']]
