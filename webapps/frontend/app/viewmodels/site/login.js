@@ -13,9 +13,9 @@
 // limitations under the License.
 /*global define, window */
 define([
-    'jquery', 'knockout', 'plugins/router', 'plugins/history',
+    'jquery', 'knockout', 'plugins/router',
     'ovs/shared'
-], function($, ko, router, history, shared) {
+], function($, ko, router, shared) {
     "use strict";
     return function() {
         var self = this;

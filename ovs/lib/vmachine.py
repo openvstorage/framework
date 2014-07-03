@@ -15,12 +15,8 @@
 """
 VMachine module
 """
-
 import time
-import copy
-import os
 
-from subprocess import check_output
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
@@ -28,17 +24,16 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.hypervisor.factory import Factory
-from ovs.extensions.generic.system import Ovs
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
-from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.package import Package
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler('lib', name='vmachine')
+
 
 class VMachineController(object):
     """
@@ -79,12 +74,12 @@ class VMachineController(object):
         target_pm = PMachine(pmachineguid)
         target_hypervisor = Factory.get(target_pm)
 
-        vsas = [vsa for vsa in VMachineList.get_vsas() if vsa.pmachine.guid == target_pm.guid]
-        if len(vsas) == 1:
-            target_vsa = vsas[0]
+        storagerouters = [sr for sr in StorageRouterList.get_storagerouters() if sr.pmachine_guid == target_pm.guid]
+        if len(storagerouters) == 1:
+            target_storagerouter = storagerouters[0]
         else:
-            raise ValueError('Pmachine {} has no VSA assigned to it'.format(pmachineguid))
-        routing_key = "vsa.{0}".format(target_vsa.machineid)
+            raise ValueError('Pmachine {} has no StorageRouter assigned to it'.format(pmachineguid))
+        routing_key = "sr.{0}".format(target_storagerouter.machineid)
 
         vpool = None
         vpool_guids = set()
@@ -107,9 +102,9 @@ class VMachineController(object):
         target_vsr = None
         source_vsr = None
         for vpool_vsr in vpool.vsrs:
-            if vpool_vsr.serving_vmachine.pmachine_guid == target_pm.guid:
+            if vpool_vsr.storagerouter.pmachine_guid == target_pm.guid:
                 target_vsr = vpool_vsr
-            if vpool_vsr.serving_vmachine.pmachine_guid == template_vm.pmachine_guid:
+            if vpool_vsr.storagerouter.pmachine_guid == template_vm.pmachine_guid:
                 source_vsr = vpool_vsr
         if target_vsr is None:
             raise RuntimeError('Volume not served on target hypervisor')
@@ -129,7 +124,7 @@ class VMachineController(object):
         if name_duplicates is not None and len(name_duplicates) > 0:
             raise RuntimeError('A vMachine with name {0} already exists'.format(name))
 
-        vm_path = target_hypervisor.get_vmachine_path(name, target_vsr.serving_vmachine.machineid)
+        vm_path = target_hypervisor.get_vmachine_path(name, target_vsr.storagerouter.machineid)
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
@@ -143,10 +138,9 @@ class VMachineController(object):
         new_vm.status = 'CREATED'
         new_vm.save()
 
-        vsrs = [vsr for vsr in vpool.vsrs if vsr.serving_vmachine.pmachine_guid == new_vm.pmachine_guid]
+        vsrs = [vsr for vsr in vpool.vsrs if vsr.storagerouter.pmachine_guid == new_vm.pmachine_guid]
         if len(vsrs) == 0:
-            raise RuntimeError('Cannot find VSR serving {0} on {1}'.format(vpool.name,
-                                                                           new_vm.pmachine.name))
+            raise RuntimeError('Cannot find VSR serving {0} on {1}'.format(vpool.name, new_vm.pmachine.name))
         vsrguid = vsrs[0].guid
 
         disks = []
@@ -246,11 +240,10 @@ class VMachineController(object):
         """
         _ = kwargs
         machine = VMachine(machineguid)
-        vsrid = [vsr for vd in machine.vdisks for vsr in vd.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine.guid][0].vsrid
         vsr_mountpoint, vsr_storage_ip = None, None
 
         try:
-            vsr = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0]
+            vsr = [vsr for vsr in machine.vpool.vsrs if vsr.storagerouter.pmachine_guid == machine.pmachine_guid][0]
             vsr_mountpoint = vsr.mountpoint
             vsr_storage_ip = vsr.storage_ip
         except Exception as ex:
@@ -261,8 +254,8 @@ class VMachineController(object):
         if machine.pmachine.hvtype == 'KVM':
             hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
 
-        disks_info = [(vsr.mountpoint, vd.devicename) for vsr in vd.vpool.vsrs for vd in machine.vdisks if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid]
-        if machine.pmachine: # Allow hypervisor id node, lookup strategy is hypervisor dependent
+        disks_info = [(vsr.mountpoint, vd.devicename) for vsr in vd.vpool.vsrs for vd in machine.vdisks if vsr.storagerouter.pmachine_guid == machine.pmachine_guid]
+        if machine.pmachine:  # Allow hypervisor id node, lookup strategy is hypervisor dependent
             try:
                 hv = Factory.get(machine.pmachine)
                 hv.delete_vm(hypervisorid, vsr_mountpoint, vsr_storage_ip, machine.devicename, disks_info, True)
@@ -601,133 +594,3 @@ class VMachineController(object):
         except Exception as ex:
             logger.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.get_physical_metadata')
-    def get_physical_metadata(files, vsa_guid):
-        """
-        Gets physical information about the machine this task is running on
-        """
-        from ovs.lib.vpool import VPoolController
-
-        mountpoints = check_output('mount -v', shell=True).strip().split('\n')
-        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
-                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
-                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
-                       and p.split(' ')[2] != '/']
-        arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
-        if arakoon_mountpoint in mountpoints:
-            mountpoints.remove(arakoon_mountpoint)
-        ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
-        ipaddresses = [ip.strip() for ip in ipaddresses]
-        ipaddresses.remove('127.0.0.1')
-        xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
-        allow_vpool = VPoolController.can_be_served_on(vsa_guid)
-        file_existence = {}
-        for check_file in files:
-            file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
-        return {'mountpoints': mountpoints,
-                'ipaddresses': ipaddresses,
-                'xmlrpcport': xmlrpcport,
-                'files': file_existence,
-                'allow_vpool': allow_vpool}
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.add_vpool')
-    def add_vpool(parameters):
-        """
-        Add a vPool to the machine this task is running on
-        """
-        from ovs.extensions.grid.manager import Manager
-        Manager.init_vpool(parameters['vsa_ip'], parameters['vpool_name'], parameters=parameters)
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.remove_vsr')
-    def remove_vsr(vsr_guid):
-        """
-        Removes a VSR (and, if it was the last VSR for a vPool, the vPool is removed as well)
-        """
-        from ovs.extensions.grid.manager import Manager
-
-        Manager.remove_vpool(vsr_guid)
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.update_vsrs')
-    def update_vsrs(vsr_guids, vsas, parameters):
-        """
-        Add/remove multiple vPools
-        @param vsr_guids: VSRs to be removed
-        @param vsas: VSA's on which to add a new link
-        @param parameters: Settings for new links
-        """
-        success = True
-        # Add VSRs
-        for vsa_ip, vsa_machineid in vsas:
-            try:
-                new_parameters = copy.copy(parameters)
-                new_parameters['vsa_ip'] = vsa_ip
-                local_machineid = Ovs.get_my_machine_id()
-                if local_machineid == vsa_machineid:
-                    # Inline execution, since it's on the same node (preventing deadlocks)
-                    VMachineController.add_vpool(new_parameters)
-                else:
-                    # Async execution, since it has to be executed on another node
-                    # @TODO: Will break in Celery 3.2, need to find another solution
-                    # Requirements:
-                    # - This code cannot continue until this new task is completed (as all these VSAs need to be
-                    #   handled sequentially
-                    # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
-                    result = VMachineController.add_vpool.s(new_parameters).apply_async(
-                        routing_key='vsa.{0}'.format(vsa_machineid)
-                    )
-                    result.wait()
-            except:
-                success = False
-        # Remove VSRs
-        for vsr_guid in vsr_guids:
-            try:
-                VMachineController.remove_vsr(vsr_guid)
-            except:
-                success = False
-        return success
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.get_version_info')
-    def get_version_info(vsa_guid):
-        """
-        Returns version information regarding a given VSA
-        """
-        return {'vsa_guid': vsa_guid,
-                'versions': Package.get_versions()}
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.check_s3')
-    def check_s3(host, port, accesskey, secretkey):
-        """
-        Validates whether connection to a given S3 backend can be made
-        """
-        try:
-            import boto
-            import boto.s3.connection
-            backend = boto.connect_s3(aws_access_key_id=accesskey,
-                                      aws_secret_access_key=secretkey,
-                                      port=port,
-                                      host=host,
-                                      is_secure=(port == 443),
-                                      calling_format=boto.s3.connection.OrdinaryCallingFormat())
-            backend.get_all_buckets()
-            return True
-        except Exception as ex:
-            logger.exception('Error during S3 check: {0}'.format(ex))
-            return False
-
-    @staticmethod
-    @celery.task(name='ovs.vsa.check_mtpt')
-    def check_mtpt(name):
-        """
-        Checks whether a given mountpoint for vPool is in use
-        """
-        mountpoint = '/mnt/{0}'.format(name)
-        if not os.path.exists(mountpoint):
-            return True
-        return check_output('ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'

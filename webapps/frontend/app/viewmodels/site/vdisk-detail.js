@@ -13,11 +13,11 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/pmachine', '../containers/vpool',
+    'jquery', 'plugins/dialog', 'knockout',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher',
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, PMachine, VPool, RollbackWizard) {
+], function($, dialog, ko, shared, generic, Refresher, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -45,14 +45,14 @@ define([
                 vdisk.load()
                     .then(function() {
                         self.snapshotsInitialLoad(false);
-                        var vm, pool,
-                            vsaGuid = vdisk.vsaGuid(),
+                        var vm, sr, pool,
+                            storageRouterGuid = vdisk.storageRouterGuid(),
                             vMachineGuid = vdisk.vMachineGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
-                        if (vsaGuid && (vdisk.vsa() === undefined || vdisk.vsa().guid() !== vsaGuid)) {
-                            vm = new VMachine(vsaGuid);
-                            vm.load();
-                            vdisk.vsa(vm);
+                        if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
+                            sr = new StorageRouter(storageRouterGuid);
+                            sr.load();
+                            vdisk.storageRouter(sr);
                         }
                         if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
                             vm = new VMachine(vMachineGuid);

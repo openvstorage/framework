@@ -26,10 +26,12 @@ import signal
 STORAGE_PREFIX = "ovs_snmp"
 NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
 
+
 class OVSSNMPServer():
     """
     Bootstrap the SNMP Server, hook into ovs
     """
+
     def __init__(self):
         """
         Init
@@ -37,8 +39,8 @@ class OVSSNMPServer():
         signal.signal(signal.SIGTERM, self.SIGTERM)
 
         from ovs.extensions.generic.system import Ovs
-        my_vsa = Ovs.get_my_vsa()
-        self.host = my_vsa.ip
+        my_storagerouter = Ovs.get_my_storagerouter()
+        self.host = my_storagerouter.ip
         self.port = 161
 
         self.persistent = PersistentFactory.get_client()
@@ -122,7 +124,6 @@ class OVSSNMPServer():
         if not self.instance_oid in self.assigned_oids[class_id]:
             self.assigned_oids[class_id][self.instance_oid] = {}
 
-
         for instance_id in self.assigned_oids[class_id]:
             for attr_id in self.assigned_oids[class_id][instance_id]:
                 existing = self.assigned_oids[class_id][instance_id][attr_id]
@@ -177,36 +178,34 @@ class OVSSNMPServer():
             enabled = True # Enabled by default, can be disabled by setting the key
         if enabled:
             from ovs.dal.lists.vdisklist import VDiskList
-            from ovs.dal.lists.vmachinelist import VMachineList
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
             from ovs.dal.lists.pmachinelist import PMachineList
+            from ovs.dal.lists.vmachinelist import VMachineList
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 
-            for vm in VMachineList.get_vsas():
-                _guids.add(vm.guid)
+            for storagerouter in StorageRouterList.get_storagerouters():
+                _guids.add(storagerouter.guid)
 
-                if vm.is_internal:
-                    self._register_dal_model(10, vm, 'guid', "0")
-                    self._register_dal_model(10, vm, 'name', "1")
-                    self._register_dal_model(10, vm, 'hypervisor_status', "2")
-                    self._register_dal_model(10, vm, 'pmachine', "3", key = 'host_status')
-                    self._register_dal_model(10, vm, 'description', "4")
-                    self._register_dal_model(10, vm, 'devicename', "5")
-                    self._register_dal_model(10, vm, 'failover_mode', "6")
-                    self._register_dal_model(10, vm, 'hypervisorid', "7")
-                    self._register_dal_model(10, vm, 'ip', "8")
-                    self._register_dal_model(10, vm, 'machineid', "9")
-                    self._register_dal_model(10, vm, 'status', "10")
-                    self._register_dal_model(10, vm, '#vdisks', "11",
-                                             func = lambda gsr: len([vdisk for vpool_vdisks in [vsr.vpool.vdisks for vsr in gsr.served_vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
-                                             atype = int)
-                    self._register_dal_model(10, vm, '#vmachines', "12",
-                                             func = lambda gsr: len(set([vdisk.vmachine.guid for vpool_vdisks in [vsr.vpool.vdisks for vsr in gsr.served_vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid])),
-                                             atype = int)
-                    self._register_dal_model(10, vm, '#stored_data', "13",
-                                             func = lambda gsr: sum([vdisk.vmachine.stored_data for vpool_vdisks in [vsr.vpool.vdisks for vsr in gsr.served_vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
-                                             atype = int)
-                    self.instance_oid += 1
+                self._register_dal_model(10, storagerouter, 'guid', "0")
+                self._register_dal_model(10, storagerouter, 'name', "1")
+                self._register_dal_model(10, storagerouter, 'pmachine', "3", key = 'host_status')
+                self._register_dal_model(10, storagerouter, 'description', "4")
+                self._register_dal_model(10, storagerouter, 'devicename', "5")
+                self._register_dal_model(10, storagerouter, 'failover_mode', "6")
+                self._register_dal_model(10, storagerouter, 'ip', "8")
+                self._register_dal_model(10, storagerouter, 'machineid', "9")
+                self._register_dal_model(10, storagerouter, 'status', "10")
+                self._register_dal_model(10, storagerouter, '#vdisks', "11",
+                                         func = lambda storagerouter: len([vdisk for vpool_vdisks in [vsr.vpool.vdisks for vsr in storagerouter.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
+                                         atype = int)
+                self._register_dal_model(10, storagerouter, '#vmachines', "12",
+                                         func = lambda storagerouter: len(set([vdisk.vmachine.guid for vpool_vdisks in [vsr.vpool.vdisks for vsr in storagerouter.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid])),
+                                         atype = int)
+                self._register_dal_model(10, storagerouter, '#stored_data', "13",
+                                         func = lambda storagerouter: sum([vdisk.vmachine.stored_data for vpool_vdisks in [vsr.vpool.vdisks for vsr in storagerouter.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
+                                         atype = int)
+                self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
                 _guids.add(vm.guid)
@@ -217,7 +216,7 @@ class OVSSNMPServer():
                     def _children(vmt):
                         children = 0
                         disks = [vd.guid for vd in vmt.vdisks]
-                        for vdisk in [vdisk.parent_vdisk_guid for item in [vm.vdisks for vm in VMachineList.get_vmachines() if not vm.is_internal and not vm.is_vtemplate] for vdisk in item]:
+                        for vdisk in [vdisk.parent_vdisk_guid for item in [vm.vdisks for vm in VMachineList.get_vmachines() if not vm.is_vtemplate] for vdisk in item]:
                             for disk in disks:
                                 if vdisk == disk:
                                     children += 1
@@ -228,7 +227,7 @@ class OVSSNMPServer():
             for vm in VMachineList.get_vmachines():
                 _guids.add(vm.guid)
 
-                if not vm.is_internal and not vm.is_vtemplate:
+                if not vm.is_vtemplate:
                     self._register_dal_model(0, vm, 'guid', "0")
                     self._register_dal_model(0, vm, 'name', "1")
                     self._register_dal_model(0, vm, 'statistics', "2.0", key = "operations", atype = int)
@@ -272,7 +271,6 @@ class OVSSNMPServer():
                     self._register_dal_model(0, vm, 'failover_mode', "6")
                     self._register_dal_model(0, vm, 'hypervisorid', "7")
                     self._register_dal_model(0, vm, 'ip', "8")
-                    self._register_dal_model(0, vm, 'machineid', "9")
                     self._register_dal_model(0, vm, 'status', "10")
                     self._register_dal_model(0, vm, 'stored_data', "10", atype = int)
                     self._register_dal_model(0, vm, 'snapshots', "11", atype = int)

@@ -17,7 +17,7 @@ VolumeStorageRouter module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
 import time
 
@@ -25,7 +25,7 @@ import time
 class VolumeStorageRouter(DataObject):
     """
     The VolumeStorageRouter class represents a Volume Storage Router (VSR). A VSR is an application
-    on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
+    on a Storage Router to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
     __blueprint = {'name':             (None, str, 'Name of the VSR.'),
@@ -39,8 +39,8 @@ class VolumeStorageRouter(DataObject):
                    'mountpoint_bfs':   (None, str, 'Mountpoint for the backend filesystem (used for local and distributed fs)'),
                    'mountpoint_md':    (None, str, 'Mountpoint for metadata'),
                    'mountpoint_cache': (None, str, 'Mountpoint for caching')}
-    __relations = {'vpool':            (VPool, 'vsrs'),
-                   'serving_vmachine': (VMachine, 'served_vsrs')}
+    __relations = {'vpool':         (VPool, 'vsrs'),
+                   'storagerouter': (StorageRouter, 'vsrs')}
     __expiry = {'status':        (30, str),
                 'statistics':     (4, dict),
                 'stored_data':   (60, int)}

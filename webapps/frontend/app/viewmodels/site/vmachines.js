@@ -13,40 +13,39 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../containers/vpool'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, VPool) {
+    '../containers/vmachine', '../containers/vpool', '../containers/storagerouter'
+], function($, ko, shared, generic, Refresher, api, VMachine, VPool, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared          = shared;
-        self.guard           = { authenticated: true };
-        self.refresher       = new Refresher();
-        self.widgets         = [];
-        self.vPoolCache      = {};
-        self.vsaCache        = {};
-        self.query           = {
+        self.shared             = shared;
+        self.guard              = { authenticated: true };
+        self.refresher          = new Refresher();
+        self.widgets            = [];
+        self.vPoolCache         = {};
+        self.storageRouterCache = {};
+        self.query              = {
             query: {
                 type: 'AND',
-                items: [['is_internal', 'EQUALS', false],
-                        ['is_vtemplate', 'EQUALS', false],
+                items: [['is_vtemplate', 'EQUALS', false],
                         ['status', 'NOT_EQUALS', 'CREATED']]
             }
         };
-        self.vMachineHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
-            { key: 'vpool',        value: $.t('ovs:generic.vpool'),      width: 150       },
-            { key: 'vsa',          value: $.t('ovs:generic.vsa'),        width: 100       },
-            { key: undefined,      value: $.t('ovs:generic.vdisks'),     width: 60        },
-            { key: 'storedData',   value: $.t('ovs:generic.storeddata'), width: 110       },
-            { key: 'cacheRatio',   value: $.t('ovs:generic.cache'),      width: 100       },
-            { key: 'iops',         value: $.t('ovs:generic.iops'),       width: 55        },
-            { key: 'readSpeed',    value: $.t('ovs:generic.read'),       width: 120       },
-            { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 120       },
-            { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: 50        }
+        self.vMachineHeaders    = [
+            { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
+            { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 150       },
+            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
+            { key: undefined,       value: $.t('ovs:generic.vdisks'),        width: 60        },
+            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
+            { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
+            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 55        },
+            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 120       },
+            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 120       },
+            { key: 'failoverMode',  value: $.t('ovs:generic.focstatus'),     width: 50        }
         ];
 
         // Handles
@@ -111,14 +110,14 @@ define([
                                 if ($.inArray(vm.guid(), guids) !== -1) {
                                     vm.fillData(vmdata[vm.guid()]);
                                     generic.crossFiller(
-                                        vm.vSAGuids, vm.vSAs,
+                                        vm.storageRouterGuids, vm.storageRouters,
                                         function(guid) {
-                                            if (!self.vsaCache.hasOwnProperty(guid)) {
-                                                var vm = new VMachine(guid);
-                                                vm.load('');
-                                                self.vsaCache[guid] = vm;
+                                            if (!self.storageRouterCache.hasOwnProperty(guid)) {
+                                                var sr = new StorageRouter(guid);
+                                                sr.load('');
+                                                self.storageRouterCache[guid] = sr;
                                             }
-                                            return self.vsaCache[guid];
+                                            return self.storageRouterCache[guid];
                                         }, 'guid'
                                     );
                                     generic.crossFiller(

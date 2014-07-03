@@ -13,10 +13,10 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../containers/pmachine', '../containers/vpool', '../containers/volumestoragerouter'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine, VPool, VolumeStorageRouter) {
+    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/volumestoragerouter'
+], function($, ko, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, VolumeStorageRouter) {
     "use strict";
     return function() {
         var self = this;
@@ -33,7 +33,7 @@ define([
         self.loadVSRsHandle   = {};
 
         // Observables
-        self.VSA               = ko.observable();
+        self.storageRouter     = ko.observable();
         self.vPoolsLoaded      = ko.observable(false);
         self.vPools            = ko.observableArray([]);
         self.checkedVPoolGuids = ko.observableArray([]);
@@ -41,29 +41,27 @@ define([
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
-                var vsa = self.VSA();
+                var storageRouter = self.storageRouter();
                 $.when.apply($, [
-                        vsa.load(),
-                        vsa.fetchServedChildren(),
-                        vsa.loadDisks(),
-                        vsa.getAvailableActions()
+                        storageRouter.load('_dynamics,_relations'),
+                        storageRouter.getAvailableActions()
                     ])
                     .then(self.loadVSRs)
                     .then(self.loadVPools)
                     .done(function() {
-                        self.checkedVPoolGuids(self.VSA().vPoolGuids);
-                        var pMachineGuid = vsa.pMachineGuid(), pm;
-                        if (pMachineGuid && (vsa.pMachine() === undefined || vsa.pMachine().guid() !== pMachineGuid)) {
+                        self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
+                        var pMachineGuid = storageRouter.pMachineGuid(), pm;
+                        if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
                             if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
                                 pm = new PMachine(pMachineGuid);
                                 pm.load();
                                 self.pMachineCache[pMachineGuid] = pm;
                             }
-                            vsa.pMachine(self.pMachineCache[pMachineGuid]);
+                            storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
                         }
                         // Move child guids to the observables for easy display
-                        vsa.vPools(vsa.vPoolGuids);
-                        vsa.vMachines(vsa.vMachineGuids);
+                        storageRouter.vPools(storageRouter.vPoolGuids);
+                        storageRouter.vMachines(storageRouter.vMachineGuids);
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -100,12 +98,12 @@ define([
         };
         self.loadVSRs = function() {
             return $.Deferred(function(deferred) {
-                $.each(self.VSA().servedVSRGuids, function(index, guid) {
+                $.each(self.storageRouter().vSRGuids, function(index, guid) {
                     if (generic.xhrCompleted(self.loadVSRsHandle[guid])) {
                         self.loadVSRsHandle[guid] = api.get('volumestoragerouters/' + guid)
                             .done(function(data) {
                                 var vsrFound = false, vsr;
-                                $.each(self.VSA().VSRs(), function(vindex, vsr) {
+                                $.each(self.storageRouter().VSRs(), function(vindex, vsr) {
                                     if (vsr.guid() === guid) {
                                         vsr.fillData(data);
                                         vsrFound = true;
@@ -116,7 +114,7 @@ define([
                                 if (vsrFound === false) {
                                     vsr = new VolumeStorageRouter(data.guid);
                                     vsr.fillData(data);
-                                    self.VSA().VSRs.push(vsr);
+                                    self.storageRouter().VSRs.push(vsr);
                                 }
                             });
                     }
@@ -124,19 +122,16 @@ define([
                 deferred.resolve();
             }).promise();
         };
-        self.updateVSAServing = function() {
-            generic.alertError('Not implemented', 'This functionality is not implemented.');
-        };
 
         // Durandal
         self.activate = function(mode, guid) {
-            self.VSA(new VMachine(guid));
-            self.VSA().VSRs = ko.observableArray();
+            self.storageRouter(new StorageRouter(guid));
+            self.storageRouter().VSRs = ko.observableArray();
 
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
-            self.shared.footerData(self.VSA);
+            self.shared.footerData(self.storageRouter);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
