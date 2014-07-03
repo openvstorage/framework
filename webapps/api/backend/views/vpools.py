@@ -15,12 +15,12 @@
 """
 VPool module
 """
-
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybkunrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.lib.vpool import VPoolController
 from ovs.lib.vmachine import VMachineController
