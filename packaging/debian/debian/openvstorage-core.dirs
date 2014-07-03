@@ -1,0 +1,6 @@
+opt/OpenvStorage/config/elk
+opt/OpenvStorage/scripts/install
+usr/share/doc/openvstorage-core
+etc/elasticsearch
+etc/logstash/conf.d
+etc/init
