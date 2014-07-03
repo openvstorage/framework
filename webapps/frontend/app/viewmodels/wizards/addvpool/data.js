@@ -37,7 +37,7 @@ define(['knockout'], function(ko){
             port:           ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
             timeout:        ko.observable(600).extend({ numeric: {}}),
             vRouterPort:    ko.observable(12322).extend({ numeric: { min: 1, max: 65536 }, identifier: 'vrouterport' }),
-            backends:       ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED', 'REST']),
+            backends:       ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']),
             vsas:           ko.observableArray([]),
             vsrs:           ko.observableArray([]),
             mountpoints:    ko.observableArray([]),

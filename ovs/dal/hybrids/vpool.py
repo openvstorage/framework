@@ -32,7 +32,7 @@ class VPool(DataObject):
                    'backend_login':      (None, str, 'Login/Username for the Storage Backend.'),
                    'backend_password':   (None, str, 'Password for the Storage Backend.'),
                    'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
-                   'backend_type':       (None, ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'REST', 'DISTRIBUTED'], 'Type of the Storage Backend.'),
+                   'backend_type':       (None, ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'DISTRIBUTED'], 'Type of the Storage Backend.'),
                    'backend_metadata':   (None, dict, 'Metadata for the backend, as used by the VolumeDriver.')}
     __relations = {}
     __expiry = {'status':        (10, str),
