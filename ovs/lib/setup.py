@@ -937,7 +937,7 @@ print Service.stop_service('{0}')
             fs_client.run('parted {0} -s mkpart backendfs 2MB 80%'.format(hdd))
             fs_client.run('parted {0} -s mkpart tempfs 80% 100%'.format(hdd))
             fs_client.run('mkfs.ext4 -q {0}1 -L backendfs'.format(hdd))
-            fs_client.run('mkfs.ext4 -q {0}3 -L tempfs'.format(hdd))
+            fs_client.run('mkfs.ext4 -q {0}2 -L tempfs'.format(hdd))
 
             extra_mountpoints = """
 LABEL=backendfs /mnt/bfs         ext4    defaults,nobootwait,noatime,discard    0    2

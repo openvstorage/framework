@@ -1436,7 +1436,7 @@ print Configuration.get('{0}')
             client.run('parted {0} -s mkpart backendfs 2MB 80%'.format(hdd))
             client.run('parted {0} -s mkpart tempfs 80% 100%'.format(hdd))
             client.run('mkfs.ext4 -q {0}1 -L backendfs'.format(hdd))
-            client.run('mkfs.ext4 -q {0}3 -L tempfs'.format(hdd))
+            client.run('mkfs.ext4 -q {0}2 -L tempfs'.format(hdd))
 
             extra_mountpoints = """
 LABEL=backendfs /mnt/bfs         ext4    defaults,nobootwait,noatime,discard    0    2
