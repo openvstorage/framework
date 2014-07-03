@@ -833,6 +833,8 @@ if Service.has_service('{0}'):
                 vpool.backend_metadata = {'backend_type': 'LOCAL'}
                 mountpoint_bfs = parameters.get('mountpoint_bfs') or Helper.ask_string('Specify {0} storage backend directory'.format(vpool.backend_type.lower()))
                 directories_to_create.append(mountpoint_bfs)
+                if vpool.backend_type == 'DISTRIBUTED':
+                    vpool.backend_metadata['local_connection_path'] = mountpoint_bfs
             if vpool.backend_type == 'REST':
                 connection_host = parameters.get('connection_host') or Helper.ask_string('Provide REST ip address')
                 connection_port = parameters.get('connection_port') or Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
@@ -850,7 +852,7 @@ if Service.has_service('{0}'):
                                                                                           max_value=65535)
                 connection_username = parameters.get('connection_username') or Helper.ask_string('Specify S3 access key')
                 connection_password = parameters.get('connection_password') or getpass.getpass()
-                strict_consistency = 'false' if vpool.backend_type in ('SWIFT_S3') else 'true'
+                strict_consistency = 'false' if vpool.backend_type in ['SWIFT_S3'] else 'true'
                 vpool.backend_metadata = {'s3_connection_host': connection_host,
                                           's3_connection_port': connection_port,
                                           's3_connection_username': connection_username,
@@ -895,11 +897,6 @@ if Service.has_service('{0}'):
         directories_to_create.append(mountpoint_temp)
         directories_to_create.append(mountpoint_md)
         directories_to_create.append(mountpoint_cache)
-
-        if vpool.backend_type == 'DISTRIBUTED':
-            volumes_directory = '{0}/bfs'.format(mountpoint_bfs)
-            vpool.backend_metadata['local_connection_path'] = volumes_directory
-            directories_to_create.append(volumes_directory)
 
         client = Client.load(ip)
         dir_create_script = """
@@ -1060,19 +1057,6 @@ Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', comma
             fc_name, fc_cmd, params
         )
         Manager._exec_python(client, service_script)
-
-        fstab_script_remove = """
-from ovs.extensions.fs.fstab import Fstab
-fstab = Fstab()
-fstab.remove_config_by_directory('{0}')
-"""
-
-        fstab_script_add = """
-from ovs.extensions.fs.fstab import Fstab
-fstab = Fstab()
-fstab.remove_config_by_directory('{0}')
-fstab.add_config('{1}', '{0}', '{2}', '{3}', '{4}', '{5}')
-"""
 
         if vsa.pmachine.hvtype == 'VMWARE':
             Manager.init_exportfs(client, vpool.name)
