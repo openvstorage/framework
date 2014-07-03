@@ -34,7 +34,7 @@ define([
         data.secretkey('');
         data.backend('LOCAL');
         data.mtptTemp(undefined);
-        data.mtptDFS(undefined);
+        data.mtptBFS(undefined);
         data.mtptMD(undefined);
         data.mtptCache(undefined);
         data.storageIP(undefined);

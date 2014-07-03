@@ -20,7 +20,7 @@ import hashlib
 import json
 import copy
 from random import randint
-from ovs.dal.helpers import Descriptor, Toolbox
+from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -78,7 +78,7 @@ class DataList(object):
             identifier = copy.deepcopy(query)
             identifier['object'] = identifier['object'].__name__
             self._key = hashlib.sha256(json.dumps(identifier)).hexdigest()
-        self._key = '%s_%s' % (DataList.namespace, self._key)
+        self._key = '{0}_{1}'.format(DataList.namespace, self._key)
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query
@@ -181,18 +181,22 @@ class DataList(object):
             # in any possible combination
 
             Toolbox.log_cache_hit('datalist', False)
+            hybrid_structure = HybridRunner.get_hybrids()
 
             items = self._query['query']['items']
             query_type = self._query['query']['type']
             query_data = self._query['data']
             query_object = self._query['object']
+            query_object_id = Descriptor(query_object).descriptor['identifier']
+            if query_object_id in hybrid_structure and query_object_id != hybrid_structure[query_object_id]['identifier']:
+                query_object = Descriptor().load(hybrid_structure[query_object_id]).get_object()
 
             invalidations = {query_object.__name__.lower(): ['__all']}
             DataList._build_invalidations(invalidations, query_object, items)
 
             for class_name in invalidations:
-                key = '%s_%s' % (DataList.cachelink, class_name)
-                mutex = VolatileMutex('listcache_%s' % class_name)
+                key = '{0}_{1}'.format(DataList.cachelink, class_name)
+                mutex = VolatileMutex('listcache_{0}'.format(class_name))
                 try:
                     mutex.acquire(60)
                     cache_list = Toolbox.try_get(key, {})
@@ -207,7 +211,7 @@ class DataList(object):
             self.from_cache = False
             namespace = query_object()._namespace
             name = query_object.__name__.lower()
-            base_key = '%s_%s_' % (namespace, name)
+            base_key = '{0}_{1}_'.format(namespace, name)
             keys = DataList.get_pks(namespace, name)
 
             if query_data == DataList.select.COUNT:
@@ -241,7 +245,7 @@ class DataList(object):
             if self._key is not None and len(keys) > 0 and self._can_cache:
                 invalidated = False
                 for class_name in invalidations:
-                    key = '%s_%s' % (DataList.cachelink, class_name)
+                    key = '{0}_{1}'.format(DataList.cachelink, class_name)
                     cache_list = Toolbox.try_get(key, {})
                     if self._key not in cache_list:
                         invalidated = True
@@ -320,11 +324,11 @@ class DataList(object):
         vMachine, own_key is vdisks and own_guid is whatever guid the current vMachine has.
         """
         own_name = own_class.__name__.lower()
-        datalist = DataList({}, '%s_%s_%s' % (own_name, own_guid, remote_key), load=False)
-        base_key = '%s_%s_%%s_%s' % (DataList.namespace, own_name, own_key)
-        # base_key is e.g. ovs_list_vmachine_%s_vdisks
+        datalist = DataList({}, '{0}_{1}_{2}'.format(own_name, own_guid, remote_key), load=False)
+        base_key = '{0}_{1}_{{0}}_{2}'.format(DataList.namespace, own_name, own_key)
+        # base_key is e.g. ovs_list_vmachine_{0}_vdisks
 
-        data = datalist._volatile.get(base_key % own_guid)
+        data = datalist._volatile.get(base_key.format(own_guid))
         if data is None:
             # Cache miss
             Toolbox.log_cache_hit('datalist', False)
@@ -332,7 +336,7 @@ class DataList(object):
             remote_name = remote_class.__name__.lower()
 
             own_namespace = own_class()._namespace
-            own_base_key = '%s_%s_' % (own_namespace, own_name)  # e.g. ovs_data_vmachine_
+            own_base_key = '{0}_{1}_'.format(own_namespace, own_name)  # e.g. ovs_data_vmachine_
             own_keys = DataList.get_pks(own_namespace, own_name)
 
             lists = {}
@@ -343,13 +347,13 @@ class DataList(object):
                 lists[own_guid] = []
 
             # Save invalidations
-            key = '%s_%s' % (DataList.cachelink, remote_name)  # e.g. ovs_listcache_vdisk
-            mutex = VolatileMutex('listcache_%s' % remote_name)
+            key = '{0}_{1}'.format(DataList.cachelink, remote_name)  # e.g. ovs_listcache_vdisk
+            mutex = VolatileMutex('listcache_{0}'.format(remote_name))
             try:
                 mutex.acquire(60)
                 cache_list = Toolbox.try_get(key, {})
                 for guid in lists:
-                    list_key = base_key % guid
+                    list_key = base_key.format(guid)
                     current_fields = cache_list.get(list_key, [])
                     current_fields = list(set(current_fields + ['__all', remote_key]))
                     cache_list[list_key] = current_fields
@@ -359,14 +363,14 @@ class DataList(object):
                 mutex.release()
 
             remote_namespace = remote_class()._namespace
-            remote_base_key = '%s_%s_' % (remote_namespace, remote_name)  # e.g. ovs_data_vdisk_
+            remote_base_key = '{0}_{1}_'.format(remote_namespace, remote_name)  # e.g. ovs_data_vdisk_
             remote_keys = DataList.get_pks(remote_namespace, remote_name)
 
             for key in remote_keys:
                 guid = key.replace(remote_base_key, '')
                 try:
                     instance = remote_class(guid)
-                    foreign_key = getattr(instance, '%s_guid' % remote_key)
+                    foreign_key = getattr(instance, '{0}_guid'.format(remote_key))
                     if foreign_key not in lists:
                         lists[foreign_key] = []
                     lists[foreign_key].append(Descriptor(remote_class, guid).descriptor)
@@ -375,8 +379,8 @@ class DataList(object):
 
             abort = False
             for guid in lists:
-                list_key = base_key % guid
-                key = '%s_%s' % (DataList.cachelink, remote_name)  # e.g. ovs_listcache_vdisk
+                list_key = base_key.format(guid)
+                key = '{0}_{1}'.format(DataList.cachelink, remote_name)  # e.g. ovs_listcache_vdisk
                 cache_list = Toolbox.try_get(key, {})
                 if list_key in cache_list:
                     datalist._volatile.set(list_key, lists[guid], 300 + randint(0, 300))  # Cache between 5 and 10 minutes
@@ -386,7 +390,7 @@ class DataList(object):
 
             if abort:
                 for guid in lists:
-                    list_key = base_key % guid
+                    list_key = base_key.format(guid)
                     datalist._volatile.delete(list_key)
 
             datalist.data = lists.get(own_guid)
@@ -409,7 +413,7 @@ class DataList(object):
         """
         This adds the current primary key to the primary key index
         """
-        mutex = VolatileMutex('primarykeys_%s' % name)
+        mutex = VolatileMutex('primarykeys_{0}'.format(name))
         try:
             mutex.acquire(10)
             keys = DataList._get_pks(namespace, name)
@@ -423,7 +427,7 @@ class DataList(object):
         """
         This deletes the current primary key from the primary key index
         """
-        mutex = VolatileMutex('primarykeys_%s' % name)
+        mutex = VolatileMutex('primarykeys_{0}'.format(name))
         try:
             mutex.acquire(10)
             keys = DataList._get_pks(namespace, name)
@@ -441,17 +445,17 @@ class DataList(object):
         Loads the primary key set information and pages, merges them to a single set
         and returns it
         """
-        internal_key = 'ovs_primarykeys_%s' % name
+        internal_key = 'ovs_primarykeys_{0}'.format(name)
         volatile = VolatileFactory.get_client()
         persistent = PersistentFactory.get_client()
         keys = set()
         key_sets = volatile.get(internal_key)
         if key_sets is None:
-            return set(persistent.prefix('%s_%s_' % (namespace, name)))
+            return set(persistent.prefix('{0}_{1}_'.format(namespace, name)))
         for key_set in key_sets:
-            subset = volatile.get('%s_%d' % (internal_key, key_set))
+            subset = volatile.get('{0}_{1}'.format(internal_key, key_set))
             if subset is None:
-                return set(persistent.prefix('%s_%s_' % (namespace, name)))
+                return set(persistent.prefix('{0}_{1}_'.format(namespace, name)))
             else:
                 keys = keys.union(subset)
         return keys
@@ -461,15 +465,15 @@ class DataList(object):
         """
         Pages and saves a set
         """
-        internal_key = 'ovs_primarykeys_%s' % name
+        internal_key = 'ovs_primarykeys_{0}'.format(name)
         volatile = VolatileFactory.get_client()
         keys = list(keys)
         old_key_sets = volatile.get(internal_key) or []
         key_sets = []
         for i in range(0, len(keys), 5000):
-            volatile.set('%s_%d' % (internal_key, i), keys[i:i + 5000])
+            volatile.set('{0}_{1}'.format(internal_key, i), keys[i:i + 5000])
             key_sets.append(i)
         for key_set in old_key_sets:
             if key_set not in key_sets:
-                volatile.delete('%s_%d' % (internal_key, key_set))
+                volatile.delete('{0}_{1}'.format(internal_key, key_set))
         volatile.set(internal_key, key_sets)

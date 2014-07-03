@@ -23,15 +23,15 @@ class MgmtCenter(DataObject):
     The MgmtCenter represents a management center (e.g. vCenter Server for VMware)
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':        (None, str, 'Name of the Management Center.'),
-                  'description': (None, str, 'Description of the Management Center.'),
-                  'username':    (None, str, 'Username of the Management Center.'),
-                  'password':    (None, str, 'Password of the Management Center.'),
-                  'ip':          (None, str, 'IP address of the Management Center.'),
-                  'port':        (None, int, 'Port of the Management Center.'),
-                  'type':        (None, ['VCENTER'], 'Management Center type.')}
-    _relations = {}
-    _expiry = {'hosts': (60, dict)}
+    __blueprint = {'name':        (None, str, 'Name of the Management Center.'),
+                   'description': (None, str, 'Description of the Management Center.'),
+                   'username':    (None, str, 'Username of the Management Center.'),
+                   'password':    (None, str, 'Password of the Management Center.'),
+                   'ip':          (None, str, 'IP address of the Management Center.'),
+                   'port':        (None, int, 'Port of the Management Center.'),
+                   'type':        (None, ['VCENTER'], 'Management Center type.')}
+    __relations = {}
+    __expiry = {'hosts': (60, dict)}
     # pylint: enable=line-too-long
 
     def _hosts(self):

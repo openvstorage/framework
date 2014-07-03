@@ -32,26 +32,26 @@ class VDisk(DataObject):
     vDisks can be part of a vMachine or stand-alone.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':              (None, str, 'Name of the vDisk.'),
-                  'description':       (None, str, 'Description of the vDisk.'),
-                  'size':              (0, int, 'Size of the vDisk in Bytes.'),
-                  'devicename':        (None, str, 'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
-                  'order':             (None, int, 'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
-                  'volumeid':          (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
-                  'parentsnapshot':    (None, str, 'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
-                  'retentionpolicyid': (None, str, 'Retention policy used by the vDisk.'),
-                  'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
-                  'tags':              (list(), list, 'Tags of the vDisk.'),
-                  'has_autobackup':    (False, bool, 'Indicates whether this vDisk has autobackup enabled.'),
-                  'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.')}
-    _relations = {'vmachine':     (VMachine, 'vdisks'),
-                  'vpool':        (VPool, 'vdisks'),
-                  'parent_vdisk': (None, 'child_vdisks')}
-    _expiry = {'snapshots':  (60, list),
-               'info':       (60, dict),
-               'statistics':  (5, dict),
-               'vsrid':      (60, str),
-               'vsa_guid':   (15, str)}
+    __blueprint = {'name':              (None, str, 'Name of the vDisk.'),
+                   'description':       (None, str, 'Description of the vDisk.'),
+                   'size':              (0, int, 'Size of the vDisk in Bytes.'),
+                   'devicename':        (None, str, 'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
+                   'order':             (None, int, 'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
+                   'volumeid':          (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
+                   'parentsnapshot':    (None, str, 'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
+                   'retentionpolicyid': (None, str, 'Retention policy used by the vDisk.'),
+                   'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
+                   'tags':              (list(), list, 'Tags of the vDisk.'),
+                   'has_autobackup':    (False, bool, 'Indicates whether this vDisk has autobackup enabled.'),
+                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.')}
+    __relations = {'vmachine':     (VMachine, 'vdisks'),
+                   'vpool':        (VPool, 'vdisks'),
+                   'parent_vdisk': (None, 'child_vdisks')}
+    __expiry = {'snapshots':  (60, list),
+                'info':       (60, dict),
+                'statistics':  (5, dict),
+                'vsrid':      (60, str),
+                'vsa_guid':   (15, str)}
     # pylint: enable=line-too-long
 
     def __init__(self, *args, **kwargs):
@@ -114,7 +114,7 @@ class VDisk(DataObject):
         """
         client = VolumeStorageRouterClient()
         volatile = VolatileFactory.get_client()
-        prev_key = '%s_%s' % (self._key, 'statistics_previous')
+        prev_key = '{0}_{1}'.format(self._key, 'statistics_previous')
         # Load data from volumedriver
         if self.volumeid and self.vpool:
             try:
@@ -141,11 +141,11 @@ class VDisk(DataObject):
                 delta = vdiskstatsdict['timestamp'] - previousdict.get('timestamp',
                                                                        vdiskstatsdict['timestamp'])
                 if delta < 0:
-                    vdiskstatsdict['%s_ps' % key] = 0
+                    vdiskstatsdict['{0}_ps'.format(key)] = 0
                 elif delta == 0:
-                    vdiskstatsdict['%s_ps' % key] = previousdict.get('%s_ps' % key, 0)
+                    vdiskstatsdict['{0}_ps'.format(key)] = previousdict.get('{0}_ps'.format(key), 0)
                 else:
-                    vdiskstatsdict['%s_ps' % key] = (vdiskstatsdict[key] - previousdict[key]) / delta
+                    vdiskstatsdict['{0}_ps'.format(key)] = (vdiskstatsdict[key] - previousdict[key]) / delta
         volatile.set(prev_key, vdiskstatsdict, self._expiry['statistics'][0] * 10)
         # Returning the dictionary
         return vdiskstatsdict

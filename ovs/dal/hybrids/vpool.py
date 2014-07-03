@@ -26,18 +26,18 @@ class VPool(DataObject):
     deploy vMachines. a vPool can span multiple VSRs and connects to a single Storage Backend.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':               (None, str, 'Name of the vPool.'),
-                  'description':        (None, str, 'Description of the vPool.'),
-                  'size':               (None, int, 'Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
-                  'backend_login':      (None, str, 'Login/Username for the Storage Backend.'),
-                  'backend_password':   (None, str, 'Password for the Storage Backend.'),
-                  'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
-                  'backend_type':       (None, ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'REST', 'DISTRIBUTED'], 'Type of the Storage Backend.'),
-                  'backend_metadata':   (None, dict, 'Metadata for the backend, as used by the VolumeDriver.')}
-    _relations = {}
-    _expiry = {'status':        (10, str),
-               'statistics':     (5, dict),
-               'stored_data':   (60, int)}
+    __blueprint = {'name':               (None, str, 'Name of the vPool.'),
+                   'description':        (None, str, 'Description of the vPool.'),
+                   'size':               (None, int, 'Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
+                   'backend_login':      (None, str, 'Login/Username for the Storage Backend.'),
+                   'backend_password':   (None, str, 'Password for the Storage Backend.'),
+                   'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
+                   'backend_type':       (None, ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'REST', 'DISTRIBUTED'], 'Type of the Storage Backend.'),
+                   'backend_metadata':   (None, dict, 'Metadata for the backend, as used by the VolumeDriver.')}
+    __relations = {}
+    __expiry = {'status':        (10, str),
+                'statistics':     (5, dict),
+                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
     def _status(self):
@@ -55,7 +55,7 @@ class VPool(DataObject):
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
-            vdiskstatsdict['%s_ps' % key] = 0
+            vdiskstatsdict['{0}_ps'.format(key)] = 0
         for disk in self.vdisks:
             statistics = disk._statistics()  # Prevent double caching
             for key, value in statistics.iteritems():

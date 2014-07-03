@@ -15,12 +15,11 @@
 """
 VolumeStorageRouter module
 """
-import time
-
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+import time
 
 
 class VolumeStorageRouter(DataObject):
@@ -29,22 +28,22 @@ class VolumeStorageRouter(DataObject):
     on a VSA to which the vDisks connect. The VSR is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':             (None, str, 'Name of the VSR.'),
-                  'description':      (None, str, 'Description of the VSR.'),
-                  'port':             (None, int, 'Port on which the VSR is listening.'),
-                  'cluster_ip':       (None, str, 'IP address on which the VSR is listening.'),
-                  'storage_ip':       (None, str, 'IP address on which the vpool is shared to hypervisor'),
-                  'vsrid':            (None, str, 'ID of the VSR in the Open vStorage Volume Driver.'),
-                  'mountpoint':       (None, str, 'Mountpoint from which the VSR serves data'),
-                  'mountpoint_temp':  (None, str, 'Mountpoint for temporary workload (scrubbing etc)'),
-                  'mountpoint_bfs':   (None, str, 'Mountpoint for the backend filesystem (used for local and distributed fs)'),
-                  'mountpoint_md':    (None, str, 'Mountpoint for metadata'),
-                  'mountpoint_cache': (None, str, 'Mountpoint for caching')}
-    _relations = {'vpool':            (VPool, 'vsrs'),
-                  'serving_vmachine': (VMachine, 'served_vsrs')}
-    _expiry = {'status':        (30, str),
-               'statistics':     (4, dict),
-               'stored_data':   (60, int)}
+    __blueprint = {'name':             (None, str, 'Name of the VSR.'),
+                   'description':      (None, str, 'Description of the VSR.'),
+                   'port':             (None, int, 'Port on which the VSR is listening.'),
+                   'cluster_ip':       (None, str, 'IP address on which the VSR is listening.'),
+                   'storage_ip':       (None, str, 'IP address on which the vpool is shared to hypervisor'),
+                   'vsrid':            (None, str, 'ID of the VSR in the Open vStorage Volume Driver.'),
+                   'mountpoint':       (None, str, 'Mountpoint from which the VSR serves data'),
+                   'mountpoint_temp':  (None, str, 'Mountpoint for temporary workload (scrubbing etc)'),
+                   'mountpoint_bfs':   (None, str, 'Mountpoint for the backend filesystem (used for local and distributed fs)'),
+                   'mountpoint_md':    (None, str, 'Mountpoint for metadata'),
+                   'mountpoint_cache': (None, str, 'Mountpoint for caching')}
+    __relations = {'vpool':            (VPool, 'vsrs'),
+                   'serving_vmachine': (VMachine, 'served_vsrs')}
+    __expiry = {'status':        (30, str),
+                'statistics':     (4, dict),
+                'stored_data':   (60, int)}
     # pylint: enable=line-too-long
 
     def _status(self):
@@ -62,7 +61,7 @@ class VolumeStorageRouter(DataObject):
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
-            vdiskstatsdict['%s_ps' % key] = 0
+            vdiskstatsdict['{0}_ps'.format(key)] = 0
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.vsrid == self.vsrid:

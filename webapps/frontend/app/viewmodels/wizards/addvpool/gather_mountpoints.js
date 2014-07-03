@@ -31,10 +31,10 @@ define([
                 fields.push('cache');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
             }
-            if (self.data.mtptDFS() === '/' && $.inArray('dfs', fields) === -1) {
+            if (self.data.mtptBFS() === '/' && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                 valid = false;
-                fields.push('dfs');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.dfs') }));
+                fields.push('bfs');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
             }
             if (self.data.mtptMD() === '/' && $.inArray('md', fields) === -1) {
                 valid = false;
@@ -55,10 +55,10 @@ define([
                     fields.push('cache');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                 }
-                if (self.data.mtptDFS() === vsr.mountpointDFS() && $.inArray('dfs', fields) === -1) {
+                if (self.data.mtptBFS() === vsr.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                     valid = false;
-                    fields.push('dfs');
-                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.dfs') }));
+                    fields.push('bfs');
+                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
                 }
                 if (self.data.mtptMD() === vsr.mountpointMD() && $.inArray('md', fields) === -1) {
                     valid = false;
@@ -70,11 +70,11 @@ define([
                     fields.push('temp');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                 }
-                if ((self.data.mtptDFS() === vsr.mountpointCache() || self.data.mtptDFS() === vsr.mountpointMD() ||
-                        self.data.mtptDFS() === vsr.mountpointTemp()) && $.inArray('dfs', fields) === -1) {
+                if ((self.data.mtptBFS() === vsr.mountpointCache() || self.data.mtptBFS() === vsr.mountpointMD() ||
+                        self.data.mtptBFS() === vsr.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
                     valid = false;
-                    fields.push('dfs');
-                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.dfsexclusive'));
+                    fields.push('bfs');
+                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsexclusive'));
                 }
                 if ($.inArray(self.data.vRouterPort(), [vsr.port() - 1, vsr.port(), vsr.port() + 1]) !== -1 && $.inArray('port', fields) === -1) {
                     valid = false;
@@ -83,18 +83,12 @@ define([
                 }
                 return true;
             });
-            if ((self.data.mtptDFS() === self.data.mtptCache() || self.data.mtptDFS() === self.data.mtptMD() ||
-                    self.data.mtptDFS() === self.data.mtptTemp()) && $.inArray('dfs', fields) === -1) {
+            if ((self.data.mtptBFS() === self.data.mtptCache() || self.data.mtptBFS() === self.data.mtptMD() ||
+                    self.data.mtptBFS() === self.data.mtptTemp()) && $.inArray('bfs', fields) === -1 &&
+                    (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                 valid = false;
-                fields.push('dfs');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.dfsnotshared'));
-            }
-            if (self.data.backend() === 'CEPH_S3' && self.data.files() !== undefined && (
-                    (self.data.files().hasOwnProperty('/etc/ceph/ceph.conf') && !self.data.files()['/etc/ceph/ceph.conf']) ||
-                    (self.data.files().hasOwnProperty('/etc/ceph/ceph.keyring') && !self.data.files()['/etc/ceph/ceph.keyring']))) {
-                valid = false;
-                fields.push('ceph_files');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.cephfilesmissing'));
+                fields.push('bfs');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsnotshared'));
             }
             if (!self.data.allowVPool() && $.inArray('vpool', fields) === -1) {
                 valid = false;
@@ -111,10 +105,10 @@ define([
                 fields.push('temp');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.tempfs') }));
             }
-            if (!self.data.mtptDFS.valid()) {
+            if (!self.data.mtptBFS.valid() && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                 valid = false;
-                fields.push('dfs');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.dfs') }));
+                fields.push('bfs');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.bfs') }));
             }
             if (!self.data.mtptMD.valid()) {
                 valid = false;

@@ -60,8 +60,8 @@ def configure_coredump():
 
 
 def setup_ssh_key_authentication():
-    root_ssh_folder = '{0}/.ssh'.format(check_output('echo ~', shell=True).strip())
-    ovs_ssh_folder = '{0}/.ssh'.format(check_output('su - ovs -c "echo ~"', shell=True).strip())
+    root_ssh_folder = '{0}/.ssh'.format(check_output('echo ~root', shell=True).strip())
+    ovs_ssh_folder = '{0}/.ssh'.format(check_output('echo ~ovs', shell=True).strip())
     private_key_filename = '{0}/id_rsa'
     authorized_keys_filename = '{0}/authorized_keys'
     known_hosts_filename = '{0}/known_hosts'

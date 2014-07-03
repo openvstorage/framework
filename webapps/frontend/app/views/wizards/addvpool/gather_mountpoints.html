@@ -16,19 +16,24 @@ limitations under the License.
 <div>
     <form role="form form-horizontal" class="form-horizontal">
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.basicinfo"></p>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.bfsinfo"
+           data-bind="visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+        </p>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('bfs', canContinue().fields) !== -1 },
+                                           visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptBFS,
+                                             free: true, defaultfree: '/mnt/bfs/' + data.name(), defaultRegex: /bfs/ }">
+                </span>
+            </div>
+        </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.mtptinfo"></p>
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('tempfs', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptTemp,
                                              free: true, defaultfree: '/', defaultRegex: /tmp/ }">
-                </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('dfs', canContinue().fields) !== -1 }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.dfs"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptDFS,
-                                             free: true, defaultfree: '/mnt/dfs/' + data.name(), defaultRegex: /dfs/ }">
                 </span>
             </div>
         </div>
@@ -48,6 +53,7 @@ limitations under the License.
                 </span>
             </div>
         </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.otherinfo"></p>
         <div class="form-group">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></label>
             <div class="col-lg-7">
