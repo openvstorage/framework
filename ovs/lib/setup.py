@@ -519,8 +519,7 @@ EOF
        'broker_username' : ovs_config.get('core', 'broker.login'),
        'broker_password' : ovs_config.get('core', 'broker.password')}))
 
-                client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
-
+                # Do not reset existing config, other applications might be using it (e.g. devstack)
                 if join_masters and join_cluster:
                     # Copy rabbitmq cookie
                     logger.debug('Copying RMQ cookie')
@@ -637,7 +636,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                                      'http://"+window.location.hostname+":9200',
                                                      'http://' + cluster_ip + ':9200')
 
-            # Imports, not earlier then here, as all required config files should be in place.
+            # Imports, not earlier than here, as all required config files should be in place.
             from ovs.dal.hybrids.pmachine import PMachine
             from ovs.dal.lists.pmachinelist import PMachineList
             from ovs.dal.hybrids.vmachine import VMachine
