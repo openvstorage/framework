@@ -161,11 +161,11 @@ class VMware(object):
         _ = self
         return path.strip('/')
 
-    def get_vmachine_path(self, machinename, storagerouter_machineid):
+    def get_vmachine_path(self, machinename, storageappliance_machineid):
         """
         Builds the path for the file representing a given vmachine
         """
-        _ = self, storagerouter_machineid  # For compatibility purposes only
+        _ = self, storageappliance_machineid  # For compatibility purposes only
         machinename = machinename.replace(' ', '_')
         return '/{}/{}.vmx'.format(machinename, machinename)
 

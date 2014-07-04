@@ -15,22 +15,22 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../containers/pmachine', '../containers/vpool', '../containers/storagerouter',
+    '../containers/vmachine', '../containers/pmachine', '../containers/vpool', '../containers/storageappliance',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine, VPool, StorageRouter, RollbackWizard, SnapshotWizard) {
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine, VPool, StorageAppliance, RollbackWizard, SnapshotWizard) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared             = shared;
-        self.guard              = { authenticated: true };
-        self.refresher          = new Refresher();
-        self.widgets            = [];
-        self.vPoolCache         = {};
-        self.storageRouterCache = {};
-        self.pMachineCache      = {};
-        self.vDiskHeaders       = [
+        self.shared                = shared;
+        self.guard                 = { authenticated: true };
+        self.refresher             = new Refresher();
+        self.widgets               = [];
+        self.vPoolCache            = {};
+        self.storageApplianceCache = {};
+        self.pMachineCache         = {};
+        self.vDiskHeaders          = [
             { key: 'name',         value: $.t('ovs:generic.name'),         width: undefined },
             { key: 'size',         value: $.t('ovs:generic.size'),         width: 100       },
             { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110       },
@@ -40,7 +40,7 @@ define([
             { key: 'writeSpeed',   value: $.t('ovs:generic.write'),        width: 100       },
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: 50        }
         ];
-        self.snapshotHeaders    = [
+        self.snapshotHeaders       = [
             { key: 'label',         value: $.t('ovs:generic.description'), width: undefined },
             { key: 'timestamp',     value: $.t('ovs:generic.datetime'),    width: 200       },
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
@@ -77,14 +77,14 @@ define([
                             }, 'guid'
                         );
                         generic.crossFiller(
-                            vm.storageRouterGuids, vm.storageRouters,
+                            vm.storageApplianceGuids, vm.storageAppliances,
                             function(guid) {
-                                if (!self.storageRouterCache.hasOwnProperty(guid)) {
-                                    var sr = new StorageRouter(guid);
-                                    sr.load('');
-                                    self.storageRouterCache[guid] = sr;
+                                if (!self.storageApplianceCache.hasOwnProperty(guid)) {
+                                    var sa = new StorageAppliance(guid);
+                                    sa.load('');
+                                    self.storageApplianceCache[guid] = sa;
                                 }
-                                return self.storageRouterCache[guid];
+                                return self.storageApplianceCache[guid];
                             }, 'guid'
                         );
                         var pMachineGuid = vm.pMachineGuid(), pm;

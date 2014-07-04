@@ -15,8 +15,8 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api', 'ovs/refresher',
-    '../containers/vmachine', '../containers/vpool', '../containers/storagerouter'
-], function(ko, $, shared, generic, api, Refresher, VMachine, VPool, StorageRouter) {
+    '../containers/vmachine', '../containers/vpool', '../containers/storageappliance'
+], function(ko, $, shared, generic, api, Refresher, VMachine, VPool, StorageAppliance) {
     "use strict";
     return function() {
         var self = this;
@@ -35,23 +35,23 @@ define([
         };
 
         // Handles
-        self.loadStorageRoutersHandle = undefined;
-        self.loadVPoolsHandle         = undefined;
-        self.loadVMachinesHandle      = undefined;
-        self.loadVMachineGuidsHandle  = undefined;
+        self.loadStorageAppliancesHandle = undefined;
+        self.loadVPoolsHandle            = undefined;
+        self.loadVMachinesHandle         = undefined;
+        self.loadVMachineGuidsHandle     = undefined;
 
         // Observ ables
-        self.storageRoutersLoading = ko.observable(false);
-        self.vPoolsLoading         = ko.observable(false);
-        self.vMachinesLoading      = ko.observable(false);
-        self.topVPoolMode          = ko.observable('topstoreddata');
-        self.topVmachineMode       = ko.observable('topstoreddata');
-        self.storageRouters        = ko.observableArray([]);
-        self.vPools                = ko.observableArray([]);
-        self.vMachineGuids         = ko.observableArray([]);
-        self.topVMachines          = ko.observableArray([]);
-        self.topVpoolModes         = ko.observableArray(['topstoreddata', 'topbandwidth']);
-        self.topVmachineModes      = ko.observableArray(['topstoreddata', 'topbandwidth']);
+        self.storageAppliancesLoading = ko.observable(false);
+        self.vPoolsLoading            = ko.observable(false);
+        self.vMachinesLoading         = ko.observable(false);
+        self.topVPoolMode             = ko.observable('topstoreddata');
+        self.topVmachineMode          = ko.observable('topstoreddata');
+        self.storageAppliances        = ko.observableArray([]);
+        self.vPools                   = ko.observableArray([]);
+        self.vMachineGuids            = ko.observableArray([]);
+        self.topVMachines             = ko.observableArray([]);
+        self.topVpoolModes            = ko.observableArray(['topstoreddata', 'topbandwidth']);
+        self.topVmachineModes         = ko.observableArray(['topstoreddata', 'topbandwidth']);
 
         // Computed
         self.topVPools = ko.computed(function() {
@@ -114,7 +114,7 @@ define([
         self.load = function() {
             return $.Deferred(function(deferred) {
                 $.when.apply($, [
-                        self.loadStorageRouters(),
+                        self.loadStorageAppliances(),
                         self.loadVPools(),
                         self.loadVMachines()
                     ])
@@ -197,34 +197,34 @@ define([
                 }
             }).promise();
         };
-        self.loadStorageRouters = function() {
+        self.loadStorageAppliances = function() {
             return $.Deferred(function(deferred) {
-                self.storageRoutersLoading(true);
-                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
-                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
+                self.storageAppliancesLoading(true);
+                if (generic.xhrCompleted(self.loadStorageAppliancesHandle)) {
+                    self.loadStorageAppliancesHandle = api.get('storageappliances', undefined, {
                         contents: '',
                         sort: 'name,vdisks_guids'
                     })
                         .done(function(data) {
-                            var guids = [], srdata = {};
+                            var guids = [], sadata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                srdata[item.guid] = item;
+                                sadata[item.guid] = item;
                             });
                             generic.crossFiller(
-                                guids, self.storageRouters,
+                                guids, self.storageAppliances,
                                 function(guid) {
-                                    return new StorageRouter(guid);
+                                    return new StorageAppliance(guid);
                                 }, 'guid'
                             );
-                            $.each(self.storageRouters(), function(index, storageRouter) {
-                                storageRouter.fillData(srdata[storageRouter.guid()]);
+                            $.each(self.storageAppliances(), function(index, storageAppliance) {
+                                storageAppliance.fillData(sadata[storageAppliance.guid()]);
                             });
                             deferred.resolve();
                         })
                         .fail(deferred.reject)
                         .always(function() {
-                            self.storageRoutersLoading(false);
+                            self.storageAppliancesLoading(false);
                         });
                 } else {
                     deferred.reject();

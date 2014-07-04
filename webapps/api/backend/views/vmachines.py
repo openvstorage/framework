@@ -248,9 +248,9 @@ class VMachineViewSet(viewsets.ViewSet):
         for vpool in vpools:
             this_pmachine_guids = set()
             for vsr in vpool.vsrs:
-                this_pmachine_guids.add(vsr.storagerouter.pmachine_guid)
+                this_pmachine_guids.add(vsr.storageappliance.pmachine_guid)
                 if hints['full'] is True:
-                    pmachines[vsr.storagerouter.pmachine_guid] = vsr.storagerouter.pmachine
+                    pmachines[vsr.storageappliance.pmachine_guid] = vsr.storageappliance.pmachine
             if pmachine_guids is None:
                 pmachine_guids = list(this_pmachine_guids)
             else:

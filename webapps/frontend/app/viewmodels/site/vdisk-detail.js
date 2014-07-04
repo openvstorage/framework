@@ -15,9 +15,9 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storageappliance',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, dialog, ko, shared, generic, Refresher, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
+], function($, dialog, ko, shared, generic, Refresher, VDisk, VMachine, VPool, StorageAppliance, RollbackWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -45,14 +45,14 @@ define([
                 vdisk.load()
                     .then(function() {
                         self.snapshotsInitialLoad(false);
-                        var vm, sr, pool,
-                            storageRouterGuid = vdisk.storageRouterGuid(),
+                        var vm, sa, pool,
+                            storageApplianceGuid = vdisk.storageApplianceGuid(),
                             vMachineGuid = vdisk.vMachineGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
-                        if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
-                            sr = new StorageRouter(storageRouterGuid);
-                            sr.load();
-                            vdisk.storageRouter(sr);
+                        if (storageApplianceGuid && (vdisk.storageAppliance() === undefined || vdisk.storageAppliance().guid() !== storageApplianceGuid)) {
+                            sa = new StorageAppliance(storageApplianceGuid);
+                            sa.load();
+                            vdisk.storageAppliance(sa);
                         }
                         if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
                             vm = new VMachine(vMachineGuid);

@@ -15,8 +15,8 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api',
-    '../containers/storagerouter'
-], function(ko, $, shared, generic, api, StorageRouter) {
+    '../containers/storageappliance'
+], function(ko, $, shared, generic, api, StorageAppliance) {
     "use strict";
     return function() {
         var self = this;
@@ -27,14 +27,14 @@ define([
         self.loading = ko.observable(true);
 
         // Observables
-        self.storageRouters = ko.observableArray([]);
+        self.storageAppliances = ko.observableArray([]);
 
         // Computed
         self.version = ko.computed(function() {
             var versions = [];
-            $.each(self.storageRouters(), function(index, storageRouter) {
-                if (storageRouter.versions() !== undefined && $.inArray(storageRouter.versions().openvstorage, versions) === -1) {
-                    versions.push(storageRouter.versions().openvstorage);
+            $.each(self.storageAppliances(), function(index, storageAppliance) {
+                if (storageAppliance.versions() !== undefined && $.inArray(storageAppliance.versions().openvstorage, versions) === -1) {
+                    versions.push(storageAppliance.versions().openvstorage);
                 }
             });
             if (versions.length > 0) {
@@ -44,39 +44,39 @@ define([
         });
 
         // Functions
-        self.fetchStorageRouters = function() {
+        self.fetchStorageAppliances = function() {
             return $.Deferred(function(deferred) {
                 var options = {
                     sort: 'name',
                     contents: ''
                 };
-                api.get('storagerouters', undefined, options)
+                api.get('storageappliances', undefined, options)
                     .done(function(data) {
-                        var guids = [], srdata = {};
+                        var guids = [], sadata = {};
                         $.each(data, function(index, item) {
                             guids.push(item.guid);
-                            srdata[item.guid] = item;
+                            sadata[item.guid] = item;
                         });
                         generic.crossFiller(
-                            guids, self.storageRouters,
+                            guids, self.storageAppliances,
                             function(guid) {
-                                var sr = new StorageRouter(guid);
+                                var sa = new StorageAppliance(guid);
                                 if ($.inArray(guid, guids) !== -1) {
-                                    sr.fillData(srdata[guid]);
+                                    sa.fillData(sadata[guid]);
                                 }
-                                sr.versions = ko.observable();
-                                sr.loading(true);
-                                api.get('storagerouters/' + guid + '/get_version_info')
+                                sa.versions = ko.observable();
+                                sa.loading(true);
+                                api.get('storageappliances/' + guid + '/get_version_info')
                                     .then(self.shared.tasks.wait)
                                     .done(function(data) {
-                                        $.each(self.storageRouters(), function(index, storageRouter) {
-                                           if (storageRouter.guid() === data.storagerouter_guid) {
-                                               storageRouter.versions(data.versions);
-                                               storageRouter.loading(false);
+                                        $.each(self.storageAppliances(), function(index, storageAppliance) {
+                                           if (storageAppliance.guid() === data.storageappliance_guid) {
+                                               storageAppliance.versions(data.versions);
+                                               storageAppliance.loading(false);
                                            }
                                         });
                                     });
-                                return sr;
+                                return sa;
                             }, 'guid'
                         );
                         self.loading(false);
@@ -88,7 +88,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.fetchStorageRouters();
+            self.fetchStorageAppliances();
         };
     };
 });

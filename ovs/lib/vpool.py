@@ -39,7 +39,7 @@ class VPoolController(object):
         vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
         if vsr is None:
             raise RuntimeError('A VSR with id {0} could not be found.'.format(vsrid))
-        if vsr.storagerouter.pmachine.hvtype == 'VMWARE':
+        if vsr.storageappliance.pmachine.hvtype == 'VMWARE':
             nfs = Nfsexports()
             nfs.unexport(mountpoint)
             nfs.export(mountpoint)
@@ -52,7 +52,7 @@ class VPoolController(object):
         """
         vpool = VPool(vpool_guid)
         for vsr in vpool.vsrs:
-            pmachine = vsr.storagerouter.pmachine
+            pmachine = vsr.storageappliance.pmachine
             hypervisor = Factory.get(pmachine)
             for vm_object in hypervisor.get_vms_by_nfs_mountinfo(vsr.storage_ip, vsr.mountpoint):
                 search_vpool = None if pmachine.hvtype == 'KVM' else vpool
@@ -63,10 +63,10 @@ class VPoolController(object):
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
 
     @staticmethod
-    def can_be_served_on(storagerouter_guid):
+    def can_be_served_on(storageappliance_guid):
         """
         temporary check to avoid creating 2 ganesha nfs exported vpools
         as this is not yet supported on volumedriverlevel
         """
-        _ = storagerouter_guid
+        _ = storageappliance_guid
         return True

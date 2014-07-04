@@ -29,10 +29,10 @@ limitations under the License.
                        data-bind="text: name,
                                   attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
-                <td data-bind="lazylist: { items: storageRouters, loadedObservable: 'loaded' }">
+                <td data-bind="lazylist: { items: storageAppliances, loadedObservable: 'loaded' }">
                     <a data-part="entry"
                        data-bind="text: name,
-                                  attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
+                                  attr: { href: $root.shared.routing.loadHash('storageappliance-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: vDisks().length"></span></td>
                 <td><span data-bind="text: storedData"></span></td>

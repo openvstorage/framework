@@ -39,8 +39,8 @@ class OVSSNMPServer():
         signal.signal(signal.SIGTERM, self.SIGTERM)
 
         from ovs.extensions.generic.system import Ovs
-        my_storagerouter = Ovs.get_my_storagerouter()
-        self.host = my_storagerouter.ip
+        my_storageappliance = Ovs.get_my_storageappliance()
+        self.host = my_storageappliance.ip
         self.port = 161
 
         self.persistent = PersistentFactory.get_client()
@@ -178,32 +178,32 @@ class OVSSNMPServer():
             enabled = True # Enabled by default, can be disabled by setting the key
         if enabled:
             from ovs.dal.lists.vdisklist import VDiskList
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
+            from ovs.dal.lists.storageappliancelist import StorageApplianceList
             from ovs.dal.lists.pmachinelist import PMachineList
             from ovs.dal.lists.vmachinelist import VMachineList
             from ovs.dal.lists.vpoollist import VPoolList
             from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 
-            for storagerouter in StorageRouterList.get_storagerouters():
-                _guids.add(storagerouter.guid)
+            for storageappliance in StorageApplianceList.get_storageappliances():
+                _guids.add(storageappliance.guid)
 
-                self._register_dal_model(10, storagerouter, 'guid', "0")
-                self._register_dal_model(10, storagerouter, 'name', "1")
-                self._register_dal_model(10, storagerouter, 'pmachine', "3", key = 'host_status')
-                self._register_dal_model(10, storagerouter, 'description', "4")
-                self._register_dal_model(10, storagerouter, 'devicename', "5")
-                self._register_dal_model(10, storagerouter, 'failover_mode', "6")
-                self._register_dal_model(10, storagerouter, 'ip', "8")
-                self._register_dal_model(10, storagerouter, 'machineid', "9")
-                self._register_dal_model(10, storagerouter, 'status', "10")
-                self._register_dal_model(10, storagerouter, '#vdisks', "11",
-                                         func = lambda storagerouter: len([vdisk for vpool_vdisks in [vsr.vpool.vdisks for vsr in storagerouter.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
+                self._register_dal_model(10, storageappliance, 'guid', "0")
+                self._register_dal_model(10, storageappliance, 'name', "1")
+                self._register_dal_model(10, storageappliance, 'pmachine', "3", key = 'host_status')
+                self._register_dal_model(10, storageappliance, 'description', "4")
+                self._register_dal_model(10, storageappliance, 'devicename', "5")
+                self._register_dal_model(10, storageappliance, 'failover_mode', "6")
+                self._register_dal_model(10, storageappliance, 'ip', "8")
+                self._register_dal_model(10, storageappliance, 'machineid', "9")
+                self._register_dal_model(10, storageappliance, 'status', "10")
+                self._register_dal_model(10, storageappliance, '#vdisks', "11",
+                                         func = lambda storageappliance: len([vdisk for vpool_vdisks in [vsr.vpool.vdisks for vsr in storageappliance.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
                                          atype = int)
-                self._register_dal_model(10, storagerouter, '#vmachines', "12",
-                                         func = lambda storagerouter: len(set([vdisk.vmachine.guid for vpool_vdisks in [vsr.vpool.vdisks for vsr in storagerouter.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid])),
+                self._register_dal_model(10, storageappliance, '#vmachines', "12",
+                                         func = lambda storageappliance: len(set([vdisk.vmachine.guid for vpool_vdisks in [vsr.vpool.vdisks for vsr in storageappliance.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid])),
                                          atype = int)
-                self._register_dal_model(10, storagerouter, '#stored_data', "13",
-                                         func = lambda storagerouter: sum([vdisk.vmachine.stored_data for vpool_vdisks in [vsr.vpool.vdisks for vsr in storagerouter.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
+                self._register_dal_model(10, storageappliance, '#stored_data', "13",
+                                         func = lambda storageappliance: sum([vdisk.vmachine.stored_data for vpool_vdisks in [vsr.vpool.vdisks for vsr in storageappliance.vsrs] for vdisk in vpool_vdisks if vdisk.vsrid == vsr.vsrid]),
                                          atype = int)
                 self.instance_oid += 1
 

@@ -82,7 +82,7 @@ define([
         self.getAvailableActions = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadActions)) {
-                    self.loadActions = api.get('storagerouters/' + self.guid() + '/get_available_actions')
+                    self.loadActions = api.get('storageappliances/' + self.guid() + '/get_available_actions')
                         .done(function(data) {
                             self.availableActions(data);
                             deferred.resolve();
@@ -143,7 +143,7 @@ define([
                     if (contents !== undefined) {
                         options.contents = contents;
                     }
-                    self.loadHandle = api.get('storagerouters/' + self.guid(), undefined, options)
+                    self.loadHandle = api.get('storageappliances/' + self.guid(), undefined, options)
                         .done(function(data) {
                             self.fillData(data);
                             self.loaded(true);

@@ -15,32 +15,32 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter'
-], function($, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter) {
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storageappliance'
+], function($, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageAppliance) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared              = shared;
-        self.guard               = { authenticated: true };
-        self.refresher           = new Refresher();
-        self.widgets             = [];
-        self.vMachineCache       = {};
-        self.storageRouterCache  = {};
-        self.vPoolCache          = {};
-        self.vDiskHeaders        = [
-            { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
-            { key: 'vmachine',      value: $.t('ovs:generic.vmachine'),      width: 110       },
-            { key: 'vpool',         value: $.t('ovs:generic.vpool'),         width: 110       },
-            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 150       },
-            { key: 'size',          value: $.t('ovs:generic.size'),          width: 100       },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
-            { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 55        },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 100       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 100       },
-            { key: 'failoverMode',  value: $.t('ovs:generic.focstatus'),     width: 50        }
+        self.shared                 = shared;
+        self.guard                  = { authenticated: true };
+        self.refresher              = new Refresher();
+        self.widgets                = [];
+        self.vMachineCache          = {};
+        self.storageApplianceCache  = {};
+        self.vPoolCache             = {};
+        self.vDiskHeaders           = [
+            { key: 'name',             value: $.t('ovs:generic.name'),             width: undefined },
+            { key: 'vmachine',         value: $.t('ovs:generic.vmachine'),         width: 110       },
+            { key: 'vpool',            value: $.t('ovs:generic.vpool'),            width: 110       },
+            { key: 'storageappliance', value: $.t('ovs:generic.storageappliance'), width: 150       },
+            { key: 'size',             value: $.t('ovs:generic.size'),             width: 100       },
+            { key: 'storedData',       value: $.t('ovs:generic.storeddata'),       width: 110       },
+            { key: 'cacheRatio',       value: $.t('ovs:generic.cache'),            width: 100       },
+            { key: 'iops',             value: $.t('ovs:generic.iops'),             width: 55        },
+            { key: 'readSpeed',        value: $.t('ovs:generic.read'),             width: 100       },
+            { key: 'writeSpeed',       value: $.t('ovs:generic.write'),            width: 100       },
+            { key: 'failoverMode',     value: $.t('ovs:generic.focstatus'),        width: 50        }
         ];
 
         // Handles
@@ -104,17 +104,17 @@ define([
                             $.each(self.vDisks(), function(index, vdisk) {
                                 if ($.inArray(vdisk.guid(), guids) !== -1) {
                                     vdisk.fillData(vddata[vdisk.guid()]);
-                                    var vm, sr, pool,
-                                        storageRouterGuid = vdisk.storageRouterGuid(),
+                                    var vm, sa, pool,
+                                        storageApplianceGuid = vdisk.storageApplianceGuid(),
                                         vMachineGuid = vdisk.vMachineGuid(),
                                         vPoolGuid = vdisk.vpoolGuid();
-                                    if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
-                                        if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
-                                            sr = new StorageRouter(storageRouterGuid);
-                                            sr.load();
-                                            self.storageRouterCache[storageRouterGuid] = sr;
+                                    if (storageApplianceGuid && (vdisk.storageAppliance() === undefined || vdisk.storageAppliance().guid() !== storageApplianceGuid)) {
+                                        if (!self.storageApplianceCache.hasOwnProperty(storageApplianceGuid)) {
+                                            sa = new StorageAppliance(storageApplianceGuid);
+                                            sa.load();
+                                            self.storageApplianceCache[storageApplianceGuid] = sa;
                                         }
-                                        vdisk.storageRouter(self.storageRouterCache[storageRouterGuid]);
+                                        vdisk.storageAppliance(self.storageApplianceCache[storageApplianceGuid]);
                                     }
                                     if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
                                         if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {

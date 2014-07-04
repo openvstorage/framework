@@ -17,7 +17,7 @@ CORS middleware module
 """
 
 from django import http
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storageappliancelist import StorageApplianceList
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('api', 'CORS middleware')
@@ -45,8 +45,8 @@ class CORSMiddleware(object):
         """
         _ = self
         if 'HTTP_ORIGIN' in request.META:
-            storagerouters = StorageRouterList.get_storagerouters()
-            allowed_origins = ['https://{0}'.format(storagerouter.ip) for storagerouter in storagerouters]
+            storageappliances = StorageApplianceList.get_storageappliances()
+            allowed_origins = ['https://{0}'.format(storageappliance.ip) for storageappliance in storageappliances]
             if request.META['HTTP_ORIGIN'] in allowed_origins:
                 logger.debug('Set CORS preflight headers')
                 response['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']

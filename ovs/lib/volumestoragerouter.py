@@ -17,7 +17,7 @@ VolumeStorageRouter module
 """
 
 from ovs.celery import celery
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.storageappliance import StorageAppliance
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
@@ -30,11 +30,11 @@ class VolumeStorageRouterController(object):
 
     @staticmethod
     @celery.task(name='ovs.vsr.move_away')
-    def move_away(storagerouter_guid):
+    def move_away(storageappliance_guid):
         """
-        Moves away all vDisks from all VSRs this Storage Router is serving
+        Moves away all vDisks from all VSRs this Storage Appliance is serving
         """
-        vsrs = StorageRouter(storagerouter_guid).vsrs
+        vsrs = StorageAppliance(storageappliance_guid).vsrs
         if len(vsrs) > 0:
             vsr_client = VolumeStorageRouterClient().load(vsrs[0].vpool)
             for vsr in vsrs:

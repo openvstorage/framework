@@ -58,10 +58,10 @@ class PMachineList(object):
         vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
         if vsr is None:
             raise RuntimeError('VolumeStorageRouter {0} could not be found'.format(vsrid))
-        storagerouter = vsr.storagerouter
-        if storagerouter is None:
-            raise RuntimeError('VolumeStorageRouter {0} not linked to a StorageRouter'.format(vsr.name))
-        pmachine = storagerouter.pmachine
+        storageappliance = vsr.storageappliance
+        if storageappliance is None:
+            raise RuntimeError('VolumeStorageRouter {0} not linked to a StorageAppliance'.format(vsr.name))
+        pmachine = storageappliance.pmachine
         if pmachine is None:
-            raise RuntimeError('StorageRouter {0} not linked to a pMachine'.format(storagerouter.name))
+            raise RuntimeError('StorageAppliance {0} not linked to a pMachine'.format(storageappliance.name))
         return pmachine

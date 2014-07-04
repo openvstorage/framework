@@ -51,7 +51,7 @@ class VDisk(DataObject):
                 'info':               (60, dict),
                 'statistics':          (5, dict),
                 'vsrid':              (60, str),
-                'storagerouter_guid': (15, str)}
+                'storageappliance_guid': (15, str)}
     # pylint: enable=line-too-long
 
     def __init__(self, *args, **kwargs):
@@ -152,13 +152,13 @@ class VDisk(DataObject):
 
     def _vsrid(self):
         """
-        Returns the Volume Storage Router ID to which the vDisk is connected.
+        Returns the Volume Storage Appliance ID to which the vDisk is connected.
         """
         return self.info.get('vrouter_id', None)
 
-    def _storagerouter_guid(self):
+    def _storageappliance_guid(self):
         """
-        Loads the vDisks StorageRouter guid
+        Loads the vDisks StorageAppliance guid
         """
         if not self.vsrid:
             return None
@@ -171,5 +171,5 @@ class VDisk(DataObject):
             VolumeStorageRouter
         )
         if len(volumestoragerouters) == 1:
-            return volumestoragerouters[0].storagerouter_guid
+            return volumestoragerouters[0].storageappliance_guid
         return None

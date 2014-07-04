@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-StorageRouter module
+StorageAppliance module
 """
 import time
 from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
@@ -21,9 +21,9 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.pmachine import PMachine
 
 
-class StorageRouter(DataObject):
+class StorageAppliance(DataObject):
     """
-    A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
+    A StorageAppliance represents the Open vStorage software stack, any (v)machine on which it is installed
     """
     # pylint: disable=line-too-long
     __blueprint = {'name':        (None,  str,  'Name of the vMachine.'),
@@ -31,7 +31,7 @@ class StorageRouter(DataObject):
                    'machineid':   (None,  str,  'The hardware identifier of the vMachine'),
                    'ip':          (None,  str,  'IP Address of the vMachine, if available'),
                    'status':      ('OK',  ['OK', 'NOK'], 'Internal status of the software stack')}
-    __relations = {'pmachine': (PMachine, 'storagerouters')}
+    __relations = {'pmachine': (PMachine, 'storageappliances')}
     __expiry = {'statistics':       (5, dict),
                 'stored_data':     (60, int),
                 'failover_mode':   (60, str),
@@ -88,8 +88,8 @@ class StorageRouter(DataObject):
 
     def _vmachines_guids(self):
         """
-        Gets the vMachine guids served by this StorageRouter.
-        Definition of "served by": vMachine whose disks are served by a given StorageRouter
+        Gets the vMachine guids served by this StorageAppliance.
+        Definition of "served by": vMachine whose disks are served by a given StorageAppliance
         """
         vmachine_guids = set()
         for vsr in self.vsrs:
@@ -101,7 +101,7 @@ class StorageRouter(DataObject):
 
     def _vdisks_guids(self):
         """
-        Gets the vDisk guids served by this StorageRouter.
+        Gets the vDisk guids served by this StorageAppliance.
         """
         vdisk_guids = []
         for vsr in self.vsrs:
@@ -112,7 +112,7 @@ class StorageRouter(DataObject):
 
     def _vpools_guids(self):
         """
-        Gets the vPool guids linked to this StorageRouter (trough VolumeStorageRouter)
+        Gets the vPool guids linked to this StorageAppliance (trough VolumeStorageRouter)
         """
         vpool_guids = set()
         for vsr in self.vsrs:

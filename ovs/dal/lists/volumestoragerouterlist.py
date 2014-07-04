@@ -52,12 +52,12 @@ class VolumeStorageRouterList(object):
         return None
 
     @staticmethod
-    def get_volumestoragerouters_by_storagerouter(machineguid):
+    def get_volumestoragerouters_by_storageappliance(machineguid):
         """
-        Returns a list of all VolumeStorageRouters for Storage Router
+        Returns a list of all VolumeStorageRouters for Storage Appliance
         """
         volumestoragerouters = DataList({'object': VolumeStorageRouter,
                                          'data': DataList.select.DESCRIPTOR,
                                          'query': {'type': DataList.where_operator.AND,
-                                                   'items': [('storagerouter_guid', DataList.operator.EQUALS, machineguid)]}}).data
+                                                   'items': [('storageappliance_guid', DataList.operator.EQUALS, machineguid)]}}).data
         return DataObjectList(volumestoragerouters, VolumeStorageRouter)

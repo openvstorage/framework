@@ -44,7 +44,7 @@ define([
         data.timeout(600);
         data.vRouterPort(12322);
         data.backends(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']);
-        data.storageRouters([]);
+        data.storageAppliances([]);
         data.vsrs([]);
         data.mountpoints([]);
         data.ipAddresses([]);

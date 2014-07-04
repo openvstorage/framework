@@ -13,25 +13,25 @@
 # limitations under the License.
 
 """
-StorageRouterList module
+StorageApplianceList module
 """
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.storageappliance import StorageAppliance
 
 
-class StorageRouterList(object):
+class StorageApplianceList(object):
     """
-    This StorageRouterList class contains various lists regarding to the StorageRouter class
+    This StorageApplianceList class contains various lists regarding to the StorageAppliance class
     """
 
     @staticmethod
-    def get_storagerouters():
+    def get_storageappliances():
         """
-        Returns a list of all StorageRouters
+        Returns a list of all StorageAppliances
         """
-        storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.DESCRIPTOR,
-                                   'query': {'type': DataList.where_operator.AND,
-                                             'items': []}}).data
-        return DataObjectList(storagerouters, StorageRouter)
+        storageappliances = DataList({'object': StorageAppliance,
+                                      'data': DataList.select.DESCRIPTOR,
+                                      'query': {'type': DataList.where_operator.AND,
+                                                'items': []}}).data
+        return DataObjectList(storageappliances, StorageAppliance)

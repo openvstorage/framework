@@ -15,22 +15,22 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool', '../containers/vmachine', '../containers/storagerouter',
-    '../wizards/storageroutertovpool/index'
-], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, StorageRouterToVPoolWizard) {
+    '../containers/vpool', '../containers/vmachine', '../containers/storageappliance',
+    '../wizards/storageappliancetovpool/index'
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageAppliance, StorageApplianceToVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared             = shared;
-        self.guard              = { authenticated: true };
-        self.refresher          = new Refresher();
-        self.widgets            = [];
-        self.storageRouterCache = {};
-        self.vMachineCache      = {};
-        self.checksInit         = false;
-        self.vDiskHeaders       = [
+        self.shared                = shared;
+        self.guard                 = { authenticated: true };
+        self.refresher             = new Refresher();
+        self.widgets               = [];
+        self.storageApplianceCache = {};
+        self.vMachineCache         = {};
+        self.checksInit            = false;
+        self.vDiskHeaders          = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
             { key: 'vmachine',     value: $.t('ovs:generic.vmachine'),   width: 110       },
             { key: 'size',         value: $.t('ovs:generic.size'),       width: 100       },
@@ -41,54 +41,54 @@ define([
             { key: 'writeSpeed',   value: $.t('ovs:generic.write'),      width: 100       },
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),  width: 50        }
         ];
-        self.vMachineHeaders    = [
-            { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
-            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 100       },
-            { key: undefined,       value: $.t('ovs:generic.vdisks'),        width: 60        },
-            { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
-            { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
-            { key: 'iops',          value: $.t('ovs:generic.iops'),          width: 55        },
-            { key: 'readSpeed',     value: $.t('ovs:generic.read'),          width: 120       },
-            { key: 'writeSpeed',    value: $.t('ovs:generic.write'),         width: 120       },
-            { key: 'failoverMode',  value: $.t('ovs:generic.focstatus'),     width: 50        }
+        self.vMachineHeaders       = [
+            { key: 'name',             value: $.t('ovs:generic.name'),             width: undefined },
+            { key: 'storageappliance', value: $.t('ovs:generic.storageappliance'), width: 100       },
+            { key: undefined,          value: $.t('ovs:generic.vdisks'),           width: 60        },
+            { key: 'storedData',       value: $.t('ovs:generic.storeddata'),       width: 110       },
+            { key: 'cacheRatio',       value: $.t('ovs:generic.cache'),            width: 100       },
+            { key: 'iops',             value: $.t('ovs:generic.iops'),             width: 55        },
+            { key: 'readSpeed',        value: $.t('ovs:generic.read'),             width: 120       },
+            { key: 'writeSpeed',       value: $.t('ovs:generic.write'),            width: 120       },
+            { key: 'failoverMode',     value: $.t('ovs:generic.focstatus'),        width: 50        }
         ];
 
         // Handles
-        self.loadVDisksHandle         = undefined;
-        self.refreshVDisksHandle      = {};
-        self.loadVMachinesHandle      = undefined;
-        self.refreshVMachinesHandle   = {};
-        self.loadStorageRoutersHandle = undefined;
+        self.loadVDisksHandle            = undefined;
+        self.refreshVDisksHandle         = {};
+        self.loadVMachinesHandle         = undefined;
+        self.refreshVMachinesHandle      = {};
+        self.loadStorageAppliancesHandle = undefined;
 
         // Observables
-        self.vDisksInitialLoad         = ko.observable(true);
-        self.vMachinesInitialLoad      = ko.observable(true);
-        self.storageRoutersLoaded      = ko.observable(false);
-        self.updatingStorageRouters    = ko.observable(false);
-        self.vPool                     = ko.observable();
-        self.storageRouters            = ko.observableArray([]);
-        self.checkedStorageRouterGuids = ko.observableArray([]);
+        self.vDisksInitialLoad            = ko.observable(true);
+        self.vMachinesInitialLoad         = ko.observable(true);
+        self.storageAppliancesLoaded      = ko.observable(false);
+        self.updatingStorageAppliances    = ko.observable(false);
+        self.vPool                        = ko.observable();
+        self.storageAppliances            = ko.observableArray([]);
+        self.checkedStorageApplianceGuids = ko.observableArray([]);
 
         // Computed
-        self.pendingStorageRouters = ko.computed(function() {
-            var storageRouters = [];
-            $.each(self.storageRouters(), function(index, storageRouter) {
-                if ($.inArray(storageRouter.guid(), self.checkedStorageRouterGuids()) !== -1 &&
-                        $.inArray(storageRouter.guid(), self.vPool().storageRouterGuids()) === -1) {
-                    storageRouters.push(storageRouter);
+        self.pendingStorageAppliances = ko.computed(function() {
+            var storageAppliances = [];
+            $.each(self.storageAppliances(), function(index, storageAppliance) {
+                if ($.inArray(storageAppliance.guid(), self.checkedStorageApplianceGuids()) !== -1 &&
+                        $.inArray(storageAppliance.guid(), self.vPool().storageApplianceGuids()) === -1) {
+                    storageAppliances.push(storageAppliance);
                 }
             });
-            return storageRouters;
+            return storageAppliances;
         });
-        self.removingStorageRouters = ko.computed(function() {
-            var storageRouters = [];
-            $.each(self.storageRouters(), function(index, storageRouter) {
-                if ($.inArray(storageRouter.guid(), self.checkedStorageRouterGuids()) === -1 &&
-                        $.inArray(storageRouter.guid(), self.vPool().storageRouterGuids()) !== -1) {
-                    storageRouters.push(storageRouter);
+        self.removingStorageAppliances = ko.computed(function() {
+            var storageAppliances = [];
+            $.each(self.storageAppliances(), function(index, storageAppliance) {
+                if ($.inArray(storageAppliance.guid(), self.checkedStorageApplianceGuids()) === -1 &&
+                        $.inArray(storageAppliance.guid(), self.vPool().storageApplianceGuids()) !== -1) {
+                    storageAppliances.push(storageAppliance);
                 }
             });
-            return storageRouters;
+            return storageAppliances;
         });
 
         // Functions
@@ -99,15 +99,15 @@ define([
                 self.vMachinesInitialLoad(false);
                 $.when.apply($, [
                     vpool.load('vsrs,_dynamics', { skipDisks: true }),
-                    vpool.loadStorageRouters()
+                    vpool.loadStorageAppliances()
                         .then(function() {
                             if (self.checksInit === false) {
-                                self.checkedStorageRouterGuids(self.vPool().storageRouterGuids().slice());
+                                self.checkedStorageApplianceGuids(self.vPool().storageApplianceGuids().slice());
                                 self.checksInit = true;
                             }
                         }),
                     vpool.loadVDisks(),
-                    self.loadStorageRouters()
+                    self.loadStorageAppliances()
                 ])
                     .fail(function(error) {
                         if (error.status === 404) {
@@ -117,32 +117,32 @@ define([
                     .always(deferred.resolve);
             }).promise();
         };
-        self.loadStorageRouters = function() {
+        self.loadStorageAppliances = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
+                if (generic.xhrCompleted(self.loadStorageAppliancesHandle)) {
                     var options = {
                         sort: 'name',
                         contents: 'vsrs'
                     };
-                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
+                    self.loadStorageAppliancesHandle = api.get('storageappliances', undefined, options)
                         .done(function(data) {
-                            var guids = [], srdata = {};
+                            var guids = [], sadata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                srdata[item.guid] = item;
+                                sadata[item.guid] = item;
                             });
                             generic.crossFiller(
-                                guids, self.storageRouters,
+                                guids, self.storageAppliances,
                                 function(guid) {
-                                    return new StorageRouter(guid);
+                                    return new StorageAppliance(guid);
                                 }, 'guid'
                             );
-                            $.each(self.storageRouters(), function(index, storageRouter) {
-                                if (srdata.hasOwnProperty(storageRouter.guid())) {
-                                    storageRouter.fillData(srdata[storageRouter.guid()]);
+                            $.each(self.storageAppliances(), function(index, storageAppliance) {
+                                if (sadata.hasOwnProperty(storageAppliance.guid())) {
+                                    storageAppliance.fillData(sadata[storageAppliance.guid()]);
                                 }
                             });
-                            self.storageRoutersLoaded(true);
+                            self.storageAppliancesLoaded(true);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -212,14 +212,14 @@ define([
                                     }
                                     vmachine.fillData(vmdata[vmachine.guid()]);
                                     generic.crossFiller(
-                                        vmachine.storageRouterGuids, vmachine.storageRouters,
+                                        vmachine.storageApplianceGuids, vmachine.storageAppliances,
                                         function(guid) {
-                                            if (!self.storageRouterCache.hasOwnProperty(guid)) {
-                                                var sr = new StorageRouter(guid);
-                                                sr.load('');
-                                                self.storageRouterCache[guid] = sr;
+                                            if (!self.storageApplianceCache.hasOwnProperty(guid)) {
+                                                var sa = new StorageAppliance(guid);
+                                                sa.load('');
+                                                self.storageApplianceCache[guid] = sa;
                                             }
-                                            return self.storageRouterCache[guid];
+                                            return self.storageApplianceCache[guid];
                                         }, 'guid'
                                     );
                                 }
@@ -268,15 +268,15 @@ define([
                     });
             }
         };
-        self.updateStorageRouterServing = function() {
-            self.updatingStorageRouters(true);
+        self.updateStorageApplianceServing = function() {
+            self.updatingStorageAppliances(true);
             var deferred = $.Deferred(), wizard;
-            wizard = new StorageRouterToVPoolWizard({
+            wizard = new StorageApplianceToVPoolWizard({
                 modal: true,
                 completed: deferred,
                 vPool: self.vPool(),
-                pendingStorageRouters: self.pendingStorageRouters,
-                removingStorageRouters: self.removingStorageRouters
+                pendingStorageAppliances: self.pendingStorageAppliances,
+                removingStorageAppliances: self.removingStorageAppliances
             });
             wizard.closing.always(function() {
                 self.load();
@@ -284,7 +284,7 @@ define([
             });
             dialog.show(wizard);
             deferred.always(function() {
-                self.updatingStorageRouters(false);
+                self.updatingStorageAppliances(false);
             });
         };
 

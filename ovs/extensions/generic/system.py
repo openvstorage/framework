@@ -22,7 +22,7 @@ import subprocess
 class Ovs():
 
     my_machine_id = ''
-    my_storagerouter_guid = ''
+    my_storageappliance_guid = ''
     my_vsr_id = ''
 
     @staticmethod
@@ -57,19 +57,19 @@ class Ovs():
         return Ovs.my_machine_id
 
     @staticmethod
-    def get_my_storagerouter():
+    def get_my_storageappliance():
         """
-        Returns unique machine storagerouter id
+        Returns unique machine storageappliance id
         """
 
-        from ovs.dal.hybrids.storagerouter import StorageRouter
-        from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.dal.hybrids.storageappliance import StorageAppliance
+        from ovs.dal.lists.storageappliancelist import StorageApplianceList
 
-        if not Ovs.my_storagerouter_guid:
-            for storagerouter in StorageRouterList.get_storagerouters():
-                if storagerouter.machineid == Ovs.get_my_machine_id():
-                    Ovs.my_storagerouter_guid = storagerouter.guid
-        return StorageRouter(Ovs.my_storagerouter_guid)
+        if not Ovs.my_storageappliance_guid:
+            for storageappliance in StorageApplianceList.get_storageappliances():
+                if storageappliance.machineid == Ovs.get_my_machine_id():
+                    Ovs.my_storageappliance_guid = storageappliance.guid
+        return StorageAppliance(Ovs.my_storageappliance_guid)
 
     @staticmethod
     def get_my_vsr_id(vpool_name):

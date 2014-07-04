@@ -15,19 +15,19 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storagerouter', '../containers/pmachine'
-], function($, ko, shared, generic, Refresher, api, StorageRouter, PMachine) {
+    '../containers/storageappliance', '../containers/pmachine'
+], function($, ko, shared, generic, Refresher, api, StorageAppliance, PMachine) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared                  = shared;
-        self.guard                   = { authenticated: true };
-        self.refresher               = new Refresher();
-        self.widgets                 = [];
-        self.pMachineCache           = {};
-        self.storageRoutersHeaders   = [
+        self.shared                     = shared;
+        self.guard                      = { authenticated: true };
+        self.refresher                  = new Refresher();
+        self.widgets                    = [];
+        self.pMachineCache              = {};
+        self.storageAppliancesHeaders   = [
             { key: 'status',     value: $.t('ovs:generic.status'),     width: 55  },
             { key: 'name',       value: $.t('ovs:generic.name'),       width: 100 },
             { key: 'ip',         value: $.t('ovs:generic.ip'),         width: 100 },
@@ -42,40 +42,40 @@ define([
         ];
 
         // Observables
-        self.storageRouters            = ko.observableArray([]);
-        self.storageRoutersInitialLoad = ko.observable(true);
+        self.storageAppliances            = ko.observableArray([]);
+        self.storageAppliancesInitialLoad = ko.observable(true);
 
         // Handles
-        self.loadStorageRoutersHandle    = undefined;
-        self.refreshStorageRoutersHandle = {};
+        self.loadStorageAppliancesHandle    = undefined;
+        self.refreshStorageAppliancesHandle = {};
 
         // Functions
-        self.fetchStorageRouters = function() {
+        self.fetchStorageAppliances = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
+                if (generic.xhrCompleted(self.loadStorageAppliancesHandle)) {
                     var options = {
                         sort: 'name',
                         contents: 'stored_data'
                     };
-                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
+                    self.loadStorageAppliancesHandle = api.get('storageappliances', undefined, options)
                         .done(function(data) {
-                            var guids = [], srdata = {};
+                            var guids = [], sadata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                srdata[item.guid] = item;
+                                sadata[item.guid] = item;
                             });
                             generic.crossFiller(
-                                guids, self.storageRouters,
+                                guids, self.storageAppliances,
                                 function(guid) {
-                                    var sr = new StorageRouter(guid);
+                                    var sa = new StorageAppliance(guid);
                                     if ($.inArray(guid, guids) !== -1) {
-                                        sr.fillData(srdata[guid]);
+                                        sa.fillData(sadata[guid]);
                                     }
-                                    sr.loading(true);
-                                    return sr;
+                                    sa.loading(true);
+                                    return sa;
                                 }, 'guid'
                             );
-                            self.storageRoutersInitialLoad(false);
+                            self.storageAppliancesInitialLoad(false);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -84,32 +84,32 @@ define([
                 }
             }).promise();
         };
-        self.refreshStorageRouters = function(page) {
+        self.refreshStorageAppliances = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshStorageRoutersHandle[page])) {
+                if (generic.xhrCompleted(self.refreshStorageAppliancesHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
                         contents: '_relations,statistics,stored_data,vdisks_guids'
                     };
-                    self.refreshStorageRoutersHandle[page] = api.get('storagerouters', undefined, options)
+                    self.refreshStorageAppliancesHandle[page] = api.get('storageappliances', undefined, options)
                         .done(function(data) {
-                            var guids = [], srdata = {};
+                            var guids = [], sadata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                srdata[item.guid] = item;
+                                sadata[item.guid] = item;
                             });
-                            $.each(self.storageRouters(), function(index, storageRouter) {
-                                if ($.inArray(storageRouter.guid(), guids) !== -1) {
-                                    storageRouter.fillData(srdata[storageRouter.guid()]);
-                                    var pMachineGuid = storageRouter.pMachineGuid(), pm;
-                                    if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
+                            $.each(self.storageAppliances(), function(index, storageAppliance) {
+                                if ($.inArray(storageAppliance.guid(), guids) !== -1) {
+                                    storageAppliance.fillData(sadata[storageAppliance.guid()]);
+                                    var pMachineGuid = storageAppliance.pMachineGuid(), pm;
+                                    if (pMachineGuid && (storageAppliance.pMachine() === undefined || storageAppliance.pMachine().guid() !== pMachineGuid)) {
                                         if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
                                             pm = new PMachine(pMachineGuid);
                                             pm.load();
                                             self.pMachineCache[pMachineGuid] = pm;
                                         }
-                                        storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
+                                        storageAppliance.pMachine(self.pMachineCache[pMachineGuid]);
                                     }
                                 }
                             });
@@ -124,12 +124,12 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(self.fetchStorageRouters, 5000);
+            self.refresher.init(self.fetchStorageAppliances, 5000);
             self.refresher.start();
-            self.shared.footerData(self.storageRouters);
+            self.shared.footerData(self.storageAppliances);
 
-            self.fetchStorageRouters().then(function() {
-                self.refreshStorageRouters(1);
+            self.fetchStorageAppliances().then(function() {
+                self.refreshStorageAppliances(1);
             });
         };
         self.deactivate = function() {

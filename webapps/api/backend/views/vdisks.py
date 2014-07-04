@@ -22,7 +22,7 @@ from rest_framework.decorators import action
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.storageappliance import StorageAppliance
 from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task

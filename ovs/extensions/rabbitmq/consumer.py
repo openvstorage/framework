@@ -43,7 +43,7 @@ def run_kvm_watcher():
     """
     Check whether to run the KVM file watcher
     """
-    return Ovs.get_my_storagerouter().pmachine.hvtype == 'KVM'
+    return Ovs.get_my_storageappliance().pmachine.hvtype == 'KVM'
 
 
 def run_event_consumer():
