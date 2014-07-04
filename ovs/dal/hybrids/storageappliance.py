@@ -64,7 +64,7 @@ class StorageAppliance(DataObject):
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
         data = 0
-        for storagerouter in self.storagerouter_s:
+        for storagerouter in self.storagerouters:
             for vdisk in storagerouter.vpool.vdisks:
                 if vdisk.storagerouter_id == storagerouter.storagerouter_id:
                     data += vdisk.info['stored']
