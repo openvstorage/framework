@@ -101,7 +101,7 @@ define([
                             fields.push('cache');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                         }
-                        if (self.vsr().mountpointBFS() === vsr.mountpointBFS() && $.inArray('bfs', fields) === -1) {
+                        if (self.vsr().mountpointBFS() === vsr.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.vPool().backendType() === 'LOCAL' || self.data.vPool().backendType() === 'DISTRIBUTED')) {
                             valid = false;
                             fields.push('bfs');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
