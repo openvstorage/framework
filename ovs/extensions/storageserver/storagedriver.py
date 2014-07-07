@@ -13,22 +13,23 @@
 # limitations under the License.
 
 """
-Wrapper class for the storagerouterclient of the voldrv team
+Wrapper class for the storagedriverclient of the voldrv team
 """
 
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient, ClusterContact, Statistics, VolumeInfo
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
+from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.generic.system import Ovs
 import json
 import os
 
 client_vpool_cache = {}
-client_vsr_cache = {}
+client_storagedriver_cache = {}
 
 
-class VolumeStorageRouterClient(object):
+class StorageDriverClient(object):
     """
-    Client to access storagerouterclient
+    Client to access storagedriverclient
     """
 
     FOC_STATUS = {'': 0,
@@ -56,23 +57,23 @@ class VolumeStorageRouterClient(object):
 
     def load(self, vpool):
         """
-        Initializes the wrapper given a vpool name for which it finds the corresponding vsr
+        Initializes the wrapper given a vpool name for which it finds the corresponding Storage Driver
         Loads and returns the client
         """
 
         key = vpool.guid
         if key not in client_vpool_cache:
             cluster_contacts = []
-            for vsr in vpool.vsrs[:3]:
-                cluster_contacts.append(ClusterContact(str(vsr.cluster_ip), vsr.port))
-            client = StorageRouterClient(str(vpool.name), cluster_contacts)
+            for storagedriver in vpool.storagedrivers[:3]:
+                cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.port))
+            client = SRClient(str(vpool.name), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
 
 
-class VolumeStorageRouterConfiguration(object):
+class StorageDriverConfiguration(object):
     """
-    VolumeStorageRouter configuration class
+    StorageDriver configuration class
     """
     def __init__(self, vpool_name):
         self._vpool = vpool_name
@@ -110,14 +111,14 @@ class VolumeStorageRouterConfiguration(object):
     def configure_backend(self, backend_config):
         self.load_config()
         if not backend_config:
-            raise ValueError('No backend config specified, unable to configure volumestoragerouter')
+            raise ValueError('No backend config specified, unable to configure storagedriver')
         for key, value in backend_config.iteritems():
             self._config_file_content['backend_connection_manager'][key] = value
         self.write_config()
 
     def configure_readcache(self, readcaches, rspath):
         """
-        Configures volume storage router content address cache
+        Configures storage driver content address cache
         @param readcaches: list of readcache configuration dictionaries
         """
         self.load_config()
@@ -127,7 +128,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_volumemanager(self, volumemanager_config):
         """
-        Configures volume storage router volume manager
+        Configures storage driver volume manager
         @param volumemanager_config: dictionary with key/value pairs
         """
         self.load_config()
@@ -137,7 +138,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_scocache(self, scocaches, trigger_gap, backoff_gap):
         """
-        Configures volume storage router scocaches
+        Configures storage driver scocaches
         @param scocaches: list of scocache dictionaries
         @param trigger_gap: string to be set as trigger_gap value
         @param backoff_gap: string to be set as backoff gap value
@@ -150,7 +151,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_hypervisor(self, hypervisor_type):
         """
-        Configures the volume storage router to handle hypervisor specific behavior
+        Configures the storage driver to handle hypervisor specific behavior
         """
         self.load_config()
         if hypervisor_type == 'VMWARE':
@@ -172,7 +173,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_failovercache(self, failovercache):
         """
-        Configures volume storage router failover cache path
+        Configures storage driver failover cache path
         @param failovercache: path to the failover cache directory
         """
         self.load_config()
@@ -181,7 +182,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_filesystem(self, filesystem_config):
         """
-        Configures volume storage router filesystem properties
+        Configures storage driver filesystem properties
         @param filesystem_config: dictionary with key/value pairs
         """
         self.load_config()
@@ -191,7 +192,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_volumerouter(self, vrouter_cluster, vrouter_config):
         """
-        Configures volume storage router
+        Configures storage driver
         @param vrouter_config: dictionary of key/value pairs
         """
         unique_machine_id = Ovs.get_my_machine_id()
@@ -209,7 +210,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_arakoon_cluster(self, arakoon_cluster_id, arakoon_nodes):
         """
-        Configures volume storage router arakoon cluster
+        Configures storage driver arakoon cluster
         @param arakoon_cluster_id: name of the arakoon cluster
         @param arakoon_nodes: dictionary of arakoon nodes in this cluster
         """
@@ -225,7 +226,7 @@ class VolumeStorageRouterConfiguration(object):
 
     def configure_event_publisher(self, queue_config):
         """
-        Configures volume storage router event publisher
+        Configures storage driver event publisher
         @param queue_config: dictionary of with queue configuration key/value
         """
         self.load_config()
