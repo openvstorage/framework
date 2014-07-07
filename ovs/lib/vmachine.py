@@ -610,6 +610,7 @@ class VMachineController(object):
         """
         from ovs.lib.vpool import VPoolController
 
+        vsa = VMachine(vsa_guid)
         mountpoints = check_output('mount -v', shell=True).strip().split('\n')
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
@@ -618,9 +619,12 @@ class VMachineController(object):
         arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
-        ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
-        ipaddresses = [ip.strip() for ip in ipaddresses]
-        ipaddresses.remove('127.0.0.1')
+        if vsa.pmachine.hvtype == 'KVM':
+            ipaddresses = ['127.0.0.1']
+        else:
+            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
+            ipaddresses = [ip.strip() for ip in ipaddresses]
+            ipaddresses.remove('127.0.0.1')
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
         allow_vpool = VPoolController.can_be_served_on(vsa_guid)
         file_existence = {}
