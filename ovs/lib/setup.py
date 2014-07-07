@@ -944,8 +944,6 @@ LABEL=backendfs /mnt/bfs         ext4    defaults,nobootwait,noatime,discard    
 LABEL=tempfs    /var/tmp         ext4    defaults,nobootwait,noatime,discard    0    2
 """
 
-            fs_client.run('mkdir -p /mnt/dfs/local')
-
         # Create partitions on SSD
         ssds = [drive for drive, info in drives.iteritems() if
                 info['ssd'] is True and root_partition not in info['partitions']]
