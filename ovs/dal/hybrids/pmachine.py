@@ -26,15 +26,15 @@ class PMachine(DataObject):
     running the Hypervisor.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':        (None, str, 'Name of the pMachine.'),
-                  'description': (None, str, 'Description of the pMachine.'),
-                  'username':    (None, str, 'Username of the pMachine.'),
-                  'password':    (None, str, 'Password of the pMachine.'),
-                  'ip':          (None, str, 'IP address of the pMachine.'),
-                  'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.'),
-                  'hypervisorid': (None, str, 'Hypervisor id - primary key on Management Center')}
-    _relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
-    _expiry = {'host_status': (60, str)}
+    __blueprint = {'name':        (None, str, 'Name of the pMachine.'),
+                   'description': (None, str, 'Description of the pMachine.'),
+                   'username':    (None, str, 'Username of the pMachine.'),
+                   'password':    (None, str, 'Password of the pMachine.'),
+                   'ip':          (None, str, 'IP address of the pMachine.'),
+                   'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.'),
+                   'hypervisorid': (None, str, 'Hypervisor id - primary key on Management Center')}
+    __relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
+    __expiry = {'host_status': (60, str)}
     # pylint: enable=line-too-long
 
     def _host_status(self):

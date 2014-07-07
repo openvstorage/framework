@@ -25,8 +25,8 @@ class RoleGroup(DataObject):
     The RoleGroup class represents the junction table between Role and Group.
     """
     # pylint: disable=line-too-long
-    _blueprint = {}
-    _relations = {'role':  (Role,  'groups'),
-                  'group': (Group, 'roles')}
-    _expiry = {}
+    __blueprint = {}
+    __relations = {'role':  (Role,  'groups'),
+                   'group': (Group, 'roles')}
+    __expiry = {}
     # pylint: enable=line-too-long

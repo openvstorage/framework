@@ -101,10 +101,10 @@ define([
                             fields.push('cache');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                         }
-                        if (self.vsr().mountpointDFS() === vsr.mountpointDFS() && $.inArray('dfs', fields) === -1) {
+                        if (self.vsr().mountpointBFS() === vsr.mountpointBFS() && $.inArray('bfs', fields) === -1) {
                             valid = false;
-                            fields.push('dfs');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.dfs') }));
+                            fields.push('bfs');
+                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
                         }
                         if (self.vsr().mountpointMD() === vsr.mountpointMD() && $.inArray('md', fields) === -1) {
                             valid = false;

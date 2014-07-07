@@ -620,6 +620,7 @@ class VMachineController(object):
             mountpoints.remove(arakoon_mountpoint)
         ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
         ipaddresses = [ip.strip() for ip in ipaddresses]
+        ipaddresses.remove('127.0.0.1')
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
         allow_vpool = VPoolController.can_be_served_on(vsa_guid)
         file_existence = {}

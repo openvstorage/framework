@@ -34,7 +34,7 @@ define([
         data.secretkey('');
         data.backend('LOCAL');
         data.mtptTemp(undefined);
-        data.mtptDFS(undefined);
+        data.mtptBFS(undefined);
         data.mtptMD(undefined);
         data.mtptCache(undefined);
         data.storageIP(undefined);
@@ -43,7 +43,7 @@ define([
         data.port(80);
         data.timeout(600);
         data.vRouterPort(12322);
-        data.backends(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED', 'REST']);
+        data.backends(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']);
         data.vsas([]);
         data.vsrs([]);
         data.mountpoints([]);

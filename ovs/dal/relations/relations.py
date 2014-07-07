@@ -31,18 +31,25 @@ class RelationMapper(object):
         This method will return a mapping of all relations towards a certain hybrid object type.
         The resulting mapping will be stored in volatile storage so it can be fetched faster
         """
-        relation_key = 'ovs_relations_%s' % object_type.__name__.lower()
+        relation_key = 'ovs_relations_{0}'.format(object_type.__name__.lower())
         volatile = VolatileFactory.get_client()
         relation_info = volatile.get(relation_key)
         if relation_info is None:
             Toolbox.log_cache_hit('relations', False)
             relation_info = {}
-            for cls in HybridRunner.get_hybrids():
+            hybrid_structure = HybridRunner.get_hybrids()
+            for class_descriptor in hybrid_structure.values():  # Extended objects
+                cls = Descriptor().load(class_descriptor).get_object()
                 for key, item in cls._relations.iteritems():
                     if item[0] is None:
-                        itemname = cls.__name__
+                        remote_class = cls
                     else:
-                        itemname = item[0].__name__
+                        identifier = Descriptor(item[0]).descriptor['identifier']
+                        if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
+                            remote_class = Descriptor().load(hybrid_structure[identifier]).get_object()
+                        else:
+                            remote_class = item[0]
+                    itemname = remote_class.__name__
                     if itemname == object_type.__name__:
                         relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
                                                   'key': key,

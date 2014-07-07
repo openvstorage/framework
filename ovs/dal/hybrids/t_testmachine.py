@@ -24,7 +24,7 @@ class TestMachine(DataObject):
     WARNING: These properties should not be changed
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name': (None, str, 'Name of the test machine')}
-    _relations = {}
-    _expiry = {}
+    __blueprint = {'name': (None, str, 'Name of the test machine')}
+    __relations = {}
+    __expiry = {}
     # pylint: enable=line-too-long

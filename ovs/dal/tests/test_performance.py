@@ -37,18 +37,18 @@ class LotsOfObjects(TestCase):
         mguids = []
         for i in xrange(0, 100):
             machine = TestMachine()
-            machine.name = 'machine_%d' % i
+            machine.name = 'machine_{0}'.format(i)
             machine.save()
             mguids.append(machine.guid)
             for ii in xrange(0, 100):
                 disk = TestDisk()
-                disk.name = 'disk_%d_%d' % (i, ii)
+                disk.name = 'disk_{0}_{1}'.format(i, ii)
                 disk.size = ii * 100
                 disk.machine = machine
                 disk.save()
             seconds_passed = (time.time() - start)
             itemspersec = ((i + 1) * 100.0) / seconds_passed
-            print '* machine %d/100 (creating %s disks per second)' % (i, str(itemspersec))
+            print '* machine {0}/100 (creating {1} disks per second)'.format(i, str(itemspersec))
         print 'loading done'
 
         print 'start queries'
@@ -58,7 +58,7 @@ class LotsOfObjects(TestCase):
             self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
             seconds_passed = (time.time() - start)
             itemspersec = ((i + 1) * 10000.0) / seconds_passed
-            print '* machine %d/100 (filtering %s disks per second)' % (i, str(itemspersec))
+            print '* machine {0}/100 (filtering {1} disks per second)'.format(i, str(itemspersec))
         print 'completed'
 
         print 'start cached queries'
@@ -67,7 +67,7 @@ class LotsOfObjects(TestCase):
             machine = TestMachine(mguids[i])
             self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
         seconds_passed = (time.time() - start)
-        print 'completed in %d seconds' % seconds_passed
+        print 'completed in {0} seconds'.format(seconds_passed)
 
         print 'start full query on disk property'
         start = time.time()
@@ -77,10 +77,9 @@ class LotsOfObjects(TestCase):
                                      'items': [('size', DataList.operator.GT, 4000),
                                                ('size', DataList.operator.LT, 7000)]}}).data
         self.assertEqual(amount, 2900,
-                         'Correct number of disks should be found. Found: %s' % str(amount))
+                         'Correct number of disks should be found. Found: {0}'.format(str(amount)))
         seconds_passed = (time.time() - start)
-        print 'completed in %d seconds (filtering %d disks per second)' \
-              % (seconds_passed, (10000.0 / seconds_passed))
+        print 'completed in {0} seconds (filtering {1} disks per second)'.format(seconds_passed, (10000.0 / seconds_passed))
 
         print 'cleaning up'
         start = time.time()
@@ -90,7 +89,7 @@ class LotsOfObjects(TestCase):
                 disk.delete()
             machine.delete()
         seconds_passed = (time.time() - start)
-        print 'completed in %d seconds' % seconds_passed
+        print 'completed in {0} seconds'.format(seconds_passed)
 
     def test_pkstretching(self):
         """
@@ -112,4 +111,4 @@ class LotsOfObjects(TestCase):
             machine = TestMachine(guid)
             machine.delete()
         seconds_passed = (time.time() - start)
-        print 'completed in %d seconds' % seconds_passed
+        print 'completed in {0} seconds'.format(seconds_passed)

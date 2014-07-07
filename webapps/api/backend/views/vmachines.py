@@ -412,7 +412,7 @@ class VMachineViewSet(viewsets.ViewSet):
             raise NotAcceptable('vMachine is not a VSA')
 
         fields = ['vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
-                  'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_dfs', 'mountpoint_md',
+                  'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_cache', 'storage_ip', 'vrouter_port']
         parameters = {'vsa_ip': obj.ip}
         for field in fields:

@@ -30,6 +30,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
 from ovs.log.logHandler import LogHandler
 
+
 logger = LogHandler('lib', name='setup')
 logger.logger.propagate = False
 
@@ -933,20 +934,14 @@ print Service.stop_service('{0}')
                     fs_client.run('umount {0}'.format(partition))
             fs_client.run('parted {0} -s mklabel gpt'.format(hdd))
             fs_client.run('parted {0} -s mkpart backendfs 2MB 80%'.format(hdd))
-            fs_client.run('parted {0} -s mkpart distribfs 80% 90%'.format(hdd))
-            fs_client.run('parted {0} -s mkpart tempfs 90% 100%'.format(hdd))
+            fs_client.run('parted {0} -s mkpart tempfs 80% 100%'.format(hdd))
             fs_client.run('mkfs.ext4 -q {0}1 -L backendfs'.format(hdd))
-            fs_client.run('mkfs.ext4 -q {0}2 -L distribfs'.format(hdd))
-            fs_client.run('mkfs.ext4 -q {0}3 -L tempfs'.format(hdd))
+            fs_client.run('mkfs.ext4 -q {0}2 -L tempfs'.format(hdd))
 
             extra_mountpoints = """
 LABEL=backendfs /mnt/bfs         ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=distribfs /mnt/dfs/local   ext4    defaults,nobootwait,noatime,discard    0    2
 LABEL=tempfs    /var/tmp         ext4    defaults,nobootwait,noatime,discard    0    2
 """
-
-            fs_client.run('mkdir -p /mnt/bfs')
-            fs_client.run('mkdir -p /mnt/dfs/local')
 
         # Create partitions on SSD
         ssds = [drive for drive, info in drives.iteritems() if

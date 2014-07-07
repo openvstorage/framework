@@ -31,24 +31,24 @@ class VMachine(DataObject):
     or a Virtual Machine running the Open vStorage software.
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
-                  'description':  (None,  str,  'Description of the vMachine.'),
-                  'hypervisorid': (None,  str,  'The identifier of the vMachine on the Hypervisor.'),
-                  'machineid':    (None,  str,  'The hardware identifier of the vMachine'),
-                  'devicename':   (None,  str,  'The name of the container file (e.g. the VMX-file) describing the vMachine.'),
-                  'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
-                  'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
-                  'ip':           (None,  str,  'IP Address of the vMachine, if available'),
-                  'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
-    _relations = {'pmachine': (PMachine, 'vmachines'),
-                  'vpool':    (VPool, 'vmachines')}
-    _expiry = {'snapshots':          (60, list),
-               'hypervisor_status': (300, str),
-               'statistics':          (5, dict),
-               'stored_data':        (60, int),
-               'failover_mode':      (60, str),
-               'vsas_guids':         (15, list),
-               'vpools_guids':       (15, list)}
+    __blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
+                   'description':  (None,  str,  'Description of the vMachine.'),
+                   'hypervisorid': (None,  str,  'The identifier of the vMachine on the Hypervisor.'),
+                   'machineid':    (None,  str,  'The hardware identifier of the vMachine'),
+                   'devicename':   (None,  str,  'The name of the container file (e.g. the VMX-file) describing the vMachine.'),
+                   'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
+                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
+                   'ip':           (None,  str,  'IP Address of the vMachine, if available'),
+                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
+    __relations = {'pmachine': (PMachine, 'vmachines'),
+                   'vpool':    (VPool, 'vmachines')}
+    __expiry = {'snapshots':          (60, list),
+                'hypervisor_status': (300, str),
+                'statistics':          (5, dict),
+                'stored_data':        (60, int),
+                'failover_mode':      (60, str),
+                'vsas_guids':         (15, list),
+                'vpools_guids':       (15, list)}
     # pylint: enable=line-too-long
 
     def _snapshots(self):
@@ -100,7 +100,7 @@ class VMachine(DataObject):
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
-            vdiskstatsdict['%s_ps' % key] = 0
+            vdiskstatsdict['{0}_ps'.format(key)] = 0
         if self.is_internal:
             vdisks = []
             for vsr in self.served_vsrs:

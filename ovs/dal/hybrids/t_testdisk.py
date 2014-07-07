@@ -25,17 +25,17 @@ class TestDisk(DataObject):
     WARNING: These properties should not be changed
     """
     # pylint: disable=line-too-long
-    _blueprint = {'name':        (None, str,   'Name of the test disk'),
-                  'description': (None, str,   'Description of the test disk'),
-                  'size':        (0,    float, 'Size of the test disk'),
-                  'order':       (0,    int,   'Order of the test disk'),
-                  'type':        (None, ['ONE', 'TWO'], 'Type of the test disk')}
-    _relations = {'machine': (TestMachine, 'disks'),
-                  'storage': (TestMachine, 'stored_disks'),
-                  'one':     (TestMachine, 'one', False),
-                  'parent':  (None,        'children')}
-    _expiry = {'used_size':  (5, int),
-               'wrong_type': (5, int)}
+    __blueprint = {'name':        (None, str,   'Name of the test disk'),
+                   'description': (None, str,   'Description of the test disk'),
+                   'size':        (0,    float, 'Size of the test disk'),
+                   'order':       (0,    int,   'Order of the test disk'),
+                   'type':        (None, ['ONE', 'TWO'], 'Type of the test disk')}
+    __relations = {'machine': (TestMachine, 'disks'),
+                   'storage': (TestMachine, 'stored_disks'),
+                   'one':     (TestMachine, 'one', False),
+                   'parent':  (None,        'children')}
+    __expiry = {'used_size':  (5, int),
+                'wrong_type': (5, int)}
     # pylint: enable=line-too-long
 
     # For testing purposes

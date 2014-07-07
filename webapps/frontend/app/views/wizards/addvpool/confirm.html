@@ -33,9 +33,11 @@ limitations under the License.
             <li><b data-i18n="ovs:wizards.addvpool.gathervpool.initialvsa"></b> <span data-bind="text: data.target() !== undefined ? data.target().name() : ''"></span></li>
         </ul>
         <p data-i18n="ovs:wizards.addvpool.confirm.mountpoints"></p>
+        <ul data-bind="visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></b> <span data-bind="text: data.mtptBFS"></span></li>
+        </ul>
         <ul>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></b> <span data-bind="text: data.mtptTemp"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.dfs"></b> <span data-bind="text: data.mtptDFS"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></b> <span data-bind="text: data.mtptMD"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.cache"></b> <span data-bind="text: data.mtptCache"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></b> <span data-bind="text: data.storageIP"></span></li>
