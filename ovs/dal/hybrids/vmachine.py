@@ -39,13 +39,13 @@ class VMachine(DataObject):
                    'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
     __relations = {'pmachine': (PMachine, 'vmachines'),
                    'vpool':    (VPool, 'vmachines')}
-    __expiry = {'snapshots':               (60, list),
-                'hypervisor_status':      (300, str),
-                'statistics':               (5, dict),
-                'stored_data':             (60, int),
-                'failover_mode':           (60, str),
-                'storageappliances_guids': (15, list),
-                'vpools_guids':            (15, list)}
+    __expiry = {'snapshots':            (60, list),
+                'hypervisor_status':   (300, str),
+                'statistics':            (5, dict),
+                'stored_data':          (60, int),
+                'failover_mode':        (60, str),
+                'storagerouters_guids': (15, list),
+                'vpools_guids':         (15, list)}
     # pylint: enable=line-too-long
 
     def _snapshots(self):
@@ -125,11 +125,11 @@ class VMachine(DataObject):
                 status_code = current_status_code
         return status
 
-    def _storageappliances_guids(self):
+    def _storagerouters_guids(self):
         """
-        Gets the StorageAppliance guids linked to this vMachine
+        Gets the StorageRouter guids linked to this vMachine
         """
-        storageappliance_guids = set()
+        storagerouter_guids = set()
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
         storagedrivers = DataList({'object': StorageDriver,
@@ -137,8 +137,8 @@ class VMachine(DataObject):
                                          'query': {'type': DataList.where_operator.AND,
                                                    'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
         for storagedriver in DataObjectList(storagedrivers, StorageDriver):
-            storageappliance_guids.add(storagedriver.storageappliance_guid)
-        return list(storageappliance_guids)
+            storagerouter_guids.add(storagedriver.storagerouter_guid)
+        return list(storagerouter_guids)
 
     def _vpools_guids(self):
         """

@@ -15,19 +15,19 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storageappliance', '../../containers/storagedriver', './data'
-], function($, ko, shared, api, generic, StorageAppliance, StorageDriver, data) {
+    '../../containers/storagerouter', '../../containers/storagedriver', './data'
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared                      = shared;
-        self.data                        = data;
-        self.loadStorageAppliancesHandle = undefined;
-        self.checkS3Handle               = undefined;
-        self.checkMtptHandle             = undefined;
-        self.loadStorageApplianceHandle  = undefined;
+        self.shared                   = shared;
+        self.data                     = data;
+        self.loadStorageRoutersHandle = undefined;
+        self.checkS3Handle            = undefined;
+        self.checkMtptHandle          = undefined;
+        self.loadStorageRouterHandle  = undefined;
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
@@ -76,7 +76,7 @@ define([
                                 accesskey: self.data.accesskey(),
                                 secretkey: self.data.secretkey()
                             };
-                            self.checkS3Handle = api.post('storageappliances/' + self.data.target().guid() + '/check_s3', postData)
+                            self.checkS3Handle = api.post('storagerouters/' + self.data.target().guid() + '/check_s3', postData)
                                 .then(self.shared.tasks.wait)
                                 .done(function(data) {
                                     if (!data) {
@@ -98,7 +98,7 @@ define([
                         var postData = {
                             name: self.data.name()
                         };
-                        self.checkMtptHandle = api.post('storageappliances/' + self.data.target().guid() + '/check_mtpt', postData)
+                        self.checkMtptHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_mtpt', postData)
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 if (!data) {
@@ -125,8 +125,8 @@ define([
             return $.Deferred(function(deferred) {
                 var calls = [
                     $.Deferred(function(mtptDeferred) {
-                        generic.xhrAbort(self.loadStorageApplianceHandle);
-                        self.loadStorageApplianceHandle = api.post('storageappliances/' + self.data.target().guid() + '/get_physical_metadata', {})
+                        generic.xhrAbort(self.loadStorageRouterHandle);
+                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_physical_metadata', {})
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
@@ -165,8 +165,8 @@ define([
 
         // Durandal
         self.activate = function() {
-            generic.xhrAbort(self.loadStorageAppliancesHandle);
-            self.loadStorageAppliancesHandle = api.get('storageappliances', undefined, {
+            generic.xhrAbort(self.loadStorageRoutersHandle);
+            self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
                 contents: 'storageDrivers',
                 sort: 'name'
             })
@@ -177,16 +177,16 @@ define([
                         srdata[item.guid] = item;
                     });
                     generic.crossFiller(
-                        guids, self.data.storageAppliances,
+                        guids, self.data.storageRouters,
                         function(guid) {
-                            return new StorageAppliance(guid);
+                            return new StorageRouter(guid);
                         }, 'guid'
                     );
-                    $.each(self.data.storageAppliances(), function(index, storageAppliance) {
-                        storageAppliance.fillData(srdata[storageAppliance.guid()]);
+                    $.each(self.data.storageRouters(), function(index, storageRouter) {
+                        storageRouter.fillData(srdata[storageRouter.guid()]);
                     });
-                    if (self.data.target() === undefined && self.data.storageAppliances().length > 0) {
-                        self.data.target(self.data.storageAppliances()[0]);
+                    if (self.data.target() === undefined && self.data.storageRouters().length > 0) {
+                        self.data.target(self.data.storageRouters()[0]);
                     }
                 });
         };

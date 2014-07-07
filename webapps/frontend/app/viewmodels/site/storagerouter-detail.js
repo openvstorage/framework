@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/storageappliance', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver'
-], function($, ko, shared, generic, Refresher, api, StorageAppliance, PMachine, VPool, StorageDriver) {
+    '../containers/storagerouter', '../containers/pmachine', '../containers/vpool', '../containers/storagedriver'
+], function($, ko, shared, generic, Refresher, api, StorageRouter, PMachine, VPool, StorageDriver) {
     "use strict";
     return function() {
         var self = this;
@@ -33,35 +33,35 @@ define([
         self.loadStorageDriversHandle = {};
 
         // Observables
-        self.storageAppliance     = ko.observable();
-        self.vPoolsLoaded         = ko.observable(false);
-        self.vPools               = ko.observableArray([]);
-        self.checkedVPoolGuids    = ko.observableArray([]);
+        self.storageRouter     = ko.observable();
+        self.vPoolsLoaded      = ko.observable(false);
+        self.vPools            = ko.observableArray([]);
+        self.checkedVPoolGuids = ko.observableArray([]);
 
         // Functions
         self.load = function() {
             return $.Deferred(function (deferred) {
-                var storageAppliance = self.storageAppliance();
+                var storageRouter = self.storageRouter();
                 $.when.apply($, [
-                        storageAppliance.load('_dynamics,_relations'),
-                        storageAppliance.getAvailableActions()
+                        storageRouter.load('_dynamics,_relations'),
+                        storageRouter.getAvailableActions()
                     ])
                     .then(self.loadStorageDrivers)
                     .then(self.loadVPools)
                     .done(function() {
-                        self.checkedVPoolGuids(self.storageAppliance().vPoolGuids);
-                        var pMachineGuid = storageAppliance.pMachineGuid(), pm;
-                        if (pMachineGuid && (storageAppliance.pMachine() === undefined || storageAppliance.pMachine().guid() !== pMachineGuid)) {
+                        self.checkedVPoolGuids(self.storageRouter().vPoolGuids);
+                        var pMachineGuid = storageRouter.pMachineGuid(), pm;
+                        if (pMachineGuid && (storageRouter.pMachine() === undefined || storageRouter.pMachine().guid() !== pMachineGuid)) {
                             if (!self.pMachineCache.hasOwnProperty(pMachineGuid)) {
                                 pm = new PMachine(pMachineGuid);
                                 pm.load();
                                 self.pMachineCache[pMachineGuid] = pm;
                             }
-                            storageAppliance.pMachine(self.pMachineCache[pMachineGuid]);
+                            storageRouter.pMachine(self.pMachineCache[pMachineGuid]);
                         }
                         // Move child guids to the observables for easy display
-                        storageAppliance.vPools(storageAppliance.vPoolGuids);
-                        storageAppliance.vMachines(storageAppliance.vMachineGuids);
+                        storageRouter.vPools(storageRouter.vPoolGuids);
+                        storageRouter.vMachines(storageRouter.vMachineGuids);
                     })
                     .always(deferred.resolve);
             }).promise();
@@ -98,12 +98,12 @@ define([
         };
         self.loadStorageDrivers = function() {
             return $.Deferred(function(deferred) {
-                $.each(self.storageAppliance().storageDriverGuids, function(index, guid) {
+                $.each(self.storageRouter().storageDriverGuids, function(index, guid) {
                     if (generic.xhrCompleted(self.loadStorageDriversHandle[guid])) {
                         self.loadStorageDriversHandle[guid] = api.get('storagedrivers/' + guid)
                             .done(function(data) {
                                 var storageDriverFound = false, storageDriver;
-                                $.each(self.storageAppliance().StorageDrivers(), function(vindex, storageDriver) {
+                                $.each(self.storageRouter().StorageDrivers(), function(vindex, storageDriver) {
                                     if (storageDriver.guid() === guid) {
                                         storageDriver.fillData(data);
                                         storageDriverFound = true;
@@ -114,7 +114,7 @@ define([
                                 if (storageDriverFound === false) {
                                     storageDriver = new StorageDriver(data.guid);
                                     storageDriver.fillData(data);
-                                    self.storageAppliance().StorageDrivers.push(storageDriver);
+                                    self.storageRouter().StorageDrivers.push(storageDriver);
                                 }
                             });
                     }
@@ -125,13 +125,13 @@ define([
 
         // Durandal
         self.activate = function(mode, guid) {
-            self.storageAppliance(new StorageAppliance(guid));
-            self.storageAppliance().StorageDrivers = ko.observableArray();
+            self.storageRouter(new StorageRouter(guid));
+            self.storageRouter().StorageDrivers = ko.observableArray();
 
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
-            self.shared.footerData(self.storageAppliance);
+            self.shared.footerData(self.storageRouter);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {

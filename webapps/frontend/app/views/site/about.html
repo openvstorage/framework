@@ -23,9 +23,9 @@ limitations under the License.
                     <b data-i18n="ovs:about.installedproducts"></b>
                 </div>
                 <div class="panel-body">
-                    <ul data-bind="foreach: storageAppliances">
+                    <ul data-bind="foreach: storageRouters">
                         <li>
-                            <span data-i18n="ovs:generic.storageappliance"></span>: <span data-bind="text: name"></span>
+                            <span data-i18n="ovs:generic.storagerouter"></span>: <span data-bind="text: name"></span>
                             <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading" data-bind="if: loading() === true"
                                style="margin-left: 10px;"></i>
                             <ul data-bind="if: loading() === false">

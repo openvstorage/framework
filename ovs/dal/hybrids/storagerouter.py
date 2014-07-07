@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-StorageAppliance module
+StorageRouter module
 """
 import time
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -21,9 +21,9 @@ from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.pmachine import PMachine
 
 
-class StorageAppliance(DataObject):
+class StorageRouter(DataObject):
     """
-    A StorageAppliance represents the Open vStorage software stack, any (v)machine on which it is installed
+    A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
     # pylint: disable=line-too-long
     __blueprint = {'name':        (None,  str,  'Name of the vMachine.'),
@@ -31,13 +31,13 @@ class StorageAppliance(DataObject):
                    'machineid':   (None,  str,  'The hardware identifier of the vMachine'),
                    'ip':          (None,  str,  'IP Address of the vMachine, if available'),
                    'status':      ('OK',  ['OK', 'NOK'], 'Internal status of the software stack')}
-    __relations = {'pmachine': (PMachine, 'storageappliances')}
+    __relations = {'pmachine': (PMachine, 'storagerouters')}
     __expiry = {'statistics':       (5, dict),
                 'stored_data':     (60, int),
                 'failover_mode':   (60, str),
                 'vmachines_guids': (15, list),
                 'vpools_guids':    (15, list),
-                'vdisks_guids':     (15, list)}
+                'vdisks_guids':    (15, list)}
     # pylint: enable=line-too-long
 
     def _statistics(self):
@@ -88,8 +88,8 @@ class StorageAppliance(DataObject):
 
     def _vmachines_guids(self):
         """
-        Gets the vMachine guids served by this StorageAppliance.
-        Definition of "served by": vMachine whose disks are served by a given StorageAppliance
+        Gets the vMachine guids served by this StorageRouter.
+        Definition of "served by": vMachine whose disks are served by a given StorageRouter
         """
         vmachine_guids = set()
         for storagedriver in self.storagedrivers:
@@ -101,7 +101,7 @@ class StorageAppliance(DataObject):
 
     def _vdisks_guids(self):
         """
-        Gets the vDisk guids served by this StorageAppliance.
+        Gets the vDisk guids served by this StorageRouter.
         """
         vdisk_guids = []
         for storagedriver in self.storagedrivers:
@@ -112,7 +112,7 @@ class StorageAppliance(DataObject):
 
     def _vpools_guids(self):
         """
-        Gets the vPool guids linked to this StorageAppliance (trough StorageDriver)
+        Gets the vPool guids linked to this StorageRouter (trough StorageDriver)
         """
         vpool_guids = set()
         for storagedriver in self.storagedrivers:

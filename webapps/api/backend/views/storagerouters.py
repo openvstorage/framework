@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-StorageAppliance module
+StorageRouter module
 """
 
 from rest_framework import status, viewsets
@@ -21,37 +21,37 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
 from rest_framework.exceptions import NotAcceptable
-from ovs.dal.lists.storageappliancelist import StorageApplianceList
-from ovs.dal.hybrids.storageappliance import StorageAppliance
+from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
-from ovs.lib.storageappliance import StorageApplianceController
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
 
-class StorageApplianceViewSet(viewsets.ViewSet):
+class StorageRouterViewSet(viewsets.ViewSet):
     """
-    Information about Storage Appliances
+    Information about Storage Routers
     """
     permission_classes = (IsAuthenticated,)
-    prefix = r'storageappliances'
-    base_name = 'storageappliances'
+    prefix = r'storagerouters'
+    base_name = 'storagerouters'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(StorageAppliance, 'name,vpool_guid')
+    @get_list(StorageRouter, 'name,vpool_guid')
     def list(self, request, hints):
         """
-        Overview of all Storage Appliances
+        Overview of all Storage Routers
         """
         _ = hints, request
-        return StorageApplianceList.get_storageappliances()
+        return StorageRouterList.get_storagerouters()
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(StorageAppliance)
-    @get_object(StorageAppliance)
+    @validate(StorageRouter)
+    @get_object(StorageRouter)
     def retrieve(self, request, obj):
         """
         Load information about a given vMachine
@@ -61,25 +61,25 @@ class StorageApplianceViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(StorageAppliance)
+    @get_list(StorageRouter)
     def filter(self, request, pk=None, format=None, hints=None):
         """
         Filters vMachines based on a filter object
         """
         _ = pk, format, hints
-        query_result = DataList({'object': StorageAppliance,
+        query_result = DataList({'object': StorageRouter,
                                  'data': DataList.select.DESCRIPTOR,
                                  'query': request.DATA['query']}).data
-        return DataObjectList(query_result, StorageAppliance)
+        return DataObjectList(query_result, StorageRouter)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'system'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     @celery_task()
     def move_away(self, request, obj):
         """
-        Moves away all vDisks from all Storage Drivers this Storage Appliance is serving
+        Moves away all vDisks from all Storage Drivers this Storage Router is serving
         """
         _ = request
         return StorageDriverController.move_away.delay(obj.guid)
@@ -87,52 +87,52 @@ class StorageApplianceViewSet(viewsets.ViewSet):
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     def get_available_actions(self, request, obj):
         """
         Gets a list of all available actions
         """
         _ = request, obj
         actions = []
-        storageappliances = StorageApplianceList.get_storageappliances()
-        if len(storageappliances) > 1:
+        storagerouters = StorageRouterList.get_storagerouters()
+        if len(storagerouters) > 1:
             actions.append('MOVE_AWAY')
         return Response(actions, status=status.HTTP_200_OK)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     @celery_task()
     def get_physical_metadata(self, request, obj):
         """
-        Returns a list of mountpoints on the given Storage Appliance
+        Returns a list of mountpoints on the given Storage Router
         """
         files = []
         if 'files' in request.DATA:
             files = request.DATA['files'].strip().split(',')
-        return StorageApplianceController.get_physical_metadata.s(files, obj.guid).apply_async(
+        return StorageRouterController.get_physical_metadata.s(files, obj.guid).apply_async(
             routing_key='sa.{0}'.format(obj.machineid)
         )
 
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     @celery_task()
     def get_version_info(self, request, obj):
         """
-        Gets version information of a given Storage Appliance
+        Gets version information of a given Storage Router
         """
         _ = request
-        return StorageApplianceController.get_version_info.s(obj.guid).apply_async(
+        return StorageRouterController.get_version_info.s(obj.guid).apply_async(
             routing_key='sa.{0}'.format(obj.machineid)
         )
 
     @action()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     @celery_task()
     def check_s3(self, request, obj):
         """
@@ -147,12 +147,12 @@ class StorageApplianceViewSet(viewsets.ViewSet):
             parameters[field] = request.DATA[field]
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
-        return StorageApplianceController.check_s3.delay(**parameters)
+        return StorageRouterController.check_s3.delay(**parameters)
 
     @action()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     @celery_task()
     def check_mtpt(self, request, obj):
         """
@@ -166,23 +166,23 @@ class StorageApplianceViewSet(viewsets.ViewSet):
             parameters[field] = request.DATA[field]
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
-        return StorageApplianceController.check_mtpt.s(parameters['name']).apply_async(
+        return StorageRouterController.check_mtpt.s(parameters['name']).apply_async(
             routing_key='sa.{0}'.format(obj.machineid)
         )
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(StorageAppliance)
+    @validate(StorageRouter)
     @celery_task()
     def add_vpool(self, request, obj):
         """
-        Adds a vPool to a given Storage Appliance
+        Adds a vPool to a given Storage Router
         """
         fields = ['vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_cache', 'storage_ip', 'vrouter_port']
-        parameters = {'storageappliance_ip': obj.ip}
+        parameters = {'storagerouter_ip': obj.ip}
         for field in fields:
             if field not in request.DATA:
                 raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
@@ -190,4 +190,4 @@ class StorageApplianceViewSet(viewsets.ViewSet):
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
 
-        return StorageApplianceController.add_vpool.s(parameters).apply_async(routing_key='sa.{0}'.format(obj.machineid))
+        return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sa.{0}'.format(obj.machineid))

@@ -490,7 +490,7 @@ if __name__ == '__main__':
     vm_name = vm_basename
 
     # ISO selection
-    parser = OptionParser(description='Open vStorage Storage Appliance Setup')
+    parser = OptionParser(description='Open vStorage Storage Router Setup')
     parser.add_option('-i', '--image', dest='image', help='absolute path to your ubuntu iso')
     parser.add_option('-s', '--skip', action="store_true", dest='skip', help='skip the sata as 3rd disk', default=False)
     (options, args) = parser.parse_args()

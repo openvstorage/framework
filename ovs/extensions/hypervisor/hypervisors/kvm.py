@@ -149,13 +149,13 @@ class KVM(object):
         _ = self
         return path.strip('/')
 
-    def get_vmachine_path(self, machinename, storageappliance_machineid):
+    def get_vmachine_path(self, machinename, storagerouter_machineid):
         """
         Builds the path for the file representing a given vmachine
         """
         _ = self
         machinename = machinename.replace(' ', '_')
-        return '/{}/{}.xml'.format(storageappliance_machineid, machinename)
+        return '/{}/{}.xml'.format(storagerouter_machineid, machinename)
 
     def get_rename_scenario(self, old_name, new_name):
         """

@@ -21,27 +21,27 @@ define(['knockout'], function(ko){
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
     singleton = function() {
         return {
-            target:            ko.observable(),
-            files:             ko.observable(),
-            accesskey:         ko.observable(''),
-            secretkey:         ko.observable(''),
-            allowVPool:        ko.observable(true),
-            backend:           ko.observable('LOCAL'),
-            mtptTemp:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
-            mtptBFS:           ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
-            mtptMD:            ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
-            mtptCache:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-cache' }),
-            storageIP:         ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
-            name:              ko.observable('').extend({ regex: nameRgex }),
-            host:              ko.observable('').extend({ regex: hostRegex }),
-            port:              ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
-            timeout:           ko.observable(600).extend({ numeric: {}}),
-            vRouterPort:       ko.observable(12322).extend({ numeric: { min: 1, max: 65536 }, identifier: 'vrouterport' }),
-            backends:          ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']),
-            storageAppliances: ko.observableArray([]),
-            storageDrivers:    ko.observableArray([]),
-            mountpoints:       ko.observableArray([]),
-            ipAddresses:       ko.observableArray([])
+            target:         ko.observable(),
+            files:          ko.observable(),
+            accesskey:      ko.observable(''),
+            secretkey:      ko.observable(''),
+            allowVPool:     ko.observable(true),
+            backend:        ko.observable('LOCAL'),
+            mtptTemp:       ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
+            mtptBFS:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
+            mtptMD:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
+            mtptCache:      ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-cache' }),
+            storageIP:      ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
+            name:           ko.observable('').extend({ regex: nameRgex }),
+            host:           ko.observable('').extend({ regex: hostRegex }),
+            port:           ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
+            timeout:        ko.observable(600).extend({ numeric: {}}),
+            vRouterPort:    ko.observable(12322).extend({ numeric: { min: 1, max: 65536 }, identifier: 'vrouterport' }),
+            backends:       ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']),
+            storageRouters: ko.observableArray([]),
+            storageDrivers: ko.observableArray([]),
+            mountpoints:    ko.observableArray([]),
+            ipAddresses:    ko.observableArray([])
         };
     };
     return singleton();

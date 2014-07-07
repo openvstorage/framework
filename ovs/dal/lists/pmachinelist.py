@@ -58,10 +58,10 @@ class PMachineList(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
             raise RuntimeError('StorageDriver {0} could not be found'.format(storagedriver_id))
-        storageappliance = storagedriver.storageappliance
-        if storageappliance is None:
-            raise RuntimeError('StorageDriver {0} not linked to a StorageAppliance'.format(storagedriver.name))
-        pmachine = storageappliance.pmachine
+        storagerouter = storagedriver.storagerouter
+        if storagerouter is None:
+            raise RuntimeError('StorageDriver {0} not linked to a StorageRouter'.format(storagedriver.name))
+        pmachine = storagerouter.pmachine
         if pmachine is None:
-            raise RuntimeError('StorageAppliance {0} not linked to a pMachine'.format(storageappliance.name))
+            raise RuntimeError('StorageRouter {0} not linked to a pMachine'.format(storagerouter.name))
         return pmachine

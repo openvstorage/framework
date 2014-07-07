@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-StorageAppliance module
+StorageRouter module
 """
 import copy
 import os
@@ -25,17 +25,17 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='storageappliance')
+logger = LogHandler('lib', name='storagerouter')
 
 
-class StorageApplianceController(object):
+class StorageRouterController(object):
     """
-    Contains all BLL related to StorageAppliance
+    Contains all BLL related to StorageRouter
     """
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.get_physical_metadata')
-    def get_physical_metadata(files, storageappliance_guid):
+    @celery.task(name='ovs.storagerouter.get_physical_metadata')
+    def get_physical_metadata(files, storagerouter_guid):
         """
         Gets physical information about the machine this task is running on
         """
@@ -53,7 +53,7 @@ class StorageApplianceController(object):
         ipaddresses = [ip.strip() for ip in ipaddresses]
         ipaddresses.remove('127.0.0.1')
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
-        allow_vpool = VPoolController.can_be_served_on(storageappliance_guid)
+        allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
@@ -64,16 +64,16 @@ class StorageApplianceController(object):
                 'allow_vpool': allow_vpool}
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.add_vpool')
+    @celery.task(name='ovs.storagerouter.add_vpool')
     def add_vpool(parameters):
         """
         Add a vPool to the machine this task is running on
         """
         from ovs.extensions.grid.manager import Manager
-        Manager.init_vpool(parameters['storageappliance_ip'], parameters['vpool_name'], parameters=parameters)
+        Manager.init_vpool(parameters['storagerouter_ip'], parameters['vpool_name'], parameters=parameters)
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.remove_storagedriver')
+    @celery.task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid):
         """
         Removes a Storage Driver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
@@ -83,32 +83,32 @@ class StorageApplianceController(object):
         Manager.remove_vpool(storagedriver_guid)
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.update_storagedrivers')
-    def update_storagedrivers(storagedriver_guids, storageappliances, parameters):
+    @celery.task(name='ovs.storagerouter.update_storagedrivers')
+    def update_storagedrivers(storagedriver_guids, storagerouters, parameters):
         """
         Add/remove multiple vPools
         @param storagedriver_guids: Storage Drivers to be removed
-        @param storageappliances: StorageAppliances on which to add a new link
+        @param storagerouters: StorageRouters on which to add a new link
         @param parameters: Settings for new links
         """
         success = True
         # Add Storage Drivers
-        for storageappliance_ip, storageapplaince_machineid in storageappliances:
+        for storagerouter_ip, storageapplaince_machineid in storagerouters:
             try:
                 new_parameters = copy.copy(parameters)
-                new_parameters['storageappliance_ip'] = storageappliance_ip
+                new_parameters['storagerouter_ip'] = storagerouter_ip
                 local_machineid = Ovs.get_my_machine_id()
                 if local_machineid == storageapplaince_machineid:
                     # Inline execution, since it's on the same node (preventing deadlocks)
-                    StorageApplianceController.add_vpool(new_parameters)
+                    StorageRouterController.add_vpool(new_parameters)
                 else:
                     # Async execution, since it has to be executed on another node
                     # @TODO: Will break in Celery 3.2, need to find another solution
                     # Requirements:
-                    # - This code cannot continue until this new task is completed (as all these Storage Appliance
+                    # - This code cannot continue until this new task is completed (as all these Storage Router
                     #   need to be handled sequentially
                     # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
-                    result = StorageApplianceController.add_vpool.s(new_parameters).apply_async(
+                    result = StorageRouterController.add_vpool.s(new_parameters).apply_async(
                         routing_key='sr.{0}'.format(storageapplaince_machineid)
                     )
                     result.wait()
@@ -117,22 +117,22 @@ class StorageApplianceController(object):
         # Remove Storage Drivers
         for storagedriver_guid in storagedriver_guids:
             try:
-                StorageApplianceController.remove_storagedriver(storagedriver_guid)
+                StorageRouterController.remove_storagedriver(storagedriver_guid)
             except:
                 success = False
         return success
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.get_version_info')
-    def get_version_info(storageappliance_guid):
+    @celery.task(name='ovs.storagerouter.get_version_info')
+    def get_version_info(storagerouter_guid):
         """
-        Returns version information regarding a given StorageAppliance
+        Returns version information regarding a given StorageRouter
         """
-        return {'storageappliance_guid': storageappliance_guid,
+        return {'storagerouter_guid': storagerouter_guid,
                 'versions': Package.get_versions()}
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.check_s3')
+    @celery.task(name='ovs.storagerouter.check_s3')
     def check_s3(host, port, accesskey, secretkey):
         """
         Validates whether connection to a given S3 backend can be made
@@ -153,7 +153,7 @@ class StorageApplianceController(object):
             return False
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.check_mtpt')
+    @celery.task(name='ovs.storagerouter.check_mtpt')
     def check_mtpt(name):
         """
         Checks whether a given mountpoint for vPool is in use

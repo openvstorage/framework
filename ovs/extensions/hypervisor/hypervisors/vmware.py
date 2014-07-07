@@ -67,13 +67,16 @@ class VMware(object):
                 return task_info.info.result.value
         return None
 
-    def delete_vm(self, vmid, storagedriver_mountpoint, storagedriver_storage_ip, devicename, disks_info=[], wait=False):
+    def delete_vm(self, vmid, storagedriver_mountpoint, storagedriver_storage_ip, devicename, disks_info=None, wait=False):
         """
         Remove the vmachine from the hypervisor
 
         @param vmid: hypervisor id of the virtual machine
         @param wait: wait for action to complete
         """
+        if disks_info is None:
+            disks_info = []
+        _ = disks_info
         self.sdk.delete_vm(vmid, storagedriver_mountpoint, storagedriver_storage_ip, devicename, wait)
 
     def get_vm_object(self, vmid):
@@ -161,11 +164,11 @@ class VMware(object):
         _ = self
         return path.strip('/')
 
-    def get_vmachine_path(self, machinename, storageappliance_machineid):
+    def get_vmachine_path(self, machinename, storagerouter_machineid):
         """
         Builds the path for the file representing a given vmachine
         """
-        _ = self, storageappliance_machineid  # For compatibility purposes only
+        _ = self, storagerouter_machineid  # For compatibility purposes only
         machinename = machinename.replace(' ', '_')
         return '/{}/{}.vmx'.format(machinename, machinename)
 

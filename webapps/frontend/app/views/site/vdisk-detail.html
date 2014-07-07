@@ -78,11 +78,11 @@ limitations under the License.
                             <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.storageappliance"></td>
+                            <td data-i18n="ovs:generic.storagerouter"></td>
                             <td>
-                                <span data-bind="lazyloader: { item: storageAppliance, loadedObservable: 'loaded', undefinedLoading: false }">
+                                <span data-bind="lazyloader: { item: storageRouter, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <a data-part="lazy-entry" data-bind="text: item().name(),
-                                                                         attr: { href: $root.shared.routing.loadHash('storageappliance-detail', { guid: item().guid }) }"></a>
+                                                                         attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.readspeed"></td>

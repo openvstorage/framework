@@ -28,18 +28,18 @@ define([
         self.vMachineGuids        = [];
 
         // Handles
-        self.loadVDisksHandle         = undefined;
-        self.loadStorageApplianceGuid = undefined;
-        self.loadHandle               = undefined;
-        self.loadVpoolGuid            = undefined;
-        self.loadChildrenGuid         = undefined;
-        self.loadSChildrenGuid        = undefined;
+        self.loadVDisksHandle      = undefined;
+        self.loadStorageRouterGuid = undefined;
+        self.loadHandle            = undefined;
+        self.loadVpoolGuid         = undefined;
+        self.loadChildrenGuid      = undefined;
+        self.loadSChildrenGuid     = undefined;
 
         // External dependencies
-        self.pMachine          = ko.observable();
-        self.storageAppliances = ko.observableArray([]);
-        self.vPools            = ko.observableArray([]);
-        self.vMachines         = ko.observableArray([]);
+        self.pMachine       = ko.observable();
+        self.storageRouters = ko.observableArray([]);
+        self.vPools         = ko.observableArray([]);
+        self.vMachines      = ko.observableArray([]);
 
         // Observables
         self.guid                  = ko.observable(guid);
@@ -113,8 +113,8 @@ define([
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
-            if (data.hasOwnProperty('storageappliances_guids')) {
-                self.storageApplianceGuids = data.storageappliances_guids;
+            if (data.hasOwnProperty('storagerouters_guids')) {
+                self.storageRouterGuids = data.storagerouters_guids;
             }
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;

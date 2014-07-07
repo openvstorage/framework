@@ -125,7 +125,7 @@ class Manager(object):
                 disktypes = ''
             if disktypes != '':
                 possible_hypervisor = 'VMWARE'
-        hypervisor = Helper.ask_choice(['VMWARE', 'KVM'], question='Which hypervisor will be backing this Storage Appliance?', default_value=possible_hypervisor)
+        hypervisor = Helper.ask_choice(['VMWARE', 'KVM'], question='Which hypervisor will be backing this Storage Router?', default_value=possible_hypervisor)
 
         ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
         ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
@@ -154,7 +154,7 @@ class Manager(object):
                 except Exception as ex:
                     print 'Could not connect to {0}: {1}'.format(hypervisor_ip, ex)
         elif hypervisor == 'KVM':
-            # In case of KVM, the Storage Appliance is the pMachine, so credentials are shared.
+            # In case of KVM, the Storage Router is the pMachine, so credentials are shared.
             hypervisor_ip = Helper.ask_choice(ipaddresses,
                                               question='Choose hypervisor public ip address',
                                               default_value=Helper.find_in_list(ipaddresses, ip))
@@ -333,8 +333,8 @@ class Manager(object):
         from configobj import ConfigObj
         from ovs.dal.hybrids.pmachine import PMachine
         from ovs.dal.lists.pmachinelist import PMachineList
-        from ovs.dal.hybrids.storageappliance import StorageAppliance
-        from ovs.dal.lists.storageappliancelist import StorageApplianceList
+        from ovs.dal.hybrids.storagerouter import StorageRouter
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
         from ovs.plugin.provider.configuration import Configuration
 
@@ -667,7 +667,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     print "Arakoon master not yet determined for {0}".format(cluster)
                     time.sleep(1)
 
-        # Add Storage Appliance and pMachine in the model, if they don't yet exist
+        # Add Storage Router and pMachine in the model, if they don't yet exist
         client = Client.load(ip)
         pmachine = None
         pmachine_ip = Manager._read_remote_config(client, 'ovs.host.ip')
@@ -684,19 +684,19 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             pmachine.hvtype = pmachine_hvtype
             pmachine.name = Manager._read_remote_config(client, 'ovs.host.name')
             pmachine.save()
-        storageappliance = None
-        for current_storageappliance in StorageApplianceList.get_storageappliances():
-            if current_storageappliance.ip == ip and current_storageappliance.machineid == unique_id:
-                storageappliance = current_storageappliance
+        storagerouter = None
+        for current_storagerouter in StorageRouterList.get_storagerouters():
+            if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
+                storagerouter = current_storagerouter
                 break
-        if storageappliance is None:
-            storageappliance = StorageAppliance()
-            storageappliance.name = new_node_hostname
-            storageappliance.machineid = unique_id
-            storageappliance.ip = Manager._read_remote_config(client, 'ovs.grid.ip')
-            storageappliance.save()
-        storageappliance.pmachine = pmachine
-        storageappliance.save()
+        if storagerouter is None:
+            storagerouter = StorageRouter()
+            storagerouter.name = new_node_hostname
+            storagerouter.machineid = unique_id
+            storagerouter.ip = Manager._read_remote_config(client, 'ovs.grid.ip')
+            storagerouter.save()
+        storagerouter.pmachine = pmachine
+        storagerouter.save()
 
         if is_master is True:
             for node in nodes:
@@ -735,7 +735,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.dal.hybrids.storagedriver import StorageDriver
         from ovs.dal.lists.vpoollist import VPoolList
         from ovs.dal.lists.storagedriverlist import StorageDriverList
-        from ovs.dal.lists.storageappliancelist import StorageApplianceList
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
         from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 
@@ -761,24 +761,24 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         client = Client.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
         unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
 
-        storageappliance = None
-        for current_storageappliance in StorageApplianceList.get_storageappliances():
-            if current_storageappliance.ip == ip and current_storageappliance.machineid == unique_id:
-                storageappliance = current_storageappliance
+        storagerouter = None
+        for current_storagerouter in StorageRouterList.get_storagerouters():
+            if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
+                storagerouter = current_storagerouter
                 break
-        if storageappliance is None:
-            raise RuntimeError('Could not find Storage Appliance with given ip address')
+        if storagerouter is None:
+            raise RuntimeError('Could not find Storage Router with given ip address')
 
         vpool = VPoolList.get_vpool_by_name(vpool_name)
         storagedriver = None
         if vpool is not None:
             if vpool.backend_type == 'LOCAL':
                 # Might be an issue, investigating whether it's on the same not or not
-                if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storageappliance.machineid != unique_id:
+                if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machineid != unique_id:
                     raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
             for vpool_storagedriver in vpool.storagedrivers:
-                if vpool_storagedriver.storageappliance_guid == storageappliance.guid:
-                    storagedriver = vpool_storagedriver  # The vPool is already added to this Storage Appliance and this might be a cleanup/recovery
+                if vpool_storagedriver.storagerouter_guid == storagerouter.guid:
+                    storagedriver = vpool_storagedriver  # The vPool is already added to this Storage Router and this might be a cleanup/recovery
 
             # Check whether there are running machines on this vPool
             machine_guids = []
@@ -791,7 +791,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         nodes = {ip}
         if vpool is not None:
             for vpool_storagedriver in vpool.storagedrivers:
-                nodes.add(vpool_storagedriver.storageappliance.ip)
+                nodes.add(vpool_storagedriver.storagerouter.ip)
         nodes = list(nodes)
 
         services = ['volumedriver_{0}'.format(vpool_name),
@@ -921,7 +921,7 @@ for directory in {0}:
         scocache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
         readcache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
         if new_storagedriver:
-            ports_used_in_model = [port_storagedriver.port for port_storagedriver in StorageDriverList.get_storagedrivers_by_storageappliance(storageappliance.guid)]
+            ports_used_in_model = [port_storagedriver.port for port_storagedriver in StorageDriverList.get_storagedrivers_by_storagerouter(storagerouter.guid)]
             vrouter_port_in_hrd = int(Manager._read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
             if vrouter_port_in_hrd in ports_used_in_model:
                 vrouter_port = int(parameters.get('vrouter_port')) or Helper.ask_integer('Provide Volumedriver connection port (make sure port is not in use)',
@@ -937,8 +937,8 @@ for directory in {0}:
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
-            raise RuntimeError('No available ip addresses found suitable for Storage Appliance storage ip')
-        if storageappliance.pmachine.hvtype == 'KVM':
+            raise RuntimeError('No available ip addresses found suitable for Storage Router storage ip')
+        if storagerouter.pmachine.hvtype == 'KVM':
             volumedriver_storageip = '127.0.0.1'
         else:
             volumedriver_storageip = parameters.get('storage_ip') or Helper.ask_choice(ipaddresses, 'Select storage ip address for this vpool')
@@ -994,7 +994,7 @@ storagedriver_configuration.configure_hypervisor('{10}')
 storagedriver_configuration.configure_filedriver(fd_config)
 """.format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           storageappliance.pmachine.hvtype, mountpoint_cache)
+           storagerouter.pmachine.hvtype, mountpoint_cache)
         Manager._exec_python(client, storagedriver_config_script)
         Manager._configure_amqp_to_volumedriver(client, vpool_name)
 
@@ -1010,7 +1010,7 @@ storagedriver_configuration.configure_filedriver(fd_config)
         storagedriver.mountpoint_cache = mountpoint_cache
         storagedriver.mountpoint_bfs = mountpoint_bfs
         storagedriver.mountpoint_md = mountpoint_md
-        storagedriver.storageappliance = storageappliance
+        storagedriver.storagerouter = storagerouter
         storagedriver.vpool = vpool
         storagedriver.save()
 
@@ -1030,7 +1030,7 @@ for filename in {1}:
         voldrv_config_file = '{0}/voldrv_vpools/{1}.json'.format(Manager._read_remote_config(client, 'ovs.core.cfgdir'), vpool_name)
         log_file = '/var/log/ovs/volumedriver/{0}.log'.format(vpool_name)
         vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logrotation --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(voldrv_config_file, storagedriver.mountpoint, log_file)
-        if storageappliance.pmachine.hvtype == 'KVM':
+        if storagerouter.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(storagedriver.mountpoint)
         else:
             vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(storagedriver.mountpoint)
@@ -1041,7 +1041,7 @@ for filename in {1}:
         fc_name = 'failovercache_{0}'.format(vpool_name)
 
         params = {'<VPOOL_MOUNTPOINT>': storagedriver.mountpoint,
-                  '<HYPERVISOR_TYPE>': storageappliance.pmachine.hvtype,
+                  '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
                   '<UUID>': str(uuid.uuid4())}
 
@@ -1058,11 +1058,11 @@ Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', comma
         )
         Manager._exec_python(client, service_script)
 
-        if storageappliance.pmachine.hvtype == 'VMWARE':
+        if storagerouter.pmachine.hvtype == 'VMWARE':
             client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
             client.run('service nfs-kernel-server start')
 
-        if storageappliance.pmachine.hvtype == 'KVM':
+        if storagerouter.pmachine.hvtype == 'KVM':
             client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, storagedriver.mountpoint))
             client.run('virsh pool-build {0}'.format(vpool_name))
             client.run('virsh pool-start {0}'.format(vpool_name))
@@ -1089,7 +1089,7 @@ Service.start_service('{0}')
     @staticmethod
     def remove_vpool(storagedriver_guid):
         """
-        Removes a Storage Appliance-vPool link (Storage Driver). If it's the last Storage Driver for the vPool, the vPool will be completely removed
+        Removes a Storage Router-vPool link (Storage Driver). If it's the last Storage Driver for the vPool, the vPool will be completely removed
         """
         from ovs.dal.hybrids.storagedriver import StorageDriver
         from ovs.dal.lists.vmachinelist import VMachineList
@@ -1098,9 +1098,9 @@ Service.start_service('{0}')
 
         # Get objects & Make some checks
         storagedriver = StorageDriver(storagedriver_guid)
-        storageappliance = storagedriver.storageappliance
-        ip = storageappliance.ip
-        pmachine = storageappliance.pmachine
+        storagerouter = storagedriver.storagerouter
+        ip = storagerouter.ip
+        pmachine = storagerouter.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         pmachine_guids = [vm.pmachine_guid for vm in vmachines]
         vpools_guids = [vm.vpool_guid for vm in vmachines if vm.vpool_guid is not None]
@@ -1119,7 +1119,7 @@ Service.start_service('{0}')
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.guid != storagedriver_guid:
                 storagedrivers_left = True
-            client = Client.load(current_storagedriver.storageappliance.ip)
+            client = Client.load(current_storagedriver.storagerouter.ip)
             for service in services:
                 Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service
@@ -1189,7 +1189,7 @@ if Service.has_service('{0}'):
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
                 if current_storagedriver.guid != storagedriver_guid:
-                    client = Client.load(current_storagedriver.storageappliance.ip)
+                    client = Client.load(current_storagedriver.storagerouter.ip)
                     for service in services:
                         Manager._exec_python(client, """
 from ovs.plugin.provider.service import Service

@@ -37,27 +37,27 @@ define([
         self.vMachines = ko.observableArray([]);
 
         // Observables
-        self.guid                  = ko.observable(guid);
-        self.loading               = ko.observable(false);
-        self.loaded                = ko.observable(false);
-        self.pMachineGuid          = ko.observable();
-        self.name                  = ko.observable();
-        self.machineid             = ko.observable();
-        self.ipAddress             = ko.observable();
-        self.status                = ko.observable();
-        self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReads          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.failoverMode          = ko.observable();
-        self.vDisks                = ko.observableArray([]);
-        self.availableActions      = ko.observableArray([]);
+        self.guid             = ko.observable(guid);
+        self.loading          = ko.observable(false);
+        self.loaded           = ko.observable(false);
+        self.pMachineGuid     = ko.observable();
+        self.name             = ko.observable();
+        self.machineid        = ko.observable();
+        self.ipAddress        = ko.observable();
+        self.status           = ko.observable();
+        self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.storedData       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReads     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.backendWritten   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.failoverMode     = ko.observable();
+        self.vDisks           = ko.observableArray([]);
+        self.availableActions = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -82,7 +82,7 @@ define([
         self.getAvailableActions = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadActions)) {
-                    self.loadActions = api.get('storageappliances/' + self.guid() + '/get_available_actions')
+                    self.loadActions = api.get('storagerouters/' + self.guid() + '/get_available_actions')
                         .done(function(data) {
                             self.availableActions(data);
                             deferred.resolve();
@@ -143,7 +143,7 @@ define([
                     if (contents !== undefined) {
                         options.contents = contents;
                     }
-                    self.loadHandle = api.get('storageappliances/' + self.guid(), undefined, options)
+                    self.loadHandle = api.get('storagerouters/' + self.guid(), undefined, options)
                         .done(function(data) {
                             self.fillData(data);
                             self.loaded(true);

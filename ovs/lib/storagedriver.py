@@ -17,7 +17,7 @@ StorageDriver module
 """
 
 from ovs.celery import celery
-from ovs.dal.hybrids.storageappliance import StorageAppliance
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -30,11 +30,11 @@ class StorageDriverController(object):
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.move_away')
-    def move_away(storageappliance_guid):
+    def move_away(storagerouter_guid):
         """
-        Moves away all vDisks from all Storage Drivers this Storage Appliance is serving
+        Moves away all vDisks from all Storage Drivers this Storage Router is serving
         """
-        storagedrivers = StorageAppliance(storageappliance_guid).storagedrivers
+        storagedrivers = StorageRouter(storagerouter_guid).storagedrivers
         if len(storagedrivers) > 0:
             storagedriver_client = StorageDriverClient().load(storagedrivers[0].vpool)
             for storagedriver in storagedrivers:

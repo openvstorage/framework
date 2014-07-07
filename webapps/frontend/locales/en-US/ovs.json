@@ -16,7 +16,7 @@
     ],
     "generic": {
         "states": {
-            "storageappliance": {
+            "storagerouter": {
                 "ok": "Online",
                 "nok": "Offline",
                 "undefined": "Unknown"
@@ -100,8 +100,8 @@
         "machines": "Machines",
         "vpool": "vPool",
         "vpools": "vPools",
-        "storageappliance": "Storage Appliance",
-        "storageappliances": "Storage Appliances",
+        "storagerouter": "Storage Router",
+        "storagerouters": "Storage Routers",
         "children": "Children",
         "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
@@ -164,32 +164,32 @@
         "noentries": "No entries available",
         "logging": "Kibana logging"
     },
-    "storageappliances": {
-        "title": "Storage Appliances",
-        "details": "Storage Appliance Details",
+    "storagerouters": {
+        "title": "Storage Routers",
+        "details": "Storage Router Details",
         "detail": {
-            "title": "Storage Appliance",
+            "title": "Storage Router",
             "hostip": "Host IP",
             "moveawaytitle": "Move all vDisks",
-            "moveawaymsg": "Move all vDisks away from this Storage Appliance and start them on other Storage Appliances.",
+            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
                 "no": "Cancel",
                 "yes": "Move away",
                 "marked": "Moving away started",
-                "markedmsg": "All vDisks will be moved away from this Storage Appliance",
+                "markedmsg": "All vDisks will be moved away from this Storage Router",
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
             },
-            "storageappliancevpoollink": "vPools served by this Storage Appliance",
+            "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Appliances",
-            "logging": "Storage Appliance logs",
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
+            "logging": "Storage Router logs",
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this Storage Appliance's logs."
+            "logginginfo3": "to view this Storage Router's logs."
         }
     },
     "vpools" : {
@@ -204,9 +204,9 @@
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
             "sync": "Sync vPool with reality",
-            "storageappliancevpoollink": "Storage Appliances serving this vPool",
+            "storageroutervpoollink": "Storage Routers serving this vPool",
             "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Appliances.",
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Routers.",
             "logging": "vPool logs",
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
@@ -294,9 +294,9 @@
     "dashboard": {
         "title": "Dashboard",
         "panels": {
-            "storageappliance": {
-                "helpcontent": "The Storage Appliance panel list all the Storage Appliances registered in the Open vStorage Cluster. For each Storage Appliance the status, name, IP address and amount of vDisks is displayed.",
-                "helptitle": "Help - Storage Appliance",
+            "storagerouter": {
+                "helpcontent": "The Storage Router panel list all the Storage Routers registered in the Open vStorage Cluster. For each Storage Router the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - Storage Router",
                 "title": "Storager Appliance"
             },
             "cache": {
@@ -391,13 +391,13 @@
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "nocredentials": "No credentials were entered",
                 "extendedinfo": "Extended vPool information",
-                "initialstorageappliance": "Initial Storage Appliance:",
-                "invalidpassword": "Invalid Storage Appliance root password",
+                "initialstoragerouter": "Initial Storage Router:",
+                "invalidpassword": "Invalid Storage Router root password",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             },
             "gathermountpoints": {
-                "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Appliances serving this vPool.",
+                "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",
                 "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
                 "mtptinfo": "Required locations:",
                 "otherinfo": "Other information:",
@@ -405,19 +405,19 @@
                 "bfs": "Backend FS:",
                 "md": "Metadata:",
                 "cache": "Cache location:",
-                "mtptinuse": "The given __what__ location is already in use on this Storage Appliance",
+                "mtptinuse": "The given __what__ location is already in use on this Storage Router",
                 "ipaddress": "Storage IP:",
                 "port": "vRouter port:",
                 "portsinuse": "Ports in use:",
                 "bfsexclusive": "The BFS mountpoint must have exclusive use",
                 "bfsnotshared": "The BFS mountpoint should not be shared between vPools",
                 "portinuse": "The given port is already in use",
-                "vpoolnotallowed": "A vPool cannot be added to this Storage Appliance: Prerequisites not met.",
+                "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "invalidmtpt": "The mountpoint __what__ is invalid."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
-                "storageapplianceinfo": "Validate whether the correct Storage Appliance was selected.",
+                "storagerouterinfo": "Validate whether the correct Storage Router was selected.",
                 "mountpoints": "Validate whether mountpoints and connection information are correct.",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
                 "started": "Creation started",
@@ -426,25 +426,25 @@
                 "success": "Creation of vPool __what__ finished."
             }
         },
-        "storageappliancetovpool": {
-            "title": "Change links between vPool and Storage Appliances",
+        "storageroutertovpool": {
+            "title": "Change links between vPool and Storage Routers",
             "confirm": {
                 "errorvalidating": "Error while validating. Try again.",
                 "validating": "Validating...",
-                "addvalid": "The vPool can be added to this Storage Appliance.",
-                "removevalid": "The vPool can be removed from this Storage Appliance.",
-                "noselection": "No Storage Appliances were selected.",
-                "mtptnotavailable": "The location __what__ is not available on this Storage Appliance",
-                "ipnotavailable": "The IP __what__ is not available on this Storage Appliance",
+                "addvalid": "The vPool can be added to this Storage Router.",
+                "removevalid": "The vPool can be removed from this Storage Router.",
+                "noselection": "No Storage Routers were selected.",
+                "mtptnotavailable": "The location __what__ is not available on this Storage Router",
+                "ipnotavailable": "The IP __what__ is not available on this Storage Router",
                 "started": "Adding/removing",
-                "inprogress": "The vPool is being added to or removed from the validated Storage Appliances",
+                "inprogress": "The vPool is being added to or removed from the validated Storage Routers",
                 "working": "adding/removing the vPool",
                 "complete": "Add/remove vPool complete",
-                "success": "The vPool was added/removed to the selected Storage Appliances with success",
-                "somefailed": "The vPool was added to or removed from some the selected Storage Appliances. Some tasks failed.",
-                "allfailed": "The vPool could not be added to or removed from any of the selected Storage Appliances",
-                "inuse": "The vPool is in use at this Storage Appliance",
-                "vpoolnotallowed": "A vPool cannot be added to this Storage Appliance: Prerequisites not met.",
+                "success": "The vPool was added/removed to the selected Storage Routers with success",
+                "somefailed": "The vPool was added to or removed from some the selected Storage Routers. Some tasks failed.",
+                "allfailed": "The vPool could not be added to or removed from any of the selected Storage Routers",
+                "inuse": "The vPool is in use at this Storage Router",
+                "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             }
         },
@@ -606,7 +606,7 @@
         "snapshot": "&#xf030;",
         "setastemplate": "&#xf023;",
         "rollback": "&#xf01e;",
-        "storageappliance": "&#xf0c2;",
+        "storagerouter": "&#xf0c2;",
         "fromtemplate": "&#xf045;",
         "notchecked": "&#xf096;",
         "checked": "&#xf046;",
@@ -617,7 +617,7 @@
         "vdisks": "&#xf0a0;",
         "add": "&#xf067;",
         "vmachines": "&#xf0e8;",
-        "storageappliancevpoollink": "&#xf07c;",
+        "storageroutervpoollink": "&#xf07c;",
         "edit": "&#xf040;",
         "save": "&#xf00c;",
         "warning": "&#xf071;",

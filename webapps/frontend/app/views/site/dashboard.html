@@ -19,21 +19,21 @@ limitations under the License.
         <div class="col-md-4">
             <!-- Left column -->
             <div class="panel panel-default">
-                <!-- StorageAppliance -->
+                <!-- StorageRouter -->
                 <div class="panel-heading">
-                    <b data-i18n="ovs:dashboard.panels.storageappliance.title"></b>
+                    <b data-i18n="ovs:dashboard.panels.storagerouter.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: storageAppliancesLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                        <span data-bind="visible: storageRoutersLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.storageappliance.helptitle',
-                                             content: 'ovs:dashboard.panels.storageappliance.helpcontent'
+                                             title: 'ovs:dashboard.panels.storagerouter.helptitle',
+                                             content: 'ovs:dashboard.panels.storagerouter.helpcontent'
                                          }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: storageAppliances,
+                                        displaymode: 'table', items: storageRouters,
                                         loadedObservable: 'loaded', colspan: 4
                                     }" >
                         <table data-dummy="dummy">
@@ -48,12 +48,12 @@ limitations under the License.
                             <tbody data-dummy="dummy">
                                 <tr data-part="table-entry">
                                         <td>
-                                            <span class="fa pointer" data-i18n="[html]ovs:icons.storageappliance"
-                                                  data-bind="tooltip: 'ovs:generic.states.storageappliance.' + status(),
+                                            <span class="fa pointer" data-i18n="[html]ovs:icons.storagerouter"
+                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
                                                              style: { color: status().indexOf('ok') === -1 ? 'red' : 'green' }"></span>
                                         </td>
                                         <td>
-                                            <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storageappliance-detail', { guid: guid }) }"></a>
+                                            <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                                         </td>
                                         <td data-bind="text: ipAddress"></td>
                                         <td data-bind="text: vDisks().length"></td>

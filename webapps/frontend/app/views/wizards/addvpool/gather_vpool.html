@@ -68,11 +68,11 @@ limitations under the License.
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathervpool.extendedinfo"></p>
         <div class="form-group">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.initialstorageappliance"></label>
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.initialstoragerouter"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
                          key: 'guid', keyisfunction: true,
-                         items: data.storageAppliances, target: data.target,
+                         items: data.storageRouters, target: data.target,
                          text: function(item) {
                              if (item !== undefined) {
                                  return item.name()

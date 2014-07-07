@@ -52,12 +52,12 @@ class StorageDriverList(object):
         return None
 
     @staticmethod
-    def get_storagedrivers_by_storageappliance(machineguid):
+    def get_storagedrivers_by_storagerouter(machineguid):
         """
-        Returns a list of all StorageDrivers for Storage Appliance
+        Returns a list of all StorageDrivers for Storage Router
         """
         storagedrivers = DataList({'object': StorageDriver,
                                    'data': DataList.select.DESCRIPTOR,
                                    'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storageappliance_guid', DataList.operator.EQUALS, machineguid)]}}).data
+                                             'items': [('storagerouter_guid', DataList.operator.EQUALS, machineguid)]}}).data
         return DataObjectList(storagedrivers, StorageDriver)

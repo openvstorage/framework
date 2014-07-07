@@ -24,7 +24,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.storageappliancelist import StorageApplianceList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
@@ -74,12 +74,12 @@ class VMachineController(object):
         target_pm = PMachine(pmachineguid)
         target_hypervisor = Factory.get(target_pm)
 
-        storageappliances = [sa for sa in StorageApplianceList.get_storageappliances() if sa.pmachine_guid == target_pm.guid]
-        if len(storageappliances) == 1:
-            target_storageappliance = storageappliances[0]
+        storagerouters = [sa for sa in StorageRouterList.get_storagerouters() if sa.pmachine_guid == target_pm.guid]
+        if len(storagerouters) == 1:
+            target_storagerouter = storagerouters[0]
         else:
-            raise ValueError('Pmachine {} has no StorageAppliance assigned to it'.format(pmachineguid))
-        routing_key = "sa.{0}".format(target_storageappliance.machineid)
+            raise ValueError('Pmachine {} has no StorageRouter assigned to it'.format(pmachineguid))
+        routing_key = "sa.{0}".format(target_storagerouter.machineid)
 
         vpool = None
         vpool_guids = set()
@@ -102,9 +102,9 @@ class VMachineController(object):
         target_storagedriver = None
         source_storagedriver = None
         for vpool_storagedriver in vpool.storagedrivers:
-            if vpool_storagedriver.storageappliance.pmachine_guid == target_pm.guid:
+            if vpool_storagedriver.storagerouter.pmachine_guid == target_pm.guid:
                 target_storagedriver = vpool_storagedriver
-            if vpool_storagedriver.storageappliance.pmachine_guid == template_vm.pmachine_guid:
+            if vpool_storagedriver.storagerouter.pmachine_guid == template_vm.pmachine_guid:
                 source_storagedriver = vpool_storagedriver
         if target_storagedriver is None:
             raise RuntimeError('Volume not served on target hypervisor')
@@ -124,7 +124,7 @@ class VMachineController(object):
         if name_duplicates is not None and len(name_duplicates) > 0:
             raise RuntimeError('A vMachine with name {0} already exists'.format(name))
 
-        vm_path = target_hypervisor.get_vmachine_path(name, target_storagedriver.storageappliance.machineid)
+        vm_path = target_hypervisor.get_vmachine_path(name, target_storagedriver.storagerouter.machineid)
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
@@ -138,7 +138,7 @@ class VMachineController(object):
         new_vm.status = 'CREATED'
         new_vm.save()
 
-        storagedrivers = [storagedriver for storagedriver in vpool.storagedrivers if storagedriver.storageappliance.pmachine_guid == new_vm.pmachine_guid]
+        storagedrivers = [storagedriver for storagedriver in vpool.storagedrivers if storagedriver.storagerouter.pmachine_guid == new_vm.pmachine_guid]
         if len(storagedrivers) == 0:
             raise RuntimeError('Cannot find Storage Driver serving {0} on {1}'.format(vpool.name, new_vm.pmachine.name))
         storagedriverguid = storagedrivers[0].guid
@@ -243,7 +243,7 @@ class VMachineController(object):
         storagedriver_mountpoint, storagedriver_storage_ip = None, None
 
         try:
-            storagedriver = [storagedriver for storagedriver in machine.vpool.storagedrivers if storagedriver.storageappliance.pmachine_guid == machine.pmachine_guid][0]
+            storagedriver = [storagedriver for storagedriver in machine.vpool.storagedrivers if storagedriver.storagerouter.pmachine_guid == machine.pmachine_guid][0]
             storagedriver_mountpoint = storagedriver.mountpoint
             storagedriver_storage_ip = storagedriver.storage_ip
         except Exception as ex:
@@ -254,7 +254,7 @@ class VMachineController(object):
         if machine.pmachine.hvtype == 'KVM':
             hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
 
-        disks_info = [(storagedriver.mountpoint, vd.devicename) for storagedriver in vd.vpool.storagedrivers for vd in machine.vdisks if storagedriver.storageappliance.pmachine_guid == machine.pmachine_guid]
+        disks_info = [(storagedriver.mountpoint, vd.devicename) for storagedriver in vd.vpool.storagedrivers for vd in machine.vdisks if storagedriver.storagerouter.pmachine_guid == machine.pmachine_guid]
         if machine.pmachine:  # Allow hypervisor id node, lookup strategy is hypervisor dependent
             try:
                 hv = Factory.get(machine.pmachine)
@@ -346,7 +346,7 @@ class VMachineController(object):
         # This is most likely required as extra security measure
         # Suppose the template is set back to a real machine
         # it can be deleted within vmware which should be blocked.
-        # This might also require a storageappliance internal check
+        # This might also require a storagerouter internal check
         # to be implemented to discourage volumes from being deleted
         # when clones were made from it.
 

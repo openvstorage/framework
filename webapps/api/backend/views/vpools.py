@@ -21,9 +21,9 @@ from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.storageappliance import StorageAppliance
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
-from ovs.lib.storageappliance import StorageApplianceController
+from ovs.lib.storagerouter import StorageRouterController
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
@@ -73,19 +73,19 @@ class VPoolViewSet(viewsets.ViewSet):
     @expose(internal=True)
     @required_roles(['view'])
     @validate(VPool)
-    @get_list(StorageAppliance)
-    def storageappliances(self, request, obj, hints):
+    @get_list(StorageRouter)
+    def storagerouters(self, request, obj, hints):
         """
-        Retreives a list of StorageAppliances, serving a given vPool
+        Retreives a list of StorageRouters, serving a given vPool
         """
         _ = request
-        storageappliance_guids = []
-        storageappliance = []
+        storagerouter_guids = []
+        storagerouter = []
         for storagedriver in obj.storagedrivers:
-            storageappliance_guids.append(storagedriver.storageappliance_guid)
+            storagerouter_guids.append(storagedriver.storagerouter_guid)
             if hints['full'] is True:
-                storageappliance.append(storagedriver.storageappliance)
-        return storageappliance if hints['full'] is True else storageappliance_guids
+                storagerouter.append(storagedriver.storagerouter)
+        return storagerouter if hints['full'] is True else storagerouter_guids
 
     @action()
     @expose(internal=True, customer=True)
@@ -96,12 +96,12 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)
         """
-        storageappliances = []
-        if 'storageappliance_guids' in request.DATA:
-            if request.DATA['storageappliance_guids'].strip() != '':
-                for storageappliance_guid in request.DATA['storageappliance_guids'].strip().split(','):
-                    storageappliance = StorageAppliance(storageappliance_guid)
-                    storageappliances.append((storageappliance.ip, storageappliance.machineid))
+        storagerouters = []
+        if 'storagerouter_guids' in request.DATA:
+            if request.DATA['storagerouter_guids'].strip() != '':
+                for storagerouter_guid in request.DATA['storagerouter_guids'].strip().split(','):
+                    storagerouter = StorageRouter(storagerouter_guid)
+                    storagerouters.append((storagerouter.ip, storagerouter.machineid))
         if 'storagedriver_guid' not in request.DATA:
             raise NotAcceptable('No Storage Driver guid passed')
         storagedriver_guids = []
@@ -131,4 +131,4 @@ class VPoolViewSet(viewsets.ViewSet):
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        return StorageApplianceController.update_storagedrivers.delay(storagedriver_guids, storageappliances, parameters)
+        return StorageRouterController.update_storagedrivers.delay(storagedriver_guids, storagerouters, parameters)

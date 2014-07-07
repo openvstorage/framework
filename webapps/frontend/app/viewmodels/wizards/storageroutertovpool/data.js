@@ -16,10 +16,10 @@ define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {
         return {
-            vPool:                     ko.observable(),
-            pendingStorageAppliances:  ko.observableArray([]),
-            removingStorageAppliances: ko.observableArray([]),
-            completed:                 undefined
+            vPool:                  ko.observable(),
+            pendingStorageRouters:  ko.observableArray([]),
+            removingStorageRouters: ko.observableArray([]),
+            completed:              undefined
         };
     };
     return singleton();

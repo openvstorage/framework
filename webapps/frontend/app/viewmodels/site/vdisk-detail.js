@@ -15,9 +15,9 @@
 define([
     'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher',
-    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storageappliance',
+    '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, dialog, ko, shared, generic, Refresher, VDisk, VMachine, VPool, StorageAppliance, RollbackWizard) {
+], function($, dialog, ko, shared, generic, Refresher, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -46,13 +46,13 @@ define([
                     .then(function() {
                         self.snapshotsInitialLoad(false);
                         var vm, sa, pool,
-                            storageApplianceGuid = vdisk.storageApplianceGuid(),
+                            storageRouterGuid = vdisk.storageRouterGuid(),
                             vMachineGuid = vdisk.vMachineGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
-                        if (storageApplianceGuid && (vdisk.storageAppliance() === undefined || vdisk.storageAppliance().guid() !== storageApplianceGuid)) {
-                            sa = new StorageAppliance(storageApplianceGuid);
+                        if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
+                            sa = new StorageRouter(storageRouterGuid);
                             sa.load();
-                            vdisk.storageAppliance(sa);
+                            vdisk.storageRouter(sa);
                         }
                         if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
                             vm = new VMachine(vMachineGuid);

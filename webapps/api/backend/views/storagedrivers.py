@@ -64,8 +64,8 @@ class StorageDriverViewSet(viewsets.ViewSet):
         """
         _ = request
         result = True
-        storageappliance = obj.storageappliance
-        pmachine = storageappliance.pmachine
+        storagerouter = obj.storagerouter
+        pmachine = storagerouter.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         vpools_guids = [vmachine.vpool_guid for vmachine in vmachines if vmachine.vpool_guid is not None]
         pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
