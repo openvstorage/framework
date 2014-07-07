@@ -1177,6 +1177,9 @@ if Service.has_service('{0}'):
         client.run('rm -rf {}/foc_{}'.format(vsr.mountpoint_cache, vpool.name))
         client.run('rm -rf {}/metadata_{}'.format(vsr.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(vsr.mountpoint_md, vpool.name))
+        client.run('rm -rf {}/tlogs_{}'.format(vsr.mountpoint_md, vpool.name))
+        client.run('rmdir {}'.format(vsr.mountpoint))
+
 
         # Remove files
         client = Client.load(ip)
