@@ -20,47 +20,47 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from backend.decorators import required_roles, expose, validate, get_list, get_object
 
 
-class StorageRouterViewSet(viewsets.ViewSet):
+class StorageDriverViewSet(viewsets.ViewSet):
     """
-    Information about StorageRouters
+    Information about StorageDrivers
     """
     permission_classes = (IsAuthenticated,)
-    prefix = r'storagerouters'
-    base_name = 'storagerouters'
+    prefix = r'storagedrivers'
+    base_name = 'storagedrivers'
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(StorageRouter)
+    @get_list(StorageDriver)
     def list(self, request, format=None, hints=None):
         """
-        Overview of all StorageRouters
+        Overview of all StorageDrivers
         """
         _ = request, format, hints
-        return StorageRouterList.get_storagerouters()
+        return StorageDriverList.get_storagedrivers()
 
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
-    @get_object(StorageRouter)
+    @validate(StorageDriver)
+    @get_object(StorageDriver)
     def retrieve(self, request, obj):
         """
-        Load information about a given StorageRouter
+        Load information about a given StorageDriver
         """
         _ = request
         return obj
 
     @action()
     @expose(internal=True)
-    @validate(StorageRouter)
+    @validate(StorageDriver)
     def can_be_deleted(self, request, obj):
         """
-        Checks whether a Storage Router can be deleted
+        Checks whether a Storage Driver can be deleted
         """
         _ = request
         result = True
@@ -73,6 +73,6 @@ class StorageRouterViewSet(viewsets.ViewSet):
 
         if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             result = False
-        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagerouter_id == obj.storagerouter_id):
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == obj.storagedriver_id):
             result = False
         return Response(result, status=status.HTTP_200_OK)

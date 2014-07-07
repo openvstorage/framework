@@ -41,19 +41,19 @@ class KVM(object):
         """
         create vm from template
         TODO:
-        storage_ip and mountpoint refer to target Storage Router
-        but on kvm storagerouter.storage_ip is 127.0.0.1
+        storage_ip and mountpoint refer to target Storage Driver
+        but on kvm storagedriver.storage_ip is 127.0.0.1
         """
         _ = storage_ip, wait  # For compatibility purposes only
         return self.sdk.create_vm_from_template(name, source_vm, disks, mountpoint)
 
-    def delete_vm(self, vmid, storagerouter_mountpoint=None, storagerouter_storage_ip=None, devicename=None, disks_info=[], wait=True):
+    def delete_vm(self, vmid, storagedriver_mountpoint=None, storagedriver_storage_ip=None, devicename=None, disks_info=[], wait=True):
         """
         Deletes a given VM and its disks
         """
         _ = wait  # For compatibility purposes only
-        _ = storagerouter_mountpoint  # No vpool mountpoint on kvm, use different logic
-        _ = storagerouter_storage_ip  # 127.0.0.1 always
+        _ = storagedriver_mountpoint  # No vpool mountpoint on kvm, use different logic
+        _ = storagedriver_storage_ip  # 127.0.0.1 always
         return self.sdk.delete_vm(vmid, devicename, disks_info)
 
     def get_vm_agnostic_object(self, vmid):

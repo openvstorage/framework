@@ -18,7 +18,7 @@ PMachineList module
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 
 
 class PMachineList(object):
@@ -51,16 +51,16 @@ class PMachineList(object):
         return None
 
     @staticmethod
-    def get_by_storagerouter_id(storagerouter_id):
+    def get_by_storagedriver_id(storagedriver_id):
         """
-        Get pMachine that hosts a given storagerouter_id
+        Get pMachine that hosts a given storagedriver_id
         """
-        storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
-        if storagerouter is None:
-            raise RuntimeError('StorageRouter {0} could not be found'.format(storagerouter_id))
-        storageappliance = storagerouter.storageappliance
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('StorageDriver {0} could not be found'.format(storagedriver_id))
+        storageappliance = storagedriver.storageappliance
         if storageappliance is None:
-            raise RuntimeError('StorageRouter {0} not linked to a StorageAppliance'.format(storagerouter.name))
+            raise RuntimeError('StorageDriver {0} not linked to a StorageAppliance'.format(storagedriver.name))
         pmachine = storageappliance.pmachine
         if pmachine is None:
             raise RuntimeError('StorageAppliance {0} not linked to a pMachine'.format(storageappliance.name))

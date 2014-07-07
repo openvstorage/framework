@@ -19,7 +19,7 @@ VPool module
 from ovs.celery import celery
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vmachine import VMachineController
@@ -32,14 +32,14 @@ class VPoolController(object):
 
     @staticmethod
     @celery.task(name='ovs.vpool.mountpoint_available_from_voldrv')
-    def mountpoint_available_from_voldrv(mountpoint, storagerouter_id):
+    def mountpoint_available_from_voldrv(mountpoint, storagedriver_id):
         """
         Hook for (re)exporting the NFS mountpoint
         """
-        storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
-        if storagerouter is None:
-            raise RuntimeError('A Storage Router with id {0} could not be found.'.format(storagerouter_id))
-        if storagerouter.storageappliance.pmachine.hvtype == 'VMWARE':
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('A Storage Driver with id {0} could not be found.'.format(storagedriver_id))
+        if storagedriver.storageappliance.pmachine.hvtype == 'VMWARE':
             nfs = Nfsexports()
             nfs.unexport(mountpoint)
             nfs.export(mountpoint)
@@ -51,10 +51,10 @@ class VPoolController(object):
         Syncs all vMachines of a given vPool with the hypervisor
         """
         vpool = VPool(vpool_guid)
-        for storagerouter in vpool.storagerouters:
-            pmachine = storagerouter.storageappliance.pmachine
+        for storagedriver in vpool.storagedrivers:
+            pmachine = storagedriver.storageappliance.pmachine
             hypervisor = Factory.get(pmachine)
-            for vm_object in hypervisor.get_vms_by_nfs_mountinfo(storagerouter.storage_ip, storagerouter.mountpoint):
+            for vm_object in hypervisor.get_vms_by_nfs_mountinfo(storagedriver.storage_ip, storagedriver.mountpoint):
                 search_vpool = None if pmachine.hvtype == 'KVM' else vpool
                 vmachine = VMachineList.get_by_devicename_and_vpool(
                     devicename=vm_object['backing']['filename'],

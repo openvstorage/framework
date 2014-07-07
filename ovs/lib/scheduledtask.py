@@ -34,7 +34,7 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
-_storagerouter_scrubber = Scrubber()
+_storagedriver_scrubber = Scrubber()
 logger = LogHandler('lib', name='scheduled tasks')
 
 
@@ -259,12 +259,12 @@ class ScheduledTaskController(object):
         total = 0
         failed = 0
         for vdisk in vdisks:
-            work_units = vdisk.storagerouter_client.get_scrubbing_workunits(str(vdisk.volume_id))
+            work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
             for work_unit in work_units:
                 try:
                     total += 1
-                    scrubbing_result = _storagerouter_scrubber.scrub(work_unit, vdisk.vpool.mountpoint_temp)
-                    vdisk.storagerouter_client.apply_scrubbing_result(scrubbing_result)
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, vdisk.vpool.mountpoint_temp)
+                    vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
                 except:
                     failed += 1
                     logger.info('Failed scrubbing work unit for volume {}'.format(

@@ -48,7 +48,7 @@ class DeleteSnapshots(TestCase):
         PersistentFactory.store = DummyPersistentStore()
         VolatileFactory.store = DummyVolatileStore()
         # Replace mocked classes
-        sys.modules['ovs.extensions.storageserver.storagerouter'] = StorageRouter
+        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriver
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.vmachine import VMachine
         from ovs.dal.hybrids.vdisk import VDisk
@@ -314,7 +314,7 @@ class SRClient():
         """
         Return fake info
         """
-        snapshots = StorageRouterClient.snapshots.get(volume_id, {})
+        snapshots = StorageDriverClient.snapshots.get(volume_id, {})
         return snapshots.keys()
 
     @staticmethod
@@ -322,23 +322,23 @@ class SRClient():
         """
         Create snapshot mockup
         """
-        snapshots = StorageRouterClient.snapshots.get(volume_id, {})
+        snapshots = StorageDriverClient.snapshots.get(volume_id, {})
         snapshots[snapshot_id] = Snapshot(metadata)
-        StorageRouterClient.snapshots[volume_id] = snapshots
+        StorageDriverClient.snapshots[volume_id] = snapshots
 
     @staticmethod
     def info_snapshot(volume_id, guid):
         """
         Info snapshot mockup
         """
-        return StorageRouterClient.snapshots[volume_id][guid]
+        return StorageDriverClient.snapshots[volume_id][guid]
 
     @staticmethod
     def delete_snapshot(volume_id, guid):
         """
         Delete snapshot mockup
         """
-        del StorageRouterClient.snapshots[volume_id][guid]
+        del StorageDriverClient.snapshots[volume_id][guid]
 
     @staticmethod
     def info_volume(volume_id):
@@ -357,9 +357,9 @@ class SRClient():
         return []
 
 
-class StorageRouterClient():
+class StorageDriverClient():
     """
-    Mocks the StorageRouterClient
+    Mocks the StorageDriverClient
     """
 
     def __init__(self):
@@ -376,11 +376,11 @@ class StorageRouterClient():
         return SRClient()
 
 
-class StorageRouter():
+class StorageDriver():
     """
-    Mocks the StorageRouter
+    Mocks the StorageDriver
     """
-    StorageRouterClient = StorageRouterClient
+    StorageDriverClient = StorageDriverClient
 
     def __init__(self):
         """

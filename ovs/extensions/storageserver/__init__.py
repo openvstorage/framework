@@ -13,5 +13,5 @@
 # limitations under the License.
 
 """
-This package contains wrapper classes around the storage router
+This package contains wrapper classes around the storage driver
 """

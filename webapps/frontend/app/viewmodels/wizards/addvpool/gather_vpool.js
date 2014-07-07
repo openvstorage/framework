@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storageappliance', '../../containers/storagerouter', './data'
-], function($, ko, shared, api, generic, StorageAppliance, StorageRouter, data) {
+    '../../containers/storageappliance', '../../containers/storagedriver', './data'
+], function($, ko, shared, api, generic, StorageAppliance, StorageDriver, data) {
     "use strict";
     return function() {
         var self = this;
@@ -142,19 +142,19 @@ define([
                     }).promise()
                 ];
                 generic.crossFiller(
-                    self.data.target().storageRouterGuids, self.data.storageRouters,
+                    self.data.target().storageDriverGuids, self.data.storageDrivers,
                     function(guid) {
-                        var storageRouter = new StorageRouter(guid);
+                        var storageDriver = new StorageDriver(guid);
                         calls.push($.Deferred(function(deferred) {
-                            generic.xhrAbort(self.loadStorageRoutersHandle[guid]);
-                            self.loadStorageRoutersHandle[guid] = api.get('storagerouters/' + guid)
-                                .done(function(storageRouterData) {
-                                    storageRouter.fillData(storageRouterData);
+                            generic.xhrAbort(self.loadStorageDriversHandle[guid]);
+                            self.loadStorageDriversHandle[guid] = api.get('storagedrivers/' + guid)
+                                .done(function(storageDriverData) {
+                                    storageDriver.fillData(storageDriverData);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);
                         }).promise());
-                        return storageRouter;
+                        return storageDriver;
                     }, 'guid'
                 );
                 $.when.apply($, calls)
@@ -167,7 +167,7 @@ define([
         self.activate = function() {
             generic.xhrAbort(self.loadStorageAppliancesHandle);
             self.loadStorageAppliancesHandle = api.get('storageappliances', undefined, {
-                contents: 'storageRouters',
+                contents: 'storageDrivers',
                 sort: 'name'
             })
                 .done(function(data) {

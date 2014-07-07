@@ -46,37 +46,37 @@ define([
                 fields.push('temp');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
             }
-            $.each(self.data.storageRouters(), function(index, storageRouter) {
-                if (self.data.target() !== undefined && storageRouter.storageRouterID() === (self.data.name() + self.data.target().machineid())) {
+            $.each(self.data.storageDrivers(), function(index, storageDriver) {
+                if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineid())) {
                     return true;
                 }
-                if (self.data.mtptCache() === storageRouter.mountpointCache() && $.inArray('cache', fields) === -1) {
+                if (self.data.mtptCache() === storageDriver.mountpointCache() && $.inArray('cache', fields) === -1) {
                     valid = false;
                     fields.push('cache');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                 }
-                if (self.data.mtptBFS() === storageRouter.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
+                if (self.data.mtptBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                     valid = false;
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
                 }
-                if (self.data.mtptMD() === storageRouter.mountpointMD() && $.inArray('md', fields) === -1) {
+                if (self.data.mtptMD() === storageDriver.mountpointMD() && $.inArray('md', fields) === -1) {
                     valid = false;
                     fields.push('md');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.mdfs') }));
                 }
-                if (self.data.mtptTemp() === storageRouter.mountpointTemp() && $.inArray('temp', fields) === -1) {
+                if (self.data.mtptTemp() === storageDriver.mountpointTemp() && $.inArray('temp', fields) === -1) {
                     valid = false;
                     fields.push('temp');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                 }
-                if ((self.data.mtptBFS() === storageRouter.mountpointCache() || self.data.mtptBFS() === storageRouter.mountpointMD() ||
-                        self.data.mtptBFS() === storageRouter.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
+                if ((self.data.mtptBFS() === storageDriver.mountpointCache() || self.data.mtptBFS() === storageDriver.mountpointMD() ||
+                        self.data.mtptBFS() === storageDriver.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
                     valid = false;
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsexclusive'));
                 }
-                if ($.inArray(self.data.vRouterPort(), [storageRouter.port() - 1, storageRouter.port(), storageRouter.port() + 1]) !== -1 && $.inArray('port', fields) === -1) {
+                if ($.inArray(self.data.vRouterPort(), [storageDriver.port() - 1, storageDriver.port(), storageDriver.port() + 1]) !== -1 && $.inArray('port', fields) === -1) {
                     valid = false;
                     fields.push('port');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.portinuse'));

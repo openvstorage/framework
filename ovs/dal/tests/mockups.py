@@ -45,9 +45,9 @@ class SRClient():
         return []
 
 
-class StorageRouterClient():
+class StorageDriverClient():
     """
-    Mocks the StorageRouterClient
+    Mocks the StorageDriverClient
     """
 
     def __init__(self):
@@ -165,11 +165,11 @@ class StorageRouterClient():
         return SRClient()
 
 
-class StorageRouter():
+class StorageDriver():
     """
-    Mocks the StorageRouter
+    Mocks the StorageDriver
     """
-    StorageRouterClient = StorageRouterClient
+    StorageDriverClient = StorageDriverClient
 
     def __init__(self):
         """

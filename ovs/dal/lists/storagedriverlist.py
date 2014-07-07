@@ -17,47 +17,47 @@ VDiskList module
 """
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.storagedriver import StorageDriver
 
 
-class StorageRouterList(object):
+class StorageDriverList(object):
     """
-    This StorageRouterList class contains various lists regarding to the StorageRouter class
+    This StorageDriverList class contains various lists regarding to the StorageDriver class
     """
 
     @staticmethod
-    def get_storagerouters():
+    def get_storagedrivers():
         """
-        Returns a list of all StorageRouters
+        Returns a list of all StorageDrivers
         """
-        storagerouters = DataList({'object': StorageRouter,
+        storagedrivers = DataList({'object': StorageDriver,
                                    'data': DataList.select.DESCRIPTOR,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': []}}).data
-        return DataObjectList(storagerouters, StorageRouter)
+        return DataObjectList(storagedrivers, StorageDriver)
 
     @staticmethod
-    def get_by_storagerouter_id(storagerouter_id):
+    def get_by_storagedriver_id(storagedriver_id):
         """
-        Returns a list of all StorageRouters based on a given storagerouter_id
+        Returns a list of all StorageDrivers based on a given storagedriver_id
         """
         # pylint: disable=line-too-long
-        storagerouters = DataList({'object': StorageRouter,
+        storagedrivers = DataList({'object': StorageDriver,
                                    'data': DataList.select.DESCRIPTOR,
                                    'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storagerouter_id', DataList.operator.EQUALS, storagerouter_id)]}}).data
+                                             'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]}}).data
         # pylint: enable=line-too-long
-        if storagerouters:
-            return DataObjectList(storagerouters, StorageRouter)[0]
+        if storagedrivers:
+            return DataObjectList(storagedrivers, StorageDriver)[0]
         return None
 
     @staticmethod
-    def get_storagerouters_by_storageappliance(machineguid):
+    def get_storagedrivers_by_storageappliance(machineguid):
         """
-        Returns a list of all StorageRouters for Storage Appliance
+        Returns a list of all StorageDrivers for Storage Appliance
         """
-        storagerouters = DataList({'object': StorageRouter,
+        storagedrivers = DataList({'object': StorageDriver,
                                    'data': DataList.select.DESCRIPTOR,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('storageappliance_guid', DataList.operator.EQUALS, machineguid)]}}).data
-        return DataObjectList(storagerouters, StorageRouter)
+        return DataObjectList(storagedrivers, StorageDriver)

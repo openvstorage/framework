@@ -335,7 +335,7 @@
         "openvstorage": "Open vStorage:",
         "openvstoragecore": "Open vStorage - Core:",
         "openvstoragewebapps": "Open vStorage - Webapps:",
-        "volumedriver": "Storage Router Driver:"
+        "volumedriver": "Storage Driver:"
     },
     "pmachines": {
         "title": "Hypervisor Mgmt.",

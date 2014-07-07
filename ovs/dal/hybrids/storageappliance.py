@@ -16,7 +16,7 @@
 StorageAppliance module
 """
 import time
-from ovs.extensions.storageserver.storagerouter import StorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.pmachine import PMachine
 
@@ -44,14 +44,14 @@ class StorageAppliance(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        client = StorageRouterClient()
+        client = StorageDriverClient()
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
-        for storagerouter in self.storagerouters:
-            for vdisk in storagerouter.vpool.vdisks:
-                if vdisk.storagerouter_id == storagerouter.storagerouter_id:
+        for storagedriver in self.storagedrivers:
+            for vdisk in storagedriver.vpool.vdisks:
+                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     statistics = vdisk._statistics()  # Prevent double caching
                     for key, value in statistics.iteritems():
                         if key != 'timestamp':
@@ -64,9 +64,9 @@ class StorageAppliance(DataObject):
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
         data = 0
-        for storagerouter in self.storagerouters:
-            for vdisk in storagerouter.vpool.vdisks:
-                if vdisk.storagerouter_id == storagerouter.storagerouter_id:
+        for storagedriver in self.storagedrivers:
+            for vdisk in storagedriver.vpool.vdisks:
+                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     data += vdisk.info['stored']
         return data
 
@@ -76,11 +76,11 @@ class StorageAppliance(DataObject):
         """
         status = 'UNKNOWN'
         status_code = 0
-        for storagerouter in self.storagerouters:
-            for vdisk in storagerouter.vpool.vdisks:
-                if vdisk.storagerouter_id == storagerouter.storagerouter_id:
+        for storagedriver in self.storagedrivers:
+            for vdisk in storagedriver.vpool.vdisks:
+                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     mode = vdisk.info['failover_mode']
-                    current_status_code = StorageRouterClient.FOC_STATUS[mode.lower()]
+                    current_status_code = StorageDriverClient.FOC_STATUS[mode.lower()]
                     if current_status_code > status_code:
                         status = mode
                         status_code = current_status_code
@@ -92,9 +92,9 @@ class StorageAppliance(DataObject):
         Definition of "served by": vMachine whose disks are served by a given StorageAppliance
         """
         vmachine_guids = set()
-        for storagerouter in self.storagerouters:
-            for vdisk in storagerouter.vpool.vdisks:
-                if vdisk.storagerouter_id == storagerouter.storagerouter_id:
+        for storagedriver in self.storagedrivers:
+            for vdisk in storagedriver.vpool.vdisks:
+                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     if vdisk.vmachine_guid is not None:
                         vmachine_guids.add(vdisk.vmachine_guid)
         return list(vmachine_guids)
@@ -104,17 +104,17 @@ class StorageAppliance(DataObject):
         Gets the vDisk guids served by this StorageAppliance.
         """
         vdisk_guids = []
-        for storagerouter in self.storagerouters:
-            for vdisk in storagerouter.vpool.vdisks:
-                if vdisk.storagerouter_id == storagerouter.storagerouter_id:
+        for storagedriver in self.storagedrivers:
+            for vdisk in storagedriver.vpool.vdisks:
+                if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     vdisk_guids.append(vdisk.guid)
         return vdisk_guids
 
     def _vpools_guids(self):
         """
-        Gets the vPool guids linked to this StorageAppliance (trough StorageRouter)
+        Gets the vPool guids linked to this StorageAppliance (trough StorageDriver)
         """
         vpool_guids = set()
-        for storagerouter in self.storagerouters:
-            vpool_guids.add(storagerouter.vpool_guid)
+        for storagedriver in self.storagedrivers:
+            vpool_guids.add(storagedriver.vpool_guid)
         return list(vpool_guids)

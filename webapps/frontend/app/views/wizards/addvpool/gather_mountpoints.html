@@ -68,9 +68,9 @@ limitations under the License.
                        data-bind="value: data.vRouterPort, valueUpdate: 'afterkeydown',
                                   attr: { id: (data.vRouterPort.hasOwnProperty('identifier') ? ('gmtptp-' + data.vRouterPort.identifier) : undefined) }">
             </div>
-            <div class="col-lg-7" style="margin-top: 7px;" data-bind="visible: data.storageRouters().length > 0">
+            <div class="col-lg-7" style="margin-top: 7px;" data-bind="visible: data.storageDrivers().length > 0">
                 <span data-i18n="ovs:wizards.addvpool.gathermountpoints.portsinuse"></span>
-                <!-- ko foreach: data.storageRouters() -->
+                <!-- ko foreach: data.storageDrivers() -->
                     <span data-bind="visible: $index() > 0">,</span>
                     <span data-bind="text: (parseInt($data.port(), 10) - 1).toString()"></span>,
                     <span data-bind="text: $data.port()"></span>,

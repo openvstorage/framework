@@ -98,7 +98,7 @@ define([
                 self.vDisksInitialLoad(false);
                 self.vMachinesInitialLoad(false);
                 $.when.apply($, [
-                    vpool.load('storagerouters,_dynamics', { skipDisks: true }),
+                    vpool.load('storagedrivers,_dynamics', { skipDisks: true }),
                     vpool.loadStorageAppliances()
                         .then(function() {
                             if (self.checksInit === false) {
@@ -122,7 +122,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageAppliancesHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'storagerouters'
+                        contents: 'storagedrivers'
                     };
                     self.loadStorageAppliancesHandle = api.get('storageappliances', undefined, options)
                         .done(function(data) {

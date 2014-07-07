@@ -22,14 +22,14 @@ from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
-from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
-from ovs.extensions.storageserver.storagerouter import StorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('lib', name='vdisk')
@@ -48,13 +48,13 @@ class VDiskController(object):
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
-            storagerouter_client = StorageRouterClient().load(vpool)
-            response = storagerouter_client.list_volumes()
+            storagedriver_client = StorageDriverClient().load(vpool)
+            response = storagedriver_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                storagerouter_client = StorageRouterClient().load(vpool)
-                response.extend(storagerouter_client.list_volumes())
+                storagedriver_client = StorageDriverClient().load(vpool)
+                response.extend(storagedriver_client.list_volumes())
         return response
 
     @staticmethod
@@ -72,7 +72,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.resize_from_voldrv')
-    def resize_from_voldrv(volumename, volumesize, volumepath, storagerouter_id):
+    def resize_from_voldrv(volumename, volumesize, volumepath, storagedriver_id):
         """
         Resize a disk
         Triggered by volumedriver messages on the queue
@@ -81,24 +81,24 @@ class VDiskController(object):
         @param volumename: volume id of the disk
         @param volumesize: size of the volume
         """
-        pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
-        storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
+        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         hypervisor = Factory.get(pmachine)
         volumepath = hypervisor.clean_backing_disk_filename(volumepath)
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk is None:
-            disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagerouter.vpool)
+            disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
             if disk is None:
                 disk = VDisk()
         disk.devicename = volumepath
         disk.volume_id = volumename
         disk.size = volumesize
-        disk.vpool = storagerouter.vpool
+        disk.vpool = storagedriver.vpool
         disk.save()
 
     @staticmethod
     @celery.task(name='ovs.disk.rename_from_voldrv')
-    def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagerouter_id):
+    def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagedriver_id):
         """
         Rename a disk
         Triggered by volumedriver messages
@@ -107,7 +107,7 @@ class VDiskController(object):
         @param volume_old_path: old path on hypervisor to the volume
         @param volume_new_path: new path on hypervisor to the volume
         """
-        pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
+        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         hypervisor = Factory.get(pmachine)
         volume_old_path = hypervisor.clean_backing_disk_filename(volume_old_path)
         volume_new_path = hypervisor.clean_backing_disk_filename(volume_new_path)
@@ -145,7 +145,7 @@ class VDiskController(object):
         _id = '{}'.format(disk.volume_id)
         _snap = '{}'.format(snapshotid)
         logger.info(_log.format(_snap, disk.name, _location))
-        volume_id = disk.storagerouter_client.create_clone(_location, _id, _snap)
+        volume_id = disk.storagedriver_client.create_clone(_location, _id, _snap)
         new_disk.copy_blueprint(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
@@ -173,7 +173,7 @@ class VDiskController(object):
         if snapshotid is None:
             snapshotid = str(uuid.uuid4())
         metadata = pickle.dumps(metadata)
-        disk.storagerouter_client.create_snapshot(
+        disk.storagedriver_client.create_snapshot(
             str(disk.volume_id),
             snapshot_id=snapshotid,
             metadata=metadata
@@ -190,13 +190,13 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         @param snapshotguid: guid of the snapshot
 
-        @todo: Check if new volumedriver storagerouter upon deletion
+        @todo: Check if new volumedriver storagedriver upon deletion
         of a snapshot has built-in protection to block it from being deleted
         if a clone was created from it.
         """
         disk = VDisk(diskguid)
         logger.info('Deleting snapshot {} from disk {}'.format(snapshotid, disk.name))
-        disk.storagerouter_client.delete_snapshot(str(disk.volume_id), str(snapshotid))
+        disk.storagedriver_client.delete_snapshot(str(disk.volume_id), str(snapshotid))
         disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
@@ -208,7 +208,7 @@ class VDiskController(object):
         @param diskguid: guid of the disk
         """
         disk = VDisk(diskguid)
-        disk.storagerouter_client.set_volume_as_template(str(disk.volume_id))
+        disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
 
     @staticmethod
     @celery.task(name='ovs.disk.rollback')
@@ -221,13 +221,13 @@ class VDiskController(object):
         if not snapshots:
             raise ValueError('No snapshot found for timestamp {}'.format(timestamp))
         snapshotguid = snapshots[0]['guid']
-        disk.storagerouter_client.rollback_volume(str(disk.volume_id), snapshotguid)
+        disk.storagedriver_client.rollback_volume(str(disk.volume_id), snapshotguid)
         disk.invalidate_dynamics(['snapshots'])
         return True
 
     @staticmethod
     @celery.task(name='ovs.disk.create_from_template')
-    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagerouter_guid=None):
+    def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagedriver_guid=None):
         """
         Create a disk from a template
 
@@ -251,10 +251,10 @@ class VDiskController(object):
         if not disk.vmachine.is_vtemplate:
             raise RuntimeError('The given disk does not belong to a template')
 
-        if storagerouter_guid is not None:
-            storagerouter_id = StorageRouter(storagerouter_guid).storagerouter_id
+        if storagedriver_guid is not None:
+            storagedriver_id = StorageDriver(storagedriver_guid).storagedriver_id
         else:
-            storagerouter_id = disk.storagerouter_id
+            storagedriver_id = disk.storagedriver_id
 
         new_disk = VDisk()
         new_disk.copy_blueprint(disk, include=properties_to_clone)
@@ -270,7 +270,7 @@ class VDiskController(object):
             disk.name, new_disk.name, disk_path
         ))
         try:
-            volume_id = disk.storagerouter_client.create_clone_from_template(disk_path, str(disk.volume_id), node_id=str(storagerouter_id))
+            volume_id = disk.storagedriver_client.create_clone_from_template(disk_path, str(disk.volume_id), node_id=str(storagedriver_id))
             new_disk.volume_id = volume_id
             new_disk.save()
         except Exception as ex:

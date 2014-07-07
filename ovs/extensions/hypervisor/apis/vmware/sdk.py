@@ -698,7 +698,7 @@ class Sdk(object):
         return config
 
     @authenticated()
-    def delete_vm(self, vmid, storagerouter_mountpoint, storagerouter_storage_ip, devicename, wait=False):
+    def delete_vm(self, vmid, storagedriver_mountpoint, storagedriver_storage_ip, devicename, wait=False):
         """
         Delete a given vm
         """
@@ -708,9 +708,9 @@ class Sdk(object):
                 machine = self._build_property('VirtualMachine', vmid)
             except Exception as ex:
                 logger.error('SDK domain retrieve failed by vmid: {}'.format(ex))
-        elif storagerouter_mountpoint and storagerouter_storage_ip and devicename:
+        elif storagedriver_mountpoint and storagedriver_storage_ip and devicename:
             try:
-                machine_info = self.get_nfs_datastore_object(storagerouter_storage_ip, storagerouter_mountpoint, devicename)[0]
+                machine_info = self.get_nfs_datastore_object(storagedriver_storage_ip, storagedriver_mountpoint, devicename)[0]
                 machine = self._build_property('VirtualMachine', machine_info.obj_identifier.value)
             except Exception as ex:
                 logger.error('SDK domain retrieve failed by nfs datastore info: {}'.format(ex))
@@ -719,8 +719,8 @@ class Sdk(object):
             if wait:
                 self.wait_for_task(task)
 
-        if storagerouter_mountpoint and devicename:
-            vmx_path = os.path.join(storagerouter_mountpoint, devicename)
+        if storagedriver_mountpoint and devicename:
+            vmx_path = os.path.join(storagedriver_mountpoint, devicename)
             if os.path.exists(vmx_path):
                 dir_name = os.path.dirname(vmx_path)
                 logger.debug('Removing leftover files in {0}'.format(dir_name))

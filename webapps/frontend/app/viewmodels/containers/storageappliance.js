@@ -25,7 +25,7 @@ define([
         self.shared             = shared;
         self.vPoolGuids         = [];
         self.vMachineGuids      = [];
-        self.storageRouterGuids = [];
+        self.storageDriverGuids = [];
 
         // Handles
         self.loadHandle  = undefined;
@@ -104,8 +104,8 @@ define([
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }
-            if (data.hasOwnProperty('storagerouters_guids')) {
-                self.storageRouterGuids = data.storagerouters_guids;
+            if (data.hasOwnProperty('storagedrivers_guids')) {
+                self.storageDriverGuids = data.storagedrivers_guids;
             }
             if (data.hasOwnProperty('vmachine_guids')) {
                 self.vMachineGuids = data.vmachine_guids;

@@ -23,7 +23,7 @@ class Ovs():
 
     my_machine_id = ''
     my_storageappliance_guid = ''
-    my_storagerouter_id = ''
+    my_storagedriver_id = ''
 
     @staticmethod
     def execute_command(cmd, catch_output=True):
@@ -72,9 +72,9 @@ class Ovs():
         return StorageAppliance(Ovs.my_storageappliance_guid)
 
     @staticmethod
-    def get_my_storagerouter_id(vpool_name):
+    def get_my_storagedriver_id(vpool_name):
         """
-        Returns unique machine storagerouter_id based on vpool_name and machineid
+        Returns unique machine storagedriver_id based on vpool_name and machineid
         """
         return vpool_name + Ovs.get_my_machine_id()
 

@@ -26,7 +26,7 @@ from ovs.dal.hybrids.storageappliance import StorageAppliance
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storageappliance import StorageApplianceController
-from ovs.lib.storagerouter import StorageRouterController
+from ovs.lib.storagedriver import StorageDriverController
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
 
@@ -79,10 +79,10 @@ class StorageApplianceViewSet(viewsets.ViewSet):
     @celery_task()
     def move_away(self, request, obj):
         """
-        Moves away all vDisks from all Storage Routers this Storage Appliance is serving
+        Moves away all vDisks from all Storage Drivers this Storage Appliance is serving
         """
         _ = request
-        return StorageRouterController.move_away.delay(obj.guid)
+        return StorageDriverController.move_away.delay(obj.guid)
 
     @link()
     @expose(internal=True)

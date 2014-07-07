@@ -570,7 +570,7 @@ EOF
                     update_voldrv = """
 import os
 from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.storageserver.storagerouter import StorageRouterConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 arakoon_management = ArakoonManagement()
 voldrv_arakoon_cluster_id = 'voldrv'
@@ -581,8 +581,8 @@ if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
     os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
 for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
     if json_file.endswith('.json'):
-        storagerouter_config = StorageRouterConfiguration(json_file.replace('.json', ''))
-        storagerouter_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+        storagedriver_config = StorageDriverConfiguration(json_file.replace('.json', ''))
+        storagedriver_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
 """
                     SetupController._exec_python(client_node, update_voldrv)
 
@@ -1160,12 +1160,12 @@ cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
 nodes = [n.strip() for n in cfg.get('main', 'nodes').split(',')]
 for node in nodes:
     uris.append({{'amqp_uri': '{{0}}://{{1}}:{{2}}@{{3}}'.format(protocol, login, password, cfg.get(node, 'location'))}})
-from ovs.extensions.storageserver.storagerouter import StorageRouterConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
                  'events_amqp_uris': uris}}
 for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
     this_vpool_name = config_file.replace('.json', '')
     if config_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
-        storagerouter_configuration = StorageRouterConfiguration(this_vpool_name)
-        storagerouter_configuration.configure_event_publisher(queue_config)"""
+        storagedriver_configuration = StorageDriverConfiguration(this_vpool_name)
+        storagedriver_configuration.configure_event_publisher(queue_config)"""
         SetupController._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))

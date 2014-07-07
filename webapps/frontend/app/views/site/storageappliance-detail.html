@@ -90,21 +90,21 @@ limitations under the License.
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
                             <td data-i18n="ovs:generic.xmlrpcport"></td>
-                            <td data-bind="lazylist: { items: StorageRouters, loadedObservable: 'loaded' }">
+                            <td data-bind="lazylist: { items: StorageDrivers, loadedObservable: 'loaded' }">
                                 <span data-part="entry" data-bind="text: port()"></span>
                             </td>
                         </tr>
                         <tr>
                             <td colspan="2">&nbsp;</td>
                             <td data-i18n="ovs:generic.focport"></td>
-                            <td data-bind="lazylist: { items: StorageRouters, loadedObservable: 'loaded' }">
+                            <td data-bind="lazylist: { items: StorageDrivers, loadedObservable: 'loaded' }">
                                 <span data-part="entry" data-bind="text: port() + 1"></span>
                             </td>
                         </tr>
                         <tr>
                             <td colspan="2">&nbsp;</td>
                             <td data-i18n="ovs:generic.mgmtport"></td>
-                            <td data-bind="lazylist: { items: StorageRouters, loadedObservable: 'loaded' }">
+                            <td data-bind="lazylist: { items: StorageDrivers, loadedObservable: 'loaded' }">
                                 <span data-part="entry" data-bind="text: port() - 1"></span>
                             </td>
                         </tr>

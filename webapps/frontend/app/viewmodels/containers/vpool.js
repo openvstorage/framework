@@ -51,7 +51,7 @@ define([
         self.vDisks                = ko.observableArray([]);
         self.vMachines             = ko.observableArray([]);
         self.storageApplianceGuids = ko.observableArray([]);
-        self.storageRouterGuids    = ko.observableArray([]);
+        self.storageDriverGuids    = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -87,8 +87,8 @@ define([
                     }, 'guid'
                 );
             }
-            if (data.hasOwnProperty('storagerouters_guids')) {
-                self.storageRouterGuids(data.storagerouters_guids);
+            if (data.hasOwnProperty('storagedrivers_guids')) {
+                self.storageDriverGuids(data.storagedrivers_guids);
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;

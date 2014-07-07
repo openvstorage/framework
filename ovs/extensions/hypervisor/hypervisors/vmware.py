@@ -67,14 +67,14 @@ class VMware(object):
                 return task_info.info.result.value
         return None
 
-    def delete_vm(self, vmid, storagerouter_mountpoint, storagerouter_storage_ip, devicename, disks_info=[], wait=False):
+    def delete_vm(self, vmid, storagedriver_mountpoint, storagedriver_storage_ip, devicename, disks_info=[], wait=False):
         """
         Remove the vmachine from the hypervisor
 
         @param vmid: hypervisor id of the virtual machine
         @param wait: wait for action to complete
         """
-        self.sdk.delete_vm(vmid, storagerouter_mountpoint, storagerouter_storage_ip, devicename, wait)
+        self.sdk.delete_vm(vmid, storagedriver_mountpoint, storagedriver_storage_ip, devicename, wait)
 
     def get_vm_object(self, vmid):
         """

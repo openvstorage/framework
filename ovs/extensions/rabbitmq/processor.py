@@ -17,7 +17,7 @@ Contains the process method for processing rabbitmq messages
 """
 
 from celery.task.control import revoke
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
@@ -37,7 +37,7 @@ def process(queue, body, mapping):
         data = EventMessages.EventMessage().FromString(body)
 
         # Possible special tags used as `arguments` key:
-        # - [NODE_ID]: Replaced by the storagerouter_id as reported by the event
+        # - [NODE_ID]: Replaced by the storagedriver_id as reported by the event
         # - [CLUSTER_ID]: Replaced by the clusterid as reported by the event
         # Possible deduping key tags:
         # - [EVENT_NAME]: The name of the eventmessage type
@@ -61,9 +61,9 @@ def process(queue, body, mapping):
                 if 'options' in current_map:
                     options = current_map['options']
                     if options.get('execonstorageappliance', False):
-                        storagerouter = StorageRouterList.get_by_storagerouter_id(data.node_id)
-                        if storagerouter is not None:
-                            routing_key = 'sa.{0}'.format(storagerouter.storageappliance.machineid)
+                        storagedriver = StorageDriverList.get_by_storagedriver_id(data.node_id)
+                        if storagedriver is not None:
+                            routing_key = 'sa.{0}'.format(storagedriver.storageappliance.machineid)
                     delay = options.get('delay', 0)
                     dedupe = options.get('dedupe', False)
                     dedupe_key = options.get('dedupe_key', None)

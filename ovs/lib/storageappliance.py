@@ -73,26 +73,26 @@ class StorageApplianceController(object):
         Manager.init_vpool(parameters['storageappliance_ip'], parameters['vpool_name'], parameters=parameters)
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.remove_storagerouter')
-    def remove_storagerouter(storagerouter_guid):
+    @celery.task(name='ovs.storageappliance.remove_storagedriver')
+    def remove_storagedriver(storagedriver_guid):
         """
-        Removes a Storage Router (and, if it was the last Storage Router for a vPool, the vPool is removed as well)
+        Removes a Storage Driver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
         """
         from ovs.extensions.grid.manager import Manager
 
-        Manager.remove_vpool(storagerouter_guid)
+        Manager.remove_vpool(storagedriver_guid)
 
     @staticmethod
-    @celery.task(name='ovs.storageappliance.update_storagerouters')
-    def update_storagerouters(storagerouter_guids, storageappliances, parameters):
+    @celery.task(name='ovs.storageappliance.update_storagedrivers')
+    def update_storagedrivers(storagedriver_guids, storageappliances, parameters):
         """
         Add/remove multiple vPools
-        @param storagerouter_guids: Storage Routers to be removed
+        @param storagedriver_guids: Storage Drivers to be removed
         @param storageappliances: StorageAppliances on which to add a new link
         @param parameters: Settings for new links
         """
         success = True
-        # Add Storage Routers
+        # Add Storage Drivers
         for storageappliance_ip, storageapplaince_machineid in storageappliances:
             try:
                 new_parameters = copy.copy(parameters)
@@ -114,10 +114,10 @@ class StorageApplianceController(object):
                     result.wait()
             except:
                 success = False
-        # Remove Storage Routers
-        for storagerouter_guid in storagerouter_guids:
+        # Remove Storage Drivers
+        for storagedriver_guid in storagedriver_guids:
             try:
-                StorageApplianceController.remove_storagerouter(storagerouter_guid)
+                StorageApplianceController.remove_storagedriver(storagedriver_guid)
             except:
                 success = False
         return success

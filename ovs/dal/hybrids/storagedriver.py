@@ -13,34 +13,34 @@
 # limitations under the License.
 
 """
-StorageRouter module
+StorageDriver module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storageappliance import StorageAppliance
-from ovs.extensions.storageserver.storagerouter import StorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 import time
 
 
-class StorageRouter(DataObject):
+class StorageDriver(DataObject):
     """
-    The StorageRouter class represents a Storage Router. A Storage Router is an application
-    on a Storage Appliance to which the vDisks connect. The Storage Router is the gateway to the Storage Backend.
+    The StorageDriver class represents a Storage Driver. A Storage Driver is an application
+    on a Storage Appliance to which the vDisks connect. The Storage Driver is the gateway to the Storage Backend.
     """
     # pylint: disable=line-too-long
-    __blueprint = {'name':             (None, str, 'Name of the Storage Router.'),
-                   'description':      (None, str, 'Description of the Storage Router.'),
-                   'port':             (None, int, 'Port on which the Storage Router is listening.'),
-                   'cluster_ip':       (None, str, 'IP address on which the Storage Router is listening.'),
+    __blueprint = {'name':             (None, str, 'Name of the Storage Driver.'),
+                   'description':      (None, str, 'Description of the Storage Driver.'),
+                   'port':             (None, int, 'Port on which the Storage Driver is listening.'),
+                   'cluster_ip':       (None, str, 'IP address on which the Storage Driver is listening.'),
                    'storage_ip':       (None, str, 'IP address on which the vpool is shared to hypervisor'),
-                   'storagerouter_id': (None, str, 'ID of the Storage Router as known by the Storage Router Drivers.'),
-                   'mountpoint':       (None, str, 'Mountpoint from which the Storage Router serves data'),
+                   'storagedriver_id': (None, str, 'ID of the Storage Driver as known by the Storage Drivers.'),
+                   'mountpoint':       (None, str, 'Mountpoint from which the Storage Driver serves data'),
                    'mountpoint_temp':  (None, str, 'Mountpoint for temporary workload (scrubbing etc)'),
                    'mountpoint_bfs':   (None, str, 'Mountpoint for the backend filesystem (used for local and distributed fs)'),
                    'mountpoint_md':    (None, str, 'Mountpoint for metadata'),
                    'mountpoint_cache': (None, str, 'Mountpoint for caching')}
-    __relations = {'vpool':            (VPool, 'storagerouters'),
-                   'storageappliance': (StorageAppliance, 'storagerouters')}
+    __relations = {'vpool':            (VPool, 'storagedrivers'),
+                   'storageappliance': (StorageAppliance, 'storagedrivers')}
     __expiry = {'status':        (30, str),
                 'statistics':     (4, dict),
                 'stored_data':   (60, int)}
@@ -48,23 +48,23 @@ class StorageRouter(DataObject):
 
     def _status(self):
         """
-        Fetches the Status of the Storage Router.
+        Fetches the Status of the Storage Driver.
         """
         _ = self
         return None
 
     def _statistics(self):
         """
-        Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the Storage Router.
+        Aggregates the Statistics (IOPS, Bandwidth, ...) of the vDisks connected to the Storage Driver.
         """
-        client = StorageRouterClient()
+        client = StorageDriverClient()
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
-                if disk.storagerouter_id == self.storagerouter_id:
+                if disk.storagedriver_id == self.storagedriver_id:
                     statistics = disk._statistics()  # Prevent double caching
                     for key, value in statistics.iteritems():
                         if key != 'timestamp':
@@ -74,7 +74,7 @@ class StorageRouter(DataObject):
 
     def _stored_data(self):
         """
-        Aggregates the Stored Data in Bytes of the vDisks connected to the Storage Router.
+        Aggregates the Stored Data in Bytes of the vDisks connected to the Storage Driver.
         """
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])

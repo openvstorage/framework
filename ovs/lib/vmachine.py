@@ -25,7 +25,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storageappliancelist import StorageApplianceList
-from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
@@ -99,21 +99,21 @@ class VMachineController(object):
         # was set to as 'the' vPool for the code below. This obviously will have to change once vPool mixes
         # are supported.
 
-        target_storagerouter = None
-        source_storagerouter = None
-        for vpool_storagerouter in vpool.storagerouters:
-            if vpool_storagerouter.storageappliance.pmachine_guid == target_pm.guid:
-                target_storagerouter = vpool_storagerouter
-            if vpool_storagerouter.storageappliance.pmachine_guid == template_vm.pmachine_guid:
-                source_storagerouter = vpool_storagerouter
-        if target_storagerouter is None:
+        target_storagedriver = None
+        source_storagedriver = None
+        for vpool_storagedriver in vpool.storagedrivers:
+            if vpool_storagedriver.storageappliance.pmachine_guid == target_pm.guid:
+                target_storagedriver = vpool_storagedriver
+            if vpool_storagedriver.storageappliance.pmachine_guid == template_vm.pmachine_guid:
+                source_storagedriver = vpool_storagedriver
+        if target_storagedriver is None:
             raise RuntimeError('Volume not served on target hypervisor')
 
         source_hv = Factory.get(template_vm.pmachine)
         target_hv = Factory.get(target_pm)
-        if not source_hv.is_datastore_available(source_storagerouter.storage_ip, source_storagerouter.mountpoint):
+        if not source_hv.is_datastore_available(source_storagedriver.storage_ip, source_storagedriver.mountpoint):
             raise RuntimeError('Datastore unavailable on source hypervisor')
-        if not target_hv.is_datastore_available(target_storagerouter.storage_ip, target_storagerouter.mountpoint):
+        if not target_hv.is_datastore_available(target_storagedriver.storage_ip, target_storagedriver.mountpoint):
             raise RuntimeError('Datastore unavailable on target hypervisor')
 
         source_vm = source_hv.get_vm_object(template_vm.hypervisorid)
@@ -124,7 +124,7 @@ class VMachineController(object):
         if name_duplicates is not None and len(name_duplicates) > 0:
             raise RuntimeError('A vMachine with name {0} already exists'.format(name))
 
-        vm_path = target_hypervisor.get_vmachine_path(name, target_storagerouter.storageappliance.machineid)
+        vm_path = target_hypervisor.get_vmachine_path(name, target_storagedriver.storageappliance.machineid)
 
         new_vm = VMachine()
         new_vm.copy_blueprint(template_vm)
@@ -138,10 +138,10 @@ class VMachineController(object):
         new_vm.status = 'CREATED'
         new_vm.save()
 
-        storagerouters = [storagerouter for storagerouter in vpool.storagerouters if storagerouter.storageappliance.pmachine_guid == new_vm.pmachine_guid]
-        if len(storagerouters) == 0:
-            raise RuntimeError('Cannot find Storage Router serving {0} on {1}'.format(vpool.name, new_vm.pmachine.name))
-        storagerouterguid = storagerouters[0].guid
+        storagedrivers = [storagedriver for storagedriver in vpool.storagedrivers if storagedriver.storageappliance.pmachine_guid == new_vm.pmachine_guid]
+        if len(storagedrivers) == 0:
+            raise RuntimeError('Cannot find Storage Driver serving {0} on {1}'.format(vpool.name, new_vm.pmachine.name))
+        storagedriverguid = storagedrivers[0].guid
 
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
@@ -154,7 +154,7 @@ class VMachineController(object):
                     pmachineguid=target_pm.guid,
                     machinename=new_vm.name,
                     machineguid=new_vm.guid,
-                    storagerouter_guid=storagerouterguid
+                    storagedriver_guid=storagedriverguid
                 )
                 disks.append(result)
                 logger.debug('Disk appended: {0}'.format(result))
@@ -165,7 +165,7 @@ class VMachineController(object):
 
         try:
             result = target_hv.create_vm_from_template(
-                name, source_vm, disks, target_storagerouter.storage_ip, target_storagerouter.mountpoint, wait=True
+                name, source_vm, disks, target_storagedriver.storage_ip, target_storagedriver.mountpoint, wait=True
             )
         except Exception as exception:
             logger.error('Creation of vm {0} on hypervisor failed: {1}'.format(new_vm.name, str(exception)), print_msg=True)
@@ -240,25 +240,25 @@ class VMachineController(object):
         """
         _ = kwargs
         machine = VMachine(machineguid)
-        storagerouter_mountpoint, storagerouter_storage_ip = None, None
+        storagedriver_mountpoint, storagedriver_storage_ip = None, None
 
         try:
-            storagerouter = [storagerouter for storagerouter in machine.vpool.storagerouters if storagerouter.storageappliance.pmachine_guid == machine.pmachine_guid][0]
-            storagerouter_mountpoint = storagerouter.mountpoint
-            storagerouter_storage_ip = storagerouter.storage_ip
+            storagedriver = [storagedriver for storagedriver in machine.vpool.storagedrivers if storagedriver.storageappliance.pmachine_guid == machine.pmachine_guid][0]
+            storagedriver_mountpoint = storagedriver.mountpoint
+            storagedriver_storage_ip = storagedriver.storage_ip
         except Exception as ex:
             logger.debug('No mountpoint info could be retrieved. Reason: {0}'.format(str(ex)))
-            storagerouter_mountpoint = None
+            storagedriver_mountpoint = None
 
         hypervisorid = machine.hypervisorid
         if machine.pmachine.hvtype == 'KVM':
             hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
 
-        disks_info = [(storagerouter.mountpoint, vd.devicename) for storagerouter in vd.vpool.storagerouters for vd in machine.vdisks if storagerouter.storageappliance.pmachine_guid == machine.pmachine_guid]
+        disks_info = [(storagedriver.mountpoint, vd.devicename) for storagedriver in vd.vpool.storagedrivers for vd in machine.vdisks if storagedriver.storageappliance.pmachine_guid == machine.pmachine_guid]
         if machine.pmachine:  # Allow hypervisor id node, lookup strategy is hypervisor dependent
             try:
                 hv = Factory.get(machine.pmachine)
-                hv.delete_vm(hypervisorid, storagerouter_mountpoint, storagerouter_storage_ip, machine.devicename, disks_info, True)
+                hv.delete_vm(hypervisorid, storagedriver_mountpoint, storagedriver_storage_ip, machine.devicename, disks_info, True)
             except Exception as exception:
                 logger.error('Deletion of vm on hypervisor failed: {0}'.format(str(exception)), print_msg=True)
 
@@ -270,19 +270,19 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
-    def delete_from_voldrv(name, storagerouter_id):
+    def delete_from_voldrv(name, storagedriver_id):
         """
         This method will delete a vmachine based on the name of the vmx given
         """
-        pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
+        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
             return
 
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
         if pmachine.hvtype == 'VMWARE':
-            storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
-            vpool = storagerouter.vpool
+            storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+            vpool = storagedriver.vpool
         else:
             vpool = None
         vm = VMachineList.get_by_devicename_and_vpool(name, vpool)
@@ -293,18 +293,18 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
-    def rename_from_voldrv(old_name, new_name, storagerouter_id):
+    def rename_from_voldrv(old_name, new_name, storagedriver_id):
         """
         This machine will handle the rename of a vmx file
         """
-        pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
+        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
             return
 
         hypervisor = Factory.get(pmachine)
         if pmachine.hvtype == 'VMWARE':
-            storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
-            vpool = storagerouter.vpool
+            storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+            vpool = storagedriver.vpool
         else:
             vpool = None
 
@@ -322,12 +322,12 @@ class VMachineController(object):
             if vm is None:
                 # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
                 # Let's create it anyway
-                VMachineController.update_from_voldrv(new_name, storagerouter_id)
+                VMachineController.update_from_voldrv(new_name, storagedriver_id)
             vm = VMachineList.get_by_devicename_and_vpool(new_name, vpool)
             if vm is None:
                 raise RuntimeError('Could not create vMachine on rename. Aborting.')
             try:
-                VMachineController.sync_with_hypervisor(vm.guid, storagerouter_id)
+                VMachineController.sync_with_hypervisor(vm.guid, storagedriver_id)
                 vm.status = 'SYNC'
             except:
                 vm.status = 'SYNC_NOK'
@@ -437,22 +437,22 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
-    def sync_with_hypervisor(vmachineguid, storagerouter_id=None):
+    def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
         """
         Updates a given vmachine with data retreived from a given pmachine
         """
         try:
             vmachine = VMachine(vmachineguid)
-            if storagerouter_id is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
+            if storagedriver_id is None and vmachine.hypervisorid is not None and vmachine.pmachine is not None:
                 # Only the vmachine was received, so base the sync on hypervisorid and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
                 logger.info('Syncing vMachine (name {})'.format(vmachine.name))
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisorid)
-            elif storagerouter_id is not None and vmachine.devicename is not None:
-                # Storage Router id was given, using the devicename instead (to allow hypervisorid updates
+            elif storagedriver_id is not None and vmachine.devicename is not None:
+                # Storage Driver id was given, using the devicename instead (to allow hypervisorid updates
                 # which can be caused by re-adding a vm to the inventory)
-                pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
-                storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
+                pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
+                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 hypervisor = Factory.get(pmachine)
                 if not hypervisor.file_exists(hypervisor.clean_vmachine_filename(vmachine.devicename)):
                     return
@@ -460,11 +460,11 @@ class VMachineController(object):
                 vmachine.save()
 
                 logger.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
-                                                                                  storagerouter.storage_ip,
-                                                                                  storagerouter.mountpoint))
+                                                                                  storagedriver.storage_ip,
+                                                                                  storagedriver.mountpoint))
                 vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
-                                                                   ip=storagerouter.storage_ip,
-                                                                   mountpoint=storagerouter.mountpoint)
+                                                                   ip=storagedriver.storage_ip,
+                                                                   mountpoint=storagedriver.mountpoint)
             else:
                 message = 'Not enough information to sync vmachine'
                 logger.info('Error: {0}'.format(message))
@@ -482,12 +482,12 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')
-    def update_from_voldrv(name, storagerouter_id):
+    def update_from_voldrv(name, storagedriver_id):
         """
         This method will update/create a vmachine based on a given vmx/xml file
         """
 
-        pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
+        pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
             return
 
@@ -496,11 +496,11 @@ class VMachineController(object):
 
         if hypervisor.should_process(name) and hypervisor.file_exists(name):
             if pmachine.hvtype == 'VMWARE':
-                storagerouter = StorageRouterList.get_by_storagerouter_id(storagerouter_id)
-                vpool = storagerouter.vpool
+                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+                vpool = storagedriver.vpool
             else:
                 vpool = None
-            pmachine = PMachineList.get_by_storagerouter_id(storagerouter_id)
+            pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
             mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
                 mutex.acquire(wait=5)
@@ -517,7 +517,7 @@ class VMachineController(object):
 
             if pmachine.hvtype == 'KVM':
                 try:
-                    VMachineController.sync_with_hypervisor(vmachine.guid, storagerouter_id)
+                    VMachineController.sync_with_hypervisor(vmachine.guid, storagedriver_id)
                     vmachine.status = 'SYNC'
                 except:
                     vmachine.status = 'SYNC_NOK'
@@ -549,8 +549,8 @@ class VMachineController(object):
             vmachine.devicename = vm_object['backing']['filename']
             vmachine.save()
             # Updating and linking disks
-            storagerouters = StorageRouterList.get_storagerouters()
-            datastores = dict([('{}:{}'.format(storagerouter.storage_ip, storagerouter.mountpoint), storagerouter) for storagerouter in storagerouters])
+            storagedrivers = StorageDriverList.get_storagedrivers()
+            datastores = dict([('{}:{}'.format(storagedriver.storage_ip, storagedriver.mountpoint), storagedriver) for storagedriver in storagedrivers])
             vdisk_guids = []
             for disk in vm_object['disks']:
                 if disk['datastore'] in vm_object['datastores']:
@@ -562,9 +562,9 @@ class VMachineController(object):
                             vdisk = VDisk()
                             vdisk.vpool = datastores[datastore].vpool
                             vdisk.save()
-                            vdisk = VDisk(vdisk.guid)  # Reload the vDisk, loading the storagerouter_client
+                            vdisk = VDisk(vdisk.guid)  # Reload the vDisk, loading the storagedriver_client
                             vdisk.devicename = disk['filename']
-                            vdisk.volume_id = vdisk.storagerouter_client.get_volume_id(str(disk['backingfilename']))
+                            vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
                             vdisk.size = vdisk.info['volume_size']
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:

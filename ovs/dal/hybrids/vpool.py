@@ -16,14 +16,14 @@
 VPool module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.extensions.storageserver.storagerouter import StorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 import time
 
 
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
-    deploy vMachines. a vPool can span multiple Storage Routers and connects to a single Storage Backend.
+    deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage Backend.
     """
     # pylint: disable=line-too-long
     __blueprint = {'name':               (None, str, 'Name of the vPool.'),
@@ -33,7 +33,7 @@ class VPool(DataObject):
                    'backend_password':   (None, str, 'Password for the Storage Backend.'),
                    'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
                    'backend_type':       (None, ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'DISTRIBUTED'], 'Type of the Storage Backend.'),
-                   'backend_metadata':   (None, dict, 'Metadata for the backend, as used by the Storage Router Drivers.')}
+                   'backend_metadata':   (None, dict, 'Metadata for the backend, as used by the Storage Drivers.')}
     __relations = {}
     __expiry = {'status':        (10, str),
                 'statistics':     (5, dict),
@@ -51,7 +51,7 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        client = StorageRouterClient()
+        client = StorageDriverClient()
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
