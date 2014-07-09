@@ -853,12 +853,18 @@ if Service.has_service('{0}'):
                                                                                           max_value=65535)
                 connection_username = parameters.get('connection_username') or Helper.ask_string('Specify S3 access key')
                 connection_password = parameters.get('connection_password') or getpass.getpass()
-                strict_consistency = 'false' if vpool.backend_type in ['SWIFT_S3'] else 'true'
+                if vpool.backend_type in ['SWIFT_S3']:
+                    strict_consistency = 'false'
+                    s3_connection_flavour = 'SWIFT'
+                else:
+                    strict_consistency = 'true'
+                    s3_connection_flavour = 'S3'
+
                 vpool.backend_metadata = {'s3_connection_host': connection_host,
                                           's3_connection_port': connection_port,
                                           's3_connection_username': connection_username,
                                           's3_connection_password': connection_password,
-                                          's3_connection_flavour': 'S3',
+                                          's3_connection_flavour': s3_connection_flavour,
                                           's3_connection_strict_consistency': strict_consistency,
                                           's3_connection_verbose_logging': 1,
                                           'backend_type': 'S3'}
