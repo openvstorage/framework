@@ -692,9 +692,16 @@ class VMachineController(object):
         for vsr_guid in vsr_guids:
             try:
                 vsr = VolumeStorageRouter(vsr_guid)
-                VMachineController.remove_vsr.s(vsr_guid).apply_async(
+                # Async execution, since it has to be executed on another node
+                # @TODO: Will break in Celery 3.2, need to find another solution
+                # Requirements:
+                # - This code cannot continue until this new task is completed (as all these VSAs need to be
+                # handled sequentially
+                # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
+                result = VMachineController.remove_vsr.s(vsr_guid).apply_async(
                     routing_key='vsa.{0}'.format(vsr.serving_vmachine.machineid)
                 )
+                result.wait()
             except:
                 success = False
         return success
