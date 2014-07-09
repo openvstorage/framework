@@ -740,6 +740,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
         from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+        from ovs.extensions.generic.system import Ovs
 
         parameters = {} if parameters is None else parameters
 
@@ -761,7 +762,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             vpool_name = Helper.ask_string('Provide new vPool name', default_value=suggestion)
 
         client = Client.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
-        unique_id = sorted(client.run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'").strip().split('\n'))[0].strip()
+        unique_id = Ovs.get_my_machine_id(client)
 
         vsa = None
         for current_vsa in VMachineList.get_vsas():

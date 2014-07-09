@@ -43,14 +43,18 @@ class Ovs():
             return process.returncode, output
 
     @staticmethod
-    def get_my_machine_id():
+    def get_my_machine_id(client=None):
         """
         Returns unique machine id based on mac address
         """
         if not Ovs.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            rcode, output = Ovs.execute_command(cmd, catch_output=False)
-            for mac in output[0].strip().split('\n'):
+            if client is None:
+                _, output = Ovs.execute_command(cmd, catch_output=False)
+                output = output[0].strip()
+            else:
+                output = client.run(cmd).strip()
+            for mac in output.split('\n'):
                 if mac.strip() != '000000000000':
                     Ovs.my_machine_id = mac.strip()
                     break
