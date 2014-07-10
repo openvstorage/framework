@@ -43,6 +43,7 @@ class VPoolController(object):
             nfs = Nfsexports()
             nfs.unexport(mountpoint)
             nfs.export(mountpoint)
+            nfs.trigger_rpc_mountd()
 
     @staticmethod
     @celery.task(name='ovs.vpool.sync_with_hypervisor')
