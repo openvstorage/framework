@@ -63,7 +63,7 @@ def process(queue, body, mapping):
                     if options.get('execonstoragerouter', False):
                         storagedriver = StorageDriverList.get_by_storagedriver_id(data.node_id)
                         if storagedriver is not None:
-                            routing_key = 'sa.{0}'.format(storagedriver.storagerouter.machineid)
+                            routing_key = 'sr.{0}'.format(storagedriver.storagerouter.machineid)
                     delay = options.get('delay', 0)
                     dedupe = options.get('dedupe', False)
                     dedupe_key = options.get('dedupe_key', None)

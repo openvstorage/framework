@@ -60,12 +60,12 @@ define([
                         generic.crossFiller(
                             guids, self.storageRouters,
                             function(guid) {
-                                var sa = new StorageRouter(guid);
+                                var sr = new StorageRouter(guid);
                                 if ($.inArray(guid, guids) !== -1) {
-                                    sa.fillData(sadata[guid]);
+                                    sr.fillData(sadata[guid]);
                                 }
-                                sa.versions = ko.observable();
-                                sa.loading(true);
+                                sr.versions = ko.observable();
+                                sr.loading(true);
                                 api.get('storagerouters/' + guid + '/get_version_info')
                                     .then(self.shared.tasks.wait)
                                     .done(function(data) {
@@ -76,7 +76,7 @@ define([
                                            }
                                         });
                                     });
-                                return sa;
+                                return sr;
                             }, 'guid'
                         );
                         self.loading(false);

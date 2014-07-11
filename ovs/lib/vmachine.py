@@ -74,12 +74,12 @@ class VMachineController(object):
         target_pm = PMachine(pmachineguid)
         target_hypervisor = Factory.get(target_pm)
 
-        storagerouters = [sa for sa in StorageRouterList.get_storagerouters() if sa.pmachine_guid == target_pm.guid]
+        storagerouters = [sr for sr in StorageRouterList.get_storagerouters() if sr.pmachine_guid == target_pm.guid]
         if len(storagerouters) == 1:
             target_storagerouter = storagerouters[0]
         else:
             raise ValueError('Pmachine {} has no StorageRouter assigned to it'.format(pmachineguid))
-        routing_key = "sa.{0}".format(target_storagerouter.machineid)
+        routing_key = "sr.{0}".format(target_storagerouter.machineid)
 
         vpool = None
         vpool_guids = set()

@@ -215,9 +215,9 @@ define([
                                         vmachine.storageRouterGuids, vmachine.storageRouters,
                                         function(guid) {
                                             if (!self.storageRouterCache.hasOwnProperty(guid)) {
-                                                var sa = new StorageRouter(guid);
-                                                sa.load('');
-                                                self.storageRouterCache[guid] = sa;
+                                                var sr = new StorageRouter(guid);
+                                                sr.load('');
+                                                self.storageRouterCache[guid] = sr;
                                             }
                                             return self.storageRouterCache[guid];
                                         }, 'guid'
