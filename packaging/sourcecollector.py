@@ -210,7 +210,7 @@ class SourceCollector(object):
         elif distribution == 'unstable':
             build = current_revision
         else:
-            builds = sorted(tag['build'] for tag in tag_data if tag['version'] == version)
+            builds = sorted(tag['build'] for tag in tag_data if tag['version'] == version and tag['suffix'] == suffix)
             if len(builds) > 0:
                 build = int(builds[-1])
                 if revision is None and increment_build is True:
