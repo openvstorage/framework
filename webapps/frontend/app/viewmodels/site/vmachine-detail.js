@@ -15,22 +15,22 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../containers/pmachine', '../containers/vpool',
+    '../containers/vmachine', '../containers/pmachine', '../containers/vpool', '../containers/storagerouter',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine, VPool, RollbackWizard, SnapshotWizard) {
+], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine, VPool, StorageRouter, RollbackWizard, SnapshotWizard) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared            = shared;
-        self.guard             = { authenticated: true };
-        self.refresher         = new Refresher();
-        self.widgets           = [];
-        self.vPoolCache        = {};
-        self.vSACache          = {};
-        self.pMachineCache     = {};
-        self.vDiskHeaders      = [
+        self.shared             = shared;
+        self.guard              = { authenticated: true };
+        self.refresher          = new Refresher();
+        self.widgets            = [];
+        self.vPoolCache         = {};
+        self.storageRouterCache = {};
+        self.pMachineCache      = {};
+        self.vDiskHeaders       = [
             { key: 'name',         value: $.t('ovs:generic.name'),         width: undefined },
             { key: 'size',         value: $.t('ovs:generic.size'),         width: 100       },
             { key: 'storedData',   value: $.t('ovs:generic.storeddata'),   width: 110       },
@@ -40,22 +40,22 @@ define([
             { key: 'writeSpeed',   value: $.t('ovs:generic.write'),        width: 100       },
             { key: 'failoverMode', value: $.t('ovs:generic.focstatus'),    width: 50        }
         ];
-        self.snapshotHeaders   = [
+        self.snapshotHeaders    = [
             { key: 'label',         value: $.t('ovs:generic.description'), width: undefined },
             { key: 'timestamp',     value: $.t('ovs:generic.datetime'),    width: 200       },
             { key: 'stored',        value: $.t('ovs:generic.storeddata'),  width: 110       },
             { key: 'is_automatic',  value: $.t('ovs:generic.type'),        width: 110       },
             { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       }
         ];
-        self.vDisksInitialLoad = ko.observable(true);
-        self.snapshotsInitialLoad = ko.observable(true);
 
         // Handles
         self.loadVDisksHandle    = undefined;
         self.refreshVDisksHandle = {};
 
         // Observables
-        self.vMachine = ko.observable();
+        self.vDisksInitialLoad    = ko.observable(true);
+        self.snapshotsInitialLoad = ko.observable(true);
+        self.vMachine             = ko.observable();
 
         // Functions
         self.load = function() {
@@ -77,14 +77,14 @@ define([
                             }, 'guid'
                         );
                         generic.crossFiller(
-                            vm.vSAGuids, vm.vSAs,
+                            vm.storageRouterGuids, vm.storageRouters,
                             function(guid) {
-                                if (!self.vSACache.hasOwnProperty(guid)) {
-                                    var vsa = new VMachine(guid);
-                                    vsa.load('');
-                                    self.vSACache[guid] = vsa;
+                                if (!self.storageRouterCache.hasOwnProperty(guid)) {
+                                    var sa = new StorageRouter(guid);
+                                    sa.load('');
+                                    self.storageRouterCache[guid] = sa;
                                 }
-                                return self.vSACache[guid];
+                                return self.storageRouterCache[guid];
                             }, 'guid'
                         );
                         var pMachineGuid = vm.pMachineGuid(), pm;

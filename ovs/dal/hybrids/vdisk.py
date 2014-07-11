@@ -20,7 +20,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 import pickle
 import time
@@ -37,7 +37,7 @@ class VDisk(DataObject):
                    'size':              (0, int, 'Size of the vDisk in Bytes.'),
                    'devicename':        (None, str, 'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
                    'order':             (None, int, 'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
-                   'volumeid':          (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
+                   'volume_id':         (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
                    'parentsnapshot':    (None, str, 'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
                    'retentionpolicyid': (None, str, 'Retention policy used by the vDisk.'),
                    'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
@@ -47,11 +47,11 @@ class VDisk(DataObject):
     __relations = {'vmachine':     (VMachine, 'vdisks'),
                    'vpool':        (VPool, 'vdisks'),
                    'parent_vdisk': (None, 'child_vdisks')}
-    __expiry = {'snapshots':  (60, list),
-                'info':       (60, dict),
-                'statistics':  (5, dict),
-                'vsrid':      (60, str),
-                'vsa_guid':   (15, str)}
+    __expiry = {'snapshots':          (60, list),
+                'info':               (60, dict),
+                'statistics':          (5, dict),
+                'storagedriver_id':   (60, str),
+                'storagerouter_guid': (15, str)}
     # pylint: enable=line-too-long
 
     def __init__(self, *args, **kwargs):
@@ -61,7 +61,7 @@ class VDisk(DataObject):
         DataObject.__init__(self, *args, **kwargs)
         if self.vpool:
             self._frozen = False
-            self.vsr_client = VolumeStorageRouterClient().load(self.vpool)
+            self.storagedriver_client = StorageDriverClient().load(self.vpool)
             self._frozen = True
 
     def _snapshots(self):
@@ -69,14 +69,14 @@ class VDisk(DataObject):
         Fetches a list of Snapshots for the vDisk
         """
         snapshots = []
-        if self.volumeid and self.vpool:
-            volumeid = str(self.volumeid)
+        if self.volume_id and self.vpool:
+            volume_id = str(self.volume_id)
             try:
-                voldrv_snapshots = self.vsr_client.list_snapshots(volumeid)
+                voldrv_snapshots = self.storagedriver_client.list_snapshots(volume_id)
             except:
                 voldrv_snapshots = []
             for guid in voldrv_snapshots:
-                snapshot = self.vsr_client.info_snapshot(volumeid, guid)
+                snapshot = self.storagedriver_client.info_snapshot(volume_id, guid)
                 # @todo: to be investigated howto handle during set as template
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
@@ -92,13 +92,13 @@ class VDisk(DataObject):
         """
         Fetches the info (see Volume Driver API) for the vDisk.
         """
-        if self.volumeid and self.vpool:
+        if self.volume_id and self.vpool:
             try:
-                vdiskinfo = self.vsr_client.info_volume(str(self.volumeid))
+                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
-                vdiskinfo = VolumeStorageRouterClient().empty_info()
+                vdiskinfo = StorageDriverClient().empty_info()
         else:
-            vdiskinfo = VolumeStorageRouterClient().empty_info()
+            vdiskinfo = StorageDriverClient().empty_info()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
@@ -112,13 +112,13 @@ class VDisk(DataObject):
         """
         Fetches the Statistics for the vDisk.
         """
-        client = VolumeStorageRouterClient()
+        client = StorageDriverClient()
         volatile = VolatileFactory.get_client()
         prev_key = '{0}_{1}'.format(self._key, 'statistics_previous')
         # Load data from volumedriver
-        if self.volumeid and self.vpool:
+        if self.volume_id and self.vpool:
             try:
-                vdiskstats = self.vsr_client.statistics_volume(str(self.volumeid))
+                vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
             except:
                 vdiskstats = client.empty_statistics()
         else:
@@ -150,26 +150,26 @@ class VDisk(DataObject):
         # Returning the dictionary
         return vdiskstatsdict
 
-    def _vsrid(self):
+    def _storagedriver_id(self):
         """
-        Returns the Volume Storage Router ID to which the vDisk is connected.
+        Returns the Volume Storage Driver ID to which the vDisk is connected.
         """
         return self.info.get('vrouter_id', None)
 
-    def _vsa_guid(self):
+    def _storagerouter_guid(self):
         """
-        Loads the vDisks VSA guid
+        Loads the vDisks StorageRouter guid
         """
-        if not self.vsrid:
+        if not self.storagedriver_id:
             return None
-        from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
-        volumestoragerouters = DataObjectList(
-            DataList({'object': VolumeStorageRouter,
+        from ovs.dal.hybrids.storagedriver import StorageDriver
+        storagedrivers = DataObjectList(
+            DataList({'object': StorageDriver,
                       'data': DataList.select.DESCRIPTOR,
                       'query': {'type': DataList.where_operator.AND,
-                                'items': [('vsrid', DataList.operator.EQUALS, self.vsrid)]}}).data,
-            VolumeStorageRouter
+                                'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]}}).data,
+            StorageDriver
         )
-        if len(volumestoragerouters) == 1:
-            return volumestoragerouters[0].serving_vmachine_guid
+        if len(storagedrivers) == 1:
+            return storagedrivers[0].storagerouter_guid
         return None

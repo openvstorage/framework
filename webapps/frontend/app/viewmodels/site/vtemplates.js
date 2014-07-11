@@ -29,8 +29,7 @@ define([
         self.query            = {
             query: {
                 type: 'AND',
-                items: [['is_internal', 'EQUALS', false],
-                        ['is_vtemplate', 'EQUALS', true]]
+                items: [['is_vtemplate', 'EQUALS', true]]
             }
         };
         self.vTemplateHeaders = [
