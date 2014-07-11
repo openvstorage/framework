@@ -22,8 +22,8 @@ import subprocess
 class Ovs():
 
     my_machine_id = ''
-    my_vsa_guid = ''
-    my_vsr_id = ''
+    my_storagerouter_guid = ''
+    my_storagedriver_id = ''
 
     @staticmethod
     def execute_command(cmd, catch_output=True):
@@ -43,38 +43,42 @@ class Ovs():
             return process.returncode, output
 
     @staticmethod
-    def get_my_machine_id():
+    def get_my_machine_id(client=None):
         """
         Returns unique machine id based on mac address
         """
         if not Ovs.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            rcode, output = Ovs.execute_command(cmd, catch_output=False)
-            for mac in output[0].strip().split('\n'):
+            if client is None:
+                _, output = Ovs.execute_command(cmd, catch_output=False)
+                output = output[0].strip()
+            else:
+                output = client.run(cmd).strip()
+            for mac in output.split('\n'):
                 if mac.strip() != '000000000000':
                     Ovs.my_machine_id = mac.strip()
                     break
         return Ovs.my_machine_id
 
     @staticmethod
-    def get_my_vsa():
+    def get_my_storagerouter():
         """
-        Returns unique machine vsa id
+        Returns unique machine storagerouter id
         """
 
-        from ovs.lib.vmachine import VMachine
-        from ovs.dal.lists.vmachinelist import VMachineList
+        from ovs.dal.hybrids.storagerouter import StorageRouter
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-        if not Ovs.my_vsa_guid:
-            for vm in VMachineList.get_vmachines():
-                if vm.is_internal and vm.machineid == Ovs.get_my_machine_id():
-                    Ovs.my_vsa_guid = vm.guid
-        return VMachine(Ovs.my_vsa_guid)
+        if not Ovs.my_storagerouter_guid:
+            for storagerouter in StorageRouterList.get_storagerouters():
+                if storagerouter.machineid == Ovs.get_my_machine_id():
+                    Ovs.my_storagerouter_guid = storagerouter.guid
+        return StorageRouter(Ovs.my_storagerouter_guid)
 
     @staticmethod
-    def get_my_vsr_id(vpool_name):
+    def get_my_storagedriver_id(vpool_name):
         """
-        Returns unique machine vsrid based on vpool_name and machineid
+        Returns unique machine storagedriver_id based on vpool_name and machineid
         """
         return vpool_name + Ovs.get_my_machine_id()
 

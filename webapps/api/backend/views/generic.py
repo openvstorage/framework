@@ -21,7 +21,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from django.http import Http404
 
 
@@ -48,8 +48,8 @@ class GenericViewSet(viewsets.ViewSet):
         _ = format, request
         if pk != '0':
             raise Http404
-        vsa_ips = []
-        for vsa in VMachineList.get_vsas():
-            vsa_ips.append(vsa.ip)
-        data = {'vsa_ips': vsa_ips}
+        storagerouter_ips = []
+        for storagerouter in StorageRouterList.get_storagerouters():
+            storagerouter_ips.append(storagerouter.ip)
+        data = {'storagerouter_ips': storagerouter_ips}
         return Response(data)

@@ -20,52 +20,52 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
-from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from backend.decorators import required_roles, expose, validate, get_list, get_object
 
 
-class VolumeStorageRouterViewSet(viewsets.ViewSet):
+class StorageDriverViewSet(viewsets.ViewSet):
     """
-    Information about VolumeStorageRouters
+    Information about StorageDrivers
     """
     permission_classes = (IsAuthenticated,)
-    prefix = r'volumestoragerouters'
-    base_name = 'volumestoragerouters'
+    prefix = r'storagedrivers'
+    base_name = 'storagedrivers'
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(VolumeStorageRouter)
+    @get_list(StorageDriver)
     def list(self, request, format=None, hints=None):
         """
-        Overview of all VolumeStorageRouters
+        Overview of all StorageDrivers
         """
         _ = request, format, hints
-        return VolumeStorageRouterList.get_volumestoragerouters()
+        return StorageDriverList.get_storagedrivers()
 
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(VolumeStorageRouter)
-    @get_object(VolumeStorageRouter)
+    @validate(StorageDriver)
+    @get_object(StorageDriver)
     def retrieve(self, request, obj):
         """
-        Load information about a given VolumeStorageRouter
+        Load information about a given StorageDriver
         """
         _ = request
         return obj
 
     @action()
     @expose(internal=True)
-    @validate(VolumeStorageRouter)
+    @validate(StorageDriver)
     def can_be_deleted(self, request, obj):
         """
-        Checks whether a VSR can be deleted
+        Checks whether a Storage Driver can be deleted
         """
         _ = request
         result = True
-        vmachine = obj.serving_vmachine
-        pmachine = vmachine.pmachine
+        storagerouter = obj.storagerouter
+        pmachine = storagerouter.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         vpools_guids = [vmachine.vpool_guid for vmachine in vmachines if vmachine.vpool_guid is not None]
         pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
@@ -73,6 +73,6 @@ class VolumeStorageRouterViewSet(viewsets.ViewSet):
 
         if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             result = False
-        if any(vdisk for vdisk in vpool.vdisks if vdisk.vsrid == obj.vsrid):
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == obj.storagedriver_id):
             result = False
         return Response(result, status=status.HTTP_200_OK)

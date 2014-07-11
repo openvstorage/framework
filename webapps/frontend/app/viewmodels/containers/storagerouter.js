@@ -22,49 +22,42 @@ define([
         var self = this;
 
         // Variables
-        self.shared               = shared;
-        self.storageApplinceGuids = [];
-        self.vPoolGuids           = [];
-        self.vMachineGuids        = [];
+        self.shared             = shared;
+        self.vPoolGuids         = [];
+        self.vMachineGuids      = [];
+        self.storageDriverGuids = [];
 
         // Handles
-        self.loadVDisksHandle      = undefined;
-        self.loadStorageRouterGuid = undefined;
-        self.loadHandle            = undefined;
-        self.loadVpoolGuid         = undefined;
-        self.loadChildrenGuid      = undefined;
-        self.loadSChildrenGuid     = undefined;
+        self.loadHandle  = undefined;
+        self.loadActions = undefined;
 
         // External dependencies
-        self.pMachine       = ko.observable();
-        self.storageRouters = ko.observableArray([]);
-        self.vPools         = ko.observableArray([]);
-        self.vMachines      = ko.observableArray([]);
+        self.pMachine  = ko.observable();
+        self.vPools    = ko.observableArray([]);
+        self.vMachines = ko.observableArray([]);
 
         // Observables
-        self.guid                  = ko.observable(guid);
-        self.loading               = ko.observable(false);
-        self.loaded                = ko.observable(false);
-        self.pMachineGuid          = ko.observable();
-        self.name                  = ko.observable();
-        self.hypervisorStatus      = ko.observable();
-        self.ipAddress             = ko.observable();
-        self.isVTemplate           = ko.observable();
-        self.status                = ko.observable();
-        self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReads          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.failoverMode          = ko.observable();
-        self.snapshots             = ko.observableArray([]);
-        self.vDisks                = ko.observableArray([]);
-        self.templateChildrenGuids = ko.observableArray([]);
+        self.guid             = ko.observable(guid);
+        self.loading          = ko.observable(false);
+        self.loaded           = ko.observable(false);
+        self.pMachineGuid     = ko.observable();
+        self.name             = ko.observable();
+        self.machineid        = ko.observable();
+        self.ipAddress        = ko.observable();
+        self.status           = ko.observable();
+        self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.storedData       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReads     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.backendWritten   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.failoverMode     = ko.observable();
+        self.vDisks           = ko.observableArray([]);
+        self.availableActions = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -77,9 +70,6 @@ define([
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
-        self.isRunning = ko.computed(function() {
-            return self.hypervisorStatus() === 'RUNNING';
-        });
         self.bandwidth = ko.computed(function() {
             if (self.readSpeed() === undefined || self.writeSpeed() === undefined) {
                 return undefined;
@@ -89,12 +79,12 @@ define([
         });
 
         // Functions
-        self.fetchTemplateChildrenGuids = function() {
+        self.getAvailableActions = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadChildrenGuid)) {
-                    self.loadChildrenGuid = api.get('vmachines/' + self.guid() + '/get_children')
+                if (generic.xhrCompleted(self.loadActions)) {
+                    self.loadActions = api.get('storagerouters/' + self.guid() + '/get_available_actions')
                         .done(function(data) {
-                            self.templateChildrenGuids(data);
+                            self.availableActions(data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
@@ -105,19 +95,20 @@ define([
         };
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
-            generic.trySet(self.hypervisorStatus, data, 'hypervisor_status');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.ipAddress, data, 'ip');
-            generic.trySet(self.isVTemplate, data, 'is_vtemplate');
-            generic.trySet(self.snapshots, data, 'snapshots');
+            generic.trySet(self.machineid, data, 'machineid');
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
-            if (data.hasOwnProperty('storagerouters_guids')) {
-                self.storageRouterGuids = data.storagerouters_guids;
-            }
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
+            }
+            if (data.hasOwnProperty('storagedrivers_guids')) {
+                self.storageDriverGuids = data.storagedrivers_guids;
+            }
+            if (data.hasOwnProperty('vmachine_guids')) {
+                self.vMachineGuids = data.vmachine_guids;
             }
             if (data.hasOwnProperty('vdisks_guids')) {
                 generic.crossFiller(
@@ -141,12 +132,6 @@ define([
                 self.backendReads(stats.sco_cache_hits + stats.cluster_cache_hits);
                 self.bandwidthSaved(Math.max(0, stats.data_read - stats.backend_data_read));
             }
-
-            self.snapshots.sort(function(a, b) {
-                // Newest first
-                return b.timestamp - a.timestamp;
-            });
-
             self.loaded(true);
             self.loading(false);
         };
@@ -158,7 +143,7 @@ define([
                     if (contents !== undefined) {
                         options.contents = contents;
                     }
-                    self.loadHandle = api.get('vmachines/' + self.guid(), undefined, options)
+                    self.loadHandle = api.get('storagerouters/' + self.guid(), undefined, options)
                         .done(function(data) {
                             self.fillData(data);
                             self.loaded(true);
