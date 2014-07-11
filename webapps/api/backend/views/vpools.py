@@ -21,10 +21,10 @@ from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.vmachine import VMachine
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
-from ovs.lib.vmachine import VMachineController
-from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
+from ovs.lib.storagerouter import StorageRouterController
+from ovs.dal.hybrids.storagedriver import StorageDriver
 from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
 
 
@@ -73,49 +73,47 @@ class VPoolViewSet(viewsets.ViewSet):
     @expose(internal=True)
     @required_roles(['view'])
     @validate(VPool)
-    @get_list(VMachine)
-    def serving_vsas(self, request, obj, hints):
+    @get_list(StorageRouter)
+    def storagerouters(self, request, obj, hints):
         """
-        Retreives a list of VSA guids, serving a given vPool
+        Retreives a list of StorageRouters, serving a given vPool
         """
         _ = request
-        vsa_guids = []
-        vsas = []
-        for vsr in obj.vsrs:
-            vsa_guids.append(vsr.serving_vmachine_guid)
+        storagerouter_guids = []
+        storagerouter = []
+        for storagedriver in obj.storagedrivers:
+            storagerouter_guids.append(storagedriver.storagerouter_guid)
             if hints['full'] is True:
-                vsas.append(vsr.serving_vmachine)
-        return vsas if hints['full'] is True else vsa_guids
+                storagerouter.append(storagedriver.storagerouter)
+        return storagerouter if hints['full'] is True else storagerouter_guids
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
     @validate(VPool)
     @celery_task()
-    def update_vsrs(self, request, obj):
+    def update_storagedrivers(self, request, obj):
         """
-        Update VSRs for a given vPool (both adding and removing VSRs)
+        Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)
         """
-        vsas = []
-        if 'vsa_guids' in request.DATA:
-            if request.DATA['vsa_guids'].strip() != '':
-                for vsa_guid in request.DATA['vsa_guids'].strip().split(','):
-                    vsa = VMachine(vsa_guid)
-                    if vsa.is_internal is not True:
-                        raise NotAcceptable('vMachine is not a VSA')
-                    vsas.append((vsa.ip, vsa.machineid))
-        if 'vsr_guid' not in request.DATA:
-            raise NotAcceptable('No VSR guid passed')
-        vsr_guids = []
-        if 'vsr_guids' in request.DATA:
-            if request.DATA['vsr_guids'].strip() != '':
-                for vsr_guid in request.DATA['vsr_guids'].strip().split(','):
-                    vsr = VolumeStorageRouter(vsr_guid)
-                    if vsr.vpool_guid != obj.guid:
-                        raise NotAcceptable('Given VSR does not belong to this vPool')
-                    vsr_guids.append(vsr.guid)
+        storagerouters = []
+        if 'storagerouter_guids' in request.DATA:
+            if request.DATA['storagerouter_guids'].strip() != '':
+                for storagerouter_guid in request.DATA['storagerouter_guids'].strip().split(','):
+                    storagerouter = StorageRouter(storagerouter_guid)
+                    storagerouters.append((storagerouter.ip, storagerouter.machineid))
+        if 'storagedriver_guid' not in request.DATA:
+            raise NotAcceptable('No Storage Driver guid passed')
+        storagedriver_guids = []
+        if 'storagedriver_guids' in request.DATA:
+            if request.DATA['storagedriver_guids'].strip() != '':
+                for storagedriver_guid in request.DATA['storagedriver_guids'].strip().split(','):
+                    storagedriver = StorageDriver(storagedriver_guid)
+                    if storagedriver.vpool_guid != obj.guid:
+                        raise NotAcceptable('Given Storage Driver does not belong to this vPool')
+                    storagedriver_guids.append(storagedriver.guid)
 
-        vsr = VolumeStorageRouter(request.DATA['vsr_guid'])
+        storagedriver = StorageDriver(request.DATA['storagedriver_guid'])
         parameters = {'vpool_name':          obj.name,
                       'backend_type':        obj.backend_type,
                       'connection_host':     None if obj.backend_connection is None else obj.backend_connection.split(':')[0],
@@ -123,14 +121,14 @@ class VPoolViewSet(viewsets.ViewSet):
                       'connection_timeout':  0,  # Not in use anyway
                       'connection_username': obj.backend_login,
                       'connection_password': obj.backend_password,
-                      'mountpoint_bfs':      vsr.mountpoint_bfs,
-                      'mountpoint_temp':     vsr.mountpoint_temp,
-                      'mountpoint_md':       vsr.mountpoint_md,
-                      'mountpoint_cache':    vsr.mountpoint_cache,
-                      'storage_ip':          vsr.storage_ip,
-                      'vrouter_port':        vsr.port}
+                      'mountpoint_bfs':      storagedriver.mountpoint_bfs,
+                      'mountpoint_temp':     storagedriver.mountpoint_temp,
+                      'mountpoint_md':       storagedriver.mountpoint_md,
+                      'mountpoint_cache':    storagedriver.mountpoint_cache,
+                      'storage_ip':          storagedriver.storage_ip,
+                      'vrouter_port':        storagedriver.port}
         for field in parameters:
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        return VMachineController.update_vsrs.delay(vsr_guids, vsas, parameters)
+        return StorageRouterController.update_storagedrivers.delay(storagedriver_guids, storagerouters, parameters)

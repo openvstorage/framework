@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api'
-], function($, ko, generic, api) {
+    'ovs/api'
+], function($, ko, api) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -31,7 +31,7 @@ define([
         self.port            = ko.observable();
         self.clusterIP       = ko.observable();
         self.storageIP       = ko.observable();
-        self.vsrid           = ko.observable();
+        self.storageDriverID = ko.observable();
         self.mountpoint      = ko.observable();
         self.mountpointTemp  = ko.observable();
         self.mountpointBFS   = ko.observable();
@@ -44,7 +44,7 @@ define([
             self.port(data.port);
             self.clusterIP(data.cluster_ip);
             self.storageIP(data.storage_ip);
-            self.vsrid(data.vsrid);
+            self.storageDriverID(data.storageDriverID);
             self.mountpoint(data.mountpoint);
             self.mountpointTemp(data.mountpoint_temp);
             self.mountpointBFS(data.mountpoint_bfs);
@@ -56,7 +56,7 @@ define([
         self.load = function() {
             return $.Deferred(function(deferred) {
                 self.loading(true);
-                api.get('volumestoragerouters/' + self.guid())
+                api.get('storagedrivers/' + self.guid())
                     .done(function(data) {
                         self.fillData(data);
                         deferred.resolve();

@@ -40,10 +40,10 @@ limitations under the License.
                     </span>
                 </td>
                 <td>
-                    <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded', undefinedLoading: false }">
+                    <span data-bind="lazyloader: { item: storageRouter, loadedObservable: 'loaded', undefinedLoading: false }">
                         <a data-part="lazy-entry"
                            data-bind="text: item().name,
-                                      attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: item().guid }) }"></a>
+                                      attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
                     </span>
                 </td>
                 <td><span data-bind="text: size"></span></td>

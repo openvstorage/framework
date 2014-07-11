@@ -18,7 +18,7 @@ PMachineList module
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
-from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 
 
 class PMachineList(object):
@@ -51,17 +51,17 @@ class PMachineList(object):
         return None
 
     @staticmethod
-    def get_by_vsrid(vsrid):
+    def get_by_storagedriver_id(storagedriver_id):
         """
-        Get pMachine that hosts a given vsrid
+        Get pMachine that hosts a given storagedriver_id
         """
-        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-        if vsr is None:
-            raise RuntimeError('VolumeStorageRouter {0} could not be found'.format(vsrid))
-        vsa = vsr.serving_vmachine
-        if vsa is None:
-            raise RuntimeError('VolumeStorageRouter {0} not linked to a VSA'.format(vsr.name))
-        pmachine = vsa.pmachine
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('StorageDriver {0} could not be found'.format(storagedriver_id))
+        storagerouter = storagedriver.storagerouter
+        if storagerouter is None:
+            raise RuntimeError('StorageDriver {0} not linked to a StorageRouter'.format(storagedriver.name))
+        pmachine = storagerouter.pmachine
         if pmachine is None:
-            raise RuntimeError('VSA {0} not linked to a pMachine'.format(vsa.name))
+            raise RuntimeError('StorageRouter {0} not linked to a pMachine'.format(storagerouter.name))
         return pmachine

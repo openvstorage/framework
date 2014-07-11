@@ -13,11 +13,11 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vpool',
     '../wizards/addvpool/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VPool, AddVPoolWizard) {
+], function($, dialog, ko, shared, generic, Refresher, api, VPool, AddVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
