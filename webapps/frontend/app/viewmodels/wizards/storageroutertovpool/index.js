@@ -25,12 +25,12 @@ define([
         self.data = data;
 
         // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.vsatovpool.title')));
+        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.storageroutertovpool.title')));
         self.modal(generic.tryGet(options, 'modal', false));
         self.data.completed = options.completed;
         self.data.vPool(options.vPool);
-        self.data.pendingVSAs(options.pendingVSAs());
-        self.data.removingVSAs(options.removingVSAs());
+        self.data.pendingStorageRouters(options.pendingStorageRouters());
+        self.data.removingStorageRouters(options.removingStorageRouters());
         self.steps([new Confirm(self)]);
         self.activateStep();
     };

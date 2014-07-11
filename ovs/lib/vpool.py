@@ -19,7 +19,7 @@ VPool module
 from ovs.celery import celery
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vmachine import VMachineController
@@ -32,14 +32,14 @@ class VPoolController(object):
 
     @staticmethod
     @celery.task(name='ovs.vpool.mountpoint_available_from_voldrv')
-    def mountpoint_available_from_voldrv(mountpoint, vsrid):
+    def mountpoint_available_from_voldrv(mountpoint, storagedriver_id):
         """
         Hook for (re)exporting the NFS mountpoint
         """
-        vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
-        if vsr is None:
-            raise RuntimeError('A VSR with id {0} could not be found.'.format(vsrid))
-        if vsr.serving_vmachine.pmachine.hvtype == 'VMWARE':
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('A Storage Driver with id {0} could not be found.'.format(storagedriver_id))
+        if storagedriver.storagerouter.pmachine.hvtype == 'VMWARE':
             nfs = Nfsexports()
             nfs.unexport(mountpoint)
             nfs.export(mountpoint)
@@ -52,10 +52,10 @@ class VPoolController(object):
         Syncs all vMachines of a given vPool with the hypervisor
         """
         vpool = VPool(vpool_guid)
-        for vsr in vpool.vsrs:
-            pmachine = vsr.serving_vmachine.pmachine
+        for storagedriver in vpool.storagedrivers:
+            pmachine = storagedriver.storagerouter.pmachine
             hypervisor = Factory.get(pmachine)
-            for vm_object in hypervisor.get_vms_by_nfs_mountinfo(vsr.storage_ip, vsr.mountpoint):
+            for vm_object in hypervisor.get_vms_by_nfs_mountinfo(storagedriver.storage_ip, storagedriver.mountpoint):
                 search_vpool = None if pmachine.hvtype == 'KVM' else vpool
                 vmachine = VMachineList.get_by_devicename_and_vpool(
                     devicename=vm_object['backing']['filename'],
@@ -64,10 +64,10 @@ class VPoolController(object):
                 VMachineController.update_vmachine_config(vmachine, vm_object, pmachine)
 
     @staticmethod
-    def can_be_served_on(vsa_guid):
+    def can_be_served_on(storagerouter_guid):
         """
         temporary check to avoid creating 2 ganesha nfs exported vpools
         as this is not yet supported on volumedriverlevel
         """
-        _ = vsa_guid
+        _ = storagerouter_guid
         return True

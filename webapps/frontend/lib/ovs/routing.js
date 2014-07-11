@@ -21,20 +21,20 @@ define(['jquery'], function($) {
        { route: ':mode*details', moduleId: 'viewmodels/index',    nav: false }
     ];
     siteRoutes = [
-        { route: '',               moduleId: 'dashboard',       title: $.t('ovs:dashboard.title'),        titlecode: 'ovs:dashboard.title',        nav: false, main: false },
-        { route: 'gsrs',           moduleId: 'vsas',            title: $.t('ovs:vsas.title'),             titlecode: 'ovs:vsas.title',             nav: true,  main: true  },
-        { route: 'gsr/:guid',      moduleId: 'vsa-detail',      title: $.t('ovs:vsas.detail.title'),      titlecode: 'ovs:vsas.detail.title',      nav: false, main: false },
-        { route: 'vpools',         moduleId: 'vpools',          title: $.t('ovs:vpools.title'),           titlecode: 'ovs:vpools.title',           nav: true,  main: true  },
-        { route: 'vpool/:guid',    moduleId: 'vpool-detail',    title: $.t('ovs:vpools.detail.title'),    titlecode: 'ovs:vpools.detail.title',    nav: false, main: false },
-        { route: 'vmachines',      moduleId: 'vmachines',       title: $.t('ovs:vmachines.title'),        titlecode: 'ovs:vmachines.title',        nav: true,  main: true  },
-        { route: 'vmachine/:guid', moduleId: 'vmachine-detail', title: $.t('ovs:vmachines.detail.title'), titlecode: 'ovs:vmachines.detail.title', nav: false, main: false },
-        { route: 'vdisks',         moduleId: 'vdisks',          title: $.t('ovs:vdisks.title'),           titlecode: 'ovs:vdisks.title',           nav: true,  main: true  },
-        { route: 'vdisk/:guid',    moduleId: 'vdisk-detail',    title: $.t('ovs:vdisks.detail.title'),    titlecode: 'ovs:vdisks.detail.title',    nav: false, main: false },
-        { route: 'vtemplates',     moduleId: 'vtemplates',      title: $.t('ovs:vtemplates.title'),       titlecode: 'ovs:vtemplates.title',       nav: true,  main: true  },
-        { route: 'statistics',     moduleId: 'statistics',      title: $.t('ovs:statistics.title'),       titlecode: 'ovs:statistics.title',       nav: false, main: false },
-        { route: 'login',          moduleId: 'login',           title: $.t('ovs:login.title'),            titlecode: 'ovs:login.title',            nav: false, main: false },
-        { route: 'about',          moduleId: 'about',           title: $.t('ovs:about.title'),            titlecode: 'ovs:about.title',            nav: true,  main: false },
-        { route: 'hmc',            moduleId: 'pmachines',       title: $.t('ovs:pmachines.title'),        titlecode: 'ovs:pmachines.title',        nav: true,  main: false }
+        { route: '',                     moduleId: 'dashboard',            title: $.t('ovs:dashboard.title'),             titlecode: 'ovs:dashboard.title',                nav: false, main: false },
+        { route: 'storagerouters',       moduleId: 'storagerouters',       title: $.t('ovs:storagerouters.title'),        titlecode: 'ovs:storagerouters.title',        nav: true,  main: true  },
+        { route: 'storagerouters/:guid', moduleId: 'storagerouter-detail', title: $.t('ovs:storagerouters.detail.title'), titlecode: 'ovs:storagerouters.detail.title', nav: false, main: false },
+        { route: 'vpools',               moduleId: 'vpools',               title: $.t('ovs:vpools.title'),                titlecode: 'ovs:vpools.title',                   nav: true,  main: true  },
+        { route: 'vpool/:guid',          moduleId: 'vpool-detail',         title: $.t('ovs:vpools.detail.title'),         titlecode: 'ovs:vpools.detail.title',            nav: false, main: false },
+        { route: 'vmachines',            moduleId: 'vmachines',            title: $.t('ovs:vmachines.title'),             titlecode: 'ovs:vmachines.title',                nav: true,  main: true  },
+        { route: 'vmachine/:guid',       moduleId: 'vmachine-detail',      title: $.t('ovs:vmachines.detail.title'),      titlecode: 'ovs:vmachines.detail.title',         nav: false, main: false },
+        { route: 'vdisks',               moduleId: 'vdisks',               title: $.t('ovs:vdisks.title'),                titlecode: 'ovs:vdisks.title',                   nav: true,  main: true  },
+        { route: 'vdisk/:guid',          moduleId: 'vdisk-detail',         title: $.t('ovs:vdisks.detail.title'),         titlecode: 'ovs:vdisks.detail.title',            nav: false, main: false },
+        { route: 'vtemplates',           moduleId: 'vtemplates',           title: $.t('ovs:vtemplates.title'),            titlecode: 'ovs:vtemplates.title',               nav: true,  main: true  },
+        { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',               nav: false, main: false },
+        { route: 'login',                moduleId: 'login',                title: $.t('ovs:login.title'),                 titlecode: 'ovs:login.title',                    nav: false, main: false },
+        { route: 'about',                moduleId: 'about',                title: $.t('ovs:about.title'),                 titlecode: 'ovs:about.title',                    nav: true,  main: false },
+        { route: 'hmc',                  moduleId: 'pmachines',            title: $.t('ovs:pmachines.title'),             titlecode: 'ovs:pmachines.title',                nav: true,  main: false }
     ];
 
     buildSiteRoutes = function(mode) {
