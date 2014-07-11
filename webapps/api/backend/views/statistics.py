@@ -35,6 +35,8 @@ class MemcacheViewSet(viewsets.ViewSet):
     Information about memcache instances
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'statistics/memcache'
+    base_name = 'memcache'
 
     @staticmethod
     def _get_memcache_nodes():

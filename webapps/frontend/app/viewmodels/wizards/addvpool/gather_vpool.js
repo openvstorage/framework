@@ -25,12 +25,17 @@ define([
         self.shared           = shared;
         self.data             = data;
         self.loadVSASHandle   = undefined;
+        self.checkS3Handle    = undefined;
+        self.checkMtptHandle  = undefined;
         self.loadVSAHandle    = undefined;
         self.loadVSRsHandle   = {};
 
+        // Observables
+        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
+
         // Computed
         self.canContinue = ko.computed(function() {
-            var valid = true, reasons = [], fields = [];
+            var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult();
             if (!self.data.name.valid()) {
                 valid = false;
                 fields.push('name');
@@ -49,20 +54,80 @@ define([
                     reasons.push($.t('ovs:wizards.addvpool.gathervpool.nocredentials'));
                 }
             }
-            return { value: valid, reasons: reasons, fields: fields };
+
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
+            }
+            return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
 
         // Functions
+        self.preValidate = function() {
+            var validationResult = { valid: true, reasons: [], fields: [] };
+            return $.Deferred(function(deferred) {
+                $.when.apply($, [
+                    $.Deferred(function(s3deferred) {
+                        if (self.data.backend().match(/^.+_S3$/)) {
+                            generic.xhrAbort(self.checkS3Handle);
+                            var postData = {
+                                host: self.data.host(),
+                                port: self.data.port(),
+                                accesskey: self.data.accesskey(),
+                                secretkey: self.data.secretkey()
+                            };
+                            self.checkS3Handle = api.post('vmachines/' + self.data.target().guid() + '/check_s3', postData)
+                                .then(self.shared.tasks.wait)
+                                .done(function(data) {
+                                    if (!data) {
+                                        validationResult.valid = false;
+                                        validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalids3info'));
+                                        validationResult.fields.push('accesskey');
+                                        validationResult.fields.push('secretkey');
+                                        validationResult.fields.push('host');
+                                    }
+                                    s3deferred.resolve();
+                                })
+                                .fail(s3deferred.reject);
+                        } else {
+                            s3deferred.resolve();
+                        }
+                    }).promise(),
+                    $.Deferred(function(mtptDeferred) {
+                        generic.xhrAbort(self.checkMtptHandle);
+                        var postData = {
+                            name: self.data.name()
+                        };
+                        self.checkMtptHandle = api.post('vmachines/' + self.data.target().guid() + '/check_mtpt', postData)
+                            .then(self.shared.tasks.wait)
+                            .done(function(data) {
+                                if (!data) {
+                                    validationResult.valid = false;
+                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.mtptinuse', { what: self.data.name() }));
+                                    validationResult.fields.push('name');
+                                }
+                                mtptDeferred.resolve();
+                            })
+                            .fail(mtptDeferred.reject);
+                    }).promise()
+                ])
+                    .always(function() {
+                        self.preValidateResult(validationResult);
+                        if (validationResult.valid) {
+                            deferred.resolve();
+                        } else {
+                            deferred.reject();
+                        }
+                    });
+            }).promise();
+        };
         self.next = function() {
             return $.Deferred(function(deferred) {
                 var calls = [
                     $.Deferred(function(mtptDeferred) {
                         generic.xhrAbort(self.loadVSAHandle);
-                        var post_data = {};
-                        if (self.data.backend() === 'CEPH_S3') {
-                            post_data.files = '/etc/ceph/ceph.conf,/etc/ceph/ceph.keyring';
-                        }
-                        self.loadVSAHandle = api.post('vmachines/' + self.data.target().guid() + '/get_physical_metadata', post_data)
+                        self.loadVSAHandle = api.post('vmachines/' + self.data.target().guid() + '/get_physical_metadata', {})
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);

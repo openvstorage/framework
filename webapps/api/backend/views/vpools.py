@@ -15,9 +15,7 @@
 """
 VPool module
 """
-
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
 from rest_framework.exceptions import NotAcceptable
@@ -35,6 +33,8 @@ class VPoolViewSet(viewsets.ViewSet):
     Information about vPools
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'vpools'
+    base_name = 'vpools'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
@@ -116,9 +116,6 @@ class VPoolViewSet(viewsets.ViewSet):
                     vsr_guids.append(vsr.guid)
 
         vsr = VolumeStorageRouter(request.DATA['vsr_guid'])
-        mountpoint_dfs = vsr.mountpoint_dfs
-        if obj.backend_type == 'DISTRIBUTED' and mountpoint_dfs.endswith('/dfs'):
-            mountpoint_dfs = mountpoint_dfs[:-4]  # Strip dfs/bfs folders, the base folder is required.
         parameters = {'vpool_name':          obj.name,
                       'backend_type':        obj.backend_type,
                       'connection_host':     None if obj.backend_connection is None else obj.backend_connection.split(':')[0],
@@ -126,8 +123,8 @@ class VPoolViewSet(viewsets.ViewSet):
                       'connection_timeout':  0,  # Not in use anyway
                       'connection_username': obj.backend_login,
                       'connection_password': obj.backend_password,
+                      'mountpoint_bfs':      vsr.mountpoint_bfs,
                       'mountpoint_temp':     vsr.mountpoint_temp,
-                      'mountpoint_dfs':      mountpoint_dfs,
                       'mountpoint_md':       vsr.mountpoint_md,
                       'mountpoint_cache':    vsr.mountpoint_cache,
                       'storage_ip':          vsr.storage_ip,

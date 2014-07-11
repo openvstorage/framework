@@ -147,7 +147,7 @@
         "errorsfound": "Errors were found. Please check the contents of all fields.",
         "followingerrorsfound": "Following errors were found:",
         "cachefs": "Cache",
-        "dfs": "DFS",
+        "bfs": "BFS",
         "tempfs": "Temporary",
         "mdfs": "Metadata",
         "management": "Management actions",
@@ -393,23 +393,28 @@
                 "extendedinfo": "Extended vPool information",
                 "initialvsa": "Initial GSR:",
                 "vsarootpassword": "Root password:",
-                "invalidpassword": "Invalid GSR root password"
+                "invalidpassword": "Invalid GSR root password",
+                "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             },
             "gathermountpoints": {
-                "basicinfo": "Enter/select the mountpoints that should be used. They will be shared accross all GSRs serving this vPool. Please also set the vPool connection info.",
+                "basicinfo": "Enter/select the requested information. It will be shared accross all GSRs serving this vPool.",
+                "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
+                "mtptinfo": "Required locations:",
+                "otherinfo": "Other information:",
                 "tempfs": "Temporary FS:",
-                "dfs": "Distributed FS:",
+                "bfs": "Backend FS:",
                 "md": "Metadata:",
                 "cache": "Cache location:",
                 "mtptinuse": "The given __what__ location is already in use on this GSR",
                 "ipaddress": "Storage IP:",
                 "port": "vRouter port:",
                 "portsinuse": "Ports in use:",
-                "dfsexclusive": "The DFS mountpoint must have exclusive use",
-                "dfsnotshared": "The DFS mountpoint should not be shared between vPools",
+                "bfsexclusive": "The BFS mountpoint must have exclusive use",
+                "bfsnotshared": "The BFS mountpoint should not be shared between vPools",
                 "portinuse": "The given port is already in use",
-                "cephfilesmissing": "One or more of the required ceph files are missing (/etc/ceph/ceph.conf and/or /etc/ceph/ceph.keyring)",
-                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met."
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "invalidmtpt": "The mountpoint __what__ is invalid."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
@@ -440,7 +445,8 @@
                 "somefailed": "The vPool was added to or removed from some the selected GSRs. Some tasks failed.",
                 "allfailed": "The vPool could not be added to or removed from any of the selected GSRs",
                 "inuse": "The vPool is in use at this GSR",
-                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met."
+                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             }
         },
         "createft": {

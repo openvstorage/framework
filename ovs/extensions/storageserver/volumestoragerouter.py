@@ -235,6 +235,26 @@ class VolumeStorageRouterConfiguration(object):
             self._config_file_content["event_publisher"][key] = value
         self.write_config()
 
+    def configure_filedriver(self, fd_config):
+        """
+        Configures cf filedriver component
+        @param queue_config: dictionary of with filedriver configuration key/value
+        """
+        # @todo: http://jira.cloudfounders.com/browse/OVS-987
+
+        self.load_config()
+        if not "file_driver" in self._config_file_content:
+            self._config_file_content["file_driver"] = {}
+
+        for key, value in fd_config.iteritems():
+            self._config_file_content["file_driver"][key] = value
+
+        # remove obsolete entry
+        if "filesystem" in self._config_file_content and "fs_backend_path" in self._config_file_content:
+            self._config_file_content["filesystem"].pop("fs_backend_path")
+
+        self.write_config()
+
 
 class GaneshaConfiguration:
 

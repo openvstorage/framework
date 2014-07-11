@@ -47,12 +47,17 @@ define([
         }
         jqXhr = $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
             .done(deferred.resolve)
-            .fail(function(xmlHttpRequest, textStatus, errorThrown) {
+            .fail(function(xmlHttpRequest) {
                 // We check whether we actually received an error, and it's not the browser navigating away
                 if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
                     generic.validate(shared.nodes);
                 } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                    deferred.reject(xmlHttpRequest, textStatus, errorThrown);
+                    deferred.reject({
+                        status: xmlHttpRequest.status,
+                        statusText: xmlHttpRequest.statusText,
+                        readyState: xmlHttpRequest.readyState,
+                        responseText: xmlHttpRequest.responseText
+                    });
                 } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
                     generic.validate(shared.nodes);
                 }

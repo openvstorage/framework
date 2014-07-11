@@ -117,6 +117,7 @@ class Injector(object):
             # remove upstart.conf file
             name = _get_name(name)
             check_output('rm -rf /etc/init/{0}.conf'.format(name), shell=True)
+            check_output('rm -rf /etc/init/{0}.override'.format(name), shell=True)
 
         def disable_service(name):
             name = _get_name(name)

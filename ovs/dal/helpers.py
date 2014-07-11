@@ -20,8 +20,12 @@ import os
 import imp
 import copy
 import re
+import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+
+from ovs.log.logHandler import LogHandler
+logger = LogHandler('api', name='debug')
 
 
 class Descriptor(object):
@@ -29,6 +33,8 @@ class Descriptor(object):
     The descriptor class contains metadata to instanciate objects that can be serialized.
     It points towards the sourcefile, class name and class type
     """
+
+    object_cache = {}
 
     def __init__(self, object_type=None, guid=None):
         """
@@ -44,16 +50,18 @@ class Descriptor(object):
         else:
             self.initialized = True
 
-            key = 'ovs_descriptor_%s' % re.sub('[\W_]+', '', str(object_type))
+            key = 'ovs_descriptor_{0}'.format(re.sub('[\W_]+', '', str(object_type)))
             self._volatile = VolatileFactory.get_client()
             self._descriptor = self._volatile.get(key)
             if self._descriptor is None:
                 Toolbox.log_cache_hit('descriptor', False)
                 filename = inspect.getfile(object_type).replace('.pyc', '.py')
                 name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
+                source = os.path.relpath(filename, os.path.dirname(__file__))
                 self._descriptor = {'name': name,
-                                    'source': os.path.relpath(filename, os.path.dirname(__file__)),
-                                    'type': object_type.__name__}
+                                    'source': source,
+                                    'type': object_type.__name__,
+                                    'identifier': name + '_' + hashlib.sha256(name + source + object_type.__name__).hexdigest()}
                 self._volatile.set(key, self._descriptor)
             else:
                 Toolbox.log_cache_hit('descriptor', True)
@@ -84,15 +92,25 @@ class Descriptor(object):
         if not self.initialized:
             raise RuntimeError('Descriptor not yet initialized')
 
-        filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
-        module = imp.load_source(self._descriptor['name'], filename)
-        cls = getattr(module, self._descriptor['type'])
+        if self._descriptor['identifier'] not in Descriptor.object_cache:
+            filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
+            module = imp.load_source(self._descriptor['name'], filename)
+            cls = getattr(module, self._descriptor['type'])
+            Descriptor.object_cache[self._descriptor['identifier']] = cls
+        else:
+            cls = Descriptor.object_cache[self._descriptor['identifier']]
         if instantiate:
             if self._descriptor['guid'] is None:
                 return None
             return cls(self._descriptor['guid'])
         else:
             return cls
+
+    def __eq__(self, other):
+        """
+        Checks the descriptor identifiers
+        """
+        return self._descriptor['identifier'] == other.descriptor['identifier']
 
 
 class HybridRunner(object):
@@ -106,14 +124,63 @@ class HybridRunner(object):
         """
         Yields all hybrid classes
         """
-        path = os.path.join(os.path.dirname(__file__), 'hybrids')
-        for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
-                name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
-                for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) and member[1].__module__ == name:
-                        yield member[1]
+        key = 'ovs_hybrid_structure'
+        volatile = VolatileFactory.get_client()
+        hybrid_structure = volatile.get(key)
+        if hybrid_structure is None:
+            Toolbox.log_cache_hit('hybrid_structure', False)
+            base_hybrids = []
+            inherit_table = {}
+            translation_table = {}
+            path = os.path.join(os.path.dirname(__file__), 'hybrids')
+            for filename in os.listdir(path):
+                if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                    name = filename.replace('.py', '')
+                    module = imp.load_source(name, os.path.join(path, filename))
+                    for member in inspect.getmembers(module):
+                        if inspect.isclass(member[1]) \
+                                and member[1].__module__ == name:
+                            current_class = member[1]
+                            current_descriptor = Descriptor(current_class).descriptor
+                            current_identifier = current_descriptor['identifier']
+                            if current_identifier not in translation_table:
+                                translation_table[current_identifier] = current_descriptor
+                            if 'DataObject' in current_class.__base__.__name__:
+                                if current_identifier not in base_hybrids:
+                                    base_hybrids.append(current_identifier)
+                                else:
+                                    raise RuntimeError('Duplicate base hybrid found: {0}'.format(current_identifier))
+                            elif 'DataObject' not in current_class.__name__:
+                                structure = []
+                                this_class = None
+                                for this_class in current_class.__mro__:
+                                    if 'DataObject' in this_class.__name__:
+                                        break
+                                    structure.append(Descriptor(this_class).descriptor['identifier'])
+                                if 'DataObject' in this_class.__name__:
+                                    for index in reversed(range(1, len(structure))):
+                                        if structure[index] in inherit_table:
+                                            raise RuntimeError('Duplicate hybrid inheritance: {0}({1})'.format(structure[index - 1], structure[index]))
+                                        inherit_table[structure[index]] = structure[index - 1]
+            items_replaced = True
+            hybrids = {hybrid: None for hybrid in base_hybrids[:]}
+            while items_replaced is True:
+                items_replaced = False
+                for hybrid, replacement in inherit_table.iteritems():
+                    if hybrid in hybrids.keys() and hybrids[hybrid] is None:
+                        hybrids[hybrid] = replacement
+                        items_replaced = True
+                    if hybrid in hybrids.values():
+                        for item in hybrids.keys():
+                            if hybrids[item] == hybrid:
+                                hybrids[item] = replacement
+                        items_replaced = True
+            hybrid_structure = {hybrid: translation_table[replacement] if replacement is not None else translation_table[hybrid]
+                                for hybrid, replacement in hybrids.iteritems()}
+            volatile.set(key, hybrid_structure)
+        else:
+            Toolbox.log_cache_hit('hybrid_structure', True)
+        return hybrid_structure
 
 
 class Toolbox(object):
@@ -179,7 +246,7 @@ class Toolbox(object):
         Registers a cache hit or miss with a specific type
         """
         volatile = VolatileFactory.get_client()
-        key = 'ovs_stats_cache_%s_%s' % (cache_type, 'hit' if hit else 'miss')
+        key = 'ovs_stats_cache_{0}_{1}'.format(cache_type, 'hit' if hit else 'miss')
         try:
             successfull = volatile.incr(key)
             if not successfull:

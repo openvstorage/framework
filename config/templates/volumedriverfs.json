@@ -5,8 +5,7 @@
                                        "size": "UNLIMITED"}]
     },
     "backend_connection_manager": {
-        "backend_type": "LOCAL",
-        "local_connection_path": "/mnt/bfs"
+        "backend_type": "LOCAL"
     },
     "volume_router": {
         "vrouter_id": "voldrv1",

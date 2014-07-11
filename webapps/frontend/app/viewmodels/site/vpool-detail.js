@@ -13,11 +13,11 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
+    'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vpool', '../containers/vmachine',
     '../wizards/vsatovpool/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VPool, VMachine, VSAToVPoolWizard) {
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, VSAToVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -106,7 +106,13 @@ define([
                         }),
                     vpool.loadVDisks(),
                     self.loadVSAs()
-                ]).always(deferred.resolve);
+                ])
+                    .fail(function(error) {
+                        if (error.status === 404) {
+                            router.navigate(shared.routing.loadHash('vpools'));
+                        }
+                    })
+                    .always(deferred.resolve);
             }).promise();
         };
         self.loadVSAs = function() {
@@ -259,7 +265,7 @@ define([
                                         $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
                                             what: $.t('ovs:vpools.sync.errormsg', { what: vp.name() }),
-                                            error: error
+                                            error: error.responseText
                                         })
                                     );
                                 });

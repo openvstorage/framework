@@ -19,7 +19,7 @@ limitations under the License.
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('name', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.name"></label>
             <div class="col-lg-7">
-                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'afterkeydown'">
+                <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input'">
             </div>
         </div>
         <div class="form-group">
@@ -38,31 +38,31 @@ limitations under the License.
             <div class="form-group" data-bind="css: { 'has-error': $.inArray('host', canContinue().fields) !== -1 }">
                 <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.host"></label>
                 <div class="col-lg-4">
-                    <input type="text" id="name" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'afterkeydown'">
+                    <input type="text" id="inputVpoolHost" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'input'">
                 </div>
                 <label class="col-lg-1 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.port"></label>
                 <div class="col-lg-2">
-                    <input type="text" id="name" class="autofocus form-control" data-bind="value: data.port, valueUpdate: 'afterkeydown'">
+                    <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port">
                 </div>
             </div>
         </div>
         <div class="form-group" data-bind="visible: data.backend() === 'REST'">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></label>
             <div class="col-lg-7">
-                <input type="text" id="name" class="autofocus form-control" data-bind="value: data.timeout, valueUpdate: 'afterkeydown'">
+                <input type="text" id="inputVpoolTimeout" class="autofocus form-control" data-bind="value: data.timeout, valueUpdate: 'input'">
             </div>
         </div>
         <div data-bind="visible: data.backend().match(/^.+_S3$/) !== null">
             <div class="form-group" data-bind="css: { 'has-error': $.inArray('accesskey', canContinue().fields) !== -1 }">
                 <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></label>
                 <div class="col-lg-7">
-                    <input type="text" id="name" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'afterkeydown'">
+                    <input type="text" id="inputVpoolAccessKey" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'">
                 </div>
             </div>
             <div class="form-group" data-bind="css: { 'has-error': $.inArray('secretkey', canContinue().fields) !== -1 }">
                 <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.secretkey"></label>
                 <div class="col-lg-7">
-                    <input type="password" id="name" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'afterkeydown'">
+                    <input type="password" id="inputVpoolSecretKey" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'">
                 </div>
             </div>
         </div>
@@ -83,7 +83,7 @@ limitations under the License.
             </div>
         </div>
     </form>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
         <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">

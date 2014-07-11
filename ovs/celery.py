@@ -34,7 +34,6 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
 from configobj import ConfigObj
 from subprocess import check_output
-from ovs.dal.lists.vmachinelist import VMachineList
 
 memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
 memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'], ]
@@ -46,16 +45,14 @@ rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
 
 unique_id = sorted(check_output("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'", shell=True).strip().split('\n'))[0]
 
-vsas = VMachineList.get_vsas()
+include = []
+path = os.path.join(os.path.dirname(__file__), 'lib')
+for filename in os.listdir(path):
+    if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+        name = filename.replace('.py', '')
+        include.append('ovs.lib.{0}'.format(name))
 
-celery = Celery('ovs',
-                include=['ovs.lib.vdisk',
-                         'ovs.lib.vmachine',
-                         'ovs.lib.vpool',
-                         'ovs.lib.messaging',
-                         'ovs.lib.scheduledtask',
-                         'ovs.lib.volumestoragerouter',
-                         'ovs.extensions.hypervisor.hypervisors.vmware'])
+celery = Celery('ovs', include=include)
 
 celery.conf.CELERY_RESULT_BACKEND = "cache"
 celery.conf.CELERY_CACHE_BACKEND = 'memcached://{0}/'.format(';'.join(memcache_servers))

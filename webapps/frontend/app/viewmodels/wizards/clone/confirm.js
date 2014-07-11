@@ -43,7 +43,7 @@ define([
                             $.t('ovs:generic.messages.errorwhile', {
                                 context: 'error',
                                 what: $.t('ovs:wizards.clone.confirm.cloning', { what: vm.name() }),
-                                error: error
+                                error: error.responseText
                             })
                         );
                         deferred.resolve(false);

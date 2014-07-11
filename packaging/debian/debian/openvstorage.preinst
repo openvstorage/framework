@@ -12,5 +12,5 @@ fi
 
 # logging
 
-mkdir -p /var/log/ovs
-chown ovs:ovs /var/log/ovs
+mkdir -p /var/log/ovs/volumedriver
+chown -R ovs:ovs /var/log/ovs

@@ -252,7 +252,7 @@ define([
                                         $.t('ovs:generic.messages.errorwhile', {
                                             context: 'error',
                                             what: $.t('ovs:pmachines.delete.errormsg', { what: mgmtCenter.name() }),
-                                            error: error
+                                            error: error.responseText
                                         })
                                     );
                                 });

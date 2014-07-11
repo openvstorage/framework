@@ -30,6 +30,8 @@ class TaskViewSet(viewsets.ViewSet):
     Information about celery tasks
     """
     permission_classes = (IsAuthenticated,)
+    prefix = r'tasks'
+    base_name = 'tasks'
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])

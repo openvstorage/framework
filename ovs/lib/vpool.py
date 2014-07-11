@@ -18,8 +18,6 @@ VPool module
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.pmachine import PMachine
-from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
 from ovs.extensions.fs.exportfs import Nfsexports
@@ -45,6 +43,7 @@ class VPoolController(object):
             nfs = Nfsexports()
             nfs.unexport(mountpoint)
             nfs.export(mountpoint)
+            nfs.trigger_rpc_mountd()
 
     @staticmethod
     @celery.task(name='ovs.vpool.sync_with_hypervisor')

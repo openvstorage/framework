@@ -19,13 +19,13 @@ VMachine module
 import time
 import copy
 import os
-import shutil
 
 from subprocess import check_output
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -40,7 +40,6 @@ from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler('lib', name='vmachine')
-
 
 class VMachineController(object):
     """
@@ -80,6 +79,13 @@ class VMachineController(object):
 
         target_pm = PMachine(pmachineguid)
         target_hypervisor = Factory.get(target_pm)
+
+        vsas = [vsa for vsa in VMachineList.get_vsas() if vsa.pmachine.guid == target_pm.guid]
+        if len(vsas) == 1:
+            target_vsa = vsas[0]
+        else:
+            raise ValueError('Pmachine {} has no VSA assigned to it'.format(pmachineguid))
+        routing_key = "vsa.{0}".format(target_vsa.machineid)
 
         vpool = None
         vpool_guids = set()
@@ -161,8 +167,7 @@ class VMachineController(object):
                 logger.debug('Disk appended: {0}'.format(result))
         except Exception as exception:
             logger.error('Creation of disk {0} failed: {1}'.format(disk.name, str(exception)), print_msg=True)
-            # @TODO cleanup strategy to be defined
-            new_vm.delete()
+            VMachineController.delete.s(machineguid=new_vm.guid).apply_async(routing_key = routing_key)
             raise
 
         try:
@@ -171,7 +176,7 @@ class VMachineController(object):
             )
         except Exception as exception:
             logger.error('Creation of vm {0} on hypervisor failed: {1}'.format(new_vm.name, str(exception)), print_msg=True)
-            VMachineController.delete(machineguid=new_vm.guid)
+            VMachineController.delete.s(machineguid=new_vm.guid).apply_async(routing_key = routing_key)
             raise
 
         new_vm.hypervisorid = result
@@ -242,34 +247,34 @@ class VMachineController(object):
         """
         _ = kwargs
         machine = VMachine(machineguid)
+        vsrid = [vsr for vd in machine.vdisks for vsr in vd.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine.guid][0].vsrid
+        vsr_mountpoint, vsr_storage_ip = None, None
 
-        if machine.pmachine and machine.hypervisorid:
+        try:
+            vsr = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0]
+            vsr_mountpoint = vsr.mountpoint
+            vsr_storage_ip = vsr.storage_ip
+        except Exception as ex:
+            logger.debug('No mountpoint info could be retrieved. Reason: {0}'.format(str(ex)))
+            vsr_mountpoint = None
+
+        hypervisorid = machine.hypervisorid
+        if machine.pmachine.hvtype == 'KVM':
+            hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
+
+        disks_info = [(vsr.mountpoint, vd.devicename) for vsr in vd.vpool.vsrs for vd in machine.vdisks if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid]
+        if machine.pmachine: # Allow hypervisor id node, lookup strategy is hypervisor dependent
             try:
                 hv = Factory.get(machine.pmachine)
-                hv.delete_vm(machine.hypervisorid, True)
+                hv.delete_vm(hypervisorid, vsr_mountpoint, vsr_storage_ip, machine.devicename, disks_info, True)
             except Exception as exception:
                 logger.error('Deletion of vm on hypervisor failed: {0}'.format(str(exception)), print_msg=True)
-        try:
-            vsr_mountpoint = [vsr for vsr in machine.vpool.vsrs if vsr.serving_vmachine.pmachine_guid == machine.pmachine_guid][0].mountpoint
-        except Exception as ex:
-            logger.debug('No mountpoint could be retrieved. Reason: {0}'.format(str(ex)))
-            vsr_mountpoint = None
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
-        if vsr_mountpoint:
-            vmx_path = os.path.join(vsr_mountpoint, machine.devicename)
-            if os.path.exists(vmx_path):
-                dir_name = os.path.dirname(vmx_path)
-                logger.debug('Removing leftover files in {0}'.format(dir_name))
-                try:
-                    shutil.rmtree(dir_name)
-                except Exception as exception:
-                    logger.error('Failed to remove dir tree {0}. Reason: {1}'.format(dir_name, str(exception)))
-
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
@@ -457,6 +462,8 @@ class VMachineController(object):
                 pmachine = PMachineList.get_by_vsrid(vsrid)
                 vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
                 hypervisor = Factory.get(pmachine)
+                if not hypervisor.file_exists(hypervisor.clean_vmachine_filename(vmachine.devicename)):
+                    return
                 vmachine.pmachine = pmachine
                 vmachine.save()
 
@@ -487,13 +494,15 @@ class VMachineController(object):
         """
         This method will update/create a vmachine based on a given vmx/xml file
         """
+
         pmachine = PMachineList.get_by_vsrid(vsrid)
         if pmachine.hvtype not in ['VMWARE', 'KVM']:
             return
 
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
-        if hypervisor.should_process(name):
+
+        if hypervisor.should_process(name) and hypervisor.file_exists(name):
             if pmachine.hvtype == 'VMWARE':
                 vsr = VolumeStorageRouterList.get_by_vsrid(vsrid)
                 vpool = vsr.vpool
@@ -521,6 +530,8 @@ class VMachineController(object):
                 except:
                     vmachine.status = 'SYNC_NOK'
                 vmachine.save()
+            if not hypervisor.file_exists(name):
+                vmachine.delete()
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_config')
@@ -600,13 +611,21 @@ class VMachineController(object):
         """
         from ovs.lib.vpool import VPoolController
 
+        vsa = VMachine(vsa_guid)
         mountpoints = check_output('mount -v', shell=True).strip().split('\n')
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
                        and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
                        and p.split(' ')[2] != '/']
-        ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
-        ipaddresses = [ip.strip() for ip in ipaddresses]
+        arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
+        if arakoon_mountpoint in mountpoints:
+            mountpoints.remove(arakoon_mountpoint)
+        if vsa.pmachine.hvtype == 'KVM':
+            ipaddresses = ['127.0.0.1']
+        else:
+            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
+            ipaddresses = [ip.strip() for ip in ipaddresses]
+            ipaddresses.remove('127.0.0.1')
         xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
         allow_vpool = VPoolController.can_be_served_on(vsa_guid)
         file_existence = {}
@@ -672,7 +691,23 @@ class VMachineController(object):
         # Remove VSRs
         for vsr_guid in vsr_guids:
             try:
-                VMachineController.remove_vsr(vsr_guid)
+                vsr = VolumeStorageRouter(vsr_guid)
+                vsa_machineid = vsr.serving_vmachine.machineid
+                local_machineid = Ovs.get_my_machine_id()
+                if local_machineid == vsa_machineid:
+                    # Inline execution, since it's on the same node (preventing deadlocks)
+                    VMachineController.remove_vsr(vsr_guid)
+                else:
+                    # Async execution, since it has to be executed on another node
+                    # @TODO: Will break in Celery 3.2, need to find another solution
+                    # Requirements:
+                    # - This code cannot continue until this new task is completed (as all these VSAs need to be
+                    # handled sequentially
+                    # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
+                    result = VMachineController.remove_vsr.s(vsr_guid).apply_async(
+                        routing_key='vsa.{0}'.format(vsa_machineid)
+                    )
+                    result.wait()
             except:
                 success = False
         return success
@@ -685,3 +720,35 @@ class VMachineController(object):
         """
         return {'vsa_guid': vsa_guid,
                 'versions': Package.get_versions()}
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.check_s3')
+    def check_s3(host, port, accesskey, secretkey):
+        """
+        Validates whether connection to a given S3 backend can be made
+        """
+        try:
+            import boto
+            import boto.s3.connection
+            backend = boto.connect_s3(aws_access_key_id=accesskey,
+                                      aws_secret_access_key=secretkey,
+                                      port=port,
+                                      host=host,
+                                      is_secure=(port == 443),
+                                      calling_format=boto.s3.connection.OrdinaryCallingFormat())
+            backend.get_all_buckets()
+            return True
+        except Exception as ex:
+            logger.exception('Error during S3 check: {0}'.format(ex))
+            return False
+
+    @staticmethod
+    @celery.task(name='ovs.vsa.check_mtpt')
+    def check_mtpt(name):
+        """
+        Checks whether a given mountpoint for vPool is in use
+        """
+        mountpoint = '/mnt/{0}'.format(name)
+        if not os.path.exists(mountpoint):
+            return True
+        return check_output('ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'

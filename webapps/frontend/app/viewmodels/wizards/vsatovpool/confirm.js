@@ -80,6 +80,7 @@ define([
             // Observables
             self.loaded      = ko.observable(false);
             self.allowVPool  = ko.observable(true);
+            self.mtptOK      = ko.observable(true);
             self.vRouterPort = ko.observable();
             self.vsrs        = ko.observableArray([]);
             self.mountpoints = ko.observableArray([]);
@@ -100,10 +101,10 @@ define([
                             fields.push('cache');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                         }
-                        if (self.vsr().mountpointDFS() === vsr.mountpointDFS() && $.inArray('dfs', fields) === -1) {
+                        if (self.vsr().mountpointBFS() === vsr.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.vPool().backendType() === 'LOCAL' || self.data.vPool().backendType() === 'DISTRIBUTED')) {
                             valid = false;
-                            fields.push('dfs');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.dfs') }));
+                            fields.push('bfs');
+                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
                         }
                         if (self.vsr().mountpointMD() === vsr.mountpointMD() && $.inArray('md', fields) === -1) {
                             valid = false;
@@ -132,6 +133,11 @@ define([
                         fields.push('vpool');
                         reasons.push($.t('ovs:wizards.vsatovpool.confirm.vpoolnotallowed'));
                     }
+                    if (!self.mtptOK()) {
+                        valid = false;
+                        fields.push('mtpt');
+                        reasons.push($.t('ovs:wizards.vsatovpool.confirm.mtptinuse', { what: self.data.vPool().name() }));
+                    }
                 }
                 return { valid: valid, reasons: reasons, fields: fields };
             });
@@ -150,6 +156,18 @@ define([
                             })
                             .done(physicalDeferred.resolve)
                             .fail(physicalDeferred.reject);
+                    }).promise(),
+                    $.Deferred(function(mtptDeferred) {
+                        var postData = {
+                            name: self.data.vPool().name()
+                        };
+                        api.post('vmachines/' + self.vsa.guid() + '/check_mtpt', postData)
+                            .then(self.shared.tasks.wait)
+                            .done(function(data) {
+                                self.mtptOK(data);
+                                mtptDeferred.resolve();
+                            })
+                            .fail(mtptDeferred.reject);
                     }).promise(),
                     self.vsrDeferred.promise()
                 ];

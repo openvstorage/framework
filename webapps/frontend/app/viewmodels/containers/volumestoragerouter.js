@@ -34,7 +34,7 @@ define([
         self.vsrid           = ko.observable();
         self.mountpoint      = ko.observable();
         self.mountpointTemp  = ko.observable();
-        self.mountpointDFS   = ko.observable();
+        self.mountpointBFS   = ko.observable();
         self.mountpointMD    = ko.observable();
         self.mountpointCache = ko.observable();
 
@@ -47,7 +47,7 @@ define([
             self.vsrid(data.vsrid);
             self.mountpoint(data.mountpoint);
             self.mountpointTemp(data.mountpoint_temp);
-            self.mountpointDFS(data.mountpoint_dfs);
+            self.mountpointBFS(data.mountpoint_bfs);
             self.mountpointMD(data.mountpoint_md);
             self.mountpointCache(data.mountpoint_cache);
             self.loaded(true);

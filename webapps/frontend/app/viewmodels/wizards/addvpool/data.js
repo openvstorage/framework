@@ -15,7 +15,7 @@
 define(['knockout'], function(ko){
     "use strict";
     var nameRgex, hostRegex, mountpointRegex, ipRegex, singleton;
-    nameRgex = /^[0-9a-zA-Z]+([\\-_]+[0-9a-zA-Z]+)*$/;
+    nameRgex = /^[0-9a-zA-Z]+(\-+[0-9a-zA-Z]+)*$/;
     hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
     mountpointRegex = /^(\/[a-zA-Z0-9\-_ \.]+)+\/?$/;
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
@@ -27,17 +27,17 @@ define(['knockout'], function(ko){
             secretkey:      ko.observable(''),
             allowVPool:     ko.observable(true),
             backend:        ko.observable('LOCAL'),
-            mtptTemp:       ko.observable().extend({ regex: mountpointRegex }),
-            mtptDFS:        ko.observable().extend({ regex: mountpointRegex }),
-            mtptMD:         ko.observable().extend({ regex: mountpointRegex }),
-            mtptCache:      ko.observable().extend({ regex: mountpointRegex }),
-            storageIP:      ko.observable().extend({ regex: ipRegex }),
+            mtptTemp:       ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
+            mtptBFS:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
+            mtptMD:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
+            mtptCache:      ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-cache' }),
+            storageIP:      ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
             name:           ko.observable('').extend({ regex: nameRgex }),
             host:           ko.observable('').extend({ regex: hostRegex }),
-            port:           ko.observable(80).extend({ numeric: { min: 1, max: 65536 }}),
+            port:           ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
             timeout:        ko.observable(600).extend({ numeric: {}}),
-            vRouterPort:    ko.observable(12322).extend({ numeric: { min: 1, max: 65536 }}),
-            backends:       ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED', 'REST']),
+            vRouterPort:    ko.observable(12322).extend({ numeric: { min: 1, max: 65536 }, identifier: 'vrouterport' }),
+            backends:       ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']),
             vsas:           ko.observableArray([]),
             vsrs:           ko.observableArray([]),
             mountpoints:    ko.observableArray([]),

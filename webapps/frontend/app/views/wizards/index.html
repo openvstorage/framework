@@ -32,7 +32,7 @@ limitations under the License.
             <button type="button"  class="pull-right btn btn-primary"
                     data-bind="visible: hasFinish(), click: finish" data-i18n="ovs:generic.finish"></button>
             <button type="button"  class="pull-right btn btn-primary"
-                    data-bind="css: { disabled: !hasNext() }, visible: !hasFinish(), click: next" data-i18n="[html]ovs:generic.next"></button>
+                    data-bind="css: { disabled: !hasNext() || loadingNext() }, visible: !hasFinish(), click: next" data-i18n="[html]ovs:generic.next"></button>
             <button type="button" class="pull-right btn btn-default"
                     data-bind="visible: hasPrevious(), click: previous" data-i18n="[html]ovs:generic.previous"></button>
             <div class="pull-right" style="margin: 7px 5px 0 0;" data-bind="visible: loadingNext">

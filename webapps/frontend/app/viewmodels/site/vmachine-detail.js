@@ -185,7 +185,7 @@ define([
                                             $.t('ovs:generic.messages.errorwhile', {
                                                 context: 'error',
                                                 what: $.t('ovs:vmachines.setastemplate.errormsg', { what: vm.name() }),
-                                                error: error
+                                                error: error.responseText
                                             })
                                         );
                                     });
