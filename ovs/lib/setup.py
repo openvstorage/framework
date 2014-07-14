@@ -520,7 +520,8 @@ EOF
        'broker_username' : ovs_config.get('core', 'broker.login'),
        'broker_password' : ovs_config.get('core', 'broker.password')}))
 
-                # Do not reset existing config, other applications might be using it (e.g. devstack)
+                # This line required for clean install of OVS
+                client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
                 if join_masters and join_cluster:
                     # Copy rabbitmq cookie
                     logger.debug('Copying RMQ cookie')
