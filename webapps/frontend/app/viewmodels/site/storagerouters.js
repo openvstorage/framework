@@ -67,12 +67,12 @@ define([
                             generic.crossFiller(
                                 guids, self.storageRouters,
                                 function(guid) {
-                                    var sa = new StorageRouter(guid);
+                                    var sr = new StorageRouter(guid);
                                     if ($.inArray(guid, guids) !== -1) {
-                                        sa.fillData(sadata[guid]);
+                                        sr.fillData(sadata[guid]);
                                     }
-                                    sa.loading(true);
-                                    return sa;
+                                    sr.loading(true);
+                                    return sr;
                                 }, 'guid'
                             );
                             self.storageRoutersInitialLoad(false);

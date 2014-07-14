@@ -45,14 +45,14 @@ define([
                 vdisk.load()
                     .then(function() {
                         self.snapshotsInitialLoad(false);
-                        var vm, sa, pool,
+                        var vm, sr, pool,
                             storageRouterGuid = vdisk.storageRouterGuid(),
                             vMachineGuid = vdisk.vMachineGuid(),
                             vPoolGuid = vdisk.vpoolGuid();
                         if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
-                            sa = new StorageRouter(storageRouterGuid);
-                            sa.load();
-                            vdisk.storageRouter(sa);
+                            sr = new StorageRouter(storageRouterGuid);
+                            sr.load();
+                            vdisk.storageRouter(sr);
                         }
                         if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
                             vm = new VMachine(vMachineGuid);

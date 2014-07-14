@@ -104,15 +104,15 @@ define([
                             $.each(self.vDisks(), function(index, vdisk) {
                                 if ($.inArray(vdisk.guid(), guids) !== -1) {
                                     vdisk.fillData(vddata[vdisk.guid()]);
-                                    var vm, sa, pool,
+                                    var vm, sr, pool,
                                         storageRouterGuid = vdisk.storageRouterGuid(),
                                         vMachineGuid = vdisk.vMachineGuid(),
                                         vPoolGuid = vdisk.vpoolGuid();
                                     if (storageRouterGuid && (vdisk.storageRouter() === undefined || vdisk.storageRouter().guid() !== storageRouterGuid)) {
                                         if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
-                                            sa = new StorageRouter(storageRouterGuid);
-                                            sa.load();
-                                            self.storageRouterCache[storageRouterGuid] = sa;
+                                            sr = new StorageRouter(storageRouterGuid);
+                                            sr.load();
+                                            self.storageRouterCache[storageRouterGuid] = sr;
                                         }
                                         vdisk.storageRouter(self.storageRouterCache[storageRouterGuid]);
                                     }
