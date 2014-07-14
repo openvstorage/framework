@@ -28,6 +28,7 @@ define([
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
         self.loadStorageRouterHandle  = undefined;
+        self.loadStorageDriversHandle = {};
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
@@ -167,7 +168,7 @@ define([
         self.activate = function() {
             generic.xhrAbort(self.loadStorageRoutersHandle);
             self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
-                contents: 'storageDrivers',
+                contents: 'storagedrivers',
                 sort: 'name'
             })
                 .done(function(data) {
