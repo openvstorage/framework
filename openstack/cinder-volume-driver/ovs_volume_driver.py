@@ -320,11 +320,11 @@ class OVSVolumeDriver(driver.VolumeDriver):
         :return mountpoint: string, mountpoint
         """
         LOG.debug('[_GET HOSTNAME MOUNTPOINT] Hostname %s' % hostname)
-        vsrs = [vsr for vsr in self.vp.vsrs if vsr.serving_vmachine.name == hostname]
-        if len(vsrs) == 1:
+        storagedrivers = [vsr for vsr in self.vp.storagedrivers if str(vsr.storagerouter.name) == str(hostname)]
+        if len(storagedrivers) == 1:
             LOG.debug('[_GET HOSTNAME MOUNTPOINT] Mountpoint %s' % vsr.mountpoint)
-            return vsr.mountpoint
-        elif not vsrs:
+            return str(vsr.mountpoint)
+        elif not storagedrivers:
             raise RuntimeError('Not vsr mountpoint found for Vpool %s and hostname %s' % (self.vpool_name, hostname))
 
     def _find_ovs_model_disk_by_location(self, location, hostname):
@@ -333,7 +333,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         :return disk: OVS DAL model object
         """
         LOG.debug('[_FIND OVS DISK] Location %s, hostname %s' % (location, hostname))
-        model_disks = [(vd.guid, "{0}/{1}".format([vsr for vsr in vd.vpool.vsrs if vsr.serving_vmachine.name == hostname][0].mountpoint, vd.devicename)) for vd in VDiskList.get_vdisks()]
+        model_disks = [(vd.guid, "{0}/{1}".format([vsr for vsr in vd.vpool.storagedrivers if vsr.serving_vmachine.name == hostname][0].mountpoint, vd.devicename)) for vd in VDiskList.get_vdisks()]
         for model_disk in model_disks:
             if model_disk[1] == location:
                 LOG.info('[_FIND OVS DISK] Location %s Disk found %s' % (location, model_disk[0]))
