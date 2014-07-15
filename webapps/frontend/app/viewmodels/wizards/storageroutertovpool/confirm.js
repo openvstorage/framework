@@ -224,7 +224,7 @@ define([
                     });
                 });
                 if (!self._removeValidations.hasOwnProperty(storageRouter.guid())) {
-                    self._removeValidations[storageRouter.guid()] = new self.RemoveValidation(storageDriverGuid);
+                    self._removeValidations[storageRouter.guid()] = new self.RemoveValidation(foundStorageDriverGuid);
                     self._removeValidations[storageRouter.guid()].validate();
                 }
             });
