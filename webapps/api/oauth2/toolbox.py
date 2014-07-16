@@ -34,10 +34,9 @@ class Toolbox(object):
         """
         access_token = None
         refresh_token = None
-        allowed_scopes = [j.scope for j in client.scopes]
-        if scopes is None:
-            scopes = allowed_scopes
-        elif any(set(scopes) - set(allowed_scopes)):
+        allowed_roles = [j.role for j in client.roles]
+        roles = scopes if scopes is not None else allowed_roles
+        if any(set(roles) - set(allowed_roles)):
             raise ValueError('invalid_scope')
         if generate_access is True:
             access_token = BearerToken()
@@ -45,9 +44,9 @@ class Toolbox(object):
             access_token.expiration = int(time.time() + 3600)
             access_token.client = client
             access_token.save()
-            for scope in scopes:
+            for role in roles:
                 link = RoleBearerToken()
-                link.scope = scope
+                link.role = role
                 link.token = access_token
                 link.save()
         if generic_refresh is True:
@@ -56,9 +55,9 @@ class Toolbox(object):
             refresh_token.expiration = int(time.time() + 86400)
             refresh_token.client = client
             refresh_token.save()
-            for scope in scopes:
+            for role in roles:
                 link = RoleBearerToken()
-                link.scope = scope
+                link.role = role
                 link.token = refresh_token
                 link.save()
         return access_token, refresh_token
@@ -70,8 +69,8 @@ class Toolbox(object):
         """
         for token in client.tokens[:]:
             if token.expiration < time.time():
-                for scope in token.scopes:
-                    scope.delete()  # These are the junction objects
+                for junction in token.roles:
+                    junction.delete()
                 token.delete()
 
     @staticmethod

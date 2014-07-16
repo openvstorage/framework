@@ -20,7 +20,9 @@ import hashlib
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.role import Role
+from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.j_roleclient import RoleClient
 
 
 class Model():
@@ -73,6 +75,18 @@ class Model():
             user.group = user_group
             user.save()
 
+            # Create internal OAuth 2 clients
+            admin_client = Client()
+            admin_client.ovs_type = 'FRONTEND'
+            admin_client.grant_type = 'PASSWORD'
+            admin_client.user = admin
+            admin_client.save()
+            user_client = Client()
+            user_client.ovs_type = 'FRONTEND'
+            user_client.grant_type = 'PASSWORD'
+            user_client.user = user
+            user_client.save()
+
             # Create roles
             view_role = Role()
             view_role.code = 'view'
@@ -102,15 +116,19 @@ class Model():
 
             # Attach groups to roles
             mapping = [
-                (admin_group, [view_role, create_role, update_role, delete_role, system_role]),
-                (user_group, [view_role, create_role, update_role, delete_role])
+                ((admin_group, admin_client), [view_role, create_role, update_role, delete_role, system_role]),
+                ((user_group, user_client), [view_role, create_role, update_role, delete_role])
             ]
             for setting in mapping:
                 for role in setting[1]:
                     rolegroup = RoleGroup()
-                    rolegroup.group = setting[0]
+                    rolegroup.group = setting[0][0]
                     rolegroup.role = role
                     rolegroup.save()
+                    roleclient = RoleClient()
+                    roleclient.client = setting[0][1]
+                    roleclient.role = role
+                    roleclient.save()
 
             # We're now at version 0.0.1
             working_version = 1

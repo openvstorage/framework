@@ -26,7 +26,7 @@ class RoleClient(DataObject):
     """
     # pylint: disable=line-too-long
     __blueprint = {}
-    __relations = {'scope':  (Role,  'clients'),
-                   'client': (Client, 'scopes')}
+    __relations = {'role':  (Role,  'clients'),
+                   'client': (Client, 'roles')}
     __expiry = {}
     # pylint: enable=line-too-long

@@ -26,7 +26,7 @@ class RoleBearerToken(DataObject):
     """
     # pylint: disable=line-too-long
     __blueprint = {}
-    __relations = {'scope': (Role,  'tokens'),
-                   'token': (BearerToken, 'scopes')}
+    __relations = {'role': (Role,  'tokens'),
+                   'token': (BearerToken, 'roles')}
     __expiry = {}
     # pylint: enable=line-too-long
