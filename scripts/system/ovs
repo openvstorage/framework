@@ -6,7 +6,7 @@ if [ "$1" = "setup" ] ; then
   ipython -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
 elif [ "$1" = "monitor" ] ; then
   if [ "$2" = "services" ] ; then
-    watch -n 1 'initctl list | grep ovs | sort'
+    watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
   fi
 elif [ "$1" = "collect" ] ; then
   if [ "$2" = "logs" ] ; then
