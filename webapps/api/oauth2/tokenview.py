@@ -15,13 +15,15 @@
 """
 Token views
 """
+
 import hashlib
 import base64
 import time
 from django.views.generic import View
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse, HttpResponseBadRequest
 from oauth2.decorators import json_response
 from oauth2.toolbox import Toolbox
-from django.http import HttpResponse, HttpResponseBadRequest
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
@@ -67,8 +69,7 @@ class OAuth2TokenView(View):
             Toolbox.clean_tokens(client)
             return HttpResponse, {'access_token': access_token.access_token,
                                   'token_type': 'bearer',
-                                  'expires_in': 86400,
-                                  'user_guid': user.guid}
+                                  'expires_in': 86400}
         elif grant_type == 'client_credentials':
             # Client Credentials
             if 'HTTP_AUTHORIZATION' not in request.META:
@@ -88,9 +89,15 @@ class OAuth2TokenView(View):
                 Toolbox.clean_tokens(client)
                 return HttpResponse, {'access_token': access_token.access_token,
                                       'token_type': 'bearer',
-                                      'expires_in': 3600,
-                                      'user_guid': client.user.guid}
+                                      'expires_in': 3600}
             except ObjectNotFoundException:
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
         else:
             return HttpResponseBadRequest, {'error': 'unsupported_grant_type'}
+
+    @csrf_exempt
+    def dispatch(self, request, *args, **kwargs):
+        """
+        Pass through method to add the CSRF exempt
+        """
+        return super(OAuth2TokenView, self).dispatch(request, *args, **kwargs)

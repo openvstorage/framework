@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'plugins/router', 'jquery', 'knockout',
     'ovs/generic', 'ovs/shared'
@@ -20,16 +20,20 @@ define([
     return function() {
         var self = this;
 
+        // Variables
         self.onLoggedIn  = [];
         self.onLoggedOut = [];
-        self.token       = undefined;
         self.required    = false;
 
-        self.userGuid = ko.observable();
-        self.username = ko.observable();
-        self.password = ko.observable();
-        self.loggedIn = ko.observable(false);
+        // Observables
+        self.accessToken = ko.observable();
 
+        // Computed
+        self.loggedIn = ko.computed(function() {
+            return self.accessToken() !== undefined;
+        });
+
+        // Functions
         self.login = function(username, password) {
             return $.Deferred(function(deferred) {
                 var callData, cookie;
@@ -49,27 +53,17 @@ define([
                 }
                 $.ajax('/api/oauth2/token/', callData)
                     .done(function(result) {
-                        var i, events = [];
-                        self.token = result.access_token;
-                        self.userGuid(result.user_guid);
-                        self.username(username);
-                        self.password(password);
-                        self.loggedIn(true);
-                        for (i = 0; i < self.onLoggedIn.length; i += 1) {
-                            events.push(self.onLoggedIn[i]());
-                        }
-                        $.when.apply($, events).always(deferred.resolve);
+                        self.accessToken(result.access_token);
+                        window.localStorage.setItem('accesstoken', result.access_token);
+                        self.dispatch(true)
+                            .always(deferred.resolve);
                     })
                     .fail(function(xmlHttpRequest) {
                         // We check whether we actually received an error, and it's not the browser navigating away
                         if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
                             generic.validate(shared.nodes);
                         } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
-                            self.token = undefined;
-                            self.username(undefined);
-                            self.password(undefined);
-                            self.userGuid(undefined);
-                            self.loggedIn(false);
+                            self.accessToken(undefined);
                             deferred.reject({
                                 status: xmlHttpRequest.status,
                                 statusText: xmlHttpRequest.statusText,
@@ -83,25 +77,30 @@ define([
             }).promise();
         };
         self.logout = function() {
-            var i, events = [];
-            self.token = undefined;
-            self.username(undefined);
-            self.password(undefined);
-            self.userGuid(undefined);
-            self.loggedIn(false);
-            for (i = 0; i < self.onLoggedOut.length; i += 1) {
-                events.push(self.onLoggedOut[i]());
-            }
-            $.when.apply($, events)
+            self.accessToken(undefined);
+            self.dispatch(false)
                 .always(function() {
                     router.navigate('');
                 });
         };
+        self.dispatch = function(login) {
+            var i, events = [];
+            if (login) {
+                for (i = 0; i < self.onLoggedIn.length; i += 1) {
+                    events.push(self.onLoggedIn[i]());
+                }
+            } else {
+                for (i = 0; i < self.onLoggedOut.length; i += 1) {
+                    events.push(self.onLoggedOut[i]());
+                }
+            }
+            return $.when.apply($, events);
+        };
         self.validate = function() {
-            return self.token !== undefined;
+            return self.loggedIn();
         };
         self.header = function() {
-            return 'Bearer ' + self.token;
+            return 'Bearer ' + self.accessToken();
         };
     };
 });

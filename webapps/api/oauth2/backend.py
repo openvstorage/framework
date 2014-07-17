@@ -42,7 +42,7 @@ class OAuth2Backend(BaseAuthentication):
             raise AuthenticationFailed('Invalid token')
         token = tokens[0]
         if token.expiration < time.time():
-            for junction in token.roles:
+            for junction in token.roles.itersafe():
                 junction.delete()
             token.delete()
             raise AuthenticationFailed('Token expired')

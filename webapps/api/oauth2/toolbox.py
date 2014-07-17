@@ -67,9 +67,9 @@ class Toolbox(object):
         """
         Cleans expired tokens
         """
-        for token in client.tokens[:]:
+        for token in client.tokens:
             if token.expiration < time.time():
-                for junction in token.roles:
+                for junction in token.roles.itersafe():
                     junction.delete()
                 token.delete()
 

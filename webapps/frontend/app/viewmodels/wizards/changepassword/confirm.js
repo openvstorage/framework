@@ -35,10 +35,6 @@ define([
                 valid = false;
                 fields.push('currentpassword');
                 reasons.push($.t('ovs:wizards.changepassword.confirm.entercurrent'));
-            } else if (self.currentPassword() !== self.shared.authentication.password()) {
-                valid = false;
-                fields.push('currentpassword');
-                reasons.push($.t('ovs:wizards.changepassword.confirm.currentinvalid'));
             }
             if (self.newPassword() === '') {
                 valid = false;
@@ -56,13 +52,12 @@ define([
         // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                api.post('users/' + self.shared.authentication.userGuid() + '/set_password', {
+                api.post('users/' + self.shared.user.guid() + '/set_password', {
                         current_password: self.currentPassword(),
                         new_password: self.newPassword()
                     })
                     .done(function() {
                         generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:generic.messages.savesuccessfully', { what: $.t('ovs:generic.password') }));
-                        shared.authentication.password(self.newPassword());
                         deferred.resolve();
                     })
                     .fail(function(error) {

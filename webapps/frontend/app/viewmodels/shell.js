@@ -11,12 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
-    'plugins/router', 'bootstrap', 'i18next',
+    'jquery', 'plugins/router', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
     'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
-], function(router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
+], function($, router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
     "use strict";
     router.map(routing.mainRoutes)
           .buildNavigationModel()
@@ -60,7 +60,26 @@ define([
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function() {
-                return api.get('users/' + self.shared.authentication.userGuid())
+                $.ajax('/api/oauth2/metadata/', {
+                    type: 'get',
+                    contentType: 'application/json',
+                    headers: { Authorization: self.shared.authentication.header() }
+                })
+                    .then(function(metadata) {
+                        self.shared.user.username(undefined);
+                        self.shared.user.guid(undefined);
+                        if (!metadata.loggedin) {
+                            window.localStorage.removeItem('accesstoken');
+                            self.shared.authentication.accessToken(undefined);
+                            router.navigate('/');
+                            return $.Deferred(function(deferred) { deferred.reject(); }).promise();
+                        }
+                        self.shared.user.username(metadata.username);
+                        self.shared.user.guid(metadata.userguid);
+                    })
+                    .then(function() {
+                        return api.get('users/' + self.shared.user.guid());
+                    })
                     .then(function(data) {
                         self.shared.language = data.language;
                     })
@@ -73,6 +92,11 @@ define([
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
+            var token = window.localStorage.getItem('accesstoken');
+            if (token !== null) {
+                self.shared.authentication.accessToken(token);
+                self.shared.authentication.dispatch(true);
+            }
             return router.activate();
         };
     };

@@ -21,6 +21,7 @@ import inspect
 from django.conf.urls import patterns, include, url
 from django.views.generic import RedirectView
 from oauth2.tokenview import OAuth2TokenView
+from oauth2.metadataview import MetadataView
 from backend.router import OVSRouter
 
 
@@ -58,9 +59,15 @@ the [Customer API](%(customerapi)s).
 """
 
 urlpatterns = patterns('',
-    url(r'^oauth2/token/', OAuth2TokenView.as_view()),
-    url(r'^api-auth/',     include('rest_framework.urls', namespace='rest_framework')),
-    url(r'^customer/',     include(build_router_urls('customer', customer_docs))),
-    url(r'^internal/',     include(build_router_urls('internal', internal_docs))),
-    url(r'^$',             RedirectView.as_view(url='customer/')),
+    # OAuth 2
+    url(r'^oauth2/token/',    OAuth2TokenView.as_view()),
+    url(r'^oauth2/metadata/', MetadataView.as_view()),
+
+    # REST framework authentication
+    url(r'^api-auth/',        include('rest_framework.urls', namespace='rest_framework')),
+
+    # Internal and customer REST apis
+    url(r'^customer/',        include(build_router_urls('customer', customer_docs))),
+    url(r'^internal/',        include(build_router_urls('internal', internal_docs))),
+    url(r'^$',                RedirectView.as_view(url='customer/')),
 )
