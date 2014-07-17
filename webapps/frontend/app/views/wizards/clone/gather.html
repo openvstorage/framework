@@ -32,7 +32,7 @@ limitations under the License.
                                 <span class="glyphicon glyphicon-minus"></span>
                             </button>
                         </span>
-                        <input type="text" id="amount" class="form-control" data-bind="value: data.amount, valueUpdate: 'afterkeydown'">
+                        <input type="text" id="amount" class="form-control" data-bind="value: data.amount">
                         <span class="input-group-btn">
                             <button class="btn btn-default" type="button" data-bind="click: function() { data.amount(parseInt('0' + data.amount(), 10) + 1); }">
                                 <span class="glyphicon glyphicon-plus"></span>
