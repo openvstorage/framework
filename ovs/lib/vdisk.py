@@ -17,6 +17,7 @@ Module for VDiskController
 """
 import pickle
 import uuid
+import os
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
@@ -31,6 +32,7 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.generic.sshclient import SSHClient
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -153,7 +155,7 @@ class VDiskController(object):
         new_disk.volume_id = volume_id
         new_disk.devicename = hypervisor.clean_backing_disk_filename(_location)
         new_disk.parentsnapshot = snapshotid
-        new_disk.machine = VMachine(machineguid) if machineguid else disk.machine
+        new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
         new_disk.save()
         return {'diskguid': new_disk.guid,
                 'name': new_disk.name,
@@ -280,3 +282,39 @@ class VDiskController(object):
 
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': disk_path}
+
+    @staticmethod
+    @celery.task(name='ovs.disk.create_volume')
+    def create_volume(location, size):
+        """
+        Create a volume using filesystem calls
+        Calls "truncate" to create sparse raw file
+        TODO: use volumedriver API
+        TODO: model VDisk() and return guid
+
+        @param location: location, filename
+        @param size: size of volume, GB
+        @return None
+        """
+        if os.path.exists(location):
+            raise RuntimeError('File already exists at %s' % location)
+        client = SSHClient.load('127.0.0.1')
+        client.run_local('truncate -s %sG %s' % (size, location), sudo=True, shell=True)
+
+    @staticmethod
+    @celery.task(name='ovs.disk.delete_volume')
+    def delete_volume(location):
+        """
+        Create a volume using filesystem calls
+        Calls "rm" to delete raw file
+        TODO: use volumedriver API
+        TODO: delete VDisk from model
+
+        @param location: location, filename
+        @return None
+        """
+        if not os.path.exists(location):
+            logger.error('File already deleted at %s' % location)
+            return
+        client = SSHClient.load('127.0.0.1')
+        client.run_local('rm -f %s' % (location), sudo=True, shell=True)
