@@ -520,8 +520,25 @@ EOF
        'broker_username' : ovs_config.get('core', 'broker.login'),
        'broker_password' : ovs_config.get('core', 'broker.password')}))
 
-                # This line required for clean install of OVS
-                client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
+                rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
+
+                if rabbitmq_running and rabbitmq_pid:
+                    print('WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
+                    client.run('service rabbitmq-server stop')
+                    time.sleep(5)
+                    try:
+                        client.run('kill {0}'.format(rabbitmq_pid))
+                        print('Process killed')
+                    except SystemExit:
+                        print('Process already stopped')
+
+                client.run('rabbitmq-server -detached; sleep 5;')
+                users = client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
+                users = [usr.split('\t')[0] for usr in users]
+                if not 'ovs' in users:
+                    client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
+                                                                     ovs_config.get('core', 'broker.password')))
+                    client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
                 if join_masters and join_cluster:
                     # Copy rabbitmq cookie
                     logger.debug('Copying RMQ cookie')
@@ -690,7 +707,18 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                             SetupController._change_service_state(node_client, service, 'start')
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
-                client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
+                try:
+                    client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
+                except SystemExit:
+                    rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
+                    if rabbitmq_running and rabbitmq_pid:
+                        client.run('kill {0}'.format(rabbitmq_pid))
+                        print('Process killed, restarting')
+                        try:
+                            client.run('service ovs-rabbitmq start')
+                        except SystemExit: pass # might already be running
+                        client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
+
             target_client = SSHClient.load(ip)
             SetupController._enable_service(target_client, 'watcher')
             SetupController._change_service_state(target_client, 'watcher', 'start')
@@ -1169,3 +1197,30 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver_configuration = StorageDriverConfiguration(this_vpool_name)
         storagedriver_configuration.configure_event_publisher(queue_config)"""
         SetupController._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
+
+    @staticmethod
+    def _is_rabbitmq_running(client):
+        rabbitmq_running, rabbitmq_pid = False, 0
+        try:
+            output = client.run('service rabbitmq-server status')
+        except SystemExit:
+            output = None
+        if output:
+            output = output.split('\r\n')
+            for line in output:
+                if 'pid' in line:
+                    rabbitmq_running = True
+                    rabbitmq_pid = line.split(',')[1].replace('}', '')
+        else:
+            try:
+                output = client.run('ps aux | grep rabbit@ | grep -v grep')
+            except SystemExit:
+                output = None
+            if output:
+                output = output.split(' ')
+                if output[0] == 'rabbitmq':
+                    rabbitmq_pid = output[1]
+                    for item in output[2:]:
+                        if 'erlang' in item or 'rabbitmq' in item or 'beam' in item:
+                            rabbitmq_running = True
+        return rabbitmq_running, rabbitmq_pid

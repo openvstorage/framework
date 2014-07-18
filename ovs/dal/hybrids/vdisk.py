@@ -43,7 +43,8 @@ class VDisk(DataObject):
                    'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
                    'tags':              (list(), list, 'Tags of the vDisk.'),
                    'has_autobackup':    (False, bool, 'Indicates whether this vDisk has autobackup enabled.'),
-                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.')}
+                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.'),
+                   'cinder_id':         (None, str, 'Cinder Volume ID, for volumes managed through Cinder'),}
     __relations = {'vmachine':     (VMachine, 'vdisks'),
                    'vpool':        (VPool, 'vdisks'),
                    'parent_vdisk': (None, 'child_vdisks')}
@@ -56,7 +57,7 @@ class VDisk(DataObject):
 
     def __init__(self, *args, **kwargs):
         """
-        Initializes a vDisk, setting up it's additional helpers
+        Initializes a vDisk, setting up its additional helpers
         """
         DataObject.__init__(self, *args, **kwargs)
         if self.vpool:
