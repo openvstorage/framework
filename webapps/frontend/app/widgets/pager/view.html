@@ -32,18 +32,22 @@ limitations under the License.
         <!-- ko if: !initialLoad() -->
             <!-- ko if: viewportItems().length == 0 -->
                 <tbody>
-                <tr>
-                    <td data-bind="attr: { colspan: headers().length }">
-                        <i data-i18n="ovs:generic.noentries"></i>
-                    </td>
-                </tr>
-            </tbody>
+                    <tr>
+                        <td data-bind="attr: { colspan: headers().length }">
+                            <i data-i18n="ovs:generic.noentries"></i>
+                        </td>
+                    </tr>
+                    <tr data-part="vfirst" style="display: none;"></tr>
+                </tbody>
             <!-- /ko -->
             <!-- ko if: viewportItems().length > 0 -->
-                <tbody data-bind="foreach: viewportItems">
-                    <tr data-part="vitem" data-bind="foreach: $parent.headers">
-                        <td data-bind="html: $parent[key]"></td>
-                    </tr>
+                <tbody>
+                    <!-- ko foreach: viewportItems -->
+                        <tr data-part="vitem" data-bind="foreach: $parent.headers">
+                            <td data-bind="html: $parent[key]"></td>
+                        </tr>
+                    <!-- /ko -->
+                    <tr data-part="vnew" style="display: none;"></tr>
                 </tbody>
             <!-- /ko -->
         <!-- /ko -->

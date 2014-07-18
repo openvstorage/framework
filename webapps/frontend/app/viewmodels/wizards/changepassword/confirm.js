@@ -14,14 +14,16 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/api'
-], function($, ko, shared, generic, api) {
+    'ovs/shared', 'ovs/generic', 'ovs/api',
+    './data'
+], function($, ko, shared, generic, api, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
         self.shared = shared;
+        self.data   = data;
 
         // Observables
         self.currentPassword = ko.observable('');
@@ -52,7 +54,7 @@ define([
         // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                api.post('users/' + self.shared.user.guid() + '/set_password', {
+                api.post('users/' + data.user().guid() + '/set_password', {
                         current_password: self.currentPassword(),
                         new_password: self.newPassword()
                     })

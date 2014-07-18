@@ -25,9 +25,10 @@ class Client(DataObject):
     will at least have one default application (frontend GUI)
     """
     # pylint: disable=line-too-long
-    __blueprint = {'client_secret':      (None, str, 'Client secret (application password)'),
-                   'grant_type':         (None, ['PASSWORD', 'CLIENT_CREDENTIALS'], 'Grant type of the Client'),
-                   'ovs_type':           (None, ['FRONTEND', 'REPLICATION'], 'The type of the client within Open vStorage')}
+    __blueprint = {'name':          (None, str, 'Optional name of the client'),
+                   'client_secret': (None, str, 'Client secret (application password)'),
+                   'grant_type':    (None, ['PASSWORD', 'CLIENT_CREDENTIALS'], 'Grant type of the Client'),
+                   'ovs_type':      (None, ['FRONTEND', 'REPLICATION', 'USER'], 'The type of the client within Open vStorage')}
     __relations = {'user': (User, 'clients')}
     __expiry = {'client_id': (86400, str)}
     # pylint: enable=line-too-long

@@ -16,18 +16,11 @@
 Metadata views
 """
 
-import hashlib
-import base64
 import time
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
+from django.http import HttpResponse
 from oauth2.decorators import json_response
-from oauth2.toolbox import Toolbox
-from ovs.dal.lists.userlist import UserList
-from ovs.dal.lists.rolelist import RoleList
-from ovs.dal.hybrids.client import Client
-from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 
 

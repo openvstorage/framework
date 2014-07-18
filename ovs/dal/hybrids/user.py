@@ -27,7 +27,6 @@ class User(DataObject):
     # pylint: disable=line-too-long
     __blueprint = {'username':  (None,    str,  'Username of the User.'),
                    'password':  (None,    str,  'Password of the User.'),
-                   'email':     (None,    str,  'Email address of the User.'),
                    'is_active': (False,   bool, 'Indicates whether the User is active.'),
                    'language':  ('en-US', ['en-US', 'nl-NL'], 'Language of the User.')}
     __relations = {'group': (Group, 'users')}

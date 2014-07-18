@@ -52,28 +52,20 @@ class Model():
             # Create groups
             admin_group = Group()
             admin_group.name = 'administrators'
-            admin_group.description = 'Administrative group. Have full access'
+            admin_group.description = 'Administrators'
             admin_group.save()
             user_group = Group()
             user_group.name = 'users'
-            user_group.description = 'User group, have limited rights'
+            user_group.description = 'Users'
             user_group.save()
 
             # Create users
             admin = User()
             admin.username = 'admin'
             admin.password = hashlib.sha256('admin').hexdigest()
-            admin.email = 'nobody@example.net'
             admin.is_active = True
             admin.group = admin_group
             admin.save()
-            user = User()
-            user.username = 'user'
-            user.password = hashlib.sha256('user').hexdigest()
-            user.email = 'nobody@example.net'
-            user.is_active = True
-            user.group = user_group
-            user.save()
 
             # Create internal OAuth 2 clients
             admin_client = Client()
@@ -81,11 +73,6 @@ class Model():
             admin_client.grant_type = 'PASSWORD'
             admin_client.user = admin
             admin_client.save()
-            user_client = Client()
-            user_client.ovs_type = 'FRONTEND'
-            user_client.grant_type = 'PASSWORD'
-            user_client.user = user
-            user_client.save()
 
             # Create roles
             view_role = Role()
@@ -116,19 +103,21 @@ class Model():
 
             # Attach groups to roles
             mapping = [
-                ((admin_group, admin_client), [view_role, create_role, update_role, delete_role, system_role]),
-                ((user_group, user_client), [view_role, create_role, update_role, delete_role])
+                (admin_group, [view_role, create_role, update_role, delete_role, system_role]),
+                (user_group, [view_role, create_role, update_role, delete_role])
             ]
             for setting in mapping:
                 for role in setting[1]:
                     rolegroup = RoleGroup()
-                    rolegroup.group = setting[0][0]
+                    rolegroup.group = setting[0]
                     rolegroup.role = role
                     rolegroup.save()
-                    roleclient = RoleClient()
-                    roleclient.client = setting[0][1]
-                    roleclient.role = role
-                    roleclient.save()
+                for user in setting[0].users:
+                    for role in setting[1]:
+                        roleclient = RoleClient()
+                        roleclient.client = user.clients[0]
+                        roleclient.role = role
+                        roleclient.save()
 
             # We're now at version 0.0.1
             working_version = 1

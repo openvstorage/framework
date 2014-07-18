@@ -54,6 +54,10 @@
         "mgmtcentertypes": {
             "VCENTER": "VMware vCenter"
         },
+        "granttypes": {
+            "PASSWORD": "Password Credentials",
+            "CLIENT_CREDENTIALS": "Client Credentials"
+        },
         "username": "Username",
         "password": "Password",
         "logout": "Log out",
@@ -162,7 +166,8 @@
         "mgmtcenter": "Mgmt. Center",
         "port": "Port",
         "noentries": "No entries available",
-        "logging": "Kibana logging"
+        "logging": "Kibana logging",
+        "generated": "Generated"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -362,6 +367,25 @@
             "failed": "Updating __what__ failed: __why__"
         }
     },
+    "users": {
+        "title": "User Mgmt.",
+        "users": {
+            "title": "Users"
+        },
+        "clients": {
+            "title": "OAuth 2 Clients",
+            "information": "Below are the configured OAuth 2 Clients for the selected User. Please note that only the Grant type &quot;Client Credentials&quot; is supported.",
+            "clientid": "Client ID",
+            "clientsecret": "Client secret",
+            "granttype": "Grant type",
+            "complete": "Completed",
+            "deletesuccess": "The Client was deleted successfully",
+            "deletefailed": "Could not delete the Client: __why__",
+            "addsuccess": "The Client was added successfully",
+            "addfailed": "Could not add the Client: __why__",
+            "delete": "Are you sure you want to delete Client: __what__?"
+        }
+    },
     "login": {
         "title": "Login",
         "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",
@@ -544,7 +568,7 @@
             "title": "Change password",
             "confirm": {
                 "title": "Please provide the required information",
-                "introduction": "Enter the requested information carefully.",
+                "introduction": "Enter the current and new password for user:",
                 "newpassword": "New password",
                 "currentpassword": "Current password",
                 "retype": "Retype",
@@ -623,6 +647,7 @@
         "warning": "&#xf071;",
         "cancel": "&#xf00d;",
         "logs": "&#xf02d;",
-        "externallink": "&#xf08e;"
+        "externallink": "&#xf08e;",
+        "password": "&#xf084;"
     }
 }

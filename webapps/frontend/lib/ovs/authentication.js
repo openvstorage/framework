@@ -78,6 +78,7 @@ define([
         };
         self.logout = function() {
             self.accessToken(undefined);
+            window.localStorage.removeItem('accesstoken');
             self.dispatch(false)
                 .always(function() {
                     router.navigate('');

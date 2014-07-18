@@ -1,0 +1,90 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:users.users.title"></h2>
+    </div>
+    <div data-bind="pager: { items: users, headers: userHeaders, initialLoad: usersInitialLoad,
+                             viewportRefresh: refreshUsers, viewportRefreshInterval: 5000, controls: true }"
+         style="clear: both;">
+        <table data-dummy="dummy">
+            <tr data-part="vitem" class="hand" data-bind="css: { info: $root.selectedUserGuid() === guid() },
+                                                          click: function() { $root.selectedUserGuid(guid()); }">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <span data-bind="text: username"></span>
+                </td>
+                <td>
+                    <i data-bind="click: function() { $root.changePassword($data.guid()); }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.password"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:users.clients.title"></h2>
+    </div>
+    <div style="clear: both;">
+        <p style="margin-bottom: 25px;">
+            <span data-i18n="[html]ovs:users.clients.information"></span>
+        </p>
+    </div>
+    <div data-bind="pager: { items: clients, headers: clientHeaders, initialLoad: clientsInitialLoad,
+                             viewportRefresh: refreshClients, viewportRefreshInterval: 5000, controls: true }"
+         style="clear: both;">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
+                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    <span data-bind="text: name"></span>
+                </td>
+                <td><span data-bind="text: guid"></span></td>
+                <td style="position: relative;">
+                    <input type="text" data-bind="value: clientSecret()" readonly="readonly"
+                           style="width: 260px; height: 20px;" />
+                    <div class="input-gradient" style="top: 9px; left: 247px; width: 20px; height: 18px; position: absolute;"></div>
+                </td>
+                <td><span data-bind="translate: 'ovs:generic.granttypes.' + grantType()"></span></td>
+                <td>
+                    <i data-bind="click: function() { $root.deleteClient($data.guid()); }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                </td>
+            </tr>
+            <tr data-part="vnew" data-bind="visible: $root.selectedUserGuid() !== undefined, with: $root.newClient()">
+                <td><input type="text" data-bind="value: name" style="width: 200px;"/></td>
+                <td><i data-i18n="ovs:generic.generated"></i></td>
+                <td><i data-i18n="ovs:generic.generated"></i></td>
+                <td><span data-i18n="ovs:generic.granttypes.CLIENT_CREDENTIALS"></span></td>
+                <td>
+                    <i data-bind="click: function() { $root.saveClient(); }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
+                </td>
+            </tr>
+            <tr data-part="vfirst" data-bind="visible: $root.selectedUserGuid() !== undefined, with: $root.newClient()">
+                <td><input type="text" data-bind="value: name" style="width: 200px;"/></td>
+                <td><i data-i18n="ovs:generic.generated"></i></td>
+                <td><i data-i18n="ovs:generic.generated"></i></td>
+                <td><span data-i18n="ovs:generic.granttypes.CLIENT_CREDENTIALS"></span></td>
+                <td>
+                    <i data-bind="click: function() { $root.saveClient(); }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
+                </td>
+            </tr>
+        </table>
+    </div>
+</section>

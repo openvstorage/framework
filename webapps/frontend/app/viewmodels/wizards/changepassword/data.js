@@ -12,23 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define([
-    'jquery', 'ovs/generic',
-    '../build', './confirm', './data'
-], function($, generic, build, Confirm, data) {
+define(['knockout'], function(ko){
     "use strict";
-    return function(options) {
-        var self = this;
-        build(self);
-
-        // Variables
-        self.data = data;
-
-        // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.changepassword.title')));
-        self.modal(generic.tryGet(options, 'modal', false));
-        self.data.user(options.user);
-        self.steps([new Confirm()]);
-        self.activateStep();
+    var singleton = function() {
+        return {
+            user: ko.observable()
+        };
     };
+    return singleton();
 });

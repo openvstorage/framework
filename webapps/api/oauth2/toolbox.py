@@ -40,7 +40,7 @@ class Toolbox(object):
             raise ValueError('invalid_scope')
         if generate_access is True:
             access_token = BearerToken()
-            access_token.access_token = Toolbox._create_hash(64)
+            access_token.access_token = Toolbox.create_hash(64)
             access_token.expiration = int(time.time() + 3600)
             access_token.client = client
             access_token.save()
@@ -51,7 +51,7 @@ class Toolbox(object):
                 link.save()
         if generic_refresh is True:
             refresh_token = BearerToken()
-            refresh_token.refresh_token = Toolbox._create_hash(128)
+            refresh_token.refresh_token = Toolbox.create_hash(128)
             refresh_token.expiration = int(time.time() + 86400)
             refresh_token.client = client
             refresh_token.save()
@@ -74,7 +74,7 @@ class Toolbox(object):
                 token.delete()
 
     @staticmethod
-    def _create_hash(length):
+    def create_hash(length):
         return ''.join(random.choice(string.ascii_letters +
                                      string.digits +
                                      '|_=+*#@!/-[]{}<>.?,\'";:~')

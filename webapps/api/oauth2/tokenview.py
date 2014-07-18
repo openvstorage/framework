@@ -55,7 +55,7 @@ class OAuth2TokenView(View):
             password = request.POST['password']
             user = UserList.get_user_by_username(username)
             if user is None or user.password != hashlib.sha256(password).hexdigest() or user.is_active is False:
-                return HttpResponseBadRequest({'error': 'invalid_client'})
+                return HttpResponseBadRequest, {'error': 'invalid_client'}
             clients = [client for client in user.clients if client.ovs_type == 'FRONTEND' and client.grant_type == 'PASSWORD']
             if len(clients) != 1:
                 return HttpResponseBadRequest, {'error': 'unauthorized_client'}
@@ -75,7 +75,7 @@ class OAuth2TokenView(View):
             if 'HTTP_AUTHORIZATION' not in request.META:
                 return HttpResponseBadRequest, {'error': ''}
             _, password_hash = request.META['HTTP_AUTHORIZATION'].split(' ')
-            client_id, client_secret = base64.decodestring(password_hash)
+            client_id, client_secret = base64.decodestring(password_hash).split(':')
             try:
                 client = Client(client_id)
                 if client.grant_type != 'CLIENT_CREDENTIALS':
