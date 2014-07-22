@@ -23,7 +23,7 @@ from rest_framework.decorators import action
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, expose, validate, get_list, get_object
+from backend.decorators import required_roles, expose, discover, return_list, return_object
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -36,43 +36,41 @@ class StorageDriverViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(StorageDriver)
-    def list(self, request, format=None, hints=None):
+    @return_list(StorageDriver)
+    @discover()
+    def list(self):
         """
         Overview of all StorageDrivers
         """
-        _ = request, format, hints
         return StorageDriverList.get_storagedrivers()
 
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageDriver)
-    @get_object(StorageDriver)
-    def retrieve(self, request, obj):
+    @return_object(StorageDriver)
+    @discover(StorageDriver)
+    def retrieve(self, storagedriver):
         """
         Load information about a given StorageDriver
         """
-        _ = request
-        return obj
+        return storagedriver
 
     @action()
     @expose(internal=True)
-    @validate(StorageDriver)
-    def can_be_deleted(self, request, obj):
+    @discover(StorageDriver)
+    def can_be_deleted(self, storagedriver):
         """
         Checks whether a Storage Driver can be deleted
         """
-        _ = request
         result = True
-        storagerouter = obj.storagerouter
+        storagerouter = storagedriver.storagerouter
         pmachine = storagerouter.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         vpools_guids = [vmachine.vpool_guid for vmachine in vmachines if vmachine.vpool_guid is not None]
         pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
-        vpool = obj.vpool
+        vpool = storagedriver.vpool
 
         if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             result = False
-        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == obj.storagedriver_id):
+        if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             result = False
         return Response(result, status=status.HTTP_200_OK)

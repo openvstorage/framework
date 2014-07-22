@@ -29,7 +29,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
-from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
+from backend.decorators import required_roles, expose, discover, return_list, return_object, celery_task
 
 
 class VMachineViewSet(viewsets.ViewSet):
@@ -42,13 +42,12 @@ class VMachineViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(VMachine, 'name,vpool_guid')
-    def list(self, request, hints):
+    @return_list(VMachine, 'name,vpool_guid')
+    @discover()
+    def list(self, vpoolguid=None):
         """
         Overview of all machines
         """
-        _ = hints
-        vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
         if vpoolguid is not None:
             vpool = VPool(vpoolguid)
             vmachine_guids = []
@@ -64,57 +63,55 @@ class VMachineViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(VMachine)
-    @get_object(VMachine)
-    def retrieve(self, request, obj):
+    @return_object(VMachine)
+    @discover(VMachine)
+    def retrieve(self, vmachine):
         """
         Load information about a given vMachine
         """
-        _ = request
-        return obj
+        return vmachine
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['delete'])
-    @validate(VMachine)
     @celery_task()
-    def destroy(self, request, obj):
+    @discover(VMachine)
+    def destroy(self, vmachine):
         """
         Deletes a machine
         """
-        _ = request
-        if not obj.is_vtemplate:
+        if not vmachine.is_vtemplate:
             raise NotAcceptable('vMachine should be a vTemplate')
-        return VMachineController.delete.delay(machineguid=obj.guid)
+        return VMachineController.delete.delay(machineguid=vmachine.guid)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VMachine)
     @celery_task()
-    def rollback(self, request, obj):
+    @discover(VMachine)
+    def rollback(self, vmachine, timestamp):
         """
         Clones a machine
         """
-        if obj.is_vtemplate:
+        if vmachine.is_vtemplate:
             raise NotAcceptable('vMachine should not be a vTemplate')
-        return VMachineController.rollback.delay(machineguid=obj.guid,
-                                                 timestamp=request.DATA['timestamp'])
+        return VMachineController.rollback.delay(machineguid=vmachine.guid,
+                                                 timestamp=timestamp)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VMachine)
     @celery_task()
-    def snapshot(self, request, obj):
+    @discover(VMachine)
+    def snapshot(self, vmachine, name, consistent):
         """
         Snapshots a given machine
         """
-        if obj.is_vtemplate:
+        if vmachine.is_vtemplate:
             raise NotAcceptable('vMachine should not be a vTemplate')
-        label = str(request.DATA['name'])
-        is_consistent = True if request.DATA['consistent'] else False  # Assure boolean type
-        return VMachineController.snapshot.delay(machineguid=obj.guid,
+        label = str(name)
+        is_consistent = True if consistent else False  # Assure boolean type
+        return VMachineController.snapshot.delay(machineguid=vmachine.guid,
                                                  label=label,
                                                  is_consistent=is_consistent,
                                                  is_automatic=False)
@@ -122,18 +119,17 @@ class VMachineViewSet(viewsets.ViewSet):
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(VMachine)
-    @get_list(VMachine)
-    def get_children(self, request, obj, hints):
+    @return_list(VMachine)
+    @discover(VMachine)
+    def get_children(self, vmachine, hints):
         """
         Returns a list of vMachines guid(s) of children of a given vMachine
         """
-        _ = request
         children_vmachine_guids = []
         children_vmachines = []
-        if obj.is_vtemplate is False:
+        if vmachine.is_vtemplate is False:
             raise NotAcceptable('vMachine is not a vTemplate')
-        for vdisk in obj.vdisks:
+        for vdisk in vmachine.vdisks:
             for cdisk in vdisk.child_vdisks:
                 if cdisk.vmachine_guid not in children_vmachine_guids:
                     children_vmachine_guids.append(cdisk.vmachine_guid)
@@ -144,59 +140,57 @@ class VMachineViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(VMachine)
-    def filter(self, request, pk=None, format=None, hints=None):
+    @return_list(VMachine)
+    @discover()
+    def filter(self, query):
         """
         Filters vMachines based on a filter object
         """
-        _ = pk, format, hints
         query_result = DataList({'object': VMachine,
                                  'data': DataList.select.DESCRIPTOR,
-                                 'query': request.DATA['query']}).data
+                                 'query': query}).data
         return DataObjectList(query_result, VMachine)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VMachine)
     @celery_task()
-    def set_as_template(self, request, obj):
+    @discover(VMachine)
+    def set_as_template(self, vmachine):
         """
         Sets a given machine as template
         """
-        _ = request
-        return VMachineController.set_as_template.delay(machineguid=obj.guid)
+        return VMachineController.set_as_template.delay(machineguid=vmachine.guid)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VMachine)
     @celery_task()
-    def create_from_template(self, request, obj):
+    @discover(VMachine)
+    def create_from_template(self, vmachine, pmachineguid, name, description):
         """
         Creates a vMachine based on a vTemplate
         """
         try:
-            pmachine = PMachine(request.DATA['pmachineguid'])
+            pmachine = PMachine(pmachineguid)
         except ObjectNotFoundException:
             raise Http404('pMachine could not be found')
-        if obj.is_vtemplate is False:
+        if vmachine.is_vtemplate is False:
             raise NotAcceptable('vMachine is not a vTemplate')
-        return VMachineController.create_from_template.delay(machineguid=obj.guid,
+        return VMachineController.create_from_template.delay(machineguid=vmachine.guid,
                                                              pmachineguid=pmachine.guid,
-                                                             name=str(request.DATA['name']),
-                                                             description=str(request.DATA['description']))
+                                                             name=str(name),
+                                                             description=str(description))
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VMachine)
     @celery_task()
-    def create_multiple_from_template(self, request, obj):
+    @discover(VMachine)
+    def create_multiple_from_template(self, vmachine, pmachineguids, amount, start, name, description):
         """
         Creates a certain amount of vMachines based on a vTemplate
         """
-        pmachineguids = request.DATA['pmachineguids']
         if len(pmachineguids) == 0:
             raise NotAcceptable
         try:
@@ -204,41 +198,38 @@ class VMachineViewSet(viewsets.ViewSet):
                 _ = PMachine(pmachienguid)
         except ObjectNotFoundException:
             raise Http404('pMachine could not be found')
-        if obj.is_vtemplate is False:
+        if vmachine.is_vtemplate is False:
             raise NotAcceptable('vMachine is not a vTemplate')
-        amount = request.DATA['amount']
-        start = request.DATA['start']
         if not isinstance(amount, int) or not isinstance(start, int):
             raise NotAcceptable('Fields amount and start should be numeric')
         amount = max(1, amount)
         start = max(0, start)
-        return VMachineController.create_multiple_from_template.delay(machineguid=obj.guid,
+        return VMachineController.create_multiple_from_template.delay(machineguid=vmachine.guid,
                                                                       pmachineguids=pmachineguids,
                                                                       amount=amount,
                                                                       start=start,
-                                                                      name=str(request.DATA['name']),
-                                                                      description=str(request.DATA['description']))
+                                                                      name=str(name),
+                                                                      description=str(description))
 
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(VMachine)
-    @get_list(PMachine)
-    def get_target_pmachines(self, request, obj, hints):
+    @return_list(PMachine)
+    @discover(VMachine)
+    def get_target_pmachines(self, vmachine, hints):
         """
         Gets all possible target pMachines for a given vMachine
         """
-        _ = request
-        if not obj.is_vtemplate:
+        if not vmachine.is_vtemplate:
             raise NotAcceptable('vMachine is not a vTemplate')
         # Collect all vPools used by the given template
         vpool_guids = []
         vpools = []
-        if obj.vpool is not None:
-            if obj.vpool_guid not in vpool_guids:
-                vpools.append(obj.vpool)
-                vpool_guids.append(obj.vpool_guid)
-        for vdisk in obj.vdisks:
+        if vmachine.vpool is not None:
+            if vmachine.vpool_guid not in vpool_guids:
+                vpools.append(vmachine.vpool)
+                vpool_guids.append(vmachine.vpool_guid)
+        for vdisk in vmachine.vdisks:
             if vdisk.vpool_guid not in vpool_guids:
                 vpools.append(vdisk.vpool)
                 vpool_guids.append(vdisk.vpool_guid)

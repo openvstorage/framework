@@ -125,7 +125,7 @@ class OVSRouter(DefaultRouter):
             __metaclass__ = Meta
             _ignore_model_permissions = True
 
-            def get(self, request, format=None):
+            def get(self, request):
                 """
                 Default GET view providing an API index overview
                 """

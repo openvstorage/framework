@@ -22,10 +22,9 @@ from rest_framework.decorators import action
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
+from backend.decorators import required_roles, expose, discover, return_list, return_object, celery_task
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -38,14 +37,12 @@ class VDiskViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(VDisk)
-    def list(self, request, format=None, hints=None):
+    @return_list(VDisk)
+    @discover()
+    def list(self, vmachineguid=None, vpoolguid=None):
         """
         Overview of all vDisks
         """
-        _ = format, hints
-        vmachineguid = request.QUERY_PARAMS.get('vmachineguid', None)
-        vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
         if vmachineguid is not None:
             vmachine = VMachine(vmachineguid)
             return vmachine.vdisks
@@ -56,25 +53,23 @@ class VDiskViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(VDisk)
-    @get_object(VDisk)
-    def retrieve(self, request, obj):
+    @return_object(VDisk)
+    @discover(VDisk)
+    def retrieve(self, vdisk):
         """
         Load information about a given vDisk
         """
-        _ = request
-        return obj
+        return vdisk
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VDisk)
     @celery_task()
-    def rollback(self, request, obj):
+    @discover(VDisk)
+    def rollback(self, vdisk, timestamp):
         """
         Rollbacks a vDisk to a given timestamp
         """
-        _ = format
-        return VDiskController.rollback.delay(diskguid=obj.guid,
-                                              timestamp=request.DATA['timestamp'])
+        return VDiskController.rollback.delay(diskguid=vdisk.guid,
+                                              timestamp=timestamp)
 

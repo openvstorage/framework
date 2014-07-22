@@ -25,7 +25,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
+from backend.decorators import required_roles, expose, discover, return_list, return_object, celery_task
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -38,50 +38,47 @@ class VPoolViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(VPool, 'name')
-    def list(self, request, format=None, hints=None):
+    @return_list(VPool, 'name')
+    @discover()
+    def list(self):
         """
         Overview of all vPools
         """
-        _ = request, format, hints
         return VPoolList.get_vpools()
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(VPool)
-    @get_object(VPool)
-    def retrieve(self, request, obj):
+    @return_object(VPool)
+    @discover(VPool)
+    def retrieve(self, vpool):
         """
         Load information about a given vPool
         """
-        _ = request
-        return obj
+        return vpool
 
     @action()
     @expose(internal=True)
     @required_roles(['view', 'create'])
-    @validate(VPool)
     @celery_task()
-    def sync_vmachines(self, request, obj):
+    @discover(VPool)
+    def sync_vmachines(self, vpool):
         """
         Syncs the vMachine of this vPool
         """
-        _ = request
-        return VPoolController.sync_with_hypervisor.delay(obj.guid)
+        return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(VPool)
-    @get_list(StorageRouter)
-    def storagerouters(self, request, obj, hints):
+    @return_list(StorageRouter)
+    @discover(VPool)
+    def storagerouters(self, vpool, hints):
         """
         Retreives a list of StorageRouters, serving a given vPool
         """
-        _ = request
         storagerouter_guids = []
         storagerouter = []
-        for storagedriver in obj.storagedrivers:
+        for storagedriver in vpool.storagedrivers:
             storagerouter_guids.append(storagedriver.storagerouter_guid)
             if hints['full'] is True:
                 storagerouter.append(storagedriver.storagerouter)
@@ -90,37 +87,35 @@ class VPoolViewSet(viewsets.ViewSet):
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VPool)
     @celery_task()
-    def update_storagedrivers(self, request, obj):
+    @discover(VPool)
+    def update_storagedrivers(self, vpool, storagedriver_guid, storagerouter_guids=None, storagedriver_guids=None):
         """
         Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)
         """
         storagerouters = []
-        if 'storagerouter_guids' in request.DATA:
-            if request.DATA['storagerouter_guids'].strip() != '':
-                for storagerouter_guid in request.DATA['storagerouter_guids'].strip().split(','):
+        if storagerouter_guids is not None:
+            if storagerouter_guids.strip() != '':
+                for storagerouter_guid in storagerouter_guids.strip().split(','):
                     storagerouter = StorageRouter(storagerouter_guid)
                     storagerouters.append((storagerouter.ip, storagerouter.machineid))
-        if 'storagedriver_guid' not in request.DATA:
-            raise NotAcceptable('No Storage Driver guid passed')
-        storagedriver_guids = []
-        if 'storagedriver_guids' in request.DATA:
-            if request.DATA['storagedriver_guids'].strip() != '':
-                for storagedriver_guid in request.DATA['storagedriver_guids'].strip().split(','):
+        valid_storagedriver_guids = []
+        if storagedriver_guids is not None:
+            if storagedriver_guids.strip() != '':
+                for storagedriver_guid in storagedriver_guids.strip().split(','):
                     storagedriver = StorageDriver(storagedriver_guid)
-                    if storagedriver.vpool_guid != obj.guid:
+                    if storagedriver.vpool_guid != vpool.guid:
                         raise NotAcceptable('Given Storage Driver does not belong to this vPool')
-                    storagedriver_guids.append(storagedriver.guid)
+                    valid_storagedriver_guids.append(storagedriver.guid)
 
-        storagedriver = StorageDriver(request.DATA['storagedriver_guid'])
-        parameters = {'vpool_name':          obj.name,
-                      'backend_type':        obj.backend_type,
-                      'connection_host':     None if obj.backend_connection is None else obj.backend_connection.split(':')[0],
-                      'connection_port':     None if obj.backend_connection is None else int(obj.backend_connection.split(':')[1]),
+        storagedriver = StorageDriver(storagedriver_guid)
+        parameters = {'vpool_name':          vpool.name,
+                      'backend_type':        vpool.backend_type,
+                      'connection_host':     None if vpool.backend_connection is None else vpool.backend_connection.split(':')[0],
+                      'connection_port':     None if vpool.backend_connection is None else int(vpool.backend_connection.split(':')[1]),
                       'connection_timeout':  0,  # Not in use anyway
-                      'connection_username': obj.backend_login,
-                      'connection_password': obj.backend_password,
+                      'connection_username': vpool.backend_login,
+                      'connection_password': vpool.backend_password,
                       'mountpoint_bfs':      storagedriver.mountpoint_bfs,
                       'mountpoint_temp':     storagedriver.mountpoint_temp,
                       'mountpoint_md':       storagedriver.mountpoint_md,
@@ -131,4 +126,4 @@ class VPoolViewSet(viewsets.ViewSet):
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])
 
-        return StorageRouterController.update_storagedrivers.delay(storagedriver_guids, storagerouters, parameters)
+        return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
