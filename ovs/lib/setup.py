@@ -707,17 +707,20 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                             SetupController._change_service_state(node_client, service, 'start')
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
-                try:
+                output = client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'', quiet=True)
+                output = output.split('\r\n')
+                retry = False
+                for line in output:
+                    if 'Error: unable to connect to node ' in line:
+                        rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
+                        if rabbitmq_running and rabbitmq_pid:
+                            client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
+                            print('Process killed, restarting')
+                            client.run('service ovs-rabbitmq start', quiet=True)
+                            retry = True
+                            break
+                if retry:
                     client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
-                except SystemExit:
-                    rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
-                    if rabbitmq_running and rabbitmq_pid:
-                        client.run('kill {0}'.format(rabbitmq_pid))
-                        print('Process killed, restarting')
-                        try:
-                            client.run('service ovs-rabbitmq start')
-                        except SystemExit: pass # might already be running
-                        client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
             target_client = SSHClient.load(ip)
             SetupController._enable_service(target_client, 'watcher')
@@ -1201,9 +1204,8 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
     @staticmethod
     def _is_rabbitmq_running(client):
         rabbitmq_running, rabbitmq_pid = False, 0
-        try:
-            output = client.run('service rabbitmq-server status')
-        except SystemExit:
+        output = client.run('service rabbitmq-server status', quiet=True)
+        if 'unrecognized service' in output:
             output = None
         if output:
             output = output.split('\r\n')
@@ -1212,11 +1214,8 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
                     rabbitmq_running = True
                     rabbitmq_pid = line.split(',')[1].replace('}', '')
         else:
-            try:
-                output = client.run('ps aux | grep rabbit@ | grep -v grep')
-            except SystemExit:
-                output = None
-            if output:
+            output = client.run('ps aux | grep rabbit@ | grep -v grep', quiet=True)
+            if output: # in case of error it is ''
                 output = output.split(' ')
                 if output[0] == 'rabbitmq':
                     rabbitmq_pid = output[1]
