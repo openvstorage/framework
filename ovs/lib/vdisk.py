@@ -250,7 +250,8 @@ class VDiskController(object):
             'snapshotpolicyid', 'has_autobackup', 'vmachine', 'vpool']
 
         disk = VDisk(diskguid)
-        if not disk.vmachine.is_vtemplate:
+        if disk.vmachine and not disk.vmachine.is_vtemplate:
+            # Disk might not be attached to a vmachine, but still be a template
             raise RuntimeError('The given disk does not belong to a template')
 
         if storagedriver_guid is not None:

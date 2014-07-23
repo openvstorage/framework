@@ -140,7 +140,9 @@ class KVM(object):
         Builds the path for the file backing a given device/disk
         """
         _ = self
-        return '/{}_{}.raw'.format(machinename.replace(' ', '_'), devicename)
+        if machinename:
+            return '/{}_{}.raw'.format(machinename.replace(' ', '_'), devicename)
+        return '/{}.raw'.format(devicename)
 
     def clean_vmachine_filename(self, path):
         """
