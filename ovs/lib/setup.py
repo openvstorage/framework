@@ -417,6 +417,28 @@ class SetupController(object):
                     logger.debug('Adding service {0}'.format(service))
                     SetupController._add_service(target_client, service, params)
 
+            print 'Updating hosts files'
+            logger.debug('Updating hosts files')
+            for node in nodes:
+                client_node = SSHClient.load(node)
+                update_hosts_file = """
+from ovs.extensions.generic.system import Ovs
+Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
+""" % {'ip': cluster_ip,
+       'host': node_name}
+                SetupController._exec_python(client_node, update_hosts_file)
+                if node == ip:
+                    for subnode in nodes:
+                        client_node = SSHClient.load(subnode)
+                        node_hostname = client_node.run('hostname')
+                        update_hosts_file = """
+from ovs.extensions.generic.system import Ovs
+Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
+""" % {'ip': subnode,
+       'host': node_hostname}
+                        client = SSHClient.load(ip)
+                        SetupController._exec_python(client, update_hosts_file)
+
             if join_masters:
                 print '\n+++ Joining master node +++\n'
                 logger.info('Joining master node')
@@ -484,30 +506,13 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 """ % {'cluster': cluster}
                     SetupController._exec_python(target_client, arakoon_create_directories)
 
-                print 'Updating hosts files'
-                logger.debug('Updating hosts files')
+                print 'Starting remote RabbitMQ nodes'
+                logger.debug('Starting remote RabbitMQ nodes')
                 for node in nodes:
-                    client_node = SSHClient.load(node)
-                    update_hosts_file = """
-from ovs.extensions.generic.system import Ovs
-Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
-""" % {'ip': cluster_ip,
-       'host': node_name}
-                    SetupController._exec_python(client_node, update_hosts_file)
                     if node != ip:
+                        client_node = SSHClient.load(node)
                         if SetupController._has_service(client_node, 'rabbitmq'):
                             SetupController._change_service_state(client_node, 'rabbitmq', 'start')
-                    else:
-                        for subnode in nodes:
-                            client_node = SSHClient.load(subnode)
-                            node_hostname = client_node.run('hostname')
-                            update_hosts_file = """
-from ovs.extensions.generic.system import Ovs
-Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
-""" % {'ip': subnode,
-       'host': node_hostname}
-                            client = SSHClient.load(ip)
-                            SetupController._exec_python(client, update_hosts_file)
 
                 print 'Setting up RabbitMQ'
                 logger.debug('Setting up RMQ')
@@ -1215,7 +1220,7 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
                     rabbitmq_pid = line.split(',')[1].replace('}', '')
         else:
             output = client.run('ps aux | grep rabbit@ | grep -v grep', quiet=True)
-            if output: # in case of error it is ''
+            if output:  # in case of error it is ''
                 output = output.split(' ')
                 if output[0] == 'rabbitmq':
                     rabbitmq_pid = output[1]
