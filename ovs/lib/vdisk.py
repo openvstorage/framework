@@ -319,3 +319,21 @@ class VDiskController(object):
             return
         client = SSHClient.load('127.0.0.1')
         client.run_local('rm -f %s' % (location), sudo=True, shell=True)
+
+    @staticmethod
+    @celery.task(name='ovs.disk.extend_volume')
+    def extend_volume(location, size):
+        """
+        Extend a volume using filesystem calls
+        Calls "truncate" to create sparse raw file
+        TODO: use volumedriver API
+        TODO: model VDisk() and return guid
+
+        @param location: location, filename
+        @param size: size of volume, GB
+        @return None
+        """
+        if not os.path.exists(location):
+            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
+        client = SSHClient.load('127.0.0.1')
+        client.run_local('truncate -s %sG %s' % (size, location), sudo=True, shell=True)

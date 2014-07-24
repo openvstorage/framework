@@ -15,13 +15,12 @@
 #pylint: disable=C0301,C0103,F0401,R0201,W0703
 """
 OpenStack Cinder driver - interface to OVS api
-- uses volumedriver filesystem API (filesystem calls)
+- uses OVS library calls (VDiskController)
 - uses Cinder logging (if configured, logging goes to syslog,
                        else it goes to screen)
 """
 
 import time
-from StringIO import StringIO
 
 # OVS
 from ovs.dal.lists.vpoollist import VPoolList
@@ -36,8 +35,9 @@ from oslo.config import cfg
 from cinder.openstack.common import log as logging
 from cinder.volume import driver
 from cinder.volume import api
+from cinder.image import image_utils
 
-VERSION = '1.0.0'
+VERSION = '1.0.0a'
 LOG = logging.getLogger(__name__)
 
 OPTS = [
@@ -70,17 +70,17 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
     Configuration file: /etc/cinder/cinder.conf
     Required parameters in config file:
     - volume_driver = cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver
-    - volume_backend_name = vpoolsaio
-    - vpool_name = vpoolsaio
+    - volume_backend_name = <VPOOLNAME>
+    - vpool_name = <VPOOLNAME>
     Required configuration:
         cinder type-create ovs
-        cinder type-key ovs set volume_backend_name=vpoolsaio
+        cinder type-key ovs set volume_backend_name=<VPOOLNAME>
 
     devstack, in screen of c-vol
     export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
     (restart c-vol)
     """
-    VERSION = "1.0.0"
+    VERSION = "1.0.0a"
 
     def __init__(self, *args, **kwargs): #pylint: disable=E1002
         """
@@ -181,10 +181,17 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
             destination_path = volume.provider_location
             if destination_path:
                 try:
-                    with open(destination_path, 'rw+') as _fd:
-                        LOG.info('CP_IMG_TO_VOL Downloading image to %s' % destination_path)
-                        image_service.download(context, image_id, _fd)
-                        LOG.info('CP_IMG_TO_VOL Download successful %s' % destination_path)
+                    LOG.info('CP_IMG_TO_VOL Deleting existing empty raw file %s ' % destination_path)
+                    VDiskController.delete_volume(location = destination_path)
+                    LOG.info('CP_IMG_TO_VOL Downloading image to %s' % destination_path)
+                    image_utils.fetch_to_raw(context,
+                                             image_service,
+                                             image_id,
+                                             destination_path,
+                                             '1M',
+                                             size = volume['size'])
+                    LOG.info('CP_IMG_TO_VOL Resizing volume to size %s' % volume['size'])
+                    self.extend_volume(volume = volume, size_gb = volume['size'])
                 except Exception as ex:
                     LOG.error('CP_IMG_TO_VOL Internal error %s ' % str(ex))
                     self.delete_volume(volume)
@@ -255,7 +262,7 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
                                                          pmachineguid = pmachineguid,
                                                          machineguid = None,
                                                          storagedriver_guid = None)
-        volume['provider_location'] = '{}/{}'.format(mountpoint,
+        volume['provider_location'] = '{}{}'.format(mountpoint,
                                                      disk_meta['backingdevice'])
         LOG.debug('[CREATE FROM TEMPLATE] New volume %s' % volume['provider_location'])
         vdisk = VDisk(disk_meta['diskguid'])
@@ -381,8 +388,11 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         """
         _debug_vol_info('EXTEND_VOL', volume)
         LOG.info('EXTEND_VOL Size %s' % size_gb)
-
-        raise NotImplementedError('Volumedriver does not implement Volume Extend')
+        location = volume.provider_location
+        if location is not None:
+            LOG.info('DO_EXTEND_VOLUME %s' % (location))
+            VDiskController.extend_volume(location = location,
+                                          size = size_gb)
 
     # Override parent behavior (NotImplementedError)
     # Not actually implemented
