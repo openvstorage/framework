@@ -179,7 +179,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.clone')
-    def clone(machineguid, timestamp, name, **kwargs):
+    def clone(machineguid, timestamp, name):
         """
         Clone a vmachine using the disk snapshot based on a snapshot timestamp
 
@@ -187,7 +187,6 @@ class VMachineController(object):
         @param timestamp: timestamp of the disk snapshots to use for the clone
         @param name: name for the new machine
         """
-        _ = kwargs
         machine = VMachine(machineguid)
 
         disks = {}
@@ -232,13 +231,12 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.delete')
-    def delete(machineguid, **kwargs):
+    def delete(machineguid):
         """
         Delete a vmachine
 
         @param machineguid: guid of the machine
         """
-        _ = kwargs
         machine = VMachine(machineguid)
         storagedriver_mountpoint, storagedriver_storage_ip = None, None
 
@@ -250,13 +248,17 @@ class VMachineController(object):
             logger.debug('No mountpoint info could be retrieved. Reason: {0}'.format(str(ex)))
             storagedriver_mountpoint = None
 
-        hypervisorid = machine.hypervisorid
-        if machine.pmachine.hvtype == 'KVM':
-            hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
-
-        disks_info = [(storagedriver.mountpoint, vd.devicename) for storagedriver in vd.vpool.storagedrivers for vd in machine.vdisks if storagedriver.storagerouter.pmachine_guid == machine.pmachine_guid]
+        disks_info = []
+        for vd in machine.vdisks:
+            for storagedriver in vd.vpool.storagedrivers:
+                if storagedriver.storagerouter.pmachine_guid == machine.pmachine_guid:
+                    disks_info.append((storagedriver.mountpoint, vd.devicename))
         if machine.pmachine:  # Allow hypervisor id node, lookup strategy is hypervisor dependent
             try:
+                hypervisorid = machine.hypervisorid
+                if machine.pmachine.hvtype == 'KVM':
+                    hypervisorid = machine.name  # On KVM we can lookup the machine by name, not by id
+
                 hv = Factory.get(machine.pmachine)
                 hv.delete_vm(hypervisorid, storagedriver_mountpoint, storagedriver_storage_ip, machine.devicename, disks_info, True)
             except Exception as exception:
