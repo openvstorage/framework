@@ -16,6 +16,7 @@
 Module for the VMware hypervisor client
 """
 
+import os
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 
 
@@ -190,8 +191,10 @@ class VMware(object):
         _ = self, devicename
         return True
 
-    def file_exists(self, devicename):
+    def file_exists(self, vpool, devicename):
         """
-        Checks whether a file (devicename .xml) exists
+        Check if devicename exists on the given vpool
         """
-        return self.sdk.file_exists(devicename)
+        _ = self
+        filename = '/mnt/{0}/{1}'.format(vpool.name, devicename)
+        return os.path.exists(filename) and os.path.isfile(filename)

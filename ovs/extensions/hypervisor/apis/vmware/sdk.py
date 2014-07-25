@@ -17,9 +17,8 @@ This module contains all code for using the VMware SOAP API/SDK
 """
 
 from time import sleep
-import datetime
 import re
-import os, glob
+import os
 import shutil
 
 from suds.client import Client, WebFault
@@ -1036,13 +1035,3 @@ class Sdk(object):
             self._client.service.Logout(self._serviceContent.sessionManager)
         except:
             pass
-
-    def file_exists(self, devicename):
-        """
-        Check if devicename .vmx exists on any mnt vpool
-        """
-        file_matcher = '/mnt/*/{0}'.format(devicename)
-        for found_file in glob.glob(file_matcher):
-            if os.path.exists(found_file) and os.path.isfile(found_file):
-                return True
-        return False

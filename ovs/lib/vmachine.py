@@ -454,7 +454,7 @@ class VMachineController(object):
                 pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 hypervisor = Factory.get(pmachine)
-                if not hypervisor.file_exists(hypervisor.clean_vmachine_filename(vmachine.devicename)):
+                if not hypervisor.file_exists(vmachine.vpool, hypervisor.clean_vmachine_filename(vmachine.devicename)):
                     return
                 vmachine.pmachine = pmachine
                 vmachine.save()
@@ -494,7 +494,7 @@ class VMachineController(object):
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
 
-        if hypervisor.should_process(name) and hypervisor.file_exists(name):
+        if hypervisor.should_process(name):
             if pmachine.hvtype == 'VMWARE':
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 vpool = storagedriver.vpool
@@ -502,6 +502,22 @@ class VMachineController(object):
                 vpool = None
             pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
             mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
+            try:
+                mutex.acquire(wait=5)
+                limit = 5
+                exists = hypervisor.file_exists(vpool, name)
+                while limit > 0 and exists is False:
+                    time.sleep(1)
+                    exists = hypervisor.file_exists(vpool, name)
+                    limit -= 1
+                if exists is False:
+                    logger.info('Could not locate vmachine with name {0} on vpool {1}'.format(name, vpool))
+                    vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
+                    if vmachine is not None:
+                        VMachineController.delete_from_voldrv(name, storagedriver_id)
+                    return
+            finally:
+                mutex.release()
             try:
                 mutex.acquire(wait=5)
                 vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
@@ -522,8 +538,6 @@ class VMachineController(object):
                 except:
                     vmachine.status = 'SYNC_NOK'
                 vmachine.save()
-            if not hypervisor.file_exists(name):
-                vmachine.delete()
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_config')
