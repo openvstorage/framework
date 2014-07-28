@@ -45,6 +45,8 @@ if __name__ == '__main__':
             raise RuntimeError("In case a release target is specified, it should be of the format: 'release,<release branch>'")
         else:
             target = tuple(target.split(','))
+    if target.startswith('experimental,'):
+        target = tuple(target.split(','))
 
     # 1. Collect sources
     source_metadata = SourceCollector.collect(target=target, revision=options.revision, suffix=options.suffix)
