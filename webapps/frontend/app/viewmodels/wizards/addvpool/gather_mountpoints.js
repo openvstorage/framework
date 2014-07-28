@@ -47,7 +47,7 @@ define([
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
             }
             $.each(self.data.storageDrivers(), function(index, storageDriver) {
-                if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineid())) {
+                if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineId())) {
                     return true;
                 }
                 if (self.data.mtptCache() === storageDriver.mountpointCache() && $.inArray('cache', fields) === -1) {

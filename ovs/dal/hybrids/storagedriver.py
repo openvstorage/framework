@@ -16,6 +16,7 @@
 StorageDriver module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -27,24 +28,22 @@ class StorageDriver(DataObject):
     The StorageDriver class represents a Storage Driver. A Storage Driver is an application
     on a Storage Router to which the vDisks connect. The Storage Driver is the gateway to the Storage Backend.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':             (None, str, 'Name of the Storage Driver.'),
-                   'description':      (None, str, 'Description of the Storage Driver.'),
-                   'port':             (None, int, 'Port on which the Storage Driver is listening.'),
-                   'cluster_ip':       (None, str, 'IP address on which the Storage Driver is listening.'),
-                   'storage_ip':       (None, str, 'IP address on which the vpool is shared to hypervisor'),
-                   'storagedriver_id': (None, str, 'ID of the Storage Driver as known by the Storage Drivers.'),
-                   'mountpoint':       (None, str, 'Mountpoint from which the Storage Driver serves data'),
-                   'mountpoint_temp':  (None, str, 'Mountpoint for temporary workload (scrubbing etc)'),
-                   'mountpoint_bfs':   (None, str, 'Mountpoint for the backend filesystem (used for local and distributed fs)'),
-                   'mountpoint_md':    (None, str, 'Mountpoint for metadata'),
-                   'mountpoint_cache': (None, str, 'Mountpoint for caching')}
-    __relations = {'vpool':         (VPool, 'storagedrivers'),
-                   'storagerouter': (StorageRouter, 'storagedrivers')}
-    __expiry = {'status':        (30, str),
-                'statistics':     (4, dict),
-                'stored_data':   (60, int)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the Storage Driver.'),
+                    Property('description', str, mandatory=False, doc='Description of the Storage Driver.'),
+                    Property('port', int, doc='Port on which the Storage Driver is listening.'),
+                    Property('cluster_ip', str, doc='IP address on which the Storage Driver is listening.'),
+                    Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
+                    Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
+                    Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
+                    Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
+                    Property('mountpoint_bfs', str, doc='Mountpoint for the backend filesystem (used for local and distributed fs)'),
+                    Property('mountpoint_md', str, doc='Mountpoint for metadata'),
+                    Property('mountpoint_cache', str, doc='Mountpoint for caching')]
+    __relations = [Relation('vpool', VPool, 'storagedrivers'),
+                   Relation('storagerouter', StorageRouter, 'storagedrivers')]
+    __dynamics = [Dynamic('status', str, 30),
+                  Dynamic('statistics', dict, 4),
+                  Dynamic('stored_data', int, 60)]
 
     def _status(self):
         """
@@ -65,8 +64,8 @@ class StorageDriver(DataObject):
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.storagedriver_id == self.storagedriver_id:
-                    statistics = disk._statistics()  # Prevent double caching
-                    for key, value in statistics.iteritems():
+                    disk.invalidate_dynamics('statistics')  # Prevent double caching
+                    for key, value in disk.statistics.iteritems():
                         if key != 'timestamp':
                             vdiskstatsdict[key] += value
         vdiskstatsdict['timestamp'] = time.time()

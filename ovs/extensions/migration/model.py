@@ -61,14 +61,12 @@ class Model():
             admin = User()
             admin.username = 'admin'
             admin.password = hashlib.sha256('admin').hexdigest()
-            admin.email = 'nobody@example.net'
             admin.is_active = True
             admin.group = admin_group
             admin.save()
             user = User()
             user.username = 'user'
             user.password = hashlib.sha256('user').hexdigest()
-            user.email = 'nobody@example.net'
             user.is_active = True
             user.group = user_group
             user.save()

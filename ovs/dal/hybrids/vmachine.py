@@ -16,6 +16,7 @@
 VMachine module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
@@ -30,23 +31,21 @@ class VMachine(DataObject):
     The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks
     or a Virtual Machine running the Open vStorage software.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
-                   'description':  (None,  str,  'Description of the vMachine.'),
-                   'hypervisorid': (None,  str,  'The identifier of the vMachine on the Hypervisor.'),
-                   'devicename':   (None,  str,  'The name of the container file (e.g. the VMX-file) describing the vMachine.'),
-                   'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
-                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
-    __relations = {'pmachine': (PMachine, 'vmachines'),
-                   'vpool':    (VPool, 'vmachines')}
-    __expiry = {'snapshots':            (60, list),
-                'hypervisor_status':   (300, str),
-                'statistics':            (5, dict),
-                'stored_data':          (60, int),
-                'failover_mode':        (60, str),
-                'storagerouters_guids': (15, list),
-                'vpools_guids':         (15, list)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, mandatory=False, doc='Name of the vMachine.'),
+                    Property('description', str, mandatory=False, doc='Description of the vMachine.'),
+                    Property('hypervisor_id', str, mandatory=False, doc='The identifier of the vMachine on the Hypervisor.'),
+                    Property('devicename', str, doc='The name of the container file (e.g. the VMX-file) describing the vMachine.'),
+                    Property('is_vtemplate', bool, default=False, doc='Indicates whether this vMachine is a vTemplate.'),
+                    Property('status', ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], default='OK', doc='Internal status of the vMachine')]
+    __relations = [Relation('pmachine', PMachine, 'vmachines'),
+                   Relation('vpool', VPool, 'vmachines')]
+    __dynamics = [Dynamic('snapshots', list, 60),
+                  Dynamic('hypervisor_status', str, 300),
+                  Dynamic('statistics', dict, 5),
+                  Dynamic('stored_data', int, 60),
+                  Dynamic('failover_mode', str, 60),
+                  Dynamic('storagerouters_guids', list, 15),
+                  Dynamic('vpools_guids', list, 15)]
 
     def _snapshots(self):
         """
@@ -80,11 +79,11 @@ class VMachine(DataObject):
         """
         Fetches the Status of the vMachine.
         """
-        if self.hypervisorid is None or self.pmachine is None:
+        if self.hypervisor_id is None or self.pmachine is None:
             return 'UNKNOWN'
         hv = hvFactory.get(self.pmachine)
         try:
-            return hv.get_state(self.hypervisorid)
+            return hv.get_state(self.hypervisor_id)
         except:
             return 'UNKNOWN'
 
@@ -98,8 +97,8 @@ class VMachine(DataObject):
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
-            statistics = vdisk._statistics()  # Prevent double caching
-            for key, value in statistics.iteritems():
+            vdisk.invalidate_dynamics('statistics')  # Prevent double caching
+            for key, value in vdisk.statistics.iteritems():
                 if key != 'timestamp':
                     vdiskstatsdict[key] += value
         vdiskstatsdict['timestamp'] = time.time()

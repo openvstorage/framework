@@ -101,7 +101,7 @@ class VPoolViewSet(viewsets.ViewSet):
             if request.DATA['storagerouter_guids'].strip() != '':
                 for storagerouter_guid in request.DATA['storagerouter_guids'].strip().split(','):
                     storagerouter = StorageRouter(storagerouter_guid)
-                    storagerouters.append((storagerouter.ip, storagerouter.machineid))
+                    storagerouters.append((storagerouter.ip, storagerouter.machine_id))
         if 'storagedriver_guid' not in request.DATA:
             raise NotAcceptable('No Storage Driver guid passed')
         storagedriver_guids = []
@@ -115,12 +115,12 @@ class VPoolViewSet(viewsets.ViewSet):
 
         storagedriver = StorageDriver(request.DATA['storagedriver_guid'])
         parameters = {'vpool_name':          obj.name,
-                      'backend_type':        obj.backend_type,
-                      'connection_host':     None if obj.backend_connection is None else obj.backend_connection.split(':')[0],
-                      'connection_port':     None if obj.backend_connection is None else int(obj.backend_connection.split(':')[1]),
+                      'type':                obj.type,
+                      'connection_host':     None if obj.connection is None else obj.connection.split(':')[0],
+                      'connection_port':     None if obj.connection is None else int(obj.connection.split(':')[1]),
                       'connection_timeout':  0,  # Not in use anyway
-                      'connection_username': obj.backend_login,
-                      'connection_password': obj.backend_password,
+                      'connection_username': obj.login,
+                      'connection_password': obj.password,
                       'mountpoint_bfs':      storagedriver.mountpoint_bfs,
                       'mountpoint_temp':     storagedriver.mountpoint_temp,
                       'mountpoint_md':       storagedriver.mountpoint_md,

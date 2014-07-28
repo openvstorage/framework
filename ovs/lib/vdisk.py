@@ -148,7 +148,7 @@ class VDiskController(object):
         _snap = '{}'.format(snapshotid)
         logger.info(_log.format(_snap, disk.name, _location))
         volume_id = disk.storagedriver_client.create_clone(_location, _id, _snap)
-        new_disk.copy_blueprint(disk, include=properties_to_clone)
+        new_disk.copy(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
         new_disk.name = '{}-clone'.format(disk.name)
         new_disk.description = description
@@ -247,7 +247,7 @@ class VDiskController(object):
         description = '{} {}'.format(machinename, devicename)
         properties_to_clone = [
             'description', 'size', 'type', 'retentionpolicyid',
-            'snapshotpolicyid', 'has_autobackup', 'vmachine', 'vpool']
+            'snapshotpolicyid', 'vmachine', 'vpool']
 
         disk = VDisk(diskguid)
         if disk.vmachine and not disk.vmachine.is_vtemplate:
@@ -260,7 +260,7 @@ class VDiskController(object):
             storagedriver_id = disk.storagedriver_id
 
         new_disk = VDisk()
-        new_disk.copy_blueprint(disk, include=properties_to_clone)
+        new_disk.copy(disk, include=properties_to_clone)
         new_disk.vpool = disk.vpool
         new_disk.devicename = hypervisor.clean_backing_disk_filename(disk_path)
         new_disk.parent_vdisk = disk

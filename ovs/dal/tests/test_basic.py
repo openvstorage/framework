@@ -77,11 +77,12 @@ class Basic(TestCase):
         # Loading an non-existing object should raise
         self.assertRaises(ObjectNotFoundException, TestDisk, uuid.uuid4(), None)
 
-    def test_newobjet_delete(self):
+    def test_newobject_delete(self):
         """
         Validates the behavior on object deletions
         """
         disk = TestDisk()
+        disk.name = 'disk'
         disk.save()
         # An object should always have a guid
         guid = disk.guid
@@ -453,6 +454,7 @@ class Basic(TestCase):
         keys = ['list_cache', None]
         for key in keys:
             disk0 = TestDisk()
+            disk0.name = 'disk 0'
             disk0.save()
             list_cache = DataList(key=key,
                                   query={'object': TestDisk,
@@ -465,6 +467,7 @@ class Basic(TestCase):
             machine.name = 'machine'
             machine.save()
             disk1 = TestDisk()
+            disk1.name = 'disk 1'
             disk1.machine = machine
             disk1.save()
             list_cache = DataList(key=key,
@@ -482,6 +485,7 @@ class Basic(TestCase):
             self.assertTrue(list_cache.from_cache, 'List should be loaded from cache (mode: {0})'.format(key))
             disk2 = TestDisk()
             disk2.machine = machine
+            disk2.name = 'disk 2'
             disk2.save()
             list_cache = DataList(key=key,
                                   query={'object': TestDisk,
@@ -515,8 +519,10 @@ class Basic(TestCase):
         Validates whether empty queries return the full resultset
         """
         disk1 = TestDisk()
+        disk1.name = 'disk 1'
         disk1.save()
         disk2 = TestDisk()
+        disk2.name = 'disk 2'
         disk2.save()
         amount = DataList(key='some_list',
                           query={'object': TestDisk,
@@ -525,6 +531,7 @@ class Basic(TestCase):
                                            'items': []}}).data
         self.assertEqual(amount, 2, 'There should be two disks ({0})'.format(amount))
         disk3 = TestDisk()
+        disk3.name = 'disk 3'
         disk3.save()
         amount = DataList(key='some_list',
                           query={'object': TestDisk,
@@ -601,6 +608,7 @@ class Basic(TestCase):
         Validates whether the primary keys are kept in sync
         """
         disk = TestDisk()
+        disk.name = 'disk'
         VolatileFactory.store.delete('ovs_primarykeys_{0}'.format(disk._name))
         keys = DataList.get_pks(disk._namespace, disk._name)
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
@@ -698,9 +706,9 @@ class Basic(TestCase):
         datalist = DataObjectList(data, TestDisk)
         self.assertEqual(len(datalist), 1, 'There should be one item ({0})'.format(len(datalist)))
 
-    def test_copy_blueprint(self):
+    def test_copy(self):
         """
-        Validates whether the copy_blueprint function works correct
+        Validates whether the copy function works correct
         """
         machine = TestMachine()
         machine.name = 'testmachine1'
@@ -713,22 +721,22 @@ class Basic(TestCase):
         disk1.machine = machine
         disk1.save()
         disk2 = TestDisk()
-        disk2.copy_blueprint(disk1)
+        disk2.copy(disk1)
         self.assertEqual(disk2.name, 'test1', 'Properties should be copied')
         self.assertEqual(disk2.size, 100, 'Properties should be copied')
         self.assertEqual(disk2.order, 1, 'Properties should be copied')
         self.assertEqual(disk2.type, 'ONE', 'Properties should be copied')
         self.assertEqual(disk2.machine, None, 'Relations should not be copied')
         disk3 = TestDisk()
-        disk3.copy_blueprint(disk1, include_relations=True)
+        disk3.copy(disk1, include_relations=True)
         self.assertEqual(disk3.machine.name, 'testmachine1', 'Relations should be copied')
         disk4 = TestDisk()
-        disk4.copy_blueprint(disk1, include=['name'])
+        disk4.copy(disk1, include=['name'])
         self.assertEqual(disk4.name, 'test1', 'Name should be copied')
         self.assertEqual(disk4.size, 0, 'Size should not be copied')
         self.assertEqual(disk4.machine, None, 'Relations should not be copied')
         disk5 = TestDisk()
-        disk5.copy_blueprint(disk1, exclude=['name'])
+        disk5.copy(disk1, exclude=['name'])
         self.assertEqual(disk5.name, None, 'Name should not be copied')
         self.assertEqual(disk5.size, 100, 'Size should be copied')
         self.assertEqual(disk5.machine, None, 'Relations should not be copied')
@@ -743,9 +751,11 @@ class Basic(TestCase):
                              'query': {'type': DataList.where_operator.AND,
                                        'items': [('used_size', DataList.operator.NOT_EQUALS, -1)]}})
         disk1 = TestDisk()
+        disk1.name = 'disk 1'
         disk1.size = 100
         disk1.save()
         disk2 = TestDisk()
+        disk2.name = 'disk 2'
         disk2.size = 100
         disk2.save()
         query_result = get_disks()
@@ -759,11 +769,14 @@ class Basic(TestCase):
         Validates the abandoning behavior of the delete method
         """
         machine = TestMachine()
+        machine.name = 'machine'
         machine.save()
         disk_1 = TestDisk()
+        disk_1.name = 'disk 1'
         disk_1.machine = machine
         disk_1.save()
         disk_2 = TestDisk()
+        disk_2.name = 'disk 2'
         disk_2.machine = machine
         disk_2.save()
         self.assertRaises(LinkedObjectException, machine.delete)
@@ -780,6 +793,7 @@ class Basic(TestCase):
         Validates whether saving a previously deleted object raises
         """
         disk = TestDisk()
+        disk.name = 'disk'
         disk.save()
         disk.delete()
         self.assertRaises(ObjectNotFoundException, disk.save, 'Cannot resave a deleted object')
@@ -820,19 +834,25 @@ class Basic(TestCase):
         Validates whether a single relation load will preload all other related relations
         """
         machine_1 = TestMachine()
+        machine_1.name = 'machine 1'
         machine_1.save()
         disk_1_1 = TestDisk()
+        disk_1_1.name = 'disk 1.1'
         disk_1_1.machine = machine_1
         disk_1_1.save()
         disk_1_2 = TestDisk()
+        disk_1_2.name = 'disk 1.2'
         disk_1_2.machine = machine_1
         disk_1_2.save()
         machine_2 = TestMachine()
+        machine_2.name = 'machine 2'
         machine_2.save()
         disk_2_1 = TestDisk()
+        disk_2_1.name = 'disk 2.1'
         disk_2_1.machine = machine_2
         disk_2_1.save()
         disk_2_2 = TestDisk()
+        disk_2_2.name = 'disk 2.2'
         disk_2_2.machine = machine_2
         disk_2_2.save()
         # Load relations
@@ -937,6 +957,7 @@ class Basic(TestCase):
         Validates whether queries can use the _guid fields
         """
         machine = TestMachine()
+        machine.name = 'machine'
         machine.save()
         disk = TestDisk()
         disk.name = 'test'
@@ -986,8 +1007,10 @@ class Basic(TestCase):
         Validates whether relations on inherited hybrids behave OK
         """
         machine = TestMachine()
+        machine.name = 'machine'
         machine.save()
         disk = TestDisk()
+        disk.name = 'disk'
         disk.machine = machine  # Validates relation acceptance (accepts TestEMachine)
         disk.save()
         machine.the_disk = disk  # Validates whether _relations is build correctly
@@ -1031,3 +1054,30 @@ class Basic(TestCase):
                                    'items': []}}).data
         datalist = DataObjectList(data, TestMachine)
         self.assertEqual(len(datalist), 2, 'There should be two machines if searched for TestEMachine ({0})'.format(len(datalist)))
+
+    def test_mandatory_fields(self):
+        """
+        Validates whether mandatory properties and relations work
+        """
+        machine = TestMachine()
+        machine.extended = 'extended'
+        machine.name = 'machine'
+        machine.save()
+        disk = TestDisk()
+        # Modify relation to mandatory
+        [_ for _ in disk._relations if _.name == 'machine'][0].mandatory = True
+        # Continue test
+        disk.name = None
+        with self.assertRaises(MissingMandatoryFieldsException) as exception:
+            disk.save()
+        self.assertIn('name', exception.exception.message, 'Field name should be in exception message: {0}'.format(exception.exception.message))
+        self.assertIn('machine', exception.exception.message, 'Field machine should be in exception message: {0}'.format(exception.exception.message))
+        disk.name = 'disk'
+        disk.machine = machine
+        disk.save()
+        disk.description = 'test'
+        disk.storage = machine
+        disk.save()
+        # Restore relation
+        [_ for _ in disk._relations if _.name == 'machine'][0].mandatory = False
+

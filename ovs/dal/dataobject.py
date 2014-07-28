@@ -17,9 +17,10 @@ DataObject module
 """
 import uuid
 import copy
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException
+import inspect
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
-from ovs.dal.relations.relations import RelationMapper
+from ovs.dal.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.datalist import DataList
 from ovs.extensions.generic.volatilemutex import VolatileMutex
@@ -38,51 +39,56 @@ class MetaClass(type):
         Overrides instance creation of all DataObject instances
         """
         if name != 'DataObject':
-            for internal in ['_blueprint', '_relations', '_expiry']:
-                data = {}
+            for internal in ['_properties', '_relations', '_dynamics']:
+                data = set()
                 for base in bases:
                     if hasattr(base, internal):
                         data.update(getattr(base, internal))
                 if '_{0}_{1}'.format(name, internal) in dct:
                     data.update(dct.pop('_{0}_{1}'.format(name, internal)))
-                dct[internal] = data
+                dct[internal] = list(data)
 
-            for attribute, default in dct['_blueprint'].iteritems():
-                docstring = default[2] if len(default) == 3 else ''
-                if isinstance(default[1], type):
-                    itemtype = default[1].__name__
+            for prop in dct['_properties']:
+                docstring = prop.docstring
+                if isinstance(prop.property_type, type):
+                    itemtype = prop.property_type.__name__
                     extra_info = ''
                 else:
-                    itemtype = 'Enum({0})'.format(default[1][0].__class__.__name__)
-                    extra_info = '(enum values: {0})'.format(', '.join([str(item) for item in default[1]]))
-                dct[attribute] = property(
+                    itemtype = 'Enum({0})'.format(prop.property_type[0].__class__.__name__)
+                    extra_info = '(enum values: {0})'.format(', '.join(prop.property_type))
+                dct[prop.name] = property(
                     doc='[persistent] {0} {1}\n@type: {2}'.format(docstring, extra_info, itemtype)
                 )
-            for attribute, relation in dct['_relations'].iteritems():
-                itemtype = relation[0].__name__ if relation[0] is not None else name
-                dct[attribute] = property(
-                    doc='[relation] one-to-many relation with {0}.{1}\n@type: {2}'.format(itemtype, relation[1], itemtype)
+            for relation in dct['_relations']:
+                itemtype = relation.foreign_type.__name__ if relation.foreign_type is not None else name
+                dct[relation.name] = property(
+                    doc='[relation] one-to-{0} relation with {1}.{2}\n@type: {3}'.format(
+                        'one' if relation.onetoone else 'many',
+                        itemtype,
+                        relation.foreign_key,
+                        itemtype
+                    )
                 )
-            for attribute, info in dct['_expiry'].iteritems():
+            for dynamic in dct['_dynamics']:
                 if bases[0].__name__ == 'DataObject':
-                    if '_{0}'.format(attribute) not in dct:
-                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(attribute, name))
-                    method = dct['_{0}'.format(attribute)]
+                    if '_{0}'.format(dynamic.name) not in dct:
+                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(dynamic.name, name))
+                    method = dct['_{0}'.format(dynamic.name)]
                 else:
-                    methods = [getattr(base, '_{0}'.format(attribute)) for base in bases if hasattr(base, '_{0}'.format(attribute))]
+                    methods = [getattr(base, '_{0}'.format(dynamic.name)) for base in bases if hasattr(base, '_{0}'.format(dynamic.name))]
                     if len(methods) == 0:
-                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(attribute, name))
+                        raise LookupError('Dynamic property {0} in {1} could not be resolved'.format(dynamic.name, name))
                     method = [0]
                 docstring = method.__doc__.strip()
-                if isinstance(info[1], type):
-                    itemtype = info[1].__name__
+                if isinstance(dynamic.return_type, type):
+                    itemtype = dynamic.return_type.__name__
                     extra_info = ''
                 else:
-                    itemtype = 'Enum({0})'.format(info[1][0].__class__.__name__)
-                    extra_info = '(enum values: {0})'.format(', '.join([str(item) for item in info[1]]))
-                dct[attribute] = property(
+                    itemtype = 'Enum({0})'.format(dynamic.return_type[0].__class__.__name__)
+                    extra_info = '(enum values: {0})'.format(', '.join(dynamic.return_type))
+                dct[dynamic.name] = property(
                     fget=method,
-                    doc='[dynamic] ({0}s) {1} {2}\n@rtype: {3}'.format(info[0], docstring, extra_info, itemtype)
+                    doc='[dynamic] ({0}s) {1} {2}\n@rtype: {3}'.format(dynamic.timeout, docstring, extra_info, itemtype)
                 )
 
         return super(MetaClass, mcs).__new__(mcs, name, bases, dct)
@@ -111,9 +117,9 @@ class DataObject(object):
     #######################
 
     # Properties that needs to be overwritten by implementation
-    _blueprint = {}            # Blueprint data of the objec type
-    _expiry = {}               # Timeout of readonly object properties cache
-    _relations = {}            # Blueprint for relations
+    _properties = []  # Blueprint data of the objec type
+    _dynamics = []    # Timeout of readonly object properties cache
+    _relations = []   # Blueprint for relations
 
     #######################
     ## Constructor
@@ -163,15 +169,11 @@ class DataObject(object):
 
         # Rebuild _relation types
         hybrid_structure = HybridRunner.get_hybrids()
-        for relation in self._relations.iterkeys():
-            if self._relations[relation][0] is not None:
-                identifier = Descriptor(self._relations[relation][0]).descriptor['identifier']
+        for relation in self._relations:
+            if relation.foreign_type is not None:
+                identifier = Descriptor(relation.foreign_type).descriptor['identifier']
                 if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
-                    new_type = Descriptor().load(hybrid_structure[identifier]).get_object()
-                    if len(self._relations[relation]) == 2:
-                        self._relations[relation] = (new_type, self._relations[relation][1])
-                    else:
-                        self._relations[relation] = (new_type, self._relations[relation][1], self._relations[relation][2])
+                    relation.foreign_type = Descriptor().load(hybrid_structure[identifier]).get_object()
 
         # Init guid
         self._new = False
@@ -206,27 +208,24 @@ class DataObject(object):
                 self._metadata['cache'] = True
 
         # Set default values on new fields
-        for key, default in self._blueprint.iteritems():
-            if key not in self._data:
-                self._data[key] = default[0]
-
-        # Add properties where appropriate, hooking in the correct dictionary
-        for attribute, default in self._blueprint.iteritems():
-            self._add_blueprint_property(attribute, self._data[attribute])
+        for prop in self._properties:
+            if prop.name not in self._data:
+                self._data[prop.name] = prop.default
+            self._add_property(prop)
 
         # Load relations
-        for attribute, relation in self._relations.iteritems():
-            if attribute not in self._data:
-                if relation[0] is None:
+        for relation in self._relations:
+            if relation.name not in self._data:
+                if relation.foreign_type is None:
                     cls = self.__class__
                 else:
-                    cls = relation[0]
-                self._data[attribute] = Descriptor(cls).descriptor
-            self._add_relation_property(attribute, self._data[attribute])
+                    cls = relation.foreign_type
+                self._data[relation.name] = Descriptor(cls).descriptor
+            self._add_relation_property(relation)
 
         # Add wrapped properties
-        for attribute, expiry in self._expiry.iteritems():
-            self._add_dynamic_property(attribute)
+        for dynamic in self._dynamics:
+            self._add_dynamic_property(dynamic)
 
         # Load foreign keys
         relations = RelationMapper.load_foreign_relations(self.__class__)
@@ -255,29 +254,27 @@ class DataObject(object):
     ## Helper methods for dynamic getting and setting
     #######################
 
-    def _add_blueprint_property(self, attribute, value):
+    def _add_property(self, prop):
         """
         Adds a simple property to the object
         """
         # pylint: disable=protected-access
-        fget = lambda s: s._get_blueprint_property(attribute)
-        fset = lambda s, v: s._set_blueprint_property(attribute, v)
+        fget = lambda s: s._get_property(prop)
+        fset = lambda s, v: s._set_property(prop, v)
         # pylint: enable=protected-access
-        setattr(self.__class__, attribute, property(fget, fset))
-        self._data[attribute] = value
+        setattr(self.__class__, prop.name, property(fget, fset))
 
-    def _add_relation_property(self, attribute, value):
+    def _add_relation_property(self, relation):
         """
         Adds a complex property to the object (hybrids)
         """
         # pylint: disable=protected-access
-        fget = lambda s: s._get_relation_property(attribute)
-        fset = lambda s, v: s._set_relation_property(attribute, v)
-        gget = lambda s: s._get_guid_property(attribute)
+        fget = lambda s: s._get_relation_property(relation)
+        fset = lambda s, v: s._set_relation_property(relation, v)
+        gget = lambda s: s._get_guid_property(relation)
         # pylint: enable=protected-access
-        setattr(self.__class__, attribute, property(fget, fset))
-        setattr(self.__class__, '{0}_guid'.format(attribute), property(gget))
-        self._data[attribute] = value
+        setattr(self.__class__, relation.name, property(fget, fset))
+        setattr(self.__class__, '{0}_guid'.format(relation.name), property(gget))
 
     def _add_list_property(self, attribute, list):
         """
@@ -290,36 +287,38 @@ class DataObject(object):
         setattr(self.__class__, attribute, property(fget))
         setattr(self.__class__, ('{0}_guids' if list else '{0}_guid').format(attribute), property(gget))
 
-    def _add_dynamic_property(self, attribute):
+    def _add_dynamic_property(self, dynamic):
         """
         Adds a dynamic property to the object
         """
         # pylint: disable=protected-access
-        fget = lambda s: s._get_dynamic_property(attribute)
+        fget = lambda s: s._get_dynamic_property(dynamic)
         # pylint: enable=protected-access
-        setattr(self.__class__, attribute, property(fget))
+        setattr(self.__class__, dynamic.name, property(fget))
 
     # Helper method spporting property fetching
-    def _get_blueprint_property(self, attribute):
+    def _get_property(self, prop):
         """
         Getter for a simple property
         """
-        return self._data[attribute]
+        return self._data[prop.name]
 
-    def _get_relation_property(self, attribute):
+    def _get_relation_property(self, relation):
         """
         Getter for a complex property (hybrid)
         It will only load the object once and caches it for the lifetime of this object
         """
+        attribute = relation.name
         if attribute not in self._objects:
             descriptor = Descriptor().load(self._data[attribute])
             self._objects[attribute] = descriptor.get_object(instantiate=True)
         return self._objects[attribute]
 
-    def _get_guid_property(self, attribute):
+    def _get_guid_property(self, relation):
         """
         Getter for a foreign key property
         """
+        attribute = relation.name
         return self._data[attribute]['guid']
 
     def _get_list_property(self, attribute):
@@ -354,36 +353,37 @@ class DataObject(object):
             return dataobjectlist._guids
         return dataobjectlist.guid
 
-    def _get_dynamic_property(self, attribute):
+    def _get_dynamic_property(self, dynamic):
         """
         Getter for dynamic property, wrapping the internal data loading property
         in a caching layer
         """
-        data_loader = getattr(self, '_{0}'.format(attribute))
-        return self._backend_property(data_loader, attribute)
+        data_loader = getattr(self, '_{0}'.format(dynamic.name))
+        return self._backend_property(data_loader, dynamic)
 
     # Helper method supporting property setting
-    def _set_blueprint_property(self, attribute, value):
+    def _set_property(self, prop, value):
         """
         Setter for a simple property that will validate the type
         """
         self.dirty = True
         if value is None:
-            self._data[attribute] = value
+            self._data[prop.name] = value
         else:
-            correct, allowed_types, given_type = Toolbox.check_type(value, self._blueprint[attribute][1])
+            correct, allowed_types, given_type = Toolbox.check_type(value, prop.property_type)
             if correct:
-                self._data[attribute] = value
+                self._data[prop.name] = value
             else:
                 raise TypeError('Property {0} allows types {1}. {2} given'.format(
-                    attribute, str(allowed_types), given_type
+                    prop.name, str(allowed_types), given_type
                 ))
 
-    def _set_relation_property(self, attribute, value):
+    def _set_relation_property(self, relation, value):
         """
         Setter for a complex property (hybrid) that will validate the type
         """
         self.dirty = True
+        attribute = relation.name
         if value is None:
             self._objects[attribute] = None
             self._data[attribute]['guid'] = None
@@ -407,9 +407,9 @@ class DataObject(object):
             # If our object structure is frozen (which is after __init__), we only allow known
             # property updates: items that are in __dict__ and our own blueprinting dicts
             allowed = key in self.__dict__ \
-                or key in self._blueprint \
-                or key in self._relations \
-                or key in self._expiry
+                or key in (prop.name for prop in self._properties) \
+                or key in (relation.name for relation in self._relations) \
+                or key in (dynamic.name for dynamic in self._dynamics)
         if allowed:
             super(DataObject, self).__setattr__(key, value)
         else:
@@ -426,13 +426,23 @@ class DataObject(object):
         It will also invalidate certain caches if required. For example lists pointing towards this
         object
         """
+        invalid_fields = []
+        for prop in self._properties:
+            if prop.mandatory is True and self._data[prop.name] is None:
+                invalid_fields.append(prop.name)
+        for relation in self._relations:
+            if relation.mandatory is True and self._data[relation.name]['guid'] is None:
+                invalid_fields.append(relation.name)
+        if len(invalid_fields) > 0:
+            raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._name, ', '.join(invalid_fields)))
+
         if recursive:
             # Save objects that point to us (e.g. disk.vmachine - if this is disk)
-            for attribute, default in self._relations.iteritems():
-                if attribute != skip:  # disks will be skipped
-                    item = getattr(self, attribute)
+            for relation in self._relations:
+                if relation.name != skip:  # disks will be skipped
+                    item = getattr(self, relation.name)
                     if item is not None:
-                        item.save(recursive=True, skip=default[1])
+                        item.save(recursive=True, skip=relation.foreign_key)
 
             # Save object we point at (e.g. machine.disks - if this is machine)
             relations = RelationMapper.load_foreign_relations(self.__class__)
@@ -489,24 +499,25 @@ class DataObject(object):
         # Invalidate lists/queries
         # First, invalidate reverse lists (where we point to a remote object,
         # invalidating that remote list)
-        for key, default in self._relations.iteritems():
+        for relation in self._relations:
+            key = relation.name
             if self._original[key]['guid'] != self._data[key]['guid']:
-                if default[0] is None:
+                if relation.foreign_type is None:
                     classname = self.__class__.__name__.lower()
                 else:
-                    classname = default[0].__name__.lower()
+                    classname = relation.foreign_type.__name__.lower()
                 # The field points to another object
                 self._volatile.delete('{0}_{1}_{2}_{3}'.format(
                     DataList.namespace,
                     classname,
                     self._original[key]['guid'],
-                    default[1]
+                    relation.foreign_key
                 ))
                 self._volatile.delete('{0}_{1}_{2}_{3}'.format(
                     DataList.namespace,
                     classname,
                     self._data[key]['guid'],
-                    default[1]
+                    relation.foreign_key
                 ))
         # Second, invalidate property lists
         try:
@@ -606,16 +617,17 @@ class DataObject(object):
         Invalidates all dynamic property caches. Use with caution, as this action can introduce
         a short performance hit.
         """
-        for key in self._expiry.keys():
-            if properties is None or key in properties:
-                self._volatile.delete('{0}_{1}'.format(self._key, key))
+        for dynamic in self._dynamics:
+            if properties is None or dynamic.name in properties:
+                self._volatile.delete('{0}_{1}'.format(self._key, dynamic.name))
 
     def serialize(self, depth=0):
         """
         Serializes the internal data, getting rid of certain metadata like descriptors
         """
         data = {'guid': self.guid}
-        for key in self._relations:
+        for relation in self._relations:
+            key = relation.name
             if depth == 0:
                 data['{0}_guid'.format(key)] = self._data[key]['guid']
             else:
@@ -624,15 +636,15 @@ class DataObject(object):
                     data[key] = getattr(self, key).serialize(depth=(depth - 1))
                 else:
                     data[key] = None
-        for key in self._blueprint:
-            data[key] = self._data[key]
-        for key in self._expiry.keys():
-            data[key] = getattr(self, key)
+        for prop in self._properties:
+            data[prop.name] = self._data[prop.name]
+        for dynamic in self._dynamics:
+            data[dynamic.name] = getattr(self, dynamic.name)
         return data
 
-    def copy_blueprint(self, other_object, include=None, exclude=None, include_relations=False):
+    def copy(self, other_object, include=None, exclude=None, include_relations=False):
         """
-        Copies all _blueprint (and optionally _relation) properties over from a given hybrid to
+        Copies all _properties (and optionally _relations) properties over from a given hybrid to
         self. One can pass in a list of properties that should be copied, or a list of properties
         that should not be copied. Exclude > Include
         """
@@ -643,17 +655,19 @@ class DataObject(object):
         if self.__class__.__name__ != other_object.__class__.__name__:
             raise TypeError('Properties can only be loaded from hybrids of the same type')
 
+        all_properties = [prop.name for prop in self._properties]
+        all_relations = [relation.name for relation in self._relations]
         if include:
             properties_to_copy = include
         else:
-            properties_to_copy = self._blueprint.keys()
+            properties_to_copy = all_properties
             if include_relations:
-                properties_to_copy += self._relations.keys()
+                properties_to_copy += all_relations
 
         if exclude:
             properties_to_copy = [p for p in properties_to_copy if p not in exclude]
 
-        possible_options = self._blueprint.keys() + (self._relations.keys() if include_relations else [])
+        possible_options = all_properties + (all_relations if include_relations else [])
         properties_to_copy = [p for p in properties_to_copy if p in possible_options]
 
         for key in properties_to_copy:
@@ -674,21 +688,26 @@ class DataObject(object):
     ## Helper methods
     #######################
 
-    def _backend_property(self, function, caller_name):
+    def _backend_property(self, function, dynamic):
         """
         Handles the internal caching of dynamic properties
         """
+        caller_name = dynamic.name
         cache_key   = '{0}_{1}'.format(self._key, caller_name)
         cached_data = self._volatile.get(cache_key)
         if cached_data is None:
-            cached_data = function()  # Load data from backend
+            function_info = inspect.getargspec(function)
+            if 'dynamic' in function_info.args:
+                cached_data = function(dynamic=dynamic)  # Load data from backend
+            else:
+                cached_data = function()
             if cached_data is not None:
-                correct, allowed_types, given_type = Toolbox.check_type(cached_data, self._expiry[caller_name][1])
+                correct, allowed_types, given_type = Toolbox.check_type(cached_data, dynamic.return_type)
                 if not correct:
                     raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
                         caller_name, str(allowed_types), given_type
                     ))
-            self._volatile.set(cache_key, cached_data, self._expiry[caller_name][0])
+            self._volatile.set(cache_key, cached_data, dynamic.timeout)
         return cached_data
 
     def __str__(self):

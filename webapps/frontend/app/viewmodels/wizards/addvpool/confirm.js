@@ -34,7 +34,7 @@ define([
             return $.Deferred(function(deferred) {
                 var post_data = {
                     vpool_name: self.data.name(),
-                    backend_type: self.data.backend(),
+                    type: self.data.backend(),
                     connection_host: self.data.host(),
                     connection_port: self.data.port(),
                     connection_timeout: self.data.timeout(),

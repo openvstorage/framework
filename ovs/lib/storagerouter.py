@@ -124,7 +124,7 @@ class StorageRouterController(object):
         for storagedriver_guid in storagedriver_guids:
             try:
                 storagedriver = StorageDriver(storagedriver_guid)
-                storagerouter_machineid = storagedriver.storagerouter.machineid
+                storagerouter_machineid = storagedriver.storagerouter.machine_id
                 local_machineid = Ovs.get_my_machine_id()
                 if local_machineid == storagerouter_machineid:
                     # Inline execution, since it's on the same node (preventing deadlocks)

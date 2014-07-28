@@ -16,6 +16,7 @@
 TestDisk module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.t_testmachine import TestMachine
 
 
@@ -24,19 +25,17 @@ class TestDisk(DataObject):
     This TestDisk object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':        (None, str,   'Name of the test disk'),
-                   'description': (None, str,   'Description of the test disk'),
-                   'size':        (0,    float, 'Size of the test disk'),
-                   'order':       (0,    int,   'Order of the test disk'),
-                   'type':        (None, ['ONE', 'TWO'], 'Type of the test disk')}
-    __relations = {'machine': (TestMachine, 'disks'),
-                   'storage': (TestMachine, 'stored_disks'),
-                   'one':     (TestMachine, 'one', False),
-                   'parent':  (None,        'children')}
-    __expiry = {'used_size':  (5, int),
-                'wrong_type': (5, int)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the test disk'),
+                    Property('description', str, mandatory=False, doc='Description of the test disk'),
+                    Property('size', float, default=0, doc='Size of the test disk'),
+                    Property('order', int, default=0, doc='Order of the test disk'),
+                    Property('type', ['ONE', 'TWO'], mandatory=False, doc='Type of the test disk')]
+    __relations = [Relation('machine', TestMachine, 'disks', mandatory=False),
+                   Relation('storage', TestMachine, 'stored_disks', mandatory=False),
+                   Relation('one', TestMachine, 'one', mandatory=False, onetoone=True),
+                   Relation('parent', None, 'children', mandatory=False)]
+    __dynamics = [Dynamic('used_size', int, 5),
+                  Dynamic('wrong_type', int, 5)]
 
     # For testing purposes
     wrong_type_data = 0

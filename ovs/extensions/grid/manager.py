@@ -686,13 +686,13 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             pmachine.save()
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():
-            if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
+            if current_storagerouter.ip == ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
         if storagerouter is None:
             storagerouter = StorageRouter()
             storagerouter.name = new_node_hostname
-            storagerouter.machineid = unique_id
+            storagerouter.machine_id = unique_id
             storagerouter.ip = Manager._read_remote_config(client, 'ovs.grid.ip')
             storagerouter.save()
         storagerouter.pmachine = pmachine
@@ -764,7 +764,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():
-            if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
+            if current_storagerouter.ip == ip and current_storagerouter.machine_id == unique_id:
                 storagerouter = current_storagerouter
                 break
         if storagerouter is None:
@@ -773,9 +773,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         vpool = VPoolList.get_vpool_by_name(vpool_name)
         storagedriver = None
         if vpool is not None:
-            if vpool.backend_type == 'LOCAL':
+            if vpool.type == 'LOCAL':
                 # Might be an issue, investigating whether it's on the same not or not
-                if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machineid != unique_id:
+                if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machine_id != unique_id:
                     raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
             for vpool_storagedriver in vpool.storagedrivers:
                 if vpool_storagedriver.storagerouter_guid == storagerouter.guid:
@@ -827,55 +827,55 @@ if Service.has_service('{0}'):
             supported_backends = Manager._read_remote_config(client, 'volumedriver.supported.backends').split(',')
             if 'REST' in supported_backends:
                 supported_backends.remove('REST')  # REST is not supported for now
-            vpool.backend_type = parameters.get('backend_type') or Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
+            vpool.type = parameters.get('type') or Helper.ask_choice(supported_backends, 'Select type of storage backend', default_value='CEPH_S3')
             connection_host = connection_port = connection_username = connection_password = None
-            if vpool.backend_type in ['LOCAL', 'DISTRIBUTED']:
-                vpool.backend_metadata = {'backend_type': 'LOCAL'}
-                mountpoint_bfs = parameters.get('mountpoint_bfs') or Helper.ask_string('Specify {0} storage backend directory'.format(vpool.backend_type.lower()))
+            if vpool.type in ['LOCAL', 'DISTRIBUTED']:
+                vpool.metadata = {'backend_type': 'LOCAL'}
+                mountpoint_bfs = parameters.get('mountpoint_bfs') or Helper.ask_string('Specify {0} storage backend directory'.format(vpool.type.lower()))
                 directories_to_create.append(mountpoint_bfs)
-                if vpool.backend_type == 'DISTRIBUTED':
-                    vpool.backend_metadata['local_connection_path'] = mountpoint_bfs
-            if vpool.backend_type == 'REST':
+                if vpool.type == 'DISTRIBUTED':
+                    vpool.metadata['local_connection_path'] = mountpoint_bfs
+            if vpool.type == 'REST':
                 connection_host = parameters.get('connection_host') or Helper.ask_string('Provide REST ip address')
                 connection_port = parameters.get('connection_port') or Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
                 rest_connection_timeout_secs = parameters.get('connection_timeout') or Helper.ask_integer('Provide desired REST connection timeout(secs)',
                                                                                                           min_value=0, max_value=99999)
-                vpool.backend_metadata = {'rest_connection_host': connection_host,
-                                          'rest_connection_port': connection_port,
-                                          'buchla_connection_log_level': "0",
-                                          'rest_connection_verbose_logging': rest_connection_timeout_secs,
-                                          'rest_connection_metadata_format': "JSON",
-                                          'backend_type': 'REST'}
-            elif vpool.backend_type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
+                vpool.metadata = {'rest_connection_host': connection_host,
+                                  'rest_connection_port': connection_port,
+                                  'buchla_connection_log_level': "0",
+                                  'rest_connection_verbose_logging': rest_connection_timeout_secs,
+                                  'rest_connection_metadata_format': "JSON",
+                                  'backend_type': 'REST'}
+            elif vpool.type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
                 connection_host = parameters.get('connection_host') or Helper.ask_string('Specify fqdn or ip address for your S3 compatible host')
                 connection_port = parameters.get('connection_port') or Helper.ask_integer('Specify port for your S3 compatible host: ', min_value=1,
                                                                                           max_value=65535)
                 connection_username = parameters.get('connection_username') or Helper.ask_string('Specify S3 access key')
                 connection_password = parameters.get('connection_password') or getpass.getpass()
-                if vpool.backend_type in ['SWIFT_S3']:
+                if vpool.type in ['SWIFT_S3']:
                     strict_consistency = 'false'
                     s3_connection_flavour = 'SWIFT'
                 else:
                     strict_consistency = 'true'
                     s3_connection_flavour = 'S3'
 
-                vpool.backend_metadata = {'s3_connection_host': connection_host,
-                                          's3_connection_port': connection_port,
-                                          's3_connection_username': connection_username,
-                                          's3_connection_password': connection_password,
-                                          's3_connection_flavour': s3_connection_flavour,
-                                          's3_connection_strict_consistency': strict_consistency,
-                                          's3_connection_verbose_logging': 1,
-                                          'backend_type': 'S3'}
+                vpool.metadata = {'s3_connection_host': connection_host,
+                                  's3_connection_port': connection_port,
+                                  's3_connection_username': connection_username,
+                                  's3_connection_password': connection_password,
+                                  's3_connection_flavour': s3_connection_flavour,
+                                  's3_connection_strict_consistency': strict_consistency,
+                                  's3_connection_verbose_logging': 1,
+                                  'backend_type': 'S3'}
 
             vpool.name = vpool_name
-            vpool.description = "{} {}".format(vpool.backend_type, vpool_name)
-            vpool.backend_login = connection_username
-            vpool.backend_password = connection_password
+            vpool.description = "{} {}".format(vpool.type, vpool_name)
+            vpool.login = connection_username
+            vpool.password = connection_password
             if not connection_host:
-                vpool.backend_connection = None
+                vpool.connection = None
             else:
-                vpool.backend_connection = '{}:{}'.format(connection_host, connection_port)
+                vpool.connection = '{}:{}'.format(connection_host, connection_port)
             vpool.save()
 
         # Connection information is Storage Driver related information
@@ -999,7 +999,7 @@ storagedriver_configuration.configure_volumerouter('{0}', {7})
 storagedriver_configuration.configure_arakoon_cluster('{8}', {9})
 storagedriver_configuration.configure_hypervisor('{10}')
 storagedriver_configuration.configure_filedriver(fd_config)
-""".format(vpool_name, vpool.backend_metadata, readcaches, scocaches, failovercache, filesystem_config,
+""".format(vpool_name, vpool.metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
            storagerouter.pmachine.hvtype, mountpoint_cache)
         Manager._exec_python(client, storagedriver_config_script)

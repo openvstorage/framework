@@ -112,7 +112,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         if 'files' in request.DATA:
             files = request.DATA['files'].strip().split(',')
         return StorageRouterController.get_physical_metadata.s(files, obj.guid).apply_async(
-            routing_key='sr.{0}'.format(obj.machineid)
+            routing_key='sr.{0}'.format(obj.machine_id)
         )
 
     @link()
@@ -126,7 +126,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         _ = request
         return StorageRouterController.get_version_info.s(obj.guid).apply_async(
-            routing_key='sr.{0}'.format(obj.machineid)
+            routing_key='sr.{0}'.format(obj.machine_id)
         )
 
     @action()
@@ -167,7 +167,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
         return StorageRouterController.check_mtpt.s(parameters['name']).apply_async(
-            routing_key='sr.{0}'.format(obj.machineid)
+            routing_key='sr.{0}'.format(obj.machine_id)
         )
 
     @action()
@@ -179,7 +179,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Adds a vPool to a given Storage Router
         """
-        fields = ['vpool_name', 'backend_type', 'connection_host', 'connection_port', 'connection_timeout',
+        fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_cache', 'storage_ip', 'vrouter_port']
         parameters = {'storagerouter_ip': obj.ip}
@@ -190,4 +190,4 @@ class StorageRouterViewSet(viewsets.ViewSet):
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
 
-        return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(obj.machineid))
+        return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(obj.machine_id))

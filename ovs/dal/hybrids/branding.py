@@ -16,18 +16,17 @@
 Branding module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property
 
 
 class Branding(DataObject):
     """
     The Branding class represents the specific OEM information.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':        (None,  str,  'Name of the Brand.'),
-                   'description': (None,  str,  'Description of the Brand.'),
-                   'css':         (None,  str,  'CSS file used by the Brand.'),
-                   'productname': (None,  str,  'Commercial product name.'),
-                   'is_default':  (False, bool, 'Indicates whether this Brand is the default one.')}
-    __relations = {}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = {Property('name', str, doc='Name of the Brand.'),
+                    Property('description', str, mandatory=False, doc='Description of the Brand.'),
+                    Property('css', str, doc='CSS file used by the Brand.'),
+                    Property('productname', str, doc='Commercial product name.'),
+                    Property('is_default', bool, doc='Indicates whether this Brand is the default one.')}
+    __relations = []
+    __dynamics = []

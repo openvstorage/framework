@@ -15,6 +15,7 @@
 """
 TestEMachine module
 """
+from ovs.dal.structures import Property, Relation
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.hybrids.t_testdisk import TestDisk
 
@@ -24,8 +25,6 @@ class TestEMachine(TestMachine):
     This ExtendedDisk object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'extended': (None, str, 'Extended property')}
-    __relations = {'the_disk': (TestDisk, 'the_machines')}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = [Property('extended', str, mandatory=False, doc='Extended property')]
+    __relations = [Relation('the_disk', TestDisk, 'the_machines', mandatory=False)]
+    __dynamics = []

@@ -16,6 +16,7 @@
 RoleGroup module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Relation
 from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.group import Group
 
@@ -24,9 +25,7 @@ class RoleGroup(DataObject):
     """
     The RoleGroup class represents the junction table between Role and Group.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {}
-    __relations = {'role':  (Role,  'groups'),
-                   'group': (Group, 'roles')}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = []
+    __relations = [Relation('role', Role, 'groups'),
+                   Relation('group', Group, 'roles')]
+    __dynamics = []

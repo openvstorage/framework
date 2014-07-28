@@ -684,15 +684,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 pmachine.save()
             storagerouter = None
             for current_storagerouter in StorageRouterList.get_storagerouters():
-                if current_storagerouter.ip == ip and current_storagerouter.machineid == unique_id:
+                if current_storagerouter.ip == ip and current_storagerouter.machine_id == unique_id:
                     storagerouter = current_storagerouter
                     break
             if storagerouter is None:
                 storagerouter = StorageRouter()
                 storagerouter.name = node_name
-                storagerouter.machineid = unique_id
+                storagerouter.machine_id = unique_id
                 storagerouter.ip = cluster_ip
-                storagerouter.save()
             storagerouter.pmachine = pmachine
             storagerouter.save()
 

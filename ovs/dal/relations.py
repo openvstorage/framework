@@ -40,20 +40,20 @@ class RelationMapper(object):
             hybrid_structure = HybridRunner.get_hybrids()
             for class_descriptor in hybrid_structure.values():  # Extended objects
                 cls = Descriptor().load(class_descriptor).get_object()
-                for key, item in cls._relations.iteritems():
-                    if item[0] is None:
+                for relation in cls._relations:
+                    if relation.foreign_type is None:
                         remote_class = cls
                     else:
-                        identifier = Descriptor(item[0]).descriptor['identifier']
+                        identifier = Descriptor(relation.foreign_type).descriptor['identifier']
                         if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
                             remote_class = Descriptor().load(hybrid_structure[identifier]).get_object()
                         else:
-                            remote_class = item[0]
+                            remote_class = relation.foreign_type
                     itemname = remote_class.__name__
                     if itemname == object_type.__name__:
-                        relation_info[item[1]] = {'class': Descriptor(cls).descriptor,
-                                                  'key': key,
-                                                  'list': item[2] if len(item) == 3 else True}
+                        relation_info[relation.foreign_key] = {'class': Descriptor(cls).descriptor,
+                                                               'key': relation.name,
+                                                               'list': not relation.onetoone}
             volatile.set(relation_key, relation_info)
         else:
             Toolbox.log_cache_hit('relations', True)

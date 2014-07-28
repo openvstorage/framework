@@ -16,6 +16,7 @@
 VDisk module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.vmachine import VMachine
@@ -31,39 +32,32 @@ class VDisk(DataObject):
     The VDisk class represents a vDisk. A vDisk is a Virtual Disk served by Open vStorage.
     vDisks can be part of a vMachine or stand-alone.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':              (None, str, 'Name of the vDisk.'),
-                   'description':       (None, str, 'Description of the vDisk.'),
-                   'size':              (0, int, 'Size of the vDisk in Bytes.'),
-                   'devicename':        (None, str, 'The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
-                   'order':             (None, int, 'Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
-                   'volume_id':         (None, str, 'ID of the vDisk in the Open vStorage Volume Driver.'),
-                   'parentsnapshot':    (None, str, 'Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
-                   'retentionpolicyid': (None, str, 'Retention policy used by the vDisk.'),
-                   'snapshotpolicyid':  (None, str, 'Snapshot policy used by the vDisk.'),
-                   'tags':              (list(), list, 'Tags of the vDisk.'),
-                   'has_autobackup':    (False, bool, 'Indicates whether this vDisk has autobackup enabled.'),
-                   'type':              ('DSSVOL', ['DSSVOL'], 'Type of the vDisk.'),
-                   'cinder_id':         (None, str, 'Cinder Volume ID, for volumes managed through Cinder'),}
-    __relations = {'vmachine':     (VMachine, 'vdisks'),
-                   'vpool':        (VPool, 'vdisks'),
-                   'parent_vdisk': (None, 'child_vdisks')}
-    __expiry = {'snapshots':          (60, list),
-                'info':               (60, dict),
-                'statistics':          (5, dict),
-                'storagedriver_id':   (60, str),
-                'storagerouter_guid': (15, str)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, mandatory=False, doc='Name of the vDisk.'),
+                    Property('description', str, mandatory=False, doc='Description of the vDisk.'),
+                    Property('size', int, doc='Size of the vDisk in Bytes.'),
+                    Property('devicename', str, doc='The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
+                    Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
+                    Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
+                    Property('parentsnapshot', str, mandatory=False, doc='Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
+                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder')]
+    __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
+                   Relation('vpool', VPool, 'vdisks'),
+                   Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
+    __dynamics = [Dynamic('snapshots', list, 60),
+                  Dynamic('info', dict, 60),
+                  Dynamic('statistics', dict, 5),
+                  Dynamic('storagedriver_id', str, 60),
+                  Dynamic('storagerouter_guid', str, 15)]
 
     def __init__(self, *args, **kwargs):
         """
         Initializes a vDisk, setting up its additional helpers
         """
         DataObject.__init__(self, *args, **kwargs)
-        if self.vpool:
-            self._frozen = False
-            self.storagedriver_client = StorageDriverClient().load(self.vpool)
-            self._frozen = True
+        self._frozen = False
+        self.storagedriver_client = None
+        self._frozen = True
+        self.reload_client()
 
     def _snapshots(self):
         """
@@ -109,7 +103,7 @@ class VDisk(DataObject):
                     vdiskinfodict[key] = str(vdiskinfodict[key])
         return vdiskinfodict
 
-    def _statistics(self):
+    def _statistics(self, dynamic):
         """
         Fetches the Statistics for the vDisk.
         """
@@ -147,7 +141,7 @@ class VDisk(DataObject):
                     vdiskstatsdict['{0}_ps'.format(key)] = previousdict.get('{0}_ps'.format(key), 0)
                 else:
                     vdiskstatsdict['{0}_ps'.format(key)] = (vdiskstatsdict[key] - previousdict[key]) / delta
-        volatile.set(prev_key, vdiskstatsdict, self._expiry['statistics'][0] * 10)
+        volatile.set(prev_key, vdiskstatsdict, dynamic.timeout * 10)
         # Returning the dictionary
         return vdiskstatsdict
 
@@ -174,3 +168,12 @@ class VDisk(DataObject):
         if len(storagedrivers) == 1:
             return storagedrivers[0].storagerouter_guid
         return None
+
+    def reload_client(self):
+        """
+        Reloads the StorageDriver Client
+        """
+        if self.vpool:
+            self._frozen = False
+            self.storagedriver_client = StorageDriverClient().load(self.vpool)
+            self._frozen = True

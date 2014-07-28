@@ -15,7 +15,7 @@
 """
 This module contains generic hybrid serializers
 """
-from ovs.dal.relations.relations import RelationMapper
+from ovs.dal.relations import RelationMapper
 from rest_framework import serializers
 
 
@@ -33,17 +33,17 @@ class FullSerializer(serializers.Serializer):
             del kwargs['allow_passwords']
         super(FullSerializer, self).__init__(*args, **kwargs)
         self.hybrid = hybrid
-        for key, default in self.hybrid._blueprint.iteritems():
-            if not 'password' in key or allow_passwords:
-                self.fields[key] = FullSerializer._map_type_to_field(default[1])
-        for key in self.hybrid._expiry:
-            if contents is None or (('_dynamics' in contents or key in contents)
-                                    and '-{0}'.format(key) not in contents):
-                self.fields[key] = serializers.Field()
-        for key in self.hybrid._relations:
-            if contents is None or (('_relations' in contents or key in contents)
-                                    and '-{0}'.format(key) not in contents):
-                self.fields['%s_guid' % key] = serializers.CharField(required=False)
+        for prop in self.hybrid._properties:
+            if not 'password' in prop.name or allow_passwords:
+                self.fields[prop.name] = FullSerializer._map_type_to_field(prop.property_type)
+        for dynamic in self.hybrid._dynamics:
+            if contents is None or (('_dynamics' in contents or dynamic.name in contents)
+                                    and '-{0}'.format(dynamic.name) not in contents):
+                self.fields[dynamic.name] = serializers.Field()
+        for relation in self.hybrid._relations:
+            if contents is None or (('_relations' in contents or relation.name in contents)
+                                    and '-{0}'.format(relation.name) not in contents):
+                self.fields['{0}_guid'.format(relation.name)] = serializers.CharField(required=False)
         relations = RelationMapper.load_foreign_relations(hybrid)
         if relations is not None:
             for key, info in relations.iteritems():
@@ -67,12 +67,12 @@ class FullSerializer(serializers.Serializer):
         Provides deserializing functionality for persistent properties
         """
         if instance is not None:
-            for key in self.hybrid._blueprint:
-                setattr(instance, key, attrs.get(key, getattr(instance, key)))
-            for key, relation in self.hybrid._relations.iteritems():
-                guid_key = '{0}_guid'.format(key)
+            for prop in self.hybrid._properties:
+                setattr(instance, prop.name, attrs.get(prop.name, getattr(instance, prop.name)))
+            for relation in self.hybrid._relations:
+                guid_key = '{0}_guid'.format(relation.name)
                 if guid_key in attrs and attrs[guid_key] != getattr(instance, guid_key):
-                    setattr(instance, key, None if attrs[guid_key] is None else relation[0](attrs[guid_key]))
+                    setattr(instance, relation.name, None if attrs[guid_key] is None else relation[0](attrs[guid_key]))
             return instance
         return self.hybrid(data=attrs)
 

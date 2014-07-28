@@ -117,10 +117,8 @@ class DeleteSnapshots(TestCase):
         vdisk_3.volume_id = 'vdisk_3'
         vdisk_3.save()
 
-        vdisk_1_1._expiry['snapshots'] = (0, list)
-        vdisk_1_2._expiry['snapshots'] = (0, list)
-        vdisk_2_1._expiry['snapshots'] = (0, list)
-        vdisk_3._expiry['snapshots'] = (0, list)
+        for disk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
+            [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
         debug = True

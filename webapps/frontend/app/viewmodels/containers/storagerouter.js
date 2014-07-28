@@ -42,7 +42,7 @@ define([
         self.loaded           = ko.observable(false);
         self.pMachineGuid     = ko.observable();
         self.name             = ko.observable();
-        self.machineid        = ko.observable();
+        self.machineId        = ko.observable();
         self.ipAddress        = ko.observable();
         self.status           = ko.observable();
         self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
@@ -97,7 +97,7 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.ipAddress, data, 'ip');
-            generic.trySet(self.machineid, data, 'machineid');
+            generic.trySet(self.machineId, data, 'machineid');
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');

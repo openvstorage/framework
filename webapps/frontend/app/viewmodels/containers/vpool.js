@@ -72,10 +72,10 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
-            generic.trySet(self.backendConnection, data, 'backend_connection');
-            generic.trySet(self.backendLogin, data, 'backend_login');
-            if (data.hasOwnProperty('backend_type')) {
-                self.backendType(data.backend_type);
+            generic.trySet(self.backendConnection, data, 'connection');
+            generic.trySet(self.backendLogin, data, 'login');
+            if (data.hasOwnProperty('type')) {
+                self.backendType(data.type);
             } else {
                 self.backendType(undefined);
             }

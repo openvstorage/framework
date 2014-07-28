@@ -18,6 +18,7 @@ StorageRouter module
 import time
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.pmachine import PMachine
 
 
@@ -25,20 +26,18 @@ class StorageRouter(DataObject):
     """
     A StorageRouter represents the Open vStorage software stack, any (v)machine on which it is installed
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':        (None,  str,  'Name of the vMachine.'),
-                   'description': (None,  str,  'Description of the vMachine.'),
-                   'machineid':   (None,  str,  'The hardware identifier of the vMachine'),
-                   'ip':          (None,  str,  'IP Address of the vMachine, if available'),
-                   'status':      ('OK',  ['OK', 'NOK'], 'Internal status of the software stack')}
-    __relations = {'pmachine': (PMachine, 'storagerouters')}
-    __expiry = {'statistics':       (5, dict),
-                'stored_data':     (60, int),
-                'failover_mode':   (60, str),
-                'vmachines_guids': (15, list),
-                'vpools_guids':    (15, list),
-                'vdisks_guids':    (15, list)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the vMachine.'),
+                    Property('description', str, mandatory=False, doc='Description of the vMachine.'),
+                    Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
+                    Property('ip', str, doc='IP Address of the vMachine, if available'),
+                    Property('status', ['OK', 'NOK'], default='OK', doc='Internal status of the software stack')]
+    __relations = [Relation('pmachine', PMachine, 'storagerouters')]
+    __dynamics = [Dynamic('statistics', dict, 5),
+                  Dynamic('stored_data', int, 60),
+                  Dynamic('failover_mode', str, 60),
+                  Dynamic('vmachines_guids', list, 15),
+                  Dynamic('vpools_guids', list, 15),
+                  Dynamic('vdisks_guids', list, 15)]
 
     def _statistics(self):
         """
@@ -52,8 +51,8 @@ class StorageRouter(DataObject):
         for storagedriver in self.storagedrivers:
             for vdisk in storagedriver.vpool.vdisks:
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    statistics = vdisk._statistics()  # Prevent double caching
-                    for key, value in statistics.iteritems():
+                    vdisk.invalidate_dynamics('statistics')  # Prevent double caching
+                    for key, value in vdisk.statistics.iteritems():
                         if key != 'timestamp':
                             vdiskstatsdict[key] += value
         vdiskstatsdict['timestamp'] = time.time()

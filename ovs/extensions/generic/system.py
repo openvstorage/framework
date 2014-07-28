@@ -71,7 +71,7 @@ class Ovs():
 
         if not Ovs.my_storagerouter_guid:
             for storagerouter in StorageRouterList.get_storagerouters():
-                if storagerouter.machineid == Ovs.get_my_machine_id():
+                if storagerouter.machine_id == Ovs.get_my_machine_id():
                     Ovs.my_storagerouter_guid = storagerouter.guid
         return StorageRouter(Ovs.my_storagerouter_guid)
 

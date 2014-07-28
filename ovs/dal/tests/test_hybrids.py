@@ -23,7 +23,7 @@ from ovs.dal.tests.mockups import FactoryModule
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.helpers import HybridRunner, Descriptor
-from ovs.dal.relations.relations import RelationMapper
+from ovs.dal.relations import RelationMapper
 
 
 class Basic(TestCase):
@@ -90,28 +90,28 @@ class Basic(TestCase):
                     else:
                         remote_properties_1.append(key)
             # Make sure certain attributes are correctly set
-            self.assertIsInstance(cls._blueprint, dict, '_blueprint required: {0}'.format(cls.__name__))
-            self.assertIsInstance(cls._relations, dict, '_relations required: {0}'.format(cls.__name__))
-            self.assertIsInstance(cls._expiry, dict, '_expiry required: {0}'.format(cls.__name__))
+            self.assertIsInstance(cls._properties, list, '_properties required: {0}'.format(cls.__name__))
+            self.assertIsInstance(cls._relations, list, '_relations required: {0}'.format(cls.__name__))
+            self.assertIsInstance(cls._dynamics, list, '_dynamics required: {0}'.format(cls.__name__))
             # Check types
             allowed_types = [int, float, str, bool, list, dict]
-            for key in cls._blueprint:
-                is_allowed_type = cls._blueprint[key][1] in allowed_types \
-                    or isinstance(cls._blueprint[key][1], list)
+            for prop in cls._properties:
+                is_allowed_type = prop.property_type in allowed_types \
+                    or isinstance(prop.property_type, list)
                 self.assertTrue(is_allowed_type,
-                                '_blueprint types in {0} should be one of {1}'.format(
+                                '_properties types in {0} should be one of {1}'.format(
                                     cls.__name__, str(allowed_types)
                                 ))
-            for key in cls._expiry:
-                is_allowed_type = cls._expiry[key][1] in allowed_types \
-                    or isinstance(cls._expiry[key][1], list)
+            for dynamic in cls._dynamics:
+                is_allowed_type = dynamic.return_type in allowed_types \
+                    or isinstance(dynamic.return_type, list)
                 self.assertTrue(is_allowed_type,
-                                '_expiry types in {0} should be one of {1}'.format(
+                                '_dynamics types in {0} should be one of {1}'.format(
                                     cls.__name__, str(allowed_types)
                                 ))
             instance = cls()
-            for key, default in cls._blueprint.iteritems():
-                self.assertEqual(getattr(instance, key), default[0],
+            for prop in cls._properties:
+                self.assertEqual(getattr(instance, prop.name), prop.default,
                                  'Default property set correctly')
             # Make sure the type can be instantiated
             self.assertIsNotNone(instance.guid)
@@ -121,27 +121,27 @@ class Basic(TestCase):
                     properties.append(item)
             # All expiries should be implemented
             missing_props = []
-            for attribute in instance._expiry.keys():
-                if attribute not in properties:
-                    missing_props.append(attribute)
+            for dynamic in instance._dynamics:
+                if dynamic.name not in properties:
+                    missing_props.append(dynamic.name)
                 else:  # ... and should work
-                    _ = getattr(instance, attribute)
+                    _ = getattr(instance, dynamic.name)
             self.assertEqual(len(missing_props), 0,
                              'Missing dynamic properties in {0}: {1}'.format(cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry
             missing_metadata = []
-            for prop in properties:
-                found = prop in cls._blueprint \
-                    or prop in cls._relations \
-                    or prop in ['{0}_guid'.format(key) for key in cls._relations.keys()] \
-                    or prop in cls._expiry \
-                    or prop in remote_properties_n \
-                    or prop in remote_properties_1 \
-                    or prop in ['{0}_guids'.format(key) for key in remote_properties_n] \
-                    or prop in ['{0}_guid'.format(key) for key in remote_properties_1] \
-                    or prop == 'guid'
+            for found_prop in properties:
+                found = found_prop in [prop.name for prop in cls._properties] \
+                    or found_prop in [relation.name for relation in cls._relations] \
+                    or found_prop in ['{0}_guid'.format(relation.name) for relation in cls._relations] \
+                    or found_prop in [dynamic.name for dynamic in cls._dynamics] \
+                    or found_prop in remote_properties_n \
+                    or found_prop in remote_properties_1 \
+                    or found_prop in ['{0}_guids'.format(key) for key in remote_properties_n] \
+                    or found_prop in ['{0}_guid'.format(key) for key in remote_properties_1] \
+                    or found_prop == 'guid'
                 if not found:
-                    missing_metadata.append(prop)
+                    missing_metadata.append(found_prop)
             self.assertEqual(len(missing_metadata), 0,
                              'Missing metadata for properties in {0}: {1}'.format(cls.__name__, missing_metadata))
             instance.delete()
