@@ -16,6 +16,7 @@
 RoleBearerToken module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Relation
 from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.bearertoken import BearerToken
 
@@ -24,9 +25,7 @@ class RoleBearerToken(DataObject):
     """
     The RoleBearerToken class represents the junction table between Role and BearerToken.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {}
-    __relations = {'role': (Role,  'tokens'),
-                   'token': (BearerToken, 'roles')}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = []
+    __relations = [Relation('role', Role, 'tokens'),
+                   Relation('token', BearerToken, 'roles')]
+    __dynamics = []

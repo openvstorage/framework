@@ -16,6 +16,7 @@
 Client module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.user import User
 
 
@@ -24,14 +25,12 @@ class Client(DataObject):
     The Client class represents a client (application) used by the User. A user might use multiple clients and
     will at least have one default application (frontend GUI)
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':          (None, str, 'Optional name of the client'),
-                   'client_secret': (None, str, 'Client secret (application password)'),
-                   'grant_type':    (None, ['PASSWORD', 'CLIENT_CREDENTIALS'], 'Grant type of the Client'),
-                   'ovs_type':      (None, ['FRONTEND', 'REPLICATION', 'USER'], 'The type of the client within Open vStorage')}
-    __relations = {'user': (User, 'clients')}
-    __expiry = {'client_id': (86400, str)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Optional name of the client'),
+                    Property('client_secret', str, doc='Client secret (application password)'),
+                    Property('grant_type', ['PASSWORD', 'CLIENT_CREDENTIALS'], doc='Grant type of the Client'),
+                    Property('ovs_type', ['FRONTEND', 'REPLICATION', 'USER'], doc='The type of the client within Open vStorage')]
+    __relations = [Relation('user', User, 'clients')]
+    __dynamics = [Dynamic('client_id', str, 86400)]
 
     def _client_id(self):
         """

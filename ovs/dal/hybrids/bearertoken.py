@@ -16,6 +16,7 @@
 Bearer Token module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation
 from ovs.dal.hybrids.client import Client
 
 
@@ -23,10 +24,8 @@ class BearerToken(DataObject):
     """
     The Bearer Token class represents the Bearer tokens used by the API by means of OAuth 2.0
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'access_token':  (None, str, 'Access token'),
-                   'refresh_token': (None, str, 'Refresh token'),
-                   'expiration':    (None, int, 'Expiration timestamp')}
-    __relations = {'client': (Client, 'tokens')}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = [Property('access_token', str, mandatory=False, doc='Access token'),
+                    Property('refresh_token', str, mandatory=False, doc='Refresh token'),
+                    Property('expiration', int, doc='Expiration timestamp')]
+    __relations = [Relation('client', Client, 'tokens')]
+    __dynamics = []

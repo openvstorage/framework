@@ -226,6 +226,7 @@ class Basic(TestCase):
         """
         self.assertRaises(ValueError, TestDisk, 'foo', None)
         disk = TestDisk()  # Should not raise
+        disk.name = 'disk'
         disk.save()
         _ = TestDisk(disk.guid)  # Should not raise
 
