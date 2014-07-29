@@ -34,7 +34,6 @@ class CORSMiddleware(object):
         """
         _ = self
         if request.method == 'OPTIONS' and 'HTTP_ACCESS_CONTROL_REQUEST_METHOD' in request.META:
-            logger.debug('Allow CORS preflight')
             response = http.HttpResponse()
             return response
         return None
@@ -48,7 +47,6 @@ class CORSMiddleware(object):
             storagerouters = StorageRouterList.get_storagerouters()
             allowed_origins = ['https://{0}'.format(storagerouter.ip) for storagerouter in storagerouters]
             if request.META['HTTP_ORIGIN'] in allowed_origins:
-                logger.debug('Set CORS preflight headers')
                 response['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
                 response['Access-Control-Allow-Credentials'] = 'true'
                 response['Access-Control-Allow-Headers'] = 'x-requested-with, content-type, accept, origin, authorization, x-csrftoken'

@@ -17,6 +17,7 @@ DataObject module
 """
 import uuid
 import copy
+import re
 import inspect
 from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
@@ -181,7 +182,11 @@ class DataObject(object):
             self._guid = str(uuid.uuid4())
             self._new = True
         else:
-            self._guid = str(guid)
+            guid = str(guid).lower()
+            if re.match('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', guid) is not None:
+                self._guid = str(guid)
+            else:
+                raise ValueError('The given guid is invalid')
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)

@@ -32,11 +32,11 @@ class Toolbox:
         return regex.match(string)
 
     @staticmethod
-    def is_user_in_roles(user, roles):
+    def is_client_in_roles(client, roles):
         """
         Checks whether a user is member of a set of roles
         """
-        user_roles = [j.role.code for j in user.group.roles]
+        user_roles = [j.role.code for j in client.roles]
         for required_role in roles:
             if required_role not in user_roles:
                 return False

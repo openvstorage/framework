@@ -40,7 +40,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(StorageRouter, 'name,vpool_guid')
+    @get_list(StorageRouter, 'name')
     def list(self, request, hints):
         """
         Overview of all Storage Routers

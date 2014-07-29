@@ -15,7 +15,10 @@ limitations under the License.
 -->
 <div>
     <div>
-        <p data-i18n="ovs:wizards.changepassword.confirm.introduction"></p>
+        <p style="margin-bottom: 18px;">
+            <span data-i18n="ovs:wizards.changepassword.confirm.introduction"></span>
+            <b data-bind="html: data.user() !== undefined ? data.user().username() : '<i>loading...</i>'"></b>
+        </p>
         <form role="form form-horizontal" class="form-horizontal">
             <div class="form-group">
                 <label class="col-lg-3 control-label" for="currentpassword" data-i18n="ovs:wizards.changepassword.confirm.currentpassword"></label>

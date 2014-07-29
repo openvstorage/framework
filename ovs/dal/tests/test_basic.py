@@ -220,6 +220,16 @@ class Basic(TestCase):
         # ... after which they should be reloaded from the backend
         self.assertNotEqual(disk.used_size, value, 'Value should be different')
 
+    def test_primarykeyvalidation(self):
+        """
+        Validates whether the passed in key (guid) of an object is validated
+        """
+        self.assertRaises(ValueError, TestDisk, 'foo', None)
+        disk = TestDisk()  # Should not raise
+        disk.name = 'disk'
+        disk.save()
+        _ = TestDisk(disk.guid)  # Should not raise
+
     def test_persistency(self):
         """
         Validates whether the object is fetches from the correct storage backend

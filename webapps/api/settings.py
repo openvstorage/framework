@@ -84,7 +84,6 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    APP_NAME + '.backend.authentication_middleware.AuthenticationMiddleware',
     APP_NAME + '.backend.error_middleware.ExceptionMiddleware',
     APP_NAME + '.backend.cors_middleware.CORSMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -92,8 +91,6 @@ MIDDLEWARE_CLASSES = (
 )
 
 AUTHENTICATION_BACKENDS = (
-    APP_NAME + '.backend.authentication_backend.UPAuthenticationBackend',
-    APP_NAME + '.backend.authentication_backend.HashAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',
 )
 
@@ -130,7 +127,7 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        APP_NAME + '.backend.authentication_backend.TokenAuthenticationBackend'
+        APP_NAME + '.oauth2.backend.OAuth2Backend'
     )
 }
 

@@ -14,8 +14,8 @@
 /*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared', 'viewmodels/wizards/changepassword/index'
-], function(router, dialog, $, shared, ChangePasswordWizard) {
+    'ovs/shared'
+], function(router, dialog, $, shared) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
@@ -45,11 +45,6 @@ define([
     return {
         shared: shared,
         router: childRouter,
-        changePassword: function() {
-            dialog.show(new ChangePasswordWizard({
-                modal: true
-            }));
-        },
         activate: function(mode) {
             var self = this;
             // Config

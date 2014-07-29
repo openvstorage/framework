@@ -16,19 +16,7 @@ define(['knockout'], function(ko){
     "use strict";
     var singleton = function() {
         return {
-            messaging      : undefined,
-            tasks          : undefined,
-            authentication : undefined,
-            defaultLanguage: 'en-US',
-            language       : 'en-US',
-            mode           : ko.observable('full'),
-            routing        : undefined,
-            footerData     : ko.observable(ko.observable()),
-            nodes          : undefined,
-            user           : {
-                username: ko.observable(),
-                guid    : ko.observable()
-            }
+            user: ko.observable()
         };
     };
     return singleton();

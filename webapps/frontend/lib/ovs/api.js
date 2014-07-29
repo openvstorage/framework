@@ -13,9 +13,9 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery',
+    'jquery', 'plugins/router',
     'ovs/shared', 'ovs/generic'
-], function($, shared, generic) {
+], function($, router, shared, generic) {
     'use strict';
     function call(api, data, filter, type) {
         var querystring = [], key, callData, cookie, jqXhr,
@@ -51,6 +51,9 @@ define([
                 // We check whether we actually received an error, and it's not the browser navigating away
                 if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
                     generic.validate(shared.nodes);
+                } else if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 403 &&
+                           xmlHttpRequest.responseText === '{"detail": "Invalid token"}') {
+                    shared.authentication.logout();
                 } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                     deferred.reject({
                         status: xmlHttpRequest.status,
