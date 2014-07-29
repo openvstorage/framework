@@ -72,7 +72,7 @@ class FullSerializer(serializers.Serializer):
             for relation in self.hybrid._relations:
                 guid_key = '{0}_guid'.format(relation.name)
                 if guid_key in attrs and attrs[guid_key] != getattr(instance, guid_key):
-                    setattr(instance, relation.name, None if attrs[guid_key] is None else relation[0](attrs[guid_key]))
+                    setattr(instance, relation.name, None if attrs[guid_key] is None else relation.foreign_type(attrs[guid_key]))
             return instance
         return self.hybrid(data=attrs)
 
