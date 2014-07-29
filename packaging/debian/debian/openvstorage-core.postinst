@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Post install deps
+easy_install -U cuisine
+pip install pysnmp==4.2.5
+
+# Activate kibana
+SOURCE=/root/kibana
+TARGET=/opt/OpenvStorage/webapps/frontend/logging
+mkdir -p ${TARGET}
+mv ${SOURCE}/* ${TARGET}
+chown -R ovs:ovs ${TARGET}
+cp ${TARGET}/app/dashboards/guided.json ${TARGET}/app/dashboards/default.json
+
+# Disable/stop default services. Will be replaced by upstart scripts
+service rabbitmq-server stop
+update-rc.d rabbitmq-server disable
+service nginx stop
+update-rc.d nginx disable
+service memcached stop
+update-rc.d memcached disable
+
+python /opt/OpenvStorage/scripts/install/openvstorage-core.postinst.py "__NEW_VERSION__" "$@"
