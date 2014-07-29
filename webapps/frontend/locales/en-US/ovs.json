@@ -302,7 +302,7 @@
             "storagerouter": {
                 "helpcontent": "The Storage Router panel list all the Storage Routers registered in the Open vStorage Cluster. For each Storage Router the status, name, IP address and amount of vDisks is displayed.",
                 "helptitle": "Help - Storage Router",
-                "title": "Storager Appliance"
+                "title": "Storage Router"
             },
             "cache": {
                 "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
