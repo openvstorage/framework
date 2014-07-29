@@ -29,7 +29,7 @@ def services_running():
     value = str(time.time())
 
     # 1. Volatile
-    print 'Testing volatile store...'
+    logger.debug('Testing volatile store...')
     max_tries = 5
     tries = 0
     while tries < max_tries:
@@ -42,16 +42,16 @@ def services_running():
                 break
             volatile.delete(key)
         except Exception as message:
-            print '  Error during volatile store test: {0}'.format(message)
+            logger.debug('  Error during volatile store test: {0}'.format(message))
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
         tries += 1
     if tries == max_tries:
-        print '  Volatile store not working correctly'
+        logger.debug('  Volatile store not working correctly')
         return False
-    print '  Volatile store OK after {0} tries'.format(tries)
+    logger.debug('  Volatile store OK after {0} tries'.format(tries))
 
     # 2. Persistent
-    print 'Testing persistent store...'
+    logger.debug('Testing persistent store...')
     max_tries = 5
     tries = 0
     while tries < max_tries:
@@ -64,16 +64,16 @@ def services_running():
                 break
             persistent.delete(key)
         except Exception as message:
-            print '  Error during persistent store test: {0}'.format(message)
+            logger.debug('  Error during persistent store test: {0}'.format(message))
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
         tries += 1
     if tries == max_tries:
-        print '  Persistent store not working correctly'
+        logger.debug('  Persistent store not working correctly')
         return False
-    print '  Persistent store OK after {0} tries'.format(tries)
+    logger.debug('  Persistent store OK after {0} tries'.format(tries))
 
     # 3. Arakoon, voldrv cluster
-    print 'Testing arakoon (voldrv)...'
+    logger.debug('Testing arakoon (voldrv)...')
     max_tries = 5
     tries = 0
     while tries < max_tries:
@@ -87,16 +87,16 @@ def services_running():
                 break
             client.delete(key)
         except Exception as message:
-            print '  Error during arakoon (voldrv) test: {0}'.format(message)
+            logger.debug('  Error during arakoon (voldrv) test: {0}'.format(message))
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
         tries += 1
     if tries == max_tries:
-        print '  Arakoon (voldrv) not working correctly'
+        logger.debug('  Arakoon (voldrv) not working correctly')
         return False
-    print '  Arakoon (voldrv) OK'
+    logger.debug('  Arakoon (voldrv) OK')
 
     # 4. RabbitMQ
-    print 'Test rabbitMQ...'
+    logger.debug('Test rabbitMQ...')
     import pika
     from configobj import ConfigObj
     from ovs.plugin.provider.configuration import Configuration
@@ -117,31 +117,31 @@ def services_running():
             connection.close()
             good_node = True
         except Exception as message:
-            print '  Error during rabbitMQ test on node {0}: {1}'.format(server, message)
+            logger.debug('  Error during rabbitMQ test on node {0}: {1}'.format(server, message))
     if good_node is False:
-        print '  No working rabbitMQ node could be found'
+        logger.debug('  No working rabbitMQ node could be found')
         return False
-    print '  RabbitMQ test OK'
-    print 'All tests OK'
+    logger.debug('  RabbitMQ test OK')
+    logger.debug('All tests OK')
     return True
 
 
 if __name__ == '__main__':
-    print 'Starting service'
+    logger.debug('Starting service')
     if sys.argv[1] == 'wait':
-        print 'Waiting for master services'
+        logger.debug('Waiting for master services')
         while True:
             if services_running():
-                print 'Master services available'
+                logger.debug('Master services available')
                 sys.exit(0)
             time.sleep(5)
     if sys.argv[1] == 'check':
-        print 'Checking master services'
+        logger.debug('Checking master services')
         while True:
             if not services_running():
-                print 'One of the master services is unavailable'
+                logger.debug('One of the master services is unavailable')
                 sys.exit(1)
             time.sleep(5)
-    print 'Invalid parameter'
+    logger.debug('Invalid parameter')
     time.sleep(60)
     sys.exit(1)
