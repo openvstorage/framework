@@ -17,7 +17,7 @@ Module for clients
 """
 
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose, validate, get_object, get_list
+from backend.decorators import required_roles, expose, return_object, return_list, discover
 from backend.toolbox import Toolbox
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from rest_framework import status, viewsets
@@ -39,38 +39,38 @@ class ClientViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(Client)
-    def list(self, request, format=None, hints=None):
+    @return_list(Client)
+    @discover()
+    def list(self, request, userguid=None):
         """
         Lists all available Clients where the logged in user has access to
         """
-        _ = format, hints
         if Toolbox.is_client_in_roles(request.client, ['system']):
             client_list = ClientList.get_clients()
         else:
             client_list = [client for client in request.client.user.clients if client.ovs_type != 'FRONTEND']
-        if request.GET.get('userguid', None) is not None:
-            return [client for client in client_list if client.user_guid == request.GET['userguid']]
+        if userguid is not None:
+            return [client for client in client_list if client.user_guid == userguid]
         return client_list
 
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(Client)
-    @get_object(Client)
-    def retrieve(self, request, obj):
+    @return_object(Client)
+    @discover(Client)
+    def retrieve(self, request, client):
         """
         Load information about a given Client
         Only the currently logged in User's Clients are accessible, or all if the logged in User has a
         system role
         """
         _ = format
-        if obj.guid in request.client.user.clients_guids or Toolbox.is_client_in_roles(request.client, ['system']):
-            return obj
+        if client.guid in request.client.user.clients_guids or Toolbox.is_client_in_roles(request.client, ['system']):
+            return client
         raise PermissionDenied('Fetching user information not allowed')
 
     @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
-    def create(self, request, format=None):
+    def create(self, request):
         """
         Creates a Client
         """
@@ -92,15 +92,14 @@ class ClientViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view', 'delete', 'system'])
-    @validate(Client)
-    def destroy(self, request, obj):
+    @discover(Client)
+    def destroy(self, client):
         """
         Deletes a user
         """
-        _ = request
-        for token in obj.tokens:
+        for token in client.tokens:
             for junction in token.roles.itersafe():
                 junction.delete()
             token.delete()
-        obj.delete()
+        client.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
