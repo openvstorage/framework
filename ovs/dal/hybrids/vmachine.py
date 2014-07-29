@@ -38,7 +38,7 @@ class VMachine(DataObject):
                     Property('is_vtemplate', bool, default=False, doc='Indicates whether this vMachine is a vTemplate.'),
                     Property('status', ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], default='OK', doc='Internal status of the vMachine')]
     __relations = [Relation('pmachine', PMachine, 'vmachines'),
-                   Relation('vpool', VPool, 'vmachines')]
+                   Relation('vpool', VPool, 'vmachines', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('hypervisor_status', str, 300),
                   Dynamic('statistics', dict, 5),
@@ -132,9 +132,9 @@ class VMachine(DataObject):
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
         storagedrivers = DataList({'object': StorageDriver,
-                                         'data': DataList.select.DESCRIPTOR,
-                                         'query': {'type': DataList.where_operator.AND,
-                                                   'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
+                                   'data': DataList.select.DESCRIPTOR,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
         for storagedriver in DataObjectList(storagedrivers, StorageDriver):
             storagerouter_guids.add(storagedriver.storagerouter_guid)
         return list(storagerouter_guids)
