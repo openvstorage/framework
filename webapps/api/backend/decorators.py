@@ -43,11 +43,13 @@ def required_roles(roles):
             """
             Wrapped function
             """
-            django_user = args[1].user
-            user = UserList.get_user_by_username(django_user.username)
+            request = args[1]
+            if not hasattr(request, 'user') or not hasattr(request, 'client'):
+                raise NotAuthenticated()
+            user = UserList.get_user_by_username(request.user.username)
             if user is None:
                 raise NotAuthenticated()
-            if not Toolbox.is_user_in_roles(user, roles):
+            if not Toolbox.is_client_in_roles(request.client, roles):
                 raise PermissionDenied('This call requires roles: %s' % (', '.join(roles)))
             return f(*args, **kw)
         return new_function

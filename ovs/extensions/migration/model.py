@@ -20,7 +20,9 @@ import hashlib
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.role import Role
+from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
+from ovs.dal.hybrids.j_roleclient import RoleClient
 
 
 class Model():
@@ -50,11 +52,11 @@ class Model():
             # Create groups
             admin_group = Group()
             admin_group.name = 'administrators'
-            admin_group.description = 'Administrative group. Have full access'
+            admin_group.description = 'Administrators'
             admin_group.save()
             user_group = Group()
             user_group.name = 'users'
-            user_group.description = 'User group, have limited rights'
+            user_group.description = 'Users'
             user_group.save()
 
             # Create users
@@ -64,12 +66,13 @@ class Model():
             admin.is_active = True
             admin.group = admin_group
             admin.save()
-            user = User()
-            user.username = 'user'
-            user.password = hashlib.sha256('user').hexdigest()
-            user.is_active = True
-            user.group = user_group
-            user.save()
+
+            # Create internal OAuth 2 clients
+            admin_client = Client()
+            admin_client.ovs_type = 'FRONTEND'
+            admin_client.grant_type = 'PASSWORD'
+            admin_client.user = admin
+            admin_client.save()
 
             # Create roles
             view_role = Role()
@@ -109,6 +112,12 @@ class Model():
                     rolegroup.group = setting[0]
                     rolegroup.role = role
                     rolegroup.save()
+                for user in setting[0].users:
+                    for role in setting[1]:
+                        roleclient = RoleClient()
+                        roleclient.client = user.clients[0]
+                        roleclient.role = role
+                        roleclient.save()
 
             # We're now at version 0.0.1
             working_version = 1

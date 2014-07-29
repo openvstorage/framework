@@ -40,25 +40,18 @@ class UserViewSet(viewsets.ViewSet):
     prefix = r'users'
     base_name = 'users'
 
-    @staticmethod
-    def _get_object(guid):
-        """
-        Gets a User object, raises a 404 in case the User doesn't exist
-        """
-        try:
-            return User(guid)
-        except ObjectNotFoundException:
-            raise Http404
-
     @expose(internal=True, customer=True)
-    @required_roles(['view', 'system'])
+    @required_roles(['view'])
     @get_list(User)
     def list(self, request, format=None, hints=None):
         """
-        Lists all available Users
+        Lists all available Users where the logged in user has access to
         """
-        _ = request, format, hints
-        return UserList.get_users()
+        _ = format, hints
+        if Toolbox.is_client_in_roles(request.client, ['system']):
+            return UserList.get_users()
+        else:
+            return [request.client.user]
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
@@ -71,8 +64,7 @@ class UserViewSet(viewsets.ViewSet):
         system role
         """
         _ = format
-        loggedin_user = UserList.get_user_by_username(request.user.username)
-        if obj.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['system']):
+        if obj.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['system']):
             return obj
         raise PermissionDenied('Fetching user information not allowed')
 
@@ -92,17 +84,20 @@ class UserViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view', 'delete', 'system'])
-    def destroy(self, request, pk=None, format=None):
+    @validate(User)
+    def destroy(self, request, obj):
         """
         Deletes a user
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        else:
-            user = UserViewSet._get_object(pk)
-            user.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        _ = request
+        for client in obj.clients:
+            for token in client.tokens:
+                for junction in token.roles.itersafe():
+                    junction.delete()
+                token.delete()
+            client.delete()
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action()
     @expose(internal=True, customer=True)
@@ -113,13 +108,18 @@ class UserViewSet(viewsets.ViewSet):
         Sets the password of a given User. A logged in User can only changes its own password,
         or all passwords if the logged in User has a system role
         """
-        loggedin_user = UserList.get_user_by_username(request.user.username)
-        if obj.username == loggedin_user.username or Toolbox.is_user_in_roles(loggedin_user, ['update', 'system']):
+        if obj.guid == request.client.user_guid or Toolbox.is_client_in_roles(request.client, ['update', 'system']):
             serializer = PasswordSerializer(data=request.DATA)
             if serializer.is_valid():
                 if obj.password == hashlib.sha256(str(serializer.data['current_password'])).hexdigest():
                     obj.password = hashlib.sha256(str(serializer.data['new_password'])).hexdigest()
                     obj.save()
+                    # Now, invalidate all access tokens granted
+                    for client in obj.clients:
+                        for token in client.tokens:
+                            for junction in token.roles:
+                                junction.delete()
+                            token.delete()
                     return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         raise PermissionDenied('Updating password not allowed')
