@@ -70,11 +70,11 @@ class ClientViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
+    @discover()
     def create(self, request):
         """
         Creates a Client
         """
-        _ = format
         serializer = FullSerializer(Client, instance=Client(), data=request.DATA)
         if serializer.is_valid():
             obj = serializer.object
