@@ -17,11 +17,11 @@ Contains various decorator
 """
 
 import math
-
+import inspect
 from ovs.dal.lists.userlist import UserList
 from rest_framework.response import Response
 from toolbox import Toolbox
-from rest_framework.exceptions import PermissionDenied, NotAuthenticated
+from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable
 from rest_framework import status
 from django.http import Http404
 from ovs.dal.exceptions import ObjectNotFoundException
@@ -56,27 +56,57 @@ def required_roles(roles):
     return wrap
 
 
-def validate(object_type):
+def discover(object_type=None):
     """
-    Parameter/object validation decorator
+    Parameter discovery decorator
     """
     def wrap(f):
         """
         Wrapper function
         """
-        def new_function(self, request, pk=None, format=None):
+        def new_function(self, request, **kwargs):
             """
             Wrapped function
             """
-            _ = self, format
-            if pk is None:
-                raise Http404
+            new_kwargs = {}
+            function_info = inspect.getargspec(f)
+            if function_info.defaults is None:
+                mandatory_vars = function_info.args[1:]
+                optional_vars = []
             else:
+                mandatory_vars = function_info.args[1:-len(function_info.defaults)]
+                optional_vars = function_info.args[len(mandatory_vars) + 1:]
+            if 'request' in mandatory_vars:
+                new_kwargs['request'] = request
+                mandatory_vars.remove('request')
+            if 'pk' in kwargs and object_type is not None:
+                typename = object_type.__name__.lower()
                 try:
-                    obj = object_type(pk)
+                    instance = object_type(kwargs['pk'])
+                    if typename in mandatory_vars:
+                        new_kwargs[typename] = instance
+                        mandatory_vars.remove(typename)
                 except ObjectNotFoundException:
-                    raise Http404('Given object not found')
-                return f(self, request=request, obj=obj)
+                    raise Http404()
+            for name in mandatory_vars:
+                if name in kwargs:
+                    new_kwargs[name] = kwargs[name]
+                else:
+                    if name not in request.DATA:
+                        if name not in request.QUERY_PARAMS:
+                            raise NotAcceptable('Invalid data passed: {0} is missing'.format(name))
+                        new_kwargs[name] = request.QUERY_PARAMS[name]
+                    else:
+                        new_kwargs[name] = request.DATA[name]
+            for name in optional_vars:
+                if name in kwargs:
+                    new_kwargs[name] = kwargs[name]
+                else:
+                    if name in request.DATA:
+                        new_kwargs[name] = request.DATA[name]
+                    elif name in request.QUERY_PARAMS:
+                        new_kwargs[name] = request.QUERY_PARAMS[name]
+            return f(self, **new_kwargs)
         return new_function
     return wrap
 
@@ -96,7 +126,7 @@ def expose(internal=False, customer=False):
     return decorator
 
 
-def get_list(object_type, default_sort=None):
+def return_list(object_type, default_sort=None):
     """
     List decorator
     """
@@ -164,7 +194,7 @@ def get_list(object_type, default_sort=None):
     return wrap
 
 
-def get_object(object_type):
+def return_object(object_type):
     """
     Object decorator
     """
@@ -194,7 +224,6 @@ def celery_task():
     """
     Object decorator
     """
-
     def wrap(f):
         """
         Wrapper function
@@ -206,8 +235,5 @@ def celery_task():
             _ = self
             task = f(self, *args, **kwargs)
             return Response(task.id, status=status.HTTP_200_OK)
-
         return new_function
-
     return wrap
-

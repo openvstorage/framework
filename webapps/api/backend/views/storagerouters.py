@@ -27,7 +27,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
-from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
+from backend.decorators import required_roles, expose, return_list, return_object, celery_task, discover
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -40,59 +40,56 @@ class StorageRouterViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(StorageRouter, 'name')
-    def list(self, request, hints):
+    @return_list(StorageRouter, 'name')
+    @discover()
+    def list(self):
         """
         Overview of all Storage Routers
         """
-        _ = hints, request
         return StorageRouterList.get_storagerouters()
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
-    @get_object(StorageRouter)
-    def retrieve(self, request, obj):
+    @return_object(StorageRouter)
+    @discover(StorageRouter)
+    def retrieve(self, storagerouter):
         """
         Load information about a given vMachine
         """
-        _ = request
-        return obj
+        return storagerouter
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(StorageRouter)
-    def filter(self, request, pk=None, format=None, hints=None):
+    @return_list(StorageRouter)
+    @discover()
+    def filter(self, query):
         """
         Filters vMachines based on a filter object
         """
-        _ = pk, format, hints
         query_result = DataList({'object': StorageRouter,
                                  'data': DataList.select.DESCRIPTOR,
-                                 'query': request.DATA['query']}).data
+                                 'query': query}).data
         return DataObjectList(query_result, StorageRouter)
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'system'])
-    @validate(StorageRouter)
     @celery_task()
-    def move_away(self, request, obj):
+    @discover(StorageRouter)
+    def move_away(self, storagerouter):
         """
         Moves away all vDisks from all Storage Drivers this Storage Router is serving
         """
-        _ = request
-        return StorageDriverController.move_away.delay(obj.guid)
+        return StorageDriverController.move_away.delay(storagerouter.guid)
 
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
-    def get_available_actions(self, request, obj):
+    @discover(StorageRouter)
+    def get_available_actions(self):
         """
         Gets a list of all available actions
         """
-        _ = request, obj
         actions = []
         storagerouters = StorageRouterList.get_storagerouters()
         if len(storagerouters) > 1:
@@ -102,49 +99,44 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
     @celery_task()
-    def get_physical_metadata(self, request, obj):
+    @discover(StorageRouter)
+    def get_physical_metadata(self, storagerouter, files=None):
         """
         Returns a list of mountpoints on the given Storage Router
         """
-        files = []
-        if 'files' in request.DATA:
-            files = request.DATA['files'].strip().split(',')
-        return StorageRouterController.get_physical_metadata.s(files, obj.guid).apply_async(
-            routing_key='sr.{0}'.format(obj.machine_id)
+        files = [] if files is None else files.strip().split(',')
+        return StorageRouterController.get_physical_metadata.s(files, storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
     @link()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
     @celery_task()
-    def get_version_info(self, request, obj):
+    @discover(StorageRouter)
+    def get_version_info(self, storagerouter):
         """
         Gets version information of a given Storage Router
         """
-        _ = request
-        return StorageRouterController.get_version_info.s(obj.guid).apply_async(
-            routing_key='sr.{0}'.format(obj.machine_id)
+        return StorageRouterController.get_version_info.s(storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
     @action()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
     @celery_task()
-    def check_s3(self, request, obj):
+    @discover(StorageRouter)
+    def check_s3(self, host, port, accesskey, secretkey):
         """
         Validates whether connection to a given S3 backend can be made
         """
-        _ = obj
-        fields = ['host', 'port', 'accesskey', 'secretkey']
-        parameters = {}
-        for field in fields:
-            if field not in request.DATA:
-                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
-            parameters[field] = request.DATA[field]
+        parameters = {'host': host,
+                      'port': port,
+                      'accesskey': accesskey,
+                      'secretkey': secretkey}
+        for field in parameters:
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
         return StorageRouterController.check_s3.delay(**parameters)
@@ -152,42 +144,35 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @action()
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(StorageRouter)
     @celery_task()
-    def check_mtpt(self, request, obj):
+    @discover(StorageRouter)
+    def check_mtpt(self, storagerouter, name):
         """
         Validates whether the mountpoint for a vPool is available
         """
-        fields = ['name']
-        parameters = {}
-        for field in fields:
-            if field not in request.DATA:
-                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
-            parameters[field] = request.DATA[field]
-            if not isinstance(parameters[field], int):
-                parameters[field] = str(parameters[field])
-        return StorageRouterController.check_mtpt.s(parameters['name']).apply_async(
-            routing_key='sr.{0}'.format(obj.machine_id)
+        name = str(name)
+        return StorageRouterController.check_mtpt.s(name).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
     @action()
     @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(StorageRouter)
     @celery_task()
-    def add_vpool(self, request, obj):
+    @discover(StorageRouter)
+    def add_vpool(self, storagerouter, call_parameters):
         """
         Adds a vPool to a given Storage Router
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_cache', 'storage_ip', 'vrouter_port']
-        parameters = {'storagerouter_ip': obj.ip}
+        parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
-            if field not in request.DATA:
+            if field not in call_parameters:
                 raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
-            parameters[field] = request.DATA[field]
+            parameters[field] = call_parameters[field]
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
 
-        return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(obj.machine_id))
+        return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))

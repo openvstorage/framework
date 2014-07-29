@@ -25,7 +25,7 @@ from backend.serializers.serializers import FullSerializer
 from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 from rest_framework import status
-from backend.decorators import required_roles, expose, validate, get_object, get_list
+from backend.decorators import required_roles, expose, discover, return_object, return_list
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('api', 'mgmtcenters')
@@ -41,43 +41,41 @@ class MgmtCenterViewSet(viewsets.ViewSet):
 
     @expose(internal=True)
     @required_roles(['view'])
-    @get_list(MgmtCenter)
-    def list(self, request, format=None, hints=None):
+    @return_list(MgmtCenter)
+    @discover()
+    def list(self):
         """
         Overview of all mgmtCenters
         """
-        _ = request, format, hints
         return MgmtCenterList.get_mgmtcenters()
 
     @expose(internal=True)
     @required_roles(['view'])
-    @validate(MgmtCenter)
-    @get_object(MgmtCenter)
-    def retrieve(self, request, obj):
+    @return_object(MgmtCenter)
+    @discover(MgmtCenter)
+    def retrieve(self, mgmtcenter):
         """
         Load information about a given mgmtCenter
         """
-        _ = request
-        return obj
+        return mgmtcenter
 
     @expose(internal=True, customer=True)
     @required_roles(['delete'])
-    @validate(MgmtCenter)
-    def destroy(self, request, obj):
+    @discover(MgmtCenter)
+    def destroy(self, mgmtcenter):
         """
         Deletes a Management center
         """
-        _ = request
-        obj.delete(abandon=True)
+        mgmtcenter.delete(abandon=True)
         return Response({}, status=status.HTTP_200_OK)
 
     @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
-    def create(self, request, format=None):
+    @discover()
+    def create(self, request):
         """
         Creates a Management Center
         """
-        _ = format
         serializer = FullSerializer(MgmtCenter, instance=MgmtCenter(), data=request.DATA, allow_passwords=True)
         if serializer.is_valid():
             mgmt_center = serializer.object

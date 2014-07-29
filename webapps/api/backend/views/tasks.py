@@ -20,7 +20,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
-from backend.decorators import required_roles, expose
+from backend.decorators import required_roles, expose, discover
 from celery.task.control import inspect
 from ovs.celery import celery
 
@@ -35,11 +35,11 @@ class TaskViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def list(self, request, format=None):
+    @discover()
+    def list(self):
         """
         Overview of active, scheduled, reserved and revoked tasks
         """
-        _ = request, format
         inspector = inspect()
         data = {'active'   : inspector.active(),
                 'scheduled': inspector.scheduled(),
@@ -49,13 +49,11 @@ class TaskViewSet(viewsets.ViewSet):
 
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @discover()
+    def retrieve(self, pk):
         """
         Load information about a given task
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
         result = celery.AsyncResult(pk)
         if result.successful():
             result_data = result.result
@@ -72,12 +70,10 @@ class TaskViewSet(viewsets.ViewSet):
     @link()
     @expose(internal=True, customer=True)
     @required_roles(['view'])
-    def get(self, request, pk=None, format=None):
+    @discover()
+    def get(self, pk):
         """
         Gets a given task's result
         """
-        _ = request, format
-        if pk is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
         result = celery.AsyncResult(pk)
         return Response(result.get(), status=status.HTTP_200_OK)

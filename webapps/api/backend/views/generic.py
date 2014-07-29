@@ -16,13 +16,10 @@
 Module for generic functionality
 """
 
-from backend.decorators import expose
-from rest_framework import status, viewsets
+from backend.decorators import expose, discover
+from rest_framework import viewsets
 from rest_framework.response import Response
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from django.http import Http404
 
 
 class GenericViewSet(viewsets.ViewSet):
@@ -33,21 +30,19 @@ class GenericViewSet(viewsets.ViewSet):
     base_name = 'nodes'
 
     @expose(internal=True)
-    def list(self, request, format=None):
+    @discover()
+    def list(self):
         """
         Dummy implementation
         """
-        _ = request, format
         return Response([{'guid': '0'}])
 
     @expose(internal=True)
-    def retrieve(self, request, pk=None, format=None):
+    @discover()
+    def retrieve(self):
         """
         Retrieve generic information
         """
-        _ = format, request
-        if pk != '0':
-            raise Http404
         storagerouter_ips = []
         for storagerouter in StorageRouterList.get_storagerouters():
             storagerouter_ips.append(storagerouter.ip)

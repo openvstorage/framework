@@ -19,7 +19,7 @@ Contains the BrandingViewSet
 from rest_framework import viewsets
 from ovs.dal.lists.brandinglist import BrandingList
 from ovs.dal.hybrids.branding import Branding
-from backend.decorators import expose, validate, get_object, get_list
+from backend.decorators import expose, return_object, return_list, discover
 
 
 class BrandingViewSet(viewsets.ViewSet):
@@ -30,20 +30,19 @@ class BrandingViewSet(viewsets.ViewSet):
     base_name = 'branding'
 
     @expose(internal=True)
-    @get_list(Branding)
-    def list(self, request, format=None, hints=None):
+    @return_list(Branding)
+    @discover()
+    def list(self):
         """
         Overview of all brandings
         """
-        _ = request, format, hints
         return BrandingList.get_brandings()
 
     @expose(internal=True)
-    @validate(Branding)
-    @get_object(Branding)
-    def retrieve(self, request, obj):
+    @return_object(Branding)
+    @discover(Branding)
+    def retrieve(self, branding):
         """
         Load information about a given branding
         """
-        _ = request
-        return obj
+        return branding
