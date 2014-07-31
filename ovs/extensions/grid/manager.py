@@ -1177,9 +1177,12 @@ if Service.has_service('{0}'):
                                                           current_storagedriver.port - 1, current_storagedriver.port, current_storagedriver.port + 1))
             vrouter_clusterregistry.set_node_configs(node_configs)
         else:
-            storagedriver_client = LocalStorageRouterClient('{0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
-            storagedriver_client.destroy_filesystem()
-            vrouter_clusterregistry.erase_node_configs()
+            try:
+                storagedriver_client = LocalStorageRouterClient('{0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
+                storagedriver_client.destroy_filesystem()
+                vrouter_clusterregistry.erase_node_configs()
+            except RuntimeError as ex:
+                print('Could not destroy filesystem or erase node configs due to error: {}'.format(ex))
 
         # Remove directories
         client = Client.load(ip)
