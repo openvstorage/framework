@@ -1022,7 +1022,9 @@ storagedriver_configuration.configure_filedriver(fd_config)
         storagedriver.save()
 
         dirs2create.append(storagedriver.mountpoint)
-        dirs2create.append(mountpoint_cache + '/fd_' + vpool_name)
+        dirs2create.append(mountpoint_cache + '/' + '/fd_' + vpool_name)
+        dirs2create.append('{0}/fd_{1}'.format(mountpoint_cache, vpool_name))
+
 
         file_create_script = """
 import os
@@ -1184,17 +1186,22 @@ if Service.has_service('{0}'):
             except RuntimeError as ex:
                 print('Could not destroy filesystem or erase node configs due to error: {}'.format(ex))
 
-        # Remove directories
+        # Cleanup directories
         client = Client.load(ip)
+        client.run('rm -rf {}/read_{}'.format(storagedriver.mountpoint_cache, vpool.name))
         client.run('rm -rf {}/sco_{}'.format(storagedriver.mountpoint_cache, vpool.name))
         client.run('rm -rf {}/foc_{}'.format(storagedriver.mountpoint_cache, vpool.name))
+        client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_cache, vpool.name))
         client.run('rm -rf {}/metadata_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(storagedriver.mountpoint_md, vpool.name))
-        client.run('rmdir {}'.format(storagedriver.mountpoint))
 
         # Remove files
-        client.run('rm -f {}/read_{}'.format(storagedriver.mountpoint_cache, vpool.name))
         client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
+
+        # Remove top directories
+        client.run('if [ -d {0} ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_cache))
+        client.run('if [ -d {0} ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_md))
+        client.run('if [ -d {0} ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
 
         # First model cleanup
         storagedriver.delete()
