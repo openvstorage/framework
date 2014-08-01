@@ -20,7 +20,7 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
-from backend.decorators import required_roles, expose, discover
+from backend.decorators import required_roles, load
 from celery.task.control import inspect
 from ovs.celery import celery
 
@@ -33,9 +33,8 @@ class TaskViewSet(viewsets.ViewSet):
     prefix = r'tasks'
     base_name = 'tasks'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @discover()
+    @load()
     def list(self):
         """
         Overview of active, scheduled, reserved and revoked tasks
@@ -47,9 +46,8 @@ class TaskViewSet(viewsets.ViewSet):
                 'revoked'  : inspector.revoked()}
         return Response(data, status=status.HTTP_200_OK)
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @discover()
+    @load()
     def retrieve(self, pk):
         """
         Load information about a given task
@@ -68,9 +66,8 @@ class TaskViewSet(viewsets.ViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @link()
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @discover()
+    @load()
     def get(self, pk):
         """
         Gets a given task's result

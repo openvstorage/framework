@@ -25,7 +25,7 @@ from backend.serializers.serializers import FullSerializer
 from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 from rest_framework import status
-from backend.decorators import required_roles, expose, discover, return_object, return_list
+from backend.decorators import required_roles, load, return_object, return_list
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('api', 'mgmtcenters')
@@ -39,29 +39,26 @@ class MgmtCenterViewSet(viewsets.ViewSet):
     prefix = r'mgmtcenters'
     base_name = 'mgmtcenters'
 
-    @expose(internal=True)
     @required_roles(['view'])
     @return_list(MgmtCenter)
-    @discover()
+    @load()
     def list(self):
         """
         Overview of all mgmtCenters
         """
         return MgmtCenterList.get_mgmtcenters()
 
-    @expose(internal=True)
     @required_roles(['view'])
     @return_object(MgmtCenter)
-    @discover(MgmtCenter)
+    @load(MgmtCenter)
     def retrieve(self, mgmtcenter):
         """
         Load information about a given mgmtCenter
         """
         return mgmtcenter
 
-    @expose(internal=True, customer=True)
     @required_roles(['delete'])
-    @discover(MgmtCenter)
+    @load(MgmtCenter)
     def destroy(self, mgmtcenter):
         """
         Deletes a Management center
@@ -69,9 +66,8 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         mgmtcenter.delete(abandon=True)
         return Response({}, status=status.HTTP_200_OK)
 
-    @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
-    @discover()
+    @load()
     def create(self, request):
         """
         Creates a Management Center

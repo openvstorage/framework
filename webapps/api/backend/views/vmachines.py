@@ -16,6 +16,7 @@
 VMachine module
 """
 
+import json
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
@@ -29,7 +30,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
-from backend.decorators import required_roles, expose, discover, return_list, return_object, celery_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task
 
 
 class VMachineViewSet(viewsets.ViewSet):
@@ -40,11 +41,10 @@ class VMachineViewSet(viewsets.ViewSet):
     prefix = r'vmachines'
     base_name = 'vmachines'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_list(VMachine, 'name,vpool_guid')
-    @discover()
-    def list(self, vpoolguid=None):
+    @load()
+    def list(self, vpoolguid=None, query=None):
         """
         Overview of all machines
         """
@@ -57,14 +57,19 @@ class VMachineViewSet(viewsets.ViewSet):
                     vmachine_guids.append(vdisk.vmachine.guid)
                     if vdisk.vmachine.is_vtemplate is False:
                         vmachines.append(vdisk.vmachine)
+        elif query is not None:
+            query = json.loads(query)
+            query_result = DataList({'object': VMachine,
+                                     'data': DataList.select.DESCRIPTOR,
+                                     'query': query}).data
+            vmachines = DataObjectList(query_result, VMachine)
         else:
             vmachines = VMachineList.get_vmachines()
         return vmachines
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_object(VMachine)
-    @discover(VMachine)
+    @load(VMachine)
     def retrieve(self, vmachine):
         """
         Load information about a given vMachine
@@ -72,10 +77,9 @@ class VMachineViewSet(viewsets.ViewSet):
         return vmachine
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['delete'])
-    @celery_task()
-    @discover(VMachine)
+    @return_task()
+    @load(VMachine)
     def destroy(self, vmachine):
         """
         Deletes a machine
@@ -85,10 +89,9 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.delete.delay(machineguid=vmachine.guid)
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VMachine)
+    @return_task()
+    @load(VMachine)
     def rollback(self, vmachine, timestamp):
         """
         Clones a machine
@@ -99,10 +102,9 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  timestamp=timestamp)
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VMachine)
+    @return_task()
+    @load(VMachine)
     def snapshot(self, vmachine, name, consistent):
         """
         Snapshots a given machine
@@ -117,10 +119,9 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  is_automatic=False)
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
     @return_list(VMachine)
-    @discover(VMachine)
+    @load(VMachine)
     def get_children(self, vmachine, hints):
         """
         Returns a list of vMachines guid(s) of children of a given vMachine
@@ -138,24 +139,10 @@ class VMachineViewSet(viewsets.ViewSet):
                         children_vmachines.append(cdisk.vmachine)
         return children_vmachines if hints['full'] is True else children_vmachine_guids
 
-    @expose(internal=True)
-    @required_roles(['view'])
-    @return_list(VMachine)
-    @discover()
-    def filter(self, query):
-        """
-        Filters vMachines based on a filter object
-        """
-        query_result = DataList({'object': VMachine,
-                                 'data': DataList.select.DESCRIPTOR,
-                                 'query': query}).data
-        return DataObjectList(query_result, VMachine)
-
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VMachine)
+    @return_task()
+    @load(VMachine)
     def set_as_template(self, vmachine):
         """
         Sets a given machine as template
@@ -163,10 +150,9 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.set_as_template.delay(machineguid=vmachine.guid)
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VMachine)
+    @return_task()
+    @load(VMachine)
     def create_from_template(self, vmachine, pmachineguid, name, description):
         """
         Creates a vMachine based on a vTemplate
@@ -183,10 +169,9 @@ class VMachineViewSet(viewsets.ViewSet):
                                                              description=str(description))
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VMachine)
+    @return_task()
+    @load(VMachine)
     def create_multiple_from_template(self, vmachine, pmachineguids, amount, start, name, description):
         """
         Creates a certain amount of vMachines based on a vTemplate
@@ -212,10 +197,9 @@ class VMachineViewSet(viewsets.ViewSet):
                                                                       description=str(description))
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
     @return_list(PMachine)
-    @discover(VMachine)
+    @load(VMachine)
     def get_target_pmachines(self, vmachine, hints):
         """
         Gets all possible target pMachines for a given vMachine

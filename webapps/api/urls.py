@@ -19,13 +19,12 @@ import os
 import imp
 import inspect
 from django.conf.urls import patterns, include, url
-from django.views.generic import RedirectView
 from oauth2.tokenview import OAuth2TokenView
-from oauth2.metadataview import MetadataView
-from backend.router import OVSRouter
+from view import MetadataView
+from rest_framework.routers import SimpleRouter
 
 
-def build_router_urls(api_mode, docs):
+def build_router_urls():
     """
     Creates a router instance to generate API urls for Customer and Internal API
     """
@@ -42,32 +41,13 @@ def build_router_urls(api_mode, docs):
                     routes.append({'prefix': member[1].prefix,
                                    'viewset': member[1],
                                    'base_name': member[1].base_name})
-
-    router = OVSRouter(api_mode, docs)
+    router = SimpleRouter()
     for route in routes:
         router.register(**route)
     return router.urls
 
-customer_docs = """
-The Customer API can be used for integration or automatisation with 3rd party applications.
-"""
-internal_docs = """
-The Internal API is for **internal use only** (used by the Open vStorage framework) and is subject
-to continuous changes without warning. It should not be used by 3rd party applications.
-*Unauthorized usage of this API can lead to unexpected results, issues or even data loss*. See
-the [Customer API](%(customerapi)s).
-"""
-
 urlpatterns = patterns('',
-    # OAuth 2
-    url(r'^oauth2/token/',    OAuth2TokenView.as_view()),
-    url(r'^oauth2/metadata/', MetadataView.as_view()),
-
-    # REST framework authentication
-    url(r'^api-auth/',        include('rest_framework.urls', namespace='rest_framework')),
-
-    # Internal and customer REST apis
-    url(r'^customer/',        include(build_router_urls('customer', customer_docs))),
-    url(r'^internal/',        include(build_router_urls('internal', internal_docs))),
-    url(r'^$',                RedirectView.as_view(url='customer/')),
+    url(r'^oauth2/token/', OAuth2TokenView.as_view()),
+    url(r'^$',             MetadataView.as_view()),
+    url(r'',               include(build_router_urls()))
 )

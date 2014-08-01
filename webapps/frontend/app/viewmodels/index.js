@@ -55,10 +55,11 @@ define([
             $.pnotify.defaults.styling = "bootstrap";
 
             // Cache node ips
-            $.ajax('/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
+            $.ajax('/api/?timestamp=' + (new Date().getTime()), {
                     type: 'GET',
-                    contentType: 'application/jsonp',
-                    timeout: 5000
+                    contentType: 'application/json',
+                    timeout: 5000,
+                    headers: { Accept: 'application/json' }
                 })
                 .done(function(nodes) {
                     shared.nodes = nodes.storagerouter_ips;

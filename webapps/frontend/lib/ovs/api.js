@@ -13,12 +13,11 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'plugins/router',
-    'ovs/shared', 'ovs/generic'
-], function($, router, shared, generic) {
+    'jquery', 'ovs/shared', 'ovs/generic'
+], function($, shared, generic) {
     'use strict';
     function call(api, data, filter, type) {
-        var querystring = [], key, callData, cookie, jqXhr,
+        var querystring = [], key, callData, jqXhr,
             deferred = $.Deferred();
 
         filter = filter || {};
@@ -33,19 +32,15 @@ define([
             type: type,
             timeout: 1000 * 60 * 60,
             contentType: 'application/json',
-            headers: { }
+            headers: { Accept: 'application/json; version=*' }
         };
         if (type !== 'GET' || !$.isEmptyObject(data)) {
             callData.data = JSON.stringify(data);
         }
-        cookie = generic.getCookie('csrftoken');
-        if (cookie !== undefined) {
-            callData.headers['X-CSRFToken'] = cookie;
-        }
         if (shared.authentication.validate()) {
             callData.headers.Authorization = shared.authentication.header();
         }
-        jqXhr = $.ajax('/api/internal/' + api + '/?' + querystring.join('&'), callData)
+        jqXhr = $.ajax('/api/' + api + '/?' + querystring.join('&'), callData)
             .done(deferred.resolve)
             .fail(function(xmlHttpRequest) {
                 // We check whether we actually received an error, and it's not the browser navigating away

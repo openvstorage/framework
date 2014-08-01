@@ -17,7 +17,7 @@ Module for clients
 """
 
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose, return_object, return_list, discover
+from backend.decorators import required_roles, return_object, return_list, load
 from backend.toolbox import Toolbox
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from rest_framework import status, viewsets
@@ -37,10 +37,9 @@ class ClientViewSet(viewsets.ViewSet):
     prefix = r'clients'
     base_name = 'clients'
 
-    @expose(internal=True)
     @required_roles(['view'])
     @return_list(Client)
-    @discover()
+    @load()
     def list(self, request, userguid=None):
         """
         Lists all available Clients where the logged in user has access to
@@ -53,10 +52,9 @@ class ClientViewSet(viewsets.ViewSet):
             return [client for client in client_list if client.user_guid == userguid]
         return client_list
 
-    @expose(internal=True)
     @required_roles(['view'])
     @return_object(Client)
-    @discover(Client)
+    @load(Client)
     def retrieve(self, request, client):
         """
         Load information about a given Client
@@ -68,9 +66,8 @@ class ClientViewSet(viewsets.ViewSet):
             return client
         raise PermissionDenied('Fetching user information not allowed')
 
-    @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
-    @discover()
+    @load()
     def create(self, request):
         """
         Creates a Client
@@ -90,9 +87,8 @@ class ClientViewSet(viewsets.ViewSet):
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @expose(internal=True)
     @required_roles(['view', 'delete', 'system'])
-    @discover(Client)
+    @load(Client)
     def destroy(self, client):
         """
         Deletes a user

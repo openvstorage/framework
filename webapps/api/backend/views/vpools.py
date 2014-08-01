@@ -25,7 +25,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, expose, discover, return_list, return_object, celery_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -36,20 +36,18 @@ class VPoolViewSet(viewsets.ViewSet):
     prefix = r'vpools'
     base_name = 'vpools'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_list(VPool, 'name')
-    @discover()
+    @load()
     def list(self):
         """
         Overview of all vPools
         """
         return VPoolList.get_vpools()
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_object(VPool)
-    @discover(VPool)
+    @load(VPool)
     def retrieve(self, vpool):
         """
         Load information about a given vPool
@@ -57,10 +55,9 @@ class VPoolViewSet(viewsets.ViewSet):
         return vpool
 
     @action()
-    @expose(internal=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VPool)
+    @return_task()
+    @load(VPool)
     def sync_vmachines(self, vpool):
         """
         Syncs the vMachine of this vPool
@@ -68,10 +65,9 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
     @return_list(StorageRouter)
-    @discover(VPool)
+    @load(VPool)
     def storagerouters(self, vpool, hints):
         """
         Retreives a list of StorageRouters, serving a given vPool
@@ -85,10 +81,9 @@ class VPoolViewSet(viewsets.ViewSet):
         return storagerouter if hints['full'] is True else storagerouter_guids
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VPool)
+    @return_task()
+    @load(VPool)
     def update_storagedrivers(self, vpool, storagedriver_guid, storagerouter_guids=None, storagedriver_guids=None):
         """
         Update Storage Drivers for a given vPool (both adding and removing Storage Drivers)

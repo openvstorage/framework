@@ -26,6 +26,7 @@ APP_NAME = Configuration.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
 
 BASE_FOLDER = os.path.join(Configuration.get('ovs.core.basedir'), Configuration.get('ovs.webapps.dir'), APP_NAME)
+VERSION = (1,)  # This tuple should contain all supported versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 
 BASE_LOG_DIR = '/var/log/ovs'
 LOG_FILENAME = '/django.log'
@@ -36,8 +37,7 @@ STATIC_URL = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    (Configuration.get('ovs.webapps.admin.name'),
-     Configuration.get('ovs.webapps.admin.email')),
+    (Configuration.get('ovs.webapps.admin.name'), Configuration.get('ovs.webapps.admin.email')),
 )
 
 MANAGERS = ADMINS
@@ -66,32 +66,30 @@ CSRF_COOKIE_SECURE = True
 os.environ['HTTPS'] = 'on'
 
 STATIC_ROOT = ''
-STATICFILES_DIRS = (
-)
+STATICFILES_DIRS = ()
 STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.FileSystemFinder',
-    'django.contrib.staticfiles.finders.AppDirectoriesFinder'
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
 SECRET_KEY = Configuration.get('ovs.webapps.main.secret')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
-    'django.template.loaders.app_directories.Loader'
+    'django.template.loaders.app_directories.Loader',
 )
 
 MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
-    APP_NAME + '.backend.error_middleware.ExceptionMiddleware',
-    APP_NAME + '.backend.cors_middleware.CORSMiddleware',
+    APP_NAME + '.middleware.OVSMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware'
+    'django.contrib.messages.middleware.MessageMiddleware',
 )
 
 AUTHENTICATION_BACKENDS = (
-    'django.contrib.auth.backends.ModelBackend',
+    APP_NAME + '.oauth2.backend.OAuth2Backend',
 )
 
 from django.conf.global_settings import TEMPLATE_CONTEXT_PROCESSORS
@@ -116,7 +114,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework.authtoken'
 )
 
 REST_FRAMEWORK = {
@@ -126,8 +123,7 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.BrowsableAPIRenderer',
     ),
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework.authentication.SessionAuthentication',
-        APP_NAME + '.oauth2.backend.OAuth2Backend'
+        APP_NAME + '.oauth2.backend.OAuth2Backend',
     )
 }
 

@@ -23,7 +23,7 @@ from rest_framework.decorators import action
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, expose, discover, return_list, return_object
+from backend.decorators import required_roles, load, return_list, return_object
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -34,20 +34,18 @@ class StorageDriverViewSet(viewsets.ViewSet):
     prefix = r'storagedrivers'
     base_name = 'storagedrivers'
 
-    @expose(internal=True)
     @required_roles(['view'])
     @return_list(StorageDriver)
-    @discover()
+    @load()
     def list(self):
         """
         Overview of all StorageDrivers
         """
         return StorageDriverList.get_storagedrivers()
 
-    @expose(internal=True)
     @required_roles(['view'])
     @return_object(StorageDriver)
-    @discover(StorageDriver)
+    @load(StorageDriver)
     def retrieve(self, storagedriver):
         """
         Load information about a given StorageDriver
@@ -55,8 +53,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
         return storagedriver
 
     @action()
-    @expose(internal=True)
-    @discover(StorageDriver)
+    @load(StorageDriver)
     def can_be_deleted(self, storagedriver):
         """
         Checks whether a Storage Driver can be deleted

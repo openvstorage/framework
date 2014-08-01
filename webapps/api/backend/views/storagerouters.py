@@ -16,6 +16,7 @@
 StorageRouter module
 """
 
+import json
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -27,7 +28,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
-from backend.decorators import required_roles, expose, return_list, return_object, celery_task, discover
+from backend.decorators import required_roles, return_list, return_object, return_task, load
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -38,44 +39,35 @@ class StorageRouterViewSet(viewsets.ViewSet):
     prefix = r'storagerouters'
     base_name = 'storagerouters'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_list(StorageRouter, 'name')
-    @discover()
-    def list(self):
+    @load()
+    def list(self, query=None):
         """
         Overview of all Storage Routers
         """
-        return StorageRouterList.get_storagerouters()
+        if query is None:
+            return StorageRouterList.get_storagerouters()
+        else:
+            query = json.loads(query)
+            query_result = DataList({'object': StorageRouter,
+                                     'data': DataList.select.DESCRIPTOR,
+                                     'query': query}).data
+            return DataObjectList(query_result, StorageRouter)
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_object(StorageRouter)
-    @discover(StorageRouter)
+    @load(StorageRouter)
     def retrieve(self, storagerouter):
         """
         Load information about a given vMachine
         """
         return storagerouter
 
-    @expose(internal=True)
-    @required_roles(['view'])
-    @return_list(StorageRouter)
-    @discover()
-    def filter(self, query):
-        """
-        Filters vMachines based on a filter object
-        """
-        query_result = DataList({'object': StorageRouter,
-                                 'data': DataList.select.DESCRIPTOR,
-                                 'query': query}).data
-        return DataObjectList(query_result, StorageRouter)
-
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'system'])
-    @celery_task()
-    @discover(StorageRouter)
+    @return_task()
+    @load(StorageRouter)
     def move_away(self, storagerouter):
         """
         Moves away all vDisks from all Storage Drivers this Storage Router is serving
@@ -83,9 +75,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageDriverController.move_away.delay(storagerouter.guid)
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
-    @discover(StorageRouter)
+    @load(StorageRouter)
     def get_available_actions(self):
         """
         Gets a list of all available actions
@@ -97,10 +88,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return Response(actions, status=status.HTTP_200_OK)
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @celery_task()
-    @discover(StorageRouter)
+    @return_task()
+    @load(StorageRouter)
     def get_physical_metadata(self, storagerouter, files=None):
         """
         Returns a list of mountpoints on the given Storage Router
@@ -111,10 +101,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
-    @celery_task()
-    @discover(StorageRouter)
+    @return_task()
+    @load(StorageRouter)
     def get_version_info(self, storagerouter):
         """
         Gets version information of a given Storage Router
@@ -124,10 +113,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
-    @expose(internal=True)
     @required_roles(['view'])
-    @celery_task()
-    @discover(StorageRouter)
+    @return_task()
+    @load(StorageRouter)
     def check_s3(self, host, port, accesskey, secretkey):
         """
         Validates whether connection to a given S3 backend can be made
@@ -142,10 +130,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageRouterController.check_s3.delay(**parameters)
 
     @action()
-    @expose(internal=True)
     @required_roles(['view'])
-    @celery_task()
-    @discover(StorageRouter)
+    @return_task()
+    @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
         """
         Validates whether the mountpoint for a vPool is available
@@ -156,10 +143,9 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(StorageRouter)
+    @return_task()
+    @load(StorageRouter)
     def add_vpool(self, storagerouter, call_parameters):
         """
         Adds a vPool to a given Storage Router

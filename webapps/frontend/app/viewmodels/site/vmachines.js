@@ -29,11 +29,9 @@ define([
         self.vPoolCache         = {};
         self.storageRouterCache = {};
         self.query              = {
-            query: {
-                type: 'AND',
-                items: [['is_vtemplate', 'EQUALS', false],
-                        ['status', 'NOT_EQUALS', 'CREATED']]
-            }
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false],
+                    ['status', 'NOT_EQUALS', 'CREATED']]
         };
         self.vMachineHeaders    = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
@@ -62,9 +60,10 @@ define([
                 if (generic.xhrCompleted(self.loadVMachinesHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: ''
+                        contents: '',
+                        query: JSON.stringify(self.query)
                     };
-                    self.loadVMachinesHandle = api.post('vmachines/filter', self.query, options)
+                    self.loadVMachinesHandle = api.get('vmachines', {}, options)
                         .done(function(data) {
                             var guids = [], vmdata = {};
                             $.each(data, function(index, item) {
@@ -97,9 +96,10 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_dynamics,_relations,-snapshots,-hypervisor_status'
+                        contents: '_dynamics,_relations,-snapshots,-hypervisor_status',
+                        query: JSON.stringify(self.query)
                     };
-                    self.refreshVMachinesHandle[page] = api.post('vmachines/filter', self.query, options)
+                    self.refreshVMachinesHandle[page] = api.get('vmachines', {}, options)
                         .done(function(data) {
                             var guids = [], vmdata = {};
                             $.each(data, function(index, item) {

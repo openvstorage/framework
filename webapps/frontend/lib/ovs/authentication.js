@@ -36,8 +36,7 @@ define([
         // Functions
         self.login = function(username, password) {
             return $.Deferred(function(deferred) {
-                var callData, cookie;
-                callData = {
+                var callData = {
                     type: 'post',
                     data: {
                         grant_type: 'password',
@@ -45,12 +44,8 @@ define([
                         password: password
                     },
                     contentType: 'application/x-www-form-urlencoded',
-                    headers: {}
+                    headers: { Accept: 'application/json; version=*' }
                 };
-                cookie = generic.getCookie('csrftoken');
-                if (cookie !== undefined) {
-                    callData.headers['X-CSRFToken'] = cookie;
-                }
                 $.ajax('/api/oauth2/token/', callData)
                     .done(function(result) {
                         self.accessToken(result.access_token);

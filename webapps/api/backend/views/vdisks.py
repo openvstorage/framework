@@ -24,7 +24,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, expose, discover, return_list, return_object, celery_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -35,10 +35,9 @@ class VDiskViewSet(viewsets.ViewSet):
     prefix = r'vdisks'
     base_name = 'vdisks'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_list(VDisk)
-    @discover()
+    @load()
     def list(self, vmachineguid=None, vpoolguid=None):
         """
         Overview of all vDisks
@@ -51,10 +50,9 @@ class VDiskViewSet(viewsets.ViewSet):
             return vpool.vdisks
         return VDiskList.get_vdisks()
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_object(VDisk)
-    @discover(VDisk)
+    @load(VDisk)
     def retrieve(self, vdisk):
         """
         Load information about a given vDisk
@@ -62,10 +60,9 @@ class VDiskViewSet(viewsets.ViewSet):
         return vdisk
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @celery_task()
-    @discover(VDisk)
+    @return_task()
+    @load(VDisk)
     def rollback(self, vdisk, timestamp):
         """
         Rollbacks a vDisk to a given timestamp

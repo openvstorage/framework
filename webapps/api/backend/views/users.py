@@ -18,7 +18,7 @@ Module for users
 
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, expose, discover, return_object, return_list
+from backend.decorators import required_roles, load, return_object, return_list
 from backend.toolbox import Toolbox
 from rest_framework import status, viewsets
 from rest_framework.exceptions import PermissionDenied
@@ -38,10 +38,9 @@ class UserViewSet(viewsets.ViewSet):
     prefix = r'users'
     base_name = 'users'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_list(User)
-    @discover()
+    @load()
     def list(self, request):
         """
         Lists all available Users where the logged in user has access to
@@ -51,10 +50,9 @@ class UserViewSet(viewsets.ViewSet):
         else:
             return [request.client.user]
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
     @return_object(User)
-    @discover(User)
+    @load(User)
     def retrieve(self, request, user):
         """
         Load information about a given User
@@ -65,9 +63,8 @@ class UserViewSet(viewsets.ViewSet):
             return user
         raise PermissionDenied('Fetching user information not allowed')
 
-    @expose(internal=True)
     @required_roles(['view', 'create', 'system'])
-    @discover()
+    @load()
     def create(self, request):
         """
         Creates a User
@@ -79,9 +76,8 @@ class UserViewSet(viewsets.ViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @expose(internal=True)
     @required_roles(['view', 'delete', 'system'])
-    @discover(User)
+    @load(User)
     def destroy(self, user):
         """
         Deletes a user
@@ -96,9 +92,8 @@ class UserViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @discover(User)
+    @load(User)
     def set_password(self, request, user):
         """
         Sets the password of a given User. A logged in User can only changes its own password,

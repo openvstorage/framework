@@ -60,7 +60,7 @@ define([
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function() {
-                $.ajax('/api/oauth2/metadata/', {
+                $.ajax('/api/?timestamp=' + generic.getTimestamp(), {
                     type: 'get',
                     contentType: 'application/json',
                     headers: { Authorization: self.shared.authentication.header() }
@@ -68,7 +68,7 @@ define([
                     .then(function(metadata) {
                         self.shared.user.username(undefined);
                         self.shared.user.guid(undefined);
-                        if (!metadata.loggedin) {
+                        if (!metadata.authenticated) {
                             window.localStorage.removeItem('accesstoken');
                             self.shared.authentication.accessToken(undefined);
                             router.navigate('/');

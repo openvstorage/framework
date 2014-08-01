@@ -79,3 +79,18 @@ class Toolbox:
         value = '' if value is None else str(value)
         sorting_key = tuple(clean_list(regex.split(value)))
         return sorting_key
+
+    @staticmethod
+    def compare(version_1, version_2):
+        version_1 = [int(v) for v in version_1.split('.')]
+        version_2 = [int(v) for v in version_2.split('.')]
+        for i in xrange(max(len(version_1), len(version_2))):
+            n_1 = 0
+            n_2 = 0
+            if i < len(version_1):
+                n_1 = version_1[i]
+            if i < len(version_2):
+                n_2 = version_2[i]
+            if n_1 != n_2:
+                return n_1 - n_2
+        return 0

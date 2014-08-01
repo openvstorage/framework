@@ -136,31 +136,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function lower(value) {
         return value.toLowerCase();
     }
-    function getCookie(name) {
-        var i, cookie, cookies;
-        cookies = document.cookie.split(';');
-        for (i = 0; i < cookies.length; i += 1) {
-            cookie = $.trim(cookies[i]);
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                return decodeURIComponent(cookie.substring(name.length + 1));
-            }
-        }
-        return undefined;
-    }
-    function setCookie(name, value, expiry) {
-        var date, expires = '';
-        if (expiry) {
-            date = new Date();
-            date.setTime(date.getTime() +
-                (tryGet(expiry, 'days', 0) * 24 * 60 * 60 * 1000) +
-                (tryGet(expiry, 'hours', 0) * 60 * 60 * 1000) +
-                (tryGet(expiry, 'minutes', 0) * 60 * 1000) +
-                (tryGet(expiry, 'seconds', 0) * 1000)
-            );
-            expires = '; expires=' + date.toUTCString();
-        }
-        document.cookie = name + '=' + value + expires + '; path=/';
-    }
     function alert(title, message, type) {
         var data = {
             title: title,
@@ -304,11 +279,12 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function validate(nodes) {
         var i, node, check, checkAndRedirect;
         check = function(node) {
-            return $.ajax(node + '/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
+            return $.ajax(node + '/api/?timestamp=' + (new Date().getTime()), {
                 type: 'GET',
                 contentType: 'application/json',
                 dataType: 'json',
-                timeout: 5000
+                timeout: 5000,
+                headers: { Accept: 'application/json' }
             });
         };
         checkAndRedirect = function(node) {
@@ -337,8 +313,6 @@ define(['jquery', 'jqp/pnotify'], function($) {
         formatShort     : formatShort,
         formatNumber    : formatNumber,
         padRight        : padRight,
-        getCookie       : getCookie,
-        setCookie       : setCookie,
         tryGet          : tryGet,
         trySet          : trySet,
         lower           : lower,

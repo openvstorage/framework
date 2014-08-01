@@ -20,54 +20,55 @@ import time
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
+from django.conf import settings
 from oauth2.decorators import json_response
 from ovs.dal.lists.bearertokenlist import BearerTokenList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 
 
 class MetadataView(View):
     """
-    Implements OAuth 2 metadata views (out of OAuth 2 spec)
+    Implements retrieval of generic metadata about the services
     """
 
     @json_response()
     def get(self, request, *args, **kwargs):
         """
-        Fetches OAuth 2 metadata
-        * Who am I
+        Fetches metadata
         """
+        _ = args, kwargs
+        data = {'authenticated': False,
+                'authentication_state': None,
+                'username': None,
+                'userguid': None,
+                'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
+                'versions': list(settings.VERSION)}
         try:
-            _ = args, kwargs
             if 'HTTP_AUTHORIZATION' not in request.META:
-                return HttpResponse, {'loggedin': False,
-                                      'reason': 'unauthorized'}
+                return HttpResponse, dict(data.items() + {'authentication_state': 'unauthenticated'}.items())
             authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')
             if authorization_type != 'Bearer':
-                return HttpResponse, {'loggedin': False,
-                                      'reason': 'invalid authorization type'}
+                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid authorization type'}.items())
 
             tokens = BearerTokenList.get_by_access_token(access_token)
             if len(tokens) != 1:
-                return HttpResponse, {'loggedin': False,
-                                      'reason': 'invalid token'}
+                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid token'}.items())
             token = tokens[0]
             if token.expiration < time.time():
                 for junction in token.roles.itersafe():
                     junction.delete()
                 token.delete()
-                return HttpResponse, {'loggedin': False,
-                                      'reason': 'token expired'}
+                return HttpResponse, dict(data.items() + {'authentication_state': 'token expired'}.items())
 
             user = token.client.user
             if not user.is_active:
-                return HttpResponse, {'loggedin': False,
-                                      'reason': 'inactive user'}
+                return HttpResponse, dict(data.items() + {'authentication_state': 'inactive user'}.items())
 
-            return HttpResponse, {'loggedin': True,
-                                  'userguid': user.guid,
-                                  'username': user.username}
+            return HttpResponse, dict(data.items() + {'authenticated': True,
+                                                      'username': user.username,
+                                                      'userguid': user.guid}.items())
         except:
-            return HttpResponse, {'loggedin': False,
-                                  'reason': 'unexpected exception'}
+            return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected exception'}.items())
 
     @csrf_exempt
     def dispatch(self, request, *args, **kwargs):

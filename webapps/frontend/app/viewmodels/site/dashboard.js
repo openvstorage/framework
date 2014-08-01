@@ -27,11 +27,9 @@ define([
         self.refresher = new Refresher();
         self.topItems  = 10;
         self.query     = {
-            query: {
-                type: 'AND',
-                items: [['is_vtemplate', 'EQUALS', false],
-                        ['status', 'NOT_EQUALS', 'CREATED']]
-            }
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false],
+                    ['status', 'NOT_EQUALS', 'CREATED']]
         };
 
         // Handles
@@ -131,9 +129,10 @@ define([
                                 var filter = {
                                     contents: 'statistics,stored_data',
                                     sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
-                                    page: 1
+                                    page: 1,
+                                    query: JSON.stringify(self.query)
                                 };
-                                self.loadVMachinesHandle = api.post('vmachines/filter', self.query, filter)
+                                self.loadVMachinesHandle = api.get('vmachines', {}, filter)
                                     .done(function(data) {
                                         var vms = [], vm;
                                         $.each(data, function(index, vmdata) {
@@ -151,7 +150,7 @@ define([
                         }).promise(),
                         $.Deferred(function(vmg_dfr) {
                             if (generic.xhrCompleted(self.loadVMachineGuidsHandle)) {
-                                self.loadVMachineGuidsHandle = api.post('vmachines/filter', self.query)
+                                self.loadVMachineGuidsHandle = api.get('vmachines', {}, { query: JSON.stringify(self.query) })
                                     .done(function(data) {
                                         self.vMachineGuids(data);
                                         vmg_dfr.resolve();

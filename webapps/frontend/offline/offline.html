@@ -24,17 +24,17 @@
         <link rel="stylesheet" href="/lib/font-awesome/css/font-awesome.min.css" />
         <link rel="stylesheet" href="/css/durandal.css" />
         <script type="text/javascript">
-            var local_ip;
-            $(document).ready(function() {
+            var connect = function() {
                 if (localStorage.hasOwnProperty('nodes') && localStorage.nodes !== null) {
                     var i, node, nodes = $.parseJSON(localStorage.nodes);
                     for (i = 0; i < nodes.length; i += 1) {
                         node = nodes[i];
                         (function(node) {
-                            $.ajax('https://' + node + '/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
+                            $.ajax('https://' + node + '/api/?timestamp=' + (new Date().getTime()), {
                                         type: 'GET',
                                         contentType: 'application/json',
-                                        timeout: 5000
+                                        timeout: 5000,
+                                        headers: { Accept: 'application/json' }
                                     })
                                     .done(function() {
                                         window.location.href = 'https://' + node;
@@ -42,6 +42,11 @@
                         }(node));
                     }
                 }
+            };
+
+            $(document).ready(function() {
+                window.setInterval(connect, 10000);
+                connect();
             });
         </script>
         <style>
