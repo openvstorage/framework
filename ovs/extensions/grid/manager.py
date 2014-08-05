@@ -1199,9 +1199,9 @@ if Service.has_service('{0}'):
         client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
 
         # Remove top directories
-        client.run('if [ -d {0} ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_cache))
-        client.run('if [ -d {0} ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_md))
-        client.run('if [ -d {0} ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_cache))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_md))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
 
         # First model cleanup
         storagedriver.delete()
