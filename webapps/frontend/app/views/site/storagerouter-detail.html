@@ -23,7 +23,7 @@ limitations under the License.
                 <a href="#information" data-toggle="tab" >
                     <span class="fa" data-i18n="[html]ovs:icons.information"
                           data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
-                                     style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
+                                     style: { color: statusColor() }"></span>
                     <span style="padding-left: 5px;" data-bind="text: name, visible: name() !== undefined"></span>
                 </a>
             </li>

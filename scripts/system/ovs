@@ -7,6 +7,8 @@ if [ "$1" = "setup" ] ; then
 elif [ "$1" = "monitor" ] ; then
   if [ "$2" = "services" ] ; then
     watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
+  elif [ "$2" = "heartbeat" ] ; then
+    python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
   fi
 elif [ "$1" = "collect" ] ; then
   if [ "$2" = "logs" ] ; then

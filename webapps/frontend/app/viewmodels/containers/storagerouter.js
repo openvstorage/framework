@@ -77,6 +77,18 @@ define([
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
         });
+        self.statusColor = ko.computed(function() {
+            if (self.status() === "ok") {
+                return 'green';
+            }
+            if (self.status() === 'failure') {
+                return 'red';
+            }
+            if (self.status() === 'warning') {
+                return 'orange';
+            }
+            return 'lightgrey';
+        });
 
         // Functions
         self.getAvailableActions = function() {

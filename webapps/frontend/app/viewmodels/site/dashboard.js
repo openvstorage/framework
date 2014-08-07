@@ -201,7 +201,7 @@ define([
                 self.storageRoutersLoading(true);
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
-                        contents: '',
+                        contents: 'status',
                         sort: 'name,vdisks_guids'
                     })
                         .done(function(data) {

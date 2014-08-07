@@ -17,9 +17,11 @@
     "generic": {
         "states": {
             "storagerouter": {
-                "ok": "Online",
-                "nok": "Offline",
-                "undefined": "Unknown"
+                "ok": "OK",
+                "warning": "Warning",
+                "failure": "Failure",
+                "undefined": "Unknown",
+                "unknown": "Unknown"
             },
             "foc": {
                 "ok_standalone": "Healthy (standalone)",

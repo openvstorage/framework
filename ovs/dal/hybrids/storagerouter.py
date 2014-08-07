@@ -30,14 +30,15 @@ class StorageRouter(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the vMachine.'),
                     Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
                     Property('ip', str, doc='IP Address of the vMachine, if available'),
-                    Property('status', ['OK', 'NOK'], default='OK', doc='Internal status of the software stack')]
+                    Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors')]
     __relations = [Relation('pmachine', PMachine, 'storagerouters')]
     __dynamics = [Dynamic('statistics', dict, 5),
                   Dynamic('stored_data', int, 60),
                   Dynamic('failover_mode', str, 60),
                   Dynamic('vmachines_guids', list, 15),
                   Dynamic('vpools_guids', list, 15),
-                  Dynamic('vdisks_guids', list, 15)]
+                  Dynamic('vdisks_guids', list, 15),
+                  Dynamic('status', str, 10)]
 
     def _statistics(self):
         """
@@ -117,3 +118,22 @@ class StorageRouter(DataObject):
         for storagedriver in self.storagedrivers:
             vpool_guids.add(storagedriver.vpool_guid)
         return list(vpool_guids)
+
+    def _status(self):
+        """
+        Calculates the current Storage Router status based on various heartbeats
+        """
+        current_time = time.time()
+        if self.heartbeats is not None:
+            process_delay = abs(self.heartbeats.get('process', 0) - current_time)
+            if process_delay > 60 * 5:
+                return 'FAILURE'
+            else:
+                delay = abs(self.heartbeats.get('celery', 0) - current_time)
+                if delay > 60 * 5:
+                    return 'FAILURE'
+                elif delay > 60 * 2:
+                    return 'WARNING'
+                else:
+                    return 'OK'
+        return 'UNKNOWN'

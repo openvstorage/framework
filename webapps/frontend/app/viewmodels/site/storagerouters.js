@@ -55,7 +55,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'stored_data'
+                        contents: 'stored_data,status'
                     };
                     self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
                         .done(function(data) {
@@ -90,7 +90,7 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_relations,statistics,stored_data,vdisks_guids'
+                        contents: '_relations,statistics,stored_data,vdisks_guids,status'
                     };
                     self.refreshStorageRoutersHandle[page] = api.get('storagerouters', undefined, options)
                         .done(function(data) {

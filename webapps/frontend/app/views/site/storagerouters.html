@@ -24,7 +24,7 @@ limitations under the License.
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     <span class="fa pointer" data-i18n="[html]ovs:icons.storagerouter"
                           data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
-                                     style: { color: status() !== undefined ? (status().indexOf('ok') === -1 ? 'red' : 'green') : 'lightgrey' }"></span>
+                                     style: { color: statusColor() }"></span>
                 </td>
                 <td>
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>

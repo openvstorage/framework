@@ -540,7 +540,6 @@ class DataObject(object):
             self._mutex_listcache.release()
 
         # Invalidate the cache
-        self.invalidate_dynamics()
         self._volatile.delete(self._key)
 
         self._original = copy.deepcopy(self._data)

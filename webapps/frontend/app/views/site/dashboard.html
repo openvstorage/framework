@@ -50,7 +50,7 @@ limitations under the License.
                                         <td>
                                             <span class="fa pointer" data-i18n="[html]ovs:icons.storagerouter"
                                                   data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
-                                                             style: { color: status().indexOf('ok') === -1 ? 'red' : 'green' }"></span>
+                                                             style: { color: statusColor() }"></span>
                                         </td>
                                         <td>
                                             <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
