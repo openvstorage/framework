@@ -18,6 +18,7 @@ DataObject module
 import uuid
 import copy
 import re
+import json
 import inspect
 from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
@@ -718,4 +719,4 @@ class DataObject(object):
         """
         The string representation of a DataObject is the serialized value
         """
-        return str(self.serialize())
+        return json.dumps(self.serialize(), indent=4)
