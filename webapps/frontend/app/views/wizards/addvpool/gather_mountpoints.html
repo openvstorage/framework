@@ -1,0 +1,89 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <form role="form form-horizontal" class="form-horizontal">
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.basicinfo"></p>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.bfsinfo"
+           data-bind="visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+        </p>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('bfs', canContinue().fields) !== -1 },
+                                           visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptBFS,
+                                             free: true, defaultfree: '/mnt/bfs/' + data.name(), defaultRegex: /bfs/ }">
+                </span>
+            </div>
+        </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.mtptinfo"></p>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('tempfs', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptTemp,
+                                             free: true, defaultfree: '/', defaultRegex: /tmp/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('md', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptMD,
+                                             free: true, defaultfree: '/', defaultRegex: /md/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('cache', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.cache"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptCache,
+                                             free: true, defaultfree: '/', defaultRegex: /cache/ }">
+                </span>
+            </div>
+        </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.otherinfo"></p>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.ipAddresses, target: data.storageIP }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('port', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.port"></label>
+            <div class="col-lg-2">
+                <input type="text" id="name" class="autofocus form-control"
+                       data-bind="value: data.vRouterPort,
+                                  attr: { id: (data.vRouterPort.hasOwnProperty('identifier') ? ('gmtptp-' + data.vRouterPort.identifier) : undefined) }">
+            </div>
+            <div class="col-lg-7" style="margin-top: 7px;" data-bind="visible: data.storageDrivers().length > 0">
+                <span data-i18n="ovs:wizards.addvpool.gathermountpoints.portsinuse"></span>
+                <!-- ko foreach: data.storageDrivers() -->
+                    <span data-bind="visible: $index() > 0">,</span>
+                    <span data-bind="text: (parseInt($data.port(), 10) - 1).toString()"></span>,
+                    <span data-bind="text: $data.port()"></span>,
+                    <span data-bind="text: (parseInt($data.port(), 10) + 1).toString()"></span>
+                <!-- /ko -->
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-danger" data-bind="visible: canContinue().value === false" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>
