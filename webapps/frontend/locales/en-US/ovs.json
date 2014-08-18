@@ -16,10 +16,12 @@
     ],
     "generic": {
         "states": {
-            "vsa": {
-                "ok": "Online",
-                "nok": "Offline",
-                "undefined": "Unknown"
+            "storagerouter": {
+                "ok": "OK",
+                "warning": "Warning",
+                "failure": "Failure",
+                "undefined": "Unknown",
+                "unknown": "Unknown"
             },
             "foc": {
                 "ok_standalone": "Healthy (standalone)",
@@ -52,7 +54,12 @@
             "DISTRIBUTED": "Distributed FS"
         },
         "mgmtcentertypes": {
-            "VCENTER": "VMware vCenter"
+            "VCENTER": "VMware vCenter",
+            "OPENSTACK": "OpenStack Controller Node"
+        },
+        "granttypes": {
+            "PASSWORD": "Password Credentials",
+            "CLIENT_CREDENTIALS": "Client Credentials"
         },
         "username": "Username",
         "password": "Password",
@@ -100,8 +107,8 @@
         "machines": "Machines",
         "vpool": "vPool",
         "vpools": "vPools",
-        "vsa": "GSR",
-        "vsas": "GSRs",
+        "storagerouter": "Storage Router",
+        "storagerouters": "Storage Routers",
         "children": "Children",
         "storeddata": "Stored Data",
         "topstoreddata": "Top Stored Data",
@@ -162,34 +169,35 @@
         "mgmtcenter": "Mgmt. Center",
         "port": "Port",
         "noentries": "No entries available",
-        "logging": "Kibana logging"
+        "logging": "Kibana logging",
+        "generated": "Generated"
     },
-    "vsas": {
-        "title": "GSRs",
-        "details": "GSR Details",
+    "storagerouters": {
+        "title": "Storage Routers",
+        "details": "Storage Router Details",
         "detail": {
-            "title": "GSR",
+            "title": "Storage Router",
             "hostip": "Host IP",
             "moveawaytitle": "Move all vDisks",
-            "moveawaymsg": "Move all vDisks away from this GSR and start them on other GSRs.",
+            "moveawaymsg": "Move all vDisks away from this Storage Router and start them on other Storage Routers.",
             "moveaway": {
                 "warning": "Are you sure you want to move all vDisks away?",
                 "title": "Are you sure",
                 "no": "Cancel",
                 "yes": "Move away",
                 "marked": "Moving away started",
-                "markedmsg": "All vDisks will be moved away from this GSR",
+                "markedmsg": "All vDisks will be moved away from this Storage Router",
                 "done": "Move away complete",
                 "donemsg": "All vDisks have been moved away from __what__",
                 "errormsg": "moving away all vDisks from __what__"
             },
-            "vsavpoollink": "vPools served by this GSR",
+            "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple GSRs",
-            "logging": "GSR logs",
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
+            "logging": "Storage Router logs",
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this GSR's logs."
+            "logginginfo3": "to view this Storage Router's logs."
         }
     },
     "vpools" : {
@@ -204,9 +212,9 @@
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
             "sync": "Sync vPool with reality",
-            "vsavpoollink": "GSRs serving this vPool",
+            "storageroutervpoollink": "Storage Routers serving this vPool",
             "updateserving": "Save changes",
-            "localvpool": "A vPool on Local Filesystem can not be shared across multiple GSRs.",
+            "localvpool": "A vPool on Local Filesystem can not be shared across multiple Storage Routers.",
             "logging": "vPool logs",
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
@@ -294,10 +302,10 @@
     "dashboard": {
         "title": "Dashboard",
         "panels": {
-            "vsa": {
-                "helpcontent": "The GSR (Grid Storage Router) panel list all the GSRs registered in the Open vStorage Cluster. For each GSR the status, name, IP address and amount of vDisks is displayed.",
-                "helptitle": "Help - GSR",
-                "title": "GSR"
+            "storagerouter": {
+                "helpcontent": "The Storage Router panel list all the Storage Routers registered in the Open vStorage Cluster. For each Storage Router the status, name, IP address and amount of vDisks is displayed.",
+                "helptitle": "Help - Storage Router",
+                "title": "Storage Routers"
             },
             "cache": {
                 "helpcontent": "The Cache Hit Ratio panel contains the percentage of the cache hits to the total amount of cache lookups for all vDisks. Below the current amount of IOPS is displayed for the whole Cluster. This panel gets updated every 5 seconds.",
@@ -335,7 +343,7 @@
         "openvstorage": "Open vStorage:",
         "openvstoragecore": "Open vStorage - Core:",
         "openvstoragewebapps": "Open vStorage - Webapps:",
-        "volumedriver": "vStorage Driver:"
+        "volumedriver": "Storage Driver:"
     },
     "pmachines": {
         "title": "Hypervisor Mgmt.",
@@ -360,6 +368,25 @@
             "complete": "Save completed",
             "success": "PMachine __what__ updated.",
             "failed": "Updating __what__ failed: __why__"
+        }
+    },
+    "users": {
+        "title": "User Mgmt.",
+        "users": {
+            "title": "Users"
+        },
+        "clients": {
+            "title": "OAuth 2 Clients",
+            "information": "Below are the configured OAuth 2 Clients for the selected User. Please note that only the Grant type &quot;Client Credentials&quot; is supported.",
+            "clientid": "Client ID",
+            "clientsecret": "Client secret",
+            "granttype": "Grant type",
+            "complete": "Completed",
+            "deletesuccess": "The Client was deleted successfully",
+            "deletefailed": "Could not delete the Client: __why__",
+            "addsuccess": "The Client was added successfully",
+            "addfailed": "Could not add the Client: __why__",
+            "delete": "Are you sure you want to delete Client: __what__?"
         }
     },
     "login": {
@@ -391,14 +418,13 @@
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "nocredentials": "No credentials were entered",
                 "extendedinfo": "Extended vPool information",
-                "initialvsa": "Initial GSR:",
-                "vsarootpassword": "Root password:",
-                "invalidpassword": "Invalid GSR root password",
+                "initialstoragerouter": "Initial Storage Router:",
+                "invalidpassword": "Invalid Storage Router root password",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             },
             "gathermountpoints": {
-                "basicinfo": "Enter/select the requested information. It will be shared accross all GSRs serving this vPool.",
+                "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",
                 "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
                 "mtptinfo": "Required locations:",
                 "otherinfo": "Other information:",
@@ -406,19 +432,19 @@
                 "bfs": "Backend FS:",
                 "md": "Metadata:",
                 "cache": "Cache location:",
-                "mtptinuse": "The given __what__ location is already in use on this GSR",
+                "mtptinuse": "The given __what__ location is already in use on this Storage Router",
                 "ipaddress": "Storage IP:",
                 "port": "vRouter port:",
                 "portsinuse": "Ports in use:",
                 "bfsexclusive": "The BFS mountpoint must have exclusive use",
                 "bfsnotshared": "The BFS mountpoint should not be shared between vPools",
                 "portinuse": "The given port is already in use",
-                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "invalidmtpt": "The mountpoint __what__ is invalid."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
-                "vsainfo": "Validate whether the correct GSR was selected.",
+                "storagerouterinfo": "Validate whether the correct Storage Router was selected.",
                 "mountpoints": "Validate whether mountpoints and connection information are correct.",
                 "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
                 "started": "Creation started",
@@ -427,25 +453,25 @@
                 "success": "Creation of vPool __what__ finished."
             }
         },
-        "vsatovpool": {
-            "title": "Change links between vPool and GSRs",
+        "storageroutertovpool": {
+            "title": "Change links between vPool and Storage Routers",
             "confirm": {
                 "errorvalidating": "Error while validating. Try again.",
                 "validating": "Validating...",
-                "addvalid": "The vPool can be added to this GSR.",
-                "removevalid": "The vPool can be removed from this GSR.",
-                "noselection": "No GSRs were selected.",
-                "mtptnotavailable": "The location __what__ is not available on this GSR",
-                "ipnotavailable": "The IP __what__ is not available on this GSR",
+                "addvalid": "The vPool can be added to this Storage Router.",
+                "removevalid": "The vPool can be removed from this Storage Router.",
+                "noselection": "No Storage Routers were selected.",
+                "mtptnotavailable": "The location __what__ is not available on this Storage Router",
+                "ipnotavailable": "The IP __what__ is not available on this Storage Router",
                 "started": "Adding/removing",
-                "inprogress": "The vPool is being added to or removed from the validated GSRs",
+                "inprogress": "The vPool is being added to or removed from the validated Storage Routers",
                 "working": "adding/removing the vPool",
                 "complete": "Add/remove vPool complete",
-                "success": "The vPool was added/removed to the selected GSRs with success",
-                "somefailed": "The vPool was added to or removed from some the selected GSRs. Some tasks failed.",
-                "allfailed": "The vPool could not be added to or removed from any of the selected GSRs",
-                "inuse": "The vPool is in use at this GSR",
-                "vpoolnotallowed": "A vPool cannot be added to this GSR: Prerequisites not met.",
+                "success": "The vPool was added/removed to the selected Storage Routers with success",
+                "somefailed": "The vPool was added to or removed from some the selected Storage Routers. Some tasks failed.",
+                "allfailed": "The vPool could not be added to or removed from any of the selected Storage Routers",
+                "inuse": "The vPool is in use at this Storage Router",
+                "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
             }
         },
@@ -545,7 +571,7 @@
             "title": "Change password",
             "confirm": {
                 "title": "Please provide the required information",
-                "introduction": "Enter the requested information carefully.",
+                "introduction": "Enter the current and new password for user:",
                 "newpassword": "New password",
                 "currentpassword": "Current password",
                 "retype": "Retype",
@@ -607,7 +633,7 @@
         "snapshot": "&#xf030;",
         "setastemplate": "&#xf023;",
         "rollback": "&#xf01e;",
-        "vsa": "&#xf0c2;",
+        "storagerouter": "&#xf0c2;",
         "fromtemplate": "&#xf045;",
         "notchecked": "&#xf096;",
         "checked": "&#xf046;",
@@ -618,12 +644,13 @@
         "vdisks": "&#xf0a0;",
         "add": "&#xf067;",
         "vmachines": "&#xf0e8;",
-        "vsavpoollink": "&#xf07c;",
+        "storageroutervpoollink": "&#xf07c;",
         "edit": "&#xf040;",
         "save": "&#xf00c;",
         "warning": "&#xf071;",
         "cancel": "&#xf00d;",
         "logs": "&#xf02d;",
-        "externallink": "&#xf08e;"
+        "externallink": "&#xf08e;",
+        "password": "&#xf084;"
     }
 }

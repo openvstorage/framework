@@ -25,7 +25,7 @@ from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.dal.relations.relations import RelationMapper
+from ovs.dal.relations import RelationMapper
 
 
 class DataList(object):
@@ -140,7 +140,7 @@ class DataList(object):
         itemcounter = 0
         for pitem in path:
             itemcounter += 1
-            if pitem in value.__class__._expiry:
+            if pitem in (dynamic.name for dynamic in value.__class__._dynamics):
                 self._can_cache = False
             value = getattr(value, pitem)
             if value is None and itemcounter != len(path):
@@ -285,21 +285,22 @@ class DataList(object):
                     if pitem == 'guid':
                         # The guid is a final value which can't be changed so it shouldn't be taken into account
                         break
-                    elif pitem in value._blueprint:
+                    elif pitem in (prop.name for prop in value._properties):
                         # The pitem is in the blueprint, so it's a simple property (e.g. vmachine.name)
                         add(class_name, pitem)
                         break
-                    elif pitem in value._relations:
+                    elif pitem in (relation.name for relation in value._relations):
                         # The pitem is in the relations, so it's a relation property (e.g. vdisk.vmachine)
                         add(class_name, pitem)
-                        if value._relations[pitem][0] is not None:
-                            value = value._relations[pitem][0]
+                        relation = [relation for relation in value._relations if relation.name == pitem][0]
+                        if relation.foreign_type is not None:
+                            value = relation.foreign_type
                         continue
-                    elif pitem.endswith('_guid') and pitem.replace('_guid', '') in value._relations:
+                    elif pitem.endswith('_guid') and pitem.replace('_guid', '') in (relation.name for relation in value._relations):
                         # The pitem is the guid pointing to a relation, so it can be handled like a simple property (e.g. vdisk.vmachine_guid)
                         add(class_name, pitem.replace('_guid', ''))
                         break
-                    elif pitem in value._expiry:
+                    elif pitem in (dynamic.name for dynamic in value._dynamics):
                         # The pitem is a dynamic property, which will be ignored anyway
                         break
                     else:

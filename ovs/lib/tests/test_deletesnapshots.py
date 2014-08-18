@@ -48,7 +48,7 @@ class DeleteSnapshots(TestCase):
         PersistentFactory.store = DummyPersistentStore()
         VolatileFactory.store = DummyVolatileStore()
         # Replace mocked classes
-        sys.modules['ovs.extensions.storageserver.volumestoragerouter'] = VolumeStorageRouter
+        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriver
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.vmachine import VMachine
         from ovs.dal.hybrids.vdisk import VDisk
@@ -96,12 +96,12 @@ class DeleteSnapshots(TestCase):
         vmachine_1.save()
         vdisk_1_1 = VDisk()
         vdisk_1_1.name = 'vdisk_1_1'
-        vdisk_1_1.volumeid = 'vdisk_1_1'
+        vdisk_1_1.volume_id = 'vdisk_1_1'
         vdisk_1_1.vmachine = vmachine_1
         vdisk_1_1.save()
         vdisk_1_2 = VDisk()
         vdisk_1_2.name = 'vdisk_1_2'
-        vdisk_1_2.volumeid = 'vdisk_1_2'
+        vdisk_1_2.volume_id = 'vdisk_1_2'
         vdisk_1_2.vmachine = vmachine_1
         vdisk_1_2.save()
         vmachine_2 = VMachine()
@@ -109,18 +109,16 @@ class DeleteSnapshots(TestCase):
         vmachine_2.save()
         vdisk_2_1 = VDisk()
         vdisk_2_1.name = 'vdisk_2_1'
-        vdisk_2_1.volumeid = 'vdisk_2_1'
+        vdisk_2_1.volume_id = 'vdisk_2_1'
         vdisk_2_1.vmachine = vmachine_2
         vdisk_2_1.save()
         vdisk_3 = VDisk()
         vdisk_3.name = 'vdisk_3'
-        vdisk_3.volumeid = 'vdisk_3'
+        vdisk_3.volume_id = 'vdisk_3'
         vdisk_3.save()
 
-        vdisk_1_1._expiry['snapshots'] = (0, list)
-        vdisk_1_2._expiry['snapshots'] = (0, list)
-        vdisk_2_1._expiry['snapshots'] = (0, list)
-        vdisk_3._expiry['snapshots'] = (0, list)
+        for disk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
+            [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
 
         # Run the testing scenario
         debug = True
@@ -296,9 +294,9 @@ class Snapshot():
         self.metadata = metadata
 
 
-class StorageRouterClient():
+class SRClient():
     """
-    Mocks the StorageRouterClient
+    Mocks the SRClient
     """
 
     snapshots = {}
@@ -314,52 +312,52 @@ class StorageRouterClient():
         """
         Return fake info
         """
-        snapshots = StorageRouterClient.snapshots.get(volume_id, {})
+        snapshots = StorageDriverClient.snapshots.get(volume_id, {})
         return snapshots.keys()
 
     @staticmethod
-    def create_snapshot(volumeid, snapshot_id, metadata):
+    def create_snapshot(volume_id, snapshot_id, metadata):
         """
         Create snapshot mockup
         """
-        snapshots = StorageRouterClient.snapshots.get(volumeid, {})
+        snapshots = StorageDriverClient.snapshots.get(volume_id, {})
         snapshots[snapshot_id] = Snapshot(metadata)
-        StorageRouterClient.snapshots[volumeid] = snapshots
+        StorageDriverClient.snapshots[volume_id] = snapshots
 
     @staticmethod
-    def info_snapshot(volumeid, guid):
+    def info_snapshot(volume_id, guid):
         """
         Info snapshot mockup
         """
-        return StorageRouterClient.snapshots[volumeid][guid]
+        return StorageDriverClient.snapshots[volume_id][guid]
 
     @staticmethod
-    def delete_snapshot(volumeid, guid):
+    def delete_snapshot(volume_id, guid):
         """
         Delete snapshot mockup
         """
-        del StorageRouterClient.snapshots[volumeid][guid]
+        del StorageDriverClient.snapshots[volume_id][guid]
 
     @staticmethod
-    def info_volume(volumeid):
+    def info_volume(volume_id):
         """
         Info volume mockup
         """
-        _ = volumeid
+        _ = volume_id
         return type('Info', (), {'object_type': 'BASE'})()
 
     @staticmethod
-    def get_scrubbing_workunits(volumeid):
+    def get_scrubbing_workunits(volume_id):
         """
         Get scrubbing workload mockup
         """
-        _ = volumeid
+        _ = volume_id
         return []
 
 
-class VolumeStorageRouterClient():
+class StorageDriverClient():
     """
-    Mocks the VolumeStorageRouterClient
+    Mocks the StorageDriverClient
     """
 
     def __init__(self):
@@ -370,17 +368,17 @@ class VolumeStorageRouterClient():
 
     def load(self):
         """
-        Returns the mocked StorageRouterClient
+        Returns the mocked SRClient
         """
         _ = self
-        return StorageRouterClient()
+        return SRClient()
 
 
-class VolumeStorageRouter():
+class StorageDriver():
     """
-    Mocks the VolumeStorageRouter
+    Mocks the StorageDriver
     """
-    VolumeStorageRouterClient = VolumeStorageRouterClient
+    StorageDriverClient = StorageDriverClient
 
     def __init__(self):
         """

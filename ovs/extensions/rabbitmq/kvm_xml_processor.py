@@ -73,7 +73,12 @@ class Kxp(pyinotify.ProcessEvent):
         disks = [self._recurse(item) for item in tree.findall("devices/disk")]
         for disk in disks:
             if disk['device'] == 'disk':
-                match = re.search(regex, disk['source']['file'])
+                if 'file' in disk['source']:
+                    match = re.search(regex, disk['source']['file'])
+                elif 'dev' in disk['source']:
+                    match = re.search(regex, disk['source']['dev'])
+                else:
+                    match = None
                 if match:
                     return match.group(1)
         return ''

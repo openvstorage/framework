@@ -84,6 +84,9 @@ class Factory(object):
                     if mgmtcenter_type == 'VCENTER':
                         from mgmtcenters.vcenter import VCenter
                         mgmtcenter = VCenter(ip, username, password)
+                    elif mgmtcenter_type == 'OPENSTACK':
+                        from mgmtcenters.openstack import OpenStack
+                        mgmtcenter = OpenStack(ip, username, password)
                     else:
                         raise NotImplementedError('Management center for {0} is not yet supported'.format(mgmtcenter_type))
                     Factory.mgmtcenters[key] = mgmtcenter

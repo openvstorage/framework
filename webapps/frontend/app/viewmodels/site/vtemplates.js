@@ -27,17 +27,14 @@ define([
         self.refresher        = new Refresher();
         self.widgets          = [];
         self.query            = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', false],
-                        ['is_vtemplate', 'EQUALS', true]]
-            }
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', true]]
         };
         self.vTemplateHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
-            { key: undefined,      value: $.t('ovs:generic.vdisks'),     width: 60        },
-            { key: 'children',     value: $.t('ovs:generic.children'),   width: 110       },
-            { key: undefined,      value: $.t('ovs:generic.actions'),    width: 80        }
+            { key: 'name',     value: $.t('ovs:generic.name'),     width: undefined },
+            { key: undefined,  value: $.t('ovs:generic.vdisks'),   width: 60        },
+            { key: 'children', value: $.t('ovs:generic.children'), width: 110       },
+            { key: undefined,  value: $.t('ovs:generic.actions'),  width: 80        }
         ];
 
         // Observables
@@ -54,9 +51,10 @@ define([
                 if (generic.xhrCompleted(self.loadVTemplatesHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'vdisks'
+                        contents: 'vdisks',
+                        query: JSON.stringify(self.query)
                     };
-                    self.loadVTemplatesHandle = api.post('vmachines/filter', self.query, options)
+                    self.loadVTemplatesHandle = api.get('vmachines', {}, options)
                         .done(function(data) {
                             var guids = [], vtdata = {};
                             $.each(data, function(index, item) {
@@ -89,9 +87,10 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: 'vdisks'
+                        contents: 'vdisks',
+                        query: JSON.stringify(self.query)
                     };
-                    self.refreshVTemplatesHandle[page] = api.post('vmachines/filter', self.query, options)
+                    self.refreshVTemplatesHandle[page] = api.get('vmachines', {}, options)
                         .done(function(data) {
                             var guids = [], vtdata = {};
                             $.each(data, function(index, item) {

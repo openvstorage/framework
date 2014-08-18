@@ -16,6 +16,7 @@
 TestMachine module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property
 
 
 class TestMachine(DataObject):
@@ -23,8 +24,6 @@ class TestMachine(DataObject):
     This TestMachine object is used for running unittests.
     WARNING: These properties should not be changed
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name': (None, str, 'Name of the test machine')}
-    __relations = {}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the test machine')]
+    __relations = []
+    __dynamics = []

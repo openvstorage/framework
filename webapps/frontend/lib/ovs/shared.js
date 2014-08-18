@@ -24,7 +24,11 @@ define(['knockout'], function(ko){
             mode           : ko.observable('full'),
             routing        : undefined,
             footerData     : ko.observable(ko.observable()),
-            nodes          : undefined
+            nodes          : undefined,
+            user           : {
+                username: ko.observable(),
+                guid    : ko.observable()
+            }
         };
     };
     return singleton();

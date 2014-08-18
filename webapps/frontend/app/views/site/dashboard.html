@@ -18,22 +18,22 @@ limitations under the License.
     <div class="row">
         <div class="col-md-4">
             <!-- Left column -->
-            <div class="panel panel-default">
-                <!-- VSA -->
+            <div id="dashboard.panels.storagerouter" class="panel panel-default">
+                <!-- StorageRouter -->
                 <div class="panel-heading">
-                    <b data-i18n="ovs:dashboard.panels.vsa.title"></b>
+                    <b data-i18n="ovs:dashboard.panels.storagerouter.title"></b>
                     <div style="float:right;">
-                        <span data-bind="visible: vSAsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
+                        <span data-bind="visible: storageRoutersLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.vsa.helptitle',
-                                             content: 'ovs:dashboard.panels.vsa.helpcontent'
+                                             title: 'ovs:dashboard.panels.storagerouter.helptitle',
+                                             content: 'ovs:dashboard.panels.storagerouter.helpcontent'
                                          }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: darkgray;">
                         </span>
                     </div>
                 </div>
                 <div class="panel-body">
                     <div data-bind="lazylist: {
-                                        displaymode: 'table', items: vSAs,
+                                        displaymode: 'table', items: storageRouters,
                                         loadedObservable: 'loaded', colspan: 4
                                     }" >
                         <table data-dummy="dummy">
@@ -48,12 +48,12 @@ limitations under the License.
                             <tbody data-dummy="dummy">
                                 <tr data-part="table-entry">
                                         <td>
-                                            <span class="fa pointer" data-i18n="[html]ovs:icons.vsa"
-                                                  data-bind="tooltip: 'ovs:generic.states.vsa.' + status(),
-                                                             style: { color: status().indexOf('ok') === -1 ? 'red' : 'green' }"></span>
+                                            <span class="fa pointer" data-i18n="[html]ovs:icons.storagerouter"
+                                                  data-bind="tooltip: 'ovs:generic.states.storagerouter.' + status(),
+                                                             style: { color: statusColor() }"></span>
                                         </td>
                                         <td>
-                                            <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
+                                            <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                                         </td>
                                         <td data-bind="text: ipAddress"></td>
                                         <td data-bind="text: vDisks().length"></td>

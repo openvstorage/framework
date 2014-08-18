@@ -16,29 +16,28 @@
 VPool module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+from ovs.dal.structures import Dynamic, Property
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 import time
 
 
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
-    deploy vMachines. a vPool can span multiple VSRs and connects to a single Storage Backend.
+    deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage Backend.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':               (None, str, 'Name of the vPool.'),
-                   'description':        (None, str, 'Description of the vPool.'),
-                   'size':               (None, int, 'Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
-                   'backend_login':      (None, str, 'Login/Username for the Storage Backend.'),
-                   'backend_password':   (None, str, 'Password for the Storage Backend.'),
-                   'backend_connection': (None, str, 'Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
-                   'backend_type':       (None, ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'DISTRIBUTED'], 'Type of the Storage Backend.'),
-                   'backend_metadata':   (None, dict, 'Metadata for the backend, as used by the VolumeDriver.')}
-    __relations = {}
-    __expiry = {'status':        (10, str),
-                'statistics':     (5, dict),
-                'stored_data':   (60, int)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the vPool'),
+                    Property('description', str, mandatory=False, doc='Description of the vPool'),
+                    Property('size', int, mandatory=False, doc='Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
+                    Property('login', str, mandatory=False, doc='Login/Username for the Storage Backend.'),
+                    Property('password', str, mandatory=False, doc='Password for the Storage Backend.'),
+                    Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
+                    Property('type', ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'DISTRIBUTED'], mandatory=False, doc='Type of the Storage Backend.'),
+                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
+    __relations = []
+    __dynamics = [Dynamic('status',      str, 10),
+                  Dynamic('statistics',  dict, 5),
+                  Dynamic('stored_data', int, 60)]
 
     def _status(self):
         """
@@ -51,14 +50,14 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        client = VolumeStorageRouterClient()
+        client = StorageDriverClient()
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
-        for disk in self.vdisks:
-            statistics = disk._statistics()  # Prevent double caching
-            for key, value in statistics.iteritems():
+        for vdisk in self.vdisks:
+            vdisk.invalidate_dynamics('statistics')  # Prevent double caching
+            for key, value in vdisk.statistics.iteritems():
                 if key != 'timestamp':
                     vdiskstatsdict[key] += value
         vdiskstatsdict['timestamp'] = time.time()

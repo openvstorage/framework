@@ -23,7 +23,7 @@ from ovs.dal.hybrids.pmachine import PMachine
 from backend.serializers.serializers import FullSerializer
 from rest_framework.response import Response
 from rest_framework import status
-from backend.decorators import required_roles, expose, validate, get_object, get_list
+from backend.decorators import required_roles, load, return_object, return_list
 
 
 class PMachineViewSet(viewsets.ViewSet):
@@ -34,37 +34,32 @@ class PMachineViewSet(viewsets.ViewSet):
     prefix = r'pmachines'
     base_name = 'pmachines'
 
-    @expose(internal=True)
     @required_roles(['view'])
-    @get_list(PMachine)
-    def list(self, request, format=None, hints=None):
+    @return_list(PMachine)
+    @load()
+    def list(self):
         """
         Overview of all pMachines
         """
-        _ = request, format, hints
         return PMachineList.get_pmachines()
 
-    @expose(internal=True)
     @required_roles(['view'])
-    @validate(PMachine)
-    @get_object(PMachine)
-    def retrieve(self, request, obj):
+    @return_object(PMachine)
+    @load(PMachine)
+    def retrieve(self, pmachine):
         """
         Load information about a given pMachine
         """
-        _ = request
-        return obj
+        return pmachine
 
-    @expose(internal=True)
     @required_roles(['view', 'update', 'system'])
-    @validate(PMachine)
-    def partial_update(self, request, obj):
+    @load(PMachine)
+    def partial_update(self, contents, pmachine, request):
         """
         Update a pMachine
         """
-        contents = request.QUERY_PARAMS.get('contents')
         contents = None if contents is None else contents.split(',')
-        serializer = FullSerializer(PMachine, contents=contents, instance=obj, data=request.DATA)
+        serializer = FullSerializer(PMachine, contents=contents, instance=pmachine, data=request.DATA)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)

@@ -37,15 +37,15 @@ class VDiskList(object):
         return DataObjectList(vdisks, VDisk)
 
     @staticmethod
-    def get_vdisk_by_volumeid(volumeid):
+    def get_vdisk_by_volume_id(volume_id):
         """
-        Returns a list of all VDisks based on a given volumeid
+        Returns a list of all VDisks based on a given volume id
         """
         # pylint: disable=line-too-long
         vdisks = DataList({'object': VDisk,
                            'data': DataList.select.DESCRIPTOR,
                            'query': {'type': DataList.where_operator.AND,
-                                     'items': [('volumeid', DataList.operator.EQUALS, volumeid)]}}).data
+                                     'items': [('volume_id', DataList.operator.EQUALS, volume_id)]}}).data
         # pylint: enable=line-too-long
         if vdisks:
             return DataObjectList(vdisks, VDisk)[0]
@@ -54,7 +54,7 @@ class VDiskList(object):
     @staticmethod
     def get_by_devicename_and_vpool(devicename, vpool):
         """
-        Returns a list of all VDisks based on a given volumeid
+        Returns a list of all VDisks based on a given device name and vpool
         """
         # pylint: disable=line-too-long
         vds = DataList({'object': VDisk,

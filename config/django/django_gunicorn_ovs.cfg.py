@@ -15,7 +15,7 @@
 import multiprocessing
 import os
 
-bind = '127.0.0.1:8000'
+bind = '127.0.0.1:8002'  # avoid conflict with devstack heat api
 workers = multiprocessing.cpu_count() + 1
 backlog = 2048
 worker_class = 'gevent'

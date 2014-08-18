@@ -22,36 +22,36 @@ define([
         var self = this;
 
         // Handles
-        self.loadHandle    = undefined;
-        self.diskHandle    = undefined;
-        self.machineHandle = undefined;
-        self.vsaHandle     = undefined;
+        self.loadHandle          = undefined;
+        self.diskHandle          = undefined;
+        self.machineHandle       = undefined;
+        self.storageRouterHandle = undefined;
 
         // Observables
-        self.loading           = ko.observable(false);
-        self.loaded            = ko.observable(false);
-        self.guid              = ko.observable(guid);
-        self.name              = ko.observable();
-        self.size              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.storedData        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendWriteSpeed = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReadSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReads      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendType       = ko.observable();
-        self.backendConnection = ko.observable();
-        self.backendLogin      = ko.observable();
-        self.vDisks            = ko.observableArray([]);
-        self.vMachines         = ko.observableArray([]);
-        self.servingVSAGuids   = ko.observableArray([]);
-        self.vSRGuids          = ko.observableArray([]);
+        self.loading            = ko.observable(false);
+        self.loaded             = ko.observable(false);
+        self.guid               = ko.observable(guid);
+        self.name               = ko.observable();
+        self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendWriteSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendReads       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.backendWritten     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendType        = ko.observable();
+        self.backendConnection  = ko.observable();
+        self.backendLogin       = ko.observable();
+        self.vDisks             = ko.observableArray([]);
+        self.vMachines          = ko.observableArray([]);
+        self.storageRouterGuids = ko.observableArray([]);
+        self.storageDriverGuids = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -72,10 +72,10 @@ define([
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.size, data, 'size');
-            generic.trySet(self.backendConnection, data, 'backend_connection');
-            generic.trySet(self.backendLogin, data, 'backend_login');
-            if (data.hasOwnProperty('backend_type')) {
-                self.backendType(data.backend_type);
+            generic.trySet(self.backendConnection, data, 'connection');
+            generic.trySet(self.backendLogin, data, 'login');
+            if (data.hasOwnProperty('type')) {
+                self.backendType(data.type);
             } else {
                 self.backendType(undefined);
             }
@@ -87,8 +87,8 @@ define([
                     }, 'guid'
                 );
             }
-            if (data.hasOwnProperty('vsrs_guids')) {
-                self.vSRGuids(data.vsrs_guids);
+            if (data.hasOwnProperty('storagedrivers_guids')) {
+                self.storageDriverGuids(data.storagedrivers_guids);
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
@@ -206,12 +206,12 @@ define([
                 }
             }).promise();
         };
-        self.loadServingVSAs = function() {
+        self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.vsaHandle)) {
-                    self.vsaHandle = api.get('vpools/' + self.guid() + '/serving_vsas')
+                if (generic.xhrCompleted(self.storageRouterHandle)) {
+                    self.storageRouterHandle = api.get('vpools/' + self.guid() + '/storagerouters')
                         .done(function(data) {
-                            self.servingVSAGuids(data);
+                            self.storageRouterGuids(data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);

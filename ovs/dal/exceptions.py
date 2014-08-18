@@ -43,3 +43,10 @@ class LinkedObjectException(Exception):
     Raised when there are linked objects when an object is deleted
     """
     pass
+
+
+class MissingMandatoryFieldsException(Exception):
+    """
+    Raised when there are mandatory fields missing
+    """
+    pass

@@ -14,8 +14,8 @@
 /*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared', 'viewmodels/wizards/changepassword/index'
-], function(router, dialog, $, shared, ChangePasswordWizard) {
+    'ovs/shared'
+], function(router, dialog, $, shared) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
@@ -45,11 +45,6 @@ define([
     return {
         shared: shared,
         router: childRouter,
-        changePassword: function() {
-            dialog.show(new ChangePasswordWizard({
-                modal: true
-            }));
-        },
         activate: function(mode) {
             var self = this;
             // Config
@@ -60,13 +55,14 @@ define([
             $.pnotify.defaults.styling = "bootstrap";
 
             // Cache node ips
-            $.ajax('/api/internal/generic/0/?timestamp=' + (new Date().getTime()), {
+            $.ajax('/api/?timestamp=' + (new Date().getTime()), {
                     type: 'GET',
-                    contentType: 'application/jsonp',
-                    timeout: 5000
+                    contentType: 'application/json',
+                    timeout: 5000,
+                    headers: { Accept: 'application/json' }
                 })
                 .done(function(nodes) {
-                    shared.nodes = nodes.vsa_ips;
+                    shared.nodes = nodes.storagerouter_ips;
                     window.localStorage.setItem('nodes', JSON.stringify(shared.nodes));
                 });
         }

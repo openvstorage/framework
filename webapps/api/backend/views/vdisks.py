@@ -16,8 +16,7 @@
 VDisk module
 """
 
-from rest_framework import status, viewsets
-from rest_framework.response import Response
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from ovs.dal.lists.vdisklist import VDiskList
@@ -25,7 +24,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, expose, validate, get_list, get_object, celery_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -36,52 +35,38 @@ class VDiskViewSet(viewsets.ViewSet):
     prefix = r'vdisks'
     base_name = 'vdisks'
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @get_list(VDisk)
-    def list(self, request, format=None, hints=None):
+    @return_list(VDisk)
+    @load()
+    def list(self, vmachineguid=None, vpoolguid=None):
         """
         Overview of all vDisks
         """
-        _ = format, hints
-        vmachineguid = request.QUERY_PARAMS.get('vmachineguid', None)
-        vpoolguid = request.QUERY_PARAMS.get('vpoolguid', None)
         if vmachineguid is not None:
             vmachine = VMachine(vmachineguid)
-            if vmachine.is_internal:
-                vdisks = []
-                for vsr in vmachine.served_vsrs:
-                    for vdisk in vsr.vpool.vdisks:
-                        if vdisk.vsrid == vsr.vsrid:
-                            vdisks.append(vdisk)
-                return vdisks
             return vmachine.vdisks
         elif vpoolguid is not None:
             vpool = VPool(vpoolguid)
             return vpool.vdisks
         return VDiskList.get_vdisks()
 
-    @expose(internal=True, customer=True)
     @required_roles(['view'])
-    @validate(VDisk)
-    @get_object(VDisk)
-    def retrieve(self, request, obj):
+    @return_object(VDisk)
+    @load(VDisk)
+    def retrieve(self, vdisk):
         """
         Load information about a given vDisk
         """
-        _ = request
-        return obj
+        return vdisk
 
     @action()
-    @expose(internal=True, customer=True)
     @required_roles(['view', 'create'])
-    @validate(VDisk)
-    @celery_task()
-    def rollback(self, request, obj):
+    @return_task()
+    @load(VDisk)
+    def rollback(self, vdisk, timestamp):
         """
         Rollbacks a vDisk to a given timestamp
         """
-        _ = format
-        return VDiskController.rollback.delay(diskguid=obj.guid,
-                                              timestamp=request.DATA['timestamp'])
+        return VDiskController.rollback.delay(diskguid=vdisk.guid,
+                                              timestamp=timestamp)
 

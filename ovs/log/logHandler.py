@@ -81,7 +81,8 @@ class LogHandler(object):
         gid = grp.getgrnam('ovs').gr_gid
         if not os.path.exists(log_filename):
             open(log_filename, 'a').close()
-        os.chown(log_filename, uid, gid)
+            os.chmod(log_filename, 0o666)
+
 
         formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
         handler = logging.FileHandler(log_filename)

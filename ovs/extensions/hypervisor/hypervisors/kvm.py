@@ -41,19 +41,21 @@ class KVM(object):
         """
         create vm from template
         TODO:
-        storage_ip and mountpoint refer to target vsr
-        but on kvm vsr.storage_ip is 127.0.0.1
+        storage_ip and mountpoint refer to target Storage Driver
+        but on kvm storagedriver.storage_ip is 127.0.0.1
         """
         _ = storage_ip, wait  # For compatibility purposes only
         return self.sdk.create_vm_from_template(name, source_vm, disks, mountpoint)
 
-    def delete_vm(self, vmid, vsr_mountpoint=None, vsr_storage_ip=None, devicename=None, disks_info=[], wait=True):
+    def delete_vm(self, vmid, storagedriver_mountpoint=None, storagedriver_storage_ip=None, devicename=None, disks_info=None, wait=True):
         """
         Deletes a given VM and its disks
         """
         _ = wait  # For compatibility purposes only
-        _ = vsr_mountpoint  # No vpool mountpoint on kvm, use different logic
-        _ = vsr_storage_ip  # 127.0.0.1 always
+        _ = storagedriver_mountpoint  # No vpool mountpoint on kvm, use different logic
+        _ = storagedriver_storage_ip  # 127.0.0.1 always
+        if disks_info is None:
+            disks_info = []
         return self.sdk.delete_vm(vmid, devicename, disks_info)
 
     def get_vm_agnostic_object(self, vmid):
@@ -140,7 +142,9 @@ class KVM(object):
         Builds the path for the file backing a given device/disk
         """
         _ = self
-        return '/{}_{}.raw'.format(machinename.replace(' ', '_'), devicename)
+        if machinename:
+            return '/{}_{}.raw'.format(machinename.replace(' ', '_'), devicename)
+        return '/{}.raw'.format(devicename)
 
     def clean_vmachine_filename(self, path):
         """
@@ -149,13 +153,13 @@ class KVM(object):
         _ = self
         return path.strip('/')
 
-    def get_vmachine_path(self, machinename, vsa_machineid):
+    def get_vmachine_path(self, machinename, storagerouter_machineid):
         """
         Builds the path for the file representing a given vmachine
         """
         _ = self
         machinename = machinename.replace(' ', '_')
-        return '/{}/{}.xml'.format(vsa_machineid, machinename)
+        return '/{}/{}.xml'.format(storagerouter_machineid, machinename)
 
     def get_rename_scenario(self, old_name, new_name):
         """
@@ -173,8 +177,10 @@ class KVM(object):
         _ = self, devicename
         return devicename.strip('/') not in ['vmcasts/rss.xml']
 
-    def file_exists(self, devicename):
+    def file_exists(self, vpool, devicename):
         """
-        Checks whether a file (devicename .xml) exists
+        Check if devicename exists
         """
-        return self.sdk.file_exists(devicename)
+        _ = vpool
+        matches = self.sdk.find_devicename(devicename)
+        return matches is not None

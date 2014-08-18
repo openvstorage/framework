@@ -15,32 +15,26 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api',
-    '../containers/vmachine'
-], function(ko, $, shared, generic, api, VMachine) {
+    '../containers/storagerouter'
+], function(ko, $, shared, generic, api, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared = shared;
-        self.guard  = { authenticated: true };
-        self.query  = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', true]]
-            }
-        };
+        self.shared  = shared;
+        self.guard   = { authenticated: true };
         self.loading = ko.observable(true);
 
         // Observables
-        self.vSAs = ko.observableArray([]);
+        self.storageRouters = ko.observableArray([]);
 
         // Computed
         self.version = ko.computed(function() {
             var versions = [];
-            $.each(self.vSAs(), function(index, vsa) {
-                if (vsa.versions() !== undefined && $.inArray(vsa.versions().openvstorage, versions) === -1) {
-                    versions.push(vsa.versions().openvstorage);
+            $.each(self.storageRouters(), function(index, storageRouter) {
+                if (storageRouter.versions() !== undefined && $.inArray(storageRouter.versions().openvstorage, versions) === -1) {
+                    versions.push(storageRouter.versions().openvstorage);
                 }
             });
             if (versions.length > 0) {
@@ -50,39 +44,39 @@ define([
         });
 
         // Functions
-        self.fetchVSAs = function() {
+        self.fetchStorageRouters = function() {
             return $.Deferred(function(deferred) {
                 var options = {
                     sort: 'name',
                     contents: ''
                 };
-                api.post('vmachines/filter', self.query, options)
+                api.get('storagerouters', undefined, options)
                     .done(function(data) {
-                        var guids = [], vsadata = {};
+                        var guids = [], sadata = {};
                         $.each(data, function(index, item) {
                             guids.push(item.guid);
-                            vsadata[item.guid] = item;
+                            sadata[item.guid] = item;
                         });
                         generic.crossFiller(
-                            guids, self.vSAs,
+                            guids, self.storageRouters,
                             function(guid) {
-                                var vmachine = new VMachine(guid);
+                                var sr = new StorageRouter(guid);
                                 if ($.inArray(guid, guids) !== -1) {
-                                    vmachine.fillData(vsadata[guid]);
+                                    sr.fillData(sadata[guid]);
                                 }
-                                vmachine.versions = ko.observable();
-                                vmachine.loading(true);
-                                api.get('vmachines/' + guid + '/get_version_info')
+                                sr.versions = ko.observable();
+                                sr.loading(true);
+                                api.get('storagerouters/' + guid + '/get_version_info')
                                     .then(self.shared.tasks.wait)
                                     .done(function(data) {
-                                        $.each(self.vSAs(), function(index, vsa) {
-                                           if (vsa.guid() === data.vsa_guid) {
-                                               vsa.versions(data.versions);
-                                               vsa.loading(false);
+                                        $.each(self.storageRouters(), function(index, storageRouter) {
+                                           if (storageRouter.guid() === data.storagerouter_guid) {
+                                               storageRouter.versions(data.versions);
+                                               storageRouter.loading(false);
                                            }
                                         });
                                     });
-                                return vmachine;
+                                return sr;
                             }, 'guid'
                         );
                         self.loading(false);
@@ -94,7 +88,7 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.fetchVSAs();
+            self.fetchStorageRouters();
         };
     };
 });

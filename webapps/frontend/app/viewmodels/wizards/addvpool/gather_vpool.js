@@ -11,24 +11,24 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define, window */
+/*global define */
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/vmachine', '../../containers/volumestoragerouter', './data'
-], function($, ko, shared, api, generic, VMachine, VolumeStorageRouter, data) {
+    '../../containers/storagerouter', '../../containers/storagedriver', './data'
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
-        self.shared           = shared;
-        self.data             = data;
-        self.loadVSASHandle   = undefined;
-        self.checkS3Handle    = undefined;
-        self.checkMtptHandle  = undefined;
-        self.loadVSAHandle    = undefined;
-        self.loadVSRsHandle   = {};
+        self.shared                   = shared;
+        self.data                     = data;
+        self.loadStorageRoutersHandle = undefined;
+        self.checkS3Handle            = undefined;
+        self.checkMtptHandle          = undefined;
+        self.loadStorageRouterHandle  = undefined;
+        self.loadStorageDriversHandle = {};
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
@@ -77,7 +77,7 @@ define([
                                 accesskey: self.data.accesskey(),
                                 secretkey: self.data.secretkey()
                             };
-                            self.checkS3Handle = api.post('vmachines/' + self.data.target().guid() + '/check_s3', postData)
+                            self.checkS3Handle = api.post('storagerouters/' + self.data.target().guid() + '/check_s3', postData)
                                 .then(self.shared.tasks.wait)
                                 .done(function(data) {
                                     if (!data) {
@@ -99,7 +99,7 @@ define([
                         var postData = {
                             name: self.data.name()
                         };
-                        self.checkMtptHandle = api.post('vmachines/' + self.data.target().guid() + '/check_mtpt', postData)
+                        self.checkMtptHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_mtpt', postData)
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 if (!data) {
@@ -126,8 +126,8 @@ define([
             return $.Deferred(function(deferred) {
                 var calls = [
                     $.Deferred(function(mtptDeferred) {
-                        generic.xhrAbort(self.loadVSAHandle);
-                        self.loadVSAHandle = api.post('vmachines/' + self.data.target().guid() + '/get_physical_metadata', {})
+                        generic.xhrAbort(self.loadStorageRouterHandle);
+                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_physical_metadata', {})
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
@@ -143,19 +143,19 @@ define([
                     }).promise()
                 ];
                 generic.crossFiller(
-                    self.data.target().servedVSRGuids, self.data.vsrs,
+                    self.data.target().storageDriverGuids, self.data.storageDrivers,
                     function(guid) {
-                        var vsr = new VolumeStorageRouter(guid);
+                        var storageDriver = new StorageDriver(guid);
                         calls.push($.Deferred(function(deferred) {
-                            generic.xhrAbort(self.loadVSRsHandle[guid]);
-                            self.loadVSAHandle[guid] = api.get('volumestoragerouters/' + guid)
-                                .done(function(vsrData) {
-                                    vsr.fillData(vsrData);
+                            generic.xhrAbort(self.loadStorageDriversHandle[guid]);
+                            self.loadStorageDriversHandle[guid] = api.get('storagedrivers/' + guid)
+                                .done(function(storageDriverData) {
+                                    storageDriver.fillData(storageDriverData);
                                     deferred.resolve();
                                 })
                                 .fail(deferred.reject);
                         }).promise());
-                        return vsr;
+                        return storageDriver;
                     }, 'guid'
                 );
                 $.when.apply($, calls)
@@ -166,34 +166,28 @@ define([
 
         // Durandal
         self.activate = function() {
-            generic.xhrAbort(self.loadVSASHandle);
-            var query = {
-                query: {
-                    type: 'AND',
-                    items: [['is_internal', 'EQUALS', true]]
-                }
-            };
-            self.loadVSASHandle = api.post('vmachines/filter', query, {
-                contents: 'served_vsrs',
+            generic.xhrAbort(self.loadStorageRoutersHandle);
+            self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
+                contents: 'storagedrivers',
                 sort: 'name'
             })
                 .done(function(data) {
-                    var guids = [], vmdata = {};
+                    var guids = [], srdata = {};
                     $.each(data, function(index, item) {
                         guids.push(item.guid);
-                        vmdata[item.guid] = item;
+                        srdata[item.guid] = item;
                     });
                     generic.crossFiller(
-                        guids, self.data.vsas,
+                        guids, self.data.storageRouters,
                         function(guid) {
-                            return new VMachine(guid);
+                            return new StorageRouter(guid);
                         }, 'guid'
                     );
-                    $.each(self.data.vsas(), function(index, vmachine) {
-                        vmachine.fillData(vmdata[vmachine.guid()]);
+                    $.each(self.data.storageRouters(), function(index, storageRouter) {
+                        storageRouter.fillData(srdata[storageRouter.guid()]);
                     });
-                    if (self.data.target() === undefined && self.data.vsas().length > 0) {
-                        self.data.target(self.data.vsas()[0]);
+                    if (self.data.target() === undefined && self.data.storageRouters().length > 0) {
+                        self.data.target(self.data.storageRouters()[0]);
                     }
                 });
         };

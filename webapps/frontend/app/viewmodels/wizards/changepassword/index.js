@@ -14,16 +14,20 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './confirm'
-], function($, generic, build, Confirm) {
+    '../build', './confirm', './data'
+], function($, generic, build, Confirm, data) {
     "use strict";
     return function(options) {
         var self = this;
         build(self);
 
+        // Variables
+        self.data = data;
+
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.changepassword.title')));
         self.modal(generic.tryGet(options, 'modal', false));
+        self.data.user(options.user);
         self.steps([new Confirm()]);
         self.activateStep();
     };

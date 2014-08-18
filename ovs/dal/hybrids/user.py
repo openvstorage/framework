@@ -16,6 +16,7 @@
 User module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation
 from ovs.dal.hybrids.group import Group
 
 
@@ -24,12 +25,9 @@ class User(DataObject):
     The User class represents a User.  A user is an individual who can perform actions
     on objects in Open vStorage.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'username':  (None,    str,  'Username of the User.'),
-                   'password':  (None,    str,  'Password of the User.'),
-                   'email':     (None,    str,  'Email address of the User.'),
-                   'is_active': (False,   bool, 'Indicates whether the User is active.'),
-                   'language':  ('en-US', ['en-US', 'nl-NL'], 'Language of the User.')}
-    __relations = {'group': (Group, 'users')}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = [Property('username', str, doc='Username of the User.'),
+                    Property('password', str, doc='Password of the User.'),
+                    Property('is_active', bool, doc='Indicates whether the User is active.'),
+                    Property('language', ['en-US', 'nl-NL'], default='en-US', doc='Language of the User.')]
+    __relations = [Relation('group', Group, 'users')]
+    __dynamics = []

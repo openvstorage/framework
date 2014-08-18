@@ -15,8 +15,8 @@
 define([
     'knockout', 'jquery',
     'ovs/shared', 'ovs/generic', 'ovs/api', 'ovs/refresher',
-    '../containers/vmachine', '../containers/vpool'
-], function(ko, $, shared, generic, api, Refresher, VMachine, VPool) {
+    '../containers/vmachine', '../containers/vpool', '../containers/storagerouter'
+], function(ko, $, shared, generic, api, Refresher, VMachine, VPool, StorageRouter) {
     "use strict";
     return function() {
         var self = this;
@@ -27,32 +27,29 @@ define([
         self.refresher = new Refresher();
         self.topItems  = 10;
         self.query     = {
-            query: {
-                type: 'AND',
-                items: [['is_internal', 'EQUALS', false],
-                        ['is_vtemplate', 'EQUALS', false],
-                        ['status', 'NOT_EQUALS', 'CREATED']]
-            }
+            type: 'AND',
+            items: [['is_vtemplate', 'EQUALS', false],
+                    ['status', 'NOT_EQUALS', 'CREATED']]
         };
 
         // Handles
-        self.loadVsasHandle          = undefined;
-        self.loadVPoolsHandle        = undefined;
-        self.loadVMachinesHandle     = undefined;
-        self.loadVMachineGuidsHandle = undefined;
+        self.loadStorageRoutersHandle = undefined;
+        self.loadVPoolsHandle         = undefined;
+        self.loadVMachinesHandle      = undefined;
+        self.loadVMachineGuidsHandle  = undefined;
 
         // Observ ables
-        self.vSAsLoading      = ko.observable(false);
-        self.vPoolsLoading    = ko.observable(false);
-        self.vMachinesLoading = ko.observable(false);
-        self.topVPoolMode     = ko.observable('topstoreddata');
-        self.topVmachineMode  = ko.observable('topstoreddata');
-        self.vSAs             = ko.observableArray([]);
-        self.vPools           = ko.observableArray([]);
-        self.vMachineGuids    = ko.observableArray([]);
-        self.topVMachines     = ko.observableArray([]);
-        self.topVpoolModes    = ko.observableArray(['topstoreddata', 'topbandwidth']);
-        self.topVmachineModes = ko.observableArray(['topstoreddata', 'topbandwidth']);
+        self.storageRoutersLoading = ko.observable(false);
+        self.vPoolsLoading         = ko.observable(false);
+        self.vMachinesLoading      = ko.observable(false);
+        self.topVPoolMode          = ko.observable('topstoreddata');
+        self.topVmachineMode       = ko.observable('topstoreddata');
+        self.storageRouters        = ko.observableArray([]);
+        self.vPools                = ko.observableArray([]);
+        self.vMachineGuids         = ko.observableArray([]);
+        self.topVMachines          = ko.observableArray([]);
+        self.topVpoolModes         = ko.observableArray(['topstoreddata', 'topbandwidth']);
+        self.topVmachineModes      = ko.observableArray(['topstoreddata', 'topbandwidth']);
 
         // Computed
         self.topVPools = ko.computed(function() {
@@ -115,7 +112,7 @@ define([
         self.load = function() {
             return $.Deferred(function(deferred) {
                 $.when.apply($, [
-                        self.loadVsas(),
+                        self.loadStorageRouters(),
                         self.loadVPools(),
                         self.loadVMachines()
                     ])
@@ -132,9 +129,10 @@ define([
                                 var filter = {
                                     contents: 'statistics,stored_data',
                                     sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
-                                    page: 1
+                                    page: 1,
+                                    query: JSON.stringify(self.query)
                                 };
-                                self.loadVMachinesHandle = api.post('vmachines/filter', self.query, filter)
+                                self.loadVMachinesHandle = api.get('vmachines', {}, filter)
                                     .done(function(data) {
                                         var vms = [], vm;
                                         $.each(data, function(index, vmdata) {
@@ -152,7 +150,7 @@ define([
                         }).promise(),
                         $.Deferred(function(vmg_dfr) {
                             if (generic.xhrCompleted(self.loadVMachineGuidsHandle)) {
-                                self.loadVMachineGuidsHandle = api.post('vmachines/filter', self.query)
+                                self.loadVMachineGuidsHandle = api.get('vmachines', {}, { query: JSON.stringify(self.query) })
                                     .done(function(data) {
                                         self.vMachineGuids(data);
                                         vmg_dfr.resolve();
@@ -198,41 +196,34 @@ define([
                 }
             }).promise();
         };
-        self.loadVsas = function() {
+        self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
-                self.vSAsLoading(true);
-                if (generic.xhrCompleted(self.loadVsasHandle)) {
-                    var query = {
-                        query: {
-                            type: 'AND',
-                            items: [['is_internal', 'EQUALS', true]]
-                        }
-                    };
-                    self.loadVsasHandle = api.post('vmachines/filter', query, {
-                        contents: '',
-                        sort: 'name'
+                self.storageRoutersLoading(true);
+                if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
+                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
+                        contents: 'status',
+                        sort: 'name,vdisks_guids'
                     })
                         .done(function(data) {
-                            var guids = [], vmdata = {};
+                            var guids = [], sadata = {};
                             $.each(data, function(index, item) {
                                 guids.push(item.guid);
-                                vmdata[item.guid] = item;
+                                sadata[item.guid] = item;
                             });
                             generic.crossFiller(
-                                guids, self.vSAs,
+                                guids, self.storageRouters,
                                 function(guid) {
-                                    return new VMachine(guid);
+                                    return new StorageRouter(guid);
                                 }, 'guid'
                             );
-                            $.each(self.vSAs(), function(index, vmachine) {
-                                vmachine.fillData(vmdata[vmachine.guid()]);
-                                vmachine.loadDisks();
+                            $.each(self.storageRouters(), function(index, storageRouter) {
+                                storageRouter.fillData(sadata[storageRouter.guid()]);
                             });
                             deferred.resolve();
                         })
                         .fail(deferred.reject)
                         .always(function() {
-                            self.vSAsLoading(false);
+                            self.storageRoutersLoading(false);
                         });
                 } else {
                     deferred.reject();

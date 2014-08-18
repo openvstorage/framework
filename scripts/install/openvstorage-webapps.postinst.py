@@ -19,7 +19,7 @@ import random
 import re
 import string
 import sys
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 
 SECRET_KEY_LENGTH = 50
 SECRET_SELECTION = "{}{}{}".format(string.ascii_letters, string.digits, string.punctuation)
@@ -57,3 +57,12 @@ for filename in filenames:
         contents = re.sub("'version=[^']+?'", "'version={0}'".format(version), contents)
         with open(filename, 'w') as changed:
             changed.write(contents)
+
+# Check conflicts with apache2 running on port 80 (most likely devstack/openstack gui)
+try:
+    running = check_output('ps aux | grep apache2 | grep -v grep', shell=True)
+except CalledProcessError:
+    running = False
+if running:
+    if os.path.exists('/etc/nginx/sites-enabled/openvstorage.conf'):
+        os.remove('/etc/nginx/sites-enabled/openvstorage.conf')

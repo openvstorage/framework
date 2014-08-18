@@ -16,6 +16,7 @@
 PMachine module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 from ovs.extensions.hypervisor.factory import Factory as hvFactory
 
@@ -25,17 +26,15 @@ class PMachine(DataObject):
     The PMachine class represents a pMachine. A pMachine is the physical machine
     running the Hypervisor.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':        (None, str, 'Name of the pMachine.'),
-                   'description': (None, str, 'Description of the pMachine.'),
-                   'username':    (None, str, 'Username of the pMachine.'),
-                   'password':    (None, str, 'Password of the pMachine.'),
-                   'ip':          (None, str, 'IP address of the pMachine.'),
-                   'hvtype':      (None, ['HYPERV', 'VMWARE', 'XEN', 'KVM'], 'Hypervisor type running on the pMachine.'),
-                   'hypervisorid': (None, str, 'Hypervisor id - primary key on Management Center')}
-    __relations = {'mgmtcenter': (MgmtCenter, 'pmachines')}
-    __expiry = {'host_status': (60, str)}
-    # pylint: enable=line-too-long
+    __properties = {Property('name', str, doc='Name of the pMachine.'),
+                    Property('description', str, mandatory=False, doc='Description of the pMachine.'),
+                    Property('username', str, doc='Username of the pMachine.'),
+                    Property('password', str, doc='Password of the pMachine.'),
+                    Property('ip', str, doc='IP address of the pMachine.'),
+                    Property('hvtype', ['HYPERV', 'VMWARE', 'XEN', 'KVM'], doc='Hypervisor type running on the pMachine.'),
+                    Property('hypervisor_id', str, mandatory=False, doc='Hypervisor id - primary key on Management Center')}
+    __relations = [Relation('mgmtcenter', MgmtCenter, 'pmachines', mandatory=False)]
+    __dynamics = [Dynamic('host_status', str, 60)]
 
     def _host_status(self):
         """
@@ -43,8 +42,8 @@ class PMachine(DataObject):
         """
         mgmtcentersdk = hvFactory.get_mgmtcenter(self)
         if mgmtcentersdk:
-            if self.hypervisorid:
-                return mgmtcentersdk.get_host_status_by_pk(self.hypervisorid)
+            if self.hypervisor_id:
+                return mgmtcentersdk.get_host_status_by_pk(self.hypervisor_id)
             if self.ip:
                 return mgmtcentersdk.get_host_status_by_ip(self.ip)
         return 'UNKNOWN'

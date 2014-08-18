@@ -21,11 +21,11 @@ define(['knockout'], function(ko){
         return {
             username:   ko.observable(),
             password:   ko.observable(),
-            centerType: ko.observable('VCENTER'),
+            centerType: ko.observable('VCENTER', 'OPENSTACK'),
             name:       ko.observable().extend({ regex: nameRgex }),
             ipAddress:  ko.observable().extend({ regex: ipRegex }),
             port:       ko.observable(443).extend({ numeric: { min: 1, max: 65536 } }),
-            types:      ko.observableArray(['VCENTER'])
+            types:      ko.observableArray(['VCENTER', 'OPENSTACK'])
         };
     };
     return singleton();

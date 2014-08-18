@@ -17,18 +17,21 @@ Contains various decorator
 """
 
 import math
-
+import re
+import inspect
 from ovs.dal.lists.userlist import UserList
 from rest_framework.response import Response
 from toolbox import Toolbox
-from rest_framework.exceptions import PermissionDenied, NotAuthenticated
+from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable
 from rest_framework import status
 from django.http import Http404
+from django.conf import settings
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('api')
+regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
 
 def required_roles(roles):
@@ -43,58 +46,91 @@ def required_roles(roles):
             """
             Wrapped function
             """
-            django_user = args[1].user
-            user = UserList.get_user_by_username(django_user.username)
+            request = args[1]
+            if not hasattr(request, 'user') or not hasattr(request, 'client'):
+                raise NotAuthenticated()
+            user = UserList.get_user_by_username(request.user.username)
             if user is None:
                 raise NotAuthenticated()
-            if not Toolbox.is_user_in_roles(user, roles):
+            if not Toolbox.is_client_in_roles(request.client, roles):
                 raise PermissionDenied('This call requires roles: %s' % (', '.join(roles)))
             return f(*args, **kw)
         return new_function
     return wrap
 
 
-def validate(object_type):
+def load(object_type=None, min_version=settings.VERSION[0], max_version=settings.VERSION[-1]):
     """
-    Parameter/object validation decorator
+    Parameter discovery decorator
     """
     def wrap(f):
         """
         Wrapper function
         """
-        def new_function(self, request, pk=None, format=None):
+        def new_function(self, request, **kwargs):
             """
             Wrapped function
             """
-            _ = self, format
-            if pk is None:
-                raise Http404
+            new_kwargs = {}
+            # Find out the arguments of the decorated function
+            function_info = inspect.getargspec(f)
+            if function_info.defaults is None:
+                mandatory_vars = function_info.args[1:]
+                optional_vars = []
             else:
+                mandatory_vars = function_info.args[1:-len(function_info.defaults)]
+                optional_vars = function_info.args[len(mandatory_vars) + 1:]
+            # Check versioning
+            version = regex.match(request.META['HTTP_ACCEPT']).groupdict()['version']
+            versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
+            if version == '*':  # If accepting all versions, it defaults to the highest one
+                version = settings.VERSION[-1]
+            version = int(version)
+            if version < versions[0] or version > versions[1]:
+                raise NotAcceptable('API version requirements: {0} <= <version> <= {1}'.format(versions[0], versions[1]))
+            if 'version' in mandatory_vars:
+                new_kwargs['version'] = version
+            # Fill request parameter, if available
+            if 'request' in mandatory_vars:
+                new_kwargs['request'] = request
+                mandatory_vars.remove('request')
+            # Fill main object, if required
+            if 'pk' in kwargs and object_type is not None:
+                typename = object_type.__name__.lower()
                 try:
-                    obj = object_type(pk)
+                    instance = object_type(kwargs['pk'])
+                    if typename in mandatory_vars:
+                        new_kwargs[typename] = instance
+                        mandatory_vars.remove(typename)
                 except ObjectNotFoundException:
-                    raise Http404('Given object not found')
-                return f(self, request=request, obj=obj)
+                    raise Http404()
+            # Fill mandatory parameters
+            for name in mandatory_vars:
+                if name in kwargs:
+                    new_kwargs[name] = kwargs[name]
+                else:
+                    if name not in request.DATA:
+                        if name not in request.QUERY_PARAMS:
+                            raise NotAcceptable('Invalid data passed: {0} is missing'.format(name))
+                        new_kwargs[name] = request.QUERY_PARAMS[name]
+                    else:
+                        new_kwargs[name] = request.DATA[name]
+            # Try to fill optional parameters
+            for name in optional_vars:
+                if name in kwargs:
+                    new_kwargs[name] = kwargs[name]
+                else:
+                    if name in request.DATA:
+                        new_kwargs[name] = request.DATA[name]
+                    elif name in request.QUERY_PARAMS:
+                        new_kwargs[name] = request.QUERY_PARAMS[name]
+            # Call the function
+            return f(self, **new_kwargs)
         return new_function
     return wrap
 
 
-def expose(internal=False, customer=False):
-    """
-    Used to mark a method on a ViewSet that should be included for which API
-    """
-    def decorator(func):
-        modes = []
-        if internal:
-            modes.append('internal')
-        if customer:
-            modes.append('customer')
-        func.api_mode = modes
-        return func
-    return decorator
-
-
-def get_list(object_type, default_sort=None):
+def return_list(object_type, default_sort=None):
     """
     List decorator
     """
@@ -162,7 +198,7 @@ def get_list(object_type, default_sort=None):
     return wrap
 
 
-def get_object(object_type):
+def return_object(object_type):
     """
     Object decorator
     """
@@ -188,11 +224,10 @@ def get_object(object_type):
     return wrap
 
 
-def celery_task():
+def return_task():
     """
     Object decorator
     """
-
     def wrap(f):
         """
         Wrapper function
@@ -204,8 +239,5 @@ def celery_task():
             _ = self
             task = f(self, *args, **kwargs)
             return Response(task.id, status=status.HTTP_200_OK)
-
         return new_function
-
     return wrap
-

@@ -14,3 +14,4 @@ fi
 
 mkdir -p /var/log/ovs/volumedriver
 chown -R ovs:ovs /var/log/ovs
+chmod 777 /var/log/ovs

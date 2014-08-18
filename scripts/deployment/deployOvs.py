@@ -19,7 +19,7 @@ Prerequisites:
 * At least 1 datastore
 
 This script will automatically create disk RDM's and an OVS vm config
-and boot the OVSVSA from that iso to install.
+and boot the OVS virtual appliance from that iso to install.
 """
 
 import subprocess as sp
@@ -346,7 +346,7 @@ class VMwareSystem():
         """
         # We first take VMware's 00:0c:29 and set the U/L bit to 1, stating it's a locally administered MAC
         # Then we add the NIC specific part of one of the local NICs to the mac, creating an address that
-        # will most likely be unique. However, this means that every VSA generated on a certain node will have
+        # will most likely be unique. However, this means that every appliance generated on a certain node will have
         # the same MAC address. This is not a supported use-case so should introduce no problems.
 
         vmx_base = """
@@ -462,7 +462,7 @@ usb_xhci.present = "TRUE"
 
     def create_vdisk_mapping(self, vm, seq, dsk, dconfig):
         """
-        Create a raw device mapping for disk and assign to VSA
+        Create a raw device mapping for disk and assign to appliance
         """
         self._verbose = False
         vmpath = '/vmfs/volumes/{0}/{1}'.format(datastore, vm)
@@ -490,7 +490,7 @@ if __name__ == '__main__':
     vm_name = vm_basename
 
     # ISO selection
-    parser = OptionParser(description='Open vStorage VSA Setup')
+    parser = OptionParser(description='Open vStorage Storage Router Setup')
     parser.add_option('-i', '--image', dest='image', help='absolute path to your ubuntu iso')
     parser.add_option('-s', '--skip', action="store_true", dest='skip', help='skip the sata as 3rd disk', default=False)
     (options, args) = parser.parse_args()
@@ -620,12 +620,12 @@ ide1:0.startConnected = "FALSE"
     InstallHelper.execute_command(['esxcli', 'system', 'settings', 'advanced', 'set', '-o', '/Power/UseCStates', '--int-value=1'])
     InstallHelper.execute_command(['esxcli', 'system', 'settings', 'advanced', 'set', '-o', '/Power/UsePStates', '--int-value=0'])
 
-    # Register VSA
-    print 'Register VSA'
+    # Register appliance
+    print 'Register appliance'
     _, out = InstallHelper.execute_command(['vim-cmd', 'solo/registervm', vm_config], True)
     vm_id = out[0].strip()
 
-    print 'Starting VSA'
+    print 'Starting appliance'
     InstallHelper.execute_command(['vim-cmd', 'hostsvc/autostartmanager/enable_autostart', '1'])
     InstallHelper.execute_command(['vim-cmd', 'hostsvc/autostartmanager/update_autostartentry',
                               '{0}'.format(vm_id), 'PowerOn', '5', '1', 'guestShutdown', '5',

@@ -16,31 +16,23 @@
 Generic system module, executing statements on local node
 """
 
-import subprocess
+from subprocess import check_output
 
 
 class Ovs():
+    """
+    Generic helper class
+    """
 
     my_machine_id = ''
-    my_vsa_guid = ''
-    my_vsr_id = ''
+    my_storagerouter_guid = ''
+    my_storagedriver_id = ''
 
-    @staticmethod
-    def execute_command(cmd, catch_output=True):
+    def __init__(self):
         """
-        Executes a command
+        Dummy init method
         """
-        if catch_output:
-            process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = process.stdout.readlines()
-            process.wait()
-            return process.returncode, output
-        else:
-            process = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            output = process.communicate()
-            return process.returncode, output
+        _ = self
 
     @staticmethod
     def get_my_machine_id(client=None):
@@ -50,8 +42,7 @@ class Ovs():
         if not Ovs.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
             if client is None:
-                _, output = Ovs.execute_command(cmd, catch_output=False)
-                output = output[0].strip()
+                output = check_output(cmd, shell=True).strip()
             else:
                 output = client.run(cmd).strip()
             for mac in output.split('\n'):
@@ -61,24 +52,24 @@ class Ovs():
         return Ovs.my_machine_id
 
     @staticmethod
-    def get_my_vsa():
+    def get_my_storagerouter():
         """
-        Returns unique machine vsa id
+        Returns unique machine storagerouter id
         """
 
-        from ovs.lib.vmachine import VMachine
-        from ovs.dal.lists.vmachinelist import VMachineList
+        from ovs.dal.hybrids.storagerouter import StorageRouter
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-        if not Ovs.my_vsa_guid:
-            for vm in VMachineList.get_vmachines():
-                if vm.is_internal and vm.machineid == Ovs.get_my_machine_id():
-                    Ovs.my_vsa_guid = vm.guid
-        return VMachine(Ovs.my_vsa_guid)
+        if not Ovs.my_storagerouter_guid:
+            for storagerouter in StorageRouterList.get_storagerouters():
+                if storagerouter.machine_id == Ovs.get_my_machine_id():
+                    Ovs.my_storagerouter_guid = storagerouter.guid
+        return StorageRouter(Ovs.my_storagerouter_guid)
 
     @staticmethod
-    def get_my_vsr_id(vpool_name):
+    def get_my_storagedriver_id(vpool_name):
         """
-        Returns unique machine vsrid based on vpool_name and machineid
+        Returns unique machine storagedriver_id based on vpool_name and machineid
         """
         return vpool_name + Ovs.get_my_machine_id()
 

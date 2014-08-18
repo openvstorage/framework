@@ -16,14 +16,12 @@
 Statistics module
 """
 
-import re
 import datetime
 import memcache
 from configobj import ConfigObj
 import os
-from backend.serializers.memcached import MemcacheSerializer
-from backend.decorators import required_roles, expose
-from rest_framework import status, viewsets
+from backend.decorators import required_roles, load
+from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -88,13 +86,12 @@ class MemcacheViewSet(viewsets.ViewSet):
                 stats['%s_%s' % (key, hittype)] = client.get(cachekey, default=0)
         return stats
 
-    @expose(internal=True)
     @required_roles(['view'])
-    def list(self, request, format=None):
+    @load()
+    def list(self):
         """
         Returns statistics information
         """
-        _ = request, format
         nodes = MemcacheViewSet._get_memcache_nodes()
         client = VolatileFactory.get_client('memcache')
         online_nodes = ['%s:%s' % (node.ip, node.port) for node in client._client.servers if node.deaduntil == 0]
@@ -110,13 +107,12 @@ class MemcacheViewSet(viewsets.ViewSet):
                 stats['offline'].append(node)
         return Response(stats)
 
-    @expose(internal=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @load()
+    def retrieve(self):
         """
         Returns statistics information
         """
-        _ = request, format
         nodes = MemcacheViewSet._get_memcache_nodes()
         client = VolatileFactory.get_client('memcache')
         online_nodes = ['%s:%s' % (node.ip, node.port) for node in client._client.servers if node.deaduntil == 0]

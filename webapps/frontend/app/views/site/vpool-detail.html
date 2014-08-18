@@ -116,10 +116,10 @@ limitations under the License.
                                 <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
                                               attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: guid }) }"></a>
                             </td>
-                            <td data-bind="lazylist: { items: vSAs, loadedObservable: 'loaded' }">
+                            <td data-bind="lazylist: { items: storageRouters, loadedObservable: 'loaded' }">
                                 <a data-part="entry"
                                    data-bind="text: name,
-                                              attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: guid }) }"></a>
+                                              attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                             </td>
                             <td><span data-bind="text: vDisks().length"></span></td>
                             <td><span data-bind="text: storedData"></span></td>
@@ -187,43 +187,43 @@ limitations under the License.
                     <tbody>
                         <tr>
                             <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
-                                <button type="button" class="btn btn-lg" data-bind="enable: false">
-                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.vsavpoollink"></span>
+                                <button id="btn.vpool.management" type="button" class="btn btn-lg" data-bind="enable: false">
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storageroutervpoollink"></span>
                                 </button>
                             </td>
                             <td style="padding: 0 0 20px 0;">
-                                <h4 data-i18n="ovs:vpools.detail.vsavpoollink"></h4>
-                                <span class="fa fa-spin" data-bind="visible: !$root.vSAsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
-                                <div data-bind="foreach: $root.vSAs">
+                                <h4 data-i18n="ovs:vpools.detail.storageroutervpoollink"></h4>
+                                <span class="fa fa-spin" data-bind="visible: !$root.storageRoutersLoaded()" data-i18n="[html]ovs:icons.loading"></span>
+                                <div data-bind="foreach: $root.storageRouters">
                                     <div>
                                         <span class="alert" data-bind="css: {
-                                                                           'alert-danger': $.inArray(guid(), $parent.servingVSAGuids()) !== -1 && $.inArray(guid(), $root.checkedVSAGuids()) === -1,
-                                                                           'alert-success': $.inArray(guid(), $parent.servingVSAGuids()) === -1 && $.inArray(guid(), $root.checkedVSAGuids()) !== -1
+                                                                           'alert-danger': $.inArray(guid(), $parent.storageRouterGuids()) !== -1 && $.inArray(guid(), $root.checkedStorageRouterGuids()) === -1,
+                                                                           'alert-success': $.inArray(guid(), $parent.storageRouterGuids()) === -1 && $.inArray(guid(), $root.checkedStorageRouterGuids()) !== -1
                                                                        }"
                                               style="padding: 2px 5px 3px 5px;">
-                                            <input type="checkbox" data-bind="attr: { id: 'vsa_' + guid() }, checkedValue: guid(),
-                                                                              checked: $root.checkedVSAGuids,
-                                                                              disable: $parent.backendType() === 'LOCAL' && $.inArray(guid(), $parent.servingVSAGuids()) === -1"
+                                            <input type="checkbox" data-bind="attr: { id: 'storagerouter_' + guid() }, checkedValue: guid(),
+                                                                              checked: $root.checkedStorageRouterGuids,
+                                                                              disable: $parent.backendType() === 'LOCAL' && $.inArray(guid(), $parent.storageRouterGuids()) === -1"
                                                     style="vertical-align: text-bottom;">
-                                            <label data-bind="attr: { for: 'vsa_' + guid() }" style="font-weight: normal; margin-left: 7px;">
+                                            <label data-bind="attr: { for: 'storagerouter_' + guid() }" style="font-weight: normal; margin-left: 7px;">
                                                 <span data-bind="text: name"></span>
                                             </label>
-                                            <span data-bind="visible: $.inArray(guid(), $parent.servingVSAGuids()) !== -1 && $.inArray(guid(), $root.checkedVSAGuids()) === -1"
+                                            <span data-bind="visible: $.inArray(guid(), $parent.storageRouterGuids()) !== -1 && $.inArray(guid(), $root.checkedStorageRouterGuids()) === -1"
                                                   class="fa" data-i18n="[html]ovs:icons.delete" style="margin-left: 7px;"></span>
-                                            <span data-bind="visible: $.inArray(guid(), $parent.servingVSAGuids()) === -1 && $.inArray(guid(), $root.checkedVSAGuids()) !== -1"
+                                            <span data-bind="visible: $.inArray(guid(), $parent.storageRouterGuids()) === -1 && $.inArray(guid(), $root.checkedStorageRouterGuids()) !== -1"
                                                   class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: 7px;"></span>
                                         </span>
                                         <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin-left: 10px;"
-                                              data-bind="visible: $root.updatingVSAs() && $parent.backendType() !== 'LOCAL' && (
-                                                             ($.inArray(guid(), $root.checkedVSAGuids()) !== -1 && $.inArray(guid(), $parent.servingVSAGuids()) === -1) ||
-                                                             ($.inArray(guid(), $root.checkedVSAGuids()) === -1 && $.inArray(guid(), $parent.servingVSAGuids()) !== -1)
+                                              data-bind="visible: $root.updatingStorageRouters() && $parent.backendType() !== 'LOCAL' && (
+                                                             ($.inArray(guid(), $root.checkedStorageRouterGuids()) !== -1 && $.inArray(guid(), $parent.storageRouterGuids()) === -1) ||
+                                                             ($.inArray(guid(), $root.checkedStorageRouterGuids()) === -1 && $.inArray(guid(), $parent.storageRouterGuids()) !== -1)
                                                          )" ></span>
                                     </div>
                                 </div>
                                 <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
-                                <button class="btn btn-default" id="buttonVpoolSaveChanges" data-bind="click: $root.updateVSAServing,
-                                                                           enable: $root.pendingVSAs().length > 0 || $root.removingVSAs().length > 0"
+                                <button class="btn btn-default" id="buttonVpoolSaveChanges" data-bind="click: $root.updateStorageRouterServing,
+                                                                           enable: $root.pendingStorageRouters().length > 0 || $root.removingStorageRouters().length > 0"
                                         style="margin-top: 10px;">
                                     <span data-i18n="ovs:vpools.detail.updateserving"></span>
                                 </button>

@@ -28,9 +28,8 @@ CACHE:
 /lib/font-awesome/fonts/fontawesome-webfont.ttf?v=4.0.3
 /lib/font-awesome/fonts/fontawesome-webfont.svg?v=4.0.3
 
-
 NETWORK:
-*
+/api/
 
 FALLBACK:
-/index.html /offline/offline.html
+/ /offline/offline.html

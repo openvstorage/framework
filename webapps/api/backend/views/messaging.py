@@ -22,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
 from ovs.lib.messaging import MessageController
-from backend.decorators import required_roles, expose
+from backend.decorators import required_roles, load
 
 
 class MessagingViewSet(viewsets.ViewSet):
@@ -33,22 +33,20 @@ class MessagingViewSet(viewsets.ViewSet):
     prefix = r'messages'
     base_name = 'messages'
 
-    @expose(internal=True)
     @required_roles(['view'])
-    def list(self, request, format=None):
+    @load()
+    def list(self):
         """
         Provides a list of subscriptions
         """
-        _ = request, format
         return Response(MessageController.all_subscriptions(), status=status.HTTP_200_OK)
 
-    @expose(internal=True)
     @required_roles(['view'])
-    def retrieve(self, request, pk=None, format=None):
+    @load()
+    def retrieve(self, pk):
         """
         Retrieves the subscriptions for a given subscriber
         """
-        _ = request, format
         try:
             pk = int(pk)
         except (ValueError, TypeError):
@@ -73,16 +71,15 @@ class MessagingViewSet(viewsets.ViewSet):
         return messages, last_message_id
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
-    def wait(self, request, pk=None, format=None):
+    @load()
+    def wait(self, pk, message_id):
         """
         Wait for messages to appear for a given subscriber
         """
-        _ = request, format
         try:
             pk = int(pk)
-            message_id = int(self.request.QUERY_PARAMS.get('message_id', None))
+            message_id = int(message_id)
         except (ValueError, TypeError):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         thread = gevent.spawn(MessagingViewSet._wait, pk, message_id)
@@ -93,31 +90,28 @@ class MessagingViewSet(viewsets.ViewSet):
                          'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
 
     @link()
-    @expose(internal=True)
     @required_roles(['view'])
-    def last(self, request, pk=None, format=None):
+    @load()
+    def last(self, pk):
         """
         Get the last messageid
         """
-        _ = request, format
         try:
-            pk = int(pk)
-            _ = pk
+            _ = int(pk)
         except (ValueError, TypeError):
             return Response(status=status.HTTP_400_BAD_REQUEST)
         return Response(MessageController.last_message_id(), status=status.HTTP_200_OK)
 
     @action()
-    @expose(internal=True)
     @required_roles(['view'])
-    def subscribe(self, request, pk=None, format=None):
+    @load()
+    def subscribe(self, request, pk):
         """
         Subscribes a subscriber to a set of types
         """
-        _ = request, format
         try:
             pk = int(pk)
-            subscriptions = self.request.DATA
+            subscriptions = request.DATA
             cleaned_subscriptions = []
             if not isinstance(subscriptions, list):
                 raise TypeError

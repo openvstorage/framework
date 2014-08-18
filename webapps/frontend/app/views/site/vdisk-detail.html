@@ -38,6 +38,7 @@ limitations under the License.
             <li class="actions">
                 <span data-i18n="ovs:generic.actions"></span>:
                 <button type="button" class="btn btn-mini btn-default"
+                        id="buttonVDiskRollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: '#428bca' },
                                    tooltip: 'ovs:vdisks.detail.rollback'">
@@ -78,11 +79,11 @@ limitations under the License.
                             <td><span data-bind="text: iops"></span></td>
                         </tr>
                         <tr>
-                            <td data-i18n="ovs:generic.vsa"></td>
+                            <td data-i18n="ovs:generic.storagerouter"></td>
                             <td>
-                                <span data-bind="lazyloader: { item: vsa, loadedObservable: 'loaded', undefinedLoading: false }">
+                                <span data-bind="lazyloader: { item: storageRouter, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <a data-part="lazy-entry" data-bind="text: item().name(),
-                                                                         attr: { href: $root.shared.routing.loadHash('vsa-detail', { guid: item().guid }) }"></a>
+                                                                         attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
                             <td data-i18n="ovs:generic.readspeed"></td>

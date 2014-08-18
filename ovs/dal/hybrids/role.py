@@ -16,6 +16,7 @@
 Role module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property
 
 
 class Role(DataObject):
@@ -23,10 +24,8 @@ class Role(DataObject):
     The Role class represents a Role. A Role is used to allow execution of a certain set of
     actions. E.g. a "Viewer" Role can view all data but has no update/write permission.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':        (None, str, 'Name of the Role'),
-                   'code':        (None, str, 'Contains a code which is referenced from the API code'),
-                   'description': (None, str, 'Description of the Role')}
-    __relations = {}
-    __expiry = {}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the Role'),
+                    Property('code', str, doc='Contains a code which is referenced from the API code'),
+                    Property('description', str, mandatory=False, doc='Description of the Role')]
+    __relations = []
+    __dynamics = []

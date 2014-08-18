@@ -22,25 +22,24 @@ define([
         var self = this;
 
         // Variables
-        self.shared         = shared;
-        self.vSAGuids       = [];
-        self.vPoolGuids     = [];
-        self.vMachineGuids  = [];
-        self.servedVSRGuids = [];
+        self.shared               = shared;
+        self.storageApplinceGuids = [];
+        self.vPoolGuids           = [];
+        self.vMachineGuids        = [];
 
         // Handles
-        self.loadVDisksHandle  = undefined;
-        self.loadVSAGuid       = undefined;
-        self.loadHandle        = undefined;
-        self.loadVpoolGuid     = undefined;
-        self.loadChildrenGuid  = undefined;
-        self.loadSChildrenGuid = undefined;
+        self.loadVDisksHandle      = undefined;
+        self.loadStorageRouterGuid = undefined;
+        self.loadHandle            = undefined;
+        self.loadVpoolGuid         = undefined;
+        self.loadChildrenGuid      = undefined;
+        self.loadSChildrenGuid     = undefined;
 
         // External dependencies
-        self.pMachine  = ko.observable();
-        self.vSAs      = ko.observableArray([]);
-        self.vPools    = ko.observableArray([]);
-        self.vMachines = ko.observableArray([]);
+        self.pMachine       = ko.observable();
+        self.storageRouters = ko.observableArray([]);
+        self.vPools         = ko.observableArray([]);
+        self.vMachines      = ko.observableArray([]);
 
         // Observables
         self.guid                  = ko.observable(guid);
@@ -48,10 +47,8 @@ define([
         self.loaded                = ko.observable(false);
         self.pMachineGuid          = ko.observable();
         self.name                  = ko.observable();
-        self.machineid             = ko.observable();
         self.hypervisorStatus      = ko.observable();
         self.ipAddress             = ko.observable();
-        self.isInternal            = ko.observable();
         self.isVTemplate           = ko.observable();
         self.status                = ko.observable();
         self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
@@ -68,7 +65,6 @@ define([
         self.snapshots             = ko.observableArray([]);
         self.vDisks                = ko.observableArray([]);
         self.templateChildrenGuids = ko.observableArray([]);
-        self.availableActions      = ko.observableArray([]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -93,20 +89,6 @@ define([
         });
 
         // Functions
-        self.fetchServedChildren = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadSChildrenGuid)) {
-                    self.loadSChildrenGuid = api.get('vmachines/' + self.guid() + '/get_served_children')
-                        .done(function(data) {
-                            self.vMachineGuids = data;
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
         self.fetchTemplateChildrenGuids = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadChildrenGuid)) {
@@ -121,63 +103,23 @@ define([
                 }
             }).promise();
         };
-        self.getAvailableActions = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadChildrenGuid)) {
-                    self.loadChildrenGuid = api.get('vmachines/' + self.guid() + '/get_available_actions')
-                        .done(function(data) {
-                            self.availableActions(data);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.loadDisks = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadVDisksHandle)) {
-                    self.loadVDisksHandle = api.get('vdisks', undefined, {vmachineguid: self.guid()})
-                        .done(function(data) {
-                            generic.crossFiller(
-                                data, self.vDisks,
-                                function(guid) {
-                                    return new VDisk(guid);
-                                }, 'guid'
-                            );
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.hypervisorStatus, data, 'hypervisor_status');
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.ipAddress, data, 'ip');
-            generic.trySet(self.isInternal, data, 'is_internal');
-            generic.trySet(self.machineid, data, 'machineid');
             generic.trySet(self.isVTemplate, data, 'is_vtemplate');
             generic.trySet(self.snapshots, data, 'snapshots');
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
-            if (data.hasOwnProperty('vsas_guids')) {
-                self.vSAGuids = data.vsas_guids;
+            if (data.hasOwnProperty('storagerouters_guids')) {
+                self.storageRouterGuids = data.storagerouters_guids;
             }
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }
-            if (data.hasOwnProperty('served_vsrs_guids')) {
-                self.servedVSRGuids = data.served_vsrs_guids;
-            }
-            // The vdisks from a full object data is only valid for non-VSA vMachines, since those
-            // don't have disks, but only serve disks.
-            if (data.hasOwnProperty('vdisks_guids') && self.isInternal() === false) {
+            if (data.hasOwnProperty('vdisks_guids')) {
                 generic.crossFiller(
                     data.vdisks_guids, self.vDisks,
                     function(guid) {

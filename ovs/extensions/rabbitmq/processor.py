@@ -17,7 +17,7 @@ Contains the process method for processing rabbitmq messages
 """
 
 from celery.task.control import revoke
-from ovs.dal.lists.volumestoragerouterlist import VolumeStorageRouterList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
@@ -37,7 +37,7 @@ def process(queue, body, mapping):
         data = EventMessages.EventMessage().FromString(body)
 
         # Possible special tags used as `arguments` key:
-        # - [NODE_ID]: Replaced by the vsrid as reported by the event
+        # - [NODE_ID]: Replaced by the storagedriver_id as reported by the event
         # - [CLUSTER_ID]: Replaced by the clusterid as reported by the event
         # Possible deduping key tags:
         # - [EVENT_NAME]: The name of the eventmessage type
@@ -60,11 +60,10 @@ def process(queue, body, mapping):
                         kwargs[target] = getattr(data_container, field)
                 if 'options' in current_map:
                     options = current_map['options']
-                    if options.get('execonvsa', False):
-                        vsr = VolumeStorageRouterList.get_by_vsrid(data.node_id)
-                        if vsr is not None:
-                            routing_key = 'vsa.{0}'.format(
-                                vsr.serving_vmachine.machineid)
+                    if options.get('execonstoragerouter', False):
+                        storagedriver = StorageDriverList.get_by_storagedriver_id(data.node_id)
+                        if storagedriver is not None:
+                            routing_key = 'sr.{0}'.format(storagedriver.storagerouter.machine_id)
                     delay = options.get('delay', 0)
                     dedupe = options.get('dedupe', False)
                     dedupe_key = options.get('dedupe_key', None)

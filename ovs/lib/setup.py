@@ -248,7 +248,7 @@ class SetupController(object):
             possible_hypervisor = SetupController._discover_hypervisor(target_client)
             if not hypervisor_type:
                 hypervisor_type = Interactive.ask_choice(['VMWARE', 'KVM'],
-                                                         question='Which type of hypervisor is this Grid Storage Router (GSR) backing?',
+                                                         question='Which type of hypervisor is this Storage Router backing?',
                                                          default_value=possible_hypervisor)
                 logger.debug('Selected hypervisor type {0}'.format(hypervisor_type))
             default_name = 'esxi' if hypervisor_type == 'VMWARE' else 'kvm'
@@ -273,7 +273,7 @@ class SetupController(object):
                         first_request = False
                         print 'Could not connect to {0}: {1}'.format(hypervisor_ip, ex)
             elif hypervisor_type == 'KVM':
-                # In case of KVM, the VSA is the pMachine, so credentials are shared.
+                # In case of KVM, the StorageRouter is the pMachine, so credentials are shared.
                 hypervisor_ip = cluster_ip
                 hypervisor_username = 'root'
                 hypervisor_password = target_node_password
@@ -417,6 +417,28 @@ class SetupController(object):
                     logger.debug('Adding service {0}'.format(service))
                     SetupController._add_service(target_client, service, params)
 
+            print 'Updating hosts files'
+            logger.debug('Updating hosts files')
+            for node in nodes:
+                client_node = SSHClient.load(node)
+                update_hosts_file = """
+from ovs.extensions.generic.system import Ovs
+Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
+""" % {'ip': cluster_ip,
+       'host': node_name}
+                SetupController._exec_python(client_node, update_hosts_file)
+                if node == ip:
+                    for subnode in nodes:
+                        client_node = SSHClient.load(subnode)
+                        node_hostname = client_node.run('hostname')
+                        update_hosts_file = """
+from ovs.extensions.generic.system import Ovs
+Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
+""" % {'ip': subnode,
+       'host': node_hostname}
+                        client = SSHClient.load(ip)
+                        SetupController._exec_python(client, update_hosts_file)
+
             if join_masters:
                 print '\n+++ Joining master node +++\n'
                 logger.info('Joining master node')
@@ -484,30 +506,13 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 """ % {'cluster': cluster}
                     SetupController._exec_python(target_client, arakoon_create_directories)
 
-                print 'Updating hosts files'
-                logger.debug('Updating hosts files')
+                print 'Starting remote RabbitMQ nodes'
+                logger.debug('Starting remote RabbitMQ nodes')
                 for node in nodes:
-                    client_node = SSHClient.load(node)
-                    update_hosts_file = """
-from ovs.extensions.generic.system import Ovs
-Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
-""" % {'ip': cluster_ip,
-       'host': node_name}
-                    SetupController._exec_python(client_node, update_hosts_file)
                     if node != ip:
+                        client_node = SSHClient.load(node)
                         if SetupController._has_service(client_node, 'rabbitmq'):
                             SetupController._change_service_state(client_node, 'rabbitmq', 'start')
-                    else:
-                        for subnode in nodes:
-                            client_node = SSHClient.load(subnode)
-                            node_hostname = client_node.run('hostname')
-                            update_hosts_file = """
-from ovs.extensions.generic.system import Ovs
-Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
-""" % {'ip': subnode,
-       'host': node_hostname}
-                            client = SSHClient.load(ip)
-                            SetupController._exec_python(client, update_hosts_file)
 
                 print 'Setting up RabbitMQ'
                 logger.debug('Setting up RMQ')
@@ -520,8 +525,26 @@ EOF
        'broker_username' : ovs_config.get('core', 'broker.login'),
        'broker_password' : ovs_config.get('core', 'broker.password')}))
 
-                client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5; rabbitmqctl reset; sleep 5; rabbitmqctl stop; sleep 5;')
+                rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
 
+                if rabbitmq_running and rabbitmq_pid:
+                    print('WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
+                    client.run('service rabbitmq-server stop')
+                    time.sleep(5)
+                    try:
+                        client.run('kill {0}'.format(rabbitmq_pid))
+                        print('Process killed')
+                    except SystemExit:
+                        print('Process already stopped')
+
+                client.run('rabbitmq-server -detached; sleep 5;')
+                users = client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
+                users = [usr.split('\t')[0] for usr in users]
+                if not 'ovs' in users:
+                    client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
+                                                                     ovs_config.get('core', 'broker.password')))
+                    client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+                client.run('rabbitmqctl stop; sleep 5;')
                 if join_masters and join_cluster:
                     # Copy rabbitmq cookie
                     logger.debug('Copying RMQ cookie')
@@ -570,7 +593,7 @@ EOF
                     update_voldrv = """
 import os
 from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
 arakoon_management = ArakoonManagement()
 voldrv_arakoon_cluster_id = 'voldrv'
@@ -581,8 +604,8 @@ if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
     os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
 for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
     if json_file.endswith('.json'):
-        vsr_config = VolumeStorageRouterConfiguration(json_file.replace('.json', ''))
-        vsr_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+        storagedriver_config = StorageDriverConfiguration(json_file.replace('.json', ''))
+        storagedriver_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
 """
                     SetupController._exec_python(client_node, update_voldrv)
 
@@ -638,11 +661,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                                                      'http://"+window.location.hostname+":9200',
                                                      'http://' + cluster_ip + ':9200')
 
-            # Imports, not earlier then here, as all required config files should be in place.
+            # Imports, not earlier than here, as all required config files should be in place.
             from ovs.dal.hybrids.pmachine import PMachine
             from ovs.dal.lists.pmachinelist import PMachineList
-            from ovs.dal.hybrids.vmachine import VMachine
-            from ovs.dal.lists.vmachinelist import VMachineList
+            from ovs.dal.hybrids.storagerouter import StorageRouter
+            from ovs.dal.lists.storagerouterlist import StorageRouterList
 
             print 'Configuring/updating model'
             logger.info('Configuring/updating model')
@@ -659,21 +682,18 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 pmachine.hvtype = hypervisor_type
                 pmachine.name = hypervisor_name
                 pmachine.save()
-            vsa = None
-            for current_vsa in VMachineList.get_vsas():
-                if current_vsa.ip == ip and current_vsa.machineid == unique_id:
-                    vsa = current_vsa
+            storagerouter = None
+            for current_storagerouter in StorageRouterList.get_storagerouters():
+                if current_storagerouter.ip == ip and current_storagerouter.machine_id == unique_id:
+                    storagerouter = current_storagerouter
                     break
-            if vsa is None:
-                vsa = VMachine()
-                vsa.name = node_name
-                vsa.is_vtemplate = False
-                vsa.is_internal = True
-                vsa.machineid = unique_id
-                vsa.ip = cluster_ip
-                vsa.save()
-            vsa.pmachine = pmachine
-            vsa.save()
+            if storagerouter is None:
+                storagerouter = StorageRouter()
+                storagerouter.name = node_name
+                storagerouter.machine_id = unique_id
+                storagerouter.ip = cluster_ip
+            storagerouter.pmachine = pmachine
+            storagerouter.save()
 
             print 'Updating configuration files'
             logger.info('Updating configuration files')
@@ -692,7 +712,39 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                             SetupController._change_service_state(node_client, service, 'start')
                 # Enable HA for the rabbitMQ queues
                 client = SSHClient.load(ip)
-                client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
+                output = client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'', quiet=True)
+                output = output.split('\r\n')
+                retry = False
+                for line in output:
+                    if 'Error: unable to connect to node ' in line:
+                        rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
+                        if rabbitmq_running and rabbitmq_pid:
+                            client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
+                            print('Process killed, restarting')
+                            client.run('service ovs-rabbitmq start', quiet=True)
+                            retry = True
+                            break
+                if retry:
+                    client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
+
+                rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client, True)
+                if ovs_rabbitmq_running and same_process:
+                    pass # correct process is running
+                elif rabbitmq_running and not ovs_rabbitmq_running:
+                    # wrong process is running, must be stopped and correct one started
+                    print('WARNING: an instance of rabbitmq-server is running, this needs to be stopped, ovs-rabbitmq will be started instead')
+                    client.run('service rabbitmq-server stop', quiet=True)
+                    time.sleep(5)
+                    try:
+                        client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
+                        print('Process killed')
+                    except SystemExit:
+                        print('Process already stopped')
+                    client.run('service ovs-rabbitmq start', quiet=True)
+                elif not rabbitmq_running and not ovs_rabbitmq_running:
+                    #neither running
+                    client.run('service ovs-rabbitmq start', quiet=True)
+
             target_client = SSHClient.load(ip)
             SetupController._enable_service(target_client, 'watcher')
             SetupController._change_service_state(target_client, 'watcher', 'start')
@@ -1162,12 +1214,45 @@ cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
 nodes = [n.strip() for n in cfg.get('main', 'nodes').split(',')]
 for node in nodes:
     uris.append({{'amqp_uri': '{{0}}://{{1}}:{{2}}@{{3}}'.format(protocol, login, password, cfg.get(node, 'location'))}})
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
                  'events_amqp_uris': uris}}
 for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
     this_vpool_name = config_file.replace('.json', '')
     if config_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
-        vsr_configuration = VolumeStorageRouterConfiguration(this_vpool_name)
-        vsr_configuration.configure_event_publisher(queue_config)"""
+        storagedriver_configuration = StorageDriverConfiguration(this_vpool_name)
+        storagedriver_configuration.configure_event_publisher(queue_config)"""
         SetupController._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
+
+    @staticmethod
+    def _is_rabbitmq_running(client, check_ovs = False):
+        rabbitmq_running, rabbitmq_pid = False, 0
+        ovs_rabbitmq_running, pid = False, -1
+        same_process = False
+        output = client.run('service rabbitmq-server status', quiet=True)
+        if 'unrecognized service' in output:
+            output = None
+        if output:
+            output = output.split('\r\n')
+            for line in output:
+                if 'pid' in line:
+                    rabbitmq_running = True
+                    rabbitmq_pid = line.split(',')[1].replace('}', '')
+        else:
+            output = client.run('ps aux | grep rabbit@ | grep -v grep', quiet=True)
+            if output:  # in case of error it is ''
+                output = output.split(' ')
+                if output[0] == 'rabbitmq':
+                    rabbitmq_pid = output[1]
+                    for item in output[2:]:
+                        if 'erlang' in item or 'rabbitmq' in item or 'beam' in item:
+                            rabbitmq_running = True
+        output = client.run('service ovs-rabbitmq status', quiet=True)
+        if 'stop/waiting' in output: pass
+        if 'start/running' in output:
+            pid = output.split('process ')[1].strip()
+            ovs_rabbitmq_running = True
+        same_process = rabbitmq_pid == pid
+        if check_ovs:
+            return rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process
+        return rabbitmq_running, rabbitmq_pid

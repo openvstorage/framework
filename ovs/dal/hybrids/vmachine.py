@@ -16,11 +16,12 @@
 VMachine module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vpool import VPool
-from ovs.extensions.storageserver.volumestoragerouter import VolumeStorageRouterClient
+from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.hypervisor.factory import Factory as hvFactory
 import time
 
@@ -30,32 +31,26 @@ class VMachine(DataObject):
     The VMachine class represents a vMachine. A vMachine is a Virtual Machine with vDisks
     or a Virtual Machine running the Open vStorage software.
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':         (None,  str,  'Name of the vMachine.'),
-                   'description':  (None,  str,  'Description of the vMachine.'),
-                   'hypervisorid': (None,  str,  'The identifier of the vMachine on the Hypervisor.'),
-                   'machineid':    (None,  str,  'The hardware identifier of the vMachine'),
-                   'devicename':   (None,  str,  'The name of the container file (e.g. the VMX-file) describing the vMachine.'),
-                   'is_vtemplate': (False, bool, 'Indicates whether this vMachine is a vTemplate.'),
-                   'is_internal':  (False, bool, 'Indicates whether this vMachine is a Management VM for the Open vStorage Framework.'),
-                   'ip':           (None,  str,  'IP Address of the vMachine, if available'),
-                   'status':       ('OK',  ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], 'Internal status of the vMachine')}
-    __relations = {'pmachine': (PMachine, 'vmachines'),
-                   'vpool':    (VPool, 'vmachines')}
-    __expiry = {'snapshots':          (60, list),
-                'hypervisor_status': (300, str),
-                'statistics':          (5, dict),
-                'stored_data':        (60, int),
-                'failover_mode':      (60, str),
-                'vsas_guids':         (15, list),
-                'vpools_guids':       (15, list)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, mandatory=False, doc='Name of the vMachine.'),
+                    Property('description', str, mandatory=False, doc='Description of the vMachine.'),
+                    Property('hypervisor_id', str, mandatory=False, doc='The identifier of the vMachine on the Hypervisor.'),
+                    Property('devicename', str, doc='The name of the container file (e.g. the VMX-file) describing the vMachine.'),
+                    Property('is_vtemplate', bool, default=False, doc='Indicates whether this vMachine is a vTemplate.'),
+                    Property('status', ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], default='OK', doc='Internal status of the vMachine')]
+    __relations = [Relation('pmachine', PMachine, 'vmachines'),
+                   Relation('vpool', VPool, 'vmachines', mandatory=False)]
+    __dynamics = [Dynamic('snapshots', list, 60),
+                  Dynamic('hypervisor_status', str, 300),
+                  Dynamic('statistics', dict, 5),
+                  Dynamic('stored_data', int, 60),
+                  Dynamic('failover_mode', str, 60),
+                  Dynamic('storagerouters_guids', list, 15),
+                  Dynamic('vpools_guids', list, 15)]
 
     def _snapshots(self):
         """
         Fetches a list of Snapshots for the vMachine.
         """
-
         snapshots_structure = {}
         for disk in self.vdisks:
             for snapshot in disk.snapshots:
@@ -84,11 +79,11 @@ class VMachine(DataObject):
         """
         Fetches the Status of the vMachine.
         """
-        if self.hypervisorid is None or self.pmachine is None:
+        if self.hypervisor_id is None or self.pmachine is None:
             return 'UNKNOWN'
         hv = hvFactory.get(self.pmachine)
         try:
-            return hv.get_state(self.hypervisorid)
+            return hv.get_state(self.hypervisor_id)
         except:
             return 'UNKNOWN'
 
@@ -96,22 +91,14 @@ class VMachine(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        client = VolumeStorageRouterClient()
+        client = StorageDriverClient()
         vdiskstatsdict = {}
         for key in client.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
-        if self.is_internal:
-            vdisks = []
-            for vsr in self.served_vsrs:
-                for vdisk in vsr.vpool.vdisks:
-                    if vdisk.vsrid == vsr.vsrid:
-                        vdisks.append(vdisk)
-        else:
-            vdisks = self.vdisks
-        for disk in vdisks:
-            statistics = disk._statistics()  # Prevent double caching
-            for key, value in statistics.iteritems():
+        for vdisk in self.vdisks:
+            vdisk.invalidate_dynamics('statistics')  # Prevent double caching
+            for key, value in vdisk.statistics.iteritems():
                 if key != 'timestamp':
                     vdiskstatsdict[key] += value
         vdiskstatsdict['timestamp'] = time.time()
@@ -121,14 +108,7 @@ class VMachine(DataObject):
         """
         Aggregates the Stored Data of each vDisk of the vMachine.
         """
-        vdisks = self.vdisks
-        if self.is_internal:
-            vdisks = []
-            for vsr in self.served_vsrs:
-                for vdisk in vsr.vpool.vdisks:
-                    if vdisk.vsrid == vsr.vsrid:
-                        vdisks.append(vdisk)
-        return sum([disk.info['stored'] for disk in vdisks])
+        return sum([vdisk.info['stored'] for vdisk in self.vdisks])
 
     def _failover_mode(self):
         """
@@ -136,41 +116,34 @@ class VMachine(DataObject):
         """
         status = 'UNKNOWN'
         status_code = 0
-        vdisks = self.vdisks
-        if self.is_internal:
-            for vsr in self.served_vsrs:
-                vdisks += vsr.vpool.vdisks
-        for disk in vdisks:
-            mode = disk.info['failover_mode']
-            current_status_code = VolumeStorageRouterClient.FOC_STATUS[mode.lower()]
+        for vdisk in self.vdisks:
+            mode = vdisk.info['failover_mode']
+            current_status_code = StorageDriverClient.FOC_STATUS[mode.lower()]
             if current_status_code > status_code:
                 status = mode
                 status_code = current_status_code
         return status
 
-    def _vsas_guids(self):
+    def _storagerouters_guids(self):
         """
-        Gets the VSA guids linked to this vMachine
+        Gets the StorageRouter guids linked to this vMachine
         """
-        vsa_guids = set()
-        from ovs.dal.hybrids.volumestoragerouter import VolumeStorageRouter
-        vsr_ids = [vdisk.vsrid for vdisk in self.vdisks if vdisk.vsrid]
-        volumestoragerouters = DataList({'object': VolumeStorageRouter,
-                                         'data': DataList.select.DESCRIPTOR,
-                                         'query': {'type': DataList.where_operator.AND,
-                                                   'items': [('vsrid', DataList.operator.IN, vsr_ids)]}}).data  # noqa
-        for vsr in DataObjectList(volumestoragerouters, VolumeStorageRouter):
-            vsa_guids.add(vsr.serving_vmachine_guid)
-        return list(vsa_guids)
+        storagerouter_guids = set()
+        from ovs.dal.hybrids.storagedriver import StorageDriver
+        storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
+        storagedrivers = DataList({'object': StorageDriver,
+                                   'data': DataList.select.DESCRIPTOR,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
+        for storagedriver in DataObjectList(storagedrivers, StorageDriver):
+            storagerouter_guids.add(storagedriver.storagerouter_guid)
+        return list(storagerouter_guids)
 
     def _vpools_guids(self):
         """
         Gets the vPool guids linked to this vMachine
         """
         vpool_guids = set()
-        if self.is_internal:
-            for vsr in self.served_vsrs:
-                vpool_guids.add(vsr.vpool_guid)
         for vdisk in self.vdisks:
             vpool_guids.add(vdisk.vpool_guid)
         return list(vpool_guids)

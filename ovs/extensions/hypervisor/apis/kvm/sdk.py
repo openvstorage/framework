@@ -19,7 +19,8 @@ This module contains all code for using the KVM libvirt api
 from xml.etree import ElementTree
 from threading import Lock
 import subprocess
-import os, glob
+import os
+import glob
 import re
 import time
 from ovs.log.logHandler import LogHandler
@@ -196,7 +197,12 @@ class Sdk(object):
                 continue
 
             # Load backing filename
-            backingfilename = disk['source']['file']
+            if 'file' in disk['source']:
+                backingfilename = disk['source']['file']
+            elif 'dev' in disk['source']:
+                backingfilename = disk['source']['dev']
+            else:
+                continue
             match = re.search(regex, backingfilename)
             if match is None:
                 continue
@@ -304,17 +310,22 @@ class Sdk(object):
             vm_object = self.get_vm_object(vmid)
         except Exception as ex:
             logger.error('SDK domain retrieve failed: {}'.format(ex))
-        found_file = self.file_exists(devicename)
-        if found_file:
-            self.ssh_run('rm {0}'.format(found_file))
-            logger.info('File on vpool deleted: {0}'.format(found_file))
+        found_files = self.find_devicename(devicename)
+        if found_files is not None:
+            for found_file in found_files:
+                self.ssh_run('rm {0}'.format(found_file))
+                logger.info('File on vpool deleted: {0}'.format(found_file))
         if vm_object:
+            found_file = ''
             # VM partially created, most likely we have disks
             for disk in self._get_disks(vm_object):
                 if disk['device'] == 'cdrom':
                     continue
-                found_file = disk.get('source', {}).get('file', '')
-                if os.path.exists(found_file) and os.path.isfile(found_file):
+                if 'file' in disk['source']:
+                    found_file = disk['source']['file']
+                elif 'dev' in disk['source']:
+                    found_file = disk['source']['dev']
+                if found_file and os.path.exists(found_file) and os.path.isfile(found_file):
                     self.ssh_run('rm {0}'.format(found_file))
                     logger.info('File on vpool deleted: {0}'.format(found_file))
             vm_object.undefine()
@@ -332,15 +343,17 @@ class Sdk(object):
         vm_object.create()
         return self.get_power_state(vmid)
 
-    def file_exists(self, devicename):
+    def find_devicename(self, devicename):
         """
-        Check if devicename .xml exists on any mnt vpool
+        Searched for a given devicename
         """
+        _ = self
         file_matcher = '/mnt/*/{0}'.format(devicename)
+        matches = []
         for found_file in glob.glob(file_matcher):
             if os.path.exists(found_file) and os.path.isfile(found_file):
-                return found_file
-        return False
+                matches.append(found_file)
+        return matches if matches else None
 
     @authenticated
     def clone_vm(self, vmid, name, disks):

@@ -15,6 +15,7 @@
 Management center module
 """
 from ovs.dal.dataobject import DataObject
+from ovs.dal.structures import Property, Dynamic
 from ovs.extensions.hypervisor.factory import Factory
 
 
@@ -22,17 +23,15 @@ class MgmtCenter(DataObject):
     """
     The MgmtCenter represents a management center (e.g. vCenter Server for VMware)
     """
-    # pylint: disable=line-too-long
-    __blueprint = {'name':        (None, str, 'Name of the Management Center.'),
-                   'description': (None, str, 'Description of the Management Center.'),
-                   'username':    (None, str, 'Username of the Management Center.'),
-                   'password':    (None, str, 'Password of the Management Center.'),
-                   'ip':          (None, str, 'IP address of the Management Center.'),
-                   'port':        (None, int, 'Port of the Management Center.'),
-                   'type':        (None, ['VCENTER'], 'Management Center type.')}
-    __relations = {}
-    __expiry = {'hosts': (60, dict)}
-    # pylint: enable=line-too-long
+    __properties = [Property('name', str, doc='Name of the Management Center.'),
+                    Property('description', str, mandatory=False, doc='Description of the Management Center.'),
+                    Property('username', str, doc='Username of the Management Center.'),
+                    Property('password', str, doc='Password of the Management Center.'),
+                    Property('ip', str, doc='IP address of the Management Center.'),
+                    Property('port', int, doc='Port of the Management Center.'),
+                    Property('type', ['VCENTER', 'OPENSTACK'], doc='Management Center type.')]
+    __relations = []
+    __dynamics = [Dynamic('hosts', dict, 60)]
 
     def _hosts(self):
         """

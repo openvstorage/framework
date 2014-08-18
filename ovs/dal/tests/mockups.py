@@ -17,9 +17,9 @@ Mockups module
 """
 
 
-class StorageRouterClient():
+class SRClient():
     """
-    Mocks the StorageRouterClient
+    Mocks the SRClient
     """
 
     def __init__(self):
@@ -45,9 +45,9 @@ class StorageRouterClient():
         return []
 
 
-class VolumeStorageRouterClient():
+class StorageDriverClient():
     """
-    Mocks the VolumeStorageRouterClient
+    Mocks the StorageDriverClient
     """
 
     def __init__(self):
@@ -159,17 +159,17 @@ class VolumeStorageRouterClient():
 
     def load(self):
         """
-        Returns the mocked StorageRouterClient
+        Returns the mocked SRClient
         """
         _ = self
-        return StorageRouterClient()
+        return SRClient()
 
 
-class VolumeStorageRouter():
+class StorageDriver():
     """
-    Mocks the VolumeStorageRouter
+    Mocks the StorageDriver
     """
-    VolumeStorageRouterClient = VolumeStorageRouterClient
+    StorageDriverClient = StorageDriverClient
 
     def __init__(self):
         """
