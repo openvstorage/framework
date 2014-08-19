@@ -16,10 +16,16 @@ import time
 from subprocess import check_output
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import Ovs
+from ovs.plugin.provider.configuration import Configuration
 
 current_time = int(time.time())
 machine_id = Ovs.get_my_machine_id()
-worker_states = check_output("/usr/local/bin/celery inspect ping 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true", shell=True)
+amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'),
+                                    Configuration.get('ovs.core.broker.login'),
+                                    Configuration.get('ovs.core.broker.password'),
+                                    Configuration.get('ovs.grid.ip'))
+
+worker_states = check_output("/usr/local/bin/celery inspect ping -b {0} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(amqp), shell=True)
 routers = StorageRouterList.get_storagerouters()
 for node in routers:
     if node.heartbeats is None:
