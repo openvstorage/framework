@@ -31,7 +31,7 @@ class BrandingList(object):
         Returns a list of all brandings
         """
         brandings = DataList({'object': Branding,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': []}}).data
         return DataObjectList(brandings, Branding)

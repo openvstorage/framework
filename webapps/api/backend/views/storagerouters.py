@@ -51,7 +51,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         else:
             query = json.loads(query)
             query_result = DataList({'object': StorageRouter,
-                                     'data': DataList.select.DESCRIPTOR,
+                                     'data': DataList.select.GUIDS,
                                      'query': query}).data
             return DataObjectList(query_result, StorageRouter)
 

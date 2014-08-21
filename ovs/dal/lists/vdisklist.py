@@ -31,7 +31,7 @@ class VDiskList(object):
         Returns a list of all VDisks
         """
         vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.DESCRIPTOR,
+                           'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
                                      'items': []}}).data
         return DataObjectList(vdisks, VDisk)
@@ -43,7 +43,7 @@ class VDiskList(object):
         """
         # pylint: disable=line-too-long
         vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.DESCRIPTOR,
+                           'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
                                      'items': [('volume_id', DataList.operator.EQUALS, volume_id)]}}).data
         # pylint: enable=line-too-long
@@ -58,7 +58,7 @@ class VDiskList(object):
         """
         # pylint: disable=line-too-long
         vds = DataList({'object': VDisk,
-                        'data': DataList.select.DESCRIPTOR,
+                        'data': DataList.select.GUIDS,
                         'query': {'type': DataList.where_operator.AND,
                                   'items': [('devicename', DataList.operator.EQUALS, devicename),
                                             ('vpool_guid', DataList.operator.EQUALS, vpool.guid)]}}).data  # noqa
@@ -76,7 +76,7 @@ class VDiskList(object):
         """
         # pylint: disable=line-too-long
         vdisks = DataList({'object': VDisk,
-                           'data': DataList.select.DESCRIPTOR,
+                           'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
                                      'items': [('vmachine_guid', DataList.operator.EQUALS, None)]}}).data
         # pylint: enable=line-too-long

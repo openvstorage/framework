@@ -60,7 +60,7 @@ class VMachineViewSet(viewsets.ViewSet):
         elif query is not None:
             query = json.loads(query)
             query_result = DataList({'object': VMachine,
-                                     'data': DataList.select.DESCRIPTOR,
+                                     'data': DataList.select.GUIDS,
                                      'query': query}).data
             vmachines = DataObjectList(query_result, VMachine)
         else:

@@ -32,7 +32,7 @@ class RoleList(object):
         Returns a single Role for the given code. Returns None if no Role was found
         """
         roles = DataList({'object': Role,
-                          'data': DataList.select.DESCRIPTOR,
+                          'data': DataList.select.GUIDS,
                           'query': {'type': DataList.where_operator.AND,
                                     'items': [('code', DataList.operator.EQUALS, code)]}}).data  # noqa
         if len(roles) == 1:
@@ -45,7 +45,7 @@ class RoleList(object):
         Returns a list of Roles for a list of codes
         """
         roles = DataList({'object': Role,
-                          'data': DataList.select.DESCRIPTOR,
+                          'data': DataList.select.GUIDS,
                           'query': {'type': DataList.where_operator.AND,
                                     'items': [('code', DataList.operator.IN, codes)]}}).data  # noqa
         return DataObjectList(roles, Role)

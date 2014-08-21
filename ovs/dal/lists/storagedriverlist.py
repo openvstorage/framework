@@ -31,7 +31,7 @@ class StorageDriverList(object):
         Returns a list of all StorageDrivers
         """
         storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.DESCRIPTOR,
+                                   'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': []}}).data
         return DataObjectList(storagedrivers, StorageDriver)
@@ -43,7 +43,7 @@ class StorageDriverList(object):
         """
         # pylint: disable=line-too-long
         storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.DESCRIPTOR,
+                                   'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('storagedriver_id', DataList.operator.EQUALS, storagedriver_id)]}}).data
         # pylint: enable=line-too-long
@@ -57,7 +57,7 @@ class StorageDriverList(object):
         Returns a list of all StorageDrivers for Storage Router
         """
         storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.DESCRIPTOR,
+                                   'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('storagerouter_guid', DataList.operator.EQUALS, machineguid)]}}).data
         return DataObjectList(storagedrivers, StorageDriver)

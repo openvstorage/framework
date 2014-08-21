@@ -1,4 +1,5 @@
-# Copyright 2014 CloudFounders NV
+#!/usr/bin/python2
+#  Copyright 2014 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +17,12 @@
 Performance unittest module
 """
 import time
+import sys
 from unittest import TestCase
 from ovs.dal.hybrids.t_testdisk import TestDisk
 from ovs.dal.hybrids.t_testmachine import TestMachine
 from ovs.dal.datalist import DataList
+from ovs.dal.exceptions import ObjectNotFoundException
 
 
 class LotsOfObjects(TestCase):
@@ -31,84 +34,113 @@ class LotsOfObjects(TestCase):
         """
         A test creating, linking and querying a lot of objects
         """
-        print 'start test'
-        print 'start loading data'
-        start = time.time()
-        mguids = []
-        for i in xrange(0, 100):
-            machine = TestMachine()
-            machine.name = 'machine_{0}'.format(i)
-            machine.save()
-            mguids.append(machine.guid)
-            for ii in xrange(0, 100):
-                disk = TestDisk()
-                disk.name = 'disk_{0}_{1}'.format(i, ii)
-                disk.size = ii * 100
-                disk.machine = machine
-                disk.save()
-            seconds_passed = (time.time() - start)
-            itemspersec = ((i + 1) * 100.0) / seconds_passed
-            print '* machine {0}/100 (creating {1} disks per second)'.format(i, str(itemspersec))
-        print 'loading done'
-
-        print 'start queries'
-        start = time.time()
-        for i in xrange(0, 100):
-            machine = TestMachine(mguids[i])
-            self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
-            seconds_passed = (time.time() - start)
-            itemspersec = ((i + 1) * 10000.0) / seconds_passed
-            print '* machine {0}/100 (filtering {1} disks per second)'.format(i, str(itemspersec))
-        print 'completed'
-
-        print 'start cached queries'
-        start = time.time()
-        for i in xrange(0, 100):
-            machine = TestMachine(mguids[i])
-            self.assertEqual(len(machine.disks), 100, 'Not all disks were retreived')
-        seconds_passed = (time.time() - start)
-        print 'completed in {0} seconds'.format(seconds_passed)
-
-        print 'start full query on disk property'
-        start = time.time()
-        amount = DataList({'object': TestDisk,
-                           'data': DataList.select.COUNT,
-                           'query': {'type': DataList.where_operator.AND,
-                                     'items': [('size', DataList.operator.GT, 4000),
-                                               ('size', DataList.operator.LT, 7000)]}}).data
-        self.assertEqual(amount, 2900,
-                         'Correct number of disks should be found. Found: {0}'.format(str(amount)))
-        seconds_passed = (time.time() - start)
-        print 'completed in {0} seconds (filtering {1} disks per second)'.format(seconds_passed, (10000.0 / seconds_passed))
-
+        print ''
         print 'cleaning up'
-        start = time.time()
-        for i in xrange(0, 100):
-            machine = TestMachine(mguids[i])
-            for disk in machine.disks:
-                disk.delete()
-            machine.delete()
-        seconds_passed = (time.time() - start)
-        print 'completed in {0} seconds'.format(seconds_passed)
-
-    def test_pkstretching(self):
-        """
-        Creating lots of object of a single type, testing the primary key list limits
-        """
+        self._clean_all()
         print 'start test'
-        start = time.time()
-        machine_guids = []
-        for i in xrange(0, 50000):
-            machine = TestMachine()
-            machine.name = 'Machine {0}'.format(i)
-            machine.save()
-            machine_guids.append(machine.guid)
-            keys = DataList._get_pks(machine._namespace, machine._name)
-            self.assertEqual(len(machine_guids), len(list(keys)), 'The primary key list should be correct')
-            if i % 100 == 0:
-                print '  progress: {0}'.format(i)
-        for guid in machine_guids:
-            machine = TestMachine(guid)
-            machine.delete()
-        seconds_passed = (time.time() - start)
-        print 'completed in {0} seconds'.format(seconds_passed)
+        load_data = True
+        if load_data:
+            print 'start loading data'
+            start = time.time()
+            mguids = []
+            min_run, max_run = 999999, 0
+            for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
+                mstart = time.time()
+                machine = TestMachine()
+                machine.name = 'machine_{0}'.format(i)
+                machine.save()
+                mguids.append(machine.guid)
+                for ii in xrange(0, int(LotsOfObjects.amount_of_disks)):
+                    disk = TestDisk()
+                    disk.name = 'disk_{0}_{1}'.format(i, ii)
+                    disk.size = ii * 100
+                    disk.machine = machine
+                    disk.save()
+                avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
+                itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
+                min_run = min(min_run, itemspersec)
+                max_run = max(max_run, itemspersec)
+                self._print_progress('* machine {0}/{1} (run: {2} dps, avg: {3} dps)'.format(i + 1, int(LotsOfObjects.amount_of_machines), round(itemspersec, 2), round(avgitemspersec, 2)))
+            print '\nloading done. min: {0} dps, max: {1} dps'.format(round(min_run, 2), round(max_run, 2))
+
+        test_queries = True
+        if test_queries:
+            print 'start queries'
+            start = time.time()
+            min_run, max_run = 999999, 0
+            for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
+                mstart = time.time()
+                machine = TestMachine(mguids[i])
+                self.assertEqual(len(machine.disks), LotsOfObjects.amount_of_disks, 'Not all disks were retreived ({0})'.format(len(machine.disks)))
+                avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
+                itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
+                min_run = min(min_run, itemspersec)
+                max_run = max(max_run, itemspersec)
+                self._print_progress('* machine {0}/{1} (run: {2} dps, avg: {3} dps)'.format(i + 1, int(LotsOfObjects.amount_of_machines), round(itemspersec, 2), round(avgitemspersec, 2)))
+            print '\ncompleted. min: {0} dps, max: {1} dps'.format(round(min_run, 2), round(max_run, 2))
+
+            print 'start full query on disk property'
+            start = time.time()
+            amount = DataList({'object': TestDisk,
+                               'data': DataList.select.COUNT,
+                               'query': {'type': DataList.where_operator.AND,
+                                         'items': [('size', DataList.operator.GT, 100),
+                                                   ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]}}).data
+            self.assertEqual(amount, (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines)))
+            seconds_passed = (time.time() - start)
+            print 'completed in {0} seconds (avg: {1} dps)'.format(round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+
+        clean_data = True
+        if clean_data:
+            print 'cleaning up'
+            start = time.time()
+            min_run, max_run = 999999, 0
+            for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
+                mstart = time.time()
+                machine = TestMachine(mguids[i])
+                for disk in machine.disks:
+                    disk.delete()
+                machine.delete()
+                avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
+                itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
+                min_run = min(min_run, itemspersec)
+                max_run = max(max_run, itemspersec)
+                self._print_progress('* machine {0}/{1} (run: {2} dps, avg: {3} dps)'.format(i + 1, int(LotsOfObjects.amount_of_machines), round(itemspersec, 2), round(avgitemspersec, 2)))
+            print '\ncompleted. min: {0} dps, max: {1} dps'.format(round(min_run, 2), round(max_run, 2))
+
+    def _print_progress(self, message):
+        """
+        Prints progress (overwriting)
+        """
+        sys.stdout.write('\r{0}'.format(message))
+        sys.stdout.flush()
+
+    def _clean_all(self):
+        """
+        Cleans all disks and machines
+        """
+        machine = TestMachine()
+        keys = DataList.get_pks(machine._namespace, machine._name)
+        for guid in keys:
+            try:
+                machine = TestMachine(guid)
+                for disk in machine.disks:
+                    disk.delete()
+                machine.delete()
+            except (ObjectNotFoundException, ValueError):
+                DataList.delete_pk(machine._namespace, machine._name, guid)
+        disk = TestDisk()
+        keys = DataList.get_pks(disk._namespace, disk._name)
+        for guid in keys:
+            try:
+                disk = TestDisk(guid)
+                disk.delete()
+            except (ObjectNotFoundException, ValueError):
+                DataList.delete_pk(disk._namespace, disk._name, guid)
+
+if __name__ == '__main__':
+    import unittest
+    LotsOfObjects.amount_of_machines = float(sys.argv[1])
+    LotsOfObjects.amount_of_disks = float(sys.argv[2])
+    suite = unittest.TestLoader().loadTestsFromTestCase(LotsOfObjects)
+    unittest.TextTestRunner(verbosity=2).run(suite)

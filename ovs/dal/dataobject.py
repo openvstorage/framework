@@ -167,6 +167,7 @@ class DataObject(object):
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
         self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._name))
+        self._mutex_reverseindex = VolatileMutex('reverseindex')
 
         # Rebuild _relation types
         hybrid_structure = HybridRunner.get_hybrids()
@@ -499,43 +500,52 @@ class DataObject(object):
         # Save the data
         self._data = copy.deepcopy(data)
         self._persistent.set(self._key, self._data)
-        DataList.add_pk(self._namespace, self._name, self._key)
+        DataList.add_pk(self._namespace, self._name, self._guid)
 
-        # Invalidate lists/queries
-        # First, invalidate reverse lists (where we point to a remote object,
-        # invalidating that remote list)
-        for relation in self._relations:
-            key = relation.name
-            if self._original[key]['guid'] != self._data[key]['guid']:
-                if relation.foreign_type is None:
-                    classname = self.__class__.__name__.lower()
-                else:
-                    classname = relation.foreign_type.__name__.lower()
-                # The field points to another object
-                self._volatile.delete('{0}_{1}_{2}_{3}'.format(
-                    DataList.namespace,
-                    classname,
-                    self._original[key]['guid'],
-                    relation.foreign_key
-                ))
-                self._volatile.delete('{0}_{1}_{2}_{3}'.format(
-                    DataList.namespace,
-                    classname,
-                    self._data[key]['guid'],
-                    relation.foreign_key
-                ))
+        # First, update reverse index
+        try:
+            self._mutex_reverseindex.acquire(60)
+            for relation in self._relations:
+                key = relation.name
+                original_guid = self._original[key]['guid']
+                new_guid = self._data[key]['guid']
+                if original_guid != new_guid:
+                    if relation.foreign_type is None:
+                        classname = self.__class__.__name__.lower()
+                    else:
+                        classname = relation.foreign_type.__name__.lower()
+                    reverse_index = DataList.get_reverseindex(classname)
+                    if reverse_index is not None:
+                        # Add to new
+                        if new_guid in reverse_index and relation.foreign_key in reverse_index[new_guid]:
+                            entries = reverse_index[new_guid][relation.foreign_key]
+                            entries[0].append(self.guid)
+                            entries[1] = str(uuid.uuid4())
+                            reverse_index[new_guid][relation.foreign_key] = entries
+                        # Remove from old
+                        if original_guid in reverse_index and relation.foreign_key in reverse_index[original_guid]:
+                            entries = reverse_index[original_guid][relation.foreign_key]
+                            entries[0].remove(self.guid)
+                            entries[1] = str(uuid.uuid4())
+                            reverse_index[original_guid][relation.foreign_key] = entries
+                        DataList.save_reverseindex(classname, reverse_index)
+        finally:
+            self._mutex_reverseindex.release()
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
             cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
+            change = False
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
                 if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
+                    change = True
                     self._volatile.delete(list_key)
                     del cache_list[list_key]
-            self._volatile.set(cache_key, cache_list)
-            self._persistent.set(cache_key, cache_list)
+            if change is True:
+                self._volatile.set(cache_key, cache_list)
+                self._persistent.set(cache_key, cache_list)
         finally:
             self._mutex_listcache.release()
 
@@ -582,18 +592,46 @@ class DataObject(object):
                     else:
                         raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
 
-        # Invalidate no-filter queries/lists pointing to this object
+        # First, update reverse index
+        try:
+            self._mutex_reverseindex.acquire(60)
+            for relation in self._relations:
+                key = relation.name
+                original_guid = self._original[key]['guid']
+                if relation.foreign_type is None:
+                    classname = self.__class__.__name__.lower()
+                else:
+                    classname = relation.foreign_type.__name__.lower()
+                reverse_index = DataList.get_reverseindex(classname)
+                if reverse_index is not None:
+                    # Remove from old
+                    if original_guid in reverse_index and relation.foreign_key in reverse_index[original_guid]:
+                        entries = reverse_index[original_guid][relation.foreign_key]
+                        entries[0].remove(self.guid)
+                        entries[1] = str(uuid.uuid4())
+                        reverse_index[original_guid][relation.foreign_key] = entries
+                        DataList.save_reverseindex(classname, reverse_index)
+            reverse_index = DataList.get_reverseindex(self._name)
+            if reverse_index is not None:
+                del reverse_index[self.guid]
+                DataList.save_reverseindex(self._name, reverse_index)
+        finally:
+            self._mutex_reverseindex.release()
+        # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
             cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
+            change = False
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
                 if '__all' in fields:
+                    change = True
                     self._volatile.delete(list_key)
                     del cache_list[list_key]
-            self._volatile.set(cache_key, cache_list)
-            self._persistent.set(cache_key, cache_list)
+            if change is True:
+                self._volatile.set(cache_key, cache_list)
+                self._persistent.set(cache_key, cache_list)
         finally:
             self._mutex_listcache.release()
 
@@ -606,7 +644,7 @@ class DataObject(object):
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-        DataList.delete_pk(self._namespace, self._name, self._key)
+        DataList.delete_pk(self._namespace, self._name, self._guid)
 
     # Discard all pending changes
     def discard(self):

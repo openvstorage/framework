@@ -31,7 +31,7 @@ class StorageRouterList(object):
         Returns a list of all StorageRouters
         """
         storagerouters = DataList({'object': StorageRouter,
-                                   'data': DataList.select.DESCRIPTOR,
+                                   'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': []}}).data
         return DataObjectList(storagerouters, StorageRouter)

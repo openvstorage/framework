@@ -33,7 +33,7 @@ class UserList(object):
         """
         # pylint: disable=line-too-long
         users = DataList({'object': User,
-                          'data': DataList.select.DESCRIPTOR,
+                          'data': DataList.select.GUIDS,
                           'query': {'type': DataList.where_operator.AND,
                                     'items': [('username', DataList.operator.EQUALS, username)]}}).data  # noqa
         # pylint: enable=line-too-long
@@ -47,7 +47,7 @@ class UserList(object):
         Returns a list of all Users
         """
         users = DataList({'object': User,
-                          'data': DataList.select.DESCRIPTOR,
+                          'data': DataList.select.GUIDS,
                           'query': {'type': DataList.where_operator.AND,
                                     'items': []}}).data
         return DataObjectList(users, User)

@@ -160,7 +160,7 @@ class VDisk(DataObject):
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedrivers = DataObjectList(
             DataList({'object': StorageDriver,
-                      'data': DataList.select.DESCRIPTOR,
+                      'data': DataList.select.GUIDS,
                       'query': {'type': DataList.where_operator.AND,
                                 'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]}}).data,
             StorageDriver

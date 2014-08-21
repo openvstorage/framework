@@ -31,7 +31,7 @@ class DataObjectList(object):
         which will yield reduced objects (with only their guid) for faster code in case
         not all properties are required
         """
-        self._guids = [x['guid'] for x in query_result]
+        self._guids = query_result
         self.type = cls
         self._objects = {}
         self._reduced = reduced
@@ -51,7 +51,7 @@ class DataObjectList(object):
         """
         # Maintaining order is very important here
         old_guids = self._guids[:]
-        new_guids = [x['guid'] for x in query_result]
+        new_guids = query_result
         self._guids = []
         for guid in old_guids:
             if guid in new_guids:
@@ -175,12 +175,11 @@ class DataObjectList(object):
         """
         if isinstance(item, slice):
             guids = self._guids[item.start:item.stop]
-            result = [item for item in self._query_result if item['guid'] in guids]
+            result = [qr_item for qr_item in self._query_result if qr_item in guids]
             data_object_list = DataObjectList(result, self.type)
             # Overwrite some internal fields, making sure we keep already fetched objects
             # and we preseve existing sorting
-            data_object_list._objects = dict(item for item in self._objects.iteritems()
-                                             if item[0] in guids)
+            data_object_list._objects = dict(item for item in self._objects.iteritems() if item[0] in guids)
             data_object_list._guids = guids
             return data_object_list
         else:

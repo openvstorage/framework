@@ -132,7 +132,7 @@ class VMachine(DataObject):
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
         storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.DESCRIPTOR,
+                                   'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
         for storagedriver in DataObjectList(storagedrivers, StorageDriver):

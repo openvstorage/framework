@@ -32,7 +32,7 @@ class PMachineList(object):
         Returns a list of all PMachines
         """
         pmachines = DataList({'object': PMachine,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': []}}).data
         return DataObjectList(pmachines, PMachine)
@@ -43,7 +43,7 @@ class PMachineList(object):
         Gets a pmachine based on a given ip address
         """
         pmachines = DataList({'object': PMachine,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': [('ip', DataList.operator.EQUALS, ip)]}}).data
         if pmachines:
