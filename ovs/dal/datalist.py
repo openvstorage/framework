@@ -65,6 +65,8 @@ class DataList(object):
     operator = Operator()
     namespace = 'ovs_list'
     cachelink = 'ovs_listcache'
+    partsize_pks = 5000
+    partsize_ri = 1000
 
     def __init__(self, query, key=None, load=True, post_query_hook=None):
         """
@@ -335,115 +337,109 @@ class DataList(object):
 
         # Check whether the requested information is available in cache
         reverse_index = DataList.get_reverseindex(own_name)
+        if reverse_index is not None and own_guid in reverse_index and own_key in reverse_index[own_guid]:
+            Toolbox.log_cache_hit('datalist', True)
+            datalist.data = reverse_index[own_guid][own_key][0]
+            datalist.from_cache = True
+            return datalist
+
+        Toolbox.log_cache_hit('datalist', False)
+        mutex = VolatileMutex('reverseindex')
+        remote_name = remote_class.__name__.lower()
+        blueprint_object = remote_class()  # vDisk object
+
+        # Preload all reverse indexes of the remote objects
+
+        reverse_indexes = {}
+        touched_data = {}
+        foreign_guids = {}
+        try:
+            mutex.acquire(60)
+            for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
+                if relation.foreign_type is None:
+                    classname = remote_name
+                    foreign_namespace = blueprint_object._namespace
+                else:
+                    classname = relation.foreign_type.__name__.lower()
+                    foreign_namespace = relation.foreign_type()._namespace
+                if classname not in reverse_indexes:
+                    foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
+                    reverse_indexes[classname] = DataList.get_reverseindex(classname)
+                    if reverse_indexes[classname] is None:
+                        reverse_indexes[classname] = {}
+                    touched_data[classname] = {}
+        finally:
+            mutex.release()
+
+        # Run the full scan over the required remote class (slow)
+        remote_namespace = blueprint_object._namespace
+        remote_keys = DataList.get_pks(remote_namespace, remote_name)
+        handled_flows = []
+        for guid in remote_keys:
+            try:
+                instance = remote_class(guid)
+                for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
+                    if relation.foreign_type is None:
+                        classname = remote_name
+                    else:
+                        classname = relation.foreign_type.__name__.lower()
+                    flow = '{0}_{1}'.format(classname, relation.foreign_key)
+                    if flow not in handled_flows:
+                        for foreign_guid in foreign_guids[classname]:
+                            if foreign_guid not in reverse_indexes[classname]:
+                                reverse_indexes[classname][foreign_guid] = {relation.foreign_key: [[], None]}
+                            elif relation.foreign_key not in reverse_indexes[classname][foreign_guid]:
+                                reverse_indexes[classname][foreign_guid][relation.foreign_key] = [[], None]
+                            if foreign_guid not in touched_data[classname]:
+                                touched_data[classname][foreign_guid] = [relation.foreign_key]
+                            elif relation.foreign_key not in touched_data[classname][foreign_guid]:
+                                touched_data[classname][foreign_guid].append(relation.foreign_key)
+                        handled_flows.append(flow)
+                    key = getattr(instance, '{0}_guid'.format(relation.name))
+                    if key is not None and key in reverse_indexes[classname]:
+                        if guid not in reverse_indexes[classname][key][relation.foreign_key][0]:
+                            reverse_indexes[classname][key][relation.foreign_key][0].append(guid)
+            except ObjectNotFoundException:
+                pass
+
+        # Merge the reverse index back
+        try:
+            mutex.acquire(60)
+            for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
+                if relation.foreign_type is None:
+                    classname = remote_name
+                else:
+                    classname = relation.foreign_type.__name__.lower()
+                reverse_index = DataList.get_reverseindex(classname)
+                if reverse_index is None:
+                    reverse_index = {}
+                changed = False
+                for guid in touched_data[classname]:
+                    for foreign_key in touched_data[classname][guid]:
+                        if guid not in reverse_index:
+                            reverse_index[guid] = {foreign_key: [[], None]}
+                        if foreign_key not in reverse_index[guid]:
+                            reverse_index[guid][foreign_key] = [[], None]
+                        if reverse_indexes[classname][guid][foreign_key][1] == reverse_index[guid][foreign_key][1]:
+                            reverse_index[guid][foreign_key][0] = reverse_indexes[classname][guid][foreign_key][0]
+                            reverse_index[guid][foreign_key][1] = str(uuid.uuid4())
+                            changed = True
+                if changed is True:
+                    DataList.save_reverseindex(classname, reverse_index)
+        finally:
+            mutex.release()
+
+        reverse_index = DataList.get_reverseindex(own_name)
         if reverse_index is None:
             reverse_index = {}
-        found = False
-        if own_guid in reverse_index:
-            if own_key in reverse_index[own_guid]:
-                found = True
-                Toolbox.log_cache_hit('datalist', True)
-                datalist.data = reverse_index[own_guid][own_key][0]
-                datalist.from_cache = True
-
-        if found is False:
-            Toolbox.log_cache_hit('datalist', False)
-            mutex = VolatileMutex('reverseindex')
-            remote_name = remote_class.__name__.lower()
-            blueprint_object = remote_class()  # vDisk object
-
-            # Preload all reverse indexes of the remote objects
-
-            reverse_indexes = {}
-            touched_data = {}
-            foreign_guids = {}
-            try:
-                mutex.acquire(60)
-                for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
-                    if relation.foreign_type is None:
-                        classname = remote_name
-                        foreign_namespace = blueprint_object._namespace
-                    else:
-                        classname = relation.foreign_type.__name__.lower()
-                        foreign_namespace = relation.foreign_type()._namespace
-                    if classname not in reverse_indexes:
-                        foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
-                        reverse_indexes[classname] = DataList.get_reverseindex(classname)
-                        if reverse_indexes[classname] is None:
-                            reverse_indexes[classname] = {}
-                        touched_data[classname] = {}
-            finally:
-                mutex.release()
-
-            # Run the full scan over the required remote class (slow)
-            remote_namespace = blueprint_object._namespace
-            remote_keys = DataList.get_pks(remote_namespace, remote_name)
-            handled_flows = []
-            for guid in remote_keys:
-                try:
-                    instance = remote_class(guid)
-                    for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
-                        if relation.foreign_type is None:
-                            classname = remote_name
-                        else:
-                            classname = relation.foreign_type.__name__.lower()
-                        flow = '{0}_{1}'.format(classname, relation.foreign_key)
-                        if flow not in handled_flows:
-                            for foreign_guid in foreign_guids[classname]:
-                                if foreign_guid not in reverse_indexes[classname]:
-                                    reverse_indexes[classname][foreign_guid] = {relation.foreign_key: [[], None]}
-                                elif relation.foreign_key not in reverse_indexes[classname][foreign_guid]:
-                                    reverse_indexes[classname][foreign_guid][relation.foreign_key] = [[], None]
-                                if foreign_guid not in touched_data[classname]:
-                                    touched_data[classname][foreign_guid] = [relation.foreign_key]
-                                elif relation.foreign_key not in touched_data[classname][foreign_guid]:
-                                    touched_data[classname][foreign_guid].append(relation.foreign_key)
-                            handled_flows.append(flow)
-                        key = getattr(instance, '{0}_guid'.format(relation.name))
-                        if key is not None:
-                            if guid not in reverse_indexes[classname][key][relation.foreign_key][0]:
-                                reverse_indexes[classname][key][relation.foreign_key][0].append(guid)
-                except ObjectNotFoundException:
-                    pass
-
-            # Merge the reverse index back
-            try:
-                mutex.acquire(60)
-                for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
-                    if relation.foreign_type is None:
-                        classname = remote_name
-                    else:
-                        classname = relation.foreign_type.__name__.lower()
-                    reverse_index = DataList.get_reverseindex(classname)
-                    if reverse_index is None:
-                        reverse_index = {}
-                    changed = False
-                    for guid in touched_data[classname]:
-                        for foreign_key in touched_data[classname][guid]:
-                            if guid not in reverse_index:
-                                reverse_index[guid] = {foreign_key: [[], None]}
-                            if foreign_key not in reverse_index[guid]:
-                                reverse_index[guid][foreign_key] = [[], None]
-                            if reverse_indexes[classname][guid][foreign_key][1] == reverse_index[guid][foreign_key][1]:
-                                reverse_index[guid][foreign_key][0] = reverse_indexes[classname][guid][foreign_key][0]
-                                reverse_index[guid][foreign_key][1] = str(uuid.uuid4())
-                                changed = True
-                    if changed is True:
-                        DataList.save_reverseindex(classname, reverse_index)
-            finally:
-                mutex.release()
-
-            reverse_index = DataList.get_reverseindex(own_name)
-            if reverse_index is None:
-                reverse_index = {}
-            if own_guid not in reverse_index:
-                reverse_index[own_guid] = {own_key: [[], str(uuid.uuid4())]}
-                DataList.save_reverseindex(own_name, reverse_index)
-            elif own_key not in reverse_index[own_guid]:
-                reverse_index[own_guid][own_key] = [[], str(uuid.uuid4())]
-                DataList.save_reverseindex(own_name, reverse_index)
-            datalist.data = reverse_index[own_guid][own_key][0]
-            datalist.from_cache = False
-
+        if own_guid not in reverse_index:
+            reverse_index[own_guid] = {own_key: [[], str(uuid.uuid4())]}
+            DataList.save_reverseindex(own_name, reverse_index)
+        elif own_key not in reverse_index[own_guid]:
+            reverse_index[own_guid][own_key] = [[], str(uuid.uuid4())]
+            DataList.save_reverseindex(own_name, reverse_index)
+        datalist.data = reverse_index[own_guid][own_key][0]
+        datalist.from_cache = False
         return datalist
 
     @staticmethod
@@ -491,21 +487,18 @@ class DataList(object):
         Loads the primary key set information and pages, merges them to a single set
         and returns it
         """
-        internal_key = 'ovs_primarykeys_{0}'.format(name)
+        internal_key = 'ovs_primarykeys_{0}_{{0}}'.format(name)
         volatile = VolatileFactory.get_client()
         persistent = PersistentFactory.get_client()
+        pointer = internal_key.format(0)
         keys = set()
-        key_sets = volatile.get(internal_key)
-        if key_sets is None:
-            prefix = '{0}_{1}_'.format(namespace, name)
-            return set([key.replace(prefix, '') for key in persistent.prefix(prefix)])
-        for key_set in key_sets:
-            subset = volatile.get('{0}_{1}'.format(internal_key, key_set))
+        while pointer is not None:
+            subset = volatile.get(pointer)
             if subset is None:
                 prefix = '{0}_{1}_'.format(namespace, name)
                 return set([key.replace(prefix, '') for key in persistent.prefix(prefix)])
-            else:
-                keys = keys.union(subset)
+            keys = keys.union(subset[0])
+            pointer = subset[1]
         return keys
 
     @staticmethod
@@ -513,45 +506,52 @@ class DataList(object):
         """
         Pages and saves a set
         """
-        internal_key = 'ovs_primarykeys_{0}'.format(name)
+        internal_key = 'ovs_primarykeys_{0}_{{0}}'.format(name)
         volatile = VolatileFactory.get_client()
         keys = list(keys)
-        old_key_sets = volatile.get(internal_key) or []
-        key_sets = []
-        for i in range(0, len(keys), 5000):
-            volatile.set('{0}_{1}'.format(internal_key, i), keys[i:i + 5000])
-            key_sets.append(i)
-        for key_set in old_key_sets:
-            if key_set not in key_sets:
-                volatile.delete('{0}_{1}'.format(internal_key, key_set))
-        volatile.set(internal_key, key_sets)
+        if len(keys) <= DataList.partsize_pks:
+            volatile.set(internal_key.format(0), [keys, None])
+        else:
+            sets = range(0, len(keys), DataList.partsize_pks)
+            sets.reverse()
+            pointer = None
+            for i in sets:
+                data = [keys[i:i + DataList.partsize_pks], pointer]
+                pointer = internal_key.format(i)
+                volatile.set(pointer, data)
 
     @staticmethod
     def get_reverseindex(name):
-        ri_key = 'ovs_reverseindex_{0}'.format(name)
+        """
+        Returns the reverse index for a certain class name
+        """
+        ri_key = 'ovs_reverseindex_{0}_{{0}}'.format(name)
         volatile = VolatileFactory.get_client()
+        pointer = ri_key.format(0)
         ri = {}
-        ri_sets = volatile.get(ri_key)
-        if ri_sets is None:
-            return None
-        for ri_set in ri_sets:
-            subset = volatile.get('{0}_{1}'.format(ri_key, ri_set))
+        while pointer is not None:
+            subset = volatile.get(pointer)
             if subset is None:
                 return None
-            ri.update(subset)
+            ri.update(subset[0])
+            pointer = subset[1]
         return ri
 
     @staticmethod
     def save_reverseindex(name, reverse_index):
-        ri_key = 'ovs_reverseindex_{0}'.format(name)
+        """
+        Pages and saves a given reverse index under a given class name
+        """
+        ri_key = 'ovs_reverseindex_{0}_{{0}}'.format(name)
         volatile = VolatileFactory.get_client()
-        old_ri_sets = volatile.get(ri_key) or []
-        ri_sets = []
         keys = reverse_index.keys()
-        for i in range(0, len(keys), 1000):
-            volatile.set('{0}_{1}'.format(ri_key, i), {key: reverse_index[key] for key in keys[i:i + 1000]}, 604800)
-            ri_sets.append(i)
-        for ri_set in old_ri_sets:
-            if ri_set not in ri_sets:
-                volatile.delete('{0}_{1}'.format(ri_key, ri_set))
-        volatile.set(ri_key, ri_sets, 604800)
+        if len(keys) <= DataList.partsize_ri:
+            volatile.set(ri_key.format(0), [reverse_index, None])
+        else:
+            sets = range(0, len(keys), DataList.partsize_ri)
+            sets.reverse()
+            pointer = None
+            for i in sets:
+                data = [{key: reverse_index[key] for key in keys[i:i + DataList.partsize_ri]}, pointer]
+                pointer = ri_key.format(i)
+                volatile.set(pointer, data, 604800)

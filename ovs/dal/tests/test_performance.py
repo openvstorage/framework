@@ -38,6 +38,10 @@ class LotsOfObjects(TestCase):
         print 'cleaning up'
         self._clean_all()
         print 'start test'
+        if getattr(LotsOfObjects, 'amount_of_machines', None) is None:
+            LotsOfObjects.amount_of_machines = 50
+        if getattr(LotsOfObjects, 'amount_of_disks', None) is None:
+            LotsOfObjects.amount_of_disks = 5
         load_data = True
         if load_data:
             print 'start loading data'

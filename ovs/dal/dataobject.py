@@ -598,21 +598,23 @@ class DataObject(object):
             for relation in self._relations:
                 key = relation.name
                 original_guid = self._original[key]['guid']
-                if relation.foreign_type is None:
-                    classname = self.__class__.__name__.lower()
-                else:
-                    classname = relation.foreign_type.__name__.lower()
-                reverse_index = DataList.get_reverseindex(classname)
-                if reverse_index is not None:
-                    # Remove from old
-                    if original_guid in reverse_index and relation.foreign_key in reverse_index[original_guid]:
-                        entries = reverse_index[original_guid][relation.foreign_key]
-                        entries[0].remove(self.guid)
-                        entries[1] = str(uuid.uuid4())
-                        reverse_index[original_guid][relation.foreign_key] = entries
-                        DataList.save_reverseindex(classname, reverse_index)
+                if original_guid is not None:
+                    if relation.foreign_type is None:
+                        classname = self.__class__.__name__.lower()
+                    else:
+                        classname = relation.foreign_type.__name__.lower()
+                    reverse_index = DataList.get_reverseindex(classname)
+                    if reverse_index is not None:
+                        # Remove from old
+                        if original_guid in reverse_index and relation.foreign_key in reverse_index[original_guid]:
+                            entries = reverse_index[original_guid][relation.foreign_key]
+                            if self.guid in entries[0]:
+                                entries[0].remove(self.guid)
+                                entries[1] = str(uuid.uuid4())
+                                reverse_index[original_guid][relation.foreign_key] = entries
+                                DataList.save_reverseindex(classname, reverse_index)
             reverse_index = DataList.get_reverseindex(self._name)
-            if reverse_index is not None:
+            if reverse_index is not None and self.guid in reverse_index:
                 del reverse_index[self.guid]
                 DataList.save_reverseindex(self._name, reverse_index)
         finally:

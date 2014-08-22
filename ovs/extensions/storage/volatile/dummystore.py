@@ -59,7 +59,7 @@ class DummyVolatileStore(object):
         if key in data['t'] and data['t'][key] > time.time():
             value = data['s'].get(key)
             if 'ovs_primarykeys_' in key:
-                value = set(value)
+                value[0] = set(value[0])
             return value
         return default
 
@@ -68,7 +68,7 @@ class DummyVolatileStore(object):
         Sets the value for a key to a given value
         """
         if 'ovs_primarykeys_' in key:
-            value = list(value)
+            value[0] = list(value[0])
         data = self._read()
         data['s'][key] = value
         data['t'][key] = time.time() + timeout
