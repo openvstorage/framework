@@ -38,7 +38,7 @@ class UserList(object):
                                     'items': [('username', DataList.operator.EQUALS, username)]}}).data  # noqa
         # pylint: enable=line-too-long
         if len(users) == 1:
-            return Descriptor().load(users[0]).get_object(True)
+            return Descriptor(User, users[0]).get_object(True)
         return None
 
     @staticmethod

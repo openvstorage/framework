@@ -36,7 +36,7 @@ class RoleList(object):
                           'query': {'type': DataList.where_operator.AND,
                                     'items': [('code', DataList.operator.EQUALS, code)]}}).data  # noqa
         if len(roles) == 1:
-            return Descriptor().load(roles[0]).get_object(True)
+            return Descriptor(Role, roles[0]).get_object(True)
         return None
 
     @staticmethod
