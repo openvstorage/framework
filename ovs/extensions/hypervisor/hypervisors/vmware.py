@@ -184,11 +184,11 @@ class VMware(object):
             return 'UPDATE'
         return 'UNSUPPORTED'
 
-    def should_process(self, devicename):
+    def should_process(self, devicename, machine_ids=None):
         """
         Checks whether a given device should be processed
         """
-        _ = self, devicename
+        _ = self, devicename, machine_ids
         return True
 
     def file_exists(self, vpool, devicename):

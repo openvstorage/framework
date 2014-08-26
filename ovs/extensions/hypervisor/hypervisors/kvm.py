@@ -170,12 +170,17 @@ class KVM(object):
             return 'RENAME'
         return 'UNSUPPORTED'
 
-    def should_process(self, devicename):
+    def should_process(self, devicename, machine_ids=None):
         """
         Checks whether a given device should be processed
         """
-        _ = self, devicename
-        return devicename.strip('/') not in ['vmcasts/rss.xml']
+        _ = self
+        valid = devicename.strip('/') not in ['vmcasts/rss.xml']
+        if not valid:
+            return False
+        if machine_ids is not None:
+            return any(machine_id for machine_id in machine_ids if devicename.strip('/').startswith(machine_id))
+        return True
 
     def file_exists(self, vpool, devicename):
         """

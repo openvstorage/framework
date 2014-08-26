@@ -495,8 +495,11 @@ class VMachineController(object):
 
         hypervisor = Factory.get(pmachine)
         name = hypervisor.clean_vmachine_filename(name)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        vpool = storagedriver.vpool
+        machine_ids = [storagedriver.storagerouter.machine_id for storagedriver in vpool.storagedrivers]
 
-        if hypervisor.should_process(name):
+        if hypervisor.should_process(name, machine_ids=machine_ids):
             if pmachine.hvtype == 'VMWARE':
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 vpool = storagedriver.vpool
@@ -540,6 +543,8 @@ class VMachineController(object):
                 except:
                     vmachine.status = 'SYNC_NOK'
                 vmachine.save()
+        else:
+            logger.info('Ignored invalid file {0}'.format(name))
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_config')
