@@ -38,6 +38,7 @@ class LotsOfObjects(TestCase):
         print 'cleaning up'
         self._clean_all()
         print 'start test'
+        tstart = time.time()
         if getattr(LotsOfObjects, 'amount_of_machines', None) is None:
             LotsOfObjects.amount_of_machines = 50
         if getattr(LotsOfObjects, 'amount_of_disks', None) is None:
@@ -47,7 +48,7 @@ class LotsOfObjects(TestCase):
             print 'start loading data'
             start = time.time()
             mguids = []
-            min_run, max_run = 999999, 0
+            runtimes = []
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
                 mstart = time.time()
                 machine = TestMachine()
@@ -62,26 +63,26 @@ class LotsOfObjects(TestCase):
                     disk.save()
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
                 itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
-                min_run = min(min_run, itemspersec)
-                max_run = max(max_run, itemspersec)
+                runtimes.append(itemspersec)
                 self._print_progress('* machine {0}/{1} (run: {2} dps, avg: {3} dps)'.format(i + 1, int(LotsOfObjects.amount_of_machines), round(itemspersec, 2), round(avgitemspersec, 2)))
-            print '\nloading done. min: {0} dps, max: {1} dps'.format(round(min_run, 2), round(max_run, 2))
+            runtimes.sort()
+            print '\nloading done ({0}s). min: {1} dps, max: {2} dps'.format(round(time.time() - tstart, 2), round(runtimes[1], 2), round(runtimes[-2], 2))
 
         test_queries = True
         if test_queries:
             print 'start queries'
             start = time.time()
-            min_run, max_run = 999999, 0
+            runtimes = []
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
                 mstart = time.time()
                 machine = TestMachine(mguids[i])
                 self.assertEqual(len(machine.disks), LotsOfObjects.amount_of_disks, 'Not all disks were retreived ({0})'.format(len(machine.disks)))
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
                 itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
-                min_run = min(min_run, itemspersec)
-                max_run = max(max_run, itemspersec)
+                runtimes.append(itemspersec)
                 self._print_progress('* machine {0}/{1} (run: {2} dps, avg: {3} dps)'.format(i + 1, int(LotsOfObjects.amount_of_machines), round(itemspersec, 2), round(avgitemspersec, 2)))
-            print '\ncompleted. min: {0} dps, max: {1} dps'.format(round(min_run, 2), round(max_run, 2))
+            runtimes.sort()
+            print '\ncompleted ({0}s). min: {1} dps, max: {2} dps'.format(round(time.time() - tstart, 2), round(runtimes[1], 2), round(runtimes[-2], 2))
 
             print 'start full query on disk property'
             start = time.time()
@@ -92,13 +93,13 @@ class LotsOfObjects(TestCase):
                                                    ('size', DataList.operator.LT, (LotsOfObjects.amount_of_disks - 1) * 100)]}}).data
             self.assertEqual(amount, (LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines, 'Incorrect amount of disks. Found {0} instead of {1}'.format(amount, int((LotsOfObjects.amount_of_disks - 3) * LotsOfObjects.amount_of_machines)))
             seconds_passed = (time.time() - start)
-            print 'completed in {0} seconds (avg: {1} dps)'.format(round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
+            print 'completed ({0}s) in {1} seconds (avg: {2} dps)'.format(round(time.time() - tstart, 2), round(seconds_passed, 2), round(LotsOfObjects.amount_of_machines * LotsOfObjects.amount_of_disks / seconds_passed, 2))
 
         clean_data = True
         if clean_data:
             print 'cleaning up'
             start = time.time()
-            min_run, max_run = 999999, 0
+            runtimes = []
             for i in xrange(0, int(LotsOfObjects.amount_of_machines)):
                 mstart = time.time()
                 machine = TestMachine(mguids[i])
@@ -107,16 +108,16 @@ class LotsOfObjects(TestCase):
                 machine.delete()
                 avgitemspersec = ((i + 1) * LotsOfObjects.amount_of_disks) / (time.time() - start)
                 itemspersec = LotsOfObjects.amount_of_disks / (time.time() - mstart)
-                min_run = min(min_run, itemspersec)
-                max_run = max(max_run, itemspersec)
+                runtimes.append(itemspersec)
                 self._print_progress('* machine {0}/{1} (run: {2} dps, avg: {3} dps)'.format(i + 1, int(LotsOfObjects.amount_of_machines), round(itemspersec, 2), round(avgitemspersec, 2)))
-            print '\ncompleted. min: {0} dps, max: {1} dps'.format(round(min_run, 2), round(max_run, 2))
+            runtimes.sort()
+            print '\ncompleted ({0}s). min: {1} dps, max: {2} dps'.format(round(time.time() - tstart, 2), round(runtimes[1], 2), round(runtimes[-2], 2))
 
     def _print_progress(self, message):
         """
         Prints progress (overwriting)
         """
-        sys.stdout.write('\r{0}'.format(message))
+        sys.stdout.write('\r{0}    '.format(message))
         sys.stdout.flush()
 
     def _clean_all(self):

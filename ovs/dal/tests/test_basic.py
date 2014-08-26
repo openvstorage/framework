@@ -702,7 +702,7 @@ class Basic(TestCase):
         cdisk2.size = 100
         cdisk2.parent = pdisk
         cdisk2.save()
-        self.assertEqual(len(pdisk.children), 2, 'There should be 2 children.')
+        self.assertEqual(len(pdisk.children), 2, 'There should be 2 children ({0})'.format(len(pdisk.children)))
         self.assertEqual(cdisk1.parent.name, 'parent', 'Parent should be loaded correctly')
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
@@ -1093,6 +1093,35 @@ class Basic(TestCase):
         disk.save()
         # Restore relation
         [_ for _ in disk._relations if _.name == 'machine'][0].mandatory = False
+
+    def test_saveorder(self):
+        """
+        Validates whether the order of saving related objects doesn't matter
+        """
+        machine1 = TestMachine()
+        machine1.name = 'machine'
+        disk1_1 = TestDisk()
+        disk1_1.name = 'disk1'
+        disk1_1.machine = machine1
+        disk1_1.save()
+        disk1_2 = TestDisk()
+        disk1_2.name = 'disk2'
+        disk1_2.machine = machine1
+        disk1_2.save()
+        machine1.save()
+        self.assertEqual(len(machine1.disks), 2, 'There should be two disks. {0}'.format(len(machine1.disks)))
+        machine2 = TestMachine()
+        machine2.name = 'machine'
+        machine2.save()
+        disk2_1 = TestDisk()
+        disk2_1.name = 'disk1'
+        disk2_1.machine = machine2
+        disk2_1.save()
+        disk2_2 = TestDisk()
+        disk2_2.name = 'disk2'
+        disk2_2.machine = machine2
+        disk2_2.save()
+        self.assertEqual(len(machine2.disks), 2, 'There should be two disks. {0}'.format(len(machine2.disks)))
 
 if __name__ == '__main__':
     import unittest

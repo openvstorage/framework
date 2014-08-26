@@ -187,7 +187,7 @@ class DataObject(object):
             if re.match('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', guid) is not None:
                 self._guid = str(guid)
             else:
-                raise ValueError('The given guid is invalid')
+                raise ValueError('The given guid is invalid: {0}'.format(guid))
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)
@@ -497,10 +497,8 @@ class DataObject(object):
                 self._name, ', '.join(data_conflicts)
             ))
 
-        # Save the data
+        # Refresh internal data structure
         self._data = copy.deepcopy(data)
-        self._persistent.set(self._key, self._data)
-        DataList.add_pk(self._namespace, self._name, self._guid)
 
         # First, update reverse index
         try:
@@ -514,21 +512,41 @@ class DataObject(object):
                         classname = self.__class__.__name__.lower()
                     else:
                         classname = relation.foreign_type.__name__.lower()
-                    reverse_index = DataList.get_reverseindex(classname)
-                    if reverse_index is not None:
-                        # Add to new
-                        if new_guid in reverse_index and relation.foreign_key in reverse_index[new_guid]:
-                            entries = reverse_index[new_guid][relation.foreign_key]
-                            entries[0].append(self.guid)
-                            entries[1] = str(uuid.uuid4())
-                            reverse_index[new_guid][relation.foreign_key] = entries
-                        # Remove from old
-                        if original_guid in reverse_index and relation.foreign_key in reverse_index[original_guid]:
-                            entries = reverse_index[original_guid][relation.foreign_key]
-                            entries[0].remove(self.guid)
-                            entries[1] = str(uuid.uuid4())
-                            reverse_index[original_guid][relation.foreign_key] = entries
-                        DataList.save_reverseindex(classname, reverse_index)
+                    if original_guid is not None:
+                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                        reverse_index = self._volatile.get(reverse_key)
+                        if reverse_index is not None:
+                            if relation.foreign_key in reverse_index:
+                                entries = reverse_index[relation.foreign_key]
+                                if self.guid in entries:
+                                    entries.remove(self.guid)
+                                    reverse_index[relation.foreign_key] = entries
+                                    self._volatile.set(reverse_key, reverse_index)
+                    if new_guid is not None:
+                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
+                        reverse_index = self._volatile.get(reverse_key)
+                        if reverse_index is not None:
+                            if relation.foreign_key in reverse_index:
+                                entries = reverse_index[relation.foreign_key]
+                                if self.guid not in entries:
+                                    entries.append(self.guid)
+                                    reverse_index[relation.foreign_key] = entries
+                                    self._volatile.set(reverse_key, reverse_index)
+                            else:
+                                reverse_index[relation.foreign_key] = [self.guid]
+                                self._volatile.set(reverse_key, reverse_index)
+                        else:
+                            reverse_index = {relation.foreign_key: [self.guid]}
+                            self._volatile.set(reverse_key, reverse_index)
+            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._name, self.guid)
+            reverse_index = self._volatile.get(reverse_key)
+            if reverse_index is None:
+                reverse_index = {}
+                relations = RelationMapper.load_foreign_relations(self.__class__)
+                if relations is not None:
+                    for key, _ in relations.iteritems():
+                        reverse_index[key] = []
+                self._volatile.set(reverse_key, reverse_index)
         finally:
             self._mutex_reverseindex.release()
         # Second, invalidate property lists
@@ -548,6 +566,10 @@ class DataObject(object):
                 self._persistent.set(cache_key, cache_list)
         finally:
             self._mutex_listcache.release()
+
+        # Save the data
+        self._persistent.set(self._key, self._data)
+        DataList.add_pk(self._namespace, self._name, self._guid)
 
         # Invalidate the cache
         self._volatile.delete(self._key)
@@ -603,20 +625,16 @@ class DataObject(object):
                         classname = self.__class__.__name__.lower()
                     else:
                         classname = relation.foreign_type.__name__.lower()
-                    reverse_index = DataList.get_reverseindex(classname)
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                    reverse_index = self._volatile.get(reverse_key)
                     if reverse_index is not None:
-                        # Remove from old
-                        if original_guid in reverse_index and relation.foreign_key in reverse_index[original_guid]:
-                            entries = reverse_index[original_guid][relation.foreign_key]
-                            if self.guid in entries[0]:
-                                entries[0].remove(self.guid)
-                                entries[1] = str(uuid.uuid4())
-                                reverse_index[original_guid][relation.foreign_key] = entries
-                                DataList.save_reverseindex(classname, reverse_index)
-            reverse_index = DataList.get_reverseindex(self._name)
-            if reverse_index is not None and self.guid in reverse_index:
-                del reverse_index[self.guid]
-                DataList.save_reverseindex(self._name, reverse_index)
+                        if relation.foreign_key in reverse_index:
+                            entries = reverse_index[relation.foreign_key]
+                            if self.guid in entries:
+                                entries.remove(self.guid)
+                                reverse_index[relation.foreign_key] = entries
+                                self._volatile.set(reverse_key, reverse_index)
+            self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._name, self.guid))
         finally:
             self._mutex_reverseindex.release()
         # Second, invalidate property lists
