@@ -842,40 +842,6 @@ class Basic(TestCase):
         self.assertEqual(filtered[0].name, 'disk_1', 'Disks should be properly sliced')
         self.assertEqual(filtered[2].name, 'disk_3', 'Disks should be properly sliced')
 
-    def test_fullrelation_load(self):
-        """
-        Validates whether a single relation load will preload all other related relations
-        """
-        machine_1 = TestMachine()
-        machine_1.name = 'machine 1'
-        machine_1.save()
-        disk_1_1 = TestDisk()
-        disk_1_1.name = 'disk 1.1'
-        disk_1_1.machine = machine_1
-        disk_1_1.save()
-        disk_1_2 = TestDisk()
-        disk_1_2.name = 'disk 1.2'
-        disk_1_2.machine = machine_1
-        disk_1_2.save()
-        machine_2 = TestMachine()
-        machine_2.name = 'machine 2'
-        machine_2.save()
-        disk_2_1 = TestDisk()
-        disk_2_1.name = 'disk 2.1'
-        disk_2_1.machine = machine_2
-        disk_2_1.save()
-        disk_2_2 = TestDisk()
-        disk_2_2.name = 'disk 2.2'
-        disk_2_2.machine = machine_2
-        disk_2_2.save()
-        # Load relations
-        disks_1 = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine_1.guid)
-        self.assertEqual(len(disks_1.data), 2, 'There should be 2 child disks')
-        self.assertFalse(disks_1.from_cache, 'The relation should not be loaded from cache')
-        disks_2 = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine_2.guid)
-        self.assertEqual(len(disks_2.data), 2, 'There should be 2 child disks')
-        self.assertTrue(disks_2.from_cache, 'The relation should be loaded from cache')
-
     def test_itemchange_during_list_build(self):
         """
         Validates whether changing, creating or deleting objects while running a depending list will cause the list to
