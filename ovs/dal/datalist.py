@@ -416,38 +416,43 @@ class DataList(object):
         """
         This method will load the primary keys for a given namespace and name
         """
-        return DataList._get_pks(namespace, name)
+        #return DataList._get_pks(namespace, name)
+        persistent = PersistentFactory.get_client()
+        prefix = '{0}_{1}_'.format(namespace, name)
+        return set([key.replace(prefix, '') for key in persistent.prefix(prefix, max_elements=-1)])
 
     @staticmethod
     def add_pk(namespace, name, key):
         """
         This adds the current primary key to the primary key index
         """
-        mutex = VolatileMutex('primarykeys_{0}'.format(name))
-        try:
-            mutex.acquire(10)
-            keys = DataList._get_pks(namespace, name)
-            keys.add(key)
-            DataList._save_pks(name, keys)
-        finally:
-            mutex.release()
+        #mutex = VolatileMutex('primarykeys_{0}'.format(name))
+        #try:
+        #    mutex.acquire(10)
+        #    keys = DataList._get_pks(namespace, name)
+        #    keys.add(key)
+        #    DataList._save_pks(name, keys)
+        #finally:
+        #    mutex.release()
+        pass
 
     @staticmethod
     def delete_pk(namespace, name, key):
         """
         This deletes the current primary key from the primary key index
         """
-        mutex = VolatileMutex('primarykeys_{0}'.format(name))
-        try:
-            mutex.acquire(10)
-            keys = DataList._get_pks(namespace, name)
-            try:
-                keys.remove(key)
-            except KeyError:
-                pass
-            DataList._save_pks(name, keys)
-        finally:
-            mutex.release()
+        #mutex = VolatileMutex('primarykeys_{0}'.format(name))
+        #try:
+        #    mutex.acquire(10)
+        #    keys = DataList._get_pks(namespace, name)
+        #    try:
+        #        keys.remove(key)
+        #    except KeyError:
+        #        pass
+        #    DataList._save_pks(name, keys)
+        #finally:
+        #    mutex.release()
+        pass
 
     @staticmethod
     def _get_pks(namespace, name):
