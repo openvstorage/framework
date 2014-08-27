@@ -15,7 +15,7 @@
 define(['knockout'], function(ko){
     "use strict";
     var nameRgex, hostRegex, mountpointRegex, ipRegex, singleton;
-    nameRgex = /^[0-9a-zA-Z]+(\-+[0-9a-zA-Z]+)*$/;
+    nameRgex = /^[0-9a-z]+(\-+[0-9a-z]+)*$/;
     hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
     mountpointRegex = /^(\/[a-zA-Z0-9\-_ \.]+)+\/?$/;
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
