@@ -968,7 +968,7 @@ for directory in {0}:
             arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
                                                           voldrv_arakoon_client_config[arakoon_node][0][0],
                                                           voldrv_arakoon_client_config[arakoon_node][1]))
-        vrouter_clusterregistry = ClusterRegistry(vpool_name, voldrv_arakoon_cluster_id, arakoon_node_configs)
+        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
         node_configs = []
         for existing_storagedriver in StorageDriverList.get_storagedrivers():
             if existing_storagedriver.vpool_guid == vpool.guid:
@@ -991,7 +991,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguratio
 
 fd_config = {{'fd_cache_path': '{11}/fd_{0}',
               'fd_extent_cache_capacity': '1024',
-              'fd_namespace' : 'fd-{0}',
+              'fd_namespace' : 'fd-{0}-{12}',
               'fd_policy_id' : ''}}
 storagedriver_configuration = StorageDriverConfiguration('{0}')
 storagedriver_configuration.configure_backend({1})
@@ -1000,13 +1000,13 @@ storagedriver_configuration.configure_scocache({3}, '1GB', '2GB')
 storagedriver_configuration.configure_failovercache('{4}')
 storagedriver_configuration.configure_filesystem({5})
 storagedriver_configuration.configure_volumemanager({6})
-storagedriver_configuration.configure_volumerouter('{0}', {7})
+storagedriver_configuration.configure_volumerouter('{12}', {7})
 storagedriver_configuration.configure_arakoon_cluster('{8}', {9})
 storagedriver_configuration.configure_hypervisor('{10}')
 storagedriver_configuration.configure_filedriver(fd_config)
 """.format(vpool_name, vpool.metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           storagerouter.pmachine.hvtype, mountpoint_cache)
+           storagerouter.pmachine.hvtype, mountpoint_cache, vpool.guid)
         Manager._exec_python(client, storagedriver_config_script)
         Manager._configure_amqp_to_volumedriver(client, vpool_name)
 
@@ -1174,7 +1174,7 @@ if Service.has_service('{0}'):
             arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
                                                           voldrv_arakoon_client_config[arakoon_node][0][0],
                                                           voldrv_arakoon_client_config[arakoon_node][1]))
-        vrouter_clusterregistry = ClusterRegistry(str(vpool.name), voldrv_arakoon_cluster_id, arakoon_node_configs)
+        vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
         # Reconfigure volumedriver
         if storagedrivers_left:
             node_configs = []
