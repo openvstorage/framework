@@ -26,6 +26,9 @@ define([
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
+            if (self.data.backend() !== 'LOCAL' && self.data.backend() !== 'DISTRIBUTED') {
+                self.data.mtptBFS('/'); // BFS isn't used, so it set to a non-conflicting value
+            }
             if (self.data.mtptCache() === '/' && $.inArray('cache', fields) === -1) {
                 valid = false;
                 fields.push('cache');
