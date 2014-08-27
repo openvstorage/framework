@@ -833,8 +833,7 @@ if Service.has_service('{0}'):
                 vpool.metadata = {'backend_type': 'LOCAL'}
                 mountpoint_bfs = parameters.get('mountpoint_bfs') or Helper.ask_string('Specify {0} storage backend directory'.format(vpool.type.lower()))
                 directories_to_create.append(mountpoint_bfs)
-                if vpool.type == 'DISTRIBUTED':
-                    vpool.metadata['local_connection_path'] = mountpoint_bfs
+                vpool.metadata['local_connection_path'] = mountpoint_bfs
             if vpool.type == 'REST':
                 connection_host = parameters.get('connection_host') or Helper.ask_string('Provide REST ip address')
                 connection_port = parameters.get('connection_port') or Helper.ask_integer('Provide REST connection port', min_value=1, max_value=65535)
