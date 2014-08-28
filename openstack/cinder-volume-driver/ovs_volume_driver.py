@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#pylint: disable=C0301,C0103,F0401,R0201,W0703
 """
 OpenStack Cinder driver - interface to OVS api
 - uses OVS library calls (VDiskController)
-- uses Cinder logging (if configured, logging goes to syslog,
-                       else it goes to screen)
+- uses Cinder logging
 """
 
 import time
@@ -37,14 +35,12 @@ from cinder.volume import driver
 from cinder.volume import api
 from cinder.image import image_utils
 
-VERSION = '1.0.0a'
 LOG = logging.getLogger(__name__)
 
 OPTS = [
         cfg.StrOpt('vpool_name',
-                   default='',
-                   help=
-        'Vpool to use for volumes - backend is defined by vpool not by us.')
+                   default = '',
+                   help = 'Vpool to use for volumes - backend is defined by vpool not by us.')
         ]
 
 CONF = cfg.CONF
@@ -75,12 +71,8 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
     Required configuration:
         cinder type-create ovs
         cinder type-key ovs set volume_backend_name=<VPOOLNAME>
-
-    devstack, in screen of c-vol
-    export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
-    (restart c-vol)
     """
-    VERSION = "1.0.0a"
+    VERSION = '1.0.1a'
 
     def __init__(self, *args, **kwargs): #pylint: disable=E1002
         """
@@ -233,16 +225,12 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         :param volume: volume reference - target volume (sqlalchemy Model)
         :param src_vref: volume reference - source volume (sqlalchemy Model)
 
-        OVS: Create clone from template (src_vref must point to a templated vdisk)
+        OVS: Create clone from template if the source is a template
+             Create volume from snapshot if the source is a volume
+             - create snapshot of source volume if it doesn't have snapshots
         """
         _debug_vol_info('CREATE_CLONED_VOL', volume)
         _debug_vol_info('CREATE_CLONED_VOL Source', src_vref)
-
-        #source
-        source_ovs_disk = self._find_ovs_model_disk_by_location(str(src_vref.provider_location), src_vref.host)
-        if not source_ovs_disk.info['object_type'] == 'TEMPLATE':
-            LOG.error('[CREATE_FROM_TEMPLATE] VDisk %s not a template' % source_ovs_disk.devicename)
-            raise NotImplementedError('Volumedriver does not implement Volume Clone from Volume')
 
         mountpoint = self._get_hostname_mountpoint(str(volume.host))
         name = volume.display_name
@@ -250,29 +238,68 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
             name = volume.name # volume-de7a8801-864c-4099-84eb-caf965cb173a
             volume.display_name = volume.name
 
-        # cloning from a template
-        LOG.debug('[CREATE FROM TEMPLATE] ovs_disk %s ' % (source_ovs_disk.devicename))
+        volume_type = self._get_volume_type_name(volume.volume_type_id)
+        if not volume_type == 'ovs':
+            raise RuntimeError('Cannot create clone for %s volume type using this driver' % volume_type)
         pmachineguid = self._find_ovs_model_pmachine_guid_by_hostname(str(volume.host))
-        LOG.debug('[CREATE FROM TEMPLATE] Pmachine %s ' % (pmachineguid))
 
-        LOG.debug('[CREATE FROM TEMPLATE] Create new volume, from template %s' % source_ovs_disk.guid)
-        disk_meta = VDiskController.create_from_template(diskguid = source_ovs_disk.guid,
-                                                         machinename = "",
-                                                         devicename = str(name),
-                                                         pmachineguid = pmachineguid,
-                                                         machineguid = None,
-                                                         storagedriver_guid = None)
-        volume['provider_location'] = '{}{}'.format(mountpoint,
-                                                     disk_meta['backingdevice'])
-        LOG.debug('[CREATE FROM TEMPLATE] New volume %s' % volume['provider_location'])
-        vdisk = VDisk(disk_meta['diskguid'])
-        vdisk.cinder_id = volume.id
-        vdisk.name = name
-        LOG.debug('[CREATE FROM TEMPLATE] Updating meta %s %s' % (volume.id, name))
-        vdisk.save()
+        #source
+        source_ovs_disk = self._find_ovs_model_disk_by_location(str(src_vref.provider_location), src_vref.host)
+        if source_ovs_disk.info['object_type'] == 'TEMPLATE':
+            LOG.info('[CREATE_FROM_TEMPLATE] VDisk %s is a template' % source_ovs_disk.devicename)
+
+            # cloning from a template
+            LOG.debug('[CREATE FROM TEMPLATE] ovs_disk %s ' % (source_ovs_disk.devicename))
+            LOG.debug('[CREATE FROM TEMPLATE] Create new volume, from template %s' % source_ovs_disk.guid)
+            disk_meta = VDiskController.create_from_template(diskguid = source_ovs_disk.guid,
+                                                             machinename = "",
+                                                             devicename = str(name),
+                                                             pmachineguid = pmachineguid,
+                                                             machineguid = None,
+                                                             storagedriver_guid = None)
+            volume['provider_location'] = '{}{}'.format(mountpoint,
+                                                        disk_meta['backingdevice'])
+            LOG.debug('[CREATE FROM TEMPLATE] New volume %s' % volume['provider_location'])
+            vdisk = VDisk(disk_meta['diskguid'])
+            vdisk.cinder_id = volume.id
+            vdisk.name = name
+            LOG.debug('[CREATE FROM TEMPLATE] Updating meta %s %s' % (volume.id, name))
+            vdisk.save()
+        else:
+            LOG.info('[THIN CLONE] VDisk %s is not a template' % source_ovs_disk.devicename)
+            # We do not support yet full volume clone - requires "emancipate" functionality
+            # So for now we'll take a snapshot (or the latest snapshot existing) and clone from that snapshot
+            if len(source_ovs_disk.snapshots) == 0:
+                metadata = {'label': "Cinder clone snapshot {0}".format(name),
+                            'is_consistent': False,
+                            'timestamp': time.time(),
+                            'machineguid': source_ovs_disk.vmachine_guid,
+                            'is_automatic': False}
+
+                LOG.debug('CREATE_SNAP %s %s' % (name, str(metadata)))
+                snapshotid = VDiskController.create_snapshot(diskguid = source_ovs_disk.guid,
+                                                             metadata = metadata,
+                                                             snapshotid = None)
+                LOG.debug('CREATE_SNAP OK')
+
+            else:
+                snapshotid = source_ovs_disk.snapshots[-1]['guid']
+            LOG.debug('[CREATE CLONE FROM SNAP] %s ' % snapshotid)
+
+            disk_meta = VDiskController.clone(diskguid = source_ovs_disk.guid,
+                                              snapshotid = snapshotid,
+                                              devicename = str(name),
+                                              pmachineguid = pmachineguid,
+                                              machinename = "",
+                                              machineguid=None)
+            volume['provider_location'] = '{}{}'.format(mountpoint,
+                                                        disk_meta['backingdevice'])
+
+            LOG.debug('[CLONE FROM SNAP] Meta: %s' % str(disk_meta))
+            LOG.debug('[CLONE FROM SNAP] New volume %s' % volume['provider_location'])
+
         return {'provider_location': volume['provider_location'],
                 'display_name': volume['display_name']}
-
 
     # Volumedriver stats
 
@@ -357,9 +384,45 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         Diskguid to be passed to the clone method is the ovs diskguid of the
             parent of the snapshot with snapshot.id
 
-        NOT SUPPORTED BY OVS VOLUMEDRIVER
+        OVS: Clone from arbitrary volume, requires volumedriver 3.6 release > 15.08.2014
         """
-        raise NotImplementedError('Volumedriver does not implement Volume Clone from Snapshot')
+        _debug_vol_info('CLONE_VOL', volume)
+        _debug_vol_info('CLONE_SNAP', snapshot)
+
+        volume_type = self._get_volume_type_name(volume.volume_type_id)
+
+        if volume_type == 'ovs':
+            mountpoint = self._get_hostname_mountpoint(str(volume.host))
+            ovs_snap_disk = self._find_ovs_model_disk_by_snapshot_id(snapshot.id)
+            devicename = volume.display_name
+            if not devicename:
+                devicename = volume.name
+            pmachineguid = self._find_ovs_model_pmachine_guid_by_hostname(str(volume.host))
+
+            LOG.info('[CLONE FROM SNAP] %s %s %s %s' % (ovs_snap_disk.guid, snapshot.id, devicename, pmachineguid))
+            try:
+                disk_meta = VDiskController.clone(diskguid = ovs_snap_disk.guid,
+                                                  snapshotid = snapshot.id,
+                                                  devicename = devicename,
+                                                  pmachineguid = pmachineguid,
+                                                  machinename = "",
+                                                  machineguid=None)
+                volume['provider_location'] = '{}{}'.format(mountpoint,
+                                                     disk_meta['backingdevice'])
+
+                LOG.debug('[CLONE FROM SNAP] Meta: %s' % str(disk_meta))
+                LOG.debug('[CLONE FROM SNAP] New volume %s' % volume['provider_location'])
+
+            except Exception as ex:
+                LOG.error('CLONE FROM SNAP: Internal error %s ' % str(ex))
+                self.delete_volume(volume)
+                self.delete_snapshot(snapshot)
+                raise ex
+        else:
+            raise RuntimeError('Cannot create volume from snapshot for %s volume type using this driver' % volume_type)
+
+        return {'provider_location': volume['provider_location'],
+                'display_name': volume['display_name']}
 
     # Attach/detach volume to instance/host
 
@@ -510,19 +573,3 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
                 return disk
         raise RuntimeError('No disk found for snapshotid %s' % snapshotid)
 
-    def _find_ovs_model_disk_by_cinder_id(self, cinder_id):
-        """
-        Find OVS disk object based on cinder_id
-        :return VDisk: OVS DAL model object
-
-        NOTE:
-        when ovs disk belongs to a template, cinder_id is the glance image id
-        when ovs disk is a clone of a template, cinder_id is the cinder volume id
-        """
-        LOG.debug('[_FIND OVS DISK] cinder_id %s' % cinder_id)
-        model_disks = [vd for vd in VDiskList.get_vdisks() if str(vd.cinder_id) == str(cinder_id)]
-        LOG.debug('[_FIND OVS DISK] model_disks %s' % str(model_disks))
-        if len(model_disks) == 1:
-            LOG.debug('[_FIND OVS DISK] cinder_id %s Disk %s' % (cinder_id, model_disks[0].guid))
-            return model_disks[0]
-        raise RuntimeError('No disk found for cinder_id %s' % cinder_id)

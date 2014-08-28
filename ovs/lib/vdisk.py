@@ -156,6 +156,7 @@ class VDiskController(object):
         new_disk.devicename = hypervisor.clean_backing_disk_filename(_location)
         new_disk.parentsnapshot = snapshotid
         new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
+        new_disk.vpool = disk.vpool
         new_disk.save()
         return {'diskguid': new_disk.guid,
                 'name': new_disk.name,
