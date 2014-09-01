@@ -34,7 +34,7 @@ class PMachineViewSet(viewsets.ViewSet):
     prefix = r'pmachines'
     base_name = 'pmachines'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(PMachine)
     @load()
     def list(self):
@@ -43,7 +43,7 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         return PMachineList.get_pmachines()
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(PMachine)
     @load(PMachine)
     def retrieve(self, pmachine):
@@ -52,7 +52,7 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         return pmachine
 
-    @required_roles(['view', 'update', 'system'])
+    @required_roles(['read', 'write', 'manage'])
     @load(PMachine)
     def partial_update(self, contents, pmachine, request):
         """

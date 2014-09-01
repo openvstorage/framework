@@ -41,7 +41,8 @@ limitations under the License.
                         id="buttonVDiskRollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: '#428bca' },
-                                   tooltip: 'ovs:vdisks.detail.rollback'">
+                                   tooltip: 'ovs:vdisks.detail.rollback',
+                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>

@@ -76,6 +76,7 @@ define([
                         }
                         self.shared.user.username(metadata.username);
                         self.shared.user.guid(metadata.userguid);
+                        self.shared.user.roles(metadata.roles);
                     })
                     .then(function() {
                         return api.get('users/' + self.shared.user.guid());

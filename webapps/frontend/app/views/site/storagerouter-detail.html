@@ -115,12 +115,12 @@ limitations under the License.
     </div>
     <div>
         <ul class="nav nav-tabs">
-            <li class="active" data-bind="tooltip: 'ovs:generic.management'">
+            <li class="active" data-bind="tooltip: 'ovs:generic.management', visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane active" id="management" style="padding: 15px;">
+            <div class="tab-pane active" id="management" style="padding: 15px;" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>

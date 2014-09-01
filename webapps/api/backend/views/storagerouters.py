@@ -39,7 +39,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     prefix = r'storagerouters'
     base_name = 'storagerouters'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(StorageRouter, 'name')
     @load()
     def list(self, query=None):
@@ -55,7 +55,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
                                      'query': query}).data
             return DataObjectList(query_result, StorageRouter)
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(StorageRouter)
     @load(StorageRouter)
     def retrieve(self, storagerouter):
@@ -65,7 +65,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return storagerouter
 
     @action()
-    @required_roles(['view', 'system'])
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
     def move_away(self, storagerouter):
@@ -75,7 +75,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageDriverController.move_away.delay(storagerouter.guid)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load(StorageRouter)
     def get_available_actions(self):
         """
@@ -88,7 +88,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return Response(actions, status=status.HTTP_200_OK)
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def get_physical_metadata(self, storagerouter, files=None):
@@ -101,7 +101,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def get_version_info(self, storagerouter):
@@ -113,7 +113,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def check_s3(self, host, port, accesskey, secretkey):
@@ -130,7 +130,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageRouterController.check_s3.delay(**parameters)
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
@@ -143,7 +143,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
     def add_vpool(self, storagerouter, call_parameters):

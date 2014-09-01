@@ -39,7 +39,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
     prefix = r'mgmtcenters'
     base_name = 'mgmtcenters'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(MgmtCenter)
     @load()
     def list(self):
@@ -48,7 +48,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         return MgmtCenterList.get_mgmtcenters()
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(MgmtCenter)
     @load(MgmtCenter)
     def retrieve(self, mgmtcenter):
@@ -57,16 +57,16 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         return mgmtcenter
 
-    @required_roles(['delete'])
+    @required_roles(['read', 'write', 'manage'])
     @load(MgmtCenter)
     def destroy(self, mgmtcenter):
         """
         Deletes a Management center
         """
         mgmtcenter.delete(abandon=True)
-        return Response({}, status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @required_roles(['view', 'create', 'system'])
+    @required_roles(['read', 'write', 'manage'])
     @load()
     def create(self, request):
         """

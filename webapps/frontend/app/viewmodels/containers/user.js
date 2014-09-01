@@ -28,15 +28,19 @@ define([
         self.clients = ko.observableArray([]);
 
         // Observables
-        self.loading   = ko.observable(false);
-        self.loaded    = ko.observable(false);
-        self.guid      = ko.observable(guid);
-        self.username  = ko.observable();
-        self.groupGuid = ko.observable();
+        self.edit        = ko.observable(false);
+        self.loading     = ko.observable(false);
+        self.loaded      = ko.observable(false);
+        self.guid        = ko.observable(guid);
+        self.active      = ko.observable();
+        self.username    = ko.observable();
+        self.groupGuid   = ko.observable();
+        self.backupValue = ko.observable();
 
         // Functions
         self.fillData = function(data) {
-            generic.trySet(self.username, data, 'username');
+            self.username(data.username);
+            self.active(data.is_active);
             generic.trySet(self.groupGuid, data, 'group_guid');
 
             self.loaded(true);
@@ -58,6 +62,36 @@ define([
                 } else {
                     deferred.reject();
                 }
+            }).promise();
+        };
+        self.save = function() {
+            return $.Deferred(function(deferred) {
+                self.loading(true);
+                api.patch('users/' + self.guid(), {
+                        group_guid: self.groupGuid()
+                    }, {
+                        contents: '_relations'
+                    })
+                    .done(function() {
+                        generic.alertSuccess(
+                            $.t('ovs:users.save.complete'),
+                            $.t('ovs:users.save.success', { what: self.username() })
+                        );
+                        self.loading(false);
+                        deferred.resolve();
+                    })
+                    .fail(function(error) {
+                        error = $.parseJSON(error.responseText);
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:users.save.failed', {
+                                what: self.username(),
+                                why: error.detail
+                            })
+                        );
+                        self.loading(false);
+                        deferred.reject();
+                    });
             }).promise();
         };
     };

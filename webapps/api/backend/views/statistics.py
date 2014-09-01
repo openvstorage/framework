@@ -86,7 +86,7 @@ class MemcacheViewSet(viewsets.ViewSet):
                 stats['%s_%s' % (key, hittype)] = client.get(cachekey, default=0)
         return stats
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def list(self):
         """
@@ -107,7 +107,7 @@ class MemcacheViewSet(viewsets.ViewSet):
                 stats['offline'].append(node)
         return Response(stats)
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def retrieve(self):
         """

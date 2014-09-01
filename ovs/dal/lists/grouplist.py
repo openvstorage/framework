@@ -13,19 +13,25 @@
 # limitations under the License.
 
 """
-Contains specific User-related serializers
+GroupList module
 """
-from rest_framework import serializers
+from ovs.dal.datalist import DataList
+from ovs.dal.dataobject import DataObjectList
+from ovs.dal.hybrids.group import Group
 
 
-class PasswordSerializer(serializers.Serializer):
+class GroupList(object):
     """
-    Serializes received passwords
+    This GroupList class contains various lists regarding to the Group class
     """
-    new_password = serializers.CharField(required=True)
 
-    class Meta:
+    @staticmethod
+    def get_groups():
         """
-        Metaclass
+        Returns a list of all Groups
         """
-        fields = ('new_password',)
+        groups = DataList({'object': Group,
+                           'data': DataList.select.GUIDS,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': []}}).data
+        return DataObjectList(groups, Group)

@@ -36,7 +36,7 @@ class VPoolViewSet(viewsets.ViewSet):
     prefix = r'vpools'
     base_name = 'vpools'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(VPool, 'name')
     @load()
     def list(self):
@@ -45,7 +45,7 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         return VPoolList.get_vpools()
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(VPool)
     @load(VPool)
     def retrieve(self, vpool):
@@ -55,7 +55,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return vpool
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VPool)
     def sync_vmachines(self, vpool):
@@ -65,7 +65,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(StorageRouter)
     @load(VPool)
     def storagerouters(self, vpool, hints):
@@ -81,7 +81,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return storagerouter if hints['full'] is True else storagerouter_guids
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VPool)
     def update_storagedrivers(self, vpool, storagedriver_guid, storagerouter_guids=None, storagedriver_guids=None):

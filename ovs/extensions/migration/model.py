@@ -54,10 +54,10 @@ class Model():
             admin_group.name = 'administrators'
             admin_group.description = 'Administrators'
             admin_group.save()
-            user_group = Group()
-            user_group.name = 'users'
-            user_group.description = 'Users'
-            user_group.save()
+            viewers_group = Group()
+            viewers_group.name = 'viewers'
+            viewers_group.description = 'Viewers'
+            viewers_group.save()
 
             # Create users
             admin = User()
@@ -75,36 +75,26 @@ class Model():
             admin_client.save()
 
             # Create roles
-            view_role = Role()
-            view_role.code = 'view'
-            view_role.name = 'Viewer'
-            view_role.description = 'Can view objects'
-            view_role.save()
-            create_role = Role()
-            create_role.code = 'create'
-            create_role.name = 'Create'
-            create_role.description = 'Can create objects'
-            create_role.save()
-            update_role = Role()
-            update_role.code = 'update'
-            update_role.name = 'Update'
-            update_role.description = 'Can update objects'
-            update_role.save()
-            delete_role = Role()
-            delete_role.code = 'delete'
-            delete_role.name = 'Delete'
-            delete_role.description = 'Can delete objects'
-            delete_role.save()
-            system_role = Role()
-            system_role.code = 'system'
-            system_role.name = 'System'
-            system_role.description = 'Can change system settings'
-            system_role.save()
+            read_role = Role()
+            read_role.code = 'read'
+            read_role.name = 'Read'
+            read_role.description = 'Can read objects'
+            read_role.save()
+            write_role = Role()
+            write_role.code = 'write'
+            write_role.name = 'Write'
+            write_role.description = 'Can write objects'
+            write_role.save()
+            manage_role = Role()
+            manage_role.code = 'manage'
+            manage_role.name = 'Manage'
+            manage_role.description = 'Can manage the system'
+            manage_role.save()
 
             # Attach groups to roles
             mapping = [
-                (admin_group, [view_role, create_role, update_role, delete_role, system_role]),
-                (user_group, [view_role, create_role, update_role, delete_role])
+                (admin_group, [read_role, write_role, manage_role]),
+                (viewers_group, [read_role])
             ]
             for setting in mapping:
                 for role in setting[1]:

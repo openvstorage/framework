@@ -52,7 +52,7 @@ def required_roles(roles):
             user = UserList.get_user_by_username(request.user.username)
             if user is None:
                 raise NotAuthenticated()
-            if not Toolbox.is_client_in_roles(request.client, roles):
+            if not Toolbox.is_token_in_roles(request.token, roles):
                 raise PermissionDenied('This call requires roles: %s' % (', '.join(roles)))
             return f(*args, **kw)
         return new_function

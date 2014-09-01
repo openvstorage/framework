@@ -26,18 +26,12 @@ define([
         self.data   = data;
 
         // Observables
-        self.currentPassword = ko.observable('');
         self.newPassword     = ko.observable('');
         self.newPassword2    = ko.observable('');
 
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
-            if (self.currentPassword() === '') {
-                valid = false;
-                fields.push('currentpassword');
-                reasons.push($.t('ovs:wizards.changepassword.confirm.entercurrent'));
-            }
             if (self.newPassword() === '') {
                 valid = false;
                 fields.push('newpassword');
@@ -55,7 +49,6 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 api.post('users/' + data.user().guid() + '/set_password', {
-                        current_password: self.currentPassword(),
                         new_password: self.newPassword()
                     })
                     .done(function() {

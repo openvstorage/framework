@@ -33,7 +33,7 @@ class MessagingViewSet(viewsets.ViewSet):
     prefix = r'messages'
     base_name = 'messages'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def list(self):
         """
@@ -41,7 +41,7 @@ class MessagingViewSet(viewsets.ViewSet):
         """
         return Response(MessageController.all_subscriptions(), status=status.HTTP_200_OK)
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def retrieve(self, pk):
         """
@@ -71,7 +71,7 @@ class MessagingViewSet(viewsets.ViewSet):
         return messages, last_message_id
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def wait(self, pk, message_id):
         """
@@ -90,7 +90,7 @@ class MessagingViewSet(viewsets.ViewSet):
                          'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def last(self, pk):
         """
@@ -103,7 +103,7 @@ class MessagingViewSet(viewsets.ViewSet):
         return Response(MessageController.last_message_id(), status=status.HTTP_200_OK)
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def subscribe(self, request, pk):
         """

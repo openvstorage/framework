@@ -35,7 +35,7 @@ class VDiskViewSet(viewsets.ViewSet):
     prefix = r'vdisks'
     base_name = 'vdisks'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(VDisk)
     @load()
     def list(self, vmachineguid=None, vpoolguid=None):
@@ -50,7 +50,7 @@ class VDiskViewSet(viewsets.ViewSet):
             return vpool.vdisks
         return VDiskList.get_vdisks()
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(VDisk)
     @load(VDisk)
     def retrieve(self, vdisk):
@@ -60,7 +60,7 @@ class VDiskViewSet(viewsets.ViewSet):
         return vdisk
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)
     def rollback(self, vdisk, timestamp):

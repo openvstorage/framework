@@ -16,7 +16,8 @@ limitations under the License.
 <section>
     <div>
         <h2 class="pull-left" data-i18n="ovs:vpools.title"></h2>
-        <button class="btn btn-default pull-right" id="buttonAddVpool" data-bind="click: addVPool"
+        <button class="btn btn-default pull-right" id="buttonAddVpool"
+                data-bind="click: addVPool, enable: $.inArray('manage', $root.shared.user.roles()) !== -1"
                 style="margin-top: 20px; margin-bottom: 10px;">
             <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
             <span data-i18n="ovs:vpools.add"></span>
