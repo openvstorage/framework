@@ -45,13 +45,14 @@
             "KVM": "KVM"
         },
         "backendtypes": {
-            "S3": "S3",
-            "AMAZON_S3": "S3 compatible",
-            "CEPH_S3": "Ceph S3",
-            "SWIFT_S3": "Swift S3",
-            "LOCAL": "Local FS",
-            "REST": "REST backend",
-            "DISTRIBUTED": "Distributed FS"
+            "s3": "S3",
+            "amazon_s3": "S3 compatible",
+            "ceph_s3": "Ceph S3",
+            "swift_s3": "Swift S3",
+            "local": "Local FS",
+            "rest": "REST backend",
+            "distributed": "Distributed FS",
+            "alba": "Alternate Backend"
         },
         "mgmtcentertypes": {
             "VCENTER": "VMware vCenter",
@@ -171,7 +172,8 @@
         "noentries": "No entries available",
         "logging": "Kibana logging",
         "generated": "Generated",
-        "group": "Group"
+        "group": "Group",
+        "backendtype": "Type"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -414,7 +416,13 @@
         "welcome": "Use the navigation to browse through the interface."
     },
     "backends": {
-        "title": "Backends"
+        "title": "Backends",
+        "backendtype": "Type",
+        "new": {
+            "complete": "Backend added",
+            "addsuccess": "The backend was added. Please open the details to configure",
+            "addfailed": "The backend could not be added: __why__"
+        }
     },
     "notfound": {
         "title": "Page not found",

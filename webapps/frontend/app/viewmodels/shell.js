@@ -60,52 +60,55 @@ define([
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function() {
-                api.get('')
-                    .then(function(metadata) {
-                        self.shared.user.username(undefined);
-                        self.shared.user.guid(undefined);
-                        self.shared.user.roles([]);
-                        self.shared.plugins({});
-                        if (!metadata.authenticated) {
-                            window.localStorage.removeItem('accesstoken');
-                            self.shared.authentication.accessToken(undefined);
-                            router.navigate('/');
-                            return $.Deferred(function(deferred) { deferred.reject(); }).promise();
-                        }
-                        self.shared.user.username(metadata.username);
-                        self.shared.user.guid(metadata.userguid);
-                        self.shared.user.roles(metadata.roles);
-                        self.shared.plugins(metadata.plugins);
-                        $.each(metadata.plugins, function(pluginType, entries) {
-                            if (pluginType === 'backends') {
-                                routing.siteRoutes.push({
-                                    route: 'backends',
-                                    moduleId: 'backends',
-                                    title: $.t('ovs:backends.title'),
-                                    titlecode: 'ovs:backends.title',
-                                    nav: true,
-                                    main: true
-                                });
-                                $.each(entries, function(i, backendEntry) {
-                                    routing.siteRoutes.push({
-                                        route: 'backend-' + backendEntry + '/:guid',
-                                        moduleId: 'backends/' + backendEntry + '-detail',
-                                        title: $.t(backendEntry + ':detail.title'),
-                                        titlecode: backendEntry + ':detail.title',
-                                        nav: false,
-                                        main: false
-                                    });
-                                });
+                return $.Deferred(function(deferred) {
+                    api.get('')
+                        .then(function(metadata) {
+                            self.shared.user.username(undefined);
+                            self.shared.user.guid(undefined);
+                            self.shared.user.roles([]);
+                            self.shared.plugins({});
+                            if (!metadata.authenticated) {
+                                window.localStorage.removeItem('accesstoken');
+                                self.shared.authentication.accessToken(undefined);
+                                router.navigate('/');
+                                return $.Deferred(function(deferred) { deferred.reject(); }).promise();
                             }
-                        });
-                    })
-                    .then(function() {
-                        return api.get('users/' + self.shared.user.guid());
-                    })
-                    .then(function(data) {
-                        self.shared.language = data.language;
-                    })
-                    .then(self._translate);
+                            self.shared.user.username(metadata.username);
+                            self.shared.user.guid(metadata.userguid);
+                            self.shared.user.roles(metadata.roles);
+                            self.shared.plugins(metadata.plugins);
+                            $.each(metadata.plugins, function(pluginType, entries) {
+                                if (pluginType === 'backend_types') {
+                                    routing.siteRoutes.push({
+                                        route: 'backends',
+                                        moduleId: 'backends',
+                                        title: $.t('ovs:backends.title'),
+                                        titlecode: 'ovs:backends.title',
+                                        nav: true,
+                                        main: true
+                                    });
+                                    $.each(entries, function(i, backendEntry) {
+                                        routing.siteRoutes.push({
+                                            route: 'backend-' + backendEntry + '/:guid',
+                                            moduleId: 'backend/' + backendEntry + '-detail',
+                                            title: $.t(backendEntry + ':detail.title'),
+                                            titlecode: backendEntry + ':detail.title',
+                                            nav: false,
+                                            main: false
+                                        });
+                                    });
+                                }
+                            });
+                        })
+                        .then(function() {
+                            return api.get('users/' + self.shared.user.guid());
+                        })
+                        .then(function(data) {
+                            self.shared.language = data.language;
+                        })
+                        .then(self._translate)
+                        .always(deferred.resolve);
+                }).promise();
             });
             self.shared.authentication.onLoggedIn.push(function() {
                 self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
@@ -114,12 +117,17 @@ define([
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
-            var token = window.localStorage.getItem('accesstoken');
+            var activationTasks = [],
+                token = window.localStorage.getItem('accesstoken');
             if (token !== null) {
                 self.shared.authentication.accessToken(token);
-                self.shared.authentication.dispatch(true);
+                activationTasks.push(self.shared.authentication.dispatch(true));
             }
-            return router.activate();
+            return $.Deferred(function(deferred) {
+                $.when.apply($, activationTasks)
+                    .then(router.activate)
+                    .always(deferred.resolve);
+            }).promise();
         };
     };
 });

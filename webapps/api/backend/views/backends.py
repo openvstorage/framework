@@ -16,19 +16,24 @@
 Contains the BackendViewSet
 """
 
-from rest_framework import viewsets
+from backend.serializers.serializers import FullSerializer
+from rest_framework import status, viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from ovs.dal.lists.backendlist import BackendList
 from ovs.dal.hybrids.backend import Backend
-from backend.decorators import return_object, return_list, load
+from backend.decorators import return_object, return_list, load, required_roles
 
 
 class BackendViewSet(viewsets.ViewSet):
     """
     Information about backends
     """
+    permission_classes = (IsAuthenticated,)
     prefix = r'backends'
     base_name = 'backends'
 
+    @required_roles(['read'])
     @return_list(Backend)
     @load()
     def list(self):
@@ -37,6 +42,7 @@ class BackendViewSet(viewsets.ViewSet):
         """
         return BackendList.get_backends()
 
+    @required_roles(['read'])
     @return_object(Backend)
     @load(Backend)
     def retrieve(self, backend):
@@ -44,3 +50,15 @@ class BackendViewSet(viewsets.ViewSet):
         Load information about a given backend
         """
         return backend
+
+    @required_roles(['read', 'write', 'manage'])
+    @load()
+    def create(self, request):
+        """
+        Creates a Backend
+        """
+        serializer = FullSerializer(Backend, instance=Backend(), data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
