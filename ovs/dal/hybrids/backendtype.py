@@ -28,7 +28,7 @@ class BackendType(DataObject):
     __properties = [Property('name', str, doc='Name of the BackendType'),
                     Property('code', str, doc='Code representing the BackendType')]
     __relations = []
-    __dynamics = [Dynamic('has_plugin', bool, 3600 * 24)]
+    __dynamics = [Dynamic('has_plugin', bool, 600)]
 
     def _has_plugin(self):
         """

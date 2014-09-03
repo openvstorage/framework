@@ -17,6 +17,7 @@ Metadata views
 """
 
 import time
+from ovs.log.logHandler import LogHandler
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -25,6 +26,8 @@ from oauth2.decorators import json_response
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
+
+logger = LogHandler('api', name='metadata')
 
 
 class MetadataView(View):
@@ -82,7 +85,8 @@ class MetadataView(View):
                                                       'userguid': user.guid,
                                                       'roles': roles,
                                                       'plugins': plugins}.items())
-        except:
+        except Exception as ex:
+            logger.exception('Unexpected exception: {0}'.format(ex))
             return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected exception'}.items())
 
     @csrf_exempt
