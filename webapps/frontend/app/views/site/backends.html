@@ -24,7 +24,7 @@ limitations under the License.
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     <!-- ko if: backendType() !== undefined -->
                         <a data-bind="text: name,
-                                      attr: { href: $root.shared.routing.loadHash('backend/' + backendType().code() + '-detail', { guid: guid }) }"></a>
+                                      attr: { href: $root.shared.routing.loadHash('backend-' + backendType().code() + '-detail', { guid: guid }) }"></a>
                     <!-- /ko -->
                     <!-- ko if: backendType() === undefined -->
                         <span data-bind="text: name"></span>

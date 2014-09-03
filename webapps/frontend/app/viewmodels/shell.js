@@ -63,42 +63,51 @@ define([
                 return $.Deferred(function(deferred) {
                     api.get('')
                         .then(function(metadata) {
-                            self.shared.user.username(undefined);
-                            self.shared.user.guid(undefined);
-                            self.shared.user.roles([]);
-                            self.shared.plugins({});
-                            if (!metadata.authenticated) {
-                                window.localStorage.removeItem('accesstoken');
-                                self.shared.authentication.accessToken(undefined);
-                                router.navigate('/');
-                                return $.Deferred(function(deferred) { deferred.reject(); }).promise();
-                            }
-                            self.shared.user.username(metadata.username);
-                            self.shared.user.guid(metadata.userguid);
-                            self.shared.user.roles(metadata.roles);
-                            self.shared.plugins(metadata.plugins);
-                            $.each(metadata.plugins, function(pluginType, entries) {
-                                if (pluginType === 'backend_types') {
-                                    routing.siteRoutes.push({
-                                        route: 'backends',
-                                        moduleId: 'backends',
-                                        title: $.t('ovs:backends.title'),
-                                        titlecode: 'ovs:backends.title',
-                                        nav: true,
-                                        main: true
-                                    });
-                                    $.each(entries, function(i, backendEntry) {
-                                        routing.siteRoutes.push({
-                                            route: 'backend-' + backendEntry + '/:guid',
-                                            moduleId: 'backend/' + backendEntry + '-detail',
-                                            title: $.t(backendEntry + ':detail.title'),
-                                            titlecode: backendEntry + ':detail.title',
-                                            nav: false,
-                                            main: false
-                                        });
-                                    });
+                            return $.Deferred(function(mdDeferred) {
+                                self.shared.user.username(undefined);
+                                self.shared.user.guid(undefined);
+                                self.shared.user.roles([]);
+                                self.shared.plugins({});
+                                if (!metadata.authenticated) {
+                                    window.localStorage.removeItem('accesstoken');
+                                    self.shared.authentication.accessToken(undefined);
+                                    router.navigate('/');
+                                    return mdDeferred.reject();
                                 }
-                            });
+                                self.shared.user.username(metadata.username);
+                                self.shared.user.guid(metadata.userguid);
+                                self.shared.user.roles(metadata.roles);
+                                self.shared.plugins(metadata.plugins);
+                                var routeHandlers = [];
+                                $.each(metadata.plugins, function(pluginType, entries) {
+                                    if (pluginType === 'backend_types') {
+                                        routing.siteRoutes.push({
+                                            route: 'backends',
+                                            moduleId: 'backends',
+                                            title: $.t('ovs:backends.title'),
+                                            titlecode: 'ovs:backends.title',
+                                            nav: true,
+                                            main: true
+                                        });
+                                        $.each(entries, function(i, backendEntry) {
+                                            routeHandlers.push($.Deferred(function(backendDeferred) {
+                                                i18n.loadNamespace(backendEntry, function() {
+                                                    routing.siteRoutes.push({
+                                                        route: 'backend-' + backendEntry + '/:guid',
+                                                        moduleId: 'backend-' + backendEntry + '-detail',
+                                                        title: $.t(backendEntry + ':detail.title'),
+                                                        titlecode: backendEntry + ':detail.title',
+                                                        nav: false,
+                                                        main: false
+                                                    });
+                                                    backendDeferred.resolve();
+                                                });
+                                            }).promise());
+                                        });
+                                    }
+                                });
+                                $.when.apply($, routeHandlers).always(mdDeferred.resolve);
+                            }).promise();
                         })
                         .then(function() {
                             return api.get('users/' + self.shared.user.guid());

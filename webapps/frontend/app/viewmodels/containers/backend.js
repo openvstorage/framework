@@ -45,10 +45,10 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('backends/' + self.guid())
+                    self.loadHandle = api.get('backends/' + self.guid(), undefined, { contents: '_relations' })
                         .done(function(data) {
                             self.fillData(data);
-                            deferred.resolve();
+                            deferred.resolve(data);
                         })
                         .fail(deferred.reject)
                         .always(function() {

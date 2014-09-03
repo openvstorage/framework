@@ -677,6 +677,7 @@
         "cancel": "&#xf00d;",
         "logs": "&#xf02d;",
         "externallink": "&#xf08e;",
-        "password": "&#xf084;"
+        "password": "&#xf084;",
+        "vpools": "&#xf0c2;"
     }
 }
