@@ -71,8 +71,8 @@ class MetadataView(View):
 
             # Gather plugin metadata
             plugins = {}
-            # - Backends. BackendType plugins must set the has_gui flag on True
-            backend_types = [backend_types.code for backend_types in BackendTypeList.get_backend_types() if backend_types.has_gui is True]
+            # - Backends. BackendType plugins must set the has_plugin flag on True
+            backend_types = [backend_types.code for backend_types in BackendTypeList.get_backend_types() if backend_types.has_plugin is True]
             if backend_types:
                 plugins['backend_types'] = backend_types
 

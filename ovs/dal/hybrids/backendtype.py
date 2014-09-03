@@ -16,7 +16,8 @@
 BackendType module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property
+from ovs.dal.structures import Property, Dynamic
+from ovs.plugin.provider.configuration import Configuration
 
 
 class BackendType(DataObject):
@@ -25,7 +26,15 @@ class BackendType(DataObject):
     like a GUI management interface
     """
     __properties = [Property('name', str, doc='Name of the BackendType'),
-                    Property('code', str, doc='Code representing the BackendType'),
-                    Property('has_gui', bool, default=False, doc='Indicates whether the backend type has a GUI (provided by means of a plugin)')]
+                    Property('code', str, doc='Code representing the BackendType')]
     __relations = []
-    __dynamics = []
+    __dynamics = [Dynamic('has_plugin', bool, 3600 * 24)]
+
+    def _has_plugin(self):
+        """
+        Checks whether this BackendType has a plugin installed
+        """
+        try:
+            return True if Configuration.get('ovs.plugins.backend.' + self.code) else False
+        except:
+            return False

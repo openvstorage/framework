@@ -135,7 +135,7 @@ define([
                         contents: '',
                         query: JSON.stringify({
                             type: 'AND',
-                            items: [['has_gui', 'EQUALS', true]]
+                            items: [['has_plugin', 'EQUALS', true]]
                         })
                     };
                     self.loadBackendTypesHandle = api.get('backendtypes', undefined, options)
