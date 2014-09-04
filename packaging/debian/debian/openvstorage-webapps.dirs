@@ -1,4 +1,5 @@
 opt/OpenvStorage/config
+opt/OpenvStorage/scripts
 opt/OpenvStorage/scripts/install
 etc/nginx/sites-enabled
 usr/share/doc/openvstorage-webapps
