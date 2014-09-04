@@ -41,7 +41,7 @@ define([
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidname'));
             }
-            if (self.data.backend().match(/^.+_S3$/)) {
+            if (self.data.backend().match(/^.+_s3$/)) {
                 if (!self.data.host.valid()) {
                     valid = false;
                     fields.push('host');
@@ -69,7 +69,7 @@ define([
             return $.Deferred(function(deferred) {
                 $.when.apply($, [
                     $.Deferred(function(s3deferred) {
-                        if (self.data.backend().match(/^.+_S3$/)) {
+                        if (self.data.backend().match(/^.+_s3$/)) {
                             generic.xhrAbort(self.checkS3Handle);
                             var postData = {
                                 host: self.data.host(),

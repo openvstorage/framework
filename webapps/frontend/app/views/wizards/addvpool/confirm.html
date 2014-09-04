@@ -24,7 +24,7 @@ limitations under the License.
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.host"></b> <span data-bind="text: data.host"></span></li>
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.port"></b> <span data-bind="text: data.port"></span></li>
                     <li data-bind="visible: data.backend() === 'rest'"><b data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></b> <span data-bind="text: data.timeout"></span></li>
-                    <li data-bind="visible: data.backend().match(/^.+_S3$/) !== null"><b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span></li>
+                    <li data-bind="visible: data.backend().match(/^.+_s3$/) !== null"><b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span></li>
                 </ul>
             </li>
         </ul>

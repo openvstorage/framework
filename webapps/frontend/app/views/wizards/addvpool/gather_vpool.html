@@ -52,7 +52,7 @@ limitations under the License.
                 <input type="text" id="inputVpoolTimeout" class="autofocus form-control" data-bind="value: data.timeout">
             </div>
         </div>
-        <div data-bind="visible: data.backend().match(/^.+_S3$/) !== null">
+        <div data-bind="visible: data.backend().match(/^.+_s3$/) !== null">
             <div class="form-group" data-bind="css: { 'has-error': $.inArray('accesskey', canContinue().fields) !== -1 }">
                 <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></label>
                 <div class="col-lg-7">
