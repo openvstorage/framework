@@ -102,7 +102,7 @@ class System():
         """
         Executes a python script on a client
         """
-        client.run('python -c """{0}"""'.format(script))
+        return client.run('python -c """{0}"""'.format(script))
 
     @staticmethod
     def read_remote_config(client, key):
