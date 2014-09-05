@@ -15,11 +15,11 @@
 import time
 from subprocess import check_output
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.system import Ovs
+from ovs.extensions.generic.system import System
 from ovs.plugin.provider.configuration import Configuration
 
 current_time = int(time.time())
-machine_id = Ovs.get_my_machine_id()
+machine_id = System.get_my_machine_id()
 amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'),
                                     Configuration.get('ovs.core.broker.login'),
                                     Configuration.get('ovs.core.broker.password'),
