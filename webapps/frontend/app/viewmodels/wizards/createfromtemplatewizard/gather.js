@@ -78,9 +78,11 @@ define([
         self._create = function(name, description, pmachine) {
             return $.Deferred(function(deferred) {
                 api.post('/vmachines/' + self.data.vm().guid() + '/create_from_template', {
-                        pmachineguid: pmachine.guid(),
-                        name: name,
-                        description: description
+                        data: {
+                            pmachineguid: pmachine.guid(),
+                            name: name,
+                            description: description
+                        }
                     })
                     .then(self.shared.tasks.wait)
                     .done(function() {
@@ -154,9 +156,11 @@ define([
                 self.data.selectedPMachines([]);
             }
             generic.xhrAbort(self.loadPMachinesHandle);
-            self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines', undefined, {
-                contents: '',
-                sort: 'name'
+            self.loadPMachinesHandle = api.get('vmachines/' + self.data.guid() + '/get_target_pmachines', {
+                queryparams: {
+                    contents: '',
+                    sort: 'name'
+                }
             })
                 .done(function(data) {
                     var guids = [], vmdata = {};

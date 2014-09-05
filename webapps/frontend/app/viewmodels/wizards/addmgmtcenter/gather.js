@@ -60,13 +60,15 @@ define([
                 );
                 deferred.resolve();
                 api.post('mgmtcenters', {
-                    name: self.data.name(),
-                    description: undefined,
-                    username: self.data.username(),
-                    password: self.data.password(),
-                    ip: self.data.ipAddress(),
-                    port: self.data.port(),
-                    type: self.data.centerType()
+                    data: {
+                        name: self.data.name(),
+                        description: undefined,
+                        username: self.data.username(),
+                        password: self.data.password(),
+                        ip: self.data.ipAddress(),
+                        port: self.data.port(),
+                        type: self.data.centerType()
+                    }
                 })
                     .done(function() {
                         generic.alertSuccess(

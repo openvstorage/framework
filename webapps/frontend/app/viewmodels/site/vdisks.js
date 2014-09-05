@@ -59,7 +59,7 @@ define([
                         sort: 'vpool_guid,devicename',  // Aka, sorted by vpool, machinename, diskname
                         contents: ''
                     };
-                    self.loadVDisksHandle = api.get('vdisks', undefined, options)
+                    self.loadVDisksHandle = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vddata = {};
                             $.each(data, function(index, item) {
@@ -94,7 +94,7 @@ define([
                         page: page,
                         contents: '_dynamics,_relations,-snapshots'
                     };
-                    self.refreshVDisksHandle[page] = api.get('vdisks', {}, options)
+                    self.refreshVDisksHandle[page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vddata = {};
                             $.each(data, function(index, item) {
@@ -149,7 +149,7 @@ define([
             self.refresher.start();
             self.shared.footerData(self.vDisks);
 
-            api.get('vmachines', {}, { contents: ''})
+            api.get('vmachines', { queryparams: { contents: ''} })
                 .done(function(data) {
                     $.each(data, function(index, item) {
                         if (!self.vMachineCache.hasOwnProperty(item.guid)) {

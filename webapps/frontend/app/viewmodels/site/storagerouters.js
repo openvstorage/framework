@@ -57,7 +57,7 @@ define([
                         sort: 'name',
                         contents: 'stored_data,status'
                     };
-                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
+                    self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             var guids = [], sadata = {};
                             $.each(data, function(index, item) {
@@ -92,7 +92,7 @@ define([
                         page: page,
                         contents: '_relations,statistics,stored_data,vdisks_guids,status'
                     };
-                    self.refreshStorageRoutersHandle[page] = api.get('storagerouters', undefined, options)
+                    self.refreshStorageRoutersHandle[page] = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             var guids = [], sadata = {};
                             $.each(data, function(index, item) {

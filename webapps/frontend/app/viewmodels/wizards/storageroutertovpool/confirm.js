@@ -161,7 +161,7 @@ define([
                         var postData = {
                             name: self.data.vPool().name()
                         };
-                        api.post('storagerouters/' + self.storageRouter.guid() + '/check_mtpt', postData)
+                        api.post('storagerouters/' + self.storageRouter.guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 self.mtptOK(data);
@@ -270,9 +270,11 @@ define([
                     }
                 });
                 api.post('vpools/' + self.data.vPool().guid() + '/update_storagedrivers', {
-                    storagedriver_guid: self.storageDriver().guid(),
-                    storagerouter_guids: storageRouterGuids.join(','),
-                    storagedriver_guids: storageDriverGuids.join(',')
+                    data: {
+                        storagedriver_guid: self.storageDriver().guid(),
+                        storagerouter_guids: storageRouterGuids.join(','),
+                        storagedriver_guids: storageDriverGuids.join(',')
+                    }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function(data) {

@@ -53,7 +53,7 @@ define([
                         sort: 'name',
                         contents: ''
                     };
-                    self.loadVPoolsHandle = api.get('vpools', undefined, options)
+                    self.loadVPoolsHandle = api.get('vpools', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data, function(index, item) {
@@ -88,7 +88,7 @@ define([
                         page: page,
                         contents: '_dynamics'
                     };
-                    self.refreshVPoolsHandle[page] = api.get('vpools', {}, options)
+                    self.refreshVPoolsHandle[page] = api.get('vpools', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data, function(index, item) {

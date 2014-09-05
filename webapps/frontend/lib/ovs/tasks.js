@@ -20,8 +20,8 @@ define([
     return function() {
         var self = this;
 
-        self.shared = shared;
-        self.hooks = {};
+        self.shared      = shared;
+        self.hooks       = {};
         self.taskIDQueue = [];
 
         self.wait = function(taskID) {
@@ -48,6 +48,20 @@ define([
                         deferred.reject(error);
                     });
             }).promise();
+        };
+        self.validateTasks = function() {
+            $.each(self.hooks, function(taskID, deferred) {
+                api.get('tasks/' + taskID)
+                    .done(function(data) {
+                        if (data.ready === true) {
+                            if (data.successful === true) {
+                                deferred.resolve(data.result);
+                            } else {
+                                deferred.reject(data.result);
+                            }
+                        }
+                    });
+            });
         };
 
         self.shared.messaging.subscribe('TASK_COMPLETE', function(taskID) {

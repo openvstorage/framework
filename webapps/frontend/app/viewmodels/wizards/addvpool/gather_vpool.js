@@ -77,7 +77,7 @@ define([
                                 accesskey: self.data.accesskey(),
                                 secretkey: self.data.secretkey()
                             };
-                            self.checkS3Handle = api.post('storagerouters/' + self.data.target().guid() + '/check_s3', postData)
+                            self.checkS3Handle = api.post('storagerouters/' + self.data.target().guid() + '/check_s3', { data: postData })
                                 .then(self.shared.tasks.wait)
                                 .done(function(data) {
                                     if (!data) {
@@ -99,7 +99,7 @@ define([
                         var postData = {
                             name: self.data.name()
                         };
-                        self.checkMtptHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_mtpt', postData)
+                        self.checkMtptHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 if (!data) {
@@ -127,7 +127,7 @@ define([
                 var calls = [
                     $.Deferred(function(mtptDeferred) {
                         generic.xhrAbort(self.loadStorageRouterHandle);
-                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_physical_metadata', {})
+                        self.loadStorageRouterHandle = api.post('storagerouters/' + self.data.target().guid() + '/get_physical_metadata')
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
@@ -167,9 +167,11 @@ define([
         // Durandal
         self.activate = function() {
             generic.xhrAbort(self.loadStorageRoutersHandle);
-            self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
-                contents: 'storagedrivers',
-                sort: 'name'
+            self.loadStorageRoutersHandle = api.get('storagerouters', {
+                queryparams: {
+                    contents: 'storagedrivers',
+                    sort: 'name'
+                }
             })
                 .done(function(data) {
                     var guids = [], srdata = {};
