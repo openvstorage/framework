@@ -422,8 +422,8 @@ class SetupController(object):
             for node in nodes:
                 client_node = SSHClient.load(node)
                 update_hosts_file = """
-from ovs.extensions.generic.system import Ovs
-Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
+from ovs.extensions.generic.system import System
+System.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
 """ % {'ip': cluster_ip,
        'host': node_name}
                 SetupController._exec_python(client_node, update_hosts_file)
@@ -432,8 +432,8 @@ Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
                         client_node = SSHClient.load(subnode)
                         node_hostname = client_node.run('hostname')
                         update_hosts_file = """
-from ovs.extensions.generic.system import Ovs
-Ovs.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
+from ovs.extensions.generic.system import System
+System.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
 """ % {'ip': subnode,
        'host': node_hostname}
                         client = SSHClient.load(ip)

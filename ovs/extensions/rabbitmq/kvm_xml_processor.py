@@ -16,7 +16,7 @@
 KVM XML watcher
 """
 
-from ovs.extensions.generic.system import Ovs
+from ovs.extensions.generic.system import System
 from xml.etree import ElementTree
 from ovs.log.logHandler import LogHandler
 from ovs.dal.lists.vmachinelist import VMachineList
@@ -86,7 +86,7 @@ class Kxp(pyinotify.ProcessEvent):
     def invalidate_vmachine_status(self, name):
         if not name.endswith('.xml'):
             return
-        devicename = '{0}/{1}'.format(Ovs.get_my_machine_id(), name)
+        devicename = '{0}/{1}'.format(System.get_my_machine_id(), name)
         vm = VMachineList().get_by_devicename_and_vpool(devicename, None)
         if vm:
             vm.invalidate_dynamics()
@@ -105,7 +105,7 @@ class Kxp(pyinotify.ProcessEvent):
         try:
             logger.debug('path: {0} - name: {1} - deleted'.format(event.path, event.name))
             if self._is_etc_watcher(event.path):
-                file_matcher = '/mnt/*/{0}/{1}'.format(Ovs.get_my_machine_id(), event.name)
+                file_matcher = '/mnt/*/{0}/{1}'.format(System.get_my_machine_id(), event.name)
                 for found_file in glob.glob(file_matcher):
                     if os.path.exists(found_file) and os.path.isfile(found_file):
                         os.remove(found_file)
@@ -138,7 +138,7 @@ class Kxp(pyinotify.ProcessEvent):
                 logger.warning('Vmachine not on vpool or invalid xml format for {0}'.format(event.pathname))
 
             if os.path.exists(vpool_path):
-                machine_id = Ovs.get_my_machine_id()
+                machine_id = System.get_my_machine_id()
                 target_path = vpool_path + '/' + machine_id + '/'
                 target_xml = target_path + event.name
                 if not os.path.exists(target_path):

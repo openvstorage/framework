@@ -38,8 +38,8 @@ class OVSSNMPServer():
         """
         signal.signal(signal.SIGTERM, self.SIGTERM)
 
-        from ovs.extensions.generic.system import Ovs
-        my_storagerouter = Ovs.get_my_storagerouter()
+        from ovs.extensions.generic.system import System
+        my_storagerouter = System.get_my_storagerouter()
         self.host = my_storagerouter.ip
         self.port = 161
 
