@@ -52,3 +52,5 @@ MOUNT_LOCATION = '%s/testmount' % VPOOL_ROOT_DIR
 
 #IMAGE TEST
 IMAGE_NAME = 'Fedora-x86_64-20-20140618-sda'
+UPLOAD_IMAGE_NAME = 'Upload-OVS-image-%s' # last part will be uuid
+

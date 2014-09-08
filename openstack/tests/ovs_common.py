@@ -90,10 +90,12 @@ class OVSPluginTestCase(test.TestCase):
         self._debug('setUp complete')
 
     def _cleanup(self):
-        for cleanup_item in self.cleanup:
-            self._debug('tearDown cleanup %s' % str(cleanup_item))
-            method, kwargs = self.cleanup[cleanup_item]
-            method(**kwargs)
+        for prio in sorted(self.cleanup.keys()):
+            for cleanup_item in self.cleanup[prio].keys():
+                self._debug('tearDown cleanup %s' % str(cleanup_item))
+                method, kwargs = self.cleanup[prio].get(cleanup_item, (None, None))
+                if method and kwargs:
+                    method(**kwargs)
 
         if VPOOL_CLEANUP:
             self._revert_cinder_config()
@@ -104,16 +106,19 @@ class OVSPluginTestCase(test.TestCase):
 
         self._debug('tearDown complete')
 
-    def register_tearDown(self, key, method, kwargs):
-        if key in self.cleanup:
+    def register_tearDown(self, prio, key, method, kwargs):
+        if not prio in self.cleanup:
+            self.cleanup[prio] = {}
+        if key in self.cleanup[prio]:
             self._debug('duplicate key %s' % key)
-        self.cleanup[key] = (method, kwargs)
+        self.cleanup[prio][key] = (method, kwargs)
 
     def unregister_tearDown(self, key):
-        try:
-            del self.cleanup[key]
-        except KeyError:
-            pass
+        for prio in self.cleanup.keys():
+            try:
+                del self.cleanup[prio][key]
+            except KeyError:
+                pass
 
     # INTERNAL
     def _get_shell_client(self):
@@ -145,7 +150,7 @@ class OVSPluginTestCase(test.TestCase):
         self.shell_client('sudo qemu-nbd -c /dev/nbd0 %s/%s' % (VPOOL_MOUNTPOINT, file_name))
         self.shell_client('sudo partprobe /dev/nbd0')
         self.shell_client('sudo mount /dev/nbd0p1 %s' % MOUNT_LOCATION)
-        self.register_tearDown('mount%s' % file_name, self._umount_volume, {'file_name': file_name})
+        self.register_tearDown(0, 'mount%s' % file_name, self._umount_volume, {'file_name': file_name})
         self._debug('mounted %s as %s' % (file_name, MOUNT_LOCATION))
 
     def _umount_volume(self, file_name):
@@ -153,11 +158,11 @@ class OVSPluginTestCase(test.TestCase):
         Umount MOUNT_LOCATION
         """
         self._debug('umounting %s' % MOUNT_LOCATION)
-        self.unregister_tearDown('mount%s' % file_name)
         self._get_shell_client()
         self.shell_client('sudo umount %s' % MOUNT_LOCATION)
         self.shell_client('sudo qemu-nbd -d /dev/nbd0')
         self.shell_client('sudo rm -r %s' % MOUNT_LOCATION)
+        self.unregister_tearDown('mount%s' % file_name)
         self._debug('umounted %s' % MOUNT_LOCATION)
 
     def _create_vpool(self):
@@ -304,12 +309,43 @@ class OVSPluginTestCase(test.TestCase):
             self.glance_client = glance_client.Client(glance_endpoint,
                                                       token=self.keystone_client.auth_token)
 
-    def _glance_get_test_image(self):
+    def _glance_get_image_by_name(self, image_name):
         self._get_glance_client()
         for image in self.glance_client.images.list():
-            if image.name == IMAGE_NAME:
+            if image.name == image_name:
                 return image
-        raise ValueError('Default test image %s not found' % IMAGE_NAME)
+        raise ValueError('Image %s not found' % image_name)
+
+    def _glance_get_test_image(self):
+        return self._glance_get_image_by_name(IMAGE_NAME)
+
+    def _glance_list_images_names(self):
+        return [image.name for image in self.glance_client.images.list()]
+
+    def _glance_delete_image(self, image_name):
+        self._debug('delete glance image %s' % image_name)
+        self._get_glance_client()
+        image = self._glance_get_image_by_name(image_name)
+        self.glance_client.images.delete(image)
+
+    def _glance_wait_until_image_state(self, image_name, state='active', timeout_sec=300):
+        start = time.time()
+        not_found = 0
+        initial_state = None
+        self._debug('wait until image %s becomes %s' % (image_name, state))
+        while time.time() < start + timeout_sec:
+            try:
+                image = self._glance_get_image_by_name(image_name)
+                if image.status == 'error':
+                    raise RuntimeError('Image %s in error state' % image_name)
+                if image.status == state:
+                    return image
+            except ValueError:
+                not_found += 1
+            time.sleep(1)
+            if not_found > 10:
+                raise RuntimeError('Image %s not created after 10 seconds' % image_name)
+        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, timeout_sec, image.status))
 
     # CINDER
     def _get_cinder_config(self):
@@ -497,6 +533,18 @@ class OVSPluginTestCase(test.TestCase):
         self._cinder_wait_until_snapshot_state(snapshot.id, status)
         self._debug('snapshot %s is now in state %s' % (snapshot.id, status))
 
+    def _cinder_upload_volume_to_glance(self, volume, image_name, container='bare', image_type='raw'):
+        """
+        Upload volume to glance
+        """
+        self._debug('upload volume %s to glance image %s' % (volume.id, image_name))
+        self._get_cinder_client()
+        volume = self._cinder_get_volume_by_id(volume.id)
+        if volume.status != 'available':
+            raise RuntimeError('Cannot upload volume in state %s' % volume.status)
+        self.cinder_client.volumes.upload_to_image(volume, True, image_name, container, image_type)
+        self._cinder_wait_until_volume_state(volume.id, 'available')
+
 
     # CINDER WAIT
     def _cinder_wait_until_volume_state(self, volume_id, status, timeout_sec=300):
@@ -583,7 +631,7 @@ class OVSPluginTestCase(test.TestCase):
         file_name = '%s.%s' % (volume_name, FILE_TYPE)
         volume = self._cinder_create_volume(volume_name)
         self._debug('created new volume %s' % volume_name)
-        self.register_tearDown(volume_name, self._cinder_delete_volume, {'volume': volume})
+        self.register_tearDown(10, volume_name, self._cinder_delete_volume, {'volume': volume})
         self._debug('volume %s created' % volume_name)
         return volume, volume_name, file_name
 
@@ -598,7 +646,7 @@ class OVSPluginTestCase(test.TestCase):
         self._debug('new snapshot for %s' % volume.id)
         snap_name = self._random_snapshot_name()
         snapshot = self._cinder_create_snapshot(volume, snap_name)
-        self.register_tearDown(snap_name, self._cinder_delete_snapshot, {'snapshot': snapshot})
+        self.register_tearDown(5, snap_name, self._cinder_delete_snapshot, {'snapshot': snapshot})
         self._debug('snapshot %s created' % snap_name)
         return snapshot, snap_name
 
@@ -615,7 +663,7 @@ class OVSPluginTestCase(test.TestCase):
         file_name = '%s.%s' % (clone_name, FILE_TYPE)
         clone_volume = self._cinder_create_volume(clone_name, snapshot_id = snapshot.id)
         self._debug('created new volume %s' % clone_name)
-        self.register_tearDown(clone_name, self._cinder_delete_volume, {'volume': clone_volume})
+        self.register_tearDown(3, clone_name, self._cinder_delete_volume, {'volume': clone_volume})
         self._debug('volume %s created' % clone_volume.display_name)
         return clone_volume, clone_name, file_name
 
@@ -625,7 +673,7 @@ class OVSPluginTestCase(test.TestCase):
         file_name = '%s.%s' % (clone_name, FILE_TYPE)
         clone_volume = self._cinder_create_volume(clone_name, volume_id = volume.id)
         self._debug('created new volume %s' % clone_name)
-        self.register_tearDown(clone_name, self._cinder_delete_volume, {'volume': clone_volume})
+        self.register_tearDown(2, clone_name, self._cinder_delete_volume, {'volume': clone_volume})
         self._debug('volume %s created' % clone_volume.display_name)
         return clone_volume, clone_name, file_name
 
@@ -636,8 +684,23 @@ class OVSPluginTestCase(test.TestCase):
         file_name = '%s.%s' % (volume_name, FILE_TYPE)
         volume = self._cinder_create_volume(volume_name, image_id = image.id)
         self._debug('created new volume %s' % volume_name)
-        self.register_tearDown(volume_name, self._cinder_delete_volume, {'volume': volume})
+        self.register_tearDown(9, volume_name, self._cinder_delete_volume, {'volume': volume})
         self._debug('volume %s created' % volume_name)
         return volume, volume_name, file_name
 
+    def _upload_volume_to_image(self, volume):
+        image_name = UPLOAD_IMAGE_NAME % str(uuid.uuid4())
+        self._debug('new image %s' % image_name)
+        self._cinder_upload_volume_to_glance(volume, image_name)
+        image = self._glance_wait_until_image_state(image_name)
+        self.register_tearDown(11, image_name, self._glance_delete_image, {'image_name': image_name})
+        self._debug('volume uploaded')
+        return image, image_name
 
+    def _remove_image(self, image_name):
+        self._debug('remove image %s' % image_name)
+        image = self._glance_get_image_by_name(image_name)
+        self._glance_wait_until_image_state(image_name)
+        self._glance_delete_image(image_name)
+        self.unregister_tearDown(image_name)
+        self._debug('image removed')

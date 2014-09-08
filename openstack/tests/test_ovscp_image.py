@@ -26,8 +26,10 @@ Image functionality testing for the cinder plugin
 -- mount clone
 -- file exists on clone, unmount
 
-- image upload <- NOT WORKING ATM
--- OVS-1210 (ticket still open)
+- image upload
+-- downloaded, converted to .raw
+-- resulting file is actually raw
+-- upload as image
 
 * validate on OVS model
 * validate on FS (volumedriver filesystem)
@@ -50,7 +52,9 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
         ASSERTS:
          file exists on mountpoint
          volume image metadata points to IMAGE_NAME
-         vdisk modelled in OVS
+         vdisk modeled in OVS
+         file removed from mountpoint
+         vdisk removed from OVS
         CLEANUP:
          none
         """
@@ -58,6 +62,42 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
         self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
         self.assertTrue(volume.volume_image_metadata['image_name'] == IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
+
+        self._remove_volume(volume, volume_name)
+        self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
+
+    def test_create_delete_volume_from_default_image_upload_to_glance(self):
+        """
+        Create a volume from image using the cinder client, upload it to glance
+        Delete the volume, delete the image
+        COMMAND:
+         cinder create --volume-type ovs --display-name VOLUME_NAME --image-id IMAGE_ID VOLUME_SIZE
+         cinder upload-to-image <VOLID> <IMAGENAME>
+         cinder delete <VOLID>
+         glance image-delete
+        ASSERTS:
+         file exists on mountpoint
+         volume image metadata points to IMAGE_NAME
+         vdisk modeled in OVS
+         file removed from mountpoint
+         vdisk removed from OVS
+        CLEANUP:
+         none
+        """
+
+        volume, volume_name, file_name = self._new_volume_from_default_image()
+        self.assertTrue(self._file_exists_on_mountpoint(file_name), 'File %s not created on mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
+        self.assertTrue(self._ovs_devicename_in_vdisklist(file_name), 'Device not modeled in OVS')
+        self.assertTrue(volume.volume_image_metadata['image_name'] == IMAGE_NAME, 'Wrong volume image metadata %s' % volume.volume_image_metadata)
+
+        image, image_name = self._upload_volume_to_image(volume)
+        self.assertTrue(image_name in self._glance_list_images_names(), 'Image not uploaded to glance')
+        image_info = self._glance_get_image_by_name(image_name)
+        self.assertFalse(image_info.status == 'error', 'Image uploaded with errors')
+
+        self._remove_image(image_name)
+        self.assertFalse(image_name in self._glance_list_images_names(), 'Image not removed from glance')
 
         self._remove_volume(volume, volume_name)
         self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))
@@ -122,7 +162,7 @@ class OVSPluginImageTestCase(OVSPluginTestCase):
 
         self._mount_volume_by_filename(clone_file_name)
 
-        self.assertTrue(self._file_exists_on_mountpoint('autotest_generated_file', MOUNT_LOCATION), 'Generated file is not present in %s' % MOUNT_LOCATION)
+        self.assertTrue(self._file_exists_on_mountpoint('autotest_generated_file', MOUNT_LOCATION), '(clone) Generated file is not present in %s' % MOUNT_LOCATION)
 
         self._umount_volume(clone_file_name)
 
