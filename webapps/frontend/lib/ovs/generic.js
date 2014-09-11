@@ -118,6 +118,12 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return value;
     }
+    function padLeft(value, character, length) {
+        while (value.length < length) {
+            value = character + value;
+        }
+        return value;
+    }
     function tryGet(object, key, fallback) {
         if (object !== undefined && object.hasOwnProperty(key)) {
             return object[key];
@@ -313,6 +319,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         formatShort     : formatShort,
         formatNumber    : formatNumber,
         padRight        : padRight,
+        padLeft         : padLeft,
         tryGet          : tryGet,
         trySet          : trySet,
         lower           : lower,
