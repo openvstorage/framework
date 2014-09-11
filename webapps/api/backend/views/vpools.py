@@ -105,7 +105,7 @@ class VPoolViewSet(viewsets.ViewSet):
 
         storagedriver = StorageDriver(storagedriver_guid)
         parameters = {'vpool_name':          vpool.name,
-                      'type':                vpool.type,
+                      'type':                vpool.backend_type.code,
                       'connection_host':     None if vpool.connection is None else vpool.connection.split(':')[0],
                       'connection_port':     None if vpool.connection is None else int(vpool.connection.split(':')[1]),
                       'connection_timeout':  0,  # Not in use anyway
