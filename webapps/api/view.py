@@ -50,6 +50,16 @@ class MetadataView(View):
                 'versions': list(settings.VERSION),
                 'plugins': {}}
         try:
+            # Gather plugin metadata
+            plugins = {}
+            # - Backends. BackendType plugins must set the has_plugin flag on True
+            for backend_type in BackendTypeList.get_backend_types():
+                if backend_type.has_plugin is True:
+                    if backend_type.code not in plugins:
+                        plugins[backend_type.code] = []
+                    plugins[backend_type.code] += ['backend', 'gui']
+            data['plugins'] = plugins
+
             # Gather authorization metadata
             if 'HTTP_AUTHORIZATION' not in request.META:
                 return HttpResponse, dict(data.items() + {'authentication_state': 'unauthenticated'}.items())
@@ -71,13 +81,6 @@ class MetadataView(View):
             if not user.is_active:
                 return HttpResponse, dict(data.items() + {'authentication_state': 'inactive user'}.items())
             roles = [j.role.code for j in token.roles]
-
-            # Gather plugin metadata
-            plugins = {}
-            # - Backends. BackendType plugins must set the has_plugin flag on True
-            backend_types = [backend_types.code for backend_types in BackendTypeList.get_backend_types() if backend_types.has_plugin is True]
-            if backend_types:
-                plugins['backend_types'] = backend_types
 
             return HttpResponse, dict(data.items() + {'authenticated': True,
                                                       'authentication_state': 'authenticated',

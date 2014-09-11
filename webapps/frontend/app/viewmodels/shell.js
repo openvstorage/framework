@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define, window */
+/*global define, window, require */
 define([
     'jquery', 'plugins/router', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
@@ -67,7 +67,6 @@ define([
                                 self.shared.user.username(undefined);
                                 self.shared.user.guid(undefined);
                                 self.shared.user.roles([]);
-                                self.shared.plugins({});
                                 if (!metadata.authenticated) {
                                     window.localStorage.removeItem('accesstoken');
                                     self.shared.authentication.accessToken(undefined);
@@ -77,36 +76,7 @@ define([
                                 self.shared.user.username(metadata.username);
                                 self.shared.user.guid(metadata.userguid);
                                 self.shared.user.roles(metadata.roles);
-                                self.shared.plugins(metadata.plugins);
-                                var routeHandlers = [];
-                                $.each(metadata.plugins, function(pluginType, entries) {
-                                    if (pluginType === 'backend_types') {
-                                        routing.siteRoutes.push({
-                                            route: 'backends',
-                                            moduleId: 'backends',
-                                            title: $.t('ovs:backends.title'),
-                                            titlecode: 'ovs:backends.title',
-                                            nav: true,
-                                            main: true
-                                        });
-                                        $.each(entries, function(i, backendEntry) {
-                                            routeHandlers.push($.Deferred(function(backendDeferred) {
-                                                i18n.loadNamespace(backendEntry, function() {
-                                                    routing.siteRoutes.push({
-                                                        route: 'backend-' + backendEntry + '/:guid',
-                                                        moduleId: 'backend-' + backendEntry + '-detail',
-                                                        title: $.t(backendEntry + ':detail.title'),
-                                                        titlecode: backendEntry + ':detail.title',
-                                                        nav: false,
-                                                        main: false
-                                                    });
-                                                    backendDeferred.resolve();
-                                                });
-                                            }).promise());
-                                        });
-                                    }
-                                });
-                                $.when.apply($, routeHandlers).always(mdDeferred.resolve);
+                                mdDeferred.resolve();
                             }).promise();
                         })
                         .then(function() {
@@ -132,6 +102,39 @@ define([
                 self.shared.authentication.accessToken(token);
                 activationTasks.push(self.shared.authentication.dispatch(true));
             }
+            activationTasks.push($.Deferred(function(deferred) {
+                api.get('')
+                    .then(function(metadata) {
+                        var pluginHandlers = [], backendsActive = false;
+                        $.each(metadata.plugins, function(plugin, types) {
+                            if ($.inArray('gui', types) !== -1) {
+                                pluginHandlers.push($.Deferred(function(moduleDeferred) {
+                                    require(['ovs/routes/' + plugin], function(routes) {
+                                        routing.extraRoutes.push(routes.routes);
+                                        moduleDeferred.resolve();
+                                    });
+                                }).promise());
+                                pluginHandlers.push($.Deferred(function(translationDeferred) {
+                                    i18n.loadNamespace(plugin, function () {
+                                        translationDeferred.resolve();
+                                    });
+                                }).promise());
+                            }
+                            if ($.inArray('backend', types) !== -1 && !backendsActive) {
+                                routing.siteRoutes.push({
+                                    route: 'backends',
+                                    moduleId: 'backends',
+                                    title: $.t('ovs:backends.title'),
+                                    titlecode: 'ovs:backends.title',
+                                    nav: true,
+                                    main: true
+                                });
+                                backendsActive = true;
+                            }
+                        });
+                        $.when.apply($, pluginHandlers).always(deferred.resolve);
+                    });
+            }).promise());
             return $.Deferred(function(deferred) {
                 $.when.apply($, activationTasks)
                     .then(router.activate)

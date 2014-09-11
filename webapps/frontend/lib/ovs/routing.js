@@ -14,7 +14,7 @@
 /*global define */
 define(['jquery'], function($) {
     "use strict";
-    var mainRoutes, siteRoutes, buildSiteRoutes, loadHash;
+    var mainRoutes, siteRoutes, buildSiteRoutes, loadHash, extraRoutes;
 
     mainRoutes = [
        { route: '',              moduleId: 'viewmodels/redirect', nav: false },
@@ -37,9 +37,15 @@ define(['jquery'], function($) {
         { route: 'users',                moduleId: 'users',                title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false }
     ];
+    extraRoutes = [];
 
     buildSiteRoutes = function(mode) {
-        var i;
+        var i, j;
+        for (i = 0; i < extraRoutes.length; i += 1) {
+            for (j = 0; j < extraRoutes[i].length; j += 1) {
+                siteRoutes.push(extraRoutes[i][j]);
+            }
+        }
         for (i = 0; i < siteRoutes.length; i += 1) {
             siteRoutes[i].hash = '#' + mode + '/' + siteRoutes[i].route;
         }
@@ -65,6 +71,7 @@ define(['jquery'], function($) {
     return {
         mainRoutes     : mainRoutes,
         siteRoutes     : siteRoutes,
+        extraRoutes    : extraRoutes,
         buildSiteRoutes: buildSiteRoutes,
         loadHash       : loadHash
     };
