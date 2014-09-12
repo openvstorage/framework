@@ -46,7 +46,7 @@ define([
                 var data = {
                     timestamp: self.data.snapshot().timestamp
                 };
-                api.post(self.data.type + 's/' + self.data.velement().guid() + '/rollback', data)
+                api.post(self.data.type + 's/' + self.data.velement().guid() + '/rollback', { data: data })
                     .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.rollback.gather.rollbackstarted'),

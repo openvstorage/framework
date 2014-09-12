@@ -49,7 +49,7 @@ define([
                         vrouter_port: self.data.vRouterPort()
                     }
                 };
-                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', post_data)
+                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })
                         .then(shared.tasks.wait)
                         .done(function() {
                             generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.addvpool.confirm.success', { what: self.data.name() }));

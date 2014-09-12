@@ -119,7 +119,7 @@ define([
                             if (contents !== undefined) {
                                 listOptions.contents = contents;
                             }
-                            self.loadHandle = api.get('vpools/' + self.guid(), undefined, listOptions)
+                            self.loadHandle = api.get('vpools/' + self.guid(), { queryparams: listOptions })
                                 .done(function(data) {
                                     self.fillData(data, options);
                                     mainDeferred.resolve();
@@ -136,7 +136,7 @@ define([
                                 vpoolguid: self.guid(),
                                 contents: ''
                             };
-                            self.machineHandle = api.get('vmachines', undefined, options)
+                            self.machineHandle = api.get('vmachines', { queryparams: options })
                                 .done(function(data) {
                                     var guids = [], vmdata = {};
                                     $.each(data, function(index, item) {
@@ -180,7 +180,7 @@ define([
                         vpoolguid: self.guid(),
                         contents: ''
                     };
-                    self.diskHandle = api.get('vdisks', undefined, options)
+                    self.diskHandle = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vddata = {};
                             $.each(data, function(index, item) {

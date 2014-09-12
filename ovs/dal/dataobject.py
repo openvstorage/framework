@@ -136,7 +136,7 @@ class DataObject(object):
         if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
             new_class = Descriptor().load(hybrid_structure[identifier]).get_object()
             return super(cls, new_class).__new__(new_class, *args, **kwargs)
-        return super(DataObject, cls).__new__(cls, *args, **kwargs)
+        return super(DataObject, cls).__new__(cls)
 
     def __init__(self, guid=None, data=None, datastore_wins=False):
         """

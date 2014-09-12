@@ -140,7 +140,7 @@ define([
                         sort: 'username',
                         contents: '_relations'
                     };
-                    self.loadUsersHandle = api.get('users', undefined, options)
+                    self.loadUsersHandle = api.get('users', { queryparams: options })
                         .done(function(data) {
                             var guids = [], udata = {};
                             $.each(data, function(i, item) {
@@ -194,7 +194,7 @@ define([
                         page: page,
                         contents: '_relations'
                     };
-                    self.refreshUsersHandle[page] = api.get('users', {}, options)
+                    self.refreshUsersHandle[page] = api.get('users', { queryparams: options })
                         .done(function(data) {
                             var guids = [], udata = {};
                             $.each(data, function(i, item) {
@@ -226,7 +226,7 @@ define([
                         userguid: self.selectedUserGuid(),
                         type: 'USER'
                     };
-                    self.loadClientsHandle = api.get('clients', undefined, options)
+                    self.loadClientsHandle = api.get('clients', { queryparams: options })
                         .done(function(data) {
                             var guids = [], cdata = {};
                             $.each(data, function(i, item) {
@@ -274,7 +274,7 @@ define([
                         contents: '_relations',
                         userguid: self.selectedUserGuid()
                     };
-                    self.refreshClientsHandle[page] = api.get('clients', {}, options)
+                    self.refreshClientsHandle[page] = api.get('clients', { querystring: options })
                         .done(function(data) {
                             var guids = [], cdata = {};
                             $.each(data, function(i, item) {
@@ -301,7 +301,7 @@ define([
                         sort: 'name',
                         contents: '_relations'
                     };
-                    self.loadGroupsHandle = api.get('groups', undefined, options)
+                    self.loadGroupsHandle = api.get('groups', { queryparams: options })
                         .done(function(data) {
                             var guids = [], gdata = {};
                             $.each(data, function(index, item) {
@@ -341,7 +341,7 @@ define([
                         sort: 'name',
                         contents: '_relations'
                     };
-                    self.loadRolesHandles = api.get('roles', undefined, options)
+                    self.loadRolesHandles = api.get('roles', { queryparams: options })
                         .done(function(data) {
                             var guids = [], rdata = {};
                             $.each(data, function(index, item) {
@@ -417,10 +417,12 @@ define([
         };
         self.saveClient = function() {
             api.post('clients', {
-                name: self.newClient().name(),
-                ovs_type: 'USER',
-                user_guid: self.selectedUserGuid(),
-                role_guids: self.newClient().roleGuids()
+                data: {
+                    name: self.newClient().name(),
+                    ovs_type: 'USER',
+                    user_guid: self.selectedUserGuid(),
+                    role_guids: self.newClient().roleGuids()
+                }
             })
                 .done(function() {
                     generic.alertSuccess(
@@ -442,10 +444,12 @@ define([
         };
         self.saveUser = function() {
             api.post('users', {
-                username: self.newUser().username(),
-                group_guid: self.newUser().group().guid(),
-                is_active: true,
-                password: generic.getTimestamp().toString()
+                data: {
+                    username: self.newUser().username(),
+                    group_guid: self.newUser().group().guid(),
+                    is_active: true,
+                    password: generic.getTimestamp().toString()
+                }
             })
                 .done(function() {
                     generic.alertSuccess(

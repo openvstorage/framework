@@ -27,7 +27,7 @@ import logging
 from configobj import ConfigObj
 import pyinotify
 from ovs.extensions.rabbitmq.processor import process
-from ovs.extensions.generic.system import Ovs
+from ovs.extensions.generic.system import System
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
@@ -43,7 +43,7 @@ def run_kvm_watcher():
     """
     Check whether to run the KVM file watcher
     """
-    return Ovs.get_my_storagerouter().pmachine.hvtype == 'KVM'
+    return System.get_my_storagerouter().pmachine.hvtype == 'KVM'
 
 
 def run_event_consumer():
@@ -52,7 +52,7 @@ def run_event_consumer():
     """
     rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
     rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'], ]
-    machine_id = Ovs.get_my_machine_id()
+    machine_id = System.get_my_machine_id()
     return machine_id in rmq_nodes
 
 

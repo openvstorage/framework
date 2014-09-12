@@ -48,9 +48,7 @@ define([
         // Functions
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                api.post('users/' + data.user().guid() + '/set_password', {
-                        new_password: self.newPassword()
-                    })
+                api.post('users/' + data.user().guid() + '/set_password', { data: { new_password: self.newPassword() } })
                     .done(function() {
                         generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:generic.messages.savesuccessfully', { what: $.t('ovs:generic.password') }));
                         deferred.resolve();

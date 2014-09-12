@@ -63,7 +63,7 @@ define([
                         contents: '',
                         query: JSON.stringify(self.query)
                     };
-                    self.loadVMachinesHandle = api.get('vmachines', {}, options)
+                    self.loadVMachinesHandle = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vmdata = {};
                             $.each(data, function(index, item) {
@@ -99,7 +99,7 @@ define([
                         contents: '_dynamics,_relations,-snapshots,-hypervisor_status',
                         query: JSON.stringify(self.query)
                     };
-                    self.refreshVMachinesHandle[page] = api.get('vmachines', {}, options)
+                    self.refreshVMachinesHandle[page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vmdata = {};
                             $.each(data, function(index, item) {

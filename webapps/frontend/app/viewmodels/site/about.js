@@ -50,7 +50,7 @@ define([
                     sort: 'name',
                     contents: ''
                 };
-                api.get('storagerouters', undefined, options)
+                api.get('storagerouters', { queryparams: options })
                     .done(function(data) {
                         var guids = [], sadata = {};
                         $.each(data, function(index, item) {

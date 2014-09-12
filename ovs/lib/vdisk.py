@@ -319,7 +319,13 @@ class VDiskController(object):
             logger.error('File already deleted at %s' % location)
             return
         client = SSHClient.load('127.0.0.1')
-        client.run_local('rm -f %s' % (location), sudo=True, shell=True)
+        output = client.run_local('rm -f %s' % (location), sudo=True, shell=True)
+        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        if os.path.exists(location):
+            raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
+        if output == '':
+            return True
+        raise RuntimeError(output)
 
     @staticmethod
     @celery.task(name='ovs.disk.extend_volume')

@@ -69,9 +69,11 @@ define([
         self.loadVPools = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    self.loadVPoolsHandle = api.get('vpools', undefined, {
-                        sort: 'name',
-                        contents: ''
+                    self.loadVPoolsHandle = api.get('vpools', {
+                        queryparams: {
+                            sort: 'name',
+                            contents: ''
+                        }
                     })
                         .done(function(data) {
                             var guids = [], vpdata = {};

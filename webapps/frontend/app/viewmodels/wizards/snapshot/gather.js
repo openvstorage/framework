@@ -47,7 +47,7 @@ define([
                     name: self.data.name(),
                     consistent: self.data.isConsistent()
                 };
-                api.post('vmachines/' + self.data.vm().guid() + '/snapshot', data)
+                api.post('vmachines/' + self.data.vm().guid() + '/snapshot', { data: data })
                     .then(function(taskID) {
                         generic.alertInfo(
                             $.t('ovs:wizards.snapshot.confirm.snapshotstarted'),

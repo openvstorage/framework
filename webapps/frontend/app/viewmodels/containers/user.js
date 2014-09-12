@@ -68,9 +68,8 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 api.patch('users/' + self.guid(), {
-                        group_guid: self.groupGuid()
-                    }, {
-                        contents: '_relations'
+                        data: { group_guid: self.groupGuid() },
+                        queryparams: { contents: '_relations' }
                     })
                     .done(function() {
                         generic.alertSuccess(

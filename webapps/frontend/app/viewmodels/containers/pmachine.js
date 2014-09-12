@@ -65,12 +65,13 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 api.patch('pmachines/' + self.guid(), {
-                        name: self.name(),
-                        mgmtcenter_guid: self.mgmtCenterGuid() === undefined ? null : self.mgmtCenterGuid(),
-                        ip: self.ipAddress(),
-                        hvtype: self.hvtype()
-                    }, {
-                        contents: 'mgmtcenter'
+                        data: {
+                            name: self.name(),
+                            mgmtcenter_guid: self.mgmtCenterGuid() === undefined ? null : self.mgmtCenterGuid(),
+                            ip: self.ipAddress(),
+                            hvtype: self.hvtype()
+                        },
+                        queryparams: { contents: 'mgmtcenter' }
                     })
                     .done(function() {
                         generic.alertSuccess(

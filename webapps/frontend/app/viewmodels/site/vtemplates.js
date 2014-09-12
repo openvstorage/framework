@@ -54,7 +54,7 @@ define([
                         contents: 'vdisks',
                         query: JSON.stringify(self.query)
                     };
-                    self.loadVTemplatesHandle = api.get('vmachines', {}, options)
+                    self.loadVTemplatesHandle = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vtdata = {};
                             $.each(data, function(index, item) {
@@ -90,7 +90,7 @@ define([
                         contents: 'vdisks',
                         query: JSON.stringify(self.query)
                     };
-                    self.refreshVTemplatesHandle[page] = api.get('vmachines', {}, options)
+                    self.refreshVTemplatesHandle[page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vtdata = {};
                             $.each(data, function(index, item) {

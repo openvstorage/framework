@@ -155,7 +155,7 @@ define([
                     if (contents !== undefined) {
                         options.contents = contents;
                     }
-                    self.loadHandle = api.get('storagerouters/' + self.guid(), undefined, options)
+                    self.loadHandle = api.get('storagerouters/' + self.guid(), { queryparams: options })
                         .done(function(data) {
                             self.fillData(data);
                             self.loaded(true);

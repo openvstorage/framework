@@ -62,7 +62,7 @@ class MessagingViewSet(viewsets.ViewSet):
             messages, last_message_id = MessageController.get_messages(subscriber_id, message_id)
             if len(messages) == 0:
                 counter += 1
-                if counter >= 240:
+                if counter >= 120:  # 120 * 0.5 seconds = 60 seconds  = 1 minute
                     break
                 gevent.sleep(.5)
         if len(messages) == 0:

@@ -100,7 +100,7 @@ define([
                     if (page !== undefined) {
                         options.page = page;
                     }
-                    self.loadPMachinesHandle = api.get('pmachines', undefined, options)
+                    self.loadPMachinesHandle = api.get('pmachines', { queryparams: options })
                         .done(function(data) {
                             var guids = [], pmdata = {};
                             $.each(data, function(index, item) {
@@ -180,7 +180,7 @@ define([
                     if (page !== undefined) {
                         options.page = page;
                     }
-                    self.loadMgmtCentersHandle = api.get('mgmtcenters', undefined, options)
+                    self.loadMgmtCentersHandle = api.get('mgmtcenters', { queryparams: options })
                         .done(function(data) {
                             var guids = [], mcdata = {};
                             $.each(data, function(index, item) {

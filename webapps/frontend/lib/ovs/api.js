@@ -11,29 +11,32 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'jquery', 'ovs/shared', 'ovs/generic'
 ], function($, shared, generic) {
     'use strict';
-    function call(api, data, filter, type) {
+    function call(api, options, type) {
         var querystring = [], key, callData, jqXhr,
-            deferred = $.Deferred();
+            deferred = $.Deferred(), queryparams, data;
 
-        filter = filter || {};
-        filter.timestamp = generic.getTimestamp();
-        for (key in filter) {
-            if (filter.hasOwnProperty(key)) {
-                querystring.push(key + '=' + filter[key]);
+        options = options || {};
+
+        queryparams = generic.tryGet(options, 'queryparams', {});
+        queryparams.timestamp = generic.getTimestamp();
+        for (key in queryparams) {
+            if (queryparams.hasOwnProperty(key)) {
+                querystring.push(key + '=' + queryparams[key]);
             }
         }
 
         callData = {
             type: type,
-            timeout: 1000 * 60 * 60,
+            timeout: generic.tryGet(options, 'timeout', 1000 * 60 * 60),
             contentType: 'application/json',
             headers: { Accept: 'application/json; version=*' }
         };
+        data = generic.tryGet(options, 'data');
         if (type !== 'GET' || !$.isEmptyObject(data)) {
             callData.data = JSON.stringify(data);
         }
@@ -46,6 +49,14 @@ define([
                 // We check whether we actually received an error, and it's not the browser navigating away
                 if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 502) {
                     generic.validate(shared.nodes);
+                    window.setTimeout(function() {
+                        deferred.reject({
+                            status: xmlHttpRequest.status,
+                            statusText: xmlHttpRequest.statusText,
+                            readyState: xmlHttpRequest.readyState,
+                            responseText: xmlHttpRequest.responseText
+                        });
+                    }, 11000);
                 } else if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 403 &&
                            xmlHttpRequest.responseText === '{"detail": "Invalid token"}') {
                     shared.authentication.logout();
@@ -58,24 +69,32 @@ define([
                     });
                 } else if (xmlHttpRequest.readyState === 0 && xmlHttpRequest.status === 0) {
                     generic.validate(shared.nodes);
+                    window.setTimeout(function() {
+                        deferred.reject({
+                            status: xmlHttpRequest.status,
+                            statusText: xmlHttpRequest.statusText,
+                            readyState: xmlHttpRequest.readyState,
+                            responseText: xmlHttpRequest.responseText
+                        });
+                    }, 11000);
                 }
             });
         return deferred.promise(jqXhr);
     }
-    function get(api, data, filter) {
-        return call(api, data, filter, 'GET');
+    function get(api, options) {
+        return call(api, options, 'GET');
     }
-    function del(api, data, filter) {
-        return call(api, data, filter, 'DELETE');
+    function del(api, options) {
+        return call(api, options, 'DELETE');
     }
-    function post(api, data, filter) {
-        return call(api, data, filter, 'POST');
+    function post(api, options) {
+        return call(api, options, 'POST');
     }
-    function put(api, data, filter) {
-        return call(api, data, filter, 'PUT');
+    function put(api, options) {
+        return call(api, options, 'PUT');
     }
-    function patch(api, data, filter) {
-        return call(api, data, filter, 'PATCH');
+    function patch(api, options) {
+        return call(api, options, 'PATCH');
     }
 
     return {
