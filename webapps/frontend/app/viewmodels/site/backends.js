@@ -54,7 +54,7 @@ define([
                         sort: 'name',
                         contents: '_relations'
                     };
-                    self.loadBackendsHandle = api.get('backends', {}, options)
+                    self.loadBackendsHandle = api.get('backends', { queryparams: options })
                         .done(function(data) {
                             var guids = [], bdata = {};
                             $.each(data, function(index, item) {
@@ -98,7 +98,7 @@ define([
                         page: page,
                         contents: '_relations'
                     };
-                    self.refreshBackendsHandle[page] = api.get('backends', {}, options)
+                    self.refreshBackendsHandle[page] = api.get('backends', { queryparams: options })
                         .done(function(data) {
                             var guids = [], bdata = {};
                             $.each(data, function(index, item) {
@@ -138,7 +138,7 @@ define([
                             items: [['has_plugin', 'EQUALS', true]]
                         })
                     };
-                    self.loadBackendTypesHandle = api.get('backendtypes', undefined, options)
+                    self.loadBackendTypesHandle = api.get('backendtypes', { queryparams: options })
                         .done(function(data) {
                             var guids = [], btdata = {};
                             $.each(data, function(index, item) {

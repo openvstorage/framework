@@ -45,7 +45,7 @@ define([
             return $.Deferred(function(deferred) {
                 self.loading(true);
                 if (generic.xhrCompleted(self.loadHandle)) {
-                    self.loadHandle = api.get('backends/' + self.guid(), undefined, { contents: '_relations' })
+                    self.loadHandle = api.get('backends/' + self.guid(), { queryparams: { contents: '_relations' } })
                         .done(function(data) {
                             self.fillData(data);
                             deferred.resolve(data);
