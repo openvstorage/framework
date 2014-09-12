@@ -19,7 +19,7 @@ Generic system module, executing statements on local node
 from subprocess import check_output
 
 
-class System():
+class System(object):
     """
     Generic helper class
     """

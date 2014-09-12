@@ -67,6 +67,16 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         """
         Wrapper function
         """
+        def _try_parse(value):
+            """
+            Tries to parse a value to a pythonic value
+            """
+            if value == 'true':
+                return True
+            if value == 'false':
+                return False
+            return value
+
         def new_function(self, request, **kwargs):
             """
             Wrapped function
@@ -112,18 +122,18 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                     if name not in request.DATA:
                         if name not in request.QUERY_PARAMS:
                             raise NotAcceptable('Invalid data passed: {0} is missing'.format(name))
-                        new_kwargs[name] = request.QUERY_PARAMS[name]
+                        new_kwargs[name] = _try_parse(request.QUERY_PARAMS[name])
                     else:
-                        new_kwargs[name] = request.DATA[name]
+                        new_kwargs[name] = _try_parse(request.DATA[name])
             # Try to fill optional parameters
             for name in optional_vars:
                 if name in kwargs:
                     new_kwargs[name] = kwargs[name]
                 else:
                     if name in request.DATA:
-                        new_kwargs[name] = request.DATA[name]
+                        new_kwargs[name] = _try_parse(request.DATA[name])
                     elif name in request.QUERY_PARAMS:
-                        new_kwargs[name] = request.QUERY_PARAMS[name]
+                        new_kwargs[name] = _try_parse(request.QUERY_PARAMS[name])
             # Call the function
             return f(self, **new_kwargs)
         return new_function
