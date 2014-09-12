@@ -29,16 +29,6 @@ define([
             if (self.data.backend() !== 'LOCAL' && self.data.backend() !== 'DISTRIBUTED') {
                 self.data.mtptBFS('/'); // BFS isn't used, so it set to a non-conflicting value
             }
-            if (self.data.mtptReadCache() === '/' && $.inArray('readcache', fields) === -1) {
-                valid = false;
-                fields.push('readcache');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-            }
-            if (self.data.mtptWriteCache() === '/' && $.inArray('writecache', fields) === -1) {
-                valid = false;
-                fields.push('writecache');
-                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-            }
             if (self.data.mtptFOC() === '/' && $.inArray('foc', fields) === -1) {
                 valid = false;
                 fields.push('foc');
@@ -63,17 +53,7 @@ define([
                 if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineId())) {
                     return true;
                 }
-                if (self.data.mtptReadCache() === storageDriver.mountpointCache() && $.inArray('readcache', fields) === -1) {
-                    valid = false;
-                    fields.push('readcache');
-                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-                }
-                if (self.data.mtptWriteCache() === storageDriver.mountpointCache() && $.inArray('writecache', fields) === -1) {
-                    valid = false;
-                    fields.push('writecache');
-                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-                }
-                if (self.data.mtptFOC() === storageDriver.mountpointCache() && $.inArray('foc', fields) === -1) {
+                if (self.data.mtptFOC() === storageDriver.mountpointFOC() && $.inArray('foc', fields) === -1) {
                     valid = false;
                     fields.push('foc');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
@@ -83,17 +63,18 @@ define([
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
                 }
-//                if (self.data.mtptMD() === storageDriver.mountpointMD() && $.inArray('md', fields) === -1) {
-//                    valid = false;
-//                    fields.push('md');
-//                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.mdfs') }));
-//                }
+                if (self.data.mtptMD() === storageDriver.mountpointMD() && $.inArray('md', fields) === -1) {
+                    valid = false;
+                    fields.push('md');
+                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.mdfs') }));
+                }
                 if (self.data.mtptTemp() === storageDriver.mountpointTemp() && $.inArray('temp', fields) === -1) {
                     valid = false;
                     fields.push('temp');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                 }
-                if ((self.data.mtptBFS() === storageDriver.mountpointCache() || self.data.mtptBFS() === storageDriver.mountpointMD() ||
+                if ((self.data.mtptBFS() === storageDriver.mountpointMD() || self.data.mtptBFS() === storageDriver.mountpointReadCache() ||
+                        self.data.mtptBFS() === storageDriver.mountpointWriteCache() || self.data.mtptBFS() === storageDriver.mountpointFOC() ||
                         self.data.mtptBFS() === storageDriver.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
                     valid = false;
                     fields.push('bfs');
