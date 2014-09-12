@@ -44,7 +44,9 @@ define([
                         mountpoint_temp: self.data.mtptTemp(),
                         mountpoint_bfs: self.data.mtptBFS(),
                         mountpoint_md: self.data.mtptMD(),
-                        mountpoint_cache: self.data.mtptCache(),
+                        mountpoint_readcache: self.data.mtptReadCache(),
+                        mountpoint_writecache: self.data.mtptWriteCache(),
+                        mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
                         vrouter_port: self.data.vRouterPort()
                     }
