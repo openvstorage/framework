@@ -24,19 +24,21 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.loading         = ko.observable(false);
-        self.loaded          = ko.observable(false);
-        self.guid            = ko.observable(guid);
-        self.name            = ko.observable();
-        self.port            = ko.observable();
-        self.clusterIP       = ko.observable();
-        self.storageIP       = ko.observable();
-        self.storageDriverID = ko.observable();
-        self.mountpoint      = ko.observable();
-        self.mountpointTemp  = ko.observable();
-        self.mountpointBFS   = ko.observable();
-        self.mountpointMD    = ko.observable();
-        self.mountpointCache = ko.observable();
+        self.loading              = ko.observable(false);
+        self.loaded               = ko.observable(false);
+        self.guid                 = ko.observable(guid);
+        self.name                 = ko.observable();
+        self.port                 = ko.observable();
+        self.clusterIP            = ko.observable();
+        self.storageIP            = ko.observable();
+        self.storageDriverID      = ko.observable();
+        self.mountpoint           = ko.observable();
+        self.mountpointTemp       = ko.observable();
+        self.mountpointBFS        = ko.observable();
+        self.mountpointMD         = ko.observable();
+        self.mountpointReadCache  = ko.observable();
+        self.mountpointWriteCache = ko.observable();
+        self.mountpointFOC        = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -49,7 +51,9 @@ define([
             self.mountpointTemp(data.mountpoint_temp);
             self.mountpointBFS(data.mountpoint_bfs);
             self.mountpointMD(data.mountpoint_md);
-            self.mountpointCache(data.mountpoint_cache);
+            self.mountpointReadCache(data.mountpoint_readcache);
+            self.mountpointWriteCache(data.mountpoint_writecache);
+            self.mountpointFOC(data.mountpoint_foc);
             self.loaded(true);
             self.loading(false);
         };

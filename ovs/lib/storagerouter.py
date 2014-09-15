@@ -218,11 +218,15 @@ if Service.has_service('{0}'):
 
         mountpoint_temp = parameters['mountpoint_temp']
         mountpoint_md = parameters['mountpoint_md']
-        mountpoint_cache = parameters['mountpoint_cache']
+        mountpoint_readcache = parameters['mountpoint_readcache']
+        mountpoint_writecache = parameters['mountpoint_writecache']
+        mountpoint_foc = parameters['mountpoint_foc']
 
         directories_to_create.append(mountpoint_temp)
         directories_to_create.append(mountpoint_md)
-        directories_to_create.append(mountpoint_cache)
+        directories_to_create.append(mountpoint_readcache)
+        directories_to_create.append(mountpoint_writecache)
+        directories_to_create.append(mountpoint_foc)
 
         client = SSHClient.load(ip)
         dir_create_script = """
@@ -233,10 +237,12 @@ for directory in {0}:
 """.format(directories_to_create)
         System.exec_remote_python(client, dir_create_script)
 
-        cache_fs = os.statvfs(mountpoint_cache)
-        scocache = '{}/sco_{}'.format(mountpoint_cache, vpool_name)
-        readcache = '{}/read_{}'.format(mountpoint_cache, vpool_name)
-        failovercache = '{}/foc_{}'.format(mountpoint_cache, vpool_name)
+        read_cache_fs = os.statvfs(mountpoint_readcache)
+        write_cache_fs = os.statvfs(mountpoint_writecache)
+        fdcache = '{}/fd_{}'.format(mountpoint_writecache, vpool_name)
+        scocache = '{}/sco_{}'.format(mountpoint_writecache, vpool_name)
+        readcache = '{}/read_{}'.format(mountpoint_readcache, vpool_name)
+        failovercache = '{}/foc_{}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
         dirs2create = [scocache, failovercache, metadatapath, tlogpath,
@@ -246,8 +252,8 @@ for directory in {0}:
         # 20% = scocache
         # 20% = failovercache (@TODO: check if this can possibly consume more than 20%)
         # 60% = readcache
-        scocache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
-        readcache_size = '{0}KiB'.format((int(cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
+        scocache_size = '{0}KiB'.format((int(write_cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
+        readcache_size = '{0}KiB'.format((int(read_cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
         if new_storagedriver:
             ports_used_in_model = [port_storagedriver.port for port_storagedriver in
                                    StorageDriverList.get_storagedrivers_by_storagerouter(storagerouter.guid)]
@@ -311,7 +317,7 @@ for directory in {0}:
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 
-fd_config = {{'fd_cache_path': '{11}/fd_{0}',
+fd_config = {{'fd_cache_path': '{11}',
               'fd_extent_cache_capacity': '1024',
               'fd_namespace' : 'fd-{0}-{12}',
               'fd_policy_id' : ''}}
@@ -328,7 +334,7 @@ storagedriver_configuration.configure_hypervisor('{10}')
 storagedriver_configuration.configure_filedriver(fd_config)
 """.format(vpool_name, vpool.metadata, readcaches, scocaches, failovercache, filesystem_config,
            volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           storagerouter.pmachine.hvtype, mountpoint_cache, vpool.guid)
+           storagerouter.pmachine.hvtype, fdcache, vpool.guid)
         System.exec_remote_python(client, storagedriver_config_script)
         remote_script = """
 import os
@@ -364,7 +370,9 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.port = vrouter_port
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.mountpoint_temp = mountpoint_temp
-        storagedriver.mountpoint_cache = mountpoint_cache
+        storagedriver.mountpoint_readcache = mountpoint_readcache
+        storagedriver.mountpoint_writecache = mountpoint_writecache
+        storagedriver.mountpoint_foc = mountpoint_foc
         storagedriver.mountpoint_bfs = mountpoint_bfs
         storagedriver.mountpoint_md = mountpoint_md
         storagedriver.storagerouter = storagerouter
@@ -372,8 +380,8 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.save()
 
         dirs2create.append(storagedriver.mountpoint)
-        dirs2create.append(mountpoint_cache + '/' + '/fd_' + vpool_name)
-        dirs2create.append('{0}/fd_{1}'.format(mountpoint_cache, vpool_name))
+        dirs2create.append(mountpoint_writecache + '/' + '/fd_' + vpool_name)
+        dirs2create.append('{0}/fd_{1}'.format(mountpoint_writecache, vpool_name))
 
         file_create_script = """
 import os
@@ -539,10 +547,10 @@ if Service.has_service('{0}'):
 
         # Cleanup directories
         client = SSHClient.load(ip)
-        client.run('rm -rf {}/read_{}'.format(storagedriver.mountpoint_cache, vpool.name))
-        client.run('rm -rf {}/sco_{}'.format(storagedriver.mountpoint_cache, vpool.name))
-        client.run('rm -rf {}/foc_{}'.format(storagedriver.mountpoint_cache, vpool.name))
-        client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_cache, vpool.name))
+        client.run('rm -rf {}/read_{}'.format(storagedriver.mountpoint_readcache, vpool.name))
+        client.run('rm -rf {}/sco_{}'.format(storagedriver.mountpoint_writecache, vpool.name))
+        client.run('rm -rf {}/foc_{}'.format(storagedriver.mountpoint_foc, vpool.name))
+        client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_writecache, vpool.name))
         client.run('rm -rf {}/metadata_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(storagedriver.mountpoint_md, vpool.name))
 
@@ -550,7 +558,9 @@ if Service.has_service('{0}'):
         client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
 
         # Remove top directories
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_cache))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_readcache))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_writecache))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_foc))
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_md))
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
 

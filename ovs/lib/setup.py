@@ -23,7 +23,6 @@ import time
 import ConfigParser
 import urllib2
 import base64
-from string import digits
 from subprocess import check_output
 
 from ovs.extensions.generic.sshclient import SSHClient
@@ -34,7 +33,7 @@ from ovs.log.logHandler import LogHandler
 logger = LogHandler('lib', name='setup')
 logger.logger.propagate = False
 
-# @TODO: Make the setup_node idempotent
+# @TODO: Make the setup_node re-entrant
 # @TODO: Make it possible to run as a non-privileged user
 # @TODO: Node password identical for all nodes
 
@@ -43,6 +42,8 @@ class SetupController(object):
     """
     This class contains all logic for setting up an environment, installed with system-native packages
     """
+
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache1'}
 
     @staticmethod
     def setup_node(ip=None, force_type=None, verbose=False):
@@ -57,6 +58,8 @@ class SetupController(object):
             logger.info('Starting Open vStorage Setup')
 
             # Prepare variables
+            auto_config = False
+            disk_layout = {}
             target_password = None
             join_cluster = False
             cluster_name = None
@@ -64,10 +67,6 @@ class SetupController(object):
             master_ip = None
             node_type = None  # in ['master', 'extra']
             nodes = []
-            extra_hdd_storage = ''
-            extra_hdd_mountpoint = ''
-            use_hdd_io_ssd = ''
-            ssd_mountpoint = ''
             hypervisor_type = ''
             hypervisor_name = ''
             hypervisor_ip = ''
@@ -92,10 +91,6 @@ class SetupController(object):
                 cluster_name = str(config.get('setup', 'cluster_name'))
                 join_cluster = config.getboolean('setup', 'join_cluster')
                 master_ip = config.get('setup', 'master_ip')
-                extra_hdd_storage = config.getboolean('setup', 'extra_hdd_storage')
-                extra_hdd_mountpoint = config.get('setup', 'extra_hdd_mountpoint')
-                use_hdd_io_ssd = config.get('setup', 'use_hdd_io_ssd')
-                ssd_mountpoint = config.get('setup', 'ssd_mountpoint')
                 hypervisor_type = config.get('setup', 'hypervisor_type')
                 hypervisor_name = config.get('setup', 'hypervisor_name')
                 hypervisor_ip = config.get('setup', 'hypervisor_ip')
@@ -103,6 +98,8 @@ class SetupController(object):
                 hypervisor_password = config.get('setup', 'hypervisor_password')
                 arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
                 verbose = config.getboolean('setup', 'verbose')
+                auto_config = config.get('setup', 'auto_config')
+                disk_layout = eval(config.get('setup', 'disk_layout'))
 
             if force_type is not None:
                 force_type = force_type.lower()
@@ -217,11 +214,9 @@ class SetupController(object):
             # Creating filesystems
             print '\n+++ Creating filesystems +++\n'
             logger.info('Creating filesystems')
-            if extra_hdd_storage == '' or extra_hdd_storage is None:
-                extra_hdd_storage = Interactive.ask_yesno('Do you want to configure an additional HDD for data storage?', default_value=False)
-                if extra_hdd_storage:
-                    logger.debug('Extra HDD should be configured')
-            SetupController._create_filesystems(target_client, extra_hdd_storage, extra_hdd_mountpoint, use_hdd_io_ssd, ssd_mountpoint)
+            disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
+            mountpoints = disk_layout.keys()
+            mountpoints.sort()
 
             # Get target grid ip
             print '\n+++ Collecting generic information +++\n'
@@ -280,9 +275,6 @@ class SetupController(object):
             logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_ip, hypervisor_username))
 
             # Ask for Arakoon's db location
-            mountpoints = target_client.run('mount -v').strip().split('\n')
-            mountpoints = [p.split(' ')[2] for p in mountpoints if
-                           len(p.split(' ')) > 2 and ('/mnt/' in p.split(' ')[2] or '/var' in p.split(' ')[2])]
             if not arakoon_mountpoint:
                 arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
                                                             default_value=Interactive.find_in_list(mountpoints, 'db'))
@@ -405,7 +397,7 @@ class SetupController(object):
 
             print 'Adding services'
             logger.info('Adding services')
-            params = {'<ARAKOON_NODE_ID>' : unique_id,
+            params = {'<ARAKOON_NODE_ID>': unique_id,
                       '<MEMCACHE_NODE_IP>': cluster_ip,
                       '<WORKER_QUEUE>': unique_id}
             if join_masters:
@@ -729,7 +721,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 
                 rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client, True)
                 if ovs_rabbitmq_running and same_process:
-                    pass # correct process is running
+                    pass  # correct process is running
                 elif rabbitmq_running and not ovs_rabbitmq_running:
                     # wrong process is running, must be stopped and correct one started
                     print('WARNING: an instance of rabbitmq-server is running, this needs to be stopped, ovs-rabbitmq will be started instead')
@@ -930,141 +922,393 @@ print Service.stop_service('{0}')
         SetupController._remote_config_write(target_client, arakoon_server_config.format(cluster), server_config)
 
     @staticmethod
-    def _create_filesystems(fs_client, create_extra, extra_hdd_mountpoint, use_hdd_io_ssd, ssd_mountpoint):
+    def _get_disk_configuration(client):
         """
-        Creates filesystems on the first two additional disks
+        Connect to target host and retrieve sata/ssd/raid configuration
         """
-        # Scan block devices
-        drive_lines = fs_client.run(
-            "ls -l /dev/* | grep -E '/dev/(sd..?|fio..?|vd..?|xvd..?)' | sed 's/\s\s*/ /g' | cut -d ' ' -f 10"
-        ).strip().split('\n')
-        drives = {}
-        for drive in drive_lines:
-            partition = drive.strip()
-            if partition == '':
-                continue
-            drive = partition.translate(None, digits)
-            if '/dev/sd' in drive or '/dev/vd' in drive or '/dev/xvd' in drive:
-                if drive not in drives:
-                    identifier = drive.replace('/dev/', '')
-                    if fs_client.run('cat /sys/block/{0}/device/type 2>/dev/null || echo "0"'.format(identifier)).strip() == '0' \
-                            and fs_client.run('cat /sys/block/{0}/removable 2>/dev/null || echo "0"'.format(identifier)).strip() == '0':
-                        ssd_output = fs_client.run(
-                            "/usr/bin/lsscsi | grep 'FUSIONIO' | grep {0} || true".format(drive)
-                        ).strip()
-                        ssd_output += str(fs_client.run(
-                            "hdparm -I {0} 2> /dev/null | grep 'Solid State' || true".format(drive)
-                        ).strip())
-                        drives[drive] = {'ssd': ('Solid State' in ssd_output or 'FUSIONIO' in ssd_output),
-                                         'partitions': []}
-                if drive in drives:
-                    drives[drive]['partitions'].append(partition)
-            else:
-                if drive not in drives:
-                    drives[drive] = {'ssd': True, 'partitions': []}
-                drives[drive]['partitions'].append(partition)
-        mounted = [device.strip() for device in fs_client.run("mount | cut -d ' ' -f 1").strip().split('\n')]
-        root_partition = fs_client.run("mount | grep 'on / ' | cut -d ' ' -f 1").strip()
-        # Start preparing partitions
-        extra_mountpoints = ''
-        hdds = [drive for drive, info in drives.iteritems() if
-                info['ssd'] is False and root_partition not in info['partitions']]
-        if create_extra:
-            # Create partitions on HDD
-            if len(hdds) == 0:
-                raise Exception('No HDD was found. At least one HDD is required when creating extra filesystems')
-            if len(hdds) > 1:
-                if not extra_hdd_mountpoint:
-                    hdd = Interactive.ask_choice(hdds, question='Choose the HDD to use for Open vStorage')
-                else:
-                    hdd = extra_hdd_mountpoint
-            else:
-                hdd = hdds[0]
-            print 'Using {0} as extra HDD'.format(hdd)
-            hdds.remove(hdd)
-            for partition in drives[hdd]['partitions']:
-                if partition in mounted:
-                    fs_client.run('umount {0}'.format(partition))
-            fs_client.run('parted {0} -s mklabel gpt'.format(hdd))
-            fs_client.run('parted {0} -s mkpart backendfs 2MB 80%'.format(hdd))
-            fs_client.run('parted {0} -s mkpart tempfs 80% 100%'.format(hdd))
-            fs_client.run('mkfs.ext4 -q {0}1 -L backendfs'.format(hdd))
-            fs_client.run('mkfs.ext4 -q {0}2 -L tempfs'.format(hdd))
 
-            extra_mountpoints = """
-LABEL=backendfs /mnt/bfs         ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=tempfs    /var/tmp         ext4    defaults,nobootwait,noatime,discard    0    2
+        remote_script = """
+from string import digits
+import pyudev
+import glob
+import re
+import os
+
+blk_patterns = ['sd.*', 'fio.*', 'vd.*', 'xvd.*']
+blk_devices = dict()
+
+def get_boot_device():
+    mtab = open('/etc/mtab').read().splitlines()
+    for line in mtab:
+        if ' / ' in line:
+            boot_partition = line.split()[0]
+            return boot_partition.lstrip('/dev/').translate(None, digits)
+
+boot_device = get_boot_device()
+
+def get_value(device, property):
+    return str(open('/sys/block/' + device + '/' + property).read())
+
+def get_size_in_bytes(device):
+    sectors = get_value(device, 'size')
+    sector_size = get_value(device, 'queue/hw_sector_size')
+    return float(sectors) * float(sector_size)
+
+def get_device_type(device):
+    '''
+    determine ssd or disk = accurate
+    determine ssd == accelerator = best guess
+
+    Returns: disk|ssd|accelerator|unknown
+    '''
+
+    rotational = get_value(device, 'queue/rotational')
+    if '1' in str(rotational):
+        return 'disk'
+    else:
+        return 'ssd'
+
+def is_part_of_sw_raid(device):
+    #ID_FS_TYPE linux_raid_member
+    #ID_FS_USAGE raid
+
+    context = pyudev.Context()
+    devices = context.list_devices(subsystem='block')
+    is_raid_member = False
+
+    for entry in devices:
+        if device not in entry['DEVNAME']:
+            continue
+
+        if entry['DEVTYPE']=='partition' and 'ID_FS_USAGE' in entry.keys():
+            if 'raid' in entry['ID_FS_USAGE'].lower():
+                is_raid_member = True
+
+    return is_raid_member
+
+def get_drive_model(device):
+    context = pyudev.Context()
+    devices = context.list_devices(subsystem='block')
+
+    for entry in devices:
+        if device not in entry['DEVNAME']:
+            continue
+
+        if entry['DEVTYPE']=='disk' and 'ID_MODEL' in entry.keys():
+            return str(entry['ID_MODEL'])
+
+    if 'fio' in device:
+        return 'FUSIONIO'
+
+    return ''
+
+def get_device_details(device):
+    return {'size' : get_size_in_bytes(device),
+            'type' : get_device_type(device),
+            'software_raid' : is_part_of_sw_raid(device),
+            'model' : get_drive_model(device),
+            'boot_device' : device == boot_device
+           }
+
+for device_path in glob.glob('/sys/block/*'):
+    device = os.path.basename(device_path)
+    for pattern in blk_patterns:
+        if re.compile(pattern).match(device):
+            blk_devices[device] = get_device_details(device)
+
+
+print blk_devices
 """
 
-        # Create partitions on SSD
-        ssds = [drive for drive, info in drives.iteritems() if
-                info['ssd'] is True and root_partition not in info['partitions']]
-        ssd = None
-        if len(ssds) == 0:
-            if len(hdds) > 0:
-                if not use_hdd_io_ssd:
-                    print 'No SSD found, but one or more HDDs are found that can be used instead.'
-                    print 'However, using a HDD instead of an SSD will cause severe performance loss.'
-                    continue_install = Interactive.ask_yesno('Are you sure you want to continue?', default_value=False)
-                    if continue_install:
-                        ssd = Interactive.ask_choice(hdds, question='Choose the HDD to use as SSD replacement')
-                elif use_hdd_io_ssd:
-                    ssd = ssd_mountpoint
+        return SetupController._exec_python(client, remote_script)
+
+    @staticmethod
+    def _generate_default_partition_layout(blk_devices):
+        """
+        Process detected block devices while
+        - ignoring bootdevice unless it's the only one
+        - ignoring devices part of a software raid
+
+        """
+
+        mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 25, 'label': 'mdpath'},
+                                   '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 25, 'label': 'db'},
+                                   '/mnt/cache1': dict(SetupController.PARTITION_DEFAULTS),
+                                   '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 80, 'label': 'backendfs'},
+                                   '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 20, 'label': 'tempfs'}}
+
+        selected_devices = dict(blk_devices)
+        skipped_devices = set()
+        for device, values in blk_devices.iteritems():
+            if values['boot_device']:
+                skipped_devices.add(device)
+            if values['software_raid']:
+                skipped_devices.add(device)
+
+        for device in skipped_devices:
+            selected_devices.pop(device)
+
+        ssd_devices = list()
+        disk_devices = list()
+
+        for device, values in selected_devices.iteritems():
+            if values['type'] == 'ssd':
+                ssd_devices.append('/dev/' + device)
+            if values['type'] == 'disk':
+                disk_devices.append('/dev/' + device)
+
+        nr_of_ssds = len(ssd_devices)
+        nr_of_disks = len(disk_devices)
+
+        print '{0} ssd devices: {1}'.format(nr_of_ssds, str(ssd_devices))
+        print '{0} sata drives: {1}'.format(nr_of_disks, str(disk_devices))
+        print
+
+        if nr_of_disks == 1:
+            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
+            mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[0]
+
+        elif nr_of_disks >= 2:
+            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
+            mountpoints_to_allocate['/var/tmp']['percentage'] = 100
+            mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[1]
+            mountpoints_to_allocate['/mnt/bfs']['percentage'] = 100
+
+        if nr_of_ssds == 1:
+            mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[0]
+
+        elif nr_of_ssds >= 2:
+            for count in xrange(nr_of_ssds):
+                marker = str('/mnt/cache' + str(count + 1))
+                mountpoints_to_allocate[marker] = dict(SetupController.PARTITION_DEFAULTS)
+                mountpoints_to_allocate[marker]['device'] = ssd_devices[count]
+                mountpoints_to_allocate[marker]['label'] = 'cache' + str(count + 1)
+                if count < 2:
+                    cache_size = 75
                 else:
-                    raise Exception('Insufficient SSD devices')
-            else:
-                raise Exception('No SSD found. At least one SSD (or replacing HDD) is required.')
-        elif len(ssds) > 1:
-            if not ssd_mountpoint:
-                ssd = Interactive.ask_choice(ssds, question='Choose the SSD to use for Open vStorage')
-            else:
-                ssd = ssd_mountpoint
-        else:
-            if not ssd_mountpoint:
-                ssd = ssds[0]
-            else:
-                ssd = ssd_mountpoint
+                    cache_size = 100
+                mountpoints_to_allocate[marker]['percentage'] = cache_size
 
-        print 'Using {0} as SSD'.format(ssd)
-        for partition in drives[ssd]['partitions']:
-            if partition in mounted:
-                fs_client.run('umount {0}'.format(partition))
-        fs_client.run('parted {0} -s mklabel gpt'.format(ssd))
-        fs_client.run('parted {0} -s mkpart cache 2MB 50%'.format(ssd))
-        fs_client.run('parted {0} -s mkpart db 50% 75%'.format(ssd))
-        fs_client.run('parted {0} -s mkpart mdpath 75% 100%'.format(ssd))
-        fs_client.run('mkfs.ext4 -q {0}1 -L cache'.format(ssd))
-        fs_client.run('mkfs.ext4 -q {0}2 -L db'.format(ssd))
-        fs_client.run('mkfs.ext4 -q {0}3 -L mdpath'.format(ssd))
+            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[1]
 
-        fs_client.run('mkdir -p /mnt/db')
-        fs_client.run('mkdir -p /mnt/cache')
-        fs_client.run('mkdir -p /mnt/md')
+        return mountpoints_to_allocate, skipped_devices
 
-        # Add content to fstab
-        new_filesystems = """
-# BEGIN Open vStorage
-LABEL=db        /mnt/db    ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=cache     /mnt/cache ext4    defaults,nobootwait,noatime,discard    0    2
-LABEL=mdpath    /mnt/md    ext4    defaults,nobootwait,noatime,discard    0    2
-{0}
-# END Open vStorage
-""".format(extra_mountpoints)
+    @staticmethod
+    def _partition_disks(client, partition_layout):
+        fstab_entry = 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2 \n'
+        mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().split('\n')]
+
+        unique_disks = set()
+        for mp, values in partition_layout.iteritems():
+            unique_disks.add(values['device'])
+
+            # umount partitions
+            if mp in mounted:
+                print 'Unmounting {0}'.format(mp)
+                client.run('umount {0}'.format(mp))
+
+        # wipe disks
+        for disk in unique_disks:
+            if disk == 'DIR_ONLY':
+                continue
+            client.run('parted {0} -s mklabel gpt'.format(disk))
+
+        # pre process partition info (disk as key)
+        mountpoints = partition_layout.keys()
+        mountpoints.sort()
+        partitions_by_disk = dict()
+        for mp in mountpoints:
+            partition = partition_layout[mp]
+            disk = partition['device']
+            percentage = partition['percentage']
+            label = partition['label']
+            if disk in partitions_by_disk:
+                partitions_by_disk[disk].append((mp, percentage, label))
+            else:
+                partitions_by_disk[disk] = [(mp, percentage, label)]
+
+        # partition and format disks
+        fstab = '# BEGIN Open vStorage \n'
+        for disk, partitions in partitions_by_disk.iteritems():
+            if disk == 'DIR_ONLY':
+                for directory, _, _ in partitions:
+                    client.run('mkdir -p {0}'.format(directory))
+                continue
+
+            start = '2MB'
+            count = 1
+            for mp, percentage, label in partitions:
+                if start == '2MB':
+                    size_in_percentage = percentage
+                    client.run('parted {0} -s mkpart {1} {2} {3}%'.format(disk, label, start, size_in_percentage))
+                else:
+                    size_in_percentage = start + percentage
+                    client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
+                client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
+                fstab = fstab + fstab_entry.format(label, mp)
+                count += 1
+                start = size_in_percentage
+
+        fstab += '# END OPENVSTORAGE \n'
+
+        # update fstab
         must_update = False
-        fstab_content = fs_client.file_read('/etc/fstab')
+        fstab_content = client.file_read('/etc/fstab')
         if not '# BEGIN Open vStorage' in fstab_content:
             fstab_content += '\n'
-            fstab_content += new_filesystems
+            fstab_content += fstab
             must_update = True
         if must_update:
-            fs_client.file_write('/etc/fstab', fstab_content)
+            client.file_write('/etc/fstab', fstab_content)
 
         try:
-            fs_client.run('timeout -k 9 5s mountall -q || true')
+            client.run('timeout -k 9 5s mountall -q || true')
         except:
             pass  # The above might fail sometimes. We don't mind and will try again
-        fs_client.run('swapoff --all')
-        fs_client.run('mountall -q')
+        client.run('swapoff --all')
+        client.run('mountall -q')
+
+    @staticmethod
+    def apply_flexible_disk_layout(client, auto_config=False, default=dict()):
+        import choice
+        blk_devices = eval(SetupController._get_disk_configuration(client))
+
+        skipped = set()
+        if not default:
+            default, skipped = SetupController._generate_default_partition_layout(blk_devices)
+
+        print 'Excluded: {0}'.format(skipped)
+        print '-> bootdisk or part of software RAID configuration'
+        print
+
+        device_size_map = dict()
+        for key, values in blk_devices.iteritems():
+            device_size_map['/dev/' + key] = values['size']
+
+        def show_layout(proposed):
+            print 'Proposed partition layout:'
+            keys = proposed.keys()
+            keys.sort()
+            key_map = list()
+            for mp in keys:
+                sub_keys = proposed[mp].keys()
+                sub_keys.sort()
+                mp_values = ''
+                for sub_key in sub_keys:
+                    value = str(proposed[mp][sub_key])
+                    if sub_key == 'device' and not value:
+                        value = 'DIR_ONLY'
+                    elif sub_key == 'device' and value and value != 'DIR_ONLY':
+                        size = device_size_map[value]
+                        size_in_gb = int(size / 1000.0 / 1000.0 / 1000.0)
+                        value = value + ' ({0} GB)'.format(size_in_gb)
+                    if sub_key in ['device']:
+                        mp_values = mp_values + ' {0} : {1:20}'.format(sub_key, value)
+                    elif sub_key in ['label']:
+                        mp_values = mp_values + ' {0} : {1:10}'.format(sub_key, value)
+                    else:
+                        mp_values = mp_values + ' {0} : {1:5}'.format(sub_key, value)
+
+                print "{0:20} : {1}".format(mp, mp_values)
+                key_map.append(mp)
+            print
+
+            return key_map
+
+        def show_submenu_layout(subitem, mountpoint):
+            sub_keys = subitem.keys()
+            sub_keys.sort()
+            for sub_key in sub_keys:
+                print "{0:15} : {1}".format(sub_key, subitem[sub_key])
+            print "{0:15} : {1}".format('mountpoint', mountpoint)
+            print
+
+        def validate_subitem(subitem, answer):
+            #@todo to be completed
+            # all clear :-)
+            return True
+
+        def process_submenu_actions(mp_to_edit):
+            subitem = default[mp_to_edit]
+            submenu_items = subitem.keys()
+            submenu_items.sort()
+            submenu_items.append('mountpoint')
+            submenu_items.append('finish')
+
+            print 'Mountpoint: {0}'.format(mp_to_edit)
+            while True:
+                show_submenu_layout(subitem, mp_to_edit)
+                subitem_chosen = choice.Menu(submenu_items).ask()
+                if subitem_chosen == 'finish':
+                    break
+                elif subitem_chosen == 'mountpoint':
+                    new_mountpoint = choice.Input('Enter new mountpoint: ', str).ask()
+                    if new_mountpoint in default:
+                        print 'New mountpoint already exists!'
+                    else:
+                        mp_values = default[mp_to_edit]
+                        default.pop(mp_to_edit)
+                        default[new_mountpoint] = mp_values
+                        mp_to_edit = new_mountpoint
+                else:
+                    answer = choice.Input('Enter new value for {}'.format(subitem_chosen)).ask()
+                    #@todo: add validation
+                    if validate_subitem(subitem_chosen, answer):
+                        subitem[subitem_chosen] = answer
+                    else:
+                        print 'Invalid entry {0} for {1}'.format(answer, subitem_chosen)
+
+        if auto_config:
+            SetupController._partition_disks(client, default)
+            return default
+
+        else:
+            choices = show_layout(default)
+            while True:
+                menu_actions = ['Add', 'Remove', 'Update', 'Print', 'Apply', 'Quit']
+                menu_devices = list(choices)
+                menu_devices.sort()
+                chosen = choice.Menu(menu_actions).ask()
+
+                if chosen == 'Add':
+                    to_add = choice.Input('Enter mountpoint to add:', str).ask()
+                    if to_add in default:
+                        print 'Mountpoint {0} already exists'.format(to_add)
+                    else:
+                        default[to_add] = dict(SetupController.PARTITION_DEFAULTS)
+                    choices = show_layout(default)
+
+                elif chosen == 'Remove':
+                    to_remove = choice.Input('Enter mountpoint to remove:', str).ask()
+                    if to_remove in default:
+                        default.pop(to_remove)
+                    else:
+                        print 'Mountpoint {0} not found, no action taken'.format(to_remove)
+                    choices = show_layout(default)
+
+                elif chosen == 'Update':
+                    print 'Choose mountpoint to update:'
+                    to_update = choice.Menu(menu_devices).ask()
+                    process_submenu_actions(to_update)
+                    choices = show_layout(default)
+
+                elif chosen == 'Print':
+                    show_layout(default)
+
+                elif chosen == 'Apply':
+                    show_layout(default)
+                    confirmation = choice.Input('Please confirm partition layout (yes/no), ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', str).ask()
+                    if confirmation.lower() == 'yes':
+                        print 'Applying partition layout ...'
+                        SetupController._partition_disks(client, default)
+                        return default
+                    else:
+                        print 'Please confirm by typing yes'
+                elif chosen == 'Quit':
+                    return 'QUIT'
 
     @staticmethod
     def _discover_nodes(client):
@@ -1225,10 +1469,9 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         SetupController._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
 
     @staticmethod
-    def _is_rabbitmq_running(client, check_ovs = False):
+    def _is_rabbitmq_running(client, check_ovs=False):
         rabbitmq_running, rabbitmq_pid = False, 0
         ovs_rabbitmq_running, pid = False, -1
-        same_process = False
         output = client.run('service rabbitmq-server status', quiet=True)
         if 'unrecognized service' in output:
             output = None
@@ -1248,7 +1491,8 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
                         if 'erlang' in item or 'rabbitmq' in item or 'beam' in item:
                             rabbitmq_running = True
         output = client.run('service ovs-rabbitmq status', quiet=True)
-        if 'stop/waiting' in output: pass
+        if 'stop/waiting' in output:
+            pass
         if 'start/running' in output:
             pid = output.split('process ')[1].strip()
             ovs_rabbitmq_running = True

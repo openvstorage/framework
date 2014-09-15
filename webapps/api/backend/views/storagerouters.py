@@ -152,7 +152,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_cache', 'storage_ip', 'vrouter_port']
+                  'mountpoint_readcache', 'mountpoint_writecache', 'mountpoint_foc', 'storage_ip', 'vrouter_port']
         parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
             if field not in call_parameters:
