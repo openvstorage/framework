@@ -43,7 +43,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache1'}
 
     @staticmethod
     def setup_node(ip=None, force_type=None, verbose=False):
@@ -1033,7 +1033,7 @@ print blk_devices
 
         mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 25, 'label': 'mdpath'},
                                    '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 25, 'label': 'db'},
-                                   '/mnt/cache': dict(SetupController.PARTITION_DEFAULTS),
+                                   '/mnt/cache1': dict(SetupController.PARTITION_DEFAULTS),
                                    '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 80, 'label': 'backendfs'},
                                    '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 20, 'label': 'tempfs'}}
 
@@ -1075,12 +1075,11 @@ print blk_devices
             mountpoints_to_allocate['/mnt/bfs']['percentage'] = 100
 
         if nr_of_ssds == 1:
-            mountpoints_to_allocate['/mnt/cache']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
             mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
             mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[0]
 
         elif nr_of_ssds >= 2:
-            mountpoints_to_allocate.pop('/mnt/cache')
             for count in xrange(nr_of_ssds):
                 marker = str('/mnt/cache' + str(count + 1))
                 mountpoints_to_allocate[marker] = dict(SetupController.PARTITION_DEFAULTS)
