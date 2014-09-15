@@ -47,70 +47,32 @@ define([
         ];
 
         // Handles
-        self.loadVMachinesHandle    = undefined;
-        self.refreshVMachinesHandle = {};
+        self.vMachinesHandle = {};
+        self.vPoolsHandle    = undefined;
 
         // Observables
-        self.vMachines            = ko.observableArray([]);
-        self.vMachinesInitialLoad = ko.observable(true);
+        self.vPools = ko.observableArray([]);
 
         // Functions
-        self.fetchVMachines = function() {
+        self.loadVMachines = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadVMachinesHandle)) {
-                    var options = {
-                        sort: 'name',
-                        contents: '',
-                        query: JSON.stringify(self.query)
-                    };
-                    self.loadVMachinesHandle = api.get('vmachines', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], vmdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vmdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.vMachines,
-                                function(guid) {
-                                    var vmachine = new VMachine(guid);
-                                    if ($.inArray(guid, guids) !== -1) {
-                                        vmachine.fillData(vmdata[guid]);
-                                    }
-                                    vmachine.loading(true);
-                                    return vmachine;
-                                }, 'guid'
-                            );
-                            self.vMachinesInitialLoad(false);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.refreshVMachines = function(page) {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVMachinesHandle[page])) {
+                if (generic.xhrCompleted(self.vMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
                         contents: '_dynamics,_relations,-snapshots,-hypervisor_status',
                         query: JSON.stringify(self.query)
                     };
-                    self.refreshVMachinesHandle[page] = api.get('vmachines', { queryparams: options })
+                    self.vMachinesHandle[page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], vmdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vmdata[item.guid] = item;
-                            });
-                            $.each(self.vMachines(), function(index, vm) {
-                                if ($.inArray(vm.guid(), guids) !== -1) {
-                                    vm.fillData(vmdata[vm.guid()]);
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    return new VMachine(guid);
+                                },
+                                dependencyLoader: function(item) {
                                     generic.crossFiller(
-                                        vm.storageRouterGuids, vm.storageRouters,
+                                        item.storageRouterGuids, item.storageRouters,
                                         function(guid) {
                                             if (!self.storageRouterCache.hasOwnProperty(guid)) {
                                                 var sr = new StorageRouter(guid);
@@ -121,7 +83,7 @@ define([
                                         }, 'guid'
                                     );
                                     generic.crossFiller(
-                                        vm.vPoolGuids, vm.vPools,
+                                        item.vPoolGuids, item.vPools,
                                         function(guid) {
                                             if (!self.vPoolCache.hasOwnProperty(guid)) {
                                                 var vp = new VPool(guid);
@@ -133,9 +95,8 @@ define([
                                     );
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
@@ -144,13 +105,32 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(self.fetchVMachines, 5000);
+            self.refresher.init(function() {
+                if (generic.xhrCompleted(self.vPoolsHandle)) {
+                    self.vPoolsHandle = api.get('vpools', { contents: 'statistics,stored_data' })
+                        .done(function(data) {
+                            var guids = [], vpdata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                vpdata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.vPools,
+                                function(guid) {
+                                    return new VPool(guid);
+                                }, 'guid'
+                            );
+                            $.each(self.vPools(), function(index, item) {
+                                if (vpdata.hasOwnProperty(item.guid())) {
+                                    item.fillData(vpdata[item.guid()]);
+                                }
+                            });
+                        });
+                }
+            }, 5000);
             self.refresher.start();
-            self.shared.footerData(self.vMachines);
-
-            self.fetchVMachines().then(function() {
-                self.refreshVMachines(1);
-            });
+            self.refresher.run();
+            self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {

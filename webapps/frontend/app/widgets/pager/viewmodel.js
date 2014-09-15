@@ -21,49 +21,46 @@ define([
         var self = this;
 
         // Variables
-        self.refresher = new Refresher();
+        self.refresher   = new Refresher();
+        self.preloadPage = 0;
+        self.key         = undefined;
 
         // Observables
         self.items           = ko.observableArray([]);
         self.internalCurrent = ko.observable(1);
+        self.totalItems      = ko.observable(0);
+        self.lastPage        = ko.observable(1);
+        self.pageFirst       = ko.observable(0);
+        self.pageLast        = ko.observable(0);
         self.headers         = ko.observableArray([]);
-        self.settings        = ko.observable({});
         self.padding         = ko.observable(2);
         self.controls        = ko.observable(true);
-        self.preloadPage     = 0;
-        self.preloadHandle   = undefined;
+        self.viewportKeys    = ko.observableArray([]);
+        self.viewportItems   = ko.observableArray([]);
+        self.pageLoading     = ko.observable(false);
+
+        // Handles
+        self.preloadHandle = {};
+        self.loadHandle    = {};
 
         // Computed
-        self.items = ko.computed(function() {
-            var settings = self.settings();
-            if (settings.hasOwnProperty('items')) {
-                return self.settings().items();
-            }
-            return [];
-        });
         self.showControls = ko.computed(function() {
             return self.controls() || (self.totalItems() > 10);
-        });
-        self.totalItems = ko.computed(function() {
-            return self.items().length;
-        });
-        self.lastPage = ko.computed(function() {
-            return Math.floor((self.totalItems() - 1) / 10) + 1;
         });
         self.current = ko.computed({
             // One-based
             read: function() {
-                return Math.min(self.internalCurrent(), Math.floor(self.totalItems() / 10) + 1);
+                return self.internalCurrent();
             },
             write: function(value) {
                 self.internalCurrent(value);
-                self.viewportRefresh(value);
+                self.load(value, false);
                 // Prefetch/refresh surrounding pages
                 if (value < self.lastPage()) {
-                    self.viewportRefresh(value + 1);
+                    self.load(value + 1, true);
                 }
                 if (value > 1) {
-                    self.viewportRefresh(value - 1);
+                    self.load(value - 1, true);
                 }
             }
         });
@@ -72,12 +69,6 @@ define([
         });
         self.hasPrevious = ko.computed(function() {
             return self.current() > 1;
-        });
-        self.pageFirst = ko.computed(function() {
-            return Math.min((self.current() - 1) * 10 + 1, self.items().length);
-        });
-        self.pageLast = ko.computed(function() {
-            return Math.min(self.pageFirst() + 9, self.items().length);
         });
         self.pages = ko.computed(function() {
             var i,
@@ -91,17 +82,22 @@ define([
             }
             return pages;
         });
-        self.viewportItems = ko.computed(function() {
-            var i,
-                items = self.items(),
-                vItems = [],
-                start = (self.current() - 1) * 10,
-                max = Math.min(start + 10, items.length);
-            for (i = start; i < max; i += 1) {
-                vItems.push(items[i]);
-            }
-            return vItems;
-        }).extend({ throttle: 50 });
+        self.viewportCalculator = ko.computed(function() {
+            generic.crossFiller(
+                self.viewportKeys(), self.viewportItems,
+                function(key) {
+                    var i;
+                    for (i = 0; i < self.items().length; i += 1) {
+                        if (self.items()[i][self.key]() === key) {
+                            return self.items()[i];
+                        }
+                    }
+                }, self.key
+            );
+        });
+        self.loading = ko.computed(function() {
+            return self.viewportItems().length === 0 && self.pageLoading();
+        });
 
         // Functions
         self.step = function(next) {
@@ -115,6 +111,47 @@ define([
                 }
             }
         };
+        self.load = function(page, preload) {
+            if ((preload === true && self.preloadHandle[page] !== undefined && self.preloadHandle[page].state() === 'pending') ||
+                (preload !== true && self.loadHandle[page] !== undefined && self.loadHandle[page].state() === 'pending')) {
+                return;
+            }
+            self.pageLoading(true);
+            $.each(self.viewportItems(), function(index, item) {
+                item.loading(true);
+            });
+            var promise = self.loadData(page)
+                .then(function(dataset) {
+                    if (dataset !== undefined) {
+                        self.totalItems(dataset.data._paging.total_items);
+                        self.lastPage(dataset.data._paging.max_page);
+                        self.pageFirst(dataset.data._paging.start_number);
+                        self.pageLast(dataset.data._paging.end_number);
+                        var keys = [], idata = {};
+                        $.each(dataset.data.data, function(index, item) {
+                            keys.push(item[self.key]);
+                            idata[item[self.key]] = item;
+                        });
+                        self.viewportKeys(keys);
+                        generic.crossFiller(keys, self.items, dataset.loader, self.key, false);
+                        $.each(self.items(), function(index, item) {
+                            if ($.inArray(item[self.key](), keys) !== -1) {
+                                item.fillData(idata[item[self.key]()]);
+                                item.loading(false);
+                                if (dataset.dependencyLoader !== undefined) {
+                                    dataset.dependencyLoader(item);
+                                }
+                            }
+                        });
+                    }
+                    self.pageLoading(false);
+                });
+            if (preload) {
+                self.preloadHandle[page] = promise;
+            } else {
+                self.loadHandle[page] = promise;
+            }
+        };
 
         // Durandal
         self.activate = function(settings) {
@@ -123,35 +160,30 @@ define([
             }
 
             self.loadData = generic.tryGet(settings, 'loadData');
-            self.initialLoad = generic.tryGet(settings, 'initialLoad', ko.observable(false));
-            self.settings(settings);
+            self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
+            self.key = generic.tryGet(settings, 'key', 'guid');
             self.headers(settings.headers);
             self.controls(generic.tryGet(settings, 'controls', true));
 
-            if (self.refresh !== undefined) {
-                self.refresher.init(function() {
-                    self.viewportRefresh(self.current());
-                    if (generic.xhrCompleted(self.preloadHandle)) {
-                        self.preloadPage += 1;
-                        if (self.preloadPage === self.current()) {
-                            self.preloadPage += 1;
-                        }
-                        if (self.preloadPage > self.lastPage()) {
-                            self.preloadPage = 1;
-                        }
-                        if (self.preloadPage !== self.current()) {
-                            self.preloadHandle = self.viewportRefresh(self.preloadPage);
-                        }
-                    }
-                }, self.refresh);
-                self.refresher.start();
-                settings.bindingContext.$root.widgets.push(self);
-            }
+            self.refresher.init(function() {
+                self.load(self.current(), false);
+                self.preloadPage += 1;
+                if (self.preloadPage === self.current()) {
+                    self.preloadPage += 1;
+                }
+                if (self.preloadPage > self.lastPage()) {
+                    self.preloadPage = 1;
+                }
+                if (self.preloadPage !== self.current()) {
+                    self.preloadHandle = self.load(self.preloadPage, true);
+                }
+            }, self.refresh);
+            self.refresher.run();
+            self.refresher.start();
+            settings.bindingContext.$root.widgets.push(self);
         };
         self.deactivate = function() {
-            if (self.refresh !== undefined) {
-                self.refresher.stop();
-            }
+            self.refresher.stop();
         };
     };
 });

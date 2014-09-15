@@ -20,7 +20,7 @@ limitations under the License.
                 <th data-bind="style: { width: width !== undefined ? width + 'px' : 'auto' }, html: value"></th>
             </tr>
         </thead>
-        <!-- ko if: initialLoad() -->
+        <!-- ko if: loading() -->
             <tbody>
                 <tr>
                     <td data-bind="attr: { colspan: headers().length }">
@@ -29,7 +29,7 @@ limitations under the License.
                 </tr>
             </tbody>
         <!-- /ko -->
-        <!-- ko if: !initialLoad() -->
+        <!-- ko if: !loading() -->
             <!-- ko if: viewportItems().length == 0 -->
                 <tbody>
                     <tr>

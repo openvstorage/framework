@@ -23,8 +23,7 @@ limitations under the License.
             <span data-i18n="ovs:vpools.add"></span>
         </button>
     </div>
-    <div data-bind="pager: { items: vPools, headers: vPoolHeaders, initialLoad: vPoolsInitialLoad,
-                             viewportRefresh: refreshVPools, viewportRefreshInterval: 5000, controls: true }"
+    <div data-bind="pager: { loadData: loadVPools, headers: vPoolHeaders, refreshInterval: 5000, controls: true }">
          style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">

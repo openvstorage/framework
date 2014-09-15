@@ -15,8 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:vmachines.title"></h2>
-    <div data-bind="pager: { items: vMachines, headers: vMachineHeaders, initialLoad: vMachinesInitialLoad,
-                             viewportRefresh: refreshVMachines, viewportRefreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: loadVMachines, headers: vMachineHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vmachine_' + guid() }">
                 <td>

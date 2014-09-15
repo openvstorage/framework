@@ -175,7 +175,7 @@ define([
             })
                 .done(function(data) {
                     var guids = [], srdata = {};
-                    $.each(data, function(index, item) {
+                    $.each(data.data, function(index, item) {
                         guids.push(item.guid);
                         srdata[item.guid] = item;
                     });

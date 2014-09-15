@@ -15,8 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:storagerouters.title"></h2>
-    <div data-bind="pager: { items: storageRouters, headers: storageRoutersHeaders, initialLoad: storageRoutersInitialLoad,
-                             viewportRefresh: refreshStorageRouters, viewportRefreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: loadStorageRouters, headers: storageRoutersHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'storagerouter_' + guid() }">
                 <td>
