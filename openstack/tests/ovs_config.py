@@ -45,7 +45,7 @@ VPOOL_FOC = '%s/cache1/foc' % VPOOL_ROOT_DIR
 VPOOL_PORT = 12326 #make sure it is available (!) Todo: get highest available
 
 FILE_TYPE = 'raw' #should not be changed unless volumedriver changes
-VOLUME_TYPE = 'ovs'
+VOLUME_TYPE = 'Open vStorage' #depends on volume-type created
 VOLUME_NAME = 'ovs-volume-%s' # last part will be uuid
 VOLUME_SIZE = 2
 SNAP_NAME = 'ovs-volume-snapshot-%s' # last part will be uuid
