@@ -1,0 +1,30 @@
+Source: openvstorage
+Maintainer: Kenneth Henderick <kenneth.henderick@cloudfounders.com>
+Standards-Version: 3.9.4.0
+Section: python
+Priority: optional
+Build-Depends: python (>= 2.7.2)
+
+Package: openvstorage-core
+Architecture: amd64
+Pre-Depends: python (>= 2.7.2), python-pip (>= 1.4.1-2)
+Depends: rabbitmq-server (>= 3.0.2-1), python-memcache (>= 1.47-2), memcached (>= 1.4.7),
+ volumedriver-server (>= 3.6.0), arakoon (>= 1.7.3), lsscsi (>= 0.27-2), libvirt0 (>= 1.1.1),
+ python-libvirt (>= 1.1.1), virtinst (>= 0.600.4), python-dev (>= 2.7.5), python-pyinotify,
+ python-pip (>= 1.4.1-2), libev4 (>= 1:4.11-1), elasticsearch (>= 1.1.1), logstash (>= 1.4.0-1-c82dc09),
+ kibana (>= 3.0.1), avahi-utils (>= 0.6.31), python-boto, nfs-kernel-server, ipython
+Description: openvStorage core
+ Core components for the Open vStorage product
+
+Package: openvstorage-webapps
+Architecture: amd64
+Depends: openvstorage-core (= ${binary:Version}), python (>= 2.7.2), python-django (>= 1.5.1-2), nginx (>= 1.2.6),
+ gunicorn (>= 0.15.0-1), python-gevent (>= 0.13.0-1build2), python-markdown (>= 2.3.1-1)
+Description: openvStorage Web Applications
+ Web components for the Open vStorage product
+
+Package: openvstorage
+Architecture: amd64
+Depends: openvstorage-core (= ${binary:Version}), openvstorage-webapps (= ${binary:Version})
+Description: openvStorage
+ Open vStorage umbrella package
