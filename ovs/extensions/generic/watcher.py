@@ -43,6 +43,7 @@ def services_running(target):
         while tries < max_tries:
             try:
                 from ovs.extensions.storage.volatilefactory import VolatileFactory
+                VolatileFactory.store = None
                 volatile = VolatileFactory.get_client()
                 volatile.set(key, value)
                 if volatile.get(key) == value:
@@ -66,6 +67,7 @@ def services_running(target):
         while tries < max_tries:
             try:
                 from ovs.extensions.storage.persistentfactory import PersistentFactory
+                PersistentFactory.store = None
                 persistent = PersistentFactory.get_client()
                 persistent.set(key, value)
                 if persistent.get(key) == value:
