@@ -158,8 +158,7 @@ limitations under the License.
         <div class="tab-content">
             <div class="tab-pane active" id="vdisks" style="padding: 15px;">
                 <h4 data-i18n="ovs:vdisks.title"></h4>
-                <div data-bind="pager: { items: vDisks, headers: $parent.vDiskHeaders, initialLoad: $parent.vDisksInitialLoad,
-                                         viewportRefresh: $parent.refreshVDisks, viewportRefreshInterval: 5000, controls: true }">
+                <div data-bind="pager: { loadData: $parent.loadVDisks, headers: $parent.vDiskHeaders, refreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
                         <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                             <td>
@@ -191,8 +190,7 @@ limitations under the License.
             </div>
             <div class="tab-pane" id="snapshots" style="padding: 15px;">
                 <h4 data-i18n="ovs:vmachines.detail.snapshots"></h4>
-                <div data-bind="pager: { items: snapshots, headers: $parent.snapshotHeaders, initialLoad: $parent.snapshotsInitialLoad,
-                                         viewportRefresh: $parent.refreshSnapshots, viewportRefreshInterval: 5000, controls: true }">
+                <div data-bind="pager: { items: snapshots, loadData: $parent.refreshSnapshots, headers: $parent.snapshotHeaders, refreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
                         <tr data-part="vitem">
                             <td><span data-bind="html: (label !== '' && label !== undefined) ? label : '<i>automatic snapshot</i>'"></span></td>

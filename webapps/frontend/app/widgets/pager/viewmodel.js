@@ -21,18 +21,21 @@ define([
         var self = this;
 
         // Variables
-        self.refresher   = new Refresher();
-        self.preloadPage = 0;
-        self.key         = undefined;
+        self.refresher     = new Refresher();
+        self.preloadPage   = 0;
+        self.key           = undefined;
+        self.viewportCache = {};
 
         // Observables
-        self.items           = ko.observableArray([]);
+        self.container       = ko.observable(ko.observableArray([]));
+        self.external        = ko.observable(false);
         self.internalCurrent = ko.observable(1);
-        self.totalItems      = ko.observable(0);
-        self.lastPage        = ko.observable(1);
-        self.pageFirst       = ko.observable(0);
-        self.pageLast        = ko.observable(0);
+        self._totalItems     = ko.observable(0);
+        self._lastPage       = ko.observable(1);
+        self._pageFirst      = ko.observable(0);
+        self._pageLast       = ko.observable(0);
         self.headers         = ko.observableArray([]);
+        self.settings        = ko.observable({});
         self.padding         = ko.observable(2);
         self.controls        = ko.observable(true);
         self.viewportKeys    = ko.observableArray([]);
@@ -40,28 +43,58 @@ define([
         self.pageLoading     = ko.observable(false);
 
         // Handles
-        self.preloadHandle = {};
-        self.loadHandle    = {};
+        self.preloadHandle = undefined;
+        self.loadHandle    = undefined;
 
         // Computed
+        self.items = ko.computed({
+            read: function() {
+                if (self.external()) {
+                    if (self.settings().hasOwnProperty('items')) {
+                        return self.settings().items();
+                    }
+                    return [];
+                }
+                return self.container()();
+            },
+            write: function(value) {
+                self.container()(value);
+            }
+        });
         self.showControls = ko.computed(function() {
             return self.controls() || (self.totalItems() > 10);
+        });
+        self.totalItems = ko.computed(function() {
+            if (self.external()) {
+                return self.items().length;
+            }
+            return self._totalItems();
+        });
+        self.lastPage = ko.computed(function() {
+            if (self.external()) {
+                return Math.floor((self.totalItems() - 1) / 10) + 1;
+            }
+            return self._lastPage();
         });
         self.current = ko.computed({
             // One-based
             read: function() {
+                if (self.external()) {
+                    return Math.min(self.internalCurrent(), Math.floor(self.totalItems() / 10) + 1);
+                }
                 return self.internalCurrent();
             },
             write: function(value) {
                 self.internalCurrent(value);
                 self.load(value, false);
-                // Prefetch/refresh surrounding pages
-                if (value < self.lastPage()) {
-                    self.load(value + 1, true);
+
+                // Prefetch/refresh next page
+                var preloadPage = value + 1;
+                if (preloadPage === self.lastPage()) {
+                    preloadPage = 1;
                 }
-                if (value > 1) {
-                    self.load(value - 1, true);
-                }
+                self.hasLoad(true, true);
+                self.load(preloadPage, true);
             }
         });
         self.hasNext = ko.computed(function() {
@@ -69,6 +102,18 @@ define([
         });
         self.hasPrevious = ko.computed(function() {
             return self.current() > 1;
+        });
+        self.pageFirst = ko.computed(function() {
+            if (self.external()) {
+                return Math.min((self.current() - 1) * 10 + 1, self.items().length);
+            }
+            return self._pageFirst();
+        });
+        self.pageLast = ko.computed(function() {
+            if (self.external()) {
+                return Math.min(self.pageFirst() + 9, self.items().length);
+            }
+            return self._pageLast();
         });
         self.pages = ko.computed(function() {
             var i,
@@ -83,17 +128,28 @@ define([
             return pages;
         });
         self.viewportCalculator = ko.computed(function() {
-            generic.crossFiller(
-                self.viewportKeys(), self.viewportItems,
-                function(key) {
-                    var i;
-                    for (i = 0; i < self.items().length; i += 1) {
-                        if (self.items()[i][self.key]() === key) {
-                            return self.items()[i];
-                        }
+            if (self.external()) {
+                var i, items = self.items(), vItems = [],
+                    start = (self.current() - 1) * 10,
+                    max = Math.min(start + 10, items.length);
+                for (i = start; i < max; i += 1) {
+                    vItems.push(items[i]);
+                }
+                self.viewportItems(vItems);
+            } else {
+                self.container().sort(function (a, b) {
+                    var aLocation = $.inArray(a[self.key](), self.viewportKeys()),
+                        bLocation = $.inArray(b[self.key](), self.viewportKeys());
+                    if (aLocation === -1) {
+                        return 1;
                     }
-                }, self.key
-            );
+                    if (bLocation === -1) {
+                        return -1;
+                    }
+                    return aLocation - bLocation;
+                });
+                self.viewportItems(self.container()().slice(0, self.viewportKeys().length));
+            }
         });
         self.loading = ko.computed(function() {
             return self.viewportItems().length === 0 && self.pageLoading();
@@ -111,45 +167,88 @@ define([
                 }
             }
         };
-        self.load = function(page, preload) {
-            if ((preload === true && self.preloadHandle[page] !== undefined && self.preloadHandle[page].state() === 'pending') ||
-                (preload !== true && self.loadHandle[page] !== undefined && self.loadHandle[page].state() === 'pending')) {
-                return;
-            }
-            self.pageLoading(true);
-            $.each(self.viewportItems(), function(index, item) {
-                item.loading(true);
-            });
-            var promise = self.loadData(page)
-                .then(function(dataset) {
-                    if (dataset !== undefined) {
-                        self.totalItems(dataset.data._paging.total_items);
-                        self.lastPage(dataset.data._paging.max_page);
-                        self.pageFirst(dataset.data._paging.start_number);
-                        self.pageLast(dataset.data._paging.end_number);
-                        var keys = [], idata = {};
-                        $.each(dataset.data.data, function(index, item) {
-                            keys.push(item[self.key]);
-                            idata[item[self.key]] = item;
-                        });
-                        self.viewportKeys(keys);
-                        generic.crossFiller(keys, self.items, dataset.loader, self.key, false);
-                        $.each(self.items(), function(index, item) {
-                            if ($.inArray(item[self.key](), keys) !== -1) {
-                                item.fillData(idata[item[self.key]()]);
-                                item.loading(false);
-                                if (dataset.dependencyLoader !== undefined) {
-                                    dataset.dependencyLoader(item);
-                                }
-                            }
-                        });
-                    }
-                    self.pageLoading(false);
-                });
+        self.hasLoad = function(preload, abort) {
             if (preload) {
-                self.preloadHandle[page] = promise;
+                if (self.preloadHandle !== undefined && self.preloadHandle.state() === 'pending') {
+                    if (abort) {
+                        generic.xhrAbort(self.preloadHandle);
+                        return false;
+                    }
+                    return true;
+                }
+                return false;
+            }
+            if (self.loadHandle !== undefined && self.loadHandle.state() === 'pending') {
+                if (abort) {
+                    generic.xhrAbort(self.loadHandle);
+                    return false;
+                }
+                return true;
+            }
+            return false;
+        };
+        self.load = function(page, preload) {
+            if (self.external()) {
+                self.loadData(page);
             } else {
-                self.loadHandle[page] = promise;
+                if (self.hasLoad(preload, !preload)) {
+                    // If there's a preload, it shouldn't abort. If it's not a preload, it should abort.
+                    return;
+                }
+                self.pageLoading(true);
+                $.each(self.viewportItems(), function (index, item) {
+                    item.loading(true);
+                });
+                if (!preload && self.viewportCache.hasOwnProperty(page)) {
+                    self.viewportKeys(self.viewportCache[page].keys);
+                    self._totalItems(self.viewportCache[page].totalItems);
+                    self._lastPage(self.viewportCache[page].lastPage);
+                    self._pageFirst(self.viewportCache[page].pageFirst);
+                    self._pageLast(self.viewportCache[page].pageLast);
+                }
+                var promise = self.loadData(page)
+                    .then(function (dataset) {
+                        if (dataset !== undefined && (preload || page === self.current())) {
+                            var keys = [], idata = {};
+                            $.each(dataset.data.data, function (index, item) {
+                                keys.push(item[self.key]);
+                                idata[item[self.key]] = item;
+                            });
+                            self.viewportCache[page] = {
+                                keys: keys,
+                                totalItems: dataset.data._paging.total_items,
+                                lastPage: dataset.data._paging.max_page,
+                                pageFirst: dataset.data._paging.start_number,
+                                pageLast: dataset.data._paging.end_number
+                            };
+                            if (!preload) {
+                                self._totalItems(self.viewportCache[page].totalItems);
+                                self._lastPage(self.viewportCache[page].lastPage);
+                                self._pageFirst(self.viewportCache[page].pageFirst);
+                                self._pageLast(self.viewportCache[page].pageLast);
+                                self.viewportKeys(self.viewportCache[page].keys);
+                            }
+                            generic.crossFiller(keys, self.container(), dataset.loader, self.key, false);
+                            $.each(self.container()(), function (index, item) {
+                                if ($.inArray(item[self.key](), keys) !== -1) {
+                                    item.fillData(idata[item[self.key]()]);
+                                    item.loading(false);
+                                    if (dataset.dependencyLoader !== undefined) {
+                                        dataset.dependencyLoader(item);
+                                    }
+                                }
+                            });
+                            if (dataset.overviewLoader !== undefined) {
+                                dataset.overviewLoader(keys);
+                            }
+                        }
+                        self.pageLoading(false);
+                    });
+                if (preload) {
+                    self.preloadHandle = promise;
+                } else {
+                    self.loadHandle = promise;
+                }
             }
         };
 
@@ -159,14 +258,30 @@ define([
                 throw 'Headers should be specified';
             }
 
+            if (settings.hasOwnProperty('items')) {
+                self.external(true);
+            }
+            if (settings.hasOwnProperty('container')) {
+                self.container(settings.container);
+            } else {
+                self.container(ko.observableArray([]));
+            }
             self.loadData = generic.tryGet(settings, 'loadData');
             self.refresh = parseInt(generic.tryGet(settings, 'refreshInterval', '5000'), 10);
             self.key = generic.tryGet(settings, 'key', 'guid');
+            self.settings(settings);
             self.headers(settings.headers);
             self.controls(generic.tryGet(settings, 'controls', true));
 
+            if (settings.hasOwnProperty('trigger')) {
+                settings.trigger.subscribe(function() { self.load(self.current(), false); });
+            }
+
             self.refresher.init(function() {
                 self.load(self.current(), false);
+                if (self.hasLoad(true, false)) {
+                    return;
+                }
                 self.preloadPage += 1;
                 if (self.preloadPage === self.current()) {
                     self.preloadPage += 1;
@@ -175,7 +290,7 @@ define([
                     self.preloadPage = 1;
                 }
                 if (self.preloadPage !== self.current()) {
-                    self.preloadHandle = self.load(self.preloadPage, true);
+                    self.load(self.preloadPage, true);
                 }
             }, self.refresh);
             self.refresher.run();

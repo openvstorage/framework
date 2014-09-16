@@ -17,9 +17,7 @@ limitations under the License.
     <div>
         <h2 class="pull-left" data-i18n="ovs:users.users.title"></h2>
     </div>
-    <div data-bind="pager: { items: users, headers: userHeaders, initialLoad: usersInitialLoad,
-                             viewportRefresh: refreshUsers, viewportRefreshInterval: 5000, controls: true }"
-         style="clear: both;">
+    <div data-bind="pager: { loadData: loadUsers, headers: userHeaders, refreshInterval: 5000, controls: true, container: users }" style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem" class="hand" data-bind="css: { info: $root.selectedUserGuid() === guid() },
                                                           click: function() { $root.selectedUserGuid(guid()); }">
@@ -85,26 +83,6 @@ limitations under the License.
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
                 </td>
             </tr>
-            <tr data-part="vfirst" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newUser()">
-                <td><input type="text" data-bind="value: username, valueUpdate: 'input'" style="width: 200px;"/></td>
-                <td>
-                    <span data-bind="dropdown: {
-                                         items: $root.groups, target: group,
-                                         text: function(item) {
-                                             return item.description();
-                                         }, key: 'guid', keyisfunction: true, small: true
-                                     }"></span>
-                </td>
-                <td>
-                    <i data-bind="click: function() {
-                                      if (username() !== undefined && username() !== '') {
-                                          $root.saveUser();
-                                      }
-                                  },
-                                  style: { color: username() !== undefined && username() !== '' ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
-                </td>
-            </tr>
         </table>
     </div>
     <div>
@@ -115,9 +93,7 @@ limitations under the License.
             <span data-i18n="[html]ovs:users.clients.information"></span>
         </p>
     </div>
-    <div data-bind="pager: { items: clients, headers: clientHeaders, initialLoad: clientsInitialLoad,
-                             viewportRefresh: refreshClients, viewportRefreshInterval: 5000, controls: true }"
-         style="clear: both;">
+    <div data-bind="pager: { loadData: loadClients, headers: clientHeaders, refreshInterval: 5000, controls: true, trigger: _selectedUserGuid, container: clients }" style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>
@@ -145,30 +121,6 @@ limitations under the License.
                 </td>
             </tr>
             <tr data-part="vnew" data-bind="visible: $root.selectedUserGuid() !== undefined && $.inArray('write', $root.shared.user.roles()) !== -1, with: $root.newClient()">
-                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
-                <td><i data-i18n="ovs:generic.generated"></i></td>
-                <td><i data-i18n="ovs:generic.generated"></i></td>
-                <td>
-                    <span data-bind="dropdown: {
-                                         key: 'guid', keyisfunction: true, small: true,
-                                         items: $root.availableRoles, target: roles,
-                                         text: function(item) {
-                                             return item.name();
-                                         }
-                                     }">
-                    </span>
-                </td>
-                <td>
-                    <i data-bind="click: function() {
-                                      if (name() !== undefined && name() !== '') {
-                                          $root.saveClient();
-                                      }
-                                  },
-                                  style: { color: name() !== undefined && name() !== '' ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
-                </td>
-            </tr>
-            <tr data-part="vfirst" data-bind="visible: $root.selectedUserGuid() !== undefined && $.inArray('write', $root.shared.user.roles()) !== -1, with: $root.newClient()">
                 <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>

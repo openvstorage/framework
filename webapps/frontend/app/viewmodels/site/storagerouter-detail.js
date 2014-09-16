@@ -77,7 +77,7 @@ define([
                     })
                         .done(function(data) {
                             var guids = [], vpdata = {};
-                            $.each(data, function(index, item) {
+                            $.each(data.data, function(index, item) {
                                 guids.push(item.guid);
                                 vpdata[item.guid] = item;
                             });

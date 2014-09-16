@@ -185,13 +185,17 @@ def return_list(object_type, default_sort=None):
                 max_page = int(math.ceil(total_items / (items_pp * 1.0)))
                 if page > max_page:
                     page = max_page
-                start_number = min(total_items, max(1, (page - 1) * items_pp))
-                end_number = min(total_items, page * items_pp)
-                data_list = data_list[start_number - 1: end_number]
+                if page == 0:
+                    start_number = -1
+                    end_number = 0
+                else:
+                    start_number = (page - 1) * items_pp  # Index - e.g. 0 for page 1, 10 for page 2
+                    end_number = start_number + items_pp  # Index - e.g. 10 for page 1, 20 for page 2
+                data_list = data_list[start_number: end_number]
                 page_metadata = dict(page_metadata.items() + {'current_page': max(1, page),
                                                               'max_page': max(1, max_page),
-                                                              'start_number': start_number,
-                                                              'end_number': end_number}.items())
+                                                              'start_number': start_number + 1,
+                                                              'end_number': min(total_items, end_number)}.items())
 
             # 6. Serializing
             if contents is not None:

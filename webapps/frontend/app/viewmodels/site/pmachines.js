@@ -47,13 +47,11 @@ define([
         // Observables
         self.pMachines              = ko.observableArray([]);
         self.mgmtCenters            = ko.observableArray([]);
-        self.pMachinesInitialLoad   = ko.observable(true);
-        self.mgmtCentersInitialLoad = ko.observable(true);
         self.mgmtCenterMapping      = ko.observable({});
 
         // Handles
-        self.loadPMachinesHandle      = undefined;
-        self.loadMgmtCentersHandle    = undefined;
+        self.pMachinesHandle   = {};
+        self.mgmtCentersHandle = {};
 
         // Computed
         self.hostMapping = ko.computed(function() {
@@ -92,24 +90,17 @@ define([
         // Functions
         self.loadPMachines = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadPMachinesHandle)) {
+                if (generic.xhrCompleted(self.pMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        contents: 'mgmtcenter'
+                        contents: 'mgmtcenter',
+                        page: page
                     };
-                    if (page !== undefined) {
-                        options.page = page;
-                    }
-                    self.loadPMachinesHandle = api.get('pmachines', { queryparams: options })
+                    self.pMachinesHandle[page] = api.get('pmachines', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], pmdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                pmdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.pMachines,
-                                function(guid) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
                                     var pm = new PMachine(guid);
                                     pm.mgmtCenter = ko.computed({
                                         write: function(mgmtCenter) {
@@ -154,42 +145,28 @@ define([
                                         owner: pm
                                     });
                                     return pm;
-                                }, 'guid'
-                            );
-                            $.each(self.pMachines(), function(index, pmachine) {
-                                if ($.inArray(pmachine.guid(), guids) !== -1) {
-                                    pmachine.fillData(pmdata[pmachine.guid()]);
                                 }
                             });
-                            self.pMachinesInitialLoad(false);
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };
         self.loadMgmtCenters = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadMgmtCentersHandle)) {
+                if (generic.xhrCompleted(self.mgmtCentersHandle[page])) {
                     var options = {
                         sort: 'name',
-                        contents: 'hosts'
+                        contents: 'hosts',
+                        page: page
                     };
-                    if (page !== undefined) {
-                        options.page = page;
-                    }
-                    self.loadMgmtCentersHandle = api.get('mgmtcenters', { queryparams: options })
+                    self.mgmtCentersHandle[page] = api.get('mgmtcenters', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], mcdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                mcdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.mgmtCenters,
-                                function(guid) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
                                     var mc = new MgmtCenter(guid),
                                         mapping = self.mgmtCenterMapping();
 
@@ -198,19 +175,12 @@ define([
                                         self.mgmtCenterMapping(mapping);
                                     }
                                     return mc;
-                                }, 'guid'
-                            );
-                            $.each(self.mgmtCenters(), function(index, mgmtCenter) {
-                                if ($.inArray(mgmtCenter.guid(), guids) !== -1) {
-                                    mgmtCenter.fillData(mcdata[mgmtCenter.guid()]);
                                 }
                             });
-                            self.mgmtCentersInitialLoad(false);
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };
@@ -259,12 +229,6 @@ define([
                         }
                     });
             }
-        };
-
-        // Durandal
-        self.activate = function() {
-            self.loadPMachines();
-            self.loadMgmtCenters();
         };
     };
 });

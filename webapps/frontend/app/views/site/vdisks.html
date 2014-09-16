@@ -15,8 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:vdisks.title"></h2>
-    <div data-bind="pager: { items: vDisks, headers: vDiskHeaders, initialLoad: vDisksInitialLoad,
-                             viewportRefresh: refreshVDisks, viewportRefreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: loadVDisks, headers: vDiskHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                 <td>

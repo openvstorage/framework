@@ -172,46 +172,12 @@ define([
                     });
             }).promise();
         };
-        self.loadVDisks = function() {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.diskHandle)) {
-                    var options = {
-                        sort: 'devicename',
-                        vpoolguid: self.guid(),
-                        contents: ''
-                    };
-                    self.diskHandle = api.get('vdisks', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], vddata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vddata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.vDisks,
-                                function(guid) {
-                                    var vdisk = new VDisk(guid);
-                                    if ($.inArray(guid, guids) !== -1) {
-                                        vdisk.fillData(vddata[guid]);
-                                    }
-                                    vdisk.loading(true);
-                                    return vdisk;
-                                }, 'guid'
-                            );
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
         self.loadStorageRouters = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRouterHandle)) {
                     self.storageRouterHandle = api.get('vpools/' + self.guid() + '/storagerouters')
                         .done(function(data) {
-                            self.storageRouterGuids(data);
+                            self.storageRouterGuids(data.data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);

@@ -15,9 +15,9 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vpool', '../containers/vmachine', '../containers/storagerouter',
+    '../containers/vpool', '../containers/vmachine', '../containers/storagerouter', '../containers/vdisk',
     '../wizards/storageroutertovpool/index'
-], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, StorageRouterToVPoolWizard) {
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, VDisk, StorageRouterToVPoolWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -54,15 +54,11 @@ define([
         ];
 
         // Handles
-        self.loadVDisksHandle         = undefined;
-        self.refreshVDisksHandle      = {};
-        self.loadVMachinesHandle      = undefined;
-        self.refreshVMachinesHandle   = {};
+        self.vDisksHandle             = {};
+        self.vMachinesHandle          = {};
         self.loadStorageRoutersHandle = undefined;
 
         // Observables
-        self.vDisksInitialLoad         = ko.observable(true);
-        self.vMachinesInitialLoad      = ko.observable(true);
         self.storageRoutersLoaded      = ko.observable(false);
         self.updatingStorageRouters    = ko.observable(false);
         self.vPool                     = ko.observable();
@@ -95,8 +91,6 @@ define([
         self.load = function() {
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
-                self.vDisksInitialLoad(false);
-                self.vMachinesInitialLoad(false);
                 $.when.apply($, [
                     vpool.load('storagedrivers,_dynamics', { skipDisks: true }),
                     vpool.loadStorageRouters()
@@ -106,7 +100,6 @@ define([
                                 self.checksInit = true;
                             }
                         }),
-                    vpool.loadVDisks(),
                     self.loadStorageRouters()
                 ])
                     .fail(function(error) {
@@ -127,7 +120,7 @@ define([
                     self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             var guids = [], sadata = {};
-                            $.each(data, function(index, item) {
+                            $.each(data.data, function(index, item) {
                                 guids.push(item.guid);
                                 sadata[item.guid] = item;
                             });
@@ -151,68 +144,52 @@ define([
                 }
             }).promise();
         };
-        self.refreshVDisks = function(page) {
+        self.loadVDisks = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVDisksHandle[page])) {
+                if (generic.xhrCompleted(self.vDisksHandle[page])) {
                     var options = {
                         sort: 'devicename',
                         page: page,
                         contents: '_dynamics,_relations,-snapshots',
                         vpoolguid: self.vPool().guid()
                     };
-                    self.refreshVDisksHandle[page] = api.get('vdisks', { queryparams: options })
+                    self.vDisksHandle[page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], vddata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vddata[item.guid] = item;
-                            });
-                            $.each(self.vPool().vDisks(), function(index, vdisk) {
-                                if ($.inArray(vdisk.guid(), guids) !== -1) {
-                                    vdisk.fillData(vddata[vdisk.guid()]);
-                                    var vm, vMachineGuid = vdisk.vMachineGuid();
-                                    if (vMachineGuid && (vdisk.vMachine() === undefined || vdisk.vMachine().guid() !== vMachineGuid)) {
-                                        if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
-                                            vm = new VMachine(vMachineGuid);
-                                            vm.load('');
-                                            self.vMachineCache[vMachineGuid] = vm;
-                                        }
-                                        vdisk.vMachine(self.vMachineCache[vMachineGuid]);
-                                    }
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    return new VDisk(guid);
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
             }).promise();
         };
-        self.refreshVMachines = function(page) {
+        self.loadVMachines = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVMachinesHandle[page])) {
+                if (generic.xhrCompleted(self.vMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
                         contents: '_dynamics,-snapshots,-hypervisor_status',
                         vpoolguid: self.vPool().guid()
                     };
-                    self.refreshVMachinesHandle[page] = api.get('vmachines', { queryparams: options })
+                    self.vMachinesHandle[page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], vmdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vmdata[item.guid] = item;
-                            });
-                            $.each(self.vPool().vMachines(), function(index, vmachine) {
-                                if ($.inArray(vmachine.guid(), guids) !== -1) {
-                                    if (!self.vMachineCache.hasOwnProperty(vmachine.guid())) {
-                                        self.vMachineCache[vmachine.guid()] = vmachine;
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    if (!self.vMachineCache.hasOwnProperty(guid)) {
+                                        self.vMachineCache[guid] = new VMachine(guid);
                                     }
-                                    vmachine.fillData(vmdata[vmachine.guid()]);
+                                    return self.vMachineCache[guid];
+                                },
+                                dependencyLoader: function(item) {
                                     generic.crossFiller(
-                                        vmachine.storageRouterGuids, vmachine.storageRouters,
+                                        item.storageRouterGuids, item.storageRouters,
                                         function(guid) {
                                             if (!self.storageRouterCache.hasOwnProperty(guid)) {
                                                 var sr = new StorageRouter(guid);
@@ -224,9 +201,8 @@ define([
                                     );
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
