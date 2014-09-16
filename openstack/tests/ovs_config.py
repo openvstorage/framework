@@ -39,7 +39,9 @@ VPOOL_ROOT_DIR = '/mnt'
 VPOOL_BFS = '%s/bfs' % VPOOL_ROOT_DIR
 VPOOL_TEMP = '%s/temp' % VPOOL_ROOT_DIR
 VPOOL_MD = '%s/md' % VPOOL_ROOT_DIR
-VPOOL_CACHE = '%s/cache' % VPOOL_ROOT_DIR
+VPOOL_READCACHE = '%s/cache1/readcache' % VPOOL_ROOT_DIR
+VPOOL_WRITECACHE = '%s/cache1/writecache' % VPOOL_ROOT_DIR
+VPOOL_FOC = '%s/cache1/foc' % VPOOL_ROOT_DIR
 VPOOL_PORT = 12326 #make sure it is available (!) Todo: get highest available
 
 FILE_TYPE = 'raw' #should not be changed unless volumedriver changes
