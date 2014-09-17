@@ -5,6 +5,8 @@ pip install suds-jurko==0.5
 pip install configobj==4.7.2
 pip install pika
 pip install protobuf
+pip install choice
+pip install pyudev
 
 id -a ovs &> /dev/null
 if [[ $? -eq 1 ]]

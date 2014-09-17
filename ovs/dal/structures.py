@@ -55,10 +55,11 @@ class Dynamic(object):
     Dynamic property
     """
 
-    def __init__(self, name, return_type, timeout):
+    def __init__(self, name, return_type, timeout, locked=False):
         """
         Initializes a dynamic property
         """
         self.name = name
         self.return_type = return_type
         self.timeout = timeout
+        self.locked = locked

@@ -36,7 +36,9 @@ define([
         data.mtptTemp(undefined);
         data.mtptBFS(undefined);
         data.mtptMD(undefined);
-        data.mtptCache(undefined);
+        data.mtptReadCache(undefined);
+        data.mtptWriteCache(undefined);
+        data.mtptFOC(undefined);
         data.storageIP(undefined);
         data.name('');
         data.host('');

@@ -173,7 +173,9 @@
         "logging": "Kibana logging",
         "generated": "Generated",
         "group": "Group",
-        "backendtype": "Type"
+        "backendtype": "Type",
+        "storageip": "Storage IP",
+        "namespace": "Backend location"
     },
     "storagerouters": {
         "title": "Storage Routers",

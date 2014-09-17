@@ -46,6 +46,7 @@ define([
         self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.namespace         = ko.observable();
         self.storageRouterGuid = ko.observable();
         self.vpoolGuid         = ko.observable();
         self.vMachineGuid      = ko.observable();
@@ -72,6 +73,7 @@ define([
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);
                 self.failoverMode(data.info.failover_mode.toLowerCase() || 'unknown');
+                self.namespace(data.info.namespace);
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
