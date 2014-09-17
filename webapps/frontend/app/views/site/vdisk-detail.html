@@ -58,15 +58,15 @@ limitations under the License.
                     </thead>
                     <tbody>
                         <tr>
-                            <td data-i18n="ovs:generic.vmachine"></td>
-                            <td>
+                            <td style="width: 15%;" data-i18n="ovs:generic.vmachine"></td>
+                            <td style="width: 35%;">
                                 <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <a data-part="lazy-entry" data-bind="text: item().name(),
                                                                          attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
                                 </span>
                             </td>
-                            <td data-i18n="ovs:generic.cache"></td>
-                            <td><span data-bind="text: cacheRatio"></span></td>
+                            <td style="width: 15%;"  data-i18n="ovs:generic.cache"></td>
+                            <td style="width: 35%;"><span data-bind="text: cacheRatio"></span></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.vpool"></td>
@@ -119,6 +119,11 @@ limitations under the License.
                                                  }, tooltip: 'ovs:generic.states.foc.' + failoverMode()"
                                      style="width: 14px; height: 14px;"></div>
                             </td>
+                            <td colspan="2">&nbsp;</td>
+                        </tr>
+                        <tr>
+                            <td data-i18n="ovs:generic.namespace"></td>
+                            <td><span data-bind="text: namespace"></span></td>
                             <td colspan="2">&nbsp;</td>
                         </tr>
                     </tbody>
