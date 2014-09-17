@@ -82,6 +82,8 @@ define([
             if (!settings.hasOwnProperty('target')) {
                 throw 'Target should be specified';
             }
+            self.items = settings.items;
+            self.target = settings.target;
             self.key(generic.tryGet(settings, 'key', undefined));
             self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));
@@ -90,10 +92,12 @@ define([
                 if (!settings.hasOwnProperty('defaultfree')) {
                     throw 'If free values are allowed, a default should be provided';
                 }
-                self._freeValue(settings.defaultfree);
+                if (self.target() !== undefined) {
+                    self._freeValue(self.target());
+                } else {
+                    self._freeValue(settings.defaultfree);
+                }
             }
-            self.items = settings.items;
-            self.target = settings.target;
             self.text = generic.tryGet(settings, 'text', function(item) { return item; });
             if (self.target.isObservableArray) {
                 self.multi(true);
