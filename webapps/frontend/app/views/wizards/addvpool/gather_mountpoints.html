@@ -29,7 +29,7 @@ limitations under the License.
             </div>
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.mtptinfo"></p>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('tempfs', canContinue().fields) !== -1 }">
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('temp', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptTemp,

@@ -171,7 +171,9 @@
         "noentries": "No entries available",
         "logging": "Kibana logging",
         "generated": "Generated",
-        "group": "Group"
+        "group": "Group",
+        "storageip": "Storage IP",
+        "namespace": "Backend location"
     },
     "storagerouters": {
         "title": "Storage Routers",

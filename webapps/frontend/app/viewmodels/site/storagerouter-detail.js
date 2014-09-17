@@ -72,7 +72,7 @@ define([
                     self.loadVPoolsHandle = api.get('vpools', {
                         queryparams: {
                             sort: 'name',
-                            contents: ''
+                            contents: 'storagedrivers'
                         }
                     })
                         .done(function(data) {
@@ -105,7 +105,7 @@ define([
                         self.loadStorageDriversHandle[guid] = api.get('storagedrivers/' + guid)
                             .done(function(data) {
                                 var storageDriverFound = false, storageDriver;
-                                $.each(self.storageRouter().StorageDrivers(), function(vindex, storageDriver) {
+                                $.each(self.storageRouter().storageDrivers(), function(vindex, storageDriver) {
                                     if (storageDriver.guid() === guid) {
                                         storageDriver.fillData(data);
                                         storageDriverFound = true;
@@ -116,7 +116,7 @@ define([
                                 if (storageDriverFound === false) {
                                     storageDriver = new StorageDriver(data.guid);
                                     storageDriver.fillData(data);
-                                    self.storageRouter().StorageDrivers.push(storageDriver);
+                                    self.storageRouter().storageDrivers.push(storageDriver);
                                 }
                             });
                     }
@@ -128,7 +128,7 @@ define([
         // Durandal
         self.activate = function(mode, guid) {
             self.storageRouter(new StorageRouter(guid));
-            self.storageRouter().StorageDrivers = ko.observableArray();
+            self.storageRouter().storageDrivers = ko.observableArray();
 
             self.refresher.init(self.load, 5000);
             self.refresher.run();
