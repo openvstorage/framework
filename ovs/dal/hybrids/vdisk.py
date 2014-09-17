@@ -45,7 +45,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
-                  Dynamic('statistics', dict, 5),
+                  Dynamic('statistics', dict, 5, locked=True),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15)]
 

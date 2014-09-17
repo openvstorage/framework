@@ -757,21 +757,30 @@ class DataObject(object):
         """
         caller_name = dynamic.name
         cache_key   = '{0}_{1}'.format(self._key, caller_name)
-        cached_data = self._volatile.get(cache_key)
-        if cached_data is None:
-            function_info = inspect.getargspec(function)
-            if 'dynamic' in function_info.args:
-                cached_data = function(dynamic=dynamic)  # Load data from backend
-            else:
-                cached_data = function()
-            if cached_data is not None:
-                correct, allowed_types, given_type = Toolbox.check_type(cached_data, dynamic.return_type)
-                if not correct:
-                    raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
-                        caller_name, str(allowed_types), given_type
-                    ))
-            self._volatile.set(cache_key, cached_data, dynamic.timeout)
-        return cached_data
+        mutex       = VolatileMutex(cache_key)
+        try:
+            cached_data = self._volatile.get(cache_key)
+            if cached_data is None:
+                if dynamic.locked:
+                    mutex.acquire()
+                    cached_data = self._volatile.get(cache_key)
+                if cached_data is None:
+                    function_info = inspect.getargspec(function)
+                    if 'dynamic' in function_info.args:
+                        cached_data = function(dynamic=dynamic)  # Load data from backend
+                    else:
+                        cached_data = function()
+                    if cached_data is not None:
+                        correct, allowed_types, given_type = Toolbox.check_type(cached_data, dynamic.return_type)
+                        if not correct:
+                            raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
+                                caller_name, str(allowed_types), given_type
+                            ))
+                    if dynamic.timeout > 0:
+                        self._volatile.set(cache_key, cached_data, dynamic.timeout)
+            return cached_data
+        finally:
+            mutex.release()
 
     def __str__(self):
         """

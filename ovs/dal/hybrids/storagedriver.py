@@ -44,7 +44,7 @@ class StorageDriver(DataObject):
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
-                  Dynamic('statistics', dict, 4),
+                  Dynamic('statistics', dict, 0),
                   Dynamic('stored_data', int, 60)]
 
     def _status(self):
@@ -66,7 +66,6 @@ class StorageDriver(DataObject):
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.storagedriver_id == self.storagedriver_id:
-                    disk.invalidate_dynamics('statistics')  # Prevent double caching
                     for key, value in disk.statistics.iteritems():
                         if key != 'timestamp':
                             vdiskstatsdict[key] += value
