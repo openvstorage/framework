@@ -19,16 +19,19 @@ Contains various decorator
 import math
 import re
 import inspect
+import time
 from ovs.dal.lists.userlist import UserList
 from rest_framework.response import Response
 from toolbox import Toolbox
-from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable
+from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
 from rest_framework import status
 from django.http import Http404
 from django.conf import settings
 from ovs.dal.exceptions import ObjectNotFoundException
 from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler('api')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
@@ -55,6 +58,8 @@ def required_roles(roles):
             if not Toolbox.is_token_in_roles(request.token, roles):
                 raise PermissionDenied('This call requires roles: %s' % (', '.join(roles)))
             return f(*args, **kw)
+
+        new_function.__name__ = f.__name__
         return new_function
     return wrap
 
@@ -126,6 +131,8 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                         new_kwargs[name] = request.QUERY_PARAMS[name]
             # Call the function
             return f(self, **new_kwargs)
+
+        new_function.__name__ = f.__name__
         return new_function
     return wrap
 
@@ -194,6 +201,7 @@ def return_list(object_type, default_sort=None):
             # 7. Building response
             return Response(data, status=status.HTTP_200_OK)
 
+        new_function.__name__ = f.__name__
         return new_function
     return wrap
 
@@ -220,6 +228,7 @@ def return_object(object_type):
             obj = f(self, request, *args, **kwargs)
             return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
+        new_function.__name__ = f.__name__
         return new_function
     return wrap
 
@@ -239,5 +248,52 @@ def return_task():
             _ = self
             task = f(self, *args, **kwargs)
             return Response(task.id, status=status.HTTP_200_OK)
+
+        new_function.__name__ = f.__name__
+        return new_function
+    return wrap
+
+
+def limit(amount, per, timeout):
+    """
+    Rate-limits the decorated call
+    """
+    def wrap(f):
+        """
+        Wrapper function
+        """
+        def new_function(self, request, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            now = time.time()
+            key = 'ovs_api_limit_{0}.{1}_{2}'.format(
+                f.__module__, f.__name__,
+                request.META['HTTP_X_REAL_IP']
+            )
+            client = VolatileFactory.get_client()
+            mutex = VolatileMutex(key)
+            try:
+                mutex.acquire()
+                rate_info = client.get(key, {'calls': [],
+                                             'timeout': None})
+                active_timeout = rate_info['timeout']
+                if active_timeout is not None:
+                    if active_timeout > now:
+                        raise Throttled(wait=active_timeout - now)
+                    else:
+                        rate_info['timeout'] = None
+                rate_info['calls'] = [call for call in rate_info['calls'] if call > (now - per)] + [now]
+                calls = len(rate_info['calls'])
+                if calls > amount:
+                    rate_info['timeout'] = now + timeout
+                    client.set(key, rate_info)
+                    raise Throttled(wait=timeout)
+                client.set(key, rate_info)
+            finally:
+                mutex.release()
+            return f(self, request, *args, **kwargs)
+
+        new_function.__name__ = f.__name__
         return new_function
     return wrap
