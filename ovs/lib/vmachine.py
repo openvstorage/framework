@@ -614,3 +614,31 @@ class VMachineController(object):
         except Exception as ex:
             logger.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
+
+    @staticmethod
+    @celery.task(name='ovs.machine.set_configparams')
+    def set_configparams(vmachine_guid, configparams):
+        """
+        Sets configuration parameters to a given vmachine/vdisk. Items not passed are (re)set.
+        """
+        vmachine = VMachine(vmachine_guid)
+        resolved_configs = {}
+        for vdisk in vmachine.vdisks:
+            resolved_configs[vdisk.guid] = vdisk.resolved_configuration
+        raw_config = vmachine.configuration
+        keys = ['iops', 'cache_strategy', 'cache_size', 'foc']
+        for key in keys:
+            if key not in configparams and key in raw_config:
+                del raw_config[key]
+            if key in configparams:
+                raw_config[key] = configparams[key]
+        vmachine.configuration = raw_config
+        vmachine.save()
+        for vdisk in vmachine.vdisks:
+            vdisk.invalidate_dynamics(['resolved_configuration'])
+            resolved_config = resolved_configs[vdisk.guid]
+            new_resolved_config = vdisk.resolved_configuration
+            for key in keys:
+                if resolved_config.get(key) != new_resolved_config.get(key):
+                    # @TODO: update the 'key' property on the disk.
+                    logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))

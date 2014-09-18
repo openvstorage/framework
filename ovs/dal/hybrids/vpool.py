@@ -33,7 +33,8 @@ class VPool(DataObject):
                     Property('password', str, mandatory=False, doc='Password for the Storage Backend.'),
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
                     Property('type', ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'DISTRIBUTED'], mandatory=False, doc='Type of the Storage Backend.'),
-                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
+                    Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.'),
+                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specifc fallback configurations')]
     __relations = []
     __dynamics = [Dynamic('status',      str, 10),
                   Dynamic('statistics',  dict, 0),

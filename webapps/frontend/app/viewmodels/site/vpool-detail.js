@@ -287,6 +287,31 @@ define([
                 self.updatingStorageRouters(false);
             });
         };
+        self.saveConfiguration = function() {
+            if (self.vPool() !== undefined) {
+                var vp = self.vPool();
+                api.post('vpools/' + vp.guid() + '/set_configparams', {
+                    data: { configparams: vp._configuration() }
+                })
+                    .then(self.shared.tasks.wait)
+                    .done(function () {
+                        generic.alertSuccess(
+                            $.t('ovs:vpools.saveconfig.done'),
+                            $.t('ovs:vpools.saveconfig.donemsg', { what: vp.name() })
+                        );
+                    })
+                    .fail(function (error) {
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.messages.errorwhile', {
+                                context: 'error',
+                                what: $.t('ovs:vpools.saveconfig.errormsg', { what: vp.name() }),
+                                error: error.responseText
+                            })
+                        );
+                    });
+            }
+        };
 
         // Durandal
         self.activate = function(mode, guid) {

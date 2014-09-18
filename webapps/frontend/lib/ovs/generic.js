@@ -304,35 +304,54 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 }, 5000);
             });
     }
+    function merge(originalObject, newObject, targetObject, keys) {
+        // If the target equals the original, the target wasn't updated, so it can updated with the new.
+        $.each(keys, function(i, key) {
+            if (originalObject.hasOwnProperty(key) && targetObject.hasOwnProperty(key)) {
+                if (originalObject[key] === targetObject[key]) {
+                    if (newObject.hasOwnProperty(key)) {
+                        targetObject[key] = newObject[key];
+                    } else {
+                        delete targetObject[key];
+                    }
+                }
+            } else if (!originalObject.hasOwnProperty(key) && !targetObject.hasOwnProperty(key)) {
+                if (newObject.hasOwnProperty(key)) {
+                    targetObject[key] = newObject[key];
+                }
+            }
+        });
+    }
 
     return {
-        getTimestamp    : getTimestamp,
-        formatBytes     : formatBytes,
-        formatSpeed     : formatSpeed,
-        formatRatio     : formatRatio,
-        formatShort     : formatShort,
-        formatNumber    : formatNumber,
-        padRight        : padRight,
-        tryGet          : tryGet,
-        trySet          : trySet,
-        lower           : lower,
-        alert           : alert,
-        alertInfo       : alertInfo,
-        alertSuccess    : alertSuccess,
-        alertError      : alertError,
-        keys            : keys,
-        xhrAbort        : xhrAbort,
-        xhrCompleted    : xhrCompleted,
-        removeElement   : removeElement,
-        smooth          : smooth,
-        round           : round,
-        ceil            : ceil,
-        buildString     : buildString,
-        setDecimals     : setDecimals,
-        crossFiller     : crossFiller,
-        deg2rad         : deg2rad,
-        numberSort      : numberSort,
-        advancedSort    : advancedSort,
-        validate        : validate
+        getTimestamp  : getTimestamp,
+        formatBytes   : formatBytes,
+        formatSpeed   : formatSpeed,
+        formatRatio   : formatRatio,
+        formatShort   : formatShort,
+        formatNumber  : formatNumber,
+        padRight      : padRight,
+        tryGet        : tryGet,
+        trySet        : trySet,
+        lower         : lower,
+        alert         : alert,
+        alertInfo     : alertInfo,
+        alertSuccess  : alertSuccess,
+        alertError    : alertError,
+        keys          : keys,
+        xhrAbort      : xhrAbort,
+        xhrCompleted  : xhrCompleted,
+        removeElement : removeElement,
+        smooth        : smooth,
+        round         : round,
+        ceil          : ceil,
+        buildString   : buildString,
+        setDecimals   : setDecimals,
+        crossFiller   : crossFiller,
+        deg2rad       : deg2rad,
+        numberSort    : numberSort,
+        advancedSort  : advancedSort,
+        validate      : validate,
+        merge         : merge
     };
 });

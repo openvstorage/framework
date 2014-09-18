@@ -23,6 +23,9 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vmachine import VMachineController
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('lib', name='vpool')
 
 
 class VPoolController(object):
@@ -71,3 +74,31 @@ class VPoolController(object):
         """
         _ = storagerouter_guid
         return True
+
+    @staticmethod
+    @celery.task(name='ovs.vpool.set_configparams')
+    def set_configparams(vpool_guid, configparams):
+        """
+        Sets configuration parameters to a given vpool/vdisk. Items not passed are (re)set.
+        """
+        vpool = VPool(vpool_guid)
+        resolved_configs = {}
+        for vdisk in vpool.vdisks:
+            resolved_configs[vdisk.guid] = vdisk.resolved_configuration
+        raw_config = vpool.configuration
+        keys = ['iops', 'cache_strategy', 'cache_size', 'foc']
+        for key in keys:
+            if key not in configparams and key in raw_config:
+                del raw_config[key]
+            if key in configparams:
+                raw_config[key] = configparams[key]
+        vpool.configuration = raw_config
+        vpool.save()
+        for vdisk in vpool.vdisks:
+            vdisk.invalidate_dynamics(['resolved_configuration'])
+            resolved_config = resolved_configs[vdisk.guid]
+            new_resolved_config = vdisk.resolved_configuration
+            for key in keys:
+                if resolved_config.get(key) != new_resolved_config.get(key):
+                    # @TODO: update the 'key' property on the disk.
+                    logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))

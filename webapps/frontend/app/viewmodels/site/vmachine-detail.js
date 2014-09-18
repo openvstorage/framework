@@ -194,6 +194,31 @@ define([
                 }
             }
         };
+        self.saveConfiguration = function() {
+            if (self.vMachine() !== undefined) {
+                var vm = self.vMachine();
+                api.post('vmachines/' + vm.guid() + '/set_configparams', {
+                    data: { configparams: vm._configuration() }
+                })
+                    .then(self.shared.tasks.wait)
+                    .done(function () {
+                        generic.alertSuccess(
+                            $.t('ovs:vmachines.saveconfig.done'),
+                            $.t('ovs:vmachines.saveconfig.donemsg', { what: vm.name() })
+                        );
+                    })
+                    .fail(function (error) {
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.messages.errorwhile', {
+                                context: 'error',
+                                what: $.t('ovs:vmachines.saveconfig.errormsg', { what: vm.name() }),
+                                error: error.responseText
+                            })
+                        );
+                    });
+            }
+        };
 
         // Durandal
         self.activate = function(mode, guid) {
