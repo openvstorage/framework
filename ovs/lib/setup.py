@@ -513,9 +513,9 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
                 client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
 {0}
 EOF
-""".format(rabbitmq_server_config % {'broker_port' : ovs_config.get('core', 'broker.port'),
-       'broker_username' : ovs_config.get('core', 'broker.login'),
-       'broker_password' : ovs_config.get('core', 'broker.password')}))
+""".format(rabbitmq_server_config % {'broker_port': ovs_config.get('core', 'broker.port'),
+                                     'broker_username': ovs_config.get('core', 'broker.login'),
+                                     'broker_password': ovs_config.get('core', 'broker.password')}))
 
                 rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(client)
 
@@ -1020,7 +1020,16 @@ for device_path in glob.glob('/sys/block/*'):
 print blk_devices
 """
 
-        return SetupController._exec_python(client, remote_script)
+        blk_devices = eval(SetupController._exec_python(client, remote_script))
+
+        # cross-check ssd devices - flawed detection on vmware
+        for disk in blk_devices.keys():
+            output = str(client.run("hdparm -I {0} 2> /dev/null | grep 'Solid State' || true".format('/dev/' + disk)).strip())
+            if 'Solid State' in output and blk_devices[disk]['type'] == 'disk':
+                print 'Updating device type for /dev/{0} to ssd'.format(disk)
+                blk_devices[disk]['type'] = 'ssd'
+
+        return blk_devices
 
     @staticmethod
     def _generate_default_partition_layout(blk_devices):
@@ -1076,8 +1085,11 @@ print blk_devices
 
         if nr_of_ssds == 1:
             mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/cache1']['percentage'] = 50
             mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
             mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
 
         elif nr_of_ssds >= 2:
             for count in xrange(nr_of_ssds):
@@ -1142,10 +1154,10 @@ print blk_devices
             count = 1
             for mp, percentage, label in partitions:
                 if start == '2MB':
-                    size_in_percentage = percentage
+                    size_in_percentage = int(percentage)
                     client.run('parted {0} -s mkpart {1} {2} {3}%'.format(disk, label, start, size_in_percentage))
                 else:
-                    size_in_percentage = start + percentage
+                    size_in_percentage = int(start) + int(percentage)
                     client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
                 client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
                 fstab = fstab + fstab_entry.format(label, mp)
@@ -1174,7 +1186,7 @@ print blk_devices
     @staticmethod
     def apply_flexible_disk_layout(client, auto_config=False, default=dict()):
         import choice
-        blk_devices = eval(SetupController._get_disk_configuration(client))
+        blk_devices = SetupController._get_disk_configuration(client)
 
         skipped = set()
         if not default:
@@ -1226,9 +1238,62 @@ print blk_devices
             print "{0:15} : {1}".format('mountpoint', mountpoint)
             print
 
+        def is_device_path(value):
+            if re.match('/dev/[a-z]3', value):
+                return True
+            else:
+                return False
+
+        def is_mountpoint(value):
+            if re.match('/mnt/[a-z]+[0-9]*', value):
+                return True
+            else:
+                return False
+
+        def is_percentage(value):
+            try:
+                if int(value) >= 0 and int(value) <=100:
+                    return True
+                else:
+                    return False
+            except:
+                return False
+
+        def is_label(value):
+            if re.match('[a-z]+[0-9]*', value):
+                return True
+            else:
+                return False
+
         def validate_subitem(subitem, answer):
-            #@todo to be completed
-            # all clear :-)
+            if subitem in ['percentage']:
+                return is_percentage(answer)
+            elif subitem in ['device']:
+                return is_device_path(answer)
+            elif subitem in ['mountpoint']:
+                return is_mountpoint(answer)
+            elif subitem in ['label']:
+                return is_label(answer)
+
+            return False
+
+        def _summarize_partition_percentages(layout):
+            total = dict()
+            for details in layout.itervalues():
+                percentage = int(details['percentage'])
+                device = details['device']
+                if device in total:
+                    total[device] += percentage
+                else:
+                    total[device] = percentage
+            print total
+            for device, percentage in total.iteritems():
+                if is_percentage(percentage):
+                    continue
+                else:
+                    print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
+                    time.sleep(1)
+                    return False
             return True
 
         def process_submenu_actions(mp_to_edit):
@@ -1255,11 +1320,11 @@ print blk_devices
                         mp_to_edit = new_mountpoint
                 else:
                     answer = choice.Input('Enter new value for {}'.format(subitem_chosen)).ask()
-                    #@todo: add validation
                     if validate_subitem(subitem_chosen, answer):
                         subitem[subitem_chosen] = answer
                     else:
-                        print 'Invalid entry {0} for {1}'.format(answer, subitem_chosen)
+                        print '\n>>> Invalid entry {0} for {1}\n'.format(answer, subitem_chosen)
+                        time.sleep(1)
 
         if auto_config:
             SetupController._partition_disks(client, default)
@@ -1299,6 +1364,8 @@ print blk_devices
                     show_layout(default)
 
                 elif chosen == 'Apply':
+                    if not _summarize_partition_percentages(default):
+                        'Partition totals are not within percentage range'
                     show_layout(default)
                     confirmation = choice.Input('Please confirm partition layout (yes/no), ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', str).ask()
                     if confirmation.lower() == 'yes':
