@@ -319,8 +319,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguratio
 
 fd_config = {{'fd_cache_path': '{11}',
               'fd_extent_cache_capacity': '1024',
-              'fd_namespace' : 'fd-{0}-{12}',
-              'fd_policy_id' : ''}}
+              'fd_namespace' : 'fd-{0}-{12}'}}
 storagedriver_configuration = StorageDriverConfiguration('{0}')
 storagedriver_configuration.configure_backend({1})
 storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
