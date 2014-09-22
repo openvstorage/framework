@@ -43,7 +43,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache1'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 50, 'label': 'cache1'}
 
     # Arakoon
     arakoon_client_config = '/opt/OpenvStorage/config/arakoon/{0}/{0}_client.cfg'
@@ -65,7 +65,7 @@ class SetupController(object):
                                               'volumerouter-consumer'] + extra_node_services
 
     @staticmethod
-    def setup_node(ip, force_type=None, verbose=False):
+    def setup_node(ip=None, force_type=None, verbose=False):
         """
         Sets up a node.
         1. Some magic figuring out here:
@@ -180,12 +180,13 @@ class SetupController(object):
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
                 if len(clusters) > 0:
+                    clusters.sort()
                     dont_join = "Don't join any of these clusters."
                     logger.debug('Manual cluster selection')
                     if force_type in [None, 'master']:
-                        clusters.append(dont_join)
+                        clusters = [dont_join] + clusters
                     print 'Following Open vStorage clusters are found.'
-                    cluster_name = Interactive.ask_choice(clusters, 'Select a cluster to join', default_value=local_cluster_name)
+                    cluster_name = Interactive.ask_choice(clusters, 'Select a cluster to join', default_value=local_cluster_name, sort_choices=False)
                     if cluster_name != dont_join:
                         logger.debug('Cluster {0} selected'.format(cluster_name))
                         nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
@@ -297,28 +298,24 @@ class SetupController(object):
         - Request hypervisor information
         """
 
-        # Creating filesystems
-        print 'Creating filesystems'
-        logger.info('Creating filesystems')
-
-        target_client = SSHClient.load(cluster_ip)
-        disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
-        mountpoints = disk_layout.keys()
-        mountpoints.sort()
+        print '\n+++ Peparing node +++\n'
+        logger.info('Preparing node')
 
         # Exchange ssh keys
         print 'Exchanging SSH keys'
         logger.info('Exchanging SSH keys')
-        passwords = None
+        passwords = {}
+        first_request = True
         prev_node_password = ''
         for node in nodes:
             if node in known_passwords:
                 passwords[node] = known_passwords[node]
                 continue
-            if passwords is None:
+            if first_request is True:
                 prev_node_password = Interactive.ask_password('Enter root password for {0}'.format(node))
                 logger.debug('Custom password for {0}'.format(node))
                 passwords = {node: prev_node_password}
+                first_request = False
             else:
                 this_node_password = Interactive.ask_password('Enter root password for {0}, just press enter if identical as above'.format(node))
                 if this_node_password == '':
@@ -354,11 +351,24 @@ class SetupController(object):
             mapping[node] = node_hostname
         for node in nodes:
             node_client = SSHClient.load(node)
-            update_hosts_file = """
+            for ip in mapping.keys():
+                update_hosts_file = """
 from ovs.extensions.generic.system import System
 System.update_hosts_file(hostname='{0}', ip='{1}')
-""".format(node, mapping[node])
-            SetupController._exec_python(node_client, update_hosts_file)
+""".format(mapping[ip], ip)
+                SetupController._exec_python(node_client, update_hosts_file)
+
+        # Creating filesystems
+        print 'Creating filesystems'
+        logger.info('Creating filesystems')
+
+        target_client = SSHClient.load(cluster_ip)
+        disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
+        mountpoints = disk_layout.keys()
+        mountpoints.sort()
+
+        print 'Collecting hypervisor information'
+        logger.info('Collecting hypervisor information')
 
         # Collecting hypervisor data
         target_client = SSHClient.load(cluster_ip)
@@ -368,7 +378,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
                                                      question='Which type of hypervisor is this Storage Router backing?',
                                                      default_value=possible_hypervisor)
             logger.debug('Selected hypervisor type {0}'.format(hypervisor_info['type']))
-        default_name = 'esxi' if hypervisor_info['type'] == 'VMWARE' else 'kvm'
+        default_name = ('esxi-{0}' if hypervisor_info['type'] == 'VMWARE' else 'kvm-{0}').format(cluster_ip.split('.')[-1])
         if not hypervisor_info.get('name'):
             hypervisor_info['name'] = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
         if hypervisor_info['type'] == 'VMWARE':
@@ -381,7 +391,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
                     hypervisor_info['username'] = Interactive.ask_string('Enter hypervisor username',
                                                                          default_value=hypervisor_info['username'])
                 if not hypervisor_info.get('password') or not first_request:
-                    hypervisor_info['password'] = Interactive.ask_password('Enter hypervisor root password')
+                    hypervisor_info['password'] = Interactive.ask_password('Enter hypervisor {0} password'.format(hypervisor_info.get('username')))
                 try:
                     request = urllib2.Request('https://{0}/mob'.format(hypervisor_info['ip']))
                     auth = base64.encodestring('{0}:{1}'.format(hypervisor_info['username'], hypervisor_info['password'])).replace('\n', '')
@@ -404,8 +414,8 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         print '\n+++ Setting up first node +++\n'
         logger.info('Setting up first node')
 
-        print 'Setting up first arakoon node'
-        logger.info('Setting up first arakoon node')
+        print 'Setting up Arakoon'
+        logger.info('Setting up Arakoon')
         # Loading arakoon mountpoint
         target_client = SSHClient.load(cluster_ip)
         if arakoon_mountpoint is None:
@@ -474,9 +484,9 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
         logger.debug('Setting up RabbitMQ')
         target_client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
 [
-   {rabbit, [{tcp_listeners, [{0}]},
-             {default_user, <<"{1}">>},
-             {default_pass, <<"{2}">>}]}
+   {{rabbit, [{{tcp_listeners, [{0}]}},
+              {{default_user, <<"{1}">>}},
+              {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
 """.format(ovs_config.get('core', 'broker.port'),
@@ -680,8 +690,6 @@ EOF
             target_client = SSHClient.load(cluster_ip)
             SetupController._remote_config_write(target_client, config, client_config)
 
-        print '\n+++ Finalizing setup +++\n'
-        logger.info('Finalizing setup')
         client = SSHClient.load(cluster_ip)
         node_name = client.run('hostname')
         client.run('mkdir -p /opt/OpenvStorage/webapps/frontend/logging')
@@ -780,7 +788,7 @@ EOF
         master_nodes = []
         for cluster in SetupController.arakoon_clusters.keys():
             config = SetupController._remote_config_read(master_client, SetupController.arakoon_client_config.format(cluster))
-            master_nodes = [node.strip() for node in config.get('global', 'cluster').split(',')]
+            master_nodes = [config.get(node.strip(), 'ip').strip() for node in config.get('global', 'cluster').split(',')]
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
@@ -872,14 +880,16 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
                 node_client = SSHClient.load(node)
                 SetupController._remote_config_write(node_client, config_file, config)
 
+        print 'Restarting master node services'
         logger.info('Restarting master node services')
         for node in master_nodes:
             node_client = SSHClient.load(node)
             for cluster in SetupController.arakoon_clusters.keys():
                 SetupController._restart_service(node_client, 'arakoon-{0}'.format(cluster))
-                cluster = ArakoonManagement().getCluster(cluster)
-                client = cluster.getClient()
-                client.nop()
+                if len(master_nodes) >= 1:  # A two node cluster needs all nodes running
+                    cluster = ArakoonManagement().getCluster(cluster)
+                    client = cluster.getClient()
+                    client.nop()
             SetupController._restart_service(node_client, 'memcache')
         target_client = SSHClient.load(cluster_ip)
         for cluster in SetupController.arakoon_clusters.keys():
@@ -1648,12 +1658,14 @@ print blk_devices
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
+        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
+        ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
         SetupController._change_service_state(client, 'dbus', 'start')
         SetupController._change_service_state(client, 'avahi-daemon', 'start')
         discover_result = client.run('avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         for entry in discover_result.split('\n'):
             entry_parts = entry.split(';')
-            if entry_parts[0] == '=' and entry_parts[2] == 'IPv4':
+            if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in ipaddresses:
                 # =;eth0;IPv4;ovs_cluster_kenneth_ovs100;_ovs_master_node._tcp;local;ovs100.local;172.22.1.10;443;
                 # split(';') -> [3]  = ovs_cluster_kenneth_ovs100
                 #               [4]  = _ovs_master_node._tcp -> contains _ovs_<type>_node
