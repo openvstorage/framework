@@ -1,0 +1,3 @@
+/etc/profile.d/OpenvStorage.sh
+opt/OpenvStorage/config/ovs.cfg
+opt/OpenvStorage/config/volumedriver.cfg

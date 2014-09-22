@@ -1,0 +1,67 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <form role="form form-horizontal" class="form-horizontal">
+        <p data-i18n="ovs:wizards.storageroutertovpool.confirm.basicinfo"></p>
+        <ul data-bind="foreach: data.pendingStorageRouters()" style="list-style-type: none;">
+            <li>
+                <span class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: -20px; margin-right: 5px;"></span>
+                <span data-bind="text: name"></span>
+                <!-- ko with: $root.addValidations()[guid()] -->
+                    <div data-bind="visible: validationState().valid === false" class="alert alert-danger" style="margin-top: 5px;">
+                        <p data-bind="visible: validationState().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+                        <p data-bind="visible: validationState().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+                        <ul data-bind="visible: validationState().reasons.length > 0, foreach: validationState().reasons">
+                            <li data-bind="text: $data"></li>
+                        </ul>
+                    </div>
+                    <div data-bind="visible: validationState().valid === true" class="alert alert-success" style="margin-top: 5px;">
+                        <span data-i18n="ovs:wizards.storageroutertovpool.confirm.addvalid"></span>
+                    </div>
+                    <div data-bind="visible: validationState().valid === undefined" class="alert alert-info" style="margin-top: 5px;">
+                        <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+                        <span data-i18n="ovs:wizards.storageroutertovpool.confirm.validating"></span>
+                    </div>
+                <!-- /ko -->
+            </li>
+        </ul>
+        <ul data-bind="foreach: data.removingStorageRouters()" style="list-style-type: none;">
+            <li>
+                <span class="fa" data-i18n="[html]ovs:icons.delete" style="margin-left: -20px; margin-right: 5px;"></span>
+                <span data-bind="text: name"></span>
+                <!-- ko with: $root.removeValidations()[guid()] -->
+                    <div data-bind="visible: validationState().valid === false" class="alert alert-danger" style="margin-top: 5px;">
+                        <p data-bind="visible: validationState().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+                        <p data-bind="visible: validationState().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+                        <ul data-bind="visible: validationState().reasons.length > 0, foreach: validationState().reasons">
+                            <li data-bind="text: $data"></li>
+                        </ul>
+                    </div>
+                    <div data-bind="visible: validationState().valid === true" class="alert alert-success" style="margin-top: 5px;">
+                        <span data-i18n="ovs:wizards.storageroutertovpool.confirm.removevalid"></span>
+                    </div>
+                    <div data-bind="visible: validationState().valid === undefined" class="alert alert-info" style="margin-top: 5px;">
+                        <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+                        <span data-i18n="ovs:wizards.storageroutertovpool.confirm.validating"></span>
+                    </div>
+                <!-- /ko -->
+            </li>
+        </ul>
+        <div data-bind="visible: data.pendingStorageRouters().length === 0 && data.removingStorageRouters().length === 0" class="alert alert-danger" style="margin-top: 5px;">
+            <span data-i18n="ovs:wizards.storageroutertovpool.confirm.noselection"></span>
+        </div>
+    </form>
+</div>
