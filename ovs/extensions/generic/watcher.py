@@ -35,6 +35,7 @@ def services_running():
     while tries < max_tries:
         try:
             from ovs.extensions.storage.volatilefactory import VolatileFactory
+            VolatileFactory.store = None
             volatile = VolatileFactory.get_client()
             volatile.set(key, value)
             if volatile.get(key) == value:
@@ -44,6 +45,7 @@ def services_running():
         except Exception as message:
             logger.debug('  Error during volatile store test: {0}'.format(message))
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+        time.sleep(1)
         tries += 1
     if tries == max_tries:
         logger.debug('  Volatile store not working correctly')
@@ -57,6 +59,7 @@ def services_running():
     while tries < max_tries:
         try:
             from ovs.extensions.storage.persistentfactory import PersistentFactory
+            PersistentFactory.store = None
             persistent = PersistentFactory.get_client()
             persistent.set(key, value)
             if persistent.get(key) == value:
@@ -66,6 +69,7 @@ def services_running():
         except Exception as message:
             logger.debug('  Error during persistent store test: {0}'.format(message))
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+        time.sleep(1)
         tries += 1
     if tries == max_tries:
         logger.debug('  Persistent store not working correctly')
@@ -89,6 +93,7 @@ def services_running():
         except Exception as message:
             logger.debug('  Error during arakoon (voldrv) test: {0}'.format(message))
         key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
+        time.sleep(1)
         tries += 1
     if tries == max_tries:
         logger.debug('  Arakoon (voldrv) not working correctly')
@@ -104,6 +109,8 @@ def services_running():
     rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
     rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
     good_node = False
+    loglevel = logging.root.manager.disable  # Workaround for disabling logging
+    logging.disable('WARNING')
     for server in rmq_servers:
         try:
             connection_string = '{0}://{1}:{2}@{3}/%2F'.format(Configuration.get('ovs.core.broker.protocol'),
@@ -116,8 +123,9 @@ def services_running():
                                   pika.BasicProperties(content_type='text/plain', delivery_mode=1))
             connection.close()
             good_node = True
-        except Exception as message:
-            logger.debug('  Error during rabbitMQ test on node {0}: {1}'.format(server, message))
+        except Exception:
+            logger.debug('  Error during rabbitMQ test on node {0}'.format(server))
+    logging.disable(loglevel)  # Restore workaround
     if good_node is False:
         logger.debug('  No working rabbitMQ node could be found')
         return False

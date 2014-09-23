@@ -23,6 +23,7 @@ import time
 import ConfigParser
 import urllib2
 import base64
+import logging
 from subprocess import check_output
 
 from ovs.extensions.generic.sshclient import SSHClient
@@ -378,7 +379,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
                                                      question='Which type of hypervisor is this Storage Router backing?',
                                                      default_value=possible_hypervisor)
             logger.debug('Selected hypervisor type {0}'.format(hypervisor_info['type']))
-        default_name = ('esxi-{0}' if hypervisor_info['type'] == 'VMWARE' else 'kvm-{0}').format(cluster_ip.split('.')[-1])
+        default_name = ('esxi{0}' if hypervisor_info['type'] == 'VMWARE' else 'kvm{0}').format(cluster_ip.split('.')[-1])
         if not hypervisor_info.get('name'):
             hypervisor_info['name'] = Interactive.ask_string('Enter hypervisor hostname', default_value=default_name)
         if hypervisor_info['type'] == 'VMWARE':
@@ -882,31 +883,34 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 
         print 'Restarting master node services'
         logger.info('Restarting master node services')
+        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
+        logging.disable('WARNING')
         for node in master_nodes:
             node_client = SSHClient.load(node)
             for cluster in SetupController.arakoon_clusters.keys():
-                SetupController._restart_service(node_client, 'arakoon-{0}'.format(cluster))
-                if len(master_nodes) >= 1:  # A two node cluster needs all nodes running
+                SetupController._change_service_state(node_client, 'arakoon-{0}'.format(cluster), 'restart')
+                if len(master_nodes) > 1:  # A two node cluster needs all nodes running
                     cluster = ArakoonManagement().getCluster(cluster)
                     client = cluster.getClient()
                     client.nop()
-            SetupController._restart_service(node_client, 'memcache')
+            SetupController._change_service_state(node_client, 'memcached', 'restart')
         target_client = SSHClient.load(cluster_ip)
         for cluster in SetupController.arakoon_clusters.keys():
-            SetupController._start_service(target_client, 'arakoon-{0}'.format(cluster))
+            SetupController._change_service_state(target_client, 'arakoon-{0}'.format(cluster), 'restart')
             cluster = ArakoonManagement().getCluster(cluster)
             client = cluster.getClient()
             client.nop()
-        SetupController._start_service(target_client, 'memcache')
+        logging.disable(loglevel)  # Restore workaround
+        SetupController._change_service_state(target_client, 'memcached', 'restart')
 
         print 'Setting up RabbitMQ'
         logger.debug('Setting up RMQ')
         target_client = SSHClient.load(cluster_ip)
         target_client.run("""cat > /etc/rabbitmq/rabbitmq.config << EOF
 [
-   {rabbit, [{tcp_listeners, [{0}]},
-             {default_user, <<"{1}">>},
-             {default_pass, <<"{2}">>}]}
+   {{rabbit, [{{tcp_listeners, [{0}]}},
+              {{default_user, <<"{1}">>}},
+              {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
 """.format(ovs_config.get('core', 'broker.port'),
@@ -977,8 +981,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         logger.info('Update ES configuration')
         SetupController._update_es_configuration(client, 'true')
 
-        SetupController._restart_service(client, 'logstash')
-        SetupController._start_service(client, 'rabbitmq')
+        SetupController._change_service_state(client, 'logstash', 'restart')
+        SetupController._change_service_state(client, 'rabbitmq', 'start')
 
         print 'Starting services'
         logger.info('Starting services for join master')
