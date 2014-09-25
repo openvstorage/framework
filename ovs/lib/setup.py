@@ -43,7 +43,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache1'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1'}
 
     @staticmethod
     def setup_node(ip=None, force_type=None, verbose=False):
@@ -1040,11 +1040,11 @@ print blk_devices
 
         """
 
-        mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 25, 'label': 'mdpath'},
-                                   '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 25, 'label': 'db'},
+        mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'mdpath'},
+                                   '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'db'},
                                    '/mnt/cache1': dict(SetupController.PARTITION_DEFAULTS),
-                                   '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 80, 'label': 'backendfs'},
-                                   '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 20, 'label': 'tempfs'}}
+                                   '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'backendfs'},
+                                   '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'tempfs'}}
 
         selected_devices = dict(blk_devices)
         skipped_devices = set()
@@ -1075,7 +1075,9 @@ print blk_devices
 
         if nr_of_disks == 1:
             mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
+            mountpoints_to_allocate['/var/tmp']['percentage'] = 20
             mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[0]
+            mountpoints_to_allocate['/mnt/bfs']['percentage'] = 80
 
         elif nr_of_disks >= 2:
             mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
@@ -1104,7 +1106,9 @@ print blk_devices
                 mountpoints_to_allocate[marker]['percentage'] = cache_size
 
             mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
+            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
             mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[1]
+            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
 
         return mountpoints_to_allocate, skipped_devices
 
@@ -1209,11 +1213,15 @@ print blk_devices
                 sub_keys = proposed[mp].keys()
                 sub_keys.sort()
                 mp_values = ''
+                if not proposed[mp]['device'] or proposed[mp]['device'] in ['DIR_ONLY']:
+                    mp_values = ' {0} : {1:20}'.format('device', 'DIR_ONLY')
+                    print "{0:20} : {1}".format(mp, mp_values)
+                    key_map.append(mp)
+                    continue
+
                 for sub_key in sub_keys:
                     value = str(proposed[mp][sub_key])
-                    if sub_key == 'device' and not value:
-                        value = 'DIR_ONLY'
-                    elif sub_key == 'device' and value and value != 'DIR_ONLY':
+                    if sub_key == 'device' and value and value != 'DIR_ONLY':
                         size = device_size_map[value]
                         size_in_gb = int(size / 1000.0 / 1000.0 / 1000.0)
                         value = value + ' ({0} GB)'.format(size_in_gb)
@@ -1239,7 +1247,7 @@ print blk_devices
             print
 
         def is_device_path(value):
-            if re.match('/dev/[a-z]3', value):
+            if re.match('/dev/[a-z][a-z][a-z]+', value):
                 return True
             else:
                 return False
@@ -1252,11 +1260,11 @@ print blk_devices
 
         def is_percentage(value):
             try:
-                if int(value) >= 0 and int(value) <=100:
+                if 0 <= int(value) <= 100:
                     return True
                 else:
                     return False
-            except:
+            except ValueError:
                 return False
 
         def is_label(value):
@@ -1280,8 +1288,14 @@ print blk_devices
         def _summarize_partition_percentages(layout):
             total = dict()
             for details in layout.itervalues():
-                percentage = int(details['percentage'])
                 device = details['device']
+                if device == 'DIR_ONLY':
+                    continue
+                if details['percentage'] == 'NA':
+                    print '>>> Invalid value {0}% for device: {1}'.format(details['percentage'], device)
+                    time.sleep(1)
+                    return False
+                percentage = int(details['percentage'])
                 if device in total:
                     total[device] += percentage
                 else:
@@ -1366,6 +1380,9 @@ print blk_devices
                 elif chosen == 'Apply':
                     if not _summarize_partition_percentages(default):
                         'Partition totals are not within percentage range'
+                        choices = show_layout(default)
+                        continue
+
                     show_layout(default)
                     confirmation = choice.Input('Please confirm partition layout (yes/no), ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', str).ask()
                     if confirmation.lower() == 'yes':
