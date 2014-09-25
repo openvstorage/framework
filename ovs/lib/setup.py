@@ -1126,6 +1126,13 @@ print blk_devices
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
 
+        mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().split('\n')]
+        for mounted_device in mounted_devices:
+            for chosen_device in unique_disks:
+                if chosen_device in mounted_device:
+                    print 'Unmounting {0}'.format(mounted_device)
+                    client.run('umount {0}'.format(mounted_device))
+
         # wipe disks
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
