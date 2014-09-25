@@ -17,10 +17,11 @@ Arakoon store module
 """
 
 import json
+import time
 from threading import Lock
 
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonNotFound
+from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 
 
@@ -63,7 +64,7 @@ class ArakoonStore(object):
         Retrieves a certain value for a given key
         """
         try:
-            return json.loads(self._client.get(key))
+            return json.loads(ArakoonStore._try(self._client.get, key))
         except ValueError:
             raise KeyNotFoundException('Could not parse JSON stored for {0}'.format(key))
         except ArakoonNotFound as field:
@@ -74,14 +75,14 @@ class ArakoonStore(object):
         """
         Sets the value for a key to a given value
         """
-        return self._client.set(key, json.dumps(value))
+        return ArakoonStore._try(self._client.set, key, json.dumps(value))
 
     @locked()
     def prefix(self, prefix, max_elements=10000):
         """
         Lists all keys starting with the given prefix
         """
-        return self._client.prefix(prefix, maxElements=max_elements)
+        return ArakoonStore._try(self._client.prefix, prefix, maxElements=max_elements)
 
     @locked()
     def delete(self, key):
@@ -89,7 +90,7 @@ class ArakoonStore(object):
         Deletes a given key from the store
         """
         try:
-            return self._client.delete(key)
+            return ArakoonStore._try(self._client.delete, key)
         except ArakoonNotFound as field:
             raise KeyNotFoundException(field)
 
@@ -98,4 +99,20 @@ class ArakoonStore(object):
         """
         Executes a nop command
         """
-        return self._client.nop()
+        return ArakoonStore._try(self._client.nop)
+
+    @staticmethod
+    def _try(method, *args, **kwargs):
+        """
+        Tries to call a given method, retry-ing if Arakoon is temporary unavailable
+        """
+        last_exception = None
+        tries = 5
+        while tries > 0:
+            try:
+                return method(*args, **kwargs)
+            except ArakoonSockReadNoBytes as exception:
+                last_exception = exception
+                tries -= 1
+                time.sleep(1)
+        raise last_exception

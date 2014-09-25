@@ -1002,8 +1002,7 @@ EOF
         if not 'ovs' in users:
             target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
                                                                     ovs_config.get('core', 'broker.password')))
-            target_client.run(
-                'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         # Copy rabbitmq cookie
@@ -1090,12 +1089,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             if SetupController._has_service(target_client, service):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
-
-        SetupController._enable_service(target_client, 'watcher')
         SetupController._change_service_state(target_client, 'watcher', 'restart')
 
         logger.debug('Restarting workers')
-        SetupController._enable_service(target_client, 'workers')
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
         print '\n+++ Announcing service +++\n'
@@ -1295,11 +1291,11 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
         if SetupController._has_service(target_client, 'rabbitmq'):
+            target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
+            target_client.run('rabbitmqctl reset; sleep 5;')
+            target_client.run('rabbitmqctl stop; sleep 5;')
             SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
             SetupController._remove_service(target_client, 'rabbitmq')
-            master_client = SSHClient.load(master_ip)
-            master_client.run("rabbitmqctl forget_cluster_node rabbit@{0}".format(node_name))
-            target_client = SSHClient.load(cluster_ip)
             target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
@@ -1309,11 +1305,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._remove_service(target_client, service)
 
-        SetupController._enable_service(target_client, 'watcher')
+        print 'Restarting services'
+        logger.debug('Restarting services')
+        for node in master_nodes:
+            node_client = SSHClient.load(node)
+            for service in [s for s in SetupController.master_node_services if s not in SetupController.master_services]:
+                SetupController._change_service_state(node_client, service, 'restart')
+        target_client = SSHClient.load(cluster_ip)
         SetupController._change_service_state(target_client, 'watcher', 'restart')
-
-        logger.debug('Restarting workers')
-        SetupController._enable_service(target_client, 'workers')
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
         print '\n+++ Announcing service +++\n'
