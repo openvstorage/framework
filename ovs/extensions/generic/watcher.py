@@ -103,11 +103,15 @@ def services_running():
     # 4. RabbitMQ
     logger.debug('Test rabbitMQ...')
     import pika
-    from configobj import ConfigObj
-    from ovs.plugin.provider.configuration import Configuration
-    rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-    rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
-    rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+    try:
+        from configobj import ConfigObj
+        from ovs.plugin.provider.configuration import Configuration
+        rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+        rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
+        rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+    except:
+        logger.debug('  No rabbitMQ configuration could be loaded')
+        return False
     good_node = False
     loglevel = logging.root.manager.disable  # Workaround for disabling logging
     logging.disable('WARNING')

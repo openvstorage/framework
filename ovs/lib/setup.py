@@ -263,8 +263,8 @@ class SetupController(object):
                 {'type': hypervisor_type,
                  'name': hypervisor_name,
                  'username': hypervisor_username,
-                 'ip': cluster_ip if hypervisor_type == 'KVM' else hypervisor_ip,
-                 'password': target_password if hypervisor_type == 'KVM' else hypervisor_password},
+                 'ip': hypervisor_ip,
+                 'password': hypervisor_password},
                 auto_config, disk_layout
             )
             if first_node:
@@ -402,6 +402,10 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
                 except Exception as ex:
                     first_request = False
                     print 'Could not connect to {0}: {1}'.format(hypervisor_info['ip'], ex)
+        elif hypervisor_info['type'] == 'KVM':
+            hypervisor_info['ip'] = cluster_ip
+            hypervisor_info['password'] = passwords[cluster_ip]
+            hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
         return mountpoints, hypervisor_info
@@ -893,7 +897,7 @@ EOF
                     arakoon_mountpoint = None
             if arakoon_mountpoint is None:
                 while True:
-                    arakoon_mountpoint = Interactive.ask_string('Enter custom path').strip().rstrip('/')
+                    arakoon_mountpoint = Interactive.ask_string('Enter arakoon database path').strip().rstrip('/')
                     if target_client.dir_exists(arakoon_mountpoint):
                         break
                     else:
@@ -1196,33 +1200,32 @@ EOF
         # Elastic search setup
         print 'Unconfiguring elastic search'
         target_client = SSHClient.load(cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('rm -f /etc/elasticsearch/elasticsearch.yml')
-        SetupController._remove_service(target_client, 'elasticsearch')
+        if SetupController._has_service(target_client, 'elasticsearch'):
+            SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
+            target_client.run('rm -f /etc/elasticsearch/elasticsearch.yml')
+            SetupController._remove_service(target_client, 'elasticsearch')
 
-        SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
+            SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
+                                                     '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
         SetupController._change_service_state(target_client, 'logstash', 'restart')
 
         print 'Departing arakoon cluster'
         logger.info('Departing arakoon cluster')
         for cluster in SetupController.arakoon_clusters.keys():
-            SetupController._change_service_state(target_client, 'arakoon-{0}'.format(cluster), 'stop')
-            SetupController._remove_service(target_client, 'arakoon-{0}'.format(cluster))
+            if SetupController._has_service(target_client, 'arakoon-{0}'.format(cluster)):
+                SetupController._change_service_state(target_client, 'arakoon-{0}'.format(cluster), 'stop')
+                SetupController._remove_service(target_client, 'arakoon-{0}'.format(cluster))
 
-            master_client = SSHClient.load(master_ip)
-            client_config = SetupController._remote_config_read(master_client, SetupController.arakoon_client_config.format(cluster))
-            server_config = SetupController._remote_config_read(master_client, SetupController.arakoon_server_config.format(cluster))
-            for node in nodes:
-                node_client = SSHClient.load(node)
-                node_client.dir_ensure('/opt/OpenvStorage/config/arakoon/{0}'.format(cluster), True)
-                SetupController._unconfigure_arakoon_client(client_config, unique_id, cluster,
-                                                            target_client, SetupController.arakoon_client_config)
-                SetupController._unconfigure_arakoon_server(server_config, unique_id, cluster,
-                                                            target_client, SetupController.arakoon_server_config)
-
-            target_client = SSHClient.load(cluster_ip)
-            target_client.run('rm -rf /opt/OpenvStorage/config/arakoon/{0}'.format(cluster))
+                master_client = SSHClient.load(master_ip)
+                client_config = SetupController._remote_config_read(master_client, SetupController.arakoon_client_config.format(cluster))
+                server_config = SetupController._remote_config_read(master_client, SetupController.arakoon_server_config.format(cluster))
+                for node in nodes:
+                    node_client = SSHClient.load(node)
+                    node_client.dir_ensure('/opt/OpenvStorage/config/arakoon/{0}'.format(cluster), True)
+                    SetupController._unconfigure_arakoon_client(client_config, unique_id, cluster,
+                                                                target_client, SetupController.arakoon_client_config)
+                    SetupController._unconfigure_arakoon_server(server_config, unique_id, cluster,
+                                                                target_client, SetupController.arakoon_server_config)
 
         logger.debug('Removing arakoon directories')
         arakoon_mountpoint = ovs_config.get('core', 'db.arakoon.location')
@@ -1264,7 +1267,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             config_nodes = [n.strip() for n in config.get('main', 'nodes').split(',')]
             if unique_id in config_nodes:
                 config_nodes.remove(unique_id)
-                config.set('main', 'nodes', ', '.join(config_nodes + [unique_id]))
+                config.set('main', 'nodes', ', '.join(config_nodes))
                 config.remove_section(unique_id)
             for node in nodes:
                 node_client = SSHClient.load(node)
@@ -1285,20 +1288,19 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             SetupController._change_service_state(node_client, 'memcached', 'restart')
         logging.disable(loglevel)  # Restore workaround
         target_client = SSHClient.load(cluster_ip)
-        SetupController._change_service_state(target_client, 'memcached', 'stop')
-        SetupController._remove_service(target_client, 'memcached')
+        if SetupController._has_service(target_client, 'memcached'):
+            SetupController._change_service_state(target_client, 'memcached', 'stop')
+            SetupController._remove_service(target_client, 'memcached')
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
-
-        SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
-        SetupController._remove_service(target_client, 'rabbitmq')
-
-        master_client = SSHClient.load(master_client)
-        master_client.run("rabbitmqctl forget_cluster_node rabbit@{0}".format(node_name))
-
-        target_client = SSHClient.load(cluster_ip)
-        target_client.file_remove("/var/lib/rabbitmq/.erlang.cookie")
+        if SetupController._has_service(target_client, 'rabbitmq'):
+            SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
+            SetupController._remove_service(target_client, 'rabbitmq')
+            master_client = SSHClient.load(master_ip)
+            master_client.run("rabbitmqctl forget_cluster_node rabbit@{0}".format(node_name))
+            target_client = SSHClient.load(cluster_ip)
+            target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
         logger.info('Removing services')
