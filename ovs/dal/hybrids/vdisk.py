@@ -140,7 +140,7 @@ class VDisk(DataObject):
                 elif delta == 0:
                     vdiskstatsdict['{0}_ps'.format(key)] = previousdict.get('{0}_ps'.format(key), 0)
                 else:
-                    vdiskstatsdict['{0}_ps'.format(key)] = (vdiskstatsdict[key] - previousdict[key]) / delta
+                    vdiskstatsdict['{0}_ps'.format(key)] = max(0, (vdiskstatsdict[key] - previousdict[key]) / delta)
         volatile.set(prev_key, vdiskstatsdict, dynamic.timeout * 10)
         # Returning the dictionary
         return vdiskstatsdict
