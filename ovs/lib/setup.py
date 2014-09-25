@@ -772,6 +772,57 @@ EOF
         logger.info('Extra node complete')
 
     @staticmethod
+    def promote_node():
+        """
+        Promotes the local node
+        """
+
+        print Interactive.boxed_message(['Open vStorage Setup - Promote'])
+        logger.info('Starting Open vStorage Setup - promote')
+
+        try:
+            print '\n+++ Collecting information +++\n'
+            logger.info('Collecting information')
+
+            if not os.path.exists(SetupController.avahi_filename):
+                raise RuntimeError('No local OVS setup found.')
+            with open(SetupController.avahi_filename, 'r') as avahi_file:
+                avahi_contents = avahi_file.read()
+            if '_ovs_master_node._tcp' in avahi_contents:
+                raise RuntimeError('This node is already master.')
+            match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
+            if 'cluster' not in match_groups:
+                raise RuntimeError('No cluster information found.')
+            cluster_name = match_groups['cluster']
+
+            target_password = Interactive.ask_password('Enter the root password for this node')
+            target_client = SSHClient.load('127.0.0.1', target_password)
+            discovery_result = SetupController._discover_nodes(target_client)
+            master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems()
+                            if node_properties.get('type', None) == 'master']
+            nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+            if len(master_nodes) == 0:
+                raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+            master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
+
+            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
+            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            unique_id = ovs_config.get('core', 'uniqueid')
+            ip = ovs_config.get('grid', 'ip')
+            nodes.append(ip)  # The client node is never included in the discovery results
+
+            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config, None, None)
+
+            logger.info('Setup complete - promote')
+
+        except Exception as exception:
+            print ''  # Spacing
+            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
+            logger.exception('Unexpected error')
+            logger.error(str(exception))
+            sys.exit(1)
+
+    @staticmethod
     def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config, mountpoints, arakoon_mountpoint):
         """
         Promotes a given node
@@ -790,6 +841,8 @@ EOF
         for cluster in SetupController.arakoon_clusters.keys():
             config = SetupController._remote_config_read(master_client, SetupController.arakoon_client_config.format(cluster))
             master_nodes = [config.get(node.strip(), 'ip').strip() for node in config.get('global', 'cluster').split(',')]
+            if cluster_ip in master_nodes:
+                master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
@@ -829,8 +882,23 @@ EOF
         # Loading arakoon mountpoint
         target_client = SSHClient.load(cluster_ip)
         if arakoon_mountpoint is None:
-            arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                        default_value=Interactive.find_in_list(mountpoints, 'db'))
+            if mountpoints:
+                manual = 'Enter custom path'
+                mountpoints.sort()
+                mountpoints = [manual] + mountpoints
+                arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
+                                                            default_value=Interactive.find_in_list(mountpoints, 'db'),
+                                                            sort_choices=False)
+                if arakoon_mountpoint == manual:
+                    arakoon_mountpoint = None
+            if arakoon_mountpoint is None:
+                while True:
+                    arakoon_mountpoint = Interactive.ask_string('Enter custom path').strip().rstrip('/')
+                    if target_client.dir_exists(arakoon_mountpoint):
+                        break
+                    else:
+                        print '  Invalid path, please retry'
+
         ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
         SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
         for cluster in SetupController.arakoon_clusters.keys():
@@ -841,10 +909,8 @@ EOF
             target_client.dir_ensure('/opt/OpenvStorage/config/arakoon/{0}'.format(cluster), True)
             SetupController._remote_config_write(target_client, SetupController.arakoon_local_nodes.format(cluster), local_config)
             master_client = SSHClient.load(master_ip)
-            client_config = SetupController._remote_config_read(master_client,
-                                                                SetupController.arakoon_client_config.format(cluster))
-            server_config = SetupController._remote_config_read(master_client,
-                                                                SetupController.arakoon_server_config.format(cluster))
+            client_config = SetupController._remote_config_read(master_client, SetupController.arakoon_client_config.format(cluster))
+            server_config = SetupController._remote_config_read(master_client, SetupController.arakoon_server_config.format(cluster))
             for node in nodes:
                 node_client = SSHClient.load(node)
                 node_client.dir_ensure('/opt/OpenvStorage/config/arakoon/{0}'.format(cluster), True)
@@ -942,13 +1008,47 @@ EOF
         master_client = SSHClient.load(master_ip)
         contents = master_client.file_read(rabbitmq_cookie_file)
         master_hostname = master_client.run('hostname')
-        client = SSHClient.load(cluster_ip)
-        client.dir_ensure(os.path.dirname(rabbitmq_cookie_file), True)
-        client.file_write(rabbitmq_cookie_file, contents)
-        client.file_attribs(rabbitmq_cookie_file, mode=400)
-        client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
-        client.run('rabbitmqctl join_cluster rabbit@{}; sleep 5;'.format(master_hostname))
-        client.run('rabbitmqctl stop; sleep 5;')
+        target_client = SSHClient.load(cluster_ip)
+        target_client.dir_ensure(os.path.dirname(rabbitmq_cookie_file), True)
+        target_client.file_write(rabbitmq_cookie_file, contents)
+        target_client.file_attribs(rabbitmq_cookie_file, mode=400)
+        target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
+        target_client.run('rabbitmqctl join_cluster rabbit@{}; sleep 5;'.format(master_hostname))
+        target_client.run('rabbitmqctl stop; sleep 5;')
+
+        # Enable HA for the rabbitMQ queues
+        SetupController._change_service_state(target_client, 'rabbitmq', 'start')
+        output = target_client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'', quiet=True).split('\r\n')
+        retry = False
+        for line in output:
+            if 'Error: unable to connect to node ' in line:
+                rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
+                if rabbitmq_running and rabbitmq_pid:
+                    target_client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
+                    print('  Process killed, restarting')
+                    target_client.run('service ovs-rabbitmq start', quiet=True)
+                    retry = True
+                    break
+        if retry:
+            target_client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
+        rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(
+            target_client, True)
+        if ovs_rabbitmq_running and same_process:
+            pass  # Correct process is running
+        elif rabbitmq_running and not ovs_rabbitmq_running:
+            # Wrong process is running, must be stopped and correct one started
+            print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped, ovs-rabbitmq will be started instead')
+            target_client.run('service rabbitmq-server stop', quiet=True)
+            time.sleep(5)
+            try:
+                target_client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
+                print('  Process killed')
+            except SystemExit:
+                print('  Process already stopped')
+            target_client.run('service ovs-rabbitmq start', quiet=True)
+        elif not rabbitmq_running and not ovs_rabbitmq_running:
+            # Neither running
+            target_client.run('service ovs-rabbitmq start', quiet=True)
 
         print 'Update existing vPools'
         logger.info('Update existing vPools')
@@ -977,55 +1077,18 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             node_client = SSHClient.load(node)
             SetupController._configure_amqp_to_volumedriver(node_client)
 
-        client = SSHClient.load(cluster_ip)
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(client, 'true')
-
-        SetupController._change_service_state(client, 'logstash', 'restart')
-        SetupController._change_service_state(client, 'rabbitmq', 'start')
-
         print 'Starting services'
-        logger.info('Starting services for join master')
+        target_client = SSHClient.load(cluster_ip)
+        logger.info('Update ES configuration')
+        SetupController._update_es_configuration(target_client, 'true')
+        logger.info('Starting services')
         for service in SetupController.master_services:
             if SetupController._has_service(target_client, service):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
-        # Enable HA for the rabbitMQ queues
-        output = target_client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'', quiet=True).split('\r\n')
-        retry = False
-        for line in output:
-            if 'Error: unable to connect to node ' in line:
-                rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
-                if rabbitmq_running and rabbitmq_pid:
-                    target_client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
-                    print('  Process killed, restarting')
-                    target_client.run('service ovs-rabbitmq start', quiet=True)
-                    retry = True
-                    break
-        if retry:
-            target_client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
-
-        rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(
-            target_client, True)
-        if ovs_rabbitmq_running and same_process:
-            pass  # Correct process is running
-        elif rabbitmq_running and not ovs_rabbitmq_running:
-            # Wrong process is running, must be stopped and correct one started
-            print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped, ovs-rabbitmq will be started instead')
-            target_client.run('service rabbitmq-server stop', quiet=True)
-            time.sleep(5)
-            try:
-                target_client.run('kill {0}'.format(rabbitmq_pid), quiet=True)
-                print('  Process killed')
-            except SystemExit:
-                print('  Process already stopped')
-            target_client.run('service ovs-rabbitmq start', quiet=True)
-        elif not rabbitmq_running and not ovs_rabbitmq_running:
-            # Neither running
-            target_client.run('service ovs-rabbitmq start', quiet=True)
 
         SetupController._enable_service(target_client, 'watcher')
-        SetupController._change_service_state(target_client, 'watcher', 'start')
+        SetupController._change_service_state(target_client, 'watcher', 'restart')
 
         logger.debug('Restarting workers')
         SetupController._enable_service(target_client, 'workers')
@@ -1053,10 +1116,224 @@ EOF
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip):
+    def demote_node():
+        """
+        Demotes the local node
+        """
+
+        print Interactive.boxed_message(['Open vStorage Setup - Demote'])
+        logger.info('Starting Open vStorage Setup - demote')
+
+        try:
+            print '\n+++ Collecting information +++\n'
+            logger.info('Collecting information')
+
+            if not os.path.exists(SetupController.avahi_filename):
+                raise RuntimeError('No local OVS setup found.')
+            with open(SetupController.avahi_filename, 'r') as avahi_file:
+                avahi_contents = avahi_file.read()
+            if '_ovs_master_node._tcp' not in avahi_contents:
+                raise RuntimeError('This node is should be a master.')
+            match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
+            if 'cluster' not in match_groups:
+                raise RuntimeError('No cluster information found.')
+            cluster_name = match_groups['cluster']
+
+            target_password = Interactive.ask_password('Enter the root password for this node')
+            target_client = SSHClient.load('127.0.0.1', target_password)
+            discovery_result = SetupController._discover_nodes(target_client)
+            master_nodes = [this_node_name for this_node_name, node_properties in
+                            discovery_result[cluster_name].iteritems()
+                            if node_properties.get('type', None) == 'master']
+            nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+            if len(master_nodes) == 0:
+                raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
+            master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
+
+            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
+            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            unique_id = ovs_config.get('core', 'uniqueid')
+            ip = ovs_config.get('grid', 'ip')
+            nodes.append(ip)  # The client node is never included in the discovery results
+
+            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config)
+
+            logger.info('Setup complete - demote')
+
+        except Exception as exception:
+            print ''  # Spacing
+            print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
+            logger.exception('Unexpected error')
+            logger.error(str(exception))
+            sys.exit(1)
+
+    @staticmethod
+    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config):
         """
         Demotes a given node
         """
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+
+        print '\n+++ Demoting node +++\n'
+        logger.info('Demoting node')
+
+        target_client = SSHClient.load(cluster_ip)
+        node_name = target_client.run('hostname')
+
+        # Find other (arakoon) master nodes
+        master_client = SSHClient.load(master_ip)
+        master_nodes = []
+        for cluster in SetupController.arakoon_clusters.keys():
+            config = SetupController._remote_config_read(master_client,
+                                                         SetupController.arakoon_client_config.format(cluster))
+            master_nodes = [config.get(node.strip(), 'ip').strip() for node in
+                            config.get('global', 'cluster').split(',')]
+            if cluster_ip in master_nodes:
+                master_nodes.remove(cluster_ip)
+        if len(master_nodes) == 0:
+            raise RuntimeError('There should be at least one other master node')
+
+        # Elastic search setup
+        print 'Unconfiguring elastic search'
+        target_client = SSHClient.load(cluster_ip)
+        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
+        target_client.run('rm -f /etc/elasticsearch/elasticsearch.yml')
+        SetupController._remove_service(target_client, 'elasticsearch')
+
+        SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
+                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
+        SetupController._change_service_state(target_client, 'logstash', 'restart')
+
+        print 'Departing arakoon cluster'
+        logger.info('Departing arakoon cluster')
+        for cluster in SetupController.arakoon_clusters.keys():
+            SetupController._change_service_state(target_client, 'arakoon-{0}'.format(cluster), 'stop')
+            SetupController._remove_service(target_client, 'arakoon-{0}'.format(cluster))
+
+            master_client = SSHClient.load(master_ip)
+            client_config = SetupController._remote_config_read(master_client, SetupController.arakoon_client_config.format(cluster))
+            server_config = SetupController._remote_config_read(master_client, SetupController.arakoon_server_config.format(cluster))
+            for node in nodes:
+                node_client = SSHClient.load(node)
+                node_client.dir_ensure('/opt/OpenvStorage/config/arakoon/{0}'.format(cluster), True)
+                SetupController._unconfigure_arakoon_client(client_config, unique_id, cluster,
+                                                            target_client, SetupController.arakoon_client_config)
+                SetupController._unconfigure_arakoon_server(server_config, unique_id, cluster,
+                                                            target_client, SetupController.arakoon_server_config)
+
+            target_client = SSHClient.load(cluster_ip)
+            target_client.run('rm -rf /opt/OpenvStorage/config/arakoon/{0}'.format(cluster))
+
+        logger.debug('Removing arakoon directories')
+        arakoon_mountpoint = ovs_config.get('core', 'db.arakoon.location')
+        target_client = SSHClient.load(cluster_ip)
+        target_client.run('rm -rf {0}/*'.format(arakoon_mountpoint))
+
+        print 'Update existing vPools'
+        logger.info('Update existing vPools')
+        for node in nodes:
+            client_node = SSHClient.load(node)
+            update_voldrv = """
+import os
+from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+arakoon_management = ArakoonManagement()
+voldrv_arakoon_cluster_id = 'voldrv'
+voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
+voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+configuration_dir = Configuration.get('ovs.core.cfgdir')
+if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
+    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
+for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
+    if json_file.endswith('.json'):
+        storagedriver_config = StorageDriverConfiguration(json_file.replace('.json', ''))
+        storagedriver_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+"""
+            SetupController._exec_python(client_node, update_voldrv)
+
+        for node in nodes:
+            node_client = SSHClient.load(node)
+            SetupController._configure_amqp_to_volumedriver(node_client)
+
+        print 'Distribute configuration files'
+        logger.info('Distribute configuration files')
+        for config_file, port in SetupController.generic_configfiles.iteritems():
+            master_client = SSHClient.load(master_ip)
+            config = SetupController._remote_config_read(master_client, config_file)
+            config_nodes = [n.strip() for n in config.get('main', 'nodes').split(',')]
+            if unique_id in config_nodes:
+                config_nodes.remove(unique_id)
+                config.set('main', 'nodes', ', '.join(config_nodes + [unique_id]))
+                config.remove_section(unique_id)
+            for node in nodes:
+                node_client = SSHClient.load(node)
+                SetupController._remote_config_write(node_client, config_file, config)
+
+        print 'Restarting master node services'
+        logger.info('Restarting master node services')
+        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
+        logging.disable('WARNING')
+        for node in master_nodes:
+            node_client = SSHClient.load(node)
+            for cluster in SetupController.arakoon_clusters.keys():
+                SetupController._change_service_state(node_client, 'arakoon-{0}'.format(cluster), 'restart')
+                if len(master_nodes) > 2:  # A two node cluster needs all nodes running
+                    cluster = ArakoonManagement().getCluster(cluster)
+                    client = cluster.getClient()
+                    client.nop()
+            SetupController._change_service_state(node_client, 'memcached', 'restart')
+        logging.disable(loglevel)  # Restore workaround
+        target_client = SSHClient.load(cluster_ip)
+        SetupController._change_service_state(target_client, 'memcached', 'stop')
+        SetupController._remove_service(target_client, 'memcached')
+
+        print 'Removing/unconfiguring RabbitMQ'
+        logger.debug('Removing/unconfiguring RabbitMQ')
+
+        SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
+        SetupController._remove_service(target_client, 'rabbitmq')
+
+        master_client = SSHClient.load(master_client)
+        master_client.run("rabbitmqctl forget_cluster_node rabbit@{0}".format(node_name))
+
+        target_client = SSHClient.load(cluster_ip)
+        target_client.file_remove("/var/lib/rabbitmq/.erlang.cookie")
+
+        print 'Removing services'
+        logger.info('Removing services')
+        for service in [s for s in SetupController.master_node_services if s not in SetupController.extra_node_services] :
+            if SetupController._has_service(target_client, service):
+                logger.debug('Removing service {0}'.format(service))
+                SetupController._remove_service(target_client, service)
+
+        SetupController._enable_service(target_client, 'watcher')
+        SetupController._change_service_state(target_client, 'watcher', 'restart')
+
+        logger.debug('Restarting workers')
+        SetupController._enable_service(target_client, 'workers')
+        SetupController._change_service_state(target_client, 'workers', 'restart')
+
+        print '\n+++ Announcing service +++\n'
+        logger.info('Announcing service')
+
+        target_client.run("""cat > {3} <<EOF
+<?xml version="1.0" standalone='no'?>
+<!--*-nxml-*-->
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!-- $Id$ -->
+<service-group>
+    <name replace-wildcards="yes">ovs_cluster_{0}_{1}</name>
+    <service>
+        <type>_ovs_{2}_node._tcp</type>
+        <port>443</port>
+    </service>
+</service-group>
+EOF
+""".format(cluster_name, node_name, 'extra', SetupController.avahi_filename))
+        SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
+
+        logger.info('Demote complete')
 
     @staticmethod
     def _add_service(client, name, params=None):
@@ -1066,7 +1343,6 @@ EOF
 from ovs.plugin.provider.service import Service
 Service.add_service('', '{0}', '', '', {1})
 """
-#        Service.add_service('', name, '', '', params)
         _ = SetupController._exec_python(client,
                                          run_service_script.format(name, params))
 
@@ -1076,7 +1352,6 @@ Service.add_service('', '{0}', '', '', {1})
 from ovs.plugin.provider.service import Service
 Service.remove_service('', '{0}')
 """
-#        Service.remove_service('', name, '', '')
         _ = SetupController._exec_python(client,
                                          run_service_script.format(name))
 
@@ -1155,13 +1430,6 @@ print Service.stop_service('{0}')
         return status
 
     @staticmethod
-    def _configure_arakoon(configs, uid, cluster, ip, port, target_client, arakoon_configs, arakoon_mountpoint):
-        arakoon_client_config, arakoon_server_config = arakoon_configs
-        client_config, server_config = configs
-        SetupController._configure_arakoon_client(client_config, uid, cluster, ip, port, target_client, arakoon_client_config)
-        SetupController._configure_arakoon_server(server_config, uid, cluster, ip, port, target_client, arakoon_server_config, arakoon_mountpoint)
-
-    @staticmethod
     def _configure_arakoon_client(config_object, uid, cluster, ip, port, target_client, config_location):
         if not config_object.has_section('global'):
             config_object.add_section('global')
@@ -1177,6 +1445,16 @@ print Service.stop_service('{0}')
             config_object.set(uid, 'name', uid)
             config_object.set(uid, 'ip', ip)
             config_object.set(uid, 'client_port', port)
+        SetupController._remote_config_write(target_client, config_location.format(cluster), config_object)
+
+    @staticmethod
+    def _unconfigure_arakoon_client(config_object, uid, cluster, target_client, config_location):
+        current_cluster = [n.strip() for n in config_object.get('global', 'cluster').split(',')]
+        if uid in current_cluster:
+            current_cluster.remove(uid)
+        config_object.set('global', 'cluster', ', '.join(current_cluster))
+        if config_object.has_section(uid):
+            config_object.remove_section(uid)
         SetupController._remote_config_write(target_client, config_location.format(cluster), config_object)
 
     @staticmethod
@@ -1201,6 +1479,16 @@ print Service.stop_service('{0}')
             config_object.set(uid, 'home', '{0}/arakoon/{1}'.format(mountpoint, cluster))
             config_object.set(uid, 'tlog_dir', '{0}/tlogs/{1}'.format(mountpoint, cluster))
             config_object.set(uid, 'fsync', 'true')
+        SetupController._remote_config_write(target_client, config_location.format(cluster), config_object)
+
+    @staticmethod
+    def _unconfigure_arakoon_server(config_object, uid, cluster, target_client, config_location):
+        current_cluster = [n.strip() for n in config_object.get('global', 'cluster').split(',')]
+        if uid in current_cluster:
+            current_cluster.remove(uid)
+        config_object.set('global', 'cluster', ', '.join(current_cluster))
+        if config_object.has_section(uid):
+            config_object.remove_section(uid)
         SetupController._remote_config_write(target_client, config_location.format(cluster), config_object)
 
     @staticmethod
