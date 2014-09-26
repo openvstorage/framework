@@ -1,0 +1,5 @@
+#!/bin/bash
+
+rm -f /etc/nginx/sites-enabled/default
+
+python /opt/OpenvStorage/scripts/install/openvstorage-webapps.postinst.py "__NEW_VERSION__" "$@"
