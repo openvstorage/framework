@@ -15,9 +15,12 @@
 """
 OVS Cinder Plugin autotests configuration module
 """
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-#This node # to do get automatic / 127.0.0.1
-IP = '10.130.10.201'
+#This node
+with open('/etc/hostname') as hostname_file:
+    hostname = hostname_file.read().strip()
+IP = [storagerouter for storagerouter in StorageRouterList.get_storagerouters() if storagerouter.name == hostname][0].ip
 
 #fix issue with add_vpool becoming interactive
 import fabric.auth
@@ -32,7 +35,7 @@ TENANT_NAME = 'admin'
 AUTH_URL = 'http://%s:35357/v2.0' % IP
 
 #VPOOL
-VPOOL_CLEANUP = False #should the vpool be removed during tearDownClass
+VPOOL_CLEANUP = True #should the vpool be removed during tearDownClass
 VPOOL_NAME = 'local' #string, lowercase no strange characters
 VPOOL_MOUNTPOINT = '/mnt/%s' % VPOOL_NAME
 VPOOL_ROOT_DIR = '/mnt'

@@ -84,7 +84,9 @@ class OVSPluginTestCase(test.TestCase):
         if not self._vpool_exists():
             self._create_vpool()
             restart = True
-        if self._set_cinder_driver_config() or self._set_cinder_volume_type() or restart:
+        restart |= self._set_cinder_driver_config()
+        restart |= self._set_cinder_volume_type()
+        if restart:
             self._restart_cinder()
 
         self._debug('setUp complete')
@@ -385,7 +387,7 @@ class OVSPluginTestCase(test.TestCase):
         config_map = {'volume_driver': 'cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver',
                       'volume_backend_name': VPOOL_NAME,
                       'vpool_name': VPOOL_NAME,
-                      'default_volume_type': 'ovs'}
+                      'default_volume_type': VOLUME_TYPE}
         for key, value in config_map.items():
             if not cfg.has_option('DEFAULT', key) or cfg.get('DEFAULT', key) != value:
                 cfg.set('DEFAULT', key, value)
