@@ -109,10 +109,8 @@ class OVSSNMPServer():
 
     def _check_added(self, model_object):
         for class_id in self.assigned_oids:
-            for instance_id in self.assigned_oids[class_id]:
-                existing = [item[0] for item in self.assigned_oids[class_id][instance_id].values()]
-                if model_object.guid in existing:
-                    return True
+            if model_object.guid in self.assigned_oids[class_id]:
+                return True
         return False
 
     def _register_dal_model(self, class_id, model_object, attribute, attrb_oid, key=None, func=None, atype=str):
@@ -126,21 +124,12 @@ class OVSSNMPServer():
         self.model_oids.add(model_object.guid)
 
         if not class_id in self.assigned_oids:
-            self.assigned_oids[class_id] = {}
+            self.assigned_oids[class_id] = []
             self.instance_oid = 0
 
-        if not self.instance_oid in self.assigned_oids[class_id]:
-            self.assigned_oids[class_id][self.instance_oid] = {}
+        if not model_object.guid in self.assigned_oids[class_id]:
+            self.assigned_oids[class_id].append(model_object.guid)
 
-        for instance_id in self.assigned_oids[class_id]:
-            for attr_id in self.assigned_oids[class_id][instance_id]:
-                existing = self.assigned_oids[class_id][instance_id][attr_id]
-                if existing[0].guid == model_object.guid and existing[1] == attribute + str(key):
-                    #  Already modeled correctly
-                    return
-
-        # Nothing exists, so we add here
-        self.assigned_oids[class_id][self.instance_oid][attrb_oid] = (model_object, attribute + str(key))
         def get_function():
             print('[DEBUG] Get function for %s %s %s' % (model_object.guid, attribute, str(key)))
             if func:
@@ -193,8 +182,8 @@ class OVSSNMPServer():
             from ovs.dal.lists.storagedriverlist import StorageDriverList
 
             for storagerouter in StorageRouterList.get_storagerouters():
+                _guids.add(storagerouter.guid)
                 if not self._check_added(storagerouter):
-                    _guids.add(storagerouter.guid)
                     self._register_dal_model(10, storagerouter, 'guid', "0")
                     self._register_dal_model(10, storagerouter, 'name', "1")
                     self._register_dal_model(10, storagerouter, 'pmachine', "3", key = 'host_status')
@@ -216,8 +205,8 @@ class OVSSNMPServer():
                     self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
+                _guids.add(vm.guid)
                 if not self._check_added(vm):
-                    _guids.add(vm.guid)
                     if vm.is_vtemplate:
                         self._register_dal_model(11, vm, 'guid', "0")
                         self._register_dal_model(11, vm, 'name', "1")
@@ -233,8 +222,8 @@ class OVSSNMPServer():
                         self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
+                _guids.add(vm.guid)
                 if not self._check_added(vm):
-                    _guids.add(vm.guid)
                     if not vm.is_vtemplate:
                         self._register_dal_model(0, vm, 'guid', "0")
                         self._register_dal_model(0, vm, 'name', "1")
@@ -288,8 +277,8 @@ class OVSSNMPServer():
                     self.instance_oid += 1
 
             for vd in VDiskList.get_vdisks():
+                _guids.add(vd.guid)
                 if not self._check_added(vd):
-                    _guids.add(vd.guid)
                     self._register_dal_model(1, vd, 'guid', "0")
                     self._register_dal_model(1, vd, 'name', "1")
                     self._register_dal_model(1, vd, 'statistics', "2.0", key = "operations", atype = int)
@@ -333,16 +322,16 @@ class OVSSNMPServer():
                     self.instance_oid += 1
 
             for pm in PMachineList.get_pmachines():
+                _guids.add(pm.guid)
                 if not self._check_added(pm):
-                    _guids.add(pm.guid)
                     self._register_dal_model(2, pm, 'guid', "0")
                     self._register_dal_model(2, pm, 'name', "1")
                     self._register_dal_model(2, pm, 'host_status', "2")
                     self.instance_oid += 1
 
             for vp in VPoolList.get_vpools():
+                _guids.add(vp.guid)
                 if not self._check_added(vp):
-                    _guids.add(vp.guid)
                     self._register_dal_model(3, vp, 'guid', "0")
                     self._register_dal_model(3, vp, 'name', "1")
                     self._register_dal_model(3, vp, 'statistics', "2.0", key = "operations", atype = int)
@@ -389,8 +378,8 @@ class OVSSNMPServer():
                     self.instance_oid += 1
 
             for storagedriver in StorageDriverList.get_storagedrivers():
+                _guids.add(storagedriver.guid)
                 if not self._check_added(storagedriver):
-                    _guids.add(storagedriver.guid)
                     self._register_dal_model(4, storagedriver, 'guid', "0")
                     self._register_dal_model(4, storagedriver, 'name', "1")
                     self._register_dal_model(4, storagedriver, 'stored_data', "2", atype = int)
