@@ -73,9 +73,12 @@ define([
                     fields.push('temp');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                 }
-                if ((self.data.mtptBFS() === storageDriver.mountpointMD() || self.data.mtptBFS() === storageDriver.mountpointReadCache() ||
-                        self.data.mtptBFS() === storageDriver.mountpointWriteCache() || self.data.mtptBFS() === storageDriver.mountpointFOC() ||
-                        self.data.mtptBFS() === storageDriver.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
+                if ((self.data.mtptBFS() === storageDriver.mountpointMD() ||
+                     self.data.mtptBFS() === storageDriver.mountpointReadCache1() ||
+                     self.data.mtptBFS() === storageDriver.mountpointReadCache2() ||
+                     self.data.mtptBFS() === storageDriver.mountpointWriteCache() ||
+                     self.data.mtptBFS() === storageDriver.mountpointFOC() ||
+                     self.data.mtptBFS() === storageDriver.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
                     valid = false;
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsexclusive'));
@@ -87,8 +90,10 @@ define([
                 }
                 return true;
             });
-            if ((self.data.mtptBFS() === self.data.mtptReadCache() || self.data.mtptBFS() === self.data.mtptMD() ||
-                    self.data.mtptBFS() === self.data.mtptTemp()) && $.inArray('bfs', fields) === -1 &&
+            if ((self.data.mtptBFS() === self.data.mtptReadCache1() ||
+                 self.data.mtptBFS() === self.data.mtptReadCache2() ||
+                 self.data.mtptBFS() === self.data.mtptMD() ||
+                 self.data.mtptBFS() === self.data.mtptTemp()) && $.inArray('bfs', fields) === -1 &&
                     (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                 valid = false;
                 fields.push('bfs');
@@ -99,9 +104,14 @@ define([
                 fields.push('vpool');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.vpoolnotallowed'));
             }
-            if (!self.data.mtptReadCache.valid()) {
+            if (!self.data.mtptReadCache1.valid()) {
                 valid = false;
-                fields.push('readcache');
+                fields.push('readcache1');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
+            }
+            if (!self.data.mtptReadCache2.valid()) {
+                valid = false;
+                fields.push('readcache2');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
             }
             if (!self.data.mtptWriteCache.valid()) {

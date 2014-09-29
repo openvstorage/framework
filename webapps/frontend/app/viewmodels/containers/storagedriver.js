@@ -36,7 +36,8 @@ define([
         self.mountpointTemp       = ko.observable();
         self.mountpointBFS        = ko.observable();
         self.mountpointMD         = ko.observable();
-        self.mountpointReadCache  = ko.observable();
+        self.mountpointReadCache1 = ko.observable();
+        self.mountpointReadCache2 = ko.observable();
         self.mountpointWriteCache = ko.observable();
         self.mountpointFOC        = ko.observable();
 
@@ -51,7 +52,8 @@ define([
             self.mountpointTemp(data.mountpoint_temp);
             self.mountpointBFS(data.mountpoint_bfs);
             self.mountpointMD(data.mountpoint_md);
-            self.mountpointReadCache(data.mountpoint_readcache);
+            self.mountpointReadCache1(data.mountpoint_readcache1);
+            self.mountpointReadCache2(data.mountpoint_readcache2);
             self.mountpointWriteCache(data.mountpoint_writecache);
             self.mountpointFOC(data.mountpoint_foc);
             self.loaded(true);

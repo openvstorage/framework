@@ -182,7 +182,8 @@ class OVSPluginTestCase(test.TestCase):
                       'mountpoint_bfs': VPOOL_BFS,
                       'mountpoint_temp': VPOOL_TEMP,
                       'mountpoint_md': VPOOL_MD,
-                      'mountpoint_readcache': VPOOL_READCACHE,
+                      'mountpoint_readcache1': VPOOL_READCACHE1,
+                      'mountpoint_readcache2': VPOOL_READCACHE2,
                       'mountpoint_writecache': VPOOL_WRITECACHE,
                       'mountpoint_foc': VPOOL_FOC,
                       'storage_ip': '127.0.0.1', #KVM

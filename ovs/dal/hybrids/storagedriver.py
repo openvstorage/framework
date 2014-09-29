@@ -38,7 +38,8 @@ class StorageDriver(DataObject):
                     Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
                     Property('mountpoint_bfs', str, doc='Mountpoint for the backend filesystem (used for local and distributed fs)'),
                     Property('mountpoint_md', str, doc='Mountpoint for metadata'),
-                    Property('mountpoint_readcache', str, doc='Mountpoint for read cache'),
+                    Property('mountpoint_readcache1', str, doc='Mountpoint for read cache 1'),
+                    Property('mountpoint_readcache2', str, doc='Mountpoint for read cache 2'),
                     Property('mountpoint_writecache', str, doc='Mountpoint for write cache'),
                     Property('mountpoint_foc', str, doc='Mountpoint for failover cache')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
