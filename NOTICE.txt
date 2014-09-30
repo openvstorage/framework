@@ -114,6 +114,15 @@ INCLUDED AND/OR USED SOFTWARE
         http://pysnmp.sourceforge.net/license.html
         Copyright (c) 2005-2014, Ilya Etingof
 
+    choice                      BSD
+        https://github.com/fyhuang/choice
+
+    pyudev                      LGPL 2.1
+        https://github.com/pyudev/pyudev
+
+    datadiff                    Apache 2.0
+        http://sourceforge.net/projects/datadiff
+
 
 LICENSES
 
