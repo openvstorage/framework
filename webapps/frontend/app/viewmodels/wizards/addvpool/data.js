@@ -74,6 +74,7 @@ define(['knockout', 'jquery'], function(ko, $){
                 }
             }
         }, mtptData);
+        mtptData.mtptReadCache1Filter.identifier = 'mtpt-readcache1';
         return mtptData;
     };
     return singleton();
