@@ -785,9 +785,14 @@ EOF
         except Exception as exception:
             print ''  # Spacing
             print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
-            print ''
             logger.exception('Unexpected error')
             logger.error(str(exception))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
             sys.exit(1)
 
     @staticmethod
