@@ -72,7 +72,7 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         cinder type-create ovs
         cinder type-key ovs set volume_backend_name=<VPOOLNAME>
     """
-    VERSION = '1.0.2b'
+    VERSION = '1.0.2c'
 
     def __init__(self, *args, **kwargs): #pylint: disable=E1002
         """
@@ -171,7 +171,7 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
                 LOG.info('CP_IMG_TO_VOL Resizing volume to size %s' % volume['size'])
                 self.extend_volume(volume = volume, size_gb = volume['size'])
             except Exception as ex:
-                LOG.error('CP_IMG_TO_VOL Internal error %s ' % str(ex))
+                LOG.error('CP_IMG_TO_VOL Internal error %s ' % unicode(ex))
                 self.delete_volume(volume)
                 raise
             ovs_disk = self._find_ovs_model_disk_by_location(volume.provider_location, str(volume.host))

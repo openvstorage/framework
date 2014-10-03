@@ -35,7 +35,7 @@ TENANT_NAME = 'admin'
 AUTH_URL = 'http://%s:35357/v2.0' % IP
 
 #VPOOL
-VPOOL_CLEANUP = True #should the vpool be removed during tearDownClass
+VPOOL_CLEANUP = False #should the vpool be removed during tearDownClass
 VPOOL_NAME = 'local' #string, lowercase no strange characters
 VPOOL_MOUNTPOINT = '/mnt/%s' % VPOOL_NAME
 VPOOL_ROOT_DIR = '/mnt'
