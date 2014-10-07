@@ -1,0 +1,4 @@
+#!/bin/bash
+
+pip install djangorestframework==2.3.9
+pip install markdown
