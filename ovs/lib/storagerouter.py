@@ -325,7 +325,8 @@ for directory in {0}:
                     writecache_factor = 0.49
             elif len(delta) == 3:
                 if mountpoint_writecache == mountpoint_foc:
-                    readcache1_factor = readcache2_factor = 0.98
+                    readcache1_factor = 0.98
+                    readcache2_factor = 0.98
                     writecache_factor = 0.49
                 elif mountpoint_readcache1 == mountpoint_writecache:
                     readcache1_factor = 0.49
@@ -347,6 +348,34 @@ for directory in {0}:
                 readcache1_factor = 0.98
                 readcache2_factor = 0.98
                 writecache_factor = 0.98
+
+        # summarize caching on root partition (directory only)
+        root_assigned = dict()
+        if not is_partition(mountpoint_readcache1):
+            root_assigned['readcache1_factor'] = readcache1_factor
+        if not is_partition(mountpoint_readcache2):
+            root_assigned['readcache2_factor'] = readcache2_factor
+        if not is_partition(mountpoint_writecache):
+            root_assigned['writecache_factor'] = writecache_factor
+        if not is_partition(mountpoint_foc):
+            root_assigned['foc_factor'] = min(readcache1_factor, readcache2_factor, writecache_factor)
+
+        # always leave at least 20% of free space
+        division_factor = 1.0
+        total_size = sum(root_assigned.values()) + .02 * len(root_assigned)
+        if 0.8 < total_size < 1.6:
+            division_factor = 2.0
+        elif 1.6 < total_size < 3.2:
+            division_factor = 4.0
+        elif total_size >= 3.2:
+            division_factor = 8.0
+
+        if 'readcache1_factor' in root_assigned.keys():
+            readcache1_factor /= division_factor
+        if 'readcache2_factor' in root_assigned.keys():
+            readcache2_factor /= division_factor
+        if 'writecache_factor' in root_assigned.keys():
+            writecache_factor /= division_factor
 
         scocache_size = '{0}KiB'.format((int(write_cache_fs.f_bavail * writecache_factor / 4096) * 4096) * 4)
         if (mountpoint_readcache1 and not mountpoint_readcache2) or (mountpoint_readcache1 == mountpoint_readcache2):
