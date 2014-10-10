@@ -18,7 +18,7 @@ OpenStack Cinder driver - interface to OVS api
 - uses Cinder logging
 """
 
-import time
+import time, socket
 
 # OVS
 from ovs.dal.lists.vpoollist import VPoolList
@@ -62,7 +62,7 @@ def _debug_vol_info(call, volume):
 
 class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
     """
-    OVS Volume Driver plugin for Cinder
+    OVS Volume Driver plugin for Cinder (support for Icehouse (stable) , Juno (RC) and Kilo (unstable))
     Configuration file: /etc/cinder/cinder.conf
     Required parameters in config file:
 
@@ -82,7 +82,7 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         cinder type-create <TYPENAME> # e.g. Open vStorage
         cinder type-key <TYPENAME> set volume_backend_name=<VPOOLNAME>
     """
-    VERSION = '1.0.3'
+    VERSION = '1.0.4'
 
     def __init__(self, *args, **kwargs): #pylint: disable=E1002
         """
@@ -477,7 +477,10 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
     # Internal
     def _get_real_hostname(self, hostname):
         LOG.debug('[_GET REAL HOSTNAME] Hostname %s' % hostname)
-        hostname, backend_name = hostname.split('#')
+        if not hostname or not isinstance(hostname, str):
+            return socket.gethostname()
+        if "#" in hostname:
+            hostname, backend_name = hostname.split('#')
         if "@" in hostname:
             hostname, driver = hostname.split('@')
             return hostname
