@@ -26,8 +26,8 @@ import signal
 import string
 import logging
 
-from arakoon import Arakoon
-from arakoon.ArakoonExceptions import ArakoonNodeNotLocal
+import Arakoon
+from ArakoonExceptions import ArakoonNodeNotLocal
 
 def which_arakoon():
     path = '/'.join([X.appDir,"arakoon/bin/arakoon"])

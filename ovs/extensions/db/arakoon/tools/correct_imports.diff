@@ -1,0 +1,18 @@
+Index: ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py	(revision 1206:ad42d289c6723b7c383a3e338014f4e061a5883a)
++++ ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py	(revision 1206+:ad42d289c672+)
+@@ -26,8 +26,8 @@
+ import string
+ import logging
+ 
+-from arakoon import Arakoon
+-from arakoon.ArakoonExceptions import ArakoonNodeNotLocal
++import Arakoon
++from ArakoonExceptions import ArakoonNodeNotLocal
+ 
+ def which_arakoon():
+     path = '/'.join([X.appDir,"arakoon/bin/arakoon"])
