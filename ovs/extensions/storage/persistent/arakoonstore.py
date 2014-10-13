@@ -19,8 +19,8 @@ Arakoon store module
 import json
 from threading import Lock
 
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonNotFound
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 
 
@@ -53,7 +53,7 @@ class ArakoonStore(object):
         """
         Initializes the client
         """
-        self._cluster = ArakoonManagement().getCluster(cluster)
+        self._cluster = ArakoonManagementEx().getCluster(cluster)
         self._client = self._cluster.getClient()
         self._lock = Lock()
 

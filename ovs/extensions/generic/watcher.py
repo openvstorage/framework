@@ -78,8 +78,8 @@ def services_running():
     tries = 0
     while tries < max_tries:
         try:
-            from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-            cluster = ArakoonManagement().getCluster('voldrv')
+            from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+            cluster = ArakoonManagementEx().getCluster('voldrv')
             client = cluster.getClient()
             client.set(key, value)
             if client.get(key) == value:

@@ -497,8 +497,8 @@ System.update_hosts_file(hostname='%(host)s', ip='%(ip)s')
                 target_client = SSHClient.load(ip)
                 for cluster in arakoon_clusters.keys():
                     arakoon_create_directories = """
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+arakoon_management = ArakoonManagementEx()
 arakoon_cluster = arakoon_management.getCluster('%(cluster)s')
 arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 """ % {'cluster': cluster}
@@ -592,8 +592,8 @@ EOF
 import os
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+arakoon_management = ArakoonManagementEx()
 voldrv_arakoon_cluster_id = 'voldrv'
 voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
 voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
