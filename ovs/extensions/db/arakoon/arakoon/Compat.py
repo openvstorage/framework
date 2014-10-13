@@ -23,7 +23,6 @@ if os.environ.has_key(VAR) and os.environ[VAR] == 'pyrakoon':
     arakoon_client = compat
 else:
     logging.info("opting for normal client")
-    print "arakoon"
     import Arakoon
     arakoon_client = Arakoon
 
@@ -212,7 +211,6 @@ class Q: # (Compat)
     
 
 def which_compat():
-    print "which_compat"
     g = globals()
     if sys.prefix == '/opt/qbase3':
         r = Q()

@@ -19,7 +19,7 @@ import os
 import time
 import signal
 import subprocess
-from configobj import ConfigObj
+import ConfigParser
 
 from arakoon.Arakoon import ArakoonClientConfig, ArakoonClient
 from arakoon.ArakoonManagement import ArakoonManagement, ArakoonCluster, logging
@@ -37,8 +37,10 @@ class ArakoonManagementEx(ArakoonManagement):
     """
 
     def __init__(self):
-        """ Call old-style super """
-        ArakoonManagement(self)
+        """
+        Dummy initializer
+        """
+        pass
 
     def getCluster(self, cluster_name):
         """
@@ -76,14 +78,43 @@ class ArakoonClusterEx(ArakoonCluster):
         self._binary = which_arakoon()
         self._arakoonDir = '{0}/arakoon'.format(config_dir)
 
+    def __validateName(self, name):
+        if name is None or name.strip() == '':
+            raise Exception('A name should be passed.  An empty name is not an option')
+        if not isinstance(name, str):
+            raise Exception('Name should be of type string')
+        for char in [' ', ',', '#']:
+            if char in name:
+                raise Exception('Name should not contain %s' % char)
+
+    @staticmethod
+    def _read_config_file(path):
+        """
+        Reads a config file
+        """
+        c_parser = ConfigParser.ConfigParser()
+        c_parser.read(path)
+        c_parser._path = path
+        return c_parser
+
+    @staticmethod
+    def _write_config_file(config_object):
+        """
+        Writes a configuration object
+        """
+        if not hasattr(config_object, '_path'):
+            raise RuntimeError('The given configuration object does not contain a _path')
+        with open(config_object._path, 'wb') as config_file:
+            config_object.write(config_file)
+
     def _getConfigFilePath(self):
         return '{0}/{1}'.format(self._arakoonDir, self._clusterName)
 
     def _getConfigFile(self):
-        return ConfigObj('{0}/{1}.cfg'.format(self._getConfigFilePath(), self._clusterName))
+        return ArakoonClusterEx._read_config_file('{0}/{1}.cfg'.format(self._getConfigFilePath(), self._clusterName))
 
     def _getClientConfigFile(self):
-        return ConfigObj('{0}/{1}_client.cfg'.format(self._getConfigFilePath(), self._clusterName))
+        return ArakoonClusterEx._read_config_file('{0}/{1}_client.cfg'.format(self._getConfigFilePath(), self._clusterName))
 
     def _changeTlogCompression(self, nodes, value):
         if nodes is None:
@@ -93,11 +124,11 @@ class ArakoonClusterEx(ArakoonCluster):
                 self.__validateName(n)
         config = self._getConfigFile()
         for n in nodes:
-            if 'disable_tlog_compression' in config[n]:
-                config[n].pop('disable_tlog_compression')
-            config[n]["tlog_compression"] = value
+            if 'disable_tlog_compression' in config.options(n):
+                config.remove_option(n, 'disable_tlog_compression')
+            config.set(n, 'tlog_compression', value)
 
-        config.write()
+        ArakoonClusterEx._write_config_file(config)
 
     def enableTlogCompression(self, nodes=None, compressor='bz2'):
         """
@@ -117,9 +148,9 @@ class ArakoonClusterEx(ArakoonCluster):
         config = self._getConfigFile()
 
         for node in nodes:
-            config[node]['fsync'] = value
+            config.set(node, 'fsync', value)
 
-        config.write()
+        ArakoonClusterEx._write_config_file(config)
 
     def getClientConfig(self):
         """
@@ -132,9 +163,9 @@ class ArakoonClusterEx(ArakoonCluster):
         nodes = self.__getNodes(config)
 
         for name in nodes:
-            ips = config[name]["ip"]
+            ips = config.get(name, 'ip')
             ip_list = ips.split(',')
-            port = int(config[name]["client_port"])
+            port = int(config.get(name, 'client_port'))
             clientconfig[name] = (ip_list, port)
 
         return clientconfig
@@ -154,10 +185,10 @@ class ArakoonClusterEx(ArakoonCluster):
         self.__validateName(name)
         config = self._getConfigFile()
 
-        if name in config:
-            return config[name]
+        if config.has_section(name):
+            return dict(config.items(name))
         else:
-            raise Exception("No node with name %s configured" % name)
+            raise Exception('No node with name %s configured' % name)
 
     def createDirs(self, name):
         """
@@ -169,28 +200,21 @@ class ArakoonClusterEx(ArakoonCluster):
 
         config = self._getConfigFile()
 
-        if name in config:
-            home = config[name]["home"]
+        if config.has_section(name):
+            home = config.get(name, 'home')
             subprocess.call(['mkdir', '-p', home])
 
-            if 'tlog_dir' in config[name]:
-                tlog_dir = config[name]["tlog_dir"]
-                subprocess.call(['mkdir', '-p', tlog_dir])
+            for option in ['tlog_dir', 'tlf_dir', 'head_dir']:
+                if config.has_option(name, option):
+                    option_dir = config.get(name, option)
+                    subprocess.call(['mkdir', '-p', option_dir])
 
-            if 'tlf_dir' in config[name]:
-                tlf_dir = config[name]["tlf_dir"]
-                subprocess.call(['mkdir', '-p', tlf_dir])
-
-            if 'head_dir' in config[name]:
-                head_dir = config[name]["head_dir"]
-                subprocess.call(['mkdir', '-p', head_dir])
-
-            log_dir = config[name]["log_dir"]
+            log_dir = config.get(name, 'log_dir')
             subprocess.call(['mkdir', '-p', log_dir])
 
             return
 
-        msg = "No node %s configured" % name
+        msg = 'No node %s configured' % name
         raise Exception(msg)
 
     def addLocalNode(self, name, config_filename=None):
@@ -207,27 +231,27 @@ class ArakoonClusterEx(ArakoonCluster):
         config_name = self._servernodes()
         if name in config:
             config_name_path = os.path.join(self._clusterPath, config_name)
-            nodesconfig = ConfigObj(config_name_path)
+            nodesconfig = ArakoonClusterEx._read_config_file(config_name_path)
 
-            if not 'global' in nodesconfig:
-                nodesconfig["global"] = dict()
-                nodesconfig["global"].update({"cluster": ""})
+            if not nodesconfig.has_section('global'):
+                nodesconfig.add_section('global')
+                nodesconfig.set('global', 'cluster', '')
 
             nodes = self.__getNodes(nodesconfig)
             if name in nodes:
-                raise Exception("node %s already present" % name)
+                raise Exception('node %s already present' % name)
             nodes.append(name)
-            nodesconfig["global"].update({"cluster": nodes})
+            nodesconfig.set('global', 'cluster', nodes)
 
             if config_filename:
-                nodesconfig.filename = config_filename
+                nodesconfig._path = config_filename
                 if not os.path.exists(os.path.dirname(config_filename)):
                     os.makedirs(os.path.dirname(config_filename))
-            nodesconfig.write()
 
+            ArakoonClusterEx._write_config_file(nodesconfig)
             return
 
-        raise Exception("No node %s" % name)
+        raise Exception('No node %s' % name)
 
     def listLocalNodes(self):
         """
@@ -236,24 +260,15 @@ class ArakoonClusterEx(ArakoonCluster):
         @return list of strings containing the node names
         """
         config_name = self._servernodes()
-        config_name_path = '{0}/{1}.cfg'.format(
-            self._getConfigFilePath(), config_name)
-        config = ConfigObj(config_name_path)
+        config_name_path = '{0}/{1}.cfg'.format(self._getConfigFilePath(), config_name)
+        config = ArakoonClusterEx._read_config_file(config_name_path)
 
         return self.__getNodes(config)
 
     def __getNodes(self, config):
-        if not 'global' in config:
-            return []
-        nodes = []
-        try:
-            if type(config['global']['cluster']) == list:
-                nodes = map(lambda x: x.strip(), config['global']['cluster'])
-            else:
-                nodes = [config['global']['cluster'].strip(), ]
-        except LookupError:
-            pass
-        return nodes
+        if config.has_section('global') and config.has_option('global', 'cluster'):
+            return [node.strip() for node in config.get('global', 'cluster').split(',')]
+        return []
 
     def start(self, daemon=True):
         """
@@ -294,11 +309,11 @@ class ArakoonClusterEx(ArakoonCluster):
         cmd = ['pkill', '-f', line]
         logging.debug("stopping '%s' with: %s" % (name, ' '.join(cmd)))
         rc = subprocess.call(cmd, close_fds=True)
-        logging.debug("%s=>rc=%i" % (cmd, rc))
+        logging.debug('%s=>rc=%i' % (cmd, rc))
         i = 0
         while self._getStatusOne(name):
             rc = subprocess.call(cmd, close_fds=True)
-            logging.debug("%s=>rc=%i" % (cmd, rc))
+            logging.debug('%s=>rc=%i' % (cmd, rc))
             time.sleep(1)
             i += 1
             logging.debug("'%s' is still running... waiting" % name)
@@ -344,10 +359,10 @@ class ArakoonClusterEx(ArakoonCluster):
                     f = open('/proc/%s/cmdline' % pid, 'r')
                     startup = f.read()
                     f.close()
-                    logging.debug("pid=%s; cmdline=%s", pid, startup)
+                    logging.debug('pid=%s; cmdline=%s', pid, startup)
                 except:
                     pass
-            raise Exception("multiple matches", pid_list)
+            raise Exception('multiple matches', pid_list)
         return result
 
     def writeClientConfig(self, config=None, config_filename=None):
@@ -360,38 +375,38 @@ class ArakoonClusterEx(ArakoonCluster):
         if not config_filename:
             client_config = self._getClientConfigFile()
         else:
-            client_config = ConfigObj(config_filename)
+            client_config = ArakoonClusterEx._read_config_file(config_filename)
 
         if not config:
             config = self.getClientConfig()
 
-        if not 'global' in client_config:
-            client_config['global'] = dict()
-            client_config['global'].update({'cluster_id': self._clusterName,
-                                            'cluster': config.keys()})
+        if not client_config.has_section('global'):
+            client_config.add_section('global')
+            client_config.set('global', 'cluster_id', self._clusterName)
+            client_config.set('global', 'cluster', config.keys())
 
         for node, node_config in config.iteritems():
-            if not node in client_config:
-                client_config[node] = dict()
-            client_config[node].update({'name': node,
-                                        'ip': node_config[0][0],
-                                        'client_port': node_config[1]})
+            if not client_config.has_section(node):
+                client_config.add_section(node)
+            client_config.set(node, 'name', node)
+            client_config.set(node, 'ip', node_config[0][0])
+            client_config.set(node, 'client_port', node_config[1])
 
-        client_config.write()
+        ArakoonClusterEx._write_config_file(client_config)
 
 if __name__ == '__main__':
     from optparse import OptionParser
 
     parser = OptionParser(description='Arakoon Management')
-    parser.add_option('--stop', dest='start_stop', action="store_false", default=None, help="Stop arakoon")
-    parser.add_option('--start', dest='start_stop', action="store_true", default=None, help="Start arakoon")
-    parser.add_option('-c', '--cluster', dest="cluster", help="Name of arakoon cluster")
+    parser.add_option('--stop', dest='start_stop', action='store_false', default=None, help='Stop arakoon')
+    parser.add_option('--start', dest='start_stop', action='store_true', default=None, help='Start arakoon')
+    parser.add_option('-c', '--cluster', dest='cluster', help='Name of arakoon cluster')
     (options, args) = parser.parse_args()
 
     if not options.cluster:
-        parser.error("No arakoon cluster specified")
+        parser.error('No arakoon cluster specified')
     if options.start_stop is None:
-        parser.error("No action specified")
+        parser.error('No action specified')
 
     arakoonManagement = ArakoonManagementEx()
     arakoon_cluster = arakoonManagement.getCluster(options.cluster)

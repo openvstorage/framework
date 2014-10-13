@@ -3,8 +3,8 @@ IDEA additional info:
 Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
---- ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py	(revision 1206:ad42d289c6723b7c383a3e338014f4e061a5883a)
-+++ ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py	(revision 1206+:ad42d289c672+)
+--- ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
++++ ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
 @@ -26,8 +26,8 @@
  import string
  import logging
@@ -17,13 +17,21 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
  def which_arakoon():
      path = '/'.join([X.appDir,"arakoon/bin/arakoon"])
 
---- ovs/extensions/db/arakoon/arakoon/Compat.py	(revision 1208:14277988c5056a5eb5a41ad969e1cdd259c68e64)
-+++ ovs/extensions/db/arakoon/arakoon/Compat.py	(revision 1208+:14277988c505+)
-@@ -24,7 +24,7 @@
+--- ovs/extensions/db/arakoon/arakoon/Compat.py
++++ ovs/extensions/db/arakoon/arakoon/Compat.py
+@@ -24,7 +24,6 @@
  else:
      logging.info("opting for normal client")
-     print "arakoon"
+-    print "arakoon"
 -    from arakoon import Arakoon
 +    import Arakoon
      arakoon_client = Arakoon
 
+
+@@ -213,5 +213,4 @@
+
+ def which_compat():
+-    print "which_compat"
+     g = globals()
+     if sys.prefix == '/opt/qbase3':
+         r = Q()

@@ -19,11 +19,11 @@ import time
 import subprocess
 import shutil
 from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
-from ArakoonManagement import ArakoonManagementExt
+from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler
 from ovs.plugin.provider.process import Process
 
-manager = ArakoonManagementExt()
+manager = ArakoonManagementEx()
 ensurearakoonworks = EnsureArakoonWorks()
 logger = LogHandler('arakoon', name='tlogchcker')
 
