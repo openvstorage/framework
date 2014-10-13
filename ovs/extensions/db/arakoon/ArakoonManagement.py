@@ -28,7 +28,7 @@ config_dir = '/opt/OpenvStorage/config'
 
 
 def which_arakoon():
-    return "arakoon"
+    return 'arakoon'
 
 
 class ArakoonManagementEx(ArakoonManagement):

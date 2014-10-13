@@ -30,7 +30,7 @@ class EnsureArakoonError(Exception):
         self.message = message
 
     def __speak__(self):
-        print "{0}".format(self.message)
+        print '{0}'.format(self.message)
 
 
 class EnsureArakoonWorks():
@@ -49,14 +49,14 @@ class EnsureArakoonWorks():
         self._client = PersistentFactory.get_client('arakoon')
         self._key = 'ensureworks'
         self._valueguid = str(uuid.uuid4())
-        self._value = "{0}{1}"
+        self._value = '{0}{1}'
 
     @staticmethod
     def _speak(message):
         """ log to standard output """
 
-        leader = "[arakoon_check]:"
-        logmessage = "{0} {1}".format(leader, message)
+        leader = '[arakoon_check]:'
+        logmessage = '{0} {1}'.format(leader, message)
         logger.debug(logmessage)
         sys.stdout.flush()
 
@@ -99,11 +99,11 @@ class EnsureArakoonWorks():
         testvalue = self._set()
         self._get()
         if self._retrieved == testvalue:
-            EnsureArakoonWorks._speak("Arakoon value sucessfully set and retrieved")
+            EnsureArakoonWorks._speak('Arakoon value sucessfully set and retrieved')
             self._works = True
         self._delete()
-        EnsureArakoonWorks._speak("set {0}".format(testvalue))
-        EnsureArakoonWorks._speak("get {0}".format(self._retrieved))
+        EnsureArakoonWorks._speak('set {0}'.format(testvalue))
+        EnsureArakoonWorks._speak('get {0}'.format(self._retrieved))
 
     @staticmethod
     def _setlockfile():
@@ -115,7 +115,7 @@ class EnsureArakoonWorks():
     def checktestresults(self):
         """ loop and wait for arakoon to work """
 
-        EnsureArakoonWorks._speak("Testing arakoon for availability")
+        EnsureArakoonWorks._speak('Testing arakoon for availability')
         runstart = self._getepoch()
         while True:
             works = self._works
@@ -123,23 +123,23 @@ class EnsureArakoonWorks():
                 try:
                     self.runtest()
                 except:
-                    notreadyerror = "running arakoon test failed - still trying"
+                    notreadyerror = 'running arakoon test failed - still trying'
                     EnsureArakoonWorks._speak(notreadyerror)
 
                 elapsedtime = runstart - self._begintime
-                waitmsg = "Waiting for arakoon.. {0} seconds passed"
+                waitmsg = 'Waiting for arakoon.. {0} seconds passed'
                 EnsureArakoonWorks._speak(waitmsg.format(elapsedtime))
                 runstart = self._getepoch()
 
                 if elapsedtime >= self._waitlimit:
-                    timeoutmessage = "Arakoon wait time exceeded: {0} seconds"
+                    timeoutmessage = 'Arakoon wait time exceeded: {0} seconds'
                     message = timeoutmessage.format(elapsedtime)
                     EnsureArakoonWorks._setlockfile()
                     raise RuntimeError(message)
 
             else:
                 waitseconds = 15
-                EnsureArakoonWorks._speak("Arakoon is now ready")
+                EnsureArakoonWorks._speak('Arakoon is now ready')
 
                 arakoonbudirs = list()
                 for arakoonbudir in os.walk('/tmp').next()[1]:
@@ -150,11 +150,11 @@ class EnsureArakoonWorks():
                     arakoonbudirs.sort()
                     latesttokeep = arakoonbudirs.pop()
                     EnsureArakoonWorks._speak(
-                        "Waiting {0} seconds and then removing any extraneous backup directories".format(waitseconds))
+                        'Waiting {0} seconds and then removing any extraneous backup directories'.format(waitseconds))
                     time.sleep(waitseconds)
                     for arakoonbudir in arakoonbudirs:
                         shutil.rmtree(arakoonbudir)
                         EnsureArakoonWorks._speak(
-                            "Arakoon startup backup dir removed: {0}".format(arakoonbudir))
-                    EnsureArakoonWorks._speak("Kept last backup of {0}".format(latesttokeep))
+                            'Arakoon startup backup dir removed: {0}'.format(arakoonbudir))
+                    EnsureArakoonWorks._speak('Kept last backup of {0}'.format(latesttokeep))
                 break

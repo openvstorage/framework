@@ -1,8 +1,3 @@
-Index: ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
-IDEA additional info:
-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
-<+>UTF-8
-===================================================================
 --- ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
 +++ ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
 @@ -26,8 +26,8 @@
