@@ -1,0 +1,17 @@
+#!/bin/bash
+
+id -a ovs &> /dev/null
+if [[ $? -eq 1 ]]
+then
+  echo 'Creating ovs user'
+  useradd ovs -d /opt/OpenvStorage
+  echo '%ovs ALL=NOPASSWD: ALL' >> /etc/sudoers
+else
+  echo 'ovs user already exists'
+fi
+
+# logging
+
+mkdir -p /var/log/ovs/volumedriver
+chown -R ovs:ovs /var/log/ovs
+chmod 777 /var/log/ovs
