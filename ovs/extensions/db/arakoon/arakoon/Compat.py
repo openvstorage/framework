@@ -24,7 +24,7 @@ if os.environ.has_key(VAR) and os.environ[VAR] == 'pyrakoon':
 else:
     logging.info("opting for normal client")
     print "arakoon"
-    from arakoon import Arakoon
+    import Arakoon
     arakoon_client = Arakoon
 
 
