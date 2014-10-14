@@ -57,6 +57,12 @@ class SetupController(object):
             print Interactive.boxed_message(['Open vStorage Setup'])
             logger.info('Starting Open vStorage Setup')
 
+            try:
+                import cuisine
+                import fabric
+            except ImportError:
+                raise RuntimeError('Some modules could not be loaded. Was Open vStorage installed correctly?')
+
             # Prepare variables
             auto_config = False
             disk_layout = {}
@@ -775,12 +781,19 @@ EOF
                 print Interactive.boxed_message(['Setup complete.',
                                                  'Point your browser to http://{0} to start using Open vStorage'.format(cluster_ip)])
             logger.info('Setup complete')
+            print ''
 
         except Exception as exception:
             print ''  # Spacing
             print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             logger.exception('Unexpected error')
             logger.error(str(exception))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
             sys.exit(1)
 
     @staticmethod
