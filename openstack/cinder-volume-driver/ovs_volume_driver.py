@@ -18,7 +18,7 @@ OpenStack Cinder driver - interface to OVS api
 - uses Cinder logging
 """
 
-import time
+import time, socket
 
 # OVS
 from ovs.dal.lists.vpoollist import VPoolList
@@ -62,17 +62,27 @@ def _debug_vol_info(call, volume):
 
 class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
     """
-    OVS Volume Driver plugin for Cinder
+    OVS Volume Driver plugin for Cinder (support for Icehouse (stable) , Juno (RC) and Kilo (unstable))
     Configuration file: /etc/cinder/cinder.conf
     Required parameters in config file:
-    - volume_driver = cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver
-    - volume_backend_name = <VPOOLNAME>
-    - vpool_name = <VPOOLNAME>
+
+    # single driver
+    volume_driver = cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver
+    volume_backend_name = <VPOOLNAME>
+    vpool_name = <VPOOLNAME>
+
+    # multiple drivers
+    enabled backends: Open vStorage
+    [Open vStorage]
+    volume_driver = cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver
+    volume_backend_name = <VPOOLNAME>
+    vpool_name = <VPOOLNAME>
+
     Required configuration:
-        cinder type-create ovs
-        cinder type-key ovs set volume_backend_name=<VPOOLNAME>
+        cinder type-create <TYPENAME> # e.g. Open vStorage
+        cinder type-key <TYPENAME> set volume_backend_name=<VPOOLNAME>
     """
-    VERSION = '1.0.2b'
+    VERSION = '1.0.4'
 
     def __init__(self, *args, **kwargs): #pylint: disable=E1002
         """
@@ -81,7 +91,8 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         """
         super(OVSVolumeDriver, self).__init__(*args, **kwargs)
         LOG.info('INIT %s %s %s ' % (CONF.vpool_name, str(args), str(kwargs)))
-        self._vpool_name = CONF.vpool_name
+        self.configuration.append_config_values(OPTS)
+        self._vpool_name = self.configuration.vpool_name
         self._vp = VPoolList.get_vpool_by_name(self._vpool_name)
         self._context = None
         self._db = kwargs.get('db', None)
@@ -171,7 +182,7 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
                 LOG.info('CP_IMG_TO_VOL Resizing volume to size %s' % volume['size'])
                 self.extend_volume(volume = volume, size_gb = volume['size'])
             except Exception as ex:
-                LOG.error('CP_IMG_TO_VOL Internal error %s ' % str(ex))
+                LOG.error('CP_IMG_TO_VOL Internal error %s ' % unicode(ex))
                 self.delete_volume(volume)
                 raise
             ovs_disk = self._find_ovs_model_disk_by_location(volume.provider_location, str(volume.host))
@@ -464,13 +475,23 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         self._context = context
 
     # Internal
+    def _get_real_hostname(self, hostname):
+        LOG.debug('[_GET REAL HOSTNAME] Hostname %s' % hostname)
+        if not hostname or not isinstance(hostname, str):
+            return socket.gethostname()
+        if "#" in hostname:
+            hostname, backend_name = hostname.split('#')
+        if "@" in hostname:
+            hostname, driver = hostname.split('@')
+            return hostname
+        return hostname
+
     def _get_hostname_mountpoint(self, hostname):
         """
         Find OVS vsr mountpoint for self._vp and hostname
         :return mountpoint: string, mountpoint
         """
-        if '#' in hostname:
-            hostname = hostname.split('#')[0] #? WUT ?
+        hostname = self._get_real_hostname(hostname)
         LOG.debug('[_GET HOSTNAME MOUNTPOINT] Hostname %s' % hostname)
         storagedrivers = [vsr for vsr in self._vp.storagedrivers
                           if str(vsr.storagerouter.name) == str(hostname)]
@@ -478,15 +499,14 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
             LOG.debug('[_GET HOSTNAME MOUNTPOINT] Mountpoint %s' % storagedrivers[0].mountpoint)
             return str(storagedrivers[0].mountpoint)
         elif not storagedrivers:
-            raise RuntimeError('Not vsr mountpoint found for Vpool %s and hostname %s' % (self._vpool_name, hostname))
+            raise RuntimeError('No vsr mountpoint found for Vpool %s and hostname %s' % (self._vpool_name, hostname))
 
     def _find_ovs_model_disk_by_location(self, location, hostname, retry=3, timeout=3):
         """
         Find OVS disk object based on location and hostname
         :return VDisk: OVS DAL model object
         """
-        if '#' in hostname:
-            hostname = hostname.split('#')[0] #? WUT ?
+        hostname = self._get_real_hostname(hostname)
         LOG.debug('[_FIND OVS DISK] Location %s, hostname %s' % (location, hostname))
         attempt = 0
         while attempt <= retry:
@@ -511,8 +531,7 @@ class OVSVolumeDriver(driver.VolumeDriver): #pylint: disable=R0921
         Find OVS pmachine guid based on storagerouter name
         :return guid: GUID
         """
-        if '#' in hostname:
-            hostname = hostname.split('#')[0] #? WUT ?
+        hostname = self._get_real_hostname(hostname)
         LOG.debug('[_FIND OVS PMACHINE] Hostname %s' % (hostname))
         mapping =  [(pm.guid, str(sr.name)) for pm in PMachineList.get_pmachines() for sr in pm.storagerouters]
         for item in mapping:

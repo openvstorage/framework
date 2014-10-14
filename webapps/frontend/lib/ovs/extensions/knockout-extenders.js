@@ -85,7 +85,12 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
         return computed;
     };
     ko.extenders.regex = function(target, regex) {
-        var computed, valid = ko.observable(false);
+        var computed, valid = ko.observable(false), optional = false;
+        if (regex.hasOwnProperty("optional")) {
+            optional = regex.optional;
+            regex = regex.regex;
+        }
+
         computed = ko.computed({
             read: target,
             write: function(newValue) {
@@ -93,7 +98,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                 if (newValue !== undefined) {
                     valid(newValue.match(regex) !== null);
                 } else {
-                    valid(false);
+                    valid(optional);
                 }
                 target.notifySubscribers(newValue);
             }
