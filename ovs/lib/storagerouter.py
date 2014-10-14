@@ -255,7 +255,8 @@ for directory in {0}:
         failovercache = '{}/foc_{}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
-        dirs2create = [scocache, failovercache, metadatapath, tlogpath,
+        rsppath = '/var/rsp/{}'.format(vpool_name)
+        dirs2create = [scocache, failovercache, metadatapath, tlogpath, rsppath,
                        System.read_remote_config(client, 'volumedriver.readcache.serialization.path')]
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
@@ -323,7 +324,8 @@ for directory in {0}:
                     writecache_factor = 0.49
             elif len(delta) == 3:
                 if mountpoint_writecache == mountpoint_foc:
-                    readcache1_factor = readcache2_factor = 0.98
+                    readcache1_factor = 0.98
+                    readcache2_factor = 0.98
                     writecache_factor = 0.49
                 elif mountpoint_readcache1 == mountpoint_writecache:
                     readcache1_factor = 0.49
@@ -345,6 +347,34 @@ for directory in {0}:
                 readcache1_factor = 0.98
                 readcache2_factor = 0.98
                 writecache_factor = 0.98
+
+        # summarize caching on root partition (directory only)
+        root_assigned = dict()
+        if not is_partition(mountpoint_readcache1):
+            root_assigned['readcache1_factor'] = readcache1_factor
+        if not is_partition(mountpoint_readcache2):
+            root_assigned['readcache2_factor'] = readcache2_factor
+        if not is_partition(mountpoint_writecache):
+            root_assigned['writecache_factor'] = writecache_factor
+        if not is_partition(mountpoint_foc):
+            root_assigned['foc_factor'] = min(readcache1_factor, readcache2_factor, writecache_factor)
+
+        # always leave at least 20% of free space
+        division_factor = 1.0
+        total_size = sum(root_assigned.values()) + .02 * len(root_assigned)
+        if 0.8 < total_size < 1.6:
+            division_factor = 2.0
+        elif 1.6 < total_size < 3.2:
+            division_factor = 4.0
+        elif total_size >= 3.2:
+            division_factor = 8.0
+
+        if 'readcache1_factor' in root_assigned.keys():
+            readcache1_factor /= division_factor
+        if 'readcache2_factor' in root_assigned.keys():
+            readcache2_factor /= division_factor
+        if 'writecache_factor' in root_assigned.keys():
+            writecache_factor /= division_factor
 
         scocache_size = '{0}KiB'.format((int(write_cache_fs.f_bavail * writecache_factor / 4096) * 4096) * 4)
         if (mountpoint_readcache1 and not mountpoint_readcache2) or (mountpoint_readcache1 == mountpoint_readcache2):
@@ -445,7 +475,7 @@ fd_config = {{'fd_cache_path': '{11}',
               'fd_namespace' : 'fd-{0}-{12}'}}
 storagedriver_configuration = StorageDriverConfiguration('{0}')
 storagedriver_configuration.configure_backend({1})
-storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
+storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path') + '/{0}')
 storagedriver_configuration.configure_scocache({3}, '1GB', '2GB')
 storagedriver_configuration.configure_failovercache('{4}')
 storagedriver_configuration.configure_filesystem({5})
@@ -679,6 +709,7 @@ if Service.has_service('{0}'):
         client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_writecache, vpool.name))
         client.run('rm -rf {}/metadata_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(storagedriver.mountpoint_md, vpool.name))
+        client.run('rm -rf /var/rsp/{}'.format(vpool.name))
 
         # Remove files
         client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
