@@ -84,7 +84,9 @@ class OVSPluginTestCase(test.TestCase):
         if not self._vpool_exists():
             self._create_vpool()
             restart = True
-        if self._set_cinder_driver_config() or self._set_cinder_volume_type() or restart:
+        restart |= self._set_cinder_driver_config()
+        restart |= self._set_cinder_volume_type()
+        if restart:
             self._restart_cinder()
 
         self._debug('setUp complete')
@@ -180,7 +182,8 @@ class OVSPluginTestCase(test.TestCase):
                       'mountpoint_bfs': VPOOL_BFS,
                       'mountpoint_temp': VPOOL_TEMP,
                       'mountpoint_md': VPOOL_MD,
-                      'mountpoint_readcache': VPOOL_READCACHE,
+                      'mountpoint_readcache1': VPOOL_READCACHE1,
+                      'mountpoint_readcache2': VPOOL_READCACHE2,
                       'mountpoint_writecache': VPOOL_WRITECACHE,
                       'mountpoint_foc': VPOOL_FOC,
                       'storage_ip': '127.0.0.1', #KVM
@@ -385,7 +388,7 @@ class OVSPluginTestCase(test.TestCase):
         config_map = {'volume_driver': 'cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver',
                       'volume_backend_name': VPOOL_NAME,
                       'vpool_name': VPOOL_NAME,
-                      'default_volume_type': 'ovs'}
+                      'default_volume_type': VOLUME_TYPE}
         for key, value in config_map.items():
             if not cfg.has_option('DEFAULT', key) or cfg.get('DEFAULT', key) != value:
                 cfg.set('DEFAULT', key, value)
@@ -447,6 +450,16 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         return self.cinder_client.volumes.get(volume_id)
 
+    def _cinder_get_volume_by_display_name(self, display_name):
+        """
+        Return volume object by display_name
+        """
+        self._get_cinder_client()
+        volumes = [v for v in self.cinder_client.volumes.list() if v.display_name == display_name]
+        if volumes:
+            return volumes[0]
+        raise RuntimeError('Volume with display name %s not found' % display_name)
+
     def _cinder_get_snapshot_by_id(self, snapshot_id):
         """
         Return snapshot object by id
@@ -454,14 +467,14 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         return self.cinder_client.volume_snapshots.get(snapshot_id)
 
-    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None):
+    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None, size = VOLUME_SIZE):
         """
         Creates a volume based partially on DEFAULT values
         - can be created from snapshot or another volume or an image
         """
         self._debug('new volume %s %s %s %s' % (name, snapshot_id, volume_id, image_id))
         self._get_cinder_client()
-        volume = self.cinder_client.volumes.create(size = VOLUME_SIZE,
+        volume = self.cinder_client.volumes.create(size = size,
                                                    display_name = name,
                                                    volume_type = VOLUME_TYPE,
                                                    snapshot_id = snapshot_id,
@@ -679,12 +692,12 @@ class OVSPluginTestCase(test.TestCase):
         self._debug('volume %s created' % clone_volume.display_name)
         return clone_volume, clone_name, file_name
 
-    def _new_volume_from_default_image(self):
+    def _new_volume_from_default_image(self, size = VOLUME_SIZE):
         image = self._glance_get_test_image()
         self._debug('new volume from image %s' % image)
         volume_name = self._random_volume_name()
         file_name = '%s.%s' % (volume_name, FILE_TYPE)
-        volume = self._cinder_create_volume(volume_name, image_id = image.id)
+        volume = self._cinder_create_volume(volume_name, image_id = image.id, size = size)
         self._debug('created new volume %s' % volume_name)
         self.register_tearDown(9, volume_name, self._cinder_delete_volume, {'volume': volume})
         self._debug('volume %s created' % volume_name)

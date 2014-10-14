@@ -288,6 +288,12 @@ class SetupController(object):
             logger.exception('Unexpected error')
             logger.error(str(exception))
             sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
+            sys.exit(1)
 
     @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, hypervisor_info, auto_config, disk_layout):
@@ -825,6 +831,12 @@ EOF
             logger.exception('Unexpected error')
             logger.error(str(exception))
             sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
+            sys.exit(1)
 
     @staticmethod
     def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config, mountpoints, arakoon_mountpoint):
@@ -1165,6 +1177,12 @@ EOF
             print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             logger.exception('Unexpected error')
             logger.error(str(exception))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
             sys.exit(1)
 
     @staticmethod

@@ -4,13 +4,13 @@ export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
 export DISPLAY=:0
 if [ "$1" = "setup" ] ; then
   if [ "$#" -ne 2 ] ; then
-    ipython -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
+    python -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
   elif [ "$2" = "master" ] || [ "$2" = "extra" ] ; then
-    ipython -c "from ovs.lib.setup import SetupController; SetupController.setup_node(force_type='$2')"
+    python -c "from ovs.lib.setup import SetupController; SetupController.setup_node(force_type='$2')"
   elif [ "$2" = "promote" ] ; then
-    ipython -c "from ovs.lib.setup import SetupController; SetupController.promote_node()"
+    python -c "from ovs.lib.setup import SetupController; SetupController.promote_node()"
   elif [ "$2" = "demote" ] ; then
-    ipython -c "from ovs.lib.setup import SetupController; SetupController.demote_node()"
+    python -c "from ovs.lib.setup import SetupController; SetupController.demote_node()"
   fi
 elif [ "$1" = "monitor" ] ; then
   if [ "$2" = "services" ] ; then
