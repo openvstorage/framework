@@ -36,7 +36,8 @@ define([
         data.mtptTemp(undefined);
         data.mtptBFS(undefined);
         data.mtptMD(undefined);
-        data.mtptReadCache(undefined);
+        data.mtptReadCache1(undefined);
+        data.mtptReadCache2(undefined);
         data.mtptWriteCache(undefined);
         data.mtptFOC(undefined);
         data.storageIP(undefined);

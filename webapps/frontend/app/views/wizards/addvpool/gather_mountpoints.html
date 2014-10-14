@@ -45,11 +45,25 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('readcache', canContinue().fields) !== -1 }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache"></label>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('readcache1', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache1"></label>
             <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptReadCache,
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptReadCache1Filter,
                                              free: true, defaultfree: '/', defaultRegex: /cache/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('readcache2', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcache2"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints2,
+                                             text: function(item) {
+                                                 if (item === undefined) {
+                                                     return '-';
+                                                 }
+                                                 return item;
+                                             }, target: data.mtptReadCache2,
+                                             free: true, defaultfree: '/' }">
                 </span>
             </div>
         </div>

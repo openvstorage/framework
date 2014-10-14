@@ -15,9 +15,12 @@
 """
 OVS Cinder Plugin autotests configuration module
 """
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-#This node # to do get automatic / 127.0.0.1
-IP = '10.130.10.201'
+#This node
+with open('/etc/hostname') as hostname_file:
+    hostname = hostname_file.read().strip()
+IP = [storagerouter for storagerouter in StorageRouterList.get_storagerouters() if storagerouter.name == hostname][0].ip
 
 #fix issue with add_vpool becoming interactive
 import fabric.auth
@@ -39,7 +42,8 @@ VPOOL_ROOT_DIR = '/mnt'
 VPOOL_BFS = '%s/bfs' % VPOOL_ROOT_DIR
 VPOOL_TEMP = '%s/temp' % VPOOL_ROOT_DIR
 VPOOL_MD = '%s/md' % VPOOL_ROOT_DIR
-VPOOL_READCACHE = '%s/cache1/readcache' % VPOOL_ROOT_DIR
+VPOOL_READCACHE1 = '%s/cache1/readcache1' % VPOOL_ROOT_DIR
+VPOOL_READCACHE2 = '%s/cache1/readcache2' % VPOOL_ROOT_DIR
 VPOOL_WRITECACHE = '%s/cache1/writecache' % VPOOL_ROOT_DIR
 VPOOL_FOC = '%s/cache1/foc' % VPOOL_ROOT_DIR
 VPOOL_PORT = 12326 #make sure it is available (!) Todo: get highest available
