@@ -257,7 +257,8 @@ for directory in {0}:
         failovercache = '{}/foc_{}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
-        dirs2create = [scocache, failovercache, metadatapath, tlogpath,
+        rsppath = '/var/rsp/{}'.format(vpool_name)
+        dirs2create = [scocache, failovercache, metadatapath, tlogpath, rsppath,
                        System.read_remote_config(client, 'volumedriver.readcache.serialization.path')]
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
@@ -456,7 +457,7 @@ fd_config = {{'fd_cache_path': '{11}',
               'fd_namespace' : 'fd-{0}-{12}'}}
 storagedriver_configuration = StorageDriverConfiguration('{0}')
 storagedriver_configuration.configure_backend({1})
-storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
+storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path') + '/{0}')
 storagedriver_configuration.configure_scocache({3}, '1GB', '2GB')
 storagedriver_configuration.configure_failovercache('{4}')
 storagedriver_configuration.configure_filesystem({5})
@@ -689,6 +690,7 @@ if Service.has_service('{0}'):
         client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_writecache, vpool.name))
         client.run('rm -rf {}/metadata_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(storagedriver.mountpoint_md, vpool.name))
+        client.run('rm -rf /var/rsp/{}'.format(vpool.name))
 
         # Remove files
         client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
