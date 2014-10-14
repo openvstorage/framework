@@ -218,13 +218,16 @@ if Service.has_service('{0}'):
 
         mountpoint_temp = parameters['mountpoint_temp']
         mountpoint_md = parameters['mountpoint_md']
-        mountpoint_readcache = parameters['mountpoint_readcache']
+        mountpoint_readcache1 = parameters['mountpoint_readcache1']
+        mountpoint_readcache2 = parameters.get('mountpoint_readcache2', '')
         mountpoint_writecache = parameters['mountpoint_writecache']
         mountpoint_foc = parameters['mountpoint_foc']
 
         directories_to_create.append(mountpoint_temp)
         directories_to_create.append(mountpoint_md)
-        directories_to_create.append(mountpoint_readcache)
+        directories_to_create.append(mountpoint_readcache1)
+        if mountpoint_readcache2:
+            directories_to_create.append(mountpoint_readcache2)
         directories_to_create.append(mountpoint_writecache)
         directories_to_create.append(mountpoint_foc)
 
@@ -237,23 +240,153 @@ for directory in {0}:
 """.format(directories_to_create)
         System.exec_remote_python(client, dir_create_script)
 
-        read_cache_fs = os.statvfs(mountpoint_readcache)
+        read_cache1_fs = os.statvfs(mountpoint_readcache1)
+        read_cache2_fs = None
+        if mountpoint_readcache2:
+            read_cache2_fs = os.statvfs(mountpoint_readcache2)
         write_cache_fs = os.statvfs(mountpoint_writecache)
         fdcache = '{}/fd_{}'.format(mountpoint_writecache, vpool_name)
         scocache = '{}/sco_{}'.format(mountpoint_writecache, vpool_name)
-        readcache = '{}/read_{}'.format(mountpoint_readcache, vpool_name)
+        readcache1 = '{}/read1_{}'.format(mountpoint_readcache1, vpool_name)
+        files2create = [readcache1]
+        if mountpoint_readcache2 and mountpoint_readcache1 != mountpoint_readcache2:
+            readcache2 = '{}/read2_{}'.format(mountpoint_readcache2, vpool_name)
+            files2create.append(readcache2)
+        else:
+            readcache2 = ''
         failovercache = '{}/foc_{}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
-        dirs2create = [scocache, failovercache, metadatapath, tlogpath,
+        rsppath = '/var/rsp/{}'.format(vpool_name)
+        dirs2create = [scocache, failovercache, metadatapath, tlogpath, rsppath,
                        System.read_remote_config(client, 'volumedriver.readcache.serialization.path')]
-        files2create = [readcache]
+
+        cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
+        mountpoints = [device.strip() for device in client.run(cmd).strip().split('\n')]
+        mountpoints.remove('/')
+
+        def is_partition(directory):
+            for mountpoint in mountpoints:
+                if directory == mountpoint:
+                    return True
+            return False
         # Cache sizes
         # 20% = scocache
         # 20% = failovercache (@TODO: check if this can possibly consume more than 20%)
         # 60% = readcache
-        scocache_size = '{0}KiB'.format((int(write_cache_fs.f_bavail * 0.2 / 4096) * 4096) * 4)
-        readcache_size = '{0}KiB'.format((int(read_cache_fs.f_bavail * 0.6 / 4096) * 4096) * 4)
+
+        # safety values:
+        readcache1_factor = 0.2
+        readcache2_factor = 0.2
+        writecache_factor = 0.1
+
+        if (mountpoint_readcache1 == mountpoint_readcache2) or not mountpoint_readcache2:
+            delta = set()
+            delta.add(mountpoint_readcache1 if is_partition(mountpoint_readcache1) else '/dummy')
+            delta.add(mountpoint_writecache if is_partition(mountpoint_writecache) else '/dummy')
+            delta.add(mountpoint_foc if is_partition(mountpoint_foc) else '/dummy')
+            if len(delta) == 1:
+                readcache1_factor = 0.49
+                writecache_factor = 0.2
+            elif len(delta) == 2:
+                if mountpoint_writecache == mountpoint_foc:
+                    readcache1_factor = 0.98
+                    writecache_factor = 0.49
+                else:
+                    readcache1_factor = 0.49
+                    if mountpoint_readcache1 == mountpoint_writecache:
+                        writecache_factor = 0.49
+                    else:
+                        writecache_factor = 0.98
+            elif len(delta) == 3:
+                readcache1_factor = 0.98
+                writecache_factor = 0.98
+        else:
+            delta = set()
+            delta.add(mountpoint_readcache1 if is_partition(mountpoint_readcache1) else '/dummy')
+            delta.add(mountpoint_readcache2 if is_partition(mountpoint_readcache2) else '/dummy')
+            delta.add(mountpoint_writecache if is_partition(mountpoint_writecache) else '/dummy')
+            delta.add(mountpoint_foc if is_partition(mountpoint_foc) else '/dummy')
+            if len(delta) == 1:
+                # consider them all to be directories
+                readcache1_factor = 0.24
+                readcache2_factor = 0.24
+                writecache_factor = 0.24
+            elif len(delta) == 2:
+                if mountpoint_writecache == mountpoint_foc:
+                    writecache_factor = 0.24
+                    if mountpoint_readcache1 == mountpoint_writecache:
+                        readcache1_factor = 0.49
+                        readcache2_factor = 0.98
+                    else:
+                        readcache1_factor = 0.98
+                        readcache2_factor = 0.49
+                else:
+                    readcache1_factor = readcache2_factor = 0.49
+                    writecache_factor = 0.49
+            elif len(delta) == 3:
+                if mountpoint_writecache == mountpoint_foc:
+                    readcache1_factor = 0.98
+                    readcache2_factor = 0.98
+                    writecache_factor = 0.49
+                elif mountpoint_readcache1 == mountpoint_writecache:
+                    readcache1_factor = 0.49
+                    readcache2_factor = 0.98
+                    writecache_factor = 0.49
+                elif mountpoint_readcache1 == mountpoint_foc:
+                    readcache1_factor = 0.49
+                    readcache2_factor = 0.98
+                    writecache_factor = 0.98
+                elif mountpoint_readcache2 == mountpoint_writecache:
+                    readcache1_factor = 0.98
+                    readcache2_factor = 0.49
+                    writecache_factor = 0.49
+                elif mountpoint_readcache2 == mountpoint_foc:
+                    readcache1_factor = 0.98
+                    readcache2_factor = 0.49
+                    writecache_factor = 0.98
+            elif len(delta) == 4:
+                readcache1_factor = 0.98
+                readcache2_factor = 0.98
+                writecache_factor = 0.98
+
+        # summarize caching on root partition (directory only)
+        root_assigned = dict()
+        if not is_partition(mountpoint_readcache1):
+            root_assigned['readcache1_factor'] = readcache1_factor
+        if not is_partition(mountpoint_readcache2):
+            root_assigned['readcache2_factor'] = readcache2_factor
+        if not is_partition(mountpoint_writecache):
+            root_assigned['writecache_factor'] = writecache_factor
+        if not is_partition(mountpoint_foc):
+            root_assigned['foc_factor'] = min(readcache1_factor, readcache2_factor, writecache_factor)
+
+        # always leave at least 20% of free space
+        division_factor = 1.0
+        total_size = sum(root_assigned.values()) + .02 * len(root_assigned)
+        if 0.8 < total_size < 1.6:
+            division_factor = 2.0
+        elif 1.6 < total_size < 3.2:
+            division_factor = 4.0
+        elif total_size >= 3.2:
+            division_factor = 8.0
+
+        if 'readcache1_factor' in root_assigned.keys():
+            readcache1_factor /= division_factor
+        if 'readcache2_factor' in root_assigned.keys():
+            readcache2_factor /= division_factor
+        if 'writecache_factor' in root_assigned.keys():
+            writecache_factor /= division_factor
+
+        scocache_size = '{0}KiB'.format((int(write_cache_fs.f_bavail * writecache_factor / 4096) * 4096) * 4)
+        if (mountpoint_readcache1 and not mountpoint_readcache2) or (mountpoint_readcache1 == mountpoint_readcache2):
+            mountpoint_readcache2 = ''
+            readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
+            readcache2 = ''
+            readcache2_size = '0KiB'
+        else:
+            readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
+            readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
         if new_storagedriver:
             ports_used_in_model = [port_storagedriver.port for port_storagedriver in
                                    StorageDriverList.get_storagedrivers_by_storagerouter(storagerouter.guid)]
@@ -265,7 +398,8 @@ for directory in {0}:
         else:
             vrouter_port = int(storagedriver.port)
 
-        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
+        cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
+        ipaddresses = client.run(cmd).strip().split('\n')
         ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
         grid_ip = System.read_remote_config(client, 'ovs.grid.ip')
         if grid_ip in ipaddresses:
@@ -308,8 +442,9 @@ for directory in {0}:
             node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip,
                                                   vrouter_port - 1, vrouter_port, vrouter_port + 1))
         vrouter_clusterregistry.set_node_configs(node_configs)
-
-        readcaches = [{'path': readcache, 'size': readcache_size}]
+        readcaches = [{'path': readcache1, 'size': readcache1_size}]
+        if readcache2:
+            readcaches.append({'path': readcache2, 'size': readcache2_size})
         scocaches = [{'path': scocache, 'size': scocache_size}]
         filesystem_config = {'fs_backend_path': mountpoint_bfs}
         volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
@@ -322,7 +457,7 @@ fd_config = {{'fd_cache_path': '{11}',
               'fd_namespace' : 'fd-{0}-{12}'}}
 storagedriver_configuration = StorageDriverConfiguration('{0}')
 storagedriver_configuration.configure_backend({1})
-storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path'))
+storagedriver_configuration.configure_readcache({2}, Configuration.get('volumedriver.readcache.serialization.path') + '/{0}')
 storagedriver_configuration.configure_scocache({3}, '1GB', '2GB')
 storagedriver_configuration.configure_failovercache('{4}')
 storagedriver_configuration.configure_filesystem({5})
@@ -369,7 +504,8 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.port = vrouter_port
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.mountpoint_temp = mountpoint_temp
-        storagedriver.mountpoint_readcache = mountpoint_readcache
+        storagedriver.mountpoint_readcache1 = mountpoint_readcache1
+        storagedriver.mountpoint_readcache2 = mountpoint_readcache2
         storagedriver.mountpoint_writecache = mountpoint_writecache
         storagedriver.mountpoint_foc = mountpoint_foc
         storagedriver.mountpoint_bfs = mountpoint_bfs
@@ -546,18 +682,23 @@ if Service.has_service('{0}'):
 
         # Cleanup directories
         client = SSHClient.load(ip)
-        client.run('rm -rf {}/read_{}'.format(storagedriver.mountpoint_readcache, vpool.name))
+        client.run('rm -rf {}/read1_{}'.format(storagedriver.mountpoint_readcache1, vpool.name))
+        if storagedriver.mountpoint_readcache2:
+            client.run('rm -rf {}/read2_{}'.format(storagedriver.mountpoint_readcache2, vpool.name))
         client.run('rm -rf {}/sco_{}'.format(storagedriver.mountpoint_writecache, vpool.name))
         client.run('rm -rf {}/foc_{}'.format(storagedriver.mountpoint_foc, vpool.name))
         client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_writecache, vpool.name))
         client.run('rm -rf {}/metadata_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(storagedriver.mountpoint_md, vpool.name))
+        client.run('rm -rf /var/rsp/{}'.format(vpool.name))
 
         # Remove files
         client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
 
         # Remove top directories
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_readcache))
+        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_readcache1))
+        if storagedriver.mountpoint_readcache2:
+            client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_readcache2))
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_writecache))
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_foc))
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_md))

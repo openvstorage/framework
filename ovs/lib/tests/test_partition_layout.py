@@ -37,6 +37,8 @@ from ovs.extensions.generic.sshclient import SSHClient
 from datadiff import diff
 from datadiff.tools import assert_equal
 
+import sys
+import pexpect
 
 class PartitionLayout(unittest.TestCase):
     full_map = {
@@ -1265,31 +1267,30 @@ class PartitionLayout(unittest.TestCase):
         self.assertTrue(valid, 'At least one generated config failed!')
 
 
-    def _test_interactive_menu(self):
-        # @todo: use config file to retrieve test params
-        # @todo: incomplete test with issues - disabled
+    def test_interactive_menu(self):
         # Use a known config - and process expected menu structure
 
-        disk_config = {'sda': {'boot_device': True,
-                               'model': 'Virtual_disk',
-                               'size': 17179869184.0,
-                               'software_raid': False,
-                               'type': 'disk'},
-                       'sdb': {'boot_device': False,
-                               'model': 'Virtual_disk',
-                               'size': 109279444992.0,
-                               'software_raid': False,
-                               'type': 'ssd'},
-                       'sdc': {'boot_device': False,
-                               'model': 'Virtual_disk',
-                               'size': 109279444992.0,
-                               'software_raid': True,
-                               'type': 'disk'},
-                       'sdd': {'boot_device': False,
-                               'model': 'Virtual_disk',
-                               'size': 109279444992.0,
-                               'software_raid': False,
-                               'type': 'disk'}}
+        def get_formated_lines(dl):
+            fl = {}
+            for k, v in dl.items():
+                fl[k] = r"{0}\s*:\s*device\s*:\s*{1}.*label\s*:\s*{2}\s*percentage\s*:\s*{3}".format(k, v['device'], v['label'], v['percentage'])
+            return fl
+
+        def check_partition_layout_table(formated_lines):
+            idxs = []
+            for _ in range(len(formated_lines)):
+                idxs.append(child.expect(formated_lines))
+
+            assert len(set(idxs)) == len(formated_lines), "Proposed partition layout did not contain all expected lines."
+
+        def pick_option(child, opt_name, fail_if_not_found = True):
+            opt = [l for l in child.buffer.splitlines() if opt_name in l]
+            assert opt or not fail_if_not_found, "Option {0} not found\n{1}".format(opt_name, child.before)
+            if opt:
+                opt = opt[0].split(":")[0].strip()
+                child.sendline(opt)
+            return bool(opt)
+
 
         disk_layout = ({'/mnt/bfs': {'device': '/dev/sdd', 'label': 'backendfs', 'percentage': 80},
                         '/mnt/cache1': {'device': '/dev/sdb', 'label': 'cache1', 'percentage': 50},
@@ -1298,23 +1299,83 @@ class PartitionLayout(unittest.TestCase):
                         '/var/tmp': {'device': '/dev/sdd', 'label': 'tempfs', 'percentage': 21}},
                        set(['sda', 'sdc']))
 
-        child = pexpect.spawn('ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no root@{0}'.format(public_ip))
+        child = pexpect.spawn("ovs")
         child.timeout = 300
-
         child.logfile = sys.stdout
 
-        child.expect('password:')
-        child.sendline(UBUNTU_PASSWORD)
-        child.expect(':~#')
+        child.expect(":")
 
-        child.sendline('ovs setup')
-        child.expect('Password:')
-        child.sendline(UBUNTU_PASSWORD)
+        child.sendline("from ovs.lib.setup import SetupController")
+        child.sendline("from ovs.extensions.generic.sshclient import SSHClient")
+        child.expect(":")
 
-        sc.apply_flexible_disk_layout(client, False, disk_layout[0])
+        child.sendline("client = SSHClient.load('127.0.0.1', 'rooter')")
+        child.expect(":")
 
+        child.sendline("sc = SetupController()")
+        child.expect(":")
 
+        child.sendline("disk_layout = " + str(disk_layout))
+        child.expect(":")
 
+        child.sendline("sc.apply_flexible_disk_layout(client, False, disk_layout[0])")
+        child.expect("Proposed partition layout:")
+
+        formated_lines = get_formated_lines(disk_layout[0])
+        check_partition_layout_table(formated_lines.values())
+
+        child.expect("Enter number or name; return for next page")
+
+        #0: Add
+        child.sendline("0")
+        new_mountpoint = {'/mnt/cache2':  {'device'     : '/dev/sdc',
+                                           'label'      : 'cache2',
+                                           'percentage' : '50'}}
+        child.expect("Enter mountpoint to add")
+        child.sendline(new_mountpoint.keys()[0])
+        check_partition_layout_table(formated_lines.values() + [new_mountpoint.keys()[0] + r"\s*:\s*device\s*:\s*DIR_ONLY"])
+
+        #2: Update
+        child.expect("Enter number or name; return for next page")
+        child.sendline("2")
+        child.expect("Choose mountpoint to update:")
+        pick_option(child, new_mountpoint.keys()[0])
+
+        update_dict = new_mountpoint[new_mountpoint.keys()[0]].copy()
+        update_dict.update({'mountpoint':'/mnt/cache3'})
+
+        child.expect("Make a choice")
+        for opt in ["device", "label", "percentage", "mountpoint"]:
+            child.expect("Make a choice")
+            pick_option(child, opt)
+            child.sendline(update_dict[opt])
+
+        pick_option(child, "finish")
+
+        disk_layout[0][update_dict['mountpoint']] = new_mountpoint[new_mountpoint.keys()[0]].copy()
+        formated_lines = get_formated_lines(disk_layout[0])
+        check_partition_layout_table(formated_lines.values())
+
+        #3 Print
+        child.expect("Enter number or name; return for next page")
+        child.sendline("3")
+        check_partition_layout_table(formated_lines.values())
+
+        #1 Remove
+        child.expect("Enter number or name; return for next page")
+        child.sendline("1")
+        child.expect("Enter mountpoint to remove")
+        child.sendline(update_dict['mountpoint'])
+        del disk_layout[0][update_dict['mountpoint']]
+        formated_lines = get_formated_lines(disk_layout[0])
+        check_partition_layout_table(formated_lines.values())
+
+        #5 Quit
+        child.expect("Enter number or name; return for next page")
+        child.sendline("5")
+        child.expect(":")
+
+        child.kill(9)
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(PartitionLayout)

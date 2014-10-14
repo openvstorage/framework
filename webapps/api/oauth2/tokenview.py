@@ -77,7 +77,7 @@ class OAuth2TokenView(View):
             if 'HTTP_AUTHORIZATION' not in request.META:
                 return HttpResponseBadRequest, {'error': ''}
             _, password_hash = request.META['HTTP_AUTHORIZATION'].split(' ')
-            client_id, client_secret = base64.decodestring(password_hash).split(':')
+            client_id, client_secret = base64.decodestring(password_hash).split(':', 1)
             try:
                 client = Client(client_id)
                 if client.grant_type != 'CLIENT_CREDENTIALS':

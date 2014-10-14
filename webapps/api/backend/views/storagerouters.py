@@ -161,11 +161,16 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_readcache', 'mountpoint_writecache', 'mountpoint_foc', 'storage_ip', 'vrouter_port']
-        parameters = {'storagerouter_ip': storagerouter.ip}
+                  'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
+                  'storage_ip', 'vrouter_port']
+        parameters = {'storagerouter_ip': storagerouter.ip }
         for field in fields:
             if field not in call_parameters:
-                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
+                if field == 'mountpoint_readcache2':
+                    parameters[field] = ''
+                    continue
+                else:
+                    raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = call_parameters[field]
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
