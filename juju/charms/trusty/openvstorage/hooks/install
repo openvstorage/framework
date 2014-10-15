@@ -1,0 +1,49 @@
+#!/bin/bash
+# Here do anything needed to install the service
+# i.e. apt-get install -y foo  or  bzr branch http://myserver/mycode /srv/webroot
+# Make sure this hook exits cleanly and is idempotent, common problems here are
+# failing to account for a debconf question on a dependency, or trying to pull
+# from github without installing git first.
+# Only for KVM nodes (OpenStack)
+
+set -e
+echo "deb http://packages.cloudfounders.com/apt/ unstable/" > /etc/apt/sources.list.d/ovsaptrepo.list
+apt-get update
+apt-get install openvstorage -y --force-yes
+
+touch /tmp/openvstorage_preconfig.cfg
+
+IP=`ip a l dev eth0 | grep "inet " | awk '{split($0,a," "); split(a[2],b,"/"); print(b[1])}'`
+PASSWORD=`config-get target_password`
+CLUSTER_NAME=`config-get cluster_name`
+JOIN_CLUSTER=`config-get join_cluster`
+MASTER_IP=`config-get master_ip`
+HYPERVISOR_NAME=`hostname`
+ARAKOON_MNTP=`config-get arakoon_mntp`
+
+echo root:$PASSWORD | chpasswd
+
+echo "[setup]" > /tmp/openvstorage_preconfig.cfg
+echo "target_ip = $IP" >> /tmp/openvstorage_preconfig.cfg
+echo "target_password = $PASSWORD" >> /tmp/openvstorage_preconfig.cfg
+echo "cluster_ip = $IP" >> /tmp/openvstorage_preconfig.cfg
+echo "cluster_name = $CLUSTER_NAME" >> /tmp/openvstorage_preconfig.cfg
+echo "join_cluster = $JOIN_CLUSTER" >> /tmp/openvstorage_preconfig.cfg
+echo "master_ip = $MASTER_IP" >> /tmp/openvstorage_preconfig.cfg
+echo "hypervisor_ip = 127.0.0.1" >> /tmp/openvstorage_preconfig.cfg
+echo "hypervisor_type = KVM" >> /tmp/openvstorage_preconfig.cfg
+echo "hypervisor_name = $HYPERVISOR_NAME" >> /tmp/openvstorage_preconfig.cfg
+echo "hypervisor_username = root" >> /tmp/openvstorage_preconfig.cfg
+echo "hypervisor_password = $PASSWORD" >> /tmp/openvstorage_preconfig.cfg
+echo "arakoon_mountpoint = $ARAKOON_MNTP" >> /tmp/openvstorage_preconfig.cfg
+echo "verbose = True" >> /tmp/openvstorage_preconfig.cfg
+echo "auto_config = True" >> /tmp/openvstorage_preconfig.cfg
+echo "disk_layout = None" >> /tmp/openvstorage_preconfig.cfg
+
+sed -i 's/PermitRootLogin without-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+
+service ssh restart
+
+ovs setup
+
