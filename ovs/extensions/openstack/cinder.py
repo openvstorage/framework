@@ -30,11 +30,13 @@ class OpenStackCinder(object):
     Represent the Cinder service
     """
 
-    def __init__(self, cinder_password, cinder_user = 'admin', tenant_name = 'admin', controller_ip = '127.0.0.1'):
+    def __init__(self, cinder_password = None, cinder_user = 'admin', tenant_name = 'admin', controller_ip = '127.0.0.1'):
         self.client = SSHClient.load('127.0.0.1')
         auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
+        self.cinder_client = None
 
-        self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
+        if cinder_password:
+            self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
         self.is_devstack = self._is_devstack()
         self.is_openstack = self._is_openstack()
         self.is_cinder_running = self._is_cinder_running()
@@ -227,21 +229,24 @@ if vpool_name in enabled_backends:
         """
         Create a cinder volume type, based on vpool name
         """
-        volume_types = self.cinder_client.volume_types.list()
-        for v in volume_types:
-            if v.name == volume_type_name:
-                return False
-        volume_type = self.cinder_client.volume_types.create(volume_type_name)
-        volume_type.set_keys(metadata = {'volume_backend_name': volume_type_name})
+        if self.cinder_client:
+            volume_types = self.cinder_client.volume_types.list()
+            for v in volume_types:
+                if v.name == volume_type_name:
+                    return False
+            volume_type = self.cinder_client.volume_types.create(volume_type_name)
+            volume_type.set_keys(metadata = {'volume_backend_name': volume_type_name})
 
     def _delete_volume_type(self, volume_type_name):
         """
         Delete a cinder volume type, based on vpool name
         """
-        volume_types = self.cinder_client.volume_types.list()
-        for v in volume_types:
-            if v.name == volume_type_name:
-                try:
-                    self.cinder_client.volume_types.delete(v.id)
-                except Exception as ex:
-                    pass
+        if self.cinder_client:
+            volume_types = self.cinder_client.volume_types.list()
+            for v in volume_types:
+                if v.name == volume_type_name:
+                    try:
+                        self.cinder_client.volume_types.delete(v.id)
+                    except Exception as ex:
+                        pass
+

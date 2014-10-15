@@ -465,6 +465,15 @@
                 "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "invalidmtpt": "The mountpoint __what__ is invalid."
             },
+            "gathercinder": {
+                "basicinfo": "Configure Cinder credentials (Keystone authentication)",
+                "cinderUser": "User name:",
+                "cinderPassword": "Password:",
+                "cinderTenant": "Tenant name",
+                "cinderCtrlIP": "Keystone IP:",
+                "configCinder": "Configure this vpool with Cinder",
+                "nocinder": "(Detecting Cinder process, please wait...)"
+            },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
                 "storagerouterinfo": "Validate whether the correct Storage Router was selected.",

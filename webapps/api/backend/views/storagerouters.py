@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from platform import machine
 
 """
 StorageRouter module
@@ -153,7 +154,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
-                  'storage_ip', 'vrouter_port']
+                  'storage_ip', 'vrouter_port', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
         parameters = {'storagerouter_ip': storagerouter.ip }
         for field in fields:
             if field not in call_parameters:
@@ -167,3 +168,13 @@ class StorageRouterViewSet(viewsets.ViewSet):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+
+    @action()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def check_cinder(self, storagerouter):
+        """
+        Checks whether cinder process is running on the specified machine
+        """
+        return StorageRouterController.check_cinder.s().apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))

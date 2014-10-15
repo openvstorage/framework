@@ -593,20 +593,22 @@ Service.start_service('{0}')
         vpool.save()
 
         # Configure Cinder
-        cinder_password = parameters.get('cinder_password', 'rooter') #default, for testing, should be None
-        cinder_user = parameters.get('cinder_user', 'admin')
-        tenant_name = parameters.get('tenant_name', 'admin')
-        controller_ip = parameters.get('controller_ip', '127.0.0.1') # Keystone host
-        if cinder_password:
-            osc = OpenStackCinder(cinder_password = cinder_password,
-                                  cinder_user = cinder_user,
-                                  tenant_name = tenant_name,
-                                  controller_ip = controller_ip)
+        config_cinder = parameters.get('config_cinder', False)
+        if config_cinder:
+            cinder_password = parameters.get('cinder_pass', None)
+            cinder_user = parameters.get('cinder_user', 'admin')
+            tenant_name = parameters.get('cinder_tenant', 'admin')
+            controller_ip = parameters.get('cinder_controller', '127.0.0.1') # Keystone host
+            if cinder_password:
+                osc = OpenStackCinder(cinder_password = cinder_password,
+                                      cinder_user = cinder_user,
+                                      tenant_name = tenant_name,
+                                      controller_ip = controller_ip)
 
-            osc.configure_vpool(vpool_name, storagedriver.mountpoint)
-            ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
-            ovsdb.set('ovs_openstack_cinder_%s' % storagedriver.guid,
-                      json.dumps([cinder_password, cinder_user, tenant_name, controller_ip]))
+                osc.configure_vpool(vpool_name, storagedriver.mountpoint)
+                ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+                ovsdb.set('ovs_openstack_cinder_%s' % storagedriver.guid,
+                          json.dumps([cinder_password, cinder_user, tenant_name, controller_ip]))
 
 
     @staticmethod
@@ -853,6 +855,15 @@ if Service.has_service('{0}'):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.check_cinder')
+    def check_cinder():
+        """
+        Checks whether cinder is running
+        """
+        osc = OpenStackCinder()
+        return osc.is_cinder_installed
 
     @staticmethod
     def _validate_ip(ip):
