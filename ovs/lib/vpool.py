@@ -16,7 +16,7 @@
 VPool module
 """
 
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList

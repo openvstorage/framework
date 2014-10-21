@@ -16,7 +16,6 @@
 ScheduledTaskController module
 """
 
-from celery import group
 from celery.task.control import inspect
 import copy
 import time
@@ -25,7 +24,7 @@ import traceback
 from time import mktime
 from datetime import datetime
 from ovs.plugin.provider.configuration import Configuration
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList

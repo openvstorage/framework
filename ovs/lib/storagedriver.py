@@ -16,7 +16,7 @@
 StorageDriver module
 """
 
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList

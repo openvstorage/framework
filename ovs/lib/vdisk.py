@@ -19,7 +19,7 @@ import pickle
 import uuid
 import os
 
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine

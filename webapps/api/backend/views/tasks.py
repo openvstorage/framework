@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
 from backend.decorators import required_roles, load
 from celery.task.control import inspect
-from ovs.celery import celery
+from ovs.celery_run import celery
 
 
 class TaskViewSet(viewsets.ViewSet):

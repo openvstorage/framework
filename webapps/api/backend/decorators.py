@@ -89,12 +89,13 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             version = regex.match(request.META['HTTP_ACCEPT']).groupdict()['version']
             versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
             if version == '*':  # If accepting all versions, it defaults to the highest one
-                version = settings.VERSION[-1]
+                version = versions[1]
             version = int(version)
             if version < versions[0] or version > versions[1]:
-                raise NotAcceptable('API version requirements: {0} <= <version> <= {1}'.format(versions[0], versions[1]))
+                raise NotAcceptable('API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
             if 'version' in mandatory_vars:
                 new_kwargs['version'] = version
+                mandatory_vars.remove('version')
             # Fill request parameter, if available
             if 'request' in mandatory_vars:
                 new_kwargs['request'] = request
