@@ -56,7 +56,7 @@ define(['knockout', 'jquery'], function(ko, $){
             cinderUser:     ko.observable('admin'),
             cinderPassword: ko.observable(''),
             cinderTenant:   ko.observable('admin'),
-            cinderCtrlIP:   ko.observable('127.0.0.1')
+            cinderCtrlIP:   ko.observable('').extend({ regex: ipRegex })
         };
 
         mtptData.mountpoints2 = ko.computed(function() {

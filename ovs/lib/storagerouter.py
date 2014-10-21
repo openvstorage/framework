@@ -593,12 +593,18 @@ Service.start_service('{0}')
         vpool.save()
 
         # Configure Cinder
-        config_cinder = parameters.get('config_cinder', False)
+        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        if ovsdb.exists(vpool_config_key):
+            # Second node gets values saved by first node
+            cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = json.loads(ovsdb.get(vpool_config_key))
+        else:
+            config_cinder = parameters.get('config_cinder', False)
         if config_cinder:
-            cinder_password = parameters.get('cinder_pass', None)
-            cinder_user = parameters.get('cinder_user', 'admin')
-            tenant_name = parameters.get('cinder_tenant', 'admin')
-            controller_ip = parameters.get('cinder_controller', '127.0.0.1') # Keystone host
+            cinder_password = parameters.get('cinder_pass', cinder_password)
+            cinder_user = parameters.get('cinder_user', cinder_user)
+            tenant_name = parameters.get('cinder_tenant', tenant_name)
+            controller_ip = parameters.get('cinder_controller', controller_ip) # Keystone host
             if cinder_password:
                 osc = OpenStackCinder(cinder_password = cinder_password,
                                       cinder_user = cinder_user,
@@ -606,9 +612,9 @@ Service.start_service('{0}')
                                       controller_ip = controller_ip)
 
                 osc.configure_vpool(vpool_name, storagedriver.mountpoint)
-                ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
-                ovsdb.set('ovs_openstack_cinder_%s' % storagedriver.guid,
-                          json.dumps([cinder_password, cinder_user, tenant_name, controller_ip]))
+                # Save values for first node to use
+                ovsdb.set(vpool_config_key,
+                          json.dumps([cinder_password, cinder_user, tenant_name, controller_ip, config_cinder]))
 
 
     @staticmethod
@@ -636,19 +642,6 @@ Service.start_service('{0}')
                     'failovercache_{0}'.format(vpool.name)]
         storagedrivers_left = False
 
-        # Unconfigure Cinder
-        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
-        key = 'ovs_openstack_cinder_%s' % storagedriver.guid
-        if ovsdb.exists(key):
-            cinder_password, cinder_user, tenant_name, controller_ip = json.loads(ovsdb.get(key))
-            client = SSHClient.load(ip)
-            System.exec_remote_python(client, """
-from ovs.extensions.openstack.cinder import OpenStackCinder
-osc = OpenStackCinder(cinder_password = '{0}', cinder_user = '{1}', tenant_name = '{2}', controller_ip = '{3}')
-osc.unconfigure_vpool('{4}', '{5}')
-""".format(cinder_password, cinder_user, tenant_name, controller_ip, vpool.name, storagedriver.mountpoint))
-            ovsdb.delete(key)
-
         # Stop services
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.guid != storagedriver_guid:
@@ -665,6 +658,20 @@ from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.stop_service('{0}')
 """.format(service))
+
+        # Unconfigure Cinder
+        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        if ovsdb.exists(key):
+            cinder_password, cinder_user, tenant_name, controller_ip, _ = json.loads(ovsdb.get(key))
+            client = SSHClient.load(ip)
+            System.exec_remote_python(client, """
+from ovs.extensions.openstack.cinder import OpenStackCinder
+osc = OpenStackCinder(cinder_password = '{0}', cinder_user = '{1}', tenant_name = '{2}', controller_ip = '{3}')
+osc.unconfigure_vpool('{4}', '{5}', {6})
+""".format(cinder_password, cinder_user, tenant_name, controller_ip, vpool.name, storagedriver.mountpoint, not storagedrivers_left))
+            if not storagedrivers_left:
+                ovsdb.delete(key)
 
         # KVM pool
         client = SSHClient.load(ip)

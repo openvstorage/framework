@@ -76,7 +76,11 @@ class OpenStackCinder(object):
         raise RuntimeError('Neither devstack nor OpenStack processes detected!')
 
     def _is_cinder_installed(self):
-        return os.path.exists(CINDER_CONF)
+        try:
+            out = self.client.run('ls %s' % CINDER_CONF)
+            return 'cannot access' not in out
+        except SystemExit:
+            return False
 
     def configure_vpool(self, vpool_name, mountpoint):
         if self.is_devstack or self.is_openstack:
@@ -87,11 +91,12 @@ class OpenStackCinder(object):
             self._patch_etc_init_cindervolume_conf()
             self._restart_cinder_process()
 
-    def unconfigure_vpool(self, vpool_name, mountpoint):
+    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
         if self.is_devstack or self.is_openstack:
             self._unchown_mountpoint(mountpoint)
             self._unconfigure_cinder_driver(vpool_name)
-            self._delete_volume_type(vpool_name)
+            if remove_volume_type:
+                self._delete_volume_type(vpool_name)
             self._unpatch_etc_init_cindervolume_conf()
             self._restart_cinder_process()
 

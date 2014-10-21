@@ -470,7 +470,7 @@
                 "cinderUser": "User name:",
                 "cinderPassword": "Password:",
                 "cinderTenant": "Tenant name",
-                "cinderCtrlIP": "Keystone IP:",
+                "cinderCtrlIP": "Keystone Public IP:",
                 "configCinder": "Configure this vpool with Cinder",
                 "nocinder": "(Detecting Cinder process, please wait...)"
             },
