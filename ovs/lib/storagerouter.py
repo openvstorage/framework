@@ -532,7 +532,7 @@ for filename in {1}:
         voldrv_config_file = '{0}/voldrv_vpools/{1}.json'.format(System.read_remote_config(client, 'ovs.core.cfgdir'),
                                                                  vpool_name)
         log_file = '/var/log/ovs/volumedriver/{0}.log'.format(vpool_name)
-        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logrotation --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(
+        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logrotation --logfile {2} -o big_writes -o sync_read -o allow_other'.format(
             voldrv_config_file, storagedriver.mountpoint, log_file)
         if storagerouter.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(storagedriver.mountpoint)
