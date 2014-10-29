@@ -600,6 +600,10 @@ Service.start_service('{0}')
             cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = json.loads(ovsdb.get(vpool_config_key))
         else:
             config_cinder = parameters.get('config_cinder', False)
+            cinder_password = ''
+            cinder_user = ''
+            tenant_name = ''
+            controller_ip = ''
         if config_cinder:
             cinder_password = parameters.get('cinder_pass', cinder_password)
             cinder_user = parameters.get('cinder_user', cinder_user)
