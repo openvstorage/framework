@@ -38,11 +38,14 @@ class StorageDriver(DataObject):
                     Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
                     Property('mountpoint_bfs', str, doc='Mountpoint for the backend filesystem (used for local and distributed fs)'),
                     Property('mountpoint_md', str, doc='Mountpoint for metadata'),
-                    Property('mountpoint_cache', str, doc='Mountpoint for caching')]
+                    Property('mountpoint_readcache1', str, doc='Mountpoint for read cache 1'),
+                    Property('mountpoint_readcache2', str, doc='Mountpoint for read cache 2'),
+                    Property('mountpoint_writecache', str, doc='Mountpoint for write cache'),
+                    Property('mountpoint_foc', str, doc='Mountpoint for failover cache')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
-                  Dynamic('statistics', dict, 4),
+                  Dynamic('statistics', dict, 0),
                   Dynamic('stored_data', int, 60)]
 
     def _status(self):
@@ -64,7 +67,6 @@ class StorageDriver(DataObject):
         if self.vpool is not None:
             for disk in self.vpool.vdisks:
                 if disk.storagedriver_id == self.storagedriver_id:
-                    disk.invalidate_dynamics('statistics')  # Prevent double caching
                     for key, value in disk.statistics.iteritems():
                         if key != 'timestamp':
                             vdiskstatsdict[key] += value

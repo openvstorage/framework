@@ -41,7 +41,7 @@ class VMachine(DataObject):
                    Relation('vpool', VPool, 'vmachines', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('hypervisor_status', str, 300),
-                  Dynamic('statistics', dict, 5),
+                  Dynamic('statistics', dict, 0),
                   Dynamic('stored_data', int, 60),
                   Dynamic('failover_mode', str, 60),
                   Dynamic('storagerouters_guids', list, 15),
@@ -97,7 +97,6 @@ class VMachine(DataObject):
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
-            vdisk.invalidate_dynamics('statistics')  # Prevent double caching
             for key, value in vdisk.statistics.iteritems():
                 if key != 'timestamp':
                     vdiskstatsdict[key] += value
@@ -132,7 +131,7 @@ class VMachine(DataObject):
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedriver_ids = [vdisk.storagedriver_id for vdisk in self.vdisks if vdisk.storagedriver_id is not None]
         storagedrivers = DataList({'object': StorageDriver,
-                                   'data': DataList.select.DESCRIPTOR,
+                                   'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
         for storagedriver in DataObjectList(storagedrivers, StorageDriver):

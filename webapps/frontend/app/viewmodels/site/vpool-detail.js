@@ -43,7 +43,7 @@ define([
         ];
         self.vMachineHeaders    = [
             { key: 'name',          value: $.t('ovs:generic.name'),          width: undefined },
-            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 100       },
+            { key: 'storagerouter', value: $.t('ovs:generic.storagerouter'), width: 200       },
             { key: undefined,       value: $.t('ovs:generic.vdisks'),        width: 60        },
             { key: 'storedData',    value: $.t('ovs:generic.storeddata'),    width: 110       },
             { key: 'cacheRatio',    value: $.t('ovs:generic.cache'),         width: 100       },
@@ -124,7 +124,7 @@ define([
                         sort: 'name',
                         contents: 'storagedrivers'
                     };
-                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, options)
+                    self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
                             var guids = [], sadata = {};
                             $.each(data, function(index, item) {
@@ -160,7 +160,7 @@ define([
                         contents: '_dynamics,_relations,-snapshots',
                         vpoolguid: self.vPool().guid()
                     };
-                    self.refreshVDisksHandle[page] = api.get('vdisks', {}, options)
+                    self.refreshVDisksHandle[page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vddata = {};
                             $.each(data, function(index, item) {
@@ -198,7 +198,7 @@ define([
                         contents: '_dynamics,-snapshots,-hypervisor_status',
                         vpoolguid: self.vPool().guid()
                     };
-                    self.refreshVMachinesHandle[page] = api.get('vmachines', {}, options)
+                    self.refreshVMachinesHandle[page] = api.get('vmachines', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vmdata = {};
                             $.each(data, function(index, item) {

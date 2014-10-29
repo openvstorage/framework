@@ -132,7 +132,7 @@ define([
                                     page: 1,
                                     query: JSON.stringify(self.query)
                                 };
-                                self.loadVMachinesHandle = api.get('vmachines', {}, filter)
+                                self.loadVMachinesHandle = api.get('vmachines', { queryparams: filter })
                                     .done(function(data) {
                                         var vms = [], vm;
                                         $.each(data, function(index, vmdata) {
@@ -150,7 +150,7 @@ define([
                         }).promise(),
                         $.Deferred(function(vmg_dfr) {
                             if (generic.xhrCompleted(self.loadVMachineGuidsHandle)) {
-                                self.loadVMachineGuidsHandle = api.get('vmachines', {}, { query: JSON.stringify(self.query) })
+                                self.loadVMachineGuidsHandle = api.get('vmachines', { queryparams: { query: JSON.stringify(self.query) } })
                                     .done(function(data) {
                                         self.vMachineGuids(data);
                                         vmg_dfr.resolve();
@@ -176,7 +176,7 @@ define([
                         contents: 'statistics,stored_data',
                         sort: (self.topVPoolMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name')
                     };
-                    self.loadVPoolsHandle = api.get('vpools', {}, filter)
+                    self.loadVPoolsHandle = api.get('vpools', { queryparams: filter })
                         .done(function(data) {
                             var vpools = [], vpool;
                             $.each(data, function(index, vpdata) {
@@ -200,9 +200,11 @@ define([
             return $.Deferred(function(deferred) {
                 self.storageRoutersLoading(true);
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
-                    self.loadStorageRoutersHandle = api.get('storagerouters', undefined, {
-                        contents: 'status',
-                        sort: 'name,vdisks_guids'
+                    self.loadStorageRoutersHandle = api.get('storagerouters', {
+                        queryparams: {
+                            contents: 'status',
+                            sort: 'name,vdisks_guids'
+                        }
                     })
                         .done(function(data) {
                             var guids = [], sadata = {};

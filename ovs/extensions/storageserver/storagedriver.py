@@ -19,7 +19,7 @@ Wrapper class for the storagedriverclient of the voldrv team
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.generic.system import Ovs
+from ovs.extensions.generic.system import System
 import json
 import os
 
@@ -61,12 +61,13 @@ class StorageDriverClient(object):
         Loads and returns the client
         """
 
+        _ = self
         key = vpool.guid
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
                 cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.port))
-            client = SRClient(str(vpool.name), cluster_contacts)
+            client = SRClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
 
@@ -195,7 +196,7 @@ class StorageDriverConfiguration(object):
         Configures storage driver
         @param vrouter_config: dictionary of key/value pairs
         """
-        unique_machine_id = Ovs.get_my_machine_id()
+        unique_machine_id = System.get_my_machine_id()
         self.load_config()
         if vrouter_config['vrouter_id'] == '{}{}'.format(self._vpool, unique_machine_id):
             for key, value in vrouter_config.iteritems():

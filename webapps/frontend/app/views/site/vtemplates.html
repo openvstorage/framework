@@ -28,13 +28,23 @@ limitations under the License.
                 <td><span data-bind="text: templateChildrenGuids().length"></span></td>
                 <td>
                     <i data-bind="attr: { id: 'vtemplateDelete_' + guid() },
-                                  click: function() { $root.deleteVT($data.guid()); },
-                                  style: { color: templateChildrenGuids().length === 0 ? 'black' : 'lightgrey' },
+                                  click: function() {
+                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                          $root.deleteVT($data.guid());
+                                      }
+                                  },
+                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 && templateChildrenGuids().length === 0 ? 'black' : 'lightgrey' },
                                   tooltip: templateChildrenGuids().length > 0 ? 'ovs:generic.templatehaschildren' : ''"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                     <i data-bind="attr: { id: 'vtemplateClone_' + guid() },
-                                  click: function() { $root.createFromTemplate($data.guid()); },
-                                  tooltip: 'ovs:generic.clone'"  class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
+                                  click: function() {
+                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                          $root.createFromTemplate($data.guid());
+                                      }
+                                  },
+                                  tooltip: 'ovs:generic.clone',
+                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.fromtemplate"></i>
                 </td>
             </tr>
         </table>

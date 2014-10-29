@@ -18,6 +18,7 @@ Module for VDiskController
 import pickle
 import uuid
 import os
+import time
 
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
@@ -33,6 +34,7 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -69,8 +71,31 @@ class VDiskController(object):
         """
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk is not None:
-            logger.info('Delete disk {}'.format(disk.name))
-            disk.delete()
+            mutex = VolatileMutex('{}_{}'.format(volumename, disk.devicename))
+            try:
+                mutex.acquire(wait=20)
+                pmachine = None
+                try:
+                    pmachine = PMachineList.get_by_storagedriver_id(disk.storagedriver_id)
+                except RuntimeError as ex:
+                    if 'could not be found' not in str(ex):
+                        raise
+                    # else: pmachine can't be loaded, because the volumedriver doesn't know about it anymore
+                if pmachine is not None:
+                    limit = 5
+                    hypervisor = Factory.get(pmachine)
+                    exists = hypervisor.file_exists(disk.vpool, disk.devicename)
+                    while limit > 0 and exists is True:
+                        time.sleep(1)
+                        exists = hypervisor.file_exists(disk.vpool, disk.devicename)
+                        limit -= 1
+                    if exists is True:
+                        logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
+                        return
+                logger.info('Delete disk {}'.format(disk.name))
+                disk.delete()
+            finally:
+                mutex.release()
 
     @staticmethod
     @celery.task(name='ovs.disk.resize_from_voldrv')
@@ -87,11 +112,16 @@ class VDiskController(object):
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         hypervisor = Factory.get(pmachine)
         volumepath = hypervisor.clean_backing_disk_filename(volumepath)
-        disk = VDiskList.get_vdisk_by_volume_id(volumename)
-        if disk is None:
-            disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
+        mutex = VolatileMutex('{}_{}'.format(volumename, volumepath))
+        try:
+            mutex.acquire(wait=30)
+            disk = VDiskList.get_vdisk_by_volume_id(volumename)
             if disk is None:
-                disk = VDisk()
+                disk = VDiskList.get_by_devicename_and_vpool(volumepath, storagedriver.vpool)
+                if disk is None:
+                    disk = VDisk()
+        finally:
+            mutex.release()
         disk.devicename = volumepath
         disk.volume_id = volumename
         disk.size = volumesize
@@ -156,6 +186,7 @@ class VDiskController(object):
         new_disk.devicename = hypervisor.clean_backing_disk_filename(_location)
         new_disk.parentsnapshot = snapshotid
         new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
+        new_disk.vpool = disk.vpool
         new_disk.save()
         return {'diskguid': new_disk.guid,
                 'name': new_disk.name,
@@ -318,7 +349,13 @@ class VDiskController(object):
             logger.error('File already deleted at %s' % location)
             return
         client = SSHClient.load('127.0.0.1')
-        client.run_local('rm -f %s' % (location), sudo=True, shell=True)
+        output = client.run_local('rm -f %s' % (location), sudo=True, shell=True)
+        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        if os.path.exists(location):
+            raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
+        if output == '':
+            return True
+        raise RuntimeError(output)
 
     @staticmethod
     @celery.task(name='ovs.disk.extend_volume')

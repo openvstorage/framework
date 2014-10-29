@@ -34,7 +34,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
     prefix = r'storagedrivers'
     base_name = 'storagedrivers'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(StorageDriver)
     @load()
     def list(self):
@@ -43,7 +43,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
         """
         return StorageDriverList.get_storagedrivers()
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(StorageDriver)
     @load(StorageDriver)
     def retrieve(self, storagedriver):
@@ -53,6 +53,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
         return storagedriver
 
     @action()
+    @required_roles(['read'])
     @load(StorageDriver)
     def can_be_deleted(self, storagedriver):
         """

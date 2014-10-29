@@ -27,7 +27,8 @@ define(['knockout'], function(ko){
             nodes          : undefined,
             user           : {
                 username: ko.observable(),
-                guid    : ko.observable()
+                guid    : ko.observable(),
+                roles   : ko.observableArray([])
             }
         };
     };

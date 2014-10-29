@@ -51,6 +51,7 @@ class OAuth2Backend(BaseAuthentication):
         if not user.is_active:
             raise AuthenticationFailed('User inactive')
         request.client = token.client
+        request.token = token
 
         try:
             duser = DUser.objects.get(username=user.username)

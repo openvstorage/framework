@@ -84,29 +84,12 @@ limitations under the License.
                         <tr>
                             <td data-i18n="ovs:generic.nrofvmachines"></td>
                             <td><span data-bind="text: vMachines().length"></span></td>
-                            <th data-i18n="ovs:generic.usedports" colspan="2"></th>
+                            <td colspan="2"></td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
-                            <td data-i18n="ovs:generic.xmlrpcport"></td>
-                            <td data-bind="lazylist: { items: StorageDrivers, loadedObservable: 'loaded' }">
-                                <span data-part="entry" data-bind="text: port()"></span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2">&nbsp;</td>
-                            <td data-i18n="ovs:generic.focport"></td>
-                            <td data-bind="lazylist: { items: StorageDrivers, loadedObservable: 'loaded' }">
-                                <span data-part="entry" data-bind="text: port() + 1"></span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2">&nbsp;</td>
-                            <td data-i18n="ovs:generic.mgmtport"></td>
-                            <td data-bind="lazylist: { items: StorageDrivers, loadedObservable: 'loaded' }">
-                                <span data-part="entry" data-bind="text: port() - 1"></span>
-                            </td>
+                            <td colspan="2"></td>
                         </tr>
                     </tbody>
                 </table>
@@ -115,12 +98,12 @@ limitations under the License.
     </div>
     <div>
         <ul class="nav nav-tabs">
-            <li class="active" data-bind="tooltip: 'ovs:generic.management'">
+            <li class="active" data-bind="tooltip: 'ovs:generic.management', visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
         <div class="tab-content">
-            <div class="tab-pane active" id="management" style="padding: 15px;">
+            <div class="tab-pane active" id="management" style="padding: 15px;" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
@@ -136,12 +119,20 @@ limitations under the License.
                                     <div>
                                         <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
                                                                           checked: $.inArray(guid(), $root.checkedVPoolGuids()) !== -1,
-                                                                          disable: true /*backendType() === 'LOCAL' || $.inArray(guid(), $parent.vPoolGuids) !== -1*/"
+                                                                          disable: true"
                                                 style="vertical-align: text-bottom;">
                                         <label data-bind="attr: { for: 'vpool_' + guid() },
                                                           tooltip: $.inArray(guid(), $root.checkedVPoolGuids()) === -1 && backendType() === 'LOCAL' ? 'ovs:storagerouters.detail.localvpool' : ''"
                                                style="font-weight: normal; margin-left: 7px;">
-                                            <span data-bind="text: name"></span>
+                                            <span data-bind="text: name" style="display: inline-block; width: 50px;"></span>
+                                            <span data-bind="foreach: $parents[0].storageDrivers()">
+                                                <span data-bind="if: $.inArray(guid(), $parent.storageDriverGuids()) !== -1">
+                                                    (<span data-i18n="ovs:generic.mgmtport"></span>: <span data-bind="text: port() - 1"></span>,
+                                                     <span data-i18n="ovs:generic.xmlrpcport"></span>: <span data-bind="text: port()"></span>,
+                                                     <span data-i18n="ovs:generic.focport"></span>: <span data-bind="text: port() + 1"></span>,
+                                                    <span data-i18n="ovs:generic.storageip"></span>: <span data-bind="text: storageIP()"></span>)
+                                                </span>
+                                            </span>
                                         </label>
                                     </div>
                                 </div>

@@ -41,6 +41,7 @@ class MetadataView(View):
                 'authentication_state': None,
                 'username': None,
                 'userguid': None,
+                'roles': [],
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION)}
         try:
@@ -66,7 +67,8 @@ class MetadataView(View):
 
             return HttpResponse, dict(data.items() + {'authenticated': True,
                                                       'username': user.username,
-                                                      'userguid': user.guid}.items())
+                                                      'userguid': user.guid,
+                                                      'roles': [j.role.code for j in token.roles]}.items())
         except:
             return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected exception'}.items())
 

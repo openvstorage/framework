@@ -11,15 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'jquery',
-    'ovs/api', 'ovs/generic'
-], function($, api, generic) {
+    'ovs/shared', 'ovs/api', 'ovs/generic'
+], function($, shared, api, generic) {
     "use strict";
     return function() {
         var self = this;
 
+        self.shared        = shared;
         self.subscriberID  = Math.random().toString().substr(3, 10);
         self.lastMessageID = 0;
         self.requestHandle = undefined;
@@ -60,19 +61,23 @@ define([
             return api.get('messages/' + self.subscriberID + '/last');
         };
         self.start = function() {
-            self.abort = false;
-            self.getLastMessageID()
-                .then(function(messageID) {
-                    self.lastMessageID = messageID;
-                })
-                .then(self.sendSubscriptions)
-                .done(function() {
-                    self.running = true;
-                    self.wait();
-                })
-                .fail(function() {
-                    throw "Last message id could not be loaded.";
-                });
+            return $.Deferred(function(deferred) {
+                self.abort = false;
+                self.getLastMessageID()
+                    .then(function (messageID) {
+                        self.lastMessageID = messageID;
+                    })
+                    .then(self.sendSubscriptions)
+                    .done(function () {
+                        self.running = true;
+                        self.wait();
+                        deferred.resolve();
+                    })
+                    .fail(function () {
+                        deferred.reject();
+                        throw "Last message id could not be loaded.";
+                    });
+            }).promise();
         };
         self.stop = function() {
             self.abort = true;
@@ -80,11 +85,14 @@ define([
             self.running = false;
         };
         self.sendSubscriptions = function() {
-            return api.post('messages/' + self.subscriberID + '/subscribe', generic.keys(self.subscriptions));
+            return api.post('messages/' + self.subscriberID + '/subscribe', { data: generic.keys(self.subscriptions) });
         };
         self.wait = function() {
             generic.xhrAbort(self.requestHandle);
-            self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', undefined, {'message_id': self.lastMessageID})
+            self.requestHandle = api.get('messages/' + self.subscriberID + '/wait', {
+                queryparams: { 'message_id': self.lastMessageID },
+                timeout: 1000 * 60 * 1.25
+            })
                 .done(function(data) {
                     var i, subscriptions = generic.keys(self.subscriptions), resubscribe = false;
                     self.lastMessageID = data.last_message_id;
@@ -109,7 +117,9 @@ define([
                 })
                 .fail(function() {
                     if (!self.abort) {
-                        window.setTimeout(self.wait, 5000);
+                        window.setTimeout(function() {
+                            self.start().always(shared.tasks.validateTasks);
+                        }, 5000);
                     }
                 });
         };

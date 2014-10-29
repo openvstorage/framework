@@ -15,8 +15,9 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/user', '../containers/client', '../wizards/changepassword/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, User, Client, ChangePasswordWizard) {
+    '../containers/user', '../containers/client', '../containers/group', '../containers/role',
+    '../wizards/changepassword/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, User, Client, Group, Role, ChangePasswordWizard) {
     "use strict";
     return function () {
         var self = this;
@@ -27,14 +28,15 @@ define([
         self.guard         = { authenticated: true };
         self.refresher     = new Refresher();
         self.userHeaders   = [
-            { key: 'username', value: $.t('ovs:generic.username'), width: undefined },
+            { key: 'username', value: $.t('ovs:generic.username'), width: 250       },
+            { key: 'group',    value: $.t('ovs:generic.group'),    width: undefined },
             { key: undefined,  value: $.t('ovs:generic.actions'),  width: 60        }
         ];
         self.clientHeaders = [
             { key: 'name',         value: $.t('ovs:generic.name'),               width: 250       },
             { key: 'clientid',     value: $.t('ovs:users.clients.clientid'),     width: 300       },
-            { key: 'clientsecret', value: $.t('ovs:users.clients.clientsecret'), width: 300       },
-            { key: 'granttype',    value: $.t('ovs:users.clients.granttype'),    width: undefined },
+            { key: 'clientsecret', value: $.t('ovs:users.clients.clientsecret'), width: 270       },
+            { key: 'granttype',    value: $.t('ovs:users.clients.roles'),        width: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),            width: 60        }
         ];
 
@@ -44,17 +46,50 @@ define([
         self.usersInitialLoad   = ko.observable(true);
         self.clients            = ko.observableArray([]);
         self.clientsInitialLoad = ko.observable(true);
-        self.newClient          = ko.observable(new Client());
+        self.roles              = ko.observableArray([]);
+        self.rolesInitialLoad   = ko.observable(true);
+        self.roleMapping        = ko.observable({});
+        self.groups             = ko.observableArray([]);
+        self.groupsInitialLoad  = ko.observable(true);
+        self.groupMapping       = ko.observable({});
 
         // Computed
         self.selectedUserGuid = ko.computed({
             write: function(guid) {
                 self._selectedUserGuid(guid);
+                self.newUser(self.buildUser());
+                self.newClient(self.buildClient());
                 self.fetchClients();
             },
             read: function() {
                 return self._selectedUserGuid();
             }
+        });
+        self.selectedUser = ko.computed(function() {
+            var user;
+            $.each(self.users(), function(i, currentUser) {
+                if (currentUser.guid() === self._selectedUserGuid()) {
+                    user = currentUser;
+                }
+            });
+            return user;
+        });
+        self.availableRoles = ko.computed(function() {
+            var availableRoles = [],
+                user = self.selectedUser(),
+                group = user !== undefined ? user.group() : undefined;
+            if (group !== undefined) {
+                $.each(group.roleJunctions(), function(i, rJunctionGuid) {
+                    $.each(self.roles(), function(j, role) {
+                        $.each(role.groupJunctions(), function(k, gJunctionGuid) {
+                            if (rJunctionGuid === gJunctionGuid) {
+                                availableRoles.push(role);
+                            }
+                        });
+                    });
+                });
+            }
+            return availableRoles;
         });
 
         // Handles
@@ -62,16 +97,50 @@ define([
         self.refreshUsersHandle   = {};
         self.loadClientsHandle    = undefined;
         self.refreshClientsHandle = {};
+        self.loadGroupsHandle     = undefined;
+        self.loadRolesHandles     = undefined;
 
         // Functions
+        self.buildUser = function() {
+            var user = new User();
+            user.group = ko.computed({
+                write: function(group) {
+                    if (group === undefined) {
+                        this.groupGuid(undefined);
+                    } else {
+                        this.groupGuid(group.guid());
+                    }
+                },
+                read: function() {
+                    if (self.groupMapping().hasOwnProperty(this.groupGuid())) {
+                        return self.groupMapping()[this.groupGuid()];
+                    }
+                    return undefined;
+                },
+                owner: user
+            });
+            return user;
+        };
+        self.buildClient = function() {
+            var client = new Client();
+            client.roles = ko.observableArray([]);
+            client.roleGuids = ko.computed(function() {
+                var guids = [];
+                $.each(this.roles(), function(i, role) {
+                    guids.push(role.guid());
+                });
+                return guids;
+            }, client);
+            return client;
+        };
         self.fetchUsers = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadUsersHandle)) {
                     var options = {
                         sort: 'username',
-                        contents: ''
+                        contents: '_relations'
                     };
-                    self.loadUsersHandle = api.get('users', undefined, options)
+                    self.loadUsersHandle = api.get('users', { queryparams: options })
                         .done(function(data) {
                             var guids = [], udata = {};
                             $.each(data, function(i, item) {
@@ -85,6 +154,22 @@ define([
                                     if ($.inArray(guid, guids) !== -1) {
                                         user.fillData(udata[guid]);
                                     }
+                                    user.group = ko.computed({
+                                        write: function(group) {
+                                            if (group === undefined) {
+                                                this.groupGuid(undefined);
+                                            } else {
+                                                this.groupGuid(group.guid());
+                                            }
+                                        },
+                                        read: function() {
+                                            if (self.groupMapping().hasOwnProperty(this.groupGuid())) {
+                                                return self.groupMapping()[this.groupGuid()];
+                                            }
+                                            return undefined;
+                                        },
+                                        owner: user
+                                    });
                                     user.loading(true);
                                     return user;
                                 }, 'guid'
@@ -109,7 +194,7 @@ define([
                         page: page,
                         contents: '_relations'
                     };
-                    self.refreshUsersHandle[page] = api.get('users', {}, options)
+                    self.refreshUsersHandle[page] = api.get('users', { queryparams: options })
                         .done(function(data) {
                             var guids = [], udata = {};
                             $.each(data, function(i, item) {
@@ -137,10 +222,11 @@ define([
                     });
                     var options = {
                         sort: 'name',
-                        contents: '',
-                        userguid: self.selectedUserGuid()
+                        contents: '_relations',
+                        userguid: self.selectedUserGuid(),
+                        type: 'USER'
                     };
-                    self.loadClientsHandle = api.get('clients', undefined, options)
+                    self.loadClientsHandle = api.get('clients', { queryparams: options })
                         .done(function(data) {
                             var guids = [], cdata = {};
                             $.each(data, function(i, item) {
@@ -151,6 +237,19 @@ define([
                                 guids, self.clients,
                                 function(guid) {
                                     var client = new Client(guid);
+                                    client.roles = ko.computed(function() {
+                                        var roles = [];
+                                        $.each(client.roleJunctions(), function(i, rJunctionGuid) {
+                                            $.each(self.roles(), function(j, role) {
+                                                $.each(role.clientJunctions(), function(k, cJunctionGuid) {
+                                                    if (rJunctionGuid === cJunctionGuid) {
+                                                        roles.push(role);
+                                                    }
+                                                });
+                                            });
+                                        });
+                                        return roles;
+                                    });
                                     if ($.inArray(guid, guids) !== -1) {
                                         client.fillData(cdata[guid]);
                                     }
@@ -175,7 +274,7 @@ define([
                         contents: '_relations',
                         userguid: self.selectedUserGuid()
                     };
-                    self.refreshClientsHandle[page] = api.get('clients', {}, options)
+                    self.refreshClientsHandle[page] = api.get('clients', { querystring: options })
                         .done(function(data) {
                             var guids = [], cdata = {};
                             $.each(data, function(i, item) {
@@ -192,6 +291,86 @@ define([
                         .fail(deferred.reject);
                 } else {
                     deferred.resolve();
+                }
+            }).promise();
+        };
+        self.fetchGroups = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadGroupsHandle)) {
+                    var options = {
+                        sort: 'name',
+                        contents: '_relations'
+                    };
+                    self.loadGroupsHandle = api.get('groups', { queryparams: options })
+                        .done(function(data) {
+                            var guids = [], gdata = {};
+                            $.each(data, function(index, item) {
+                                guids.push(item.guid);
+                                gdata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.groups,
+                                function(guid) {
+                                    var group = new Group(guid),
+                                        mapping = self.groupMapping();
+                                    if (!mapping.hasOwnProperty(guid)) {
+                                        mapping[guid] = group;
+                                        self.groupMapping(mapping);
+                                    }
+                                    return group;
+                                }, 'guid'
+                            );
+                            $.each(self.groups(), function(index, group) {
+                                if ($.inArray(group.guid(), guids) !== -1) {
+                                    group.fillData(gdata[group.guid()]);
+                                }
+                            });
+                            self.groupsInitialLoad(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.fetchRoles = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadRolesHandles)) {
+                    var options = {
+                        sort: 'name',
+                        contents: '_relations'
+                    };
+                    self.loadRolesHandles = api.get('roles', { queryparams: options })
+                        .done(function(data) {
+                            var guids = [], rdata = {};
+                            $.each(data, function(index, item) {
+                                guids.push(item.guid);
+                                rdata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.roles,
+                                function(guid) {
+                                    var role = new Role(guid),
+                                        mapping = self.roleMapping();
+                                    if (!mapping.hasOwnProperty(guid)) {
+                                        mapping[guid] = role;
+                                        self.roleMapping(mapping);
+                                    }
+                                    return role;
+                                }, 'guid'
+                            );
+                            $.each(self.roles(), function(index, role) {
+                                if ($.inArray(role.guid(), guids) !== -1) {
+                                    role.fillData(rdata[role.guid()]);
+                                }
+                            });
+                            self.rolesInitialLoad(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
                 }
             }).promise();
         };
@@ -238,9 +417,12 @@ define([
         };
         self.saveClient = function() {
             api.post('clients', {
-                name: self.newClient().name(),
-                ovs_type: 'USER',
-                user_guid: self.selectedUserGuid()
+                data: {
+                    name: self.newClient().name(),
+                    ovs_type: 'USER',
+                    user_guid: self.selectedUserGuid(),
+                    role_guids: self.newClient().roleGuids()
+                }
             })
                 .done(function() {
                     generic.alertSuccess(
@@ -257,15 +439,79 @@ define([
                     );
                 })
                 .always(function() {
-                    self.newClient(new Client());
+                    self.newClient(self.buildClient());
                 });
         };
+        self.saveUser = function() {
+            api.post('users', {
+                data: {
+                    username: self.newUser().username(),
+                    group_guid: self.newUser().group().guid(),
+                    is_active: true,
+                    password: generic.getTimestamp().toString()
+                }
+            })
+                .done(function() {
+                    generic.alertSuccess(
+                        $.t('ovs:users.new.complete'),
+                        $.t('ovs:users.new.addsuccess')
+                    );
+                    self.fetchUsers();
+                })
+                .fail(function(error) {
+                    error = $.parseJSON(error.responseText);
+                    generic.alertError(
+                        $.t('ovs:generic.error'),
+                        $.t('ovs:users.new.addfailed', { why: error.detail })
+                    );
+                })
+                .always(function() {
+                    self.newUser(self.buildUser());
+                });
+        };
+        self.deleteUser = function(guid) {
+            $.each(self.users(), function(i, user) {
+                if (user.guid() === guid) {
+                    app.showMessage(
+                        $.t('ovs:users.delete.delete', { what: user.username() }),
+                        $.t('ovs:generic.areyousure'),
+                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            api.del('users/' + guid)
+                                .done(function () {
+                                    generic.alertSuccess(
+                                        $.t('ovs:users.delete.complete'),
+                                        $.t('ovs:users.delete.deletesuccess')
+                                    );
+                                    self.users.remove(user);
+                                    self.fetchUsers();
+                                })
+                                .fail(function (error) {
+                                    error = $.parseJSON(error.responseText);
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:users.clients.deletefailed', { why: error.detail })
+                                    );
+                                });
+                        }
+                    });
+                }
+            });
+        };
+
+        // More observables
+        self.newUser   = ko.observable(self.buildUser());
+        self.newClient = ko.observable(self.buildClient());
 
         // Durandal
         self.activate = function() {
             self.refresher.init(function() {
                 self.fetchClients();
                 self.fetchUsers();
+                self.fetchGroups();
+                self.fetchRoles();
             }, 5000);
             self.refresher.start();
             self.fetchClients().then(function() {
@@ -274,6 +520,8 @@ define([
             self.fetchUsers().then(function() {
                 self.refreshUsers(1);
             });
+            self.fetchGroups();
+            self.fetchRoles();
         };
         self.deactivate = function() {
             $.each(self.widgets, function(i, item) {

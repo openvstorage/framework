@@ -112,7 +112,7 @@ define([
                         contents: '_dynamics,-snapshots',
                         vmachineguid: self.vMachine().guid()
                     };
-                    self.refreshVDisksHandle[page] = api.get('vdisks', {}, options)
+                    self.refreshVDisksHandle[page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
                             var guids = [], vddata = {};
                             $.each(data, function(index, item) {

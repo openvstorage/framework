@@ -19,7 +19,7 @@ Generic system module, executing statements on local node
 from subprocess import check_output
 
 
-class Ovs():
+class System():
     """
     Generic helper class
     """
@@ -39,7 +39,7 @@ class Ovs():
         """
         Returns unique machine id based on mac address
         """
-        if not Ovs.my_machine_id:
+        if not System.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
             if client is None:
                 output = check_output(cmd, shell=True).strip()
@@ -47,9 +47,9 @@ class Ovs():
                 output = client.run(cmd).strip()
             for mac in output.split('\n'):
                 if mac.strip() != '000000000000':
-                    Ovs.my_machine_id = mac.strip()
+                    System.my_machine_id = mac.strip()
                     break
-        return Ovs.my_machine_id
+        return System.my_machine_id
 
     @staticmethod
     def get_my_storagerouter():
@@ -60,18 +60,18 @@ class Ovs():
         from ovs.dal.hybrids.storagerouter import StorageRouter
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-        if not Ovs.my_storagerouter_guid:
+        if not System.my_storagerouter_guid:
             for storagerouter in StorageRouterList.get_storagerouters():
-                if storagerouter.machine_id == Ovs.get_my_machine_id():
-                    Ovs.my_storagerouter_guid = storagerouter.guid
-        return StorageRouter(Ovs.my_storagerouter_guid)
+                if storagerouter.machine_id == System.get_my_machine_id():
+                    System.my_storagerouter_guid = storagerouter.guid
+        return StorageRouter(System.my_storagerouter_guid)
 
     @staticmethod
     def get_my_storagedriver_id(vpool_name):
         """
         Returns unique machine storagedriver_id based on vpool_name and machineid
         """
-        return vpool_name + Ovs.get_my_machine_id()
+        return vpool_name + System.get_my_machine_id()
 
     @staticmethod
     def update_hosts_file(hostname, ip):
@@ -96,3 +96,21 @@ class Ovs():
 
         with open('/etc/hosts', 'wb') as hosts_file:
             hosts_file.write(contents)
+
+    @staticmethod
+    def exec_remote_python(client, script):
+        """
+        Executes a python script on a client
+        """
+        return client.run('python -c """{0}"""'.format(script))
+
+    @staticmethod
+    def read_remote_config(client, key):
+        """
+        Reads remote configuration key
+        """
+        read = """
+from ovs.plugin.provider.configuration import Configuration
+print Configuration.get('{0}')
+""".format(key)
+        return System.exec_remote_python(client, read)

@@ -32,7 +32,7 @@ define([
             var currentData = $.extend({}, callData);
             currentData.name = self.data.amount() === 1 ? self.data.name() : self.data.name() + '-' + i;
             return $.Deferred(function(deferred) {
-                api.post('vmachines/' + vm.guid() + '/clone', currentData)
+                api.post('vmachines/' + vm.guid() + '/clone', { data: currentData })
                     .then(self.shared.tasks.wait)
                     .done(function() {
                         deferred.resolve(true);

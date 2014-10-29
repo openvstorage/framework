@@ -33,7 +33,7 @@ class TaskViewSet(viewsets.ViewSet):
     prefix = r'tasks'
     base_name = 'tasks'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def list(self):
         """
@@ -46,7 +46,7 @@ class TaskViewSet(viewsets.ViewSet):
                 'revoked'  : inspector.revoked()}
         return Response(data, status=status.HTTP_200_OK)
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def retrieve(self, pk):
         """
@@ -66,7 +66,7 @@ class TaskViewSet(viewsets.ViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load()
     def get(self, pk):
         """

@@ -19,7 +19,7 @@ Contains the BrandingViewSet
 from rest_framework import viewsets
 from ovs.dal.lists.brandinglist import BrandingList
 from ovs.dal.hybrids.branding import Branding
-from backend.decorators import return_object, return_list, load
+from backend.decorators import return_object, return_list, load, limit
 
 
 class BrandingViewSet(viewsets.ViewSet):
@@ -29,6 +29,7 @@ class BrandingViewSet(viewsets.ViewSet):
     prefix = r'branding'
     base_name = 'branding'
 
+    @limit(amount=5, per=60, timeout=60)
     @return_list(Branding)
     @load()
     def list(self):
@@ -37,6 +38,7 @@ class BrandingViewSet(viewsets.ViewSet):
         """
         return BrandingList.get_brandings()
 
+    @limit(amount=5, per=60, timeout=60)
     @return_object(Branding)
     @load(Branding)
     def retrieve(self, branding):

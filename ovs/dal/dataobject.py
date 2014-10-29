@@ -18,6 +18,7 @@ DataObject module
 import uuid
 import copy
 import re
+import json
 import inspect
 from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
@@ -135,7 +136,7 @@ class DataObject(object):
         if identifier in hybrid_structure and identifier != hybrid_structure[identifier]['identifier']:
             new_class = Descriptor().load(hybrid_structure[identifier]).get_object()
             return super(cls, new_class).__new__(new_class, *args, **kwargs)
-        return super(DataObject, cls).__new__(cls, *args, **kwargs)
+        return super(DataObject, cls).__new__(cls)
 
     def __init__(self, guid=None, data=None, datastore_wins=False):
         """
@@ -167,6 +168,7 @@ class DataObject(object):
         self._name = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
         self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._name))
+        self._mutex_reverseindex = VolatileMutex('reverseindex')
 
         # Rebuild _relation types
         hybrid_structure = HybridRunner.get_hybrids()
@@ -186,7 +188,7 @@ class DataObject(object):
             if re.match('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$', guid) is not None:
                 self._guid = str(guid)
             else:
-                raise ValueError('The given guid is invalid')
+                raise ValueError('The given guid is invalid: {0}'.format(guid))
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)
@@ -496,48 +498,79 @@ class DataObject(object):
                 self._name, ', '.join(data_conflicts)
             ))
 
-        # Save the data
+        # Refresh internal data structure
         self._data = copy.deepcopy(data)
-        self._persistent.set(self._key, self._data)
-        DataList.add_pk(self._namespace, self._name, self._key)
 
-        # Invalidate lists/queries
-        # First, invalidate reverse lists (where we point to a remote object,
-        # invalidating that remote list)
-        for relation in self._relations:
-            key = relation.name
-            if self._original[key]['guid'] != self._data[key]['guid']:
-                if relation.foreign_type is None:
-                    classname = self.__class__.__name__.lower()
-                else:
-                    classname = relation.foreign_type.__name__.lower()
-                # The field points to another object
-                self._volatile.delete('{0}_{1}_{2}_{3}'.format(
-                    DataList.namespace,
-                    classname,
-                    self._original[key]['guid'],
-                    relation.foreign_key
-                ))
-                self._volatile.delete('{0}_{1}_{2}_{3}'.format(
-                    DataList.namespace,
-                    classname,
-                    self._data[key]['guid'],
-                    relation.foreign_key
-                ))
+        # First, update reverse index
+        try:
+            self._mutex_reverseindex.acquire(60)
+            for relation in self._relations:
+                key = relation.name
+                original_guid = self._original[key]['guid']
+                new_guid = self._data[key]['guid']
+                if original_guid != new_guid:
+                    if relation.foreign_type is None:
+                        classname = self.__class__.__name__.lower()
+                    else:
+                        classname = relation.foreign_type.__name__.lower()
+                    if original_guid is not None:
+                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                        reverse_index = self._volatile.get(reverse_key)
+                        if reverse_index is not None:
+                            if relation.foreign_key in reverse_index:
+                                entries = reverse_index[relation.foreign_key]
+                                if self.guid in entries:
+                                    entries.remove(self.guid)
+                                    reverse_index[relation.foreign_key] = entries
+                                    self._volatile.set(reverse_key, reverse_index)
+                    if new_guid is not None:
+                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
+                        reverse_index = self._volatile.get(reverse_key)
+                        if reverse_index is not None:
+                            if relation.foreign_key in reverse_index:
+                                entries = reverse_index[relation.foreign_key]
+                                if self.guid not in entries:
+                                    entries.append(self.guid)
+                                    reverse_index[relation.foreign_key] = entries
+                                    self._volatile.set(reverse_key, reverse_index)
+                            else:
+                                reverse_index[relation.foreign_key] = [self.guid]
+                                self._volatile.set(reverse_key, reverse_index)
+                        else:
+                            reverse_index = {relation.foreign_key: [self.guid]}
+                            self._volatile.set(reverse_key, reverse_index)
+            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._name, self.guid)
+            reverse_index = self._volatile.get(reverse_key)
+            if reverse_index is None:
+                reverse_index = {}
+                relations = RelationMapper.load_foreign_relations(self.__class__)
+                if relations is not None:
+                    for key, _ in relations.iteritems():
+                        reverse_index[key] = []
+                self._volatile.set(reverse_key, reverse_index)
+        finally:
+            self._mutex_reverseindex.release()
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
             cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
+            change = False
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
                 if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
+                    change = True
                     self._volatile.delete(list_key)
                     del cache_list[list_key]
-            self._volatile.set(cache_key, cache_list)
-            self._persistent.set(cache_key, cache_list)
+            if change is True:
+                self._volatile.set(cache_key, cache_list)
+                self._persistent.set(cache_key, cache_list)
         finally:
             self._mutex_listcache.release()
+
+        # Save the data
+        self._persistent.set(self._key, self._data)
+        DataList.add_pk(self._namespace, self._name, self._guid)
 
         # Invalidate the cache
         self._volatile.delete(self._key)
@@ -582,18 +615,44 @@ class DataObject(object):
                     else:
                         raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
 
-        # Invalidate no-filter queries/lists pointing to this object
+        # First, update reverse index
+        try:
+            self._mutex_reverseindex.acquire(60)
+            for relation in self._relations:
+                key = relation.name
+                original_guid = self._original[key]['guid']
+                if original_guid is not None:
+                    if relation.foreign_type is None:
+                        classname = self.__class__.__name__.lower()
+                    else:
+                        classname = relation.foreign_type.__name__.lower()
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                    reverse_index = self._volatile.get(reverse_key)
+                    if reverse_index is not None:
+                        if relation.foreign_key in reverse_index:
+                            entries = reverse_index[relation.foreign_key]
+                            if self.guid in entries:
+                                entries.remove(self.guid)
+                                reverse_index[relation.foreign_key] = entries
+                                self._volatile.set(reverse_key, reverse_index)
+            self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._name, self.guid))
+        finally:
+            self._mutex_reverseindex.release()
+        # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
             cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
             cache_list = Toolbox.try_get(cache_key, {})
+            change = False
             for list_key in cache_list.keys():
                 fields = cache_list[list_key]
                 if '__all' in fields:
+                    change = True
                     self._volatile.delete(list_key)
                     del cache_list[list_key]
-            self._volatile.set(cache_key, cache_list)
-            self._persistent.set(cache_key, cache_list)
+            if change is True:
+                self._volatile.set(cache_key, cache_list)
+                self._persistent.set(cache_key, cache_list)
         finally:
             self._mutex_listcache.release()
 
@@ -606,7 +665,7 @@ class DataObject(object):
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-        DataList.delete_pk(self._namespace, self._name, self._key)
+        DataList.delete_pk(self._namespace, self._name, self._guid)
 
     # Discard all pending changes
     def discard(self):
@@ -698,24 +757,33 @@ class DataObject(object):
         """
         caller_name = dynamic.name
         cache_key   = '{0}_{1}'.format(self._key, caller_name)
-        cached_data = self._volatile.get(cache_key)
-        if cached_data is None:
-            function_info = inspect.getargspec(function)
-            if 'dynamic' in function_info.args:
-                cached_data = function(dynamic=dynamic)  # Load data from backend
-            else:
-                cached_data = function()
-            if cached_data is not None:
-                correct, allowed_types, given_type = Toolbox.check_type(cached_data, dynamic.return_type)
-                if not correct:
-                    raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
-                        caller_name, str(allowed_types), given_type
-                    ))
-            self._volatile.set(cache_key, cached_data, dynamic.timeout)
-        return cached_data
+        mutex       = VolatileMutex(cache_key)
+        try:
+            cached_data = self._volatile.get(cache_key)
+            if cached_data is None:
+                if dynamic.locked:
+                    mutex.acquire()
+                    cached_data = self._volatile.get(cache_key)
+                if cached_data is None:
+                    function_info = inspect.getargspec(function)
+                    if 'dynamic' in function_info.args:
+                        cached_data = function(dynamic=dynamic)  # Load data from backend
+                    else:
+                        cached_data = function()
+                    if cached_data is not None:
+                        correct, allowed_types, given_type = Toolbox.check_type(cached_data, dynamic.return_type)
+                        if not correct:
+                            raise TypeError('Dynamic property {0} allows types {1}. {2} given'.format(
+                                caller_name, str(allowed_types), given_type
+                            ))
+                    if dynamic.timeout > 0:
+                        self._volatile.set(cache_key, cached_data, dynamic.timeout)
+            return cached_data
+        finally:
+            mutex.release()
 
     def __str__(self):
         """
         The string representation of a DataObject is the serialized value
         """
-        return str(self.serialize())
+        return json.dumps(self.serialize(), indent=4)

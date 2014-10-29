@@ -37,7 +37,8 @@ limitations under the License.
                         id="buttonVmachineSnapshot"
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
-                                   tooltip: 'ovs:vmachines.detail.snapshot'">
+                                   tooltip: 'ovs:vmachines.detail.snapshot',
+                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
                     <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
@@ -45,7 +46,8 @@ limitations under the License.
                         data-bind="click: function() { $root.setAsTemplate(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    enable: !isRunning() && loaded(),
-                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate'">
+                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate',
+                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
                     <span class="fa" data-i18n="[html]ovs:icons.setastemplate"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
@@ -53,7 +55,8 @@ limitations under the License.
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
                                    enable: !isRunning() && loaded(),
-                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback'">
+                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback',
+                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>

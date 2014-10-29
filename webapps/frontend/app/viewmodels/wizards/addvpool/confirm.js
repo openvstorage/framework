@@ -44,12 +44,15 @@ define([
                         mountpoint_temp: self.data.mtptTemp(),
                         mountpoint_bfs: self.data.mtptBFS(),
                         mountpoint_md: self.data.mtptMD(),
-                        mountpoint_cache: self.data.mtptCache(),
+                        mountpoint_readcache1: self.data.mtptReadCache1(),
+                        mountpoint_readcache2: self.data.mtptReadCache2(),
+                        mountpoint_writecache: self.data.mtptWriteCache(),
+                        mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
                         vrouter_port: self.data.vRouterPort()
                     }
                 };
-                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', post_data)
+                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })
                         .then(shared.tasks.wait)
                         .done(function() {
                             generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.addvpool.confirm.success', { what: self.data.name() }));

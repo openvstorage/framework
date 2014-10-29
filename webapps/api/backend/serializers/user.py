@@ -22,11 +22,10 @@ class PasswordSerializer(serializers.Serializer):
     """
     Serializes received passwords
     """
-    current_password = serializers.CharField(required=True)
     new_password = serializers.CharField(required=True)
 
     class Meta:
         """
         Metaclass
         """
-        fields = ('current_password', 'new_password')
+        fields = ('new_password',)

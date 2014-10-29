@@ -34,9 +34,20 @@ class Toolbox:
     @staticmethod
     def is_client_in_roles(client, roles):
         """
-        Checks whether a user is member of a set of roles
+        Checks whether a client is member of a set of roles
         """
         user_roles = [j.role.code for j in client.roles]
+        for required_role in roles:
+            if required_role not in user_roles:
+                return False
+        return True
+
+    @staticmethod
+    def is_token_in_roles(token, roles):
+        """
+        Checks whether a token is member of a set of roles
+        """
+        user_roles = [j.role.code for j in token.roles]
         for required_role in roles:
             if required_role not in user_roles:
                 return False

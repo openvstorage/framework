@@ -28,9 +28,81 @@ limitations under the License.
                        class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     <span data-bind="text: username"></span>
                 </td>
+                <td data-bind="style: { 'paddingBottom': edit() ? '5px' : '8px', 'paddingTop': edit() ? '5px' : '8px' }" class="edit-container">
+                    <span data-bind="visible: !edit()">
+                        <span data-bind="text: group() !== undefined ? group().description() : '-'"></span>
+                        <i class="hand fa fa-fw edit-button" data-i18n="[html]ovs:icons.edit" style="padding-left: 10px; display: none;"
+                           data-bind="click: function() {
+                                          if (!$root.groupsInitialLoad() && guid() !== $root.shared.user.guid()) {
+                                              backupValue(groupGuid());
+                                              edit(true);
+                                          }
+                                      },
+                                      style: { color: !$root.groupsInitialLoad() && guid() !== $root.shared.user.guid() ? 'black' : 'lightgrey' }"></i>
+                    </span>
+                    <span data-bind="visible: edit()">
+                        <span data-bind="dropdown: {
+                                             items: $root.groups, target: group,
+                                             text: function(item) {
+                                                 return item.description();
+                                             }, key: 'guid', keyisfunction: true, small: true
+                                         }"></span>
+                        <i class="hand fa fa-fw" data-i18n="[html]ovs:icons.save" style="padding-left: 10px;"
+                           data-bind="click: function() { save(); edit(false); }"></i>
+                        <i class="hand fa fa-fw" data-i18n="[html]ovs:icons.cancel" style="padding-left: 10px;"
+                           data-bind="click: function() { groupGuid(backupValue()); edit(false); }"></i>
+                    </span>
+                </td>
                 <td>
                     <i data-bind="click: function() { $root.changePassword($data.guid()); }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.password"></i>
+                    <i data-bind="click: function() {
+                                      if (guid() !== $root.shared.user.guid()) {
+                                          $root.deleteUser($data.guid());
+                                      }
+                                  },
+                                  style: { color: guid() !== $root.shared.user.guid() ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                </td>
+            </tr>
+            <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newUser()">
+                <td><input type="text" data-bind="value: username, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td>
+                    <span data-bind="dropdown: {
+                                         items: $root.groups, target: group,
+                                         text: function(item) {
+                                             return item.description();
+                                         }, key: 'guid', keyisfunction: true, small: true
+                                     }"></span>
+                </td>
+                <td>
+                    <i data-bind="click: function() {
+                                      if (username() !== undefined && username() !== '') {
+                                          $root.saveUser();
+                                      }
+                                  },
+                                  style: { color: username() !== undefined && username() !== '' ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
+                </td>
+            </tr>
+            <tr data-part="vfirst" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newUser()">
+                <td><input type="text" data-bind="value: username, valueUpdate: 'input'" style="width: 200px;"/></td>
+                <td>
+                    <span data-bind="dropdown: {
+                                         items: $root.groups, target: group,
+                                         text: function(item) {
+                                             return item.description();
+                                         }, key: 'guid', keyisfunction: true, small: true
+                                     }"></span>
+                </td>
+                <td>
+                    <i data-bind="click: function() {
+                                      if (username() !== undefined && username() !== '') {
+                                          $root.saveUser();
+                                      }
+                                  },
+                                  style: { color: username() !== undefined && username() !== '' ? 'black' : 'lightgrey' }"
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
                 </td>
             </tr>
         </table>
@@ -56,32 +128,67 @@ limitations under the License.
                 <td><span data-bind="text: guid"></span></td>
                 <td style="position: relative;">
                     <input type="text" data-bind="value: clientSecret()" readonly="readonly"
-                           style="width: 260px; height: 20px;" />
-                    <div class="input-gradient" style="top: 9px; left: 247px; width: 20px; height: 18px; position: absolute;"></div>
+                           style="width: 230px; height: 20px;" />
+                    <div class="input-gradient" style="top: 9px; left: 217px; width: 20px; height: 18px; position: absolute;"></div>
                 </td>
-                <td><span data-bind="translate: 'ovs:generic.granttypes.' + grantType()"></span></td>
+                <td data-bind="lazylist: { items: roles, loadedObservable: 'loaded' }">
+                    <span data-part="entry" data-bind="text: name"></span>
+                </td>
                 <td>
-                    <i data-bind="click: function() { $root.deleteClient($data.guid()); }"
+                    <i data-bind="click: function() {
+                                      if ($.inArray('write', $root.shared.user.roles()) !== -1) {
+                                          $root.deleteClient($data.guid());
+                                      }
+                                  },
+                                  style: { color: $.inArray('write', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                 </td>
             </tr>
-            <tr data-part="vnew" data-bind="visible: $root.selectedUserGuid() !== undefined, with: $root.newClient()">
-                <td><input type="text" data-bind="value: name" style="width: 200px;"/></td>
+            <tr data-part="vnew" data-bind="visible: $root.selectedUserGuid() !== undefined && $.inArray('write', $root.shared.user.roles()) !== -1, with: $root.newClient()">
+                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>
-                <td><span data-i18n="ovs:generic.granttypes.CLIENT_CREDENTIALS"></span></td>
                 <td>
-                    <i data-bind="click: function() { $root.saveClient(); }"
+                    <span data-bind="dropdown: {
+                                         key: 'guid', keyisfunction: true, small: true,
+                                         items: $root.availableRoles, target: roles,
+                                         text: function(item) {
+                                             return item.name();
+                                         }
+                                     }">
+                    </span>
+                </td>
+                <td>
+                    <i data-bind="click: function() {
+                                      if (name() !== undefined && name() !== '') {
+                                          $root.saveClient();
+                                      }
+                                  },
+                                  style: { color: name() !== undefined && name() !== '' ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
                 </td>
             </tr>
-            <tr data-part="vfirst" data-bind="visible: $root.selectedUserGuid() !== undefined, with: $root.newClient()">
-                <td><input type="text" data-bind="value: name" style="width: 200px;"/></td>
+            <tr data-part="vfirst" data-bind="visible: $root.selectedUserGuid() !== undefined && $.inArray('write', $root.shared.user.roles()) !== -1, with: $root.newClient()">
+                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>
                 <td><i data-i18n="ovs:generic.generated"></i></td>
-                <td><span data-i18n="ovs:generic.granttypes.CLIENT_CREDENTIALS"></span></td>
                 <td>
-                    <i data-bind="click: function() { $root.saveClient(); }"
+                    <span data-bind="dropdown: {
+                                         key: 'guid', keyisfunction: true, small: true,
+                                         items: $root.availableRoles, target: roles,
+                                         text: function(item) {
+                                             return item.name();
+                                         }
+                                     }">
+                    </span>
+                </td>
+                <td>
+                    <i data-bind="click: function() {
+                                      if (name() !== undefined && name() !== '') {
+                                          $root.saveClient();
+                                      }
+                                  },
+                                  style: { color: name() !== undefined && name() !== '' ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
                 </td>
             </tr>

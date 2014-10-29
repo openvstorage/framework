@@ -32,7 +32,7 @@ class StorageRouter(DataObject):
                     Property('ip', str, doc='IP Address of the vMachine, if available'),
                     Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors')]
     __relations = [Relation('pmachine', PMachine, 'storagerouters')]
-    __dynamics = [Dynamic('statistics', dict, 5),
+    __dynamics = [Dynamic('statistics', dict, 0),
                   Dynamic('stored_data', int, 60),
                   Dynamic('failover_mode', str, 60),
                   Dynamic('vmachines_guids', list, 15),
@@ -52,7 +52,6 @@ class StorageRouter(DataObject):
         for storagedriver in self.storagedrivers:
             for vdisk in storagedriver.vpool.vdisks:
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
-                    vdisk.invalidate_dynamics('statistics')  # Prevent double caching
                     for key, value in vdisk.statistics.iteritems():
                         if key != 'timestamp':
                             vdiskstatsdict[key] += value

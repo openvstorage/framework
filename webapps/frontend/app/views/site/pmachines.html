@@ -17,7 +17,7 @@ limitations under the License.
     <div>
         <h2 class="pull-left" data-i18n="ovs:pmachines.mgmtcenter.title"></h2>
         <button class="btn btn-default pull-right"
-                data-bind="click: addMgmtCenter"
+                data-bind="click: addMgmtCenter, enable: $.inArray('manage', $root.shared.user.roles()) !== -1"
                 id="buttonAddMgmtCenter"
                 style="margin-top: 20px; margin-bottom: 10px;">
             <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
@@ -43,7 +43,12 @@ limitations under the License.
                     <span data-bind="text: $root.hostMapping()[guid()].total"></span>
                 </td>
                 <td>
-                    <i data-bind="click: function() { $root.deleteMgmtCenter($data.guid()); }"
+                    <i data-bind="click: function() {
+                                      if ($.inArray('manage', $root.shared.user.roles()) !== -1) {
+                                          $root.deleteMgmtCenter($data.guid());
+                                      }
+                                  },
+                                  style: { color: $.inArray('manage', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' }"
                        class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
                 </td>
             </tr>
@@ -67,12 +72,12 @@ limitations under the License.
                         <span data-bind="text: mgmtCenter() !== undefined ? mgmtCenter().name() : '-'"></span>
                         <i class="hand fa fa-fw edit-button" data-i18n="[html]ovs:icons.edit" style="padding-left: 10px; display: none;"
                            data-bind="click: function() {
-                                          if (!$root.mgmtCentersInitialLoad()) {
+                                          if (!$root.mgmtCentersInitialLoad() && $.inArray('manage', $root.shared.user.roles()) !== -1) {
                                               backupValue(mgmtCenterGuid());
                                               edit(true);
                                           }
                                       },
-                                      style: { color: !$root.mgmtCentersInitialLoad() ? 'black' : 'lightgrey' },"></i>
+                                      style: { color: !$root.mgmtCentersInitialLoad() && $.inArray('manage', $root.shared.user.roles()) !== -1 ? 'black' : 'lightgrey' },"></i>
                     </span>
                     <span data-bind="visible: edit()">
                         <span data-bind="dropdown: {

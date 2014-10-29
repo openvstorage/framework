@@ -41,7 +41,7 @@ class VMachineViewSet(viewsets.ViewSet):
     prefix = r'vmachines'
     base_name = 'vmachines'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(VMachine, 'name,vpool_guid')
     @load()
     def list(self, vpoolguid=None, query=None):
@@ -60,14 +60,14 @@ class VMachineViewSet(viewsets.ViewSet):
         elif query is not None:
             query = json.loads(query)
             query_result = DataList({'object': VMachine,
-                                     'data': DataList.select.DESCRIPTOR,
+                                     'data': DataList.select.GUIDS,
                                      'query': query}).data
             vmachines = DataObjectList(query_result, VMachine)
         else:
             vmachines = VMachineList.get_vmachines()
         return vmachines
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(VMachine)
     @load(VMachine)
     def retrieve(self, vmachine):
@@ -77,7 +77,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return vmachine
 
     @action()
-    @required_roles(['delete'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
     def destroy(self, vmachine):
@@ -89,7 +89,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.delete.delay(machineguid=vmachine.guid)
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
     def rollback(self, vmachine, timestamp):
@@ -102,7 +102,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  timestamp=timestamp)
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
     def snapshot(self, vmachine, name, consistent):
@@ -119,7 +119,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  is_automatic=False)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(VMachine)
     @load(VMachine)
     def get_children(self, vmachine, hints):
@@ -140,7 +140,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return children_vmachines if hints['full'] is True else children_vmachine_guids
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
     def set_as_template(self, vmachine):
@@ -150,7 +150,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.set_as_template.delay(machineguid=vmachine.guid)
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
     def create_from_template(self, vmachine, pmachineguid, name, description):
@@ -169,7 +169,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                              description=str(description))
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
     def create_multiple_from_template(self, vmachine, pmachineguids, amount, start, name, description):
@@ -197,7 +197,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                                       description=str(description))
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(PMachine)
     @load(VMachine)
     def get_target_pmachines(self, vmachine, hints):

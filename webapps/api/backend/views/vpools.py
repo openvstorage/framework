@@ -36,7 +36,7 @@ class VPoolViewSet(viewsets.ViewSet):
     prefix = r'vpools'
     base_name = 'vpools'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(VPool, 'name')
     @load()
     def list(self):
@@ -45,7 +45,7 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         return VPoolList.get_vpools()
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(VPool)
     @load(VPool)
     def retrieve(self, vpool):
@@ -55,7 +55,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return vpool
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write'])
     @return_task()
     @load(VPool)
     def sync_vmachines(self, vpool):
@@ -65,12 +65,12 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(StorageRouter)
     @load(VPool)
     def storagerouters(self, vpool, hints):
         """
-        Retreives a list of StorageRouters, serving a given vPool
+        Retrieves a list of StorageRouters, serving a given vPool
         """
         storagerouter_guids = []
         storagerouter = []
@@ -81,7 +81,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return storagerouter if hints['full'] is True else storagerouter_guids
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VPool)
     def update_storagedrivers(self, vpool, storagedriver_guid, storagerouter_guids=None, storagedriver_guids=None):
@@ -104,19 +104,22 @@ class VPoolViewSet(viewsets.ViewSet):
                     valid_storagedriver_guids.append(storagedriver.guid)
 
         storagedriver = StorageDriver(storagedriver_guid)
-        parameters = {'vpool_name':          vpool.name,
-                      'type':                vpool.type,
-                      'connection_host':     None if vpool.connection is None else vpool.connection.split(':')[0],
-                      'connection_port':     None if vpool.connection is None else int(vpool.connection.split(':')[1]),
-                      'connection_timeout':  0,  # Not in use anyway
-                      'connection_username': vpool.login,
-                      'connection_password': vpool.password,
-                      'mountpoint_bfs':      storagedriver.mountpoint_bfs,
-                      'mountpoint_temp':     storagedriver.mountpoint_temp,
-                      'mountpoint_md':       storagedriver.mountpoint_md,
-                      'mountpoint_cache':    storagedriver.mountpoint_cache,
-                      'storage_ip':          storagedriver.storage_ip,
-                      'vrouter_port':        storagedriver.port}
+        parameters = {'vpool_name':            vpool.name,
+                      'type':                  vpool.type,
+                      'connection_host':       None if vpool.connection is None else vpool.connection.split(':')[0],
+                      'connection_port':       None if vpool.connection is None else int(vpool.connection.split(':')[1]),
+                      'connection_timeout':    0,  # Not in use anyway
+                      'connection_username':   vpool.login,
+                      'connection_password':   vpool.password,
+                      'mountpoint_bfs':        storagedriver.mountpoint_bfs,
+                      'mountpoint_temp':       storagedriver.mountpoint_temp,
+                      'mountpoint_md':         storagedriver.mountpoint_md,
+                      'mountpoint_readcache1': storagedriver.mountpoint_readcache1,
+                      'mountpoint_readcache2': storagedriver.mountpoint_readcache2,
+                      'mountpoint_writecache': storagedriver.mountpoint_writecache,
+                      'mountpoint_foc':        storagedriver.mountpoint_foc,
+                      'storage_ip':            storagedriver.storage_ip,
+                      'vrouter_port':          storagedriver.port}
         for field in parameters:
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])

@@ -39,7 +39,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     prefix = r'storagerouters'
     base_name = 'storagerouters'
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_list(StorageRouter, 'name')
     @load()
     def list(self, query=None):
@@ -51,11 +51,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
         else:
             query = json.loads(query)
             query_result = DataList({'object': StorageRouter,
-                                     'data': DataList.select.DESCRIPTOR,
+                                     'data': DataList.select.GUIDS,
                                      'query': query}).data
             return DataObjectList(query_result, StorageRouter)
 
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_object(StorageRouter)
     @load(StorageRouter)
     def retrieve(self, storagerouter):
@@ -65,7 +65,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return storagerouter
 
     @action()
-    @required_roles(['view', 'system'])
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
     def move_away(self, storagerouter):
@@ -75,7 +75,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageDriverController.move_away.delay(storagerouter.guid)
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @load(StorageRouter)
     def get_available_actions(self):
         """
@@ -88,7 +88,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return Response(actions, status=status.HTTP_200_OK)
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def get_physical_metadata(self, storagerouter, files=None):
@@ -101,7 +101,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @link()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def get_version_info(self, storagerouter):
@@ -113,7 +113,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def check_s3(self, host, port, accesskey, secretkey):
@@ -130,7 +130,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageRouterController.check_s3.delay(**parameters)
 
     @action()
-    @required_roles(['view'])
+    @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
     def check_mtpt(self, storagerouter, name):
@@ -143,7 +143,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
-    @required_roles(['view', 'create'])
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
     def add_vpool(self, storagerouter, call_parameters):
@@ -152,11 +152,16 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_cache', 'storage_ip', 'vrouter_port']
-        parameters = {'storagerouter_ip': storagerouter.ip}
+                  'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
+                  'storage_ip', 'vrouter_port']
+        parameters = {'storagerouter_ip': storagerouter.ip }
         for field in fields:
             if field not in call_parameters:
-                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
+                if field == 'mountpoint_readcache2':
+                    parameters[field] = ''
+                    continue
+                else:
+                    raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = call_parameters[field]
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])

@@ -1,4 +1,5 @@
-# Copyright 2014 CloudFounders NV
+#!/usr/bin/python2
+#  Copyright 2014 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +27,7 @@ from ovs.dal.helpers import HybridRunner, Descriptor
 from ovs.dal.relations import RelationMapper
 
 
-class Basic(TestCase):
+class Hybrid(TestCase):
     """
     The basic unittestsuite will test all basic functionality of the DAL framework
     It will also try accessing all dynamic properties of all hybrids making sure
@@ -76,6 +77,7 @@ class Basic(TestCase):
         """
         # Some stuff here to dynamically test all hybrid properties
         hybrid_structure = HybridRunner.get_hybrids()
+        print ''
         print 'Validating hybrids...'
         for class_descriptor in hybrid_structure.values():
             cls = Descriptor().load(class_descriptor).get_object()
@@ -145,3 +147,8 @@ class Basic(TestCase):
             self.assertEqual(len(missing_metadata), 0,
                              'Missing metadata for properties in {0}: {1}'.format(cls.__name__, missing_metadata))
             instance.delete()
+
+if __name__ == '__main__':
+    import unittest
+    suite = unittest.TestLoader().loadTestsFromTestCase(Hybrid)
+    unittest.TextTestRunner(verbosity=2).run(suite)

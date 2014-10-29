@@ -27,16 +27,27 @@ class RoleList(object):
     """
 
     @staticmethod
+    def get_roles():
+        """
+        Returns a list of all Roles
+        """
+        roles = DataList({'object': Role,
+                          'data': DataList.select.GUIDS,
+                          'query': {'type': DataList.where_operator.AND,
+                                    'items': []}}).data
+        return DataObjectList(roles, Role)
+
+    @staticmethod
     def get_role_by_code(code):
         """
         Returns a single Role for the given code. Returns None if no Role was found
         """
         roles = DataList({'object': Role,
-                          'data': DataList.select.DESCRIPTOR,
+                          'data': DataList.select.GUIDS,
                           'query': {'type': DataList.where_operator.AND,
                                     'items': [('code', DataList.operator.EQUALS, code)]}}).data  # noqa
         if len(roles) == 1:
-            return Descriptor().load(roles[0]).get_object(True)
+            return Descriptor(Role, roles[0]).get_object(True)
         return None
 
     @staticmethod
@@ -45,7 +56,7 @@ class RoleList(object):
         Returns a list of Roles for a list of codes
         """
         roles = DataList({'object': Role,
-                          'data': DataList.select.DESCRIPTOR,
+                          'data': DataList.select.GUIDS,
                           'query': {'type': DataList.where_operator.AND,
                                     'items': [('code', DataList.operator.IN, codes)]}}).data  # noqa
         return DataObjectList(roles, Role)

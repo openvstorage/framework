@@ -96,9 +96,24 @@ define([
                     reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.errorvalidating'));
                 } else {
                     $.each(self.storageDrivers(), function(index, storageDriver) {
-                        if (self.storageDriver().mountpointCache() === storageDriver.mountpointCache() && $.inArray('cache', fields) === -1) {
+                        if (self.storageDriver().mountpointReadCache1() === storageDriver.mountpointReadCache1() && $.inArray('readcache1', fields) === -1) {
                             valid = false;
-                            fields.push('cache');
+                            fields.push('readcache1');
+                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+                        }
+                        if (self.storageDriver().mountpointReadCache2() === storageDriver.mountpointReadCache2() && $.inArray('readcache2', fields) === -1) {
+                            valid = false;
+                            fields.push('readcache2');
+                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+                        }
+                        if (self.storageDriver().mountpointWriteCache() === storageDriver.mountpointWriteCache() && $.inArray('writecache', fields) === -1) {
+                            valid = false;
+                            fields.push('writecache');
+                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+                        }
+                        if (self.storageDriver().mountpointFOC() === storageDriver.mountpointFOC() && $.inArray('foc', fields) === -1) {
+                            valid = false;
+                            fields.push('foc');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                         }
                         if (self.storageDriver().mountpointBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.vPool().backendType() === 'LOCAL' || self.data.vPool().backendType() === 'DISTRIBUTED')) {
@@ -161,7 +176,7 @@ define([
                         var postData = {
                             name: self.data.vPool().name()
                         };
-                        api.post('storagerouters/' + self.storageRouter.guid() + '/check_mtpt', postData)
+                        api.post('storagerouters/' + self.storageRouter.guid() + '/check_mtpt', { data: postData })
                             .then(self.shared.tasks.wait)
                             .done(function(data) {
                                 self.mtptOK(data);
@@ -270,9 +285,11 @@ define([
                     }
                 });
                 api.post('vpools/' + self.data.vPool().guid() + '/update_storagedrivers', {
-                    storagedriver_guid: self.storageDriver().guid(),
-                    storagerouter_guids: storageRouterGuids.join(','),
-                    storagedriver_guids: storageDriverGuids.join(',')
+                    data: {
+                        storagedriver_guid: self.storageDriver().guid(),
+                        storagerouter_guids: storageRouterGuids.join(','),
+                        storagedriver_guids: storageDriverGuids.join(',')
+                    }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function(data) {

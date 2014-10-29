@@ -15,13 +15,10 @@ limitations under the License.
 -->
 <section>
     <!-- ko if: displaymode() === 'span' -->
-        <span data-bind="foreach: items">
-            <span data-bind="visible: $index() > 0">,</span>
+        <!-- // The crappy layout below is required to make sure there are no spaces before the comma, because that's ugly -->
+        <span data-bind="foreach: items"><span data-bind="visible: $index() > 0">,</span>
             <span data-bind="visible: !$parent.isLoaded($data)"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-            <span data-bind="visible: $parent.isLoaded($data)">
-                <span data-part="entry" data-bind="text: $data"></span>
-            </span>
-        </span>
+            <span data-bind="visible: $parent.isLoaded($data)"><span data-part="entry" data-bind="text: $data"></span></span></span>
     <!-- /ko -->
     <!-- ko if: displaymode() === 'table' -->
         <table class="table table-striped table-hover" >

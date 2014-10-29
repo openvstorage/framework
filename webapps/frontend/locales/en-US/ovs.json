@@ -170,7 +170,10 @@
         "port": "Port",
         "noentries": "No entries available",
         "logging": "Kibana logging",
-        "generated": "Generated"
+        "generated": "Generated",
+        "group": "Group",
+        "storageip": "Storage IP",
+        "namespace": "Backend location"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -381,12 +384,29 @@
             "clientid": "Client ID",
             "clientsecret": "Client secret",
             "granttype": "Grant type",
+            "roles": "Roles",
             "complete": "Completed",
             "deletesuccess": "The Client was deleted successfully",
             "deletefailed": "Could not delete the Client: __why__",
             "addsuccess": "The Client was added successfully",
             "addfailed": "Could not add the Client: __why__",
             "delete": "Are you sure you want to delete Client: __what__?"
+        },
+        "save": {
+            "complete": "Save completed",
+            "success": "User __what__ updated.",
+            "failed": "Updating __what__ failed: __why__"
+        },
+        "new": {
+            "complete": "Created",
+            "addsuccess": "User created",
+            "addfailed": "User could not be created: __why__"
+        },
+        "delete": {
+            "delete": "Are you sure you want to delete user __what__?",
+            "complete": "Deleted",
+            "deletesuccess": "User deleted",
+            "deletefailed": "Could not delete the user: __why__"
         }
     },
     "login": {
@@ -431,7 +451,10 @@
                 "tempfs": "Temporary FS:",
                 "bfs": "Backend FS:",
                 "md": "Metadata:",
-                "cache": "Cache location:",
+                "readcache1": "Read Cache 1:",
+                "readcache2": "Read Cache 2:",
+                "writecache": "Write Cache:",
+                "foc": "Failover Cache:",
                 "mtptinuse": "The given __what__ location is already in use on this Storage Router",
                 "ipaddress": "Storage IP:",
                 "port": "vRouter port:",
@@ -571,12 +594,9 @@
             "title": "Change password",
             "confirm": {
                 "title": "Please provide the required information",
-                "introduction": "Enter the current and new password for user:",
+                "introduction": "Enter the new password for user:",
                 "newpassword": "New password",
-                "currentpassword": "Current password",
                 "retype": "Retype",
-                "entercurrent": "Enter current password",
-                "currentinvalid": "Invalid password",
                 "enternew": "Enter new password",
                 "shouldmatch": "New passwords should match",
                 "updatingpassword": "updating the password"

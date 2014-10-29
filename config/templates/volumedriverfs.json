@@ -16,8 +16,7 @@
         "vrouter_redirect_timeout_ms" : "5000",
         "vrouter_routing_retries" : 10,
         "vrouter_volume_read_threshold" : 1024,
-        "vrouter_volume_write_threshold" : 1024,
-        "vrouter_policy_id" : "17427d6ab4c84687b47a596498213336"
+        "vrouter_volume_write_threshold" : 1024
     },
     "volume_manager": {
         "metadata_path": "/mnt/metadata",

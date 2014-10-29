@@ -38,7 +38,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var returnValue, finished = false;
 
             runs(function() {
-                api.get('api/dummy', {}, {})
+                api.get('api/dummy', {})
                     .done(function(value) {
                         returnValue = value;
                         finished = true;
@@ -54,7 +54,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var returnValue, finished = false;
 
             runs(function() {
-                api.get('api/dummy', {}, {})
+                api.get('api/dummy', {})
                     .done(function(value) {
                         returnValue = value;
                         finished = true;
@@ -70,7 +70,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var returnValue, finished = false;
 
             runs(function() {
-                api.post('api/dummy', {}, {})
+                api.post('api/dummy', {})
                     .done(function(value) {
                         returnValue = value;
                         finished = true;
@@ -86,7 +86,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var returnValue, finished = false;
 
             runs(function() {
-                api.del('api/dummy', {}, {})
+                api.del('api/dummy', {})
                     .done(function(value) {
                         returnValue = value;
                         finished = true;
@@ -113,7 +113,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
 
             runs(function() {
                 generic.setCookie('csrftoken', 'def', { seconds: 1 });
-                api.get('api/dummy', { abc: 123, def: 456 }, {})
+                api.get('api/dummy', { data: { abc: 123, def: 456 } })
                     .done(function(value) {
                         returnValue = value;
                         finished = true;
@@ -129,7 +129,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var returnValue, finished = false;
 
             runs(function() {
-                api.get('api/dummy', {}, { abc: 123, def: 456 })
+                api.get('api/dummy', { queryparams: { abc: 123, def: 456 } })
                     .done(function(value) {
                         returnValue = value;
                         finished = true;
@@ -160,7 +160,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var finished = false;
 
             runs(function() {
-                api.get('api/dummy', {}, {})
+                api.get('api/dummy', {})
                     .always(function() {
                         finished = true;
                     });
@@ -190,7 +190,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var returnValue, finished = false;
 
             runs(function() {
-                api.get('api/dummy', {}, {})
+                api.get('api/dummy', {})
                     .fail(function(xmlHttpRequest, textStatus, errorThrown) {
                         returnValue = {
                             xmlHttpRequest: xmlHttpRequest,
@@ -222,7 +222,7 @@ define(['ovs/api', 'ovs/shared', 'ovs/generic', 'jquery'], function(api, shared,
             var deferred, promise, finished = false;
             runs(function() {
                 deferred = $.Deferred(function(dfd) {
-                    api.get('api/dummy', {}, {}).always(dfd.resolve);
+                    api.get('api/dummy', {}).always(dfd.resolve);
                 });
                 deferred.always(function() { finished = true; });
                 promise = deferred.promise();

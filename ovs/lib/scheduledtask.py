@@ -180,7 +180,7 @@ class ScheduledTaskController(object):
         # Place all snapshots in bucket_chains
         bucket_chains = []
         for vmachine in VMachineList.get_customer_vmachines():
-            if any(vd.info['object_type'] in ['BASE', 'CLONE'] for vd in vmachine.vdisks):
+            if any(vd.info['object_type'] in ['BASE'] for vd in vmachine.vdisks):
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vmachine.snapshots:
                     timestamp = int(snapshot['timestamp'])
@@ -194,7 +194,7 @@ class ScheduledTaskController(object):
                 bucket_chains.append(bucket_chain)
 
         for vdisk in VDiskList.get_without_vmachine():
-            if vdisk.info['object_type'] in ['BASE', 'CLONE']:
+            if vdisk.info['object_type'] in ['BASE']:
                 bucket_chain = copy.deepcopy(buckets)
                 for snapshot in vdisk.snapshots:
                     timestamp = int(snapshot['timestamp'])
@@ -250,10 +250,10 @@ class ScheduledTaskController(object):
         vdisks = []
         for vmachine in VMachineList.get_customer_vmachines():
             for vdisk in vmachine.vdisks:
-                if vdisk.info['object_type'] in ['BASE', 'CLONE']:
+                if vdisk.info['object_type'] in ['BASE']:
                     vdisks.append(vdisk)
         for vdisk in VDiskList.get_without_vmachine():
-            if vdisk.info['object_type'] in ['BASE', 'CLONE']:
+            if vdisk.info['object_type'] in ['BASE']:
                 vdisks.append(vdisk)
 
         total = 0

@@ -31,7 +31,7 @@ class VPoolList(object):
         Returns a list of all VPools
         """
         vpools = DataList({'object': VPool,
-                           'data': DataList.select.DESCRIPTOR,
+                           'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
                                      'items': []}}).data
         return DataObjectList(vpools, VPool)
@@ -42,7 +42,7 @@ class VPoolList(object):
         Returns all VPools which have a given name
         """
         vpools = DataList({'object': VPool,
-                           'data': DataList.select.DESCRIPTOR,
+                           'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
                                      'items': [('name', DataList.operator.EQUALS, vpool_name)]}}).data
         if len(vpools) == 0:

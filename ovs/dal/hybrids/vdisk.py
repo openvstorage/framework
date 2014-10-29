@@ -45,7 +45,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
-                  Dynamic('statistics', dict, 5),
+                  Dynamic('statistics', dict, 5, locked=True),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15)]
 
@@ -140,7 +140,7 @@ class VDisk(DataObject):
                 elif delta == 0:
                     vdiskstatsdict['{0}_ps'.format(key)] = previousdict.get('{0}_ps'.format(key), 0)
                 else:
-                    vdiskstatsdict['{0}_ps'.format(key)] = (vdiskstatsdict[key] - previousdict[key]) / delta
+                    vdiskstatsdict['{0}_ps'.format(key)] = max(0, (vdiskstatsdict[key] - previousdict[key]) / delta)
         volatile.set(prev_key, vdiskstatsdict, dynamic.timeout * 10)
         # Returning the dictionary
         return vdiskstatsdict
@@ -160,7 +160,7 @@ class VDisk(DataObject):
         from ovs.dal.hybrids.storagedriver import StorageDriver
         storagedrivers = DataObjectList(
             DataList({'object': StorageDriver,
-                      'data': DataList.select.DESCRIPTOR,
+                      'data': DataList.select.GUIDS,
                       'query': {'type': DataList.where_operator.AND,
                                 'items': [('storagedriver_id', DataList.operator.EQUALS, self.storagedriver_id)]}}).data,
             StorageDriver

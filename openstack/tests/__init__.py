@@ -13,5 +13,6 @@
 # limitations under the License.
 
 """
-This package contains the grid extension.
+This package contains the unit tests for OVS Cinder Plugin for OpenStack
+Tested on Plugin version 1.0.2a
 """

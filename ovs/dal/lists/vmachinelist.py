@@ -31,7 +31,7 @@ class VMachineList(object):
         Returns a list of all VMachines
         """
         vmachines = DataList({'object': VMachine,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': []}}).data
         return DataObjectList(vmachines, VMachine)
@@ -43,7 +43,7 @@ class VMachineList(object):
         """
         # pylint: disable=line-too-long
         vmachines = DataList({'object': VMachine,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': [('name', DataList.operator.EQUALS, vmname)]}}).data  # noqa
         # pylint: enable=line-too-long
@@ -58,7 +58,7 @@ class VMachineList(object):
         """
         vpool_guid = None if vpool is None else vpool.guid
         vms = DataList({'object': VMachine,
-                        'data': DataList.select.DESCRIPTOR,
+                        'data': DataList.select.GUIDS,
                         'query': {'type': DataList.where_operator.AND,
                                   'items': [('devicename', DataList.operator.EQUALS, devicename),
                                             ('vpool_guid', DataList.operator.EQUALS, vpool_guid)]}}).data
@@ -74,7 +74,7 @@ class VMachineList(object):
         Returns "real" vmachines. No vTemplates
         """
         vmachines = DataList({'object': VMachine,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': [('is_vtemplate', DataList.operator.EQUALS, False)]}}).data
         return DataObjectList(vmachines, VMachine)
@@ -85,7 +85,7 @@ class VMachineList(object):
         Returns vTemplates
         """
         vmachines = DataList({'object': VMachine,
-                              'data': DataList.select.DESCRIPTOR,
+                              'data': DataList.select.GUIDS,
                               'query': {'type': DataList.where_operator.AND,
                                         'items': [('is_vtemplate', DataList.operator.EQUALS, True)]}}).data
         return DataObjectList(vmachines, VMachine)

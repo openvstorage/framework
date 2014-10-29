@@ -24,14 +24,15 @@ define([
         self.loadHandle = undefined;
 
         // Observables
-        self.loading      = ko.observable(false);
-        self.loaded       = ko.observable(false);
-        self.guid         = ko.observable(guid);
-        self.name         = ko.observable();
-        self.clientSecret = ko.observable();
-        self.grantType    = ko.observable();
-        self.ovsType      = ko.observable();
-        self.userGuid     = ko.observable();
+        self.loading       = ko.observable(false);
+        self.loaded        = ko.observable(false);
+        self.guid          = ko.observable(guid);
+        self.name          = ko.observable();
+        self.clientSecret  = ko.observable();
+        self.grantType     = ko.observable();
+        self.ovsType       = ko.observable();
+        self.userGuid      = ko.observable();
+        self.roleJunctions = ko.observableArray([]);
 
         // Functions
         self.fillData = function(data) {
@@ -40,6 +41,7 @@ define([
             self.grantType(data.grant_type);
             self.ovsType(data.ovs_type);
             generic.trySet(self.userGuid, data, 'user_guid');
+            generic.trySet(self.roleJunctions, data, 'roles_guids');
 
             self.loaded(true);
             self.loading(false);

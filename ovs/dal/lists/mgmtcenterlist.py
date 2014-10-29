@@ -31,7 +31,7 @@ class MgmtCenterList(object):
         Returns a list of MgmtCenters
         """
         mgmtcenters = DataList({'object': MgmtCenter,
-                                'data': DataList.select.DESCRIPTOR,
+                                'data': DataList.select.GUIDS,
                                 'query': {'type': DataList.where_operator.AND,
                                           'items': []}}).data
         return DataObjectList(mgmtcenters, MgmtCenter)
@@ -42,7 +42,7 @@ class MgmtCenterList(object):
         Gets a mgmtCenter based on a given ip address
         """
         mgmtcenters = DataList({'object': MgmtCenter,
-                                'data': DataList.select.DESCRIPTOR,
+                                'data': DataList.select.GUIDS,
                                 'query': {'type': DataList.where_operator.AND,
                                           'items': [('ip', DataList.operator.EQUALS, ip)]}}).data
         if mgmtcenters:

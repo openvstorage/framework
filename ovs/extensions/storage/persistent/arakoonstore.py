@@ -77,11 +77,11 @@ class ArakoonStore(object):
         return self._client.set(key, json.dumps(value))
 
     @locked()
-    def prefix(self, prefix):
+    def prefix(self, prefix, max_elements=10000):
         """
         Lists all keys starting with the given prefix
         """
-        return self._client.prefix(prefix)
+        return self._client.prefix(prefix, maxElements=max_elements)
 
     @locked()
     def delete(self, key):

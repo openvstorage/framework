@@ -26,9 +26,12 @@ define([
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
-            if (self.data.mtptCache() === '/' && $.inArray('cache', fields) === -1) {
+            if (self.data.backend() !== 'LOCAL' && self.data.backend() !== 'DISTRIBUTED') {
+                self.data.mtptBFS('/'); // BFS isn't used, so it set to a non-conflicting value
+            }
+            if (self.data.mtptFOC() === '/' && $.inArray('foc', fields) === -1) {
                 valid = false;
-                fields.push('cache');
+                fields.push('foc');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
             }
             if (self.data.mtptBFS() === '/' && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
@@ -50,9 +53,40 @@ define([
                 if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineId())) {
                     return true;
                 }
-                if (self.data.mtptCache() === storageDriver.mountpointCache() && $.inArray('cache', fields) === -1) {
+                if ((self.data.mtptReadCache1() === storageDriver.mountpointReadCache1() ||
+                     self.data.mtptReadCache1() === storageDriver.mountpointReadCache2() ||
+                     self.data.mtptReadCache1() === storageDriver.mountpointWriteCache() ||
+                     self.data.mtptReadCache1() === storageDriver.mountpointFOC()
+                    ) && $.inArray('readcache1', fields) === -1) {
                     valid = false;
-                    fields.push('cache');
+                    fields.push('readcache1');
+                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+                }
+                if ((self.data.mtptReadCache2() === storageDriver.mountpointReadCache1() ||
+                     self.data.mtptReadCache2() === storageDriver.mountpointReadCache2() ||
+                     self.data.mtptReadCache2() === storageDriver.mountpointWriteCache() ||
+                     self.data.mtptReadCache2() === storageDriver.mountpointFOC()
+                    ) && $.inArray('readcache2', fields) === -1) {
+                    valid = false;
+                    fields.push('readcache2');
+                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+                }
+                if ((self.data.mtptWriteCache() === storageDriver.mountpointReadCache1() ||
+                     self.data.mtptWriteCache() === storageDriver.mountpointReadCache2() ||
+                     self.data.mtptWriteCache() === storageDriver.mountpointWriteCache() ||
+                     self.data.mtptWriteCache() === storageDriver.mountpointFOC()
+                    ) && $.inArray('writecache', fields) === -1) {
+                    valid = false;
+                    fields.push('writecache');
+                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
+                }
+                if ((self.data.mtptFOC() === storageDriver.mountpointReadCache1() ||
+                     self.data.mtptFOC() === storageDriver.mountpointReadCache2() ||
+                     self.data.mtptFOC() === storageDriver.mountpointWriteCache() ||
+                     self.data.mtptFOC() === storageDriver.mountpointFOC()
+                    ) && $.inArray('foc', fields) === -1) {
+                    valid = false;
+                    fields.push('foc');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                 }
                 if (self.data.mtptBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
@@ -70,8 +104,12 @@ define([
                     fields.push('temp');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                 }
-                if ((self.data.mtptBFS() === storageDriver.mountpointCache() || self.data.mtptBFS() === storageDriver.mountpointMD() ||
-                        self.data.mtptBFS() === storageDriver.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
+                if ((self.data.mtptBFS() === storageDriver.mountpointMD() ||
+                     self.data.mtptBFS() === storageDriver.mountpointReadCache1() ||
+                     self.data.mtptBFS() === storageDriver.mountpointReadCache2() ||
+                     self.data.mtptBFS() === storageDriver.mountpointWriteCache() ||
+                     self.data.mtptBFS() === storageDriver.mountpointFOC() ||
+                     self.data.mtptBFS() === storageDriver.mountpointTemp()) && $.inArray('bfs', fields) === -1) {
                     valid = false;
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsexclusive'));
@@ -83,8 +121,10 @@ define([
                 }
                 return true;
             });
-            if ((self.data.mtptBFS() === self.data.mtptCache() || self.data.mtptBFS() === self.data.mtptMD() ||
-                    self.data.mtptBFS() === self.data.mtptTemp()) && $.inArray('bfs', fields) === -1 &&
+            if ((self.data.mtptBFS() === self.data.mtptReadCache1() ||
+                 self.data.mtptBFS() === self.data.mtptReadCache2() ||
+                 self.data.mtptBFS() === self.data.mtptMD() ||
+                 self.data.mtptBFS() === self.data.mtptTemp()) && $.inArray('bfs', fields) === -1 &&
                     (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
                 valid = false;
                 fields.push('bfs');
@@ -95,9 +135,24 @@ define([
                 fields.push('vpool');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.vpoolnotallowed'));
             }
-            if (!self.data.mtptCache.valid()) {
+            if (!self.data.mtptReadCache1.valid()) {
                 valid = false;
-                fields.push('cache');
+                fields.push('readcache1');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
+            }
+            if (!self.data.mtptReadCache2.valid()) {
+                valid = false;
+                fields.push('readcache2');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
+            }
+            if (!self.data.mtptWriteCache.valid()) {
+                valid = false;
+                fields.push('writecache');
+                reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
+            }
+            if (!self.data.mtptFOC.valid()) {
+                valid = false;
+                fields.push('foc');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.cachefs') }));
             }
             if (!self.data.mtptTemp.valid()) {
