@@ -64,12 +64,14 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_from_voldrv')
-    def delete_from_voldrv(volumename):
+    @log('VOLUMEDRIVER_TASK')
+    def delete_from_voldrv(volumename, storagedriver_id):
         """
         Delete a disk
         Triggered by volumedriver messages on the queue
         @param volumename: volume id of the disk
         """
+        _ = storagedriver_id  # For logging purposes
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk is not None:
             mutex = VolatileMutex('{}_{}'.format(volumename, disk.devicename))

@@ -30,7 +30,7 @@ class BrandingViewSet(viewsets.ViewSet):
     base_name = 'branding'
 
     @log()
-    @limit(amount=5, per=60, timeout=60)
+    @limit(amount=60, per=60, timeout=60)
     @return_list(Branding)
     @load()
     def list(self):
@@ -40,7 +40,7 @@ class BrandingViewSet(viewsets.ViewSet):
         return BrandingList.get_brandings()
 
     @log()
-    @limit(amount=5, per=60, timeout=60)
+    @limit(amount=60, per=60, timeout=60)
     @return_object(Branding)
     @load(Branding)
     def retrieve(self, branding):
