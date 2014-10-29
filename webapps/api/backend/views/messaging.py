@@ -22,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link, action
 from ovs.lib.messaging import MessageController
-from backend.decorators import required_roles, load
+from backend.decorators import required_roles, load, log
 
 
 class MessagingViewSet(viewsets.ViewSet):
@@ -33,6 +33,7 @@ class MessagingViewSet(viewsets.ViewSet):
     prefix = r'messages'
     base_name = 'messages'
 
+    @log()
     @required_roles(['read'])
     @load()
     def list(self):
@@ -41,6 +42,7 @@ class MessagingViewSet(viewsets.ViewSet):
         """
         return Response(MessageController.all_subscriptions(), status=status.HTTP_200_OK)
 
+    @log()
     @required_roles(['read'])
     @load()
     def retrieve(self, pk):
@@ -71,6 +73,7 @@ class MessagingViewSet(viewsets.ViewSet):
         return messages, last_message_id
 
     @link()
+    @log()
     @required_roles(['read'])
     @load()
     def wait(self, pk, message_id):
@@ -90,6 +93,7 @@ class MessagingViewSet(viewsets.ViewSet):
                          'subscriptions'  : MessageController.subscriptions(pk)}, status=status.HTTP_200_OK)
 
     @link()
+    @log()
     @required_roles(['read'])
     @load()
     def last(self, pk):
@@ -103,6 +107,7 @@ class MessagingViewSet(viewsets.ViewSet):
         return Response(MessageController.last_message_id(), status=status.HTTP_200_OK)
 
     @action()
+    @log()
     @required_roles(['read'])
     @load()
     def subscribe(self, request, pk):

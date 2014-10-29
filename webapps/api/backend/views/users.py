@@ -19,7 +19,7 @@ Module for users
 import hashlib
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, load, return_object, return_list
+from backend.decorators import required_roles, load, return_object, return_list, log
 from backend.toolbox import Toolbox
 from rest_framework import status, viewsets
 from rest_framework.exceptions import PermissionDenied
@@ -40,6 +40,7 @@ class UserViewSet(viewsets.ViewSet):
     prefix = r'users'
     base_name = 'users'
 
+    @log()
     @required_roles(['read'])
     @return_list(User)
     @load()
@@ -52,6 +53,7 @@ class UserViewSet(viewsets.ViewSet):
         else:
             return [request.client.user]
 
+    @log()
     @required_roles(['read'])
     @return_object(User)
     @load(User)
@@ -65,6 +67,7 @@ class UserViewSet(viewsets.ViewSet):
             return user
         raise PermissionDenied('Fetching user information not allowed')
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load()
     def create(self, request):
@@ -92,6 +95,7 @@ class UserViewSet(viewsets.ViewSet):
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load(User)
     def destroy(self, request, user):
@@ -111,6 +115,7 @@ class UserViewSet(viewsets.ViewSet):
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load(User)
     def partial_update(self, contents, user, request):
@@ -128,6 +133,7 @@ class UserViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @load(User)
     def set_password(self, request, user):

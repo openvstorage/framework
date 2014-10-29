@@ -20,6 +20,7 @@ import uuid
 import os
 import time
 
+from ovs.lib.helpers.decorators import log
 from ovs.celery import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
@@ -63,12 +64,14 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_from_voldrv')
-    def delete_from_voldrv(volumename):
+    @log('VOLUMEDRIVER_TASK')
+    def delete_from_voldrv(volumename, storagedriver_id):
         """
         Delete a disk
         Triggered by volumedriver messages on the queue
         @param volumename: volume id of the disk
         """
+        _ = storagedriver_id  # For logging purposes
         disk = VDiskList.get_vdisk_by_volume_id(volumename)
         if disk is not None:
             mutex = VolatileMutex('{}_{}'.format(volumename, disk.devicename))
@@ -99,6 +102,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.resize_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def resize_from_voldrv(volumename, volumesize, volumepath, storagedriver_id):
         """
         Resize a disk
@@ -130,6 +134,7 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.rename_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagedriver_id):
         """
         Rename a disk

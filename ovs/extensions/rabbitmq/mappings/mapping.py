@@ -25,7 +25,8 @@ class Mapping(object):
     """
     mapping = {EventMessages.EventMessage.VolumeDelete: [{'property': 'volume_delete',
                                                           'task': VDiskController.delete_from_voldrv,
-                                                          'arguments': {'name': 'volumename'}}],
+                                                          'arguments': {'name': 'volumename',
+                                                                        '[NODE_ID]': 'storagedriver_id'}}],
                EventMessages.EventMessage.VolumeResize: [{'property': 'volume_resize',
                                                           'task': VDiskController.resize_from_voldrv,
                                                           'arguments': {'name': 'volumename',
