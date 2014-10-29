@@ -39,6 +39,7 @@ from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
+from tests.mockups import Serializers
 
 
 class Decorators(TestCase):
@@ -96,6 +97,14 @@ class Decorators(TestCase):
         user.is_active = True
         user.group = viewers_group
         user.save()
+        sort_combinations = [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]  # No logical ordering
+        for username, password in sort_combinations:
+            sort_user = User()
+            sort_user.username = username
+            sort_user.password = password
+            sort_user.is_active = True
+            sort_user.group = viewers_group
+            sort_user.save()
 
         # Create internal OAuth 2 clients
         admin_client = Client()
@@ -151,6 +160,8 @@ class Decorators(TestCase):
                         roleclient.save()
 
         Decorators.initial_data = PersistentFactory.store._read(), VolatileFactory.store._read()
+
+        sys.modules['backend.serializers.serializers'] = Serializers
 
         sys.path.append('/opt/OpenvStorage')
         sys.path.append('/opt/OpenvStorage/webapps')
@@ -371,6 +382,138 @@ class Decorators(TestCase):
         response = the_function(1)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, 1)
+
+    def test_return_object(self):
+        """
+        Validates whether the return_object decorator works:
+        * Parses the 'contents' parameter, and passes it into the serializer
+        """
+        from backend.decorators import return_object
+
+        @return_object(User)
+        def the_function(input_value, *args, **kwargs):
+            """
+            Return a fake User object that would be serialized
+            """
+            _ = args, kwargs
+            return type('User', (), {'input_value': input_value})
+
+        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        request.QUERY_PARAMS = {}
+        response = the_function(1, request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['instance'].input_value, 1)
+        self.assertIsNone(response.data['contents'])
+        request.QUERY_PARAMS['contents'] = 'foo,bar'
+        response = the_function(2, request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['instance'].input_value, 2)
+        self.assertEqual(response.data['contents'], ['foo', 'bar'])
+
+    def test_return_list(self):
+        """
+        Validates whether the return_list decorator works correctly:
+        * Parsing:
+          * Parses the 'sort' parameter, optionally falling back to value specified by decorator
+          * Parses the 'page' parameter
+          * Parses the 'contents' parameter
+        * Passes the 'full' hint to the decorated function, indicating whether full objects are usefull
+        * If sorting is requested:
+          * Loads a possibly returned list of guids
+          * Sorts the returned list
+        * Contents:
+          * If contents are specified: Runs the list trough the serializer
+          * Else, return the guid list
+        """
+        from backend.decorators import return_list
+        from ovs.dal.datalist import DataList
+        from ovs.dal.dataobjectlist import DataObjectList
+
+        @return_list(User)
+        def the_function_1(*args, **kwargs):
+            """
+            Returns a list of all Users.
+            """
+            output_values['args'] = args
+            output_values['kwargs'] = kwargs
+            return data_list_users
+
+        @return_list(User, default_sort='username,password')
+        def the_function_2(*args, **kwargs):
+            """
+            Returns a guid list of all Users.
+            """
+            output_values['args'] = args
+            output_values['kwargs'] = kwargs
+            return data_list_userguids
+
+        # Username/password combinations: [('bb', 'aa'), ('aa', 'cc'), ('bb', 'dd'), ('aa', 'bb')]
+        output_values = {}
+        users = DataList({'object': User,
+                          'data': DataList.select.GUIDS,
+                          'query': {'type': DataList.where_operator.OR,
+                                    'items': [('username', DataList.operator.EQUALS, 'aa'),
+                                              ('username', DataList.operator.EQUALS, 'bb')]}}).data
+        data_list_users = DataObjectList(users, User)
+        self.assertEqual(len(data_list_users), 4)
+        guid_table = {}
+        for user in data_list_users:
+            if user.username not in guid_table:
+                guid_table[user.username] = {}
+            guid_table[user.username][user.password] = user.guid
+        data_list_userguids = [user.guid for user in data_list_users]
+        request = Decorators.factory.get('/', HTTP_ACCEPT='application/json; version=1')
+        for function in [the_function_1, the_function_2]:
+            request.QUERY_PARAMS = {}
+            response = function(1, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], function.__name__ == 'the_function_2')
+            self.assertEqual(len(response.data), len(data_list_users))
+            if function.__name__ == 'the_function_2':
+                self.assertListEqual(response.data, [guid_table['aa']['bb'],
+                                                     guid_table['aa']['cc'],
+                                                     guid_table['bb']['aa'],
+                                                     guid_table['bb']['dd']])
+            request.QUERY_PARAMS['sort'] = 'username,-password'
+            response = function(2, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], True)
+            self.assertEqual(len(response.data), len(data_list_users))
+            self.assertListEqual(response.data, [guid_table['aa']['cc'],
+                                                 guid_table['aa']['bb'],
+                                                 guid_table['bb']['dd'],
+                                                 guid_table['bb']['aa']])
+            request.QUERY_PARAMS['sort'] = '-username,-password'
+            response = function(3, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], True)
+            self.assertEqual(len(response.data), len(data_list_users))
+            self.assertListEqual(response.data, [guid_table['bb']['dd'],
+                                                 guid_table['bb']['aa'],
+                                                 guid_table['aa']['cc'],
+                                                 guid_table['aa']['bb']])
+            request.QUERY_PARAMS['sort'] = 'password,username'
+            response = function(4, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], True)
+            self.assertEqual(len(response.data), len(data_list_users))
+            self.assertListEqual(response.data, [guid_table['bb']['aa'],
+                                                 guid_table['aa']['bb'],
+                                                 guid_table['aa']['cc'],
+                                                 guid_table['bb']['dd']])
+            request.QUERY_PARAMS['contents'] = ''
+            response = function(5, request)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(output_values['kwargs']['hints']['full'], True)
+            self.assertEqual(len(response.data), len(data_list_users))
+            if function.__name__ == 'the_function_1':
+                self.assertIsInstance(response.data['instance'], DataObjectList)
+                self.assertIsInstance(response.data['instance'][0], User)
+                self.assertIn(response.data['instance'][0].username, ['aa', 'bb'])
+            else:
+                self.assertIsInstance(response.data['instance'], list)
+                self.assertIsInstance(response.data['instance'][0], User)
+                self.assertIn(response.data['instance'][0].username, ['aa', 'bb'])
 
 if __name__ == '__main__':
     import unittest
