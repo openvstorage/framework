@@ -11,8 +11,13 @@ echo "deb http://packages.cloudfounders.com/apt/ unstable/" > /etc/apt/sources.l
 apt-get update
 apt-get install avahi-utils openvstorage -y --force-yes
 
-
+echo "getting network info"
 IP=`ip a l dev eth0 | grep "inet " | awk '{split($0,a," "); split(a[2],b,"/"); print(b[1])}'`
+if [ -z "$IP" ]; then
+ IP=`ip a l dev eth1 | grep "inet " | awk '{split($0,a," "); split(a[2],b,"/"); print(b[1])}'`
+fi
+echo "ip address: $IP"
+
 PASSWORD=`config-get target_password`
 CLUSTER_NAME=`config-get cluster_name`
 HYPERVISOR_NAME=`hostname`
@@ -32,7 +37,7 @@ if [ -n "$MASTER_IP" ]; then
 else
  JOIN_CLUSTER=False
 fi
-echo "avahi done..."
+echo "avahi done: $MASTER_IP"
 
 echo root:$PASSWORD | chpasswd
 
