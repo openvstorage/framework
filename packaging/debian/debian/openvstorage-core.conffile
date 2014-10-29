@@ -1,0 +1,2 @@
+etc/logstash/conf.d/indexer.conf
+opt/OpenvStorage/config/main.cfg
