@@ -16,7 +16,7 @@
 Module for roles
 """
 
-from backend.decorators import required_roles, return_object, return_list, load
+from backend.decorators import required_roles, return_object, return_list, load, log
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.hybrids.role import Role
@@ -31,6 +31,7 @@ class RoleViewSet(viewsets.ViewSet):
     prefix = r'roles'
     base_name = 'roles'
 
+    @log()
     @required_roles(['read'])
     @return_list(Role)
     @load()
@@ -40,6 +41,7 @@ class RoleViewSet(viewsets.ViewSet):
         """
         return RoleList.get_roles()
 
+    @log()
     @required_roles(['read'])
     @return_object(Role)
     @load(Role)

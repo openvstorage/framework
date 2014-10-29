@@ -407,11 +407,11 @@ class SetupController(object):
                       '<MEMCACHE_NODE_IP>': cluster_ip,
                       '<WORKER_QUEUE>': unique_id}
             if join_masters:
-                for service in master_node_services + ['watcher']:
+                for service in master_node_services + ['watcher-volumedriver', 'watcher-framework']:
                     logger.debug('Adding service {0}'.format(service))
                     SetupController._add_service(target_client, service, params)
             else:
-                for service in extra_node_services + ['watcher']:
+                for service in extra_node_services + ['watcher-volumedriver', 'watcher-framework']:
                     logger.debug('Adding service {0}'.format(service))
                     SetupController._add_service(target_client, service, params)
 
@@ -744,8 +744,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     client.run('service ovs-rabbitmq start', quiet=True)
 
             target_client = SSHClient.load(ip)
-            SetupController._enable_service(target_client, 'watcher')
-            SetupController._change_service_state(target_client, 'watcher', 'start')
+            for service in ['watcher-volumedriver', 'watcher-framework']:
+                SetupController._enable_service(target_client, service)
+                SetupController._change_service_state(target_client, service, 'start')
 
             logger.debug('Restarting workers')
             for node in nodes:

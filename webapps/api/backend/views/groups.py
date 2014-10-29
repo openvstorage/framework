@@ -16,7 +16,7 @@
 Module for groups
 """
 
-from backend.decorators import required_roles, return_object, return_list, load
+from backend.decorators import required_roles, return_object, return_list, load, log
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.hybrids.group import Group
@@ -31,6 +31,7 @@ class GroupViewSet(viewsets.ViewSet):
     prefix = r'groups'
     base_name = 'groups'
 
+    @log()
     @required_roles(['read'])
     @return_list(Group)
     @load()
@@ -40,6 +41,7 @@ class GroupViewSet(viewsets.ViewSet):
         """
         return GroupList.get_groups()
 
+    @log()
     @required_roles(['read'])
     @return_object(Group)
     @load(Group)
