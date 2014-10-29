@@ -1,21 +1,13 @@
 options:
   target_password:
     type: string
-    default: "rooter"
+    default: "password"
     description: "Node root password"
   cluster_name:
     type: string
-    default: "ovs-openstack-1"
+    default: "openstack-openvstorage-cluster"
     description: "OVS Cluster name"
-  join_cluster:
-    type: boolean
-    default: False
-    description: "If this is the first node then join_cluster is False; for other nodes it should be True"
-  master_ip:
-    type: string
-    default: ""
-    description: "If this is the first node then master_ip is empty; for other nodes it should be the first node's ip"
   arakoon_mntp:
     type: string
     default: "/mnt/db"
-    description: "If you have an SSD device put here a mountpoint on that device (partitioning and mounting not performed by OVS)"
+    description: "If you have an SSD device put here a mount point or that device"
