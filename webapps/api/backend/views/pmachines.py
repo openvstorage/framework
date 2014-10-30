@@ -23,7 +23,7 @@ from ovs.dal.hybrids.pmachine import PMachine
 from backend.serializers.serializers import FullSerializer
 from rest_framework.response import Response
 from rest_framework import status
-from backend.decorators import required_roles, load, return_object, return_list
+from backend.decorators import required_roles, load, return_object, return_list, log
 
 
 class PMachineViewSet(viewsets.ViewSet):
@@ -34,6 +34,7 @@ class PMachineViewSet(viewsets.ViewSet):
     prefix = r'pmachines'
     base_name = 'pmachines'
 
+    @log()
     @required_roles(['read'])
     @return_list(PMachine)
     @load()
@@ -43,6 +44,7 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         return PMachineList.get_pmachines()
 
+    @log()
     @required_roles(['read'])
     @return_object(PMachine)
     @load(PMachine)
@@ -52,6 +54,7 @@ class PMachineViewSet(viewsets.ViewSet):
         """
         return pmachine
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load(PMachine)
     def partial_update(self, contents, pmachine, request):

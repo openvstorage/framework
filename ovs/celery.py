@@ -89,6 +89,13 @@ celery.conf.CELERYBEAT_SCHEDULE = {
         'task': 'ovs.scheduled.collapse_arakoon',
         'schedule': crontab(minute='30', hour='0'),
         'args': []
+    },
+    # Clean audit trail logs after 30 days
+    # > Executes every day at 00:30
+    'logs-cleanup': {
+        'task': 'ovs.scheduled.clean_logs',
+        'schedule': crontab(minute='30', hour='0'),
+        'args': []
     }
 }
 

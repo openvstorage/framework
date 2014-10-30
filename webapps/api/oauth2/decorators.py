@@ -21,6 +21,7 @@ from django.http import HttpResponse
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.log.logHandler import LogHandler
+from ovs.dal.hybrids.log import Log
 
 logger = LogHandler('api', 'oauth2')
 
@@ -46,6 +47,7 @@ def json_response():
                 return return_type(json.dumps(data), content_type='application/json', status=status_code)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -93,5 +95,45 @@ def limit(amount, per, timeout):
             return f(self, request, *args, **kwargs)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
+
+
+def log():
+    """
+    Task logger
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(self, request, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            # Log the call
+            log_entry = Log()
+            log_entry.source = 'API'
+            log_entry.module = f.__module__
+            log_entry.method = f.__name__
+            log_entry.method_args = list(args)
+            log_entry.method_kwargs = kwargs
+            log_entry.time = time.time()
+            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
+            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            log_entry.save()
+
+            # Call the function
+            return f(self, request, *args, **kwargs)
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
+    return wrap
+

@@ -16,7 +16,7 @@
 VMachine module
 """
 import time
-
+from ovs.lib.helpers.decorators import log
 from ovs.celery import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
@@ -272,6 +272,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(name, storagedriver_id):
         """
         This method will delete a vmachine based on the name of the vmx given
@@ -295,6 +296,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def rename_from_voldrv(old_name, new_name, storagedriver_id):
         """
         This machine will handle the rename of a vmx file
@@ -439,6 +441,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
+    @log('VOLUMEDRIVER_TASK')
     def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
         """
         Updates a given vmachine with data retreived from a given pmachine
@@ -484,6 +487,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def update_from_voldrv(name, storagedriver_id):
         """
         This method will update/create a vmachine based on a given vmx/xml file

@@ -428,7 +428,7 @@
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
-                "invalidname": "vPool name is invalid",
+                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPoolnames.",
                 "backendtype": "Backend:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
