@@ -12,80 +12,74 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-Changes applied by CloudFounders NV
-* PEP8 code cleanup
 """
 
 
-from Arakoon import ArakoonClient
-from NurseryRouting import RoutingInfo
-from ArakoonExceptions import NurseryRangeError, NurseryInvalidConfig, ArakoonException
+
+from Arakoon import ArakoonClient 
+from NurseryRouting import RoutingInfo 
+from ArakoonExceptions import NurseryRangeError, NurseryInvalidConfig,ArakoonException
 from functools import wraps
 import time
 import logging
 
 maxDuration = 3
 
-
-def retryDuringMigration(f):
-    @wraps(f)
-    def retrying_f(self, *args, **kwargs):
+def retryDuringMigration (f):
+    @wraps(f)    
+    def retrying_f (self,*args,**kwargs):
         naptime = 0.1
         duration = 0.0
         start = time.time()
-
+        
         callSucceeded = False
-        while (not callSucceeded and duration < maxDuration):
+        while (not callSucceeded and duration < maxDuration ):
             try:
-                retVal = f(self, *args, **kwargs)
+                retVal = f(self,*args,**kwargs)
                 callSucceeded = True
             except (NurseryRangeError, NurseryInvalidConfig) as ex:
-                logging.warning(
-                    "Nursery range or config error (%s). Sleep %f before next attempt" % (ex, naptime))
-                time.sleep(naptime)
+                logging.warning("Nursery range or config error (%s). Sleep %f before next attempt" % (ex, naptime) )
+                time.sleep(naptime)       
                 duration = time.time() - start
-                naptime *= 1.5
+                naptime *= 1.5    
                 self._fetchNurseryConfig()
-
-        if(duration >= maxDuration):
-            raise ArakoonException(
-                "Failed to process nursery request in a timely fashion")
-
+        
+        if( duration >= maxDuration) :
+            raise ArakoonException("Failed to process nursery request in a timely fashion")
+        
         return retVal
-
+    
     return retrying_f
 
-
 class NurseryClient:
-
-    def __init__(self, clientConfig):
+    
+    def __init__(self,clientConfig):
         self.nurseryClusterId = clientConfig.getClusterId()
         self._keeperClient = ArakoonClient(clientConfig)
-        self._clusterClients = dict()
+        self._clusterClients = dict ()
         self._fetchNurseryConfig()
-
+    
     def _fetchNurseryConfig(self):
-        (routing, cfgs) = self._keeperClient.getNurseryConfig()
+        (routing,cfgs) = self._keeperClient.getNurseryConfig()
         self._routing = routing
-        logging.debug("Nursery client has routing: %s" % str(routing))
-        for (clusterId, client) in self._clusterClients.iteritems():
+        logging.debug( "Nursery client has routing: %s" % str(routing))
+        for (clusterId,client) in self._clusterClients.iteritems() :
             client.dropConnections()
-
+        
         self._clusterClients = dict()
         logging.debug("Nursery contains %d clusters", len(cfgs))
-        for (clusterId, cfg) in cfgs.iteritems():
+        for (clusterId,cfg) in cfgs.iteritems():
             client = ArakoonClient(cfg)
-            logging.debug("Adding client for cluster %s" % clusterId)
+            logging.debug("Adding client for cluster %s" % clusterId )
             self._clusterClients[clusterId] = client
-
+    
     def _getArakoonClient(self, key):
         clusterId = self._routing.getClusterId(key)
         logging.debug("Key %s goes to cluster %s" % (key, clusterId))
-        if not self._clusterClients.has_key(clusterId):
+        if not self._clusterClients.has_key( clusterId ):
             raise NurseryInvalidConfig()
         return self._clusterClients[clusterId]
-
+    
     @retryDuringMigration
     def set(self, key, value):
         """
@@ -103,8 +97,8 @@ class NurseryClient:
         @rtype: void
         """
         client = self._getArakoonClient(key)
-        client.set(key, value)
-
+        client.set(key,value)
+        
     @retryDuringMigration
     def get(self, key):
         """
@@ -118,7 +112,7 @@ class NurseryClient:
 
         client = self._getArakoonClient(key)
         return client.get(key)
-
+    
     @retryDuringMigration
     def delete(self, key):
         """
@@ -131,3 +125,4 @@ class NurseryClient:
         """
         client = self._getArakoonClient(key)
         client.delete(key)
+

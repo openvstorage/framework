@@ -12,16 +12,12 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-Changes applied by CloudFounders NV
-* PEP8 code cleanup
 """
 
 import socket
 import logging
 
 import RemoteControlProtocol as RCP
-
 
 def collapse(ip, port, clusterId, n):
     """
@@ -38,7 +34,7 @@ def collapse(ip, port, clusterId, n):
 
     try:
         RCP._prologue(clusterId, s)
-        cmd = RCP._int_to(RCP._COLLAPSE_TLOGS | RCP._MAGIC)
+        cmd  = RCP._int_to(RCP._COLLAPSE_TLOGS | RCP._MAGIC)
         cmd += RCP._int_to(n)
         s.send(cmd)
         RCP.check_error_code(s)
@@ -52,39 +48,36 @@ def collapse(ip, port, clusterId, n):
     finally:
         s.close()
 
-
 def downloadDb(ip, port, clusterId, location):
     s = RCP.make_socket(ip, port)
 
     try:
-        with open(location, 'w+b') as db_file:
+        with open(location,'w+b') as db_file:
             RCP._prologue(clusterId, s)
-            cmd = RCP._int_to(RCP._DOWNLOAD_DB | RCP._MAGIC)
+            cmd  = RCP._int_to(RCP._DOWNLOAD_DB | RCP._MAGIC)
             s.send(cmd)
             RCP.check_error_code(s)
             db_size = RCP._receive_int64(s)
-            while (db_size > 0):
-                chunkSize = min(4 * 1024, db_size)
+            while (db_size > 0 ) :
+                chunkSize = min(4*1024, db_size)
                 chunk = RCP._receive_all(s, chunkSize)
                 db_size -= len(chunk)
                 db_file.write(chunk)
     finally:
         s.close()
 
-
 def copyDbToHead(ip, port, clusterId, tlogsToKeep):
     s = RCP.make_socket(ip, port)
     try:
         RCP._prologue(clusterId, s)
-        cmd = RCP._int_to(RCP._COPY_DB_TO_HEAD | RCP._MAGIC)
+        cmd  = RCP._int_to(RCP._COPY_DB_TO_HEAD | RCP._MAGIC)
         cmd += RCP._int_to(tlogsToKeep)
         s.send(cmd)
         RCP.check_error_code(s)
     finally:
         s.close()
 
-
-def _simple_cmd(ip, port, clusterId, code):
+def _simple_cmd(ip,port,clusterId, code):
     s = RCP.make_socket(ip, port)
     try:
         RCP._prologue(clusterId, s)
@@ -94,32 +87,27 @@ def _simple_cmd(ip, port, clusterId, code):
     finally:
         s.close()
 
-
 def optimizeDb(ip, port, clusterId):
-    _simple_cmd(ip, port, clusterId, RCP._OPTIMIZE_DB)
+    _simple_cmd(ip,port,clusterId, RCP._OPTIMIZE_DB)
 
+def defragDb(ip,port,clusterId):
+    _simple_cmd(ip,port,clusterId, RCP._DEFRAG_DB)
 
-def defragDb(ip, port, clusterId):
-    _simple_cmd(ip, port, clusterId, RCP._DEFRAG_DB)
+def dropMaster(ip,port,clusterId):
+    _simple_cmd(ip,port,clusterId, RCP._DROP_MASTER)
 
-
-def dropMaster(ip, port, clusterId):
-    _simple_cmd(ip, port, clusterId, RCP._DROP_MASTER)
-
-
-def flushStore(ip, port, clusterId):
-    _simple_cmd(ip, port, clusterId, RCP._FLUSH_STORE)
-
+def flushStore(ip,port,clusterId):
+    _simple_cmd(ip,port,clusterId, RCP._FLUSH_STORE)
 
 def setInterval(cluster_id, ip, port, pub_start, pub_end, priv_start, priv_end):
-    s = RCP.make_socket(ip, port)
+    s = RCP.make_socket(ip,port)
     try:
         RCP._prologue(cluster_id, s)
         cmd = RCP._int_to(RCP._SET_INTERVAL | RCP._MAGIC)
-        cmd += RCP._string_option_to(pub_start)
-        cmd += RCP._string_option_to(pub_end)
-        cmd += RCP._string_option_to(priv_start)
-        cmd += RCP._string_option_to(priv_end)
+        cmd += RCP._string_option_to (pub_start)
+        cmd += RCP._string_option_to (pub_end)
+        cmd += RCP._string_option_to (priv_start)
+        cmd += RCP._string_option_to (priv_end)
         s.send(cmd)
         RCP.check_error_code(s)
     finally:

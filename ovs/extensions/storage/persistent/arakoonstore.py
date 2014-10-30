@@ -54,7 +54,7 @@ class ArakoonStore(object):
         """
         Initializes the client
         """
-        self._cluster = ArakoonManagement().getCluster(cluster)
+        self._cluster = ArakoonManagementEx().getCluster(cluster)
         self._client = self._cluster.getClient()
         self._lock = Lock()
 

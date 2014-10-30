@@ -12,9 +12,6 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-Changes applied by CloudFounders NV
-* PEP8 code cleanup
 """
 
 import socket
@@ -30,74 +27,63 @@ _DEFRAG_DB = 0x26
 _DROP_MASTER = 0x30
 _FLUSH_STORE = 0x42
 _COPY_DB_TO_HEAD = 0x44
-_MAGIC = 0xb1ff0000
+_MAGIC   = 0xb1ff0000
 _VERSION = 0x00000001
-
 
 def _int_to(i):
     r = struct.pack("I", i)
     return r
 
-
-def _int_from(buff, pos):
-    r = struct.unpack_from("I", buff, pos)
+def _int_from(buff,pos):
+    r = struct.unpack_from("I",buff, pos)
     return r[0], pos + 4
 
-
-def _int64_from(buff, pos):
-    r = struct.unpack_from("Q", buff, pos)
+def _int64_from(buff,pos):
+    r = struct.unpack_from("Q",buff,pos)
     return r[0], pos + 8
-
 
 def _string_to(s):
     size = len(s)
     r = struct.pack("I%ds" % size, size, s)
     return r
 
-
 def _prologue(clusterId, sock):
-    m = _int_to(_MAGIC)
+    m  = _int_to(_MAGIC)
     m += _int_to(_VERSION)
     m += _string_to(clusterId)
     sock.sendall(m)
 
-
-def _receive_all(sock, n):
+def _receive_all(sock,n):
     todo = n
     r = ""
     while todo:
         chunk = sock.recv(todo)
-        if chunk == "":
+        if chunk == "" :
             raise RuntimeError("Not enough data on socket. Aborting...")
         todo -= len(chunk)
         r += chunk
     return r
 
-
 def _receive_int(sock):
-    sizes = _receive_all(sock, 4)
-    i, _ = _int_from(sizes, 0)
+    sizes = _receive_all(sock,4)
+    i,_  = _int_from(sizes,0)
     return i
-
 
 def _receive_int64(sock):
     buf = _receive_all(sock, 8)
-    i64, _ = _int64_from(buf, 0)
+    i64,_ = _int64_from(buf,0)
     return i64
-
 
 def _receive_string(sock):
     size = _receive_int(sock)
-    s = _receive_all(sock, size)
+    s = _receive_all(sock,size)
     return s
-
 
 def check_error_code(s):
     rc = _receive_int(s)
     if rc:
-        msg = _receive_string(s)
+        msg   = _receive_string(s)
         raise Exception(rc, msg)
-
 
 def make_socket(ip, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
