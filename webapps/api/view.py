@@ -22,7 +22,7 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from django.conf import settings
-from oauth2.decorators import json_response
+from oauth2.decorators import json_response, limit
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
@@ -36,6 +36,7 @@ class MetadataView(View):
     """
 
     @json_response()
+    @limit(amount=5, per=60, timeout=60)
     def get(self, request, *args, **kwargs):
         """
         Fetches metadata
@@ -65,21 +66,21 @@ class MetadataView(View):
                 return HttpResponse, dict(data.items() + {'authentication_state': 'unauthenticated'}.items())
             authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')
             if authorization_type != 'Bearer':
-                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid authorization type'}.items())
+                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid_authorization_type'}.items())
             tokens = BearerTokenList.get_by_access_token(access_token)
             if len(tokens) != 1:
-                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid token'}.items())
+                return HttpResponse, dict(data.items() + {'authentication_state': 'invalid_token'}.items())
             token = tokens[0]
             if token.expiration < time.time():
                 for junction in token.roles.itersafe():
                     junction.delete()
                 token.delete()
-                return HttpResponse, dict(data.items() + {'authentication_state': 'token expired'}.items())
+                return HttpResponse, dict(data.items() + {'authentication_state': 'token_expired'}.items())
 
             # Gather user metadata
             user = token.client.user
             if not user.is_active:
-                return HttpResponse, dict(data.items() + {'authentication_state': 'inactive user'}.items())
+                return HttpResponse, dict(data.items() + {'authentication_state': 'inactive_user'}.items())
             roles = [j.role.code for j in token.roles]
 
             return HttpResponse, dict(data.items() + {'authenticated': True,
@@ -90,7 +91,7 @@ class MetadataView(View):
                                                       'plugins': plugins}.items())
         except Exception as ex:
             logger.exception('Unexpected exception: {0}'.format(ex))
-            return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected exception'}.items())
+            return HttpResponse, dict(data.items() + {'authentication_state': 'unexpected_exception'}.items())
 
     @csrf_exempt
     def dispatch(self, request, *args, **kwargs):

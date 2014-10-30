@@ -35,7 +35,7 @@ class Toolbox(object):
         access_token = None
         refresh_token = None
         allowed_roles = [j.role for j in client.roles]
-        roles = scopes if scopes is not None else allowed_roles
+        roles = [s for s in scopes] if scopes is not None else allowed_roles
         if any(set(roles) - set(allowed_roles)):
             raise ValueError('invalid_scope')
         if generate_access is True:

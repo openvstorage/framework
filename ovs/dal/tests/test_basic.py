@@ -21,6 +21,7 @@ import time
 from unittest import TestCase
 from ovs.dal.exceptions import *
 from ovs.dal.dataobjectlist import DataObjectList
+from ovs.extensions.generic import fakesleep
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -54,6 +55,8 @@ class Basic(TestCase):
         VolatileFactory.store.clean()
         VolatileFactory.store.clean()
 
+        fakesleep.monkey_patch()
+
     @classmethod
     def setUp(cls):
         """
@@ -69,7 +72,7 @@ class Basic(TestCase):
         """
         Clean up the unittest
         """
-        pass
+        fakesleep.monkey_restore()
 
     def test_invalidobject(self):
         """

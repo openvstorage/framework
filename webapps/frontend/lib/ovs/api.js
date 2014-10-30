@@ -58,7 +58,7 @@ define([
                         });
                     }, 11000);
                 } else if (xmlHttpRequest.readyState === 4 && xmlHttpRequest.status === 403 &&
-                           xmlHttpRequest.responseText === '{"detail": "Invalid token"}') {
+                           xmlHttpRequest.responseText === '{"detail": "invalid_token"}') {
                     shared.authentication.logout();
                 } else if (xmlHttpRequest.readyState !== 0 && xmlHttpRequest.status !== 0) {
                     deferred.reject({
