@@ -17,7 +17,7 @@ Module for clients
 """
 
 from backend.serializers.serializers import FullSerializer
-from backend.decorators import required_roles, return_object, return_list, load
+from backend.decorators import required_roles, return_object, return_list, load, log
 from backend.toolbox import Toolbox
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from rest_framework import status, viewsets
@@ -38,6 +38,7 @@ class ClientViewSet(viewsets.ViewSet):
     prefix = r'clients'
     base_name = 'clients'
 
+    @log()
     @required_roles(['read'])
     @return_list(Client)
     @load()
@@ -56,6 +57,7 @@ class ClientViewSet(viewsets.ViewSet):
             return [client for client in client_list if client.user_guid == userguid]
         return client_list
 
+    @log()
     @required_roles(['read'])
     @return_object(Client)
     @load(Client)
@@ -70,6 +72,7 @@ class ClientViewSet(viewsets.ViewSet):
             return client
         raise PermissionDenied('Fetching client information not allowed')
 
+    @log()
     @required_roles(['read', 'write'])
     @load()
     def create(self, request, role_guids=None):
@@ -99,6 +102,7 @@ class ClientViewSet(viewsets.ViewSet):
                     return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @log()
     @required_roles(['read', 'write'])
     @load(Client)
     def destroy(self, request, client):

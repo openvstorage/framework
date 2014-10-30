@@ -21,7 +21,7 @@ from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.plugin.provider.configuration import Configuration
 from ovs.dal.dataobjectlist import DataObjectList
 
-import signal
+import signal, time
 
 STORAGE_PREFIX = "ovs_snmp"
 NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
@@ -107,6 +107,12 @@ class OVSSNMPServer():
             mapping[oid] = attr_name
         return mapping
 
+    def _check_added(self, model_object):
+        for class_id in self.assigned_oids:
+            if model_object.guid in self.assigned_oids[class_id]:
+                return True
+        return False
+
     def _register_dal_model(self, class_id, model_object, attribute, attrb_oid, key=None, func=None, atype=str):
         """
         Register a DAL model as OID
@@ -118,21 +124,12 @@ class OVSSNMPServer():
         self.model_oids.add(model_object.guid)
 
         if not class_id in self.assigned_oids:
-            self.assigned_oids[class_id] = {}
+            self.assigned_oids[class_id] = []
             self.instance_oid = 0
 
-        if not self.instance_oid in self.assigned_oids[class_id]:
-            self.assigned_oids[class_id][self.instance_oid] = {}
+        if not model_object.guid in self.assigned_oids[class_id]:
+            self.assigned_oids[class_id].append(model_object.guid)
 
-        for instance_id in self.assigned_oids[class_id]:
-            for attr_id in self.assigned_oids[class_id][instance_id]:
-                existing = self.assigned_oids[class_id][instance_id][attr_id]
-                if existing[0].guid == model_object.guid and existing[1] == attribute + str(key):
-                    #  Already modeled correctly
-                    return
-
-        # Nothing exists, so we add here
-        self.assigned_oids[class_id][self.instance_oid][attrb_oid] = (model_object, attribute + str(key))
         def get_function():
             print('[DEBUG] Get function for %s %s %s' % (model_object.guid, attribute, str(key)))
             if func:
@@ -186,207 +183,207 @@ class OVSSNMPServer():
 
             for storagerouter in StorageRouterList.get_storagerouters():
                 _guids.add(storagerouter.guid)
-
-                self._register_dal_model(10, storagerouter, 'guid', "0")
-                self._register_dal_model(10, storagerouter, 'name', "1")
-                self._register_dal_model(10, storagerouter, 'pmachine', "3", key = 'host_status')
-                self._register_dal_model(10, storagerouter, 'description', "4")
-                self._register_dal_model(10, storagerouter, 'devicename', "5")
-                self._register_dal_model(10, storagerouter, 'failover_mode', "6")
-                self._register_dal_model(10, storagerouter, 'ip', "8")
-                self._register_dal_model(10, storagerouter, 'machineid', "9")
-                self._register_dal_model(10, storagerouter, 'status', "10")
-                self._register_dal_model(10, storagerouter, '#vdisks', "11",
-                                         func = lambda storagerouter: len([vdisk for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id]),
-                                         atype = int)
-                self._register_dal_model(10, storagerouter, '#vmachines', "12",
-                                         func = lambda storagerouter: len(set([vdisk.vmachine.guid for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id])),
-                                         atype = int)
-                self._register_dal_model(10, storagerouter, '#stored_data', "13",
-                                         func = lambda storagerouter: sum([vdisk.vmachine.stored_data for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id]),
-                                         atype = int)
-                self.instance_oid += 1
-
-            for vm in VMachineList.get_vmachines():
-                _guids.add(vm.guid)
-
-                if vm.is_vtemplate:
-                    self._register_dal_model(11, vm, 'guid', "0")
-                    self._register_dal_model(11, vm, 'name', "1")
-                    def _children(vmt):
-                        children = 0
-                        disks = [vd.guid for vd in vmt.vdisks]
-                        for vdisk in [vdisk.parent_vdisk_guid for item in [vm.vdisks for vm in VMachineList.get_vmachines() if not vm.is_vtemplate] for vdisk in item]:
-                            for disk in disks:
-                                if vdisk == disk:
-                                    children += 1
-                        return children
-                    self._register_dal_model(11, vm, '#children', 2, func = _children, atype = int)
+                if not self._check_added(storagerouter):
+                    self._register_dal_model(10, storagerouter, 'guid', "0")
+                    self._register_dal_model(10, storagerouter, 'name', "1")
+                    self._register_dal_model(10, storagerouter, 'pmachine', "3", key = 'host_status')
+                    self._register_dal_model(10, storagerouter, 'description', "4")
+                    self._register_dal_model(10, storagerouter, 'devicename', "5")
+                    self._register_dal_model(10, storagerouter, 'failover_mode', "6")
+                    self._register_dal_model(10, storagerouter, 'ip', "8")
+                    self._register_dal_model(10, storagerouter, 'machineid', "9")
+                    self._register_dal_model(10, storagerouter, 'status', "10")
+                    self._register_dal_model(10, storagerouter, '#vdisks', "11",
+                                             func = lambda storagerouter: len([vdisk for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id]),
+                                             atype = int)
+                    self._register_dal_model(10, storagerouter, '#vmachines', "12",
+                                             func = lambda storagerouter: len(set([vdisk.vmachine.guid for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id])),
+                                             atype = int)
+                    self._register_dal_model(10, storagerouter, '#stored_data', "13",
+                                             func = lambda storagerouter: sum([vdisk.vmachine.stored_data for vpool_vdisks in [storagedriver.vpool.vdisks for storagedriver in storagerouter.storagedrivers] for vdisk in vpool_vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id]),
+                                             atype = int)
                     self.instance_oid += 1
 
             for vm in VMachineList.get_vmachines():
                 _guids.add(vm.guid)
+                if not self._check_added(vm):
+                    if vm.is_vtemplate:
+                        self._register_dal_model(11, vm, 'guid', "0")
+                        self._register_dal_model(11, vm, 'name', "1")
+                        def _children(vmt):
+                            children = 0
+                            disks = [vd.guid for vd in vmt.vdisks]
+                            for vdisk in [vdisk.parent_vdisk_guid for item in [vm.vdisks for vm in VMachineList.get_vmachines() if not vm.is_vtemplate] for vdisk in item]:
+                                for disk in disks:
+                                    if vdisk == disk:
+                                        children += 1
+                            return children
+                        self._register_dal_model(11, vm, '#children', 2, func = _children, atype = int)
+                        self.instance_oid += 1
 
-                if not vm.is_vtemplate:
-                    self._register_dal_model(0, vm, 'guid', "0")
-                    self._register_dal_model(0, vm, 'name', "1")
-                    self._register_dal_model(0, vm, 'statistics', "2.0", key = "operations", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.1", key = "cluster_cache_misses_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.2", key = "data_read", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.3", key = "sco_cache_misses", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.4", key = "sco_cache_hits_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.5", key = "sco_cache_hits", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.6", key = "write_operations", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.7", key = "cluster_cache_misses", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.8", key = "read_operations_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.9", key = "sco_cache_misses_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.10", key = "backend_write_operations", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.11", key = "backend_data_read", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.12", key = "cache_hits", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.13", key = "backend_write_operations_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.14", key = "metadata_store_hits_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.15", key = "metadata_store_misses", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.16", key = "backend_data_written", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.17", key = "data_read_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.18", key = "read_operations", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.19", key = "cluster_cache_hits", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.20", key = "data_written_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.21", key = "cluster_cache_hits_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.22", key = "cache_hits_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.23", key = "timestamp", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.24", key = "metadata_store_misses_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.25", key = "backend_data_written_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.26", key = "backend_read_operations", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.27", key = "data_written", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.28", key = "metadata_store_hits", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.29", key = "backend_data_read_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.30", key = "operations_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.31", key = "backend_read_operations_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.33", key = "write_operations_ps", atype = int)
-                    self._register_dal_model(0, vm, 'statistics', "2.34", key = "data_transferred", atype = int)
-                    self._register_dal_model(0, vm, 'stored_data', "3", atype = int)
-                    self._register_dal_model(0, vm, 'description', "4")
-                    self._register_dal_model(0, vm, 'devicename', "5")
-                    self._register_dal_model(0, vm, 'failover_mode', "6")
-                    self._register_dal_model(0, vm, 'hypervisorid', "7")
-                    self._register_dal_model(0, vm, 'ip', "8")
-                    self._register_dal_model(0, vm, 'status', "10")
-                    self._register_dal_model(0, vm, 'stored_data', "10", atype = int)
-                    self._register_dal_model(0, vm, 'snapshots', "11", atype = int)
-                    self._register_dal_model(0, vm, 'vdisks', "12", atype = int)
-                    self._register_dal_model(0, vm, 'FOC', '13',
-                                             func = lambda vm: 'DEGRADED' if all(item == 'DEGRADED' for item in [vd.info['failover_mode'] for vd in vm.vdisks]) else 'OK')
-                self.instance_oid += 1
+            for vm in VMachineList.get_vmachines():
+                _guids.add(vm.guid)
+                if not self._check_added(vm):
+                    if not vm.is_vtemplate:
+                        self._register_dal_model(0, vm, 'guid', "0")
+                        self._register_dal_model(0, vm, 'name', "1")
+                        self._register_dal_model(0, vm, 'statistics', "2.0", key = "operations", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.1", key = "cluster_cache_misses_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.2", key = "data_read", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.3", key = "sco_cache_misses", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.4", key = "sco_cache_hits_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.5", key = "sco_cache_hits", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.6", key = "write_operations", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.7", key = "cluster_cache_misses", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.8", key = "read_operations_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.9", key = "sco_cache_misses_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.10", key = "backend_write_operations", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.11", key = "backend_data_read", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.12", key = "cache_hits", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.13", key = "backend_write_operations_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.14", key = "metadata_store_hits_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.15", key = "metadata_store_misses", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.16", key = "backend_data_written", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.17", key = "data_read_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.18", key = "read_operations", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.19", key = "cluster_cache_hits", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.20", key = "data_written_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.21", key = "cluster_cache_hits_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.22", key = "cache_hits_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.23", key = "timestamp", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.24", key = "metadata_store_misses_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.25", key = "backend_data_written_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.26", key = "backend_read_operations", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.27", key = "data_written", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.28", key = "metadata_store_hits", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.29", key = "backend_data_read_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.30", key = "operations_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.31", key = "backend_read_operations_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.33", key = "write_operations_ps", atype = int)
+                        self._register_dal_model(0, vm, 'statistics', "2.34", key = "data_transferred", atype = int)
+                        self._register_dal_model(0, vm, 'stored_data', "3", atype = int)
+                        self._register_dal_model(0, vm, 'description', "4")
+                        self._register_dal_model(0, vm, 'devicename', "5")
+                        self._register_dal_model(0, vm, 'failover_mode', "6")
+                        self._register_dal_model(0, vm, 'hypervisorid', "7")
+                        self._register_dal_model(0, vm, 'ip', "8")
+                        self._register_dal_model(0, vm, 'status', "10")
+                        self._register_dal_model(0, vm, 'stored_data', "10", atype = int)
+                        self._register_dal_model(0, vm, 'snapshots', "11", atype = int)
+                        self._register_dal_model(0, vm, 'vdisks', "12", atype = int)
+                        self._register_dal_model(0, vm, 'FOC', '13',
+                                                 func = lambda vm: 'DEGRADED' if all(item == 'DEGRADED' for item in [vd.info['failover_mode'] for vd in vm.vdisks]) else 'OK')
+                    self.instance_oid += 1
 
             for vd in VDiskList.get_vdisks():
                 _guids.add(vd.guid)
-
-                self._register_dal_model(1, vd, 'guid', "0")
-                self._register_dal_model(1, vd, 'name', "1")
-                self._register_dal_model(1, vd, 'statistics', "2.0", key = "operations", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.1", key = "data_written_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.2", key = "data_read", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.3", key = "sco_cache_misses", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.4", key = "sco_cache_hits_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.5", key = "sco_cache_hits", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.6", key = "write_operations", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.7", key = "cluster_cache_misses", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.8", key = "read_operations_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.9", key = "sco_cache_misses_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.10", key = "backend_write_operations", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.11", key = "backend_data_read", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.12", key = "cache_hits", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.13", key = "backend_write_operations_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.14", key = "metadata_store_hits_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.15", key = "metadata_store_misses", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.16", key = "backend_data_written", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.17", key = "data_read_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.18", key = "read_operations", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.19", key = "cluster_cache_hits", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.20", key = "cluster_cache_misses_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.21", key = "cluster_cache_hits_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.22", key = "cache_hits_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.23", key = "timestamp", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.24", key = "metadata_store_misses_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.25", key = "backend_data_written_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.26", key = "backend_read_operations", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.27", key = "data_written", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.28", key = "metadata_store_hits", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.29", key = "backend_data_read_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.30", key = "operations_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.31", key = "backend_read_operations_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.33", key = "write_operations_ps", atype = int)
-                self._register_dal_model(1, vd, 'statistics', "2.34", key = "data_transferred", atype = int)
-                self._register_dal_model(1, vd, 'info', "3", key = 'stored', atype = int)
-                self._register_dal_model(1, vd, 'info', "4", key = 'failover_mode', atype = int)
-                self._register_dal_model(1, vd, 'snapshots', "5", atype = int)
-                self.instance_oid += 1
+                if not self._check_added(vd):
+                    self._register_dal_model(1, vd, 'guid', "0")
+                    self._register_dal_model(1, vd, 'name', "1")
+                    self._register_dal_model(1, vd, 'statistics', "2.0", key = "operations", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.1", key = "data_written_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.2", key = "data_read", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.3", key = "sco_cache_misses", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.4", key = "sco_cache_hits_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.5", key = "sco_cache_hits", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.6", key = "write_operations", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.7", key = "cluster_cache_misses", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.8", key = "read_operations_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.9", key = "sco_cache_misses_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.10", key = "backend_write_operations", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.11", key = "backend_data_read", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.12", key = "cache_hits", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.13", key = "backend_write_operations_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.14", key = "metadata_store_hits_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.15", key = "metadata_store_misses", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.16", key = "backend_data_written", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.17", key = "data_read_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.18", key = "read_operations", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.19", key = "cluster_cache_hits", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.20", key = "cluster_cache_misses_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.21", key = "cluster_cache_hits_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.22", key = "cache_hits_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.23", key = "timestamp", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.24", key = "metadata_store_misses_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.25", key = "backend_data_written_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.26", key = "backend_read_operations", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.27", key = "data_written", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.28", key = "metadata_store_hits", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.29", key = "backend_data_read_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.30", key = "operations_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.31", key = "backend_read_operations_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.33", key = "write_operations_ps", atype = int)
+                    self._register_dal_model(1, vd, 'statistics', "2.34", key = "data_transferred", atype = int)
+                    self._register_dal_model(1, vd, 'info', "3", key = 'stored', atype = int)
+                    self._register_dal_model(1, vd, 'info', "4", key = 'failover_mode', atype = int)
+                    self._register_dal_model(1, vd, 'snapshots', "5", atype = int)
+                    self.instance_oid += 1
 
             for pm in PMachineList.get_pmachines():
                 _guids.add(pm.guid)
-
-                self._register_dal_model(2, pm, 'guid', "0")
-                self._register_dal_model(2, pm, 'name', "1")
-                self._register_dal_model(2, pm, 'host_status', "2")
-                self.instance_oid += 1
+                if not self._check_added(pm):
+                    self._register_dal_model(2, pm, 'guid', "0")
+                    self._register_dal_model(2, pm, 'name', "1")
+                    self._register_dal_model(2, pm, 'host_status', "2")
+                    self.instance_oid += 1
 
             for vp in VPoolList.get_vpools():
                 _guids.add(vp.guid)
-
-                self._register_dal_model(3, vm, 'guid', "0")
-                self._register_dal_model(3, vp, 'name', "1")
-                self._register_dal_model(3, vp, 'statistics', "2.0", key = "operations", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.1", key = "cluster_cache_misses_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.2", key = "data_read", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.3", key = "sco_cache_misses", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.4", key = "sco_cache_hits_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.5", key = "sco_cache_hits", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.6", key = "write_operations", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.7", key = "cluster_cache_misses", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.8", key = "read_operations_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.9", key = "sco_cache_misses_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.10", key = "backend_write_operations", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.11", key = "backend_data_read", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.12", key = "cache_hits", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.13", key = "backend_write_operations_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.14", key = "metadata_store_hits_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.15", key = "metadata_store_misses", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.16", key = "backend_data_written", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.17", key = "data_read_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.18", key = "read_operations", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.19", key = "cluster_cache_hits", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.20", key = "data_written_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.21", key = "cluster_cache_hits_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.22", key = "cache_hits_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.23", key = "timestamp", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.24", key = "metadata_store_misses_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.25", key = "backend_data_written_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.26", key = "backend_read_operations", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.27", key = "data_written", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.28", key = "metadata_store_hits", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.29", key = "backend_data_read_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.30", key = "operations_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.31", key = "backend_read_operations_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.33", key = "write_operations_ps", atype = int)
-                self._register_dal_model(3, vp, 'statistics', "2.34", key = "data_transferred", atype = int)
-                self._register_dal_model(3, vp, 'status', "3")
-                self._register_dal_model(3, vp, 'description', "4")
-                self._register_dal_model(3, vp, 'vdisks', "5", atype = int)
-                self._register_dal_model(3, vp, '#vmachines', "6",
-                                         func = lambda vp: len(set([vd.vmachine.guid for vd in vp.vdisks])),
-                                         atype = int)
-                self.instance_oid += 1
+                if not self._check_added(vp):
+                    self._register_dal_model(3, vp, 'guid', "0")
+                    self._register_dal_model(3, vp, 'name', "1")
+                    self._register_dal_model(3, vp, 'statistics', "2.0", key = "operations", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.1", key = "cluster_cache_misses_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.2", key = "data_read", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.3", key = "sco_cache_misses", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.4", key = "sco_cache_hits_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.5", key = "sco_cache_hits", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.6", key = "write_operations", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.7", key = "cluster_cache_misses", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.8", key = "read_operations_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.9", key = "sco_cache_misses_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.10", key = "backend_write_operations", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.11", key = "backend_data_read", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.12", key = "cache_hits", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.13", key = "backend_write_operations_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.14", key = "metadata_store_hits_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.15", key = "metadata_store_misses", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.16", key = "backend_data_written", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.17", key = "data_read_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.18", key = "read_operations", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.19", key = "cluster_cache_hits", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.20", key = "data_written_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.21", key = "cluster_cache_hits_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.22", key = "cache_hits_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.23", key = "timestamp", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.24", key = "metadata_store_misses_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.25", key = "backend_data_written_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.26", key = "backend_read_operations", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.27", key = "data_written", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.28", key = "metadata_store_hits", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.29", key = "backend_data_read_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.30", key = "operations_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.31", key = "backend_read_operations_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.32", key = "data_transferred_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.33", key = "write_operations_ps", atype = int)
+                    self._register_dal_model(3, vp, 'statistics', "2.34", key = "data_transferred", atype = int)
+                    self._register_dal_model(3, vp, 'status', "3")
+                    self._register_dal_model(3, vp, 'description', "4")
+                    self._register_dal_model(3, vp, 'vdisks', "5", atype = int)
+                    self._register_dal_model(3, vp, '#vmachines', "6",
+                                             func = lambda vp: len(set([vd.vmachine.guid for vd in vp.vdisks])),
+                                             atype = int)
+                    self.instance_oid += 1
 
             for storagedriver in StorageDriverList.get_storagedrivers():
                 _guids.add(storagedriver.guid)
-
-                self._register_dal_model(4, storagedriver, 'guid', "0")
-                self._register_dal_model(4, storagedriver, 'name', "1")
-                self._register_dal_model(4, storagedriver, 'stored_data', "2", atype = int)
-                self.instance_oid += 1
+                if not self._check_added(storagedriver):
+                    self._register_dal_model(4, storagedriver, 'guid', "0")
+                    self._register_dal_model(4, storagedriver, 'name', "1")
+                    self._register_dal_model(4, storagedriver, 'stored_data', "2", atype = int)
+                    self.instance_oid += 1
 
             reload = False
             for object_guid in list(self.model_oids):
@@ -398,9 +395,10 @@ class OVSSNMPServer():
 
     def _polling_functions(self):
         def _poll(timestamp_float):
+            start = time.time()
             print('[POLLING] %s' % (str(timestamp_float)))
             self._bootstrap_dal_models()
-            print('[DONE POLLING]')
+            print('[DONE POLLING] %s' % (time.time() - start))
         self.server.register_polling_function(_poll, 300) #5 minutes
 
     def _reload_snmp(self):

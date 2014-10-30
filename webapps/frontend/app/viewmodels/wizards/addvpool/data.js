@@ -50,7 +50,13 @@ define(['knockout', 'jquery'], function(ko, $){
             storageRouters: ko.observableArray([]),
             storageDrivers: ko.observableArray([]),
             mountpoints:    ko.observableArray([]),
-            ipAddresses:    ko.observableArray([])
+            ipAddresses:    ko.observableArray([]),
+            hasCinder:      ko.observable(false),
+            configCinder:   ko.observable(false),
+            cinderUser:     ko.observable('admin'),
+            cinderPassword: ko.observable(''),
+            cinderTenant:   ko.observable('admin'),
+            cinderCtrlIP:   ko.observable('').extend({ regex: ipRegex })
         };
 
         mtptData.mountpoints2 = ko.computed(function() {

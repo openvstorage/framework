@@ -25,7 +25,7 @@ from backend.serializers.serializers import FullSerializer
 from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 from rest_framework import status
-from backend.decorators import required_roles, load, return_object, return_list
+from backend.decorators import required_roles, load, return_object, return_list, log
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('api', 'mgmtcenters')
@@ -39,6 +39,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
     prefix = r'mgmtcenters'
     base_name = 'mgmtcenters'
 
+    @log()
     @required_roles(['read'])
     @return_list(MgmtCenter)
     @load()
@@ -48,6 +49,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         return MgmtCenterList.get_mgmtcenters()
 
+    @log()
     @required_roles(['read'])
     @return_object(MgmtCenter)
     @load(MgmtCenter)
@@ -57,6 +59,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         return mgmtcenter
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load(MgmtCenter)
     def destroy(self, mgmtcenter):
@@ -66,6 +69,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         mgmtcenter.delete(abandon=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load()
     def create(self, request):

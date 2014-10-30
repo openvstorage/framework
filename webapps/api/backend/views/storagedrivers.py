@@ -23,7 +23,7 @@ from rest_framework.decorators import action
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, load, return_list, return_object
+from backend.decorators import required_roles, load, return_list, return_object, log
 
 
 class StorageDriverViewSet(viewsets.ViewSet):
@@ -34,6 +34,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
     prefix = r'storagedrivers'
     base_name = 'storagedrivers'
 
+    @log()
     @required_roles(['read'])
     @return_list(StorageDriver)
     @load()
@@ -43,6 +44,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
         """
         return StorageDriverList.get_storagedrivers()
 
+    @log()
     @required_roles(['read'])
     @return_object(StorageDriver)
     @load(StorageDriver)
@@ -52,6 +54,7 @@ class StorageDriverViewSet(viewsets.ViewSet):
         """
         return storagedriver
 
+    @log()
     @action()
     @required_roles(['read'])
     @load(StorageDriver)

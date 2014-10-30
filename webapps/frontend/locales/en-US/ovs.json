@@ -428,7 +428,7 @@
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
-                "invalidname": "vPool name is invalid",
+                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPoolnames.",
                 "backendtype": "Backend:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
@@ -464,6 +464,15 @@
                 "portinuse": "The given port is already in use",
                 "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "invalidmtpt": "The mountpoint __what__ is invalid."
+            },
+            "gathercinder": {
+                "basicinfo": "Configure Cinder credentials (Keystone authentication)",
+                "cinderUser": "User name:",
+                "cinderPassword": "Password:",
+                "cinderTenant": "Tenant name",
+                "cinderCtrlIP": "Keystone Public IP:",
+                "configCinder": "Configure this vpool with Cinder",
+                "nocinder": "(Detecting Cinder process, please wait...)"
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
