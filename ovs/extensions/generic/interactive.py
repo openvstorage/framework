@@ -43,7 +43,7 @@ class Interactive(object):
                     print invalid_message
 
     @staticmethod
-    def ask_choice(choice_options, question=None, default_value=None):
+    def ask_choice(choice_options, question=None, default_value=None, sort_choices=True):
         """
         Lets the user chose one of a set of options
         """
@@ -52,7 +52,8 @@ class Interactive(object):
         if len(choice_options) == 1:
             print 'Found exactly one choice: {0}'.format(choice_options[0])
             return choice_options[0]
-        choice_options.sort()
+        if sort_choices:
+            choice_options.sort()
         print '{0}Make a selection please: '.format('{0}. '.format(question) if question is not None else '')
         nr = 0
         default_nr = None

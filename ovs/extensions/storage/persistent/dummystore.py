@@ -90,6 +90,13 @@ class DummyPersistentStore(object):
         else:
             raise KeyNotFoundException(key)
 
+    def nop(self):
+        """
+        Executes a nop command
+        """
+        _ = self
+        pass
+
     def _save(self, data):
         """
         Saves the local json file

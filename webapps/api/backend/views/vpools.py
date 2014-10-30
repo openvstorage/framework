@@ -25,7 +25,7 @@ from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.lib.vpool import VPoolController
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from backend.decorators import required_roles, load, return_list, return_object, return_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 
 
 class VPoolViewSet(viewsets.ViewSet):
@@ -36,6 +36,7 @@ class VPoolViewSet(viewsets.ViewSet):
     prefix = r'vpools'
     base_name = 'vpools'
 
+    @log()
     @required_roles(['read'])
     @return_list(VPool, 'name')
     @load()
@@ -45,6 +46,7 @@ class VPoolViewSet(viewsets.ViewSet):
         """
         return VPoolList.get_vpools()
 
+    @log()
     @required_roles(['read'])
     @return_object(VPool)
     @load(VPool)
@@ -55,6 +57,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return vpool
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VPool)
@@ -65,6 +68,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return VPoolController.sync_with_hypervisor.delay(vpool.guid)
 
     @link()
+    @log()
     @required_roles(['read'])
     @return_list(StorageRouter)
     @load(VPool)
@@ -81,6 +85,7 @@ class VPoolViewSet(viewsets.ViewSet):
         return storagerouter if hints['full'] is True else storagerouter_guids
 
     @action()
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VPool)

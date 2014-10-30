@@ -32,6 +32,8 @@ from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.dal.hybrids.log import Log
+
 
 logger = LogHandler('api')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
@@ -60,6 +62,7 @@ def required_roles(roles):
             return f(*args, **kw)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -133,6 +136,7 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             return f(self, **new_kwargs)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -223,6 +227,7 @@ def return_list(object_type, default_sort=None):
             return Response(result, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -250,6 +255,7 @@ def return_object(object_type):
             return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -271,6 +277,7 @@ def return_task():
             return Response(task.id, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -316,5 +323,44 @@ def limit(amount, per, timeout):
             return f(self, request, *args, **kwargs)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
+    return wrap
+
+
+def log():
+    """
+    Task logger
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(self, request, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            # Log the call
+            log_entry = Log()
+            log_entry.source = 'API'
+            log_entry.module = f.__module__
+            log_entry.method = f.__name__
+            log_entry.method_args = list(args)
+            log_entry.method_kwargs = kwargs
+            log_entry.time = time.time()
+            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
+            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            log_entry.save()
+
+            # Call the function
+            return f(self, request, *args, **kwargs)
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
     return wrap

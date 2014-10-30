@@ -19,6 +19,7 @@ import copy
 import os
 import re
 import uuid
+import json
 
 from subprocess import check_output
 from ovs.celery import celery
@@ -36,6 +37,7 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.openstack.cinder import OpenStackCinder
 
 logger = LogHandler('lib', name='storagerouter')
 
@@ -532,7 +534,7 @@ for filename in {1}:
         voldrv_config_file = '{0}/voldrv_vpools/{1}.json'.format(System.read_remote_config(client, 'ovs.core.cfgdir'),
                                                                  vpool_name)
         log_file = '/var/log/ovs/volumedriver/{0}.log'.format(vpool_name)
-        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logrotation --logfile {2} -o big_writes -o sync_read -o allow_other -o default_permissions'.format(
+        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logrotation --logfile {2} -o big_writes -o sync_read -o allow_other'.format(
             voldrv_config_file, storagedriver.mountpoint, log_file)
         if storagerouter.pmachine.hvtype == 'KVM':
             vd_stopcmd = 'umount {0}'.format(storagedriver.mountpoint)
@@ -591,6 +593,35 @@ Service.start_service('{0}')
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
+        # Configure Cinder
+        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        if ovsdb.exists(vpool_config_key):
+            # Second node gets values saved by first node
+            cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = json.loads(ovsdb.get(vpool_config_key))
+        else:
+            config_cinder = parameters.get('config_cinder', False)
+            cinder_password = ''
+            cinder_user = ''
+            tenant_name = ''
+            controller_ip = ''
+        if config_cinder:
+            cinder_password = parameters.get('cinder_pass', cinder_password)
+            cinder_user = parameters.get('cinder_user', cinder_user)
+            tenant_name = parameters.get('cinder_tenant', tenant_name)
+            controller_ip = parameters.get('cinder_controller', controller_ip) # Keystone host
+            if cinder_password:
+                osc = OpenStackCinder(cinder_password = cinder_password,
+                                      cinder_user = cinder_user,
+                                      tenant_name = tenant_name,
+                                      controller_ip = controller_ip)
+
+                osc.configure_vpool(vpool_name, storagedriver.mountpoint)
+                # Save values for first node to use
+                ovsdb.set(vpool_config_key,
+                          json.dumps([cinder_password, cinder_user, tenant_name, controller_ip, config_cinder]))
+
+
     @staticmethod
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid):
@@ -632,6 +663,20 @@ from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.stop_service('{0}')
 """.format(service))
+
+        # Unconfigure Cinder
+        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        if ovsdb.exists(key):
+            cinder_password, cinder_user, tenant_name, controller_ip, _ = json.loads(ovsdb.get(key))
+            client = SSHClient.load(ip)
+            System.exec_remote_python(client, """
+from ovs.extensions.openstack.cinder import OpenStackCinder
+osc = OpenStackCinder(cinder_password = '{0}', cinder_user = '{1}', tenant_name = '{2}', controller_ip = '{3}')
+osc.unconfigure_vpool('{4}', '{5}', {6})
+""".format(cinder_password, cinder_user, tenant_name, controller_ip, vpool.name, storagedriver.mountpoint, not storagedrivers_left))
+            if not storagedrivers_left:
+                ovsdb.delete(key)
 
         # KVM pool
         client = SSHClient.load(ip)
@@ -823,6 +868,15 @@ if Service.has_service('{0}'):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.check_cinder')
+    def check_cinder():
+        """
+        Checks whether cinder is running
+        """
+        osc = OpenStackCinder()
+        return osc.is_cinder_installed
 
     @staticmethod
     def _validate_ip(ip):
