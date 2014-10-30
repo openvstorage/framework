@@ -241,6 +241,10 @@ class SetupController(object):
                 nodes.append(cluster_ip)
             logger.debug('Cluster ip is selected as {0}'.format(cluster_ip))
 
+            if target_password is not None:
+                for node in nodes:
+                    known_passwords[node] = target_password
+
             # Deciding master/extra
             print 'Analyzing cluster layout'
             logger.info('Analyzing cluster layout')
@@ -256,10 +260,6 @@ class SetupController(object):
                         promote = True
             else:
                 promote = True  # Correct, but irrelevant, since a first node is always master
-
-            if target_password is not None:
-                for node in nodes:
-                    known_passwords[node] = target_password
 
             mountpoints, hypervisor_info = SetupController._prepare_node(
                 cluster_ip, nodes, known_passwords,
@@ -828,6 +828,8 @@ EOF
 
             SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config, None, None)
 
+            print ''
+            print Interactive.boxed_message(['Promote complete.'])
             logger.info('Setup complete - promote')
 
         except Exception as exception:
@@ -848,8 +850,6 @@ EOF
         """
         Promotes a given node
         """
-        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-
         print '\n+++ Promoting node +++\n'
         logger.info('Promoting node')
 
@@ -977,16 +977,12 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
             for cluster in SetupController.arakoon_clusters.keys():
                 SetupController._change_service_state(node_client, 'arakoon-{0}'.format(cluster), 'restart')
                 if len(master_nodes) > 1:  # A two node cluster needs all nodes running
-                    cluster = ArakoonManagement().getCluster(cluster)
-                    client = cluster.getClient()
-                    client.nop()
+                    SetupController._wait_for_cluster(cluster)
             SetupController._change_service_state(node_client, 'memcached', 'restart')
         target_client = SSHClient.load(cluster_ip)
         for cluster in SetupController.arakoon_clusters.keys():
             SetupController._change_service_state(target_client, 'arakoon-{0}'.format(cluster), 'restart')
-            cluster = ArakoonManagement().getCluster(cluster)
-            client = cluster.getClient()
-            client.nop()
+            SetupController._wait_for_cluster(cluster)
         logging.disable(loglevel)  # Restore workaround
         SetupController._change_service_state(target_client, 'memcached', 'restart')
 
@@ -1176,6 +1172,8 @@ EOF
 
             SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config)
 
+            print ''
+            print Interactive.boxed_message(['Demote complete.'])
             logger.info('Setup complete - demote')
 
         except Exception as exception:
@@ -1196,8 +1194,6 @@ EOF
         """
         Demotes a given node
         """
-        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-
         print '\n+++ Demoting node +++\n'
         logger.info('Demoting node')
 
@@ -1229,8 +1225,8 @@ EOF
                                                      '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
         SetupController._change_service_state(target_client, 'logstash', 'restart')
 
-        print 'Departing arakoon cluster'
-        logger.info('Departing arakoon cluster')
+        print 'Leaving arakoon cluster'
+        logger.info('Leaving arakoon cluster')
         for cluster in SetupController.arakoon_clusters.keys():
             if SetupController._has_service(target_client, 'arakoon-{0}'.format(cluster)):
                 SetupController._change_service_state(target_client, 'arakoon-{0}'.format(cluster), 'stop')
@@ -1302,9 +1298,7 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for cluster in SetupController.arakoon_clusters.keys():
                 SetupController._change_service_state(node_client, 'arakoon-{0}'.format(cluster), 'restart')
                 if len(master_nodes) > 2:  # A two node cluster needs all nodes running
-                    cluster = ArakoonManagement().getCluster(cluster)
-                    client = cluster.getClient()
-                    client.nop()
+                    SetupController._wait_for_cluster(cluster)
             SetupController._change_service_state(node_client, 'memcached', 'restart')
         logging.disable(loglevel)  # Restore workaround
         target_client = SSHClient.load(cluster_ip)
@@ -1516,6 +1510,28 @@ print Service.stop_service('{0}')
         if config_object.has_section(uid):
             config_object.remove_section(uid)
         SetupController._remote_config_write(target_client, config_location.format(cluster), config_object)
+
+    @staticmethod
+    def _wait_for_cluster(cluster):
+        """
+        Waits for an Arakoon cluster to catch up (by sending a nop)
+        """
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+        from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
+
+        last_exception = None
+        tries = 3
+        while tries > 0:
+            try:
+                cluster_object = ArakoonManagement().getCluster(cluster)
+                client = cluster_object.getClient()
+                client.nop()
+                return
+            except ArakoonSockReadNoBytes as exception:
+                last_exception = exception
+                tries -= 1
+                time.sleep(1)
+        raise last_exception
 
     @staticmethod
     def _get_disk_configuration(client):
