@@ -202,7 +202,7 @@ limitations under the License.
                                               style="padding: 2px 5px 3px 5px;">
                                             <input type="checkbox" data-bind="attr: { id: 'storagerouter_' + guid() }, checkedValue: guid(),
                                                                               checked: $root.checkedStorageRouterGuids,
-                                                                              disable: $parent.backendType() === 'LOCAL' && $.inArray(guid(), $parent.storageRouterGuids()) === -1"
+                                                                              disable: $parent.backendType() === 'local' && $.inArray(guid(), $parent.storageRouterGuids()) === -1"
                                                     style="vertical-align: text-bottom;">
                                             <label data-bind="attr: { for: 'storagerouter_' + guid() }" style="font-weight: normal; margin-left: 7px;">
                                                 <span data-bind="text: name"></span>
@@ -213,13 +213,13 @@ limitations under the License.
                                                   class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: 7px;"></span>
                                         </span>
                                         <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin-left: 10px;"
-                                              data-bind="visible: $root.updatingStorageRouters() && $parent.backendType() !== 'LOCAL' && (
+                                              data-bind="visible: $root.updatingStorageRouters() && $parent.backendType() !== 'local' && (
                                                              ($.inArray(guid(), $root.checkedStorageRouterGuids()) !== -1 && $.inArray(guid(), $parent.storageRouterGuids()) === -1) ||
                                                              ($.inArray(guid(), $root.checkedStorageRouterGuids()) === -1 && $.inArray(guid(), $parent.storageRouterGuids()) !== -1)
                                                          )" ></span>
                                     </div>
                                 </div>
-                                <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
+                                <div data-bind="visible: backendType() === 'local'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
                                 <button class="btn btn-default" id="buttonVpoolSaveChanges" data-bind="click: $root.updateStorageRouterServing,
                                                                            enable: $root.pendingStorageRouters().length > 0 || $root.removingStorageRouters().length > 0"

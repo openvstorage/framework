@@ -23,6 +23,7 @@ from ovs.dal.hybrids.role import Role
 from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.j_roleclient import RoleClient
+from ovs.dal.hybrids.backendtype import BackendType
 
 
 class Model():
@@ -108,6 +109,14 @@ class Model():
                         roleclient.client = user.clients[0]
                         roleclient.role = role
                         roleclient.save()
+
+            # Add backends
+            for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amason_s3'), ('Swift', 'swift_s3'),
+                                      ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
+                backend_type = BackendType()
+                backend_type.name = backend_type_info[0]
+                backend_type.code = backend_type_info[1]
+                backend_type.save()
 
             # We're now at version 0.0.1
             working_version = 1

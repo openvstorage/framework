@@ -1,4 +1,6 @@
+opt/OpenvStorage/config
 opt/OpenvStorage/config/elk
+opt/OpenvStorage/scripts
 opt/OpenvStorage/scripts/install
 usr/share/doc/openvstorage-core
 etc/elasticsearch

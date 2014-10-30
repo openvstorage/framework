@@ -16,25 +16,25 @@
 VPool module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Dynamic, Property
+from ovs.dal.structures import Dynamic, Property, Relation
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.dal.hybrids.backendtype import BackendType
 import time
 
 
 class VPool(DataObject):
     """
     The VPool class represents a vPool. A vPool is a Virtual Storage Pool, a Filesystem, used to
-    deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage Backend.
+    deploy vMachines. a vPool can span multiple Storage Drivers and connects to a single Storage BackendType.
     """
     __properties = [Property('name', str, doc='Name of the vPool'),
                     Property('description', str, mandatory=False, doc='Description of the vPool'),
                     Property('size', int, mandatory=False, doc='Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
-                    Property('login', str, mandatory=False, doc='Login/Username for the Storage Backend.'),
-                    Property('password', str, mandatory=False, doc='Password for the Storage Backend.'),
-                    Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domainname, Zone, ...) for the Storage Backend.'),
-                    Property('type', ['CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'LOCAL', 'DISTRIBUTED'], mandatory=False, doc='Type of the Storage Backend.'),
+                    Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
+                    Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
+                    Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domainname, Zone, ...) for the Storage BackendType.'),
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
-    __relations = []
+    __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
     __dynamics = [Dynamic('status',      str, 10),
                   Dynamic('statistics',  dict, 0),
                   Dynamic('stored_data', int, 60)]

@@ -14,7 +14,7 @@
 /*global define */
 define(['jquery'], function($) {
     "use strict";
-    var mainRoutes, siteRoutes, buildSiteRoutes, loadHash;
+    var mainRoutes, siteRoutes, buildSiteRoutes, loadHash, extraRoutes;
 
     mainRoutes = [
        { route: '',              moduleId: 'viewmodels/redirect', nav: false },
@@ -31,16 +31,21 @@ define(['jquery'], function($) {
         { route: 'vdisks',               moduleId: 'vdisks',               title: $.t('ovs:vdisks.title'),                titlecode: 'ovs:vdisks.title',                nav: true,  main: true  },
         { route: 'vdisk/:guid',          moduleId: 'vdisk-detail',         title: $.t('ovs:vdisks.detail.title'),         titlecode: 'ovs:vdisks.detail.title',         nav: false, main: false },
         { route: 'vtemplates',           moduleId: 'vtemplates',           title: $.t('ovs:vtemplates.title'),            titlecode: 'ovs:vtemplates.title',            nav: true,  main: true  },
-        { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: false, main: false },
         { route: 'login',                moduleId: 'login',                title: $.t('ovs:login.title'),                 titlecode: 'ovs:login.title',                 nav: false, main: false },
         { route: 'about',                moduleId: 'about',                title: $.t('ovs:about.title'),                 titlecode: 'ovs:about.title',                 nav: true,  main: false },
         { route: 'hmc',                  moduleId: 'pmachines',            title: $.t('ovs:pmachines.title'),             titlecode: 'ovs:pmachines.title',             nav: true,  main: false },
         { route: 'users',                moduleId: 'users',                title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false }
     ];
+    extraRoutes = [];
 
     buildSiteRoutes = function(mode) {
-        var i;
+        var i, j;
+        for (i = 0; i < extraRoutes.length; i += 1) {
+            for (j = 0; j < extraRoutes[i].length; j += 1) {
+                siteRoutes.push(extraRoutes[i][j]);
+            }
+        }
         for (i = 0; i < siteRoutes.length; i += 1) {
             siteRoutes[i].hash = '#' + mode + '/' + siteRoutes[i].route;
         }
@@ -66,6 +71,7 @@ define(['jquery'], function($) {
     return {
         mainRoutes     : mainRoutes,
         siteRoutes     : siteRoutes,
+        extraRoutes    : extraRoutes,
         buildSiteRoutes: buildSiteRoutes,
         loadHash       : loadHash
     };

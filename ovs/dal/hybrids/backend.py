@@ -13,20 +13,17 @@
 # limitations under the License.
 
 """
-Branding module
+Backend module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property
+from ovs.dal.structures import Property, Relation
+from ovs.dal.hybrids.backendtype import BackendType
 
 
-class Branding(DataObject):
+class Backend(DataObject):
     """
-    The Branding class represents the specific OEM information.
+    A Backend represents an instance of the supported backend types that has been setup with the OVS GUI
     """
-    __properties = [Property('name', str, doc='Name of the Brand.'),
-                    Property('description', str, mandatory=False, doc='Description of the Brand.'),
-                    Property('css', str, doc='CSS file used by the Brand.'),
-                    Property('productname', str, doc='Commercial product name.'),
-                    Property('is_default', bool, doc='Indicates whether this Brand is the default one.')]
-    __relations = []
+    __properties = [Property('name', str, doc='Name of the Backend.')]
+    __relations = [Relation('backend_type', BackendType, 'backends', doc='Type of the backend.')]
     __dynamics = []

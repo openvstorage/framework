@@ -112,7 +112,7 @@ class StorageRouterController(object):
         vpool = VPoolList.get_vpool_by_name(vpool_name)
         storagedriver = None
         if vpool is not None:
-            if vpool.type == 'LOCAL':
+            if vpool.backend_type.code == 'local':
                 # Might be an issue, investigating whether it's on the same not or not
                 if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machine_id != unique_id:
                     raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
@@ -162,16 +162,17 @@ if Service.has_service('{0}'):
         if vpool is None:
             vpool = VPool()
             supported_backends = System.read_remote_config(client, 'volumedriver.supported.backends').split(',')
-            if 'REST' in supported_backends:
-                supported_backends.remove('REST')  # REST is not supported for now
-            vpool.type = parameters['type']
+            if 'rest' in supported_backends:
+                supported_backends.remove('rest')  # REST is not supported for now
+            backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
+            vpool.backend_type = backend_type
             connection_host = connection_port = connection_username = connection_password = None
-            if vpool.type in ['LOCAL', 'DISTRIBUTED']:
+            if vpool.backend_type.code in ['local', 'distributed']:
                 vpool.metadata = {'backend_type': 'LOCAL'}
                 mountpoint_bfs = parameters['mountpoint_bfs']
                 directories_to_create.append(mountpoint_bfs)
                 vpool.metadata['local_connection_path'] = mountpoint_bfs
-            if vpool.type == 'REST':
+            if vpool.backend_type.code == 'rest':
                 connection_host = parameters['connection_host']
                 connection_port = parameters['connection_port']
                 rest_connection_timeout_secs = parameters['connection_timeout']
@@ -181,12 +182,12 @@ if Service.has_service('{0}'):
                                   'rest_connection_verbose_logging': rest_connection_timeout_secs,
                                   'rest_connection_metadata_format': "JSON",
                                   'backend_type': 'REST'}
-            elif vpool.type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
+            elif vpool.backend_type.code in ('ceph_s3', 'amazon_s3', 'swift_s3'):
                 connection_host = parameters['connection_host']
                 connection_port = parameters['connection_port']
                 connection_username = parameters['connection_username']
                 connection_password = parameters['connection_password']
-                if vpool.type in ['SWIFT_S3']:
+                if vpool.backend_type.code in ['swift_s3']:
                     strict_consistency = 'false'
                     s3_connection_flavour = 'SWIFT'
                 else:
@@ -203,7 +204,7 @@ if Service.has_service('{0}'):
                                   'backend_type': 'S3'}
 
             vpool.name = vpool_name
-            vpool.description = "{} {}".format(vpool.type, vpool_name)
+            vpool.description = "{} {}".format(vpool.backend_type.code, vpool_name)
             vpool.login = connection_username
             vpool.password = connection_password
             if not connection_host:
