@@ -77,7 +77,7 @@ class OpenStackCinder(object):
                 return 'start/running' in str(self.client.run('service cinder-volume status'))
             except SystemExit:
                 return False
-        raise RuntimeError('Neither devstack nor OpenStack processes detected!')
+        return False
 
     def _is_cinder_installed(self):
         try:
