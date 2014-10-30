@@ -27,6 +27,8 @@ CACHE:
 /lib/font-awesome/fonts/fontawesome-webfont.woff?v=4.0.3
 /lib/font-awesome/fonts/fontawesome-webfont.ttf?v=4.0.3
 /lib/font-awesome/fonts/fontawesome-webfont.svg?v=4.0.3
+# images
+/lib/ovs/images/ovssplash.png
 
 NETWORK:
 /api/
