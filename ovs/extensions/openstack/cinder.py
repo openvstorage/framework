@@ -17,7 +17,6 @@ This module contains OpenStack Cinder commands
 """
 import os, time
 from ovs.extensions.generic.sshclient import SSHClient
-from cinderclient.v1 import client as cinder_client
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
 CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
@@ -36,7 +35,12 @@ class OpenStackCinder(object):
         self.cinder_client = None
 
         if cinder_password:
-            self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
+            try:
+                from cinderclient.v1 import client as cinder_client
+            except ImportError:
+                pass
+            else:
+                self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
         self.is_devstack = self._is_devstack()
         self.is_openstack = self._is_openstack()
         self.is_cinder_running = self._is_cinder_running()
