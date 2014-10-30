@@ -28,7 +28,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
-from backend.decorators import required_roles, return_list, return_object, return_task, load
+from backend.decorators import required_roles, return_list, return_object, return_task, load, log
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -39,6 +39,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     prefix = r'storagerouters'
     base_name = 'storagerouters'
 
+    @log()
     @required_roles(['read'])
     @return_list(StorageRouter, 'name')
     @load()
@@ -55,6 +56,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
                                      'query': query}).data
             return DataObjectList(query_result, StorageRouter)
 
+    @log()
     @required_roles(['read'])
     @return_object(StorageRouter)
     @load(StorageRouter)
@@ -65,6 +67,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return storagerouter
 
     @action()
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
@@ -75,6 +78,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageDriverController.move_away.delay(storagerouter.guid)
 
     @link()
+    @log()
     @required_roles(['read'])
     @load(StorageRouter)
     def get_available_actions(self):
@@ -88,6 +92,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return Response(actions, status=status.HTTP_200_OK)
 
     @action()
+    @log()
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
@@ -101,6 +106,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @link()
+    @log()
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
@@ -113,6 +119,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
+    @log()
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
@@ -130,6 +137,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageRouterController.check_s3.delay(**parameters)
 
     @action()
+    @log()
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)
@@ -143,6 +151,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         )
 
     @action()
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
@@ -152,13 +161,28 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_readcache', 'mountpoint_writecache', 'mountpoint_foc', 'storage_ip', 'vrouter_port']
-        parameters = {'storagerouter_ip': storagerouter.ip}
+                  'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
+                  'storage_ip', 'vrouter_port', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
+        parameters = {'storagerouter_ip': storagerouter.ip }
         for field in fields:
             if field not in call_parameters:
-                raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
+                if field == 'mountpoint_readcache2':
+                    parameters[field] = ''
+                    continue
+                else:
+                    raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = call_parameters[field]
             if not isinstance(parameters[field], int):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+
+    @action()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def check_cinder(self, storagerouter):
+        """
+        Checks whether cinder process is running on the specified machine
+        """
+        return StorageRouterController.check_cinder.s().apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))

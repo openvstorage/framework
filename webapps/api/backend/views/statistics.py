@@ -20,7 +20,7 @@ import datetime
 import memcache
 from configobj import ConfigObj
 import os
-from backend.decorators import required_roles, load
+from backend.decorators import required_roles, load, log
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -42,7 +42,9 @@ class MemcacheViewSet(viewsets.ViewSet):
         Get the memcache nodes
         """
         memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-        nodes = memcache_ini['main']['nodes'].split(',')
+        nodes = memcache_ini['main']['nodes']
+        if not isinstance(nodes, list):
+            nodes = nodes.split(',')
         nodes = [node.strip() for node in nodes]
         return [memcache_ini[node]['location'] for node in nodes]
 
@@ -86,6 +88,7 @@ class MemcacheViewSet(viewsets.ViewSet):
                 stats['%s_%s' % (key, hittype)] = client.get(cachekey, default=0)
         return stats
 
+    @log()
     @required_roles(['read'])
     @load()
     def list(self):
@@ -107,6 +110,7 @@ class MemcacheViewSet(viewsets.ViewSet):
                 stats['offline'].append(node)
         return Response(stats)
 
+    @log()
     @required_roles(['read'])
     @load()
     def retrieve(self):

@@ -23,6 +23,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vmachine import VMachineController
+from ovs.lib.helpers.decorators import log
 
 
 class VPoolController(object):
@@ -32,6 +33,7 @@ class VPoolController(object):
 
     @staticmethod
     @celery.task(name='ovs.vpool.mountpoint_available_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def mountpoint_available_from_voldrv(mountpoint, storagedriver_id):
         """
         Hook for (re)exporting the NFS mountpoint

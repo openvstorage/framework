@@ -44,11 +44,17 @@ define([
                         mountpoint_temp: self.data.mtptTemp(),
                         mountpoint_bfs: self.data.mtptBFS(),
                         mountpoint_md: self.data.mtptMD(),
-                        mountpoint_readcache: self.data.mtptReadCache(),
+                        mountpoint_readcache1: self.data.mtptReadCache1(),
+                        mountpoint_readcache2: self.data.mtptReadCache2(),
                         mountpoint_writecache: self.data.mtptWriteCache(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        vrouter_port: self.data.vRouterPort()
+                        vrouter_port: self.data.vRouterPort(),
+                        config_cinder: self.data.configCinder(),
+                        cinder_user: self.data.cinderUser(),
+                        cinder_pass: self.data.cinderPassword(),
+                        cinder_tenant: self.data.cinderTenant(),
+                        cinder_controller: self.data.cinderCtrlIP()
                     }
                 };
                 api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })

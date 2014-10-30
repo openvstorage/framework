@@ -22,7 +22,7 @@ import time
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest
-from oauth2.decorators import json_response, limit
+from oauth2.decorators import json_response, limit, log
 from oauth2.toolbox import Toolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
@@ -35,6 +35,7 @@ class OAuth2TokenView(View):
     Implements OAuth 2 token views
     """
 
+    @log()
     @limit(amount=5, per=60, timeout=60)
     @json_response()
     def post(self, request, *args, **kwargs):
@@ -76,7 +77,7 @@ class OAuth2TokenView(View):
             if 'HTTP_AUTHORIZATION' not in request.META:
                 return HttpResponseBadRequest, {'error': ''}
             _, password_hash = request.META['HTTP_AUTHORIZATION'].split(' ')
-            client_id, client_secret = base64.decodestring(password_hash).split(':')
+            client_id, client_secret = base64.decodestring(password_hash).split(':', 1)
             try:
                 client = Client(client_id)
                 if client.grant_type != 'CLIENT_CREDENTIALS':

@@ -57,6 +57,12 @@ class SetupController(object):
             print Interactive.boxed_message(['Open vStorage Setup'])
             logger.info('Starting Open vStorage Setup')
 
+            try:
+                import cuisine
+                import fabric
+            except ImportError:
+                raise RuntimeError('Some modules could not be loaded. Was Open vStorage installed correctly?')
+
             # Prepare variables
             auto_config = False
             disk_layout = {}
@@ -401,11 +407,11 @@ class SetupController(object):
                       '<MEMCACHE_NODE_IP>': cluster_ip,
                       '<WORKER_QUEUE>': unique_id}
             if join_masters:
-                for service in master_node_services + ['watcher']:
+                for service in master_node_services + ['watcher-volumedriver', 'watcher-framework']:
                     logger.debug('Adding service {0}'.format(service))
                     SetupController._add_service(target_client, service, params)
             else:
-                for service in extra_node_services + ['watcher']:
+                for service in extra_node_services + ['watcher-volumedriver', 'watcher-framework']:
                     logger.debug('Adding service {0}'.format(service))
                     SetupController._add_service(target_client, service, params)
 
@@ -738,8 +744,9 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
                     client.run('service ovs-rabbitmq start', quiet=True)
 
             target_client = SSHClient.load(ip)
-            SetupController._enable_service(target_client, 'watcher')
-            SetupController._change_service_state(target_client, 'watcher', 'start')
+            for service in ['watcher-volumedriver', 'watcher-framework']:
+                SetupController._enable_service(target_client, service)
+                SetupController._change_service_state(target_client, service, 'start')
 
             logger.debug('Restarting workers')
             for node in nodes:
@@ -774,12 +781,19 @@ EOF
                 print Interactive.boxed_message(['Setup complete.',
                                                  'Point your browser to http://{0} to start using Open vStorage'.format(cluster_ip)])
             logger.info('Setup complete')
+            print ''
 
         except Exception as exception:
             print ''  # Spacing
             print Interactive.boxed_message(['An unexpected error occurred:', str(exception)])
             logger.exception('Unexpected error')
             logger.error(str(exception))
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print ''
+            print ''
+            print Interactive.boxed_message(['This setup was aborted. Open vStorage may be in an inconsistent state, make sure to validate the installation.'])
+            logger.error('Keyboard interrupt')
             sys.exit(1)
 
     @staticmethod
@@ -1114,14 +1128,15 @@ print blk_devices
 
     @staticmethod
     def _partition_disks(client, partition_layout):
-        fstab_entry = 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2 \n'
+        fstab_entry = 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2'
+        fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
         mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().split('\n')]
 
         unique_disks = set()
         for mp, values in partition_layout.iteritems():
             unique_disks.add(values['device'])
 
-            # umount partitions
+            # Umount partitions
             if mp in mounted:
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
@@ -1133,13 +1148,13 @@ print blk_devices
                     print 'Unmounting {0}'.format(mounted_device)
                     client.run('umount {0}'.format(mounted_device))
 
-        # wipe disks
+        # Wipe disks
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
                 continue
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
-        # pre process partition info (disk as key)
+        # Pre process partition info (disk as key)
         mountpoints = partition_layout.keys()
         mountpoints.sort()
         partitions_by_disk = dict()
@@ -1153,8 +1168,8 @@ print blk_devices
             else:
                 partitions_by_disk[disk] = [(mp, percentage, label)]
 
-        # partition and format disks
-        fstab = '# BEGIN Open vStorage \n'
+        # Partition and format disks
+        fstab_entries = ['{0} - Do not edit anything in this block'.format(fstab_separator[0])]
         for disk, partitions in partitions_by_disk.iteritems():
             if disk == 'DIR_ONLY':
                 for directory, _, _ in partitions:
@@ -1171,21 +1186,26 @@ print blk_devices
                     size_in_percentage = int(start) + int(percentage)
                     client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
                 client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
-                fstab = fstab + fstab_entry.format(label, mp)
+                fstab_entries.append(fstab_entry.format(label, mp))
                 count += 1
                 start = size_in_percentage
 
-        fstab += '# END OPENVSTORAGE \n'
+        fstab_entries.append(fstab_separator[1])
 
-        # update fstab
-        must_update = False
-        fstab_content = client.file_read('/etc/fstab')
-        if not '# BEGIN Open vStorage' in fstab_content:
-            fstab_content += '\n'
-            fstab_content += fstab
-            must_update = True
-        if must_update:
-            client.file_write('/etc/fstab', fstab_content)
+        # Update fstab
+        original_content = [line.strip() for line in client.file_read('/etc/fstab').strip().split('\n')]
+        new_content = []
+        skip = False
+        for line in original_content:
+            if skip is False:
+                if line.startswith(fstab_separator[0]):
+                    skip = True
+                else:
+                    new_content.append(line)
+            elif line.startswith(fstab_separator[1]):
+                skip = False
+        new_content += fstab_entries
+        client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
         try:
             client.run('timeout -k 9 5s mountall -q || true')

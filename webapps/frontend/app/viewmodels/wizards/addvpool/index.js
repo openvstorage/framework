@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_vpool', './gather_mountpoints', './confirm'
-], function($, generic, build, data, GatherVPool, GatherMountPoints, Confirm) {
+    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_cinder', './confirm'
+], function($, generic, build, data, GatherVPool, GatherMountPoints, GatherCinder, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -24,7 +24,7 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new GatherVPool(), new GatherMountPoints(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherMountPoints(), new GatherCinder(self), new Confirm()]);
         self.step(0);
         self.activateStep();
 
@@ -36,7 +36,8 @@ define([
         data.mtptTemp(undefined);
         data.mtptBFS(undefined);
         data.mtptMD(undefined);
-        data.mtptReadCache(undefined);
+        data.mtptReadCache1(undefined);
+        data.mtptReadCache2(undefined);
         data.mtptWriteCache(undefined);
         data.mtptFOC(undefined);
         data.storageIP(undefined);
@@ -50,5 +51,11 @@ define([
         data.storageDrivers([]);
         data.mountpoints([]);
         data.ipAddresses([]);
+        data.cinderUser('admin');
+        data.cinderPassword('');
+        data.cinderTenant('admin');
+        data.cinderCtrlIP('127.0.0.1');
+        data.configCinder(false);
+        data.hasCinder(false);
     };
 });
