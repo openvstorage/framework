@@ -95,6 +95,7 @@ class SetupController(object):
         auto_config = None
         disk_layout = None
         arakoon_mountpoint = None
+        join_cluster = False
 
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
@@ -115,6 +116,7 @@ class SetupController(object):
             verbose = config.getboolean('setup', 'verbose')
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
+            join_cluster = config.getboolean('setup', 'join_cluster')
 
         try:
             if force_type is not None:
@@ -225,6 +227,7 @@ class SetupController(object):
                 logger.debug('Automated installation')
                 if cluster_name in discovery_result:
                     nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+                first_node = not join_cluster
             if not cluster_name:
                 raise RuntimeError('The name of the cluster should be known by now.')
 
@@ -321,7 +324,7 @@ class SetupController(object):
             if first_request is True:
                 prev_node_password = Interactive.ask_password('Enter root password for {0}'.format(node))
                 logger.debug('Custom password for {0}'.format(node))
-                passwords = {node: prev_node_password}
+                passwords[node] = prev_node_password
                 first_request = False
             else:
                 this_node_password = Interactive.ask_password('Enter root password for {0}, just press enter if identical as above'.format(node))
