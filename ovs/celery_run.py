@@ -23,8 +23,6 @@ sys.path.append('/opt/OpenvStorage')
 import os
 from kombu import Queue
 from celery import Celery
-from celery.beat import Scheduler, ScheduleEntry  # Do not remove, need these in celery_beat.py
-from celery import current_app  # Do not remove, need these in celery_beat.py
 from celery.schedules import crontab
 from celery.signals import task_postrun, worker_process_init
 from ovs.lib.messaging import MessageController

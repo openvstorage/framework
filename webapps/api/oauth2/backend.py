@@ -35,21 +35,21 @@ class OAuth2Backend(BaseAuthentication):
             return None
         authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')
         if authorization_type != 'Bearer':
-            raise AuthenticationFailed('A Bearer token is required')
+            raise AuthenticationFailed('invalid_authorization_type')
 
         tokens = BearerTokenList.get_by_access_token(access_token)
         if len(tokens) != 1:
-            raise AuthenticationFailed('Invalid token')
+            raise AuthenticationFailed('invalid_token')
         token = tokens[0]
         if token.expiration < time.time():
             for junction in token.roles.itersafe():
                 junction.delete()
             token.delete()
-            raise AuthenticationFailed('Token expired')
+            raise AuthenticationFailed('token_expired')
 
         user = token.client.user
         if not user.is_active:
-            raise AuthenticationFailed('User inactive')
+            raise AuthenticationFailed('inactive_user')
         request.client = token.client
         request.token = token
 

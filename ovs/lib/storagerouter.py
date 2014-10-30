@@ -22,7 +22,7 @@ import uuid
 import json
 
 from subprocess import check_output
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool

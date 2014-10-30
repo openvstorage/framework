@@ -787,3 +787,25 @@ class DataObject(object):
         The string representation of a DataObject is the serialized value
         """
         return json.dumps(self.serialize(), indent=4)
+
+    def __hash__(self):
+        """
+        Defines a hashing equivalent for a given object. The key (object type and guid) is considered to be identifying
+        """
+        return hash(self._key)
+
+    def __eq__(self, other):
+        """
+        Checks whether two objects are the same.
+        """
+        if not isinstance(other, DataObject):
+            return False
+        return self.__hash__() == other.__hash__()
+
+    def __ne__(self, other):
+        """
+        Checks whether to objects are not the same.
+        """
+        if not isinstance(other, DataObject):
+            return False
+        return not self.__eq__(other)

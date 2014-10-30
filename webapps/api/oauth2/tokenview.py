@@ -56,8 +56,10 @@ class OAuth2TokenView(View):
             username = request.POST['username']
             password = request.POST['password']
             user = UserList.get_user_by_username(username)
-            if user is None or user.password != hashlib.sha256(password).hexdigest() or user.is_active is False:
+            if user is None or user.password != hashlib.sha256(password).hexdigest():
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
+            if user.is_active is False:
+                return HttpResponseBadRequest, {'error': 'inactive_user'}
             clients = [client for client in user.clients if client.ovs_type == 'FRONTEND' and client.grant_type == 'PASSWORD']
             if len(clients) != 1:
                 return HttpResponseBadRequest, {'error': 'unauthorized_client'}
@@ -67,7 +69,7 @@ class OAuth2TokenView(View):
                 access_token.expiration = int(time.time() + 86400)
                 access_token.save()
             except ValueError as error:
-                return HttpResponseBadRequest, {'error': error}
+                return HttpResponseBadRequest, {'error': str(error)}
             Toolbox.clean_tokens(client)
             return HttpResponse, {'access_token': access_token.access_token,
                                   'token_type': 'bearer',
@@ -75,7 +77,7 @@ class OAuth2TokenView(View):
         elif grant_type == 'client_credentials':
             # Client Credentials
             if 'HTTP_AUTHORIZATION' not in request.META:
-                return HttpResponseBadRequest, {'error': ''}
+                return HttpResponseBadRequest, {'error': 'missing_header'}
             _, password_hash = request.META['HTTP_AUTHORIZATION'].split(' ')
             client_id, client_secret = base64.decodestring(password_hash).split(':', 1)
             try:
@@ -83,16 +85,16 @@ class OAuth2TokenView(View):
                 if client.grant_type != 'CLIENT_CREDENTIALS':
                     return HttpResponseBadRequest, {'error': 'invalid_grant'}
                 if not client.user.is_active:
-                    return HttpResponseBadRequest, {'error': 'unauthorized_client'}
+                    return HttpResponseBadRequest, {'error': 'inactive_user'}
                 try:
                     access_token, _ = Toolbox.generate_tokens(client, generate_access=True, scopes=scopes)
                 except ValueError as error:
-                    return HttpResponseBadRequest, {'error': error}
+                    return HttpResponseBadRequest, {'error': str(error)}
                 Toolbox.clean_tokens(client)
                 return HttpResponse, {'access_token': access_token.access_token,
                                       'token_type': 'bearer',
                                       'expires_in': 3600}
-            except ObjectNotFoundException:
+            except:
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
         else:
             return HttpResponseBadRequest, {'error': 'unsupported_grant_type'}
