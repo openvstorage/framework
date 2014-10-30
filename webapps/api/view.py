@@ -36,7 +36,7 @@ class MetadataView(View):
     """
 
     @json_response()
-    @limit(amount=5, per=60, timeout=60)
+    @limit(amount=60, per=60, timeout=60)
     def get(self, request, *args, **kwargs):
         """
         Fetches metadata
