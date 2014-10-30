@@ -12,21 +12,18 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-Changes applied by CloudFounders NV
-* PEP8 code cleanup
-* No default reconnect on __init__
 """
+
+
 
 import ssl
 import socket
 from ArakoonProtocol import *
 from ArakoonExceptions import *
 
+class ArakoonClientConnection :
 
-class ArakoonClientConnection:
-
-    def __init__(self, nodeLocations, clusterId, config):
+    def __init__ (self, nodeLocations, clusterId, config):
         self._clusterId = clusterId
         self._nodeIPs = nodeLocations[0]
         self._nodePort = nodeLocations[1]
@@ -36,14 +33,14 @@ class ArakoonClientConnection:
         self._socket = None
         self._socketInfo = None
         self._config = config
-        # self._reconnect()
+        self._reconnect()
 
     def _reconnect(self):
         self.close()
-        try:
+        try :
             ip = self._nodeIPs[self._index]
-            sock = socket.create_connection((ip, self._nodePort),
-                                            ArakoonClientConfig.getConnectionTimeout())
+            sock = socket.create_connection((ip , self._nodePort),
+                                                    ArakoonClientConfig.getConnectionTimeout())
 
             if self._config.tls:
                 kwargs = {
@@ -68,55 +65,53 @@ class ArakoonClientConnection:
             self._socketInfo = (ip, self._nodePort)
             sendPrologue(self._socket, self._clusterId)
             self._connected = True
-        except Exception, ex:
-            ArakoonClientLogger.logWarning(
-                "Unable to connect to %s:%s (%s: '%s')",
-                self._nodeIPs[self._index],
-                self._nodePort,
-                ex.__class__.__name__,
-                ex)
+        except Exception, ex :
+            ArakoonClientLogger.logWarning( "Unable to connect to %s:%s (%s: '%s')" ,
+                                            self._nodeIPs[self._index],
+                                            self._nodePort,
+                                            ex.__class__.__name__,
+                                            ex  )
             self._index = (self._index + 1) % self._nIPs
+
 
     def send(self, msg):
 
-        if not self._connected:
+        if not self._connected :
             self._reconnect()
-            if not self._connected:
-                raise ArakoonNotConnected((self._nodeIPs, self._nodePort))
+            if not self._connected :
+                raise ArakoonNotConnected( (self._nodeIPs, self._nodePort) )
         try:
-            self._socket.sendall(msg)
+            self._socket.sendall( msg )
         except Exception, ex:
             self.close()
-            ArakoonClientLogger.logWarning(
-                "Error while sending data to (%s,%s) => %s: '%s'",
-                self._nodeIPs[self._index], self._nodePort, ex.__class__.__name__, ex)
-            raise ArakoonSockSendError()
+            ArakoonClientLogger.logWarning( "Error while sending data to (%s,%s) => %s: '%s'" ,
+                self._nodeIPs[self._index], self._nodePort, ex.__class__.__name__, ex  )
+            raise ArakoonSockSendError ()
 
     def close(self):
-        if self._connected and self._socket is not None:
+        if self._connected and self._socket is not None :
             try:
                 self._socket.close()
             except Exception, ex:
-                ArakoonClientLogger.logError(
-                    "Error while closing socket to %s:%s (%s: '%s')",
-                    self._nodeIPs[self._index], self._nodePort, ex.__class__.__name__, ex)
+                ArakoonClientLogger.logError( "Error while closing socket to %s:%s (%s: '%s')" ,
+                    self._nodeIPs[self._index], self._nodePort, ex.__class__.__name__, ex  )
             self._socketInfo = None
             self._connected = False
 
-    def decodeStringResult(self):
-        return ArakoonProtocol.decodeStringResult(self)
+    def decodeStringResult(self) :
+        return ArakoonProtocol.decodeStringResult ( self )
 
-    def decodeBoolResult(self):
-        return ArakoonProtocol.decodeBoolResult(self)
+    def decodeBoolResult(self) :
+        return ArakoonProtocol.decodeBoolResult ( self )
 
-    def decodeVoidResult(self):
-        ArakoonProtocol.decodeVoidResult(self)
+    def decodeVoidResult(self) :
+        ArakoonProtocol.decodeVoidResult ( self )
 
-    def decodeStringOptionResult(self):
-        return ArakoonProtocol.decodeStringOptionResult(self)
+    def decodeStringOptionResult (self):
+        return ArakoonProtocol.decodeStringOptionResult ( self )
 
-    def decodeStringArrayResult(self):
-        return ArakoonProtocol.decodeStringArrayResult(self)
+    def decodeStringArrayResult(self) :
+        return ArakoonProtocol.decodeStringArrayResult ( self )
 
     def decodeStringListResult(self):
         return ArakoonProtocol.decodeStringListResult(self)
@@ -124,8 +119,8 @@ class ArakoonClientConnection:
     def decodeStringOptionArrayResult(self):
         return ArakoonProtocol.decodeStringOptionArrayResult(self)
 
-    def decodeStringPairListResult(self):
-        return ArakoonProtocol.decodeStringPairListResult(self)
+    def decodeStringPairListResult(self) :
+        return ArakoonProtocol.decodeStringPairListResult ( self )
 
     def decodeStatistics(self):
         return ArakoonProtocol.decodeStatistics(self)
@@ -144,3 +139,4 @@ class ArakoonClientConnection:
 
     def decodeGetTxidResult(self):
         return ArakoonProtocol.decodeGetTxidResult(self)
+

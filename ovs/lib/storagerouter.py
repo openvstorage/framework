@@ -31,7 +31,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.extensions.generic.system import System
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
@@ -425,7 +425,7 @@ for directory in {0}:
                           'vrouter_min_workers': 4,
                           'vrouter_max_workers': 16}
         voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'volumedriver.arakoon.clusterid'))
-        voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+        voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
         for arakoon_node in voldrv_arakoon_client_config.keys():
@@ -595,7 +595,7 @@ Service.start_service('{0}')
         vpool.save()
 
         # Configure Cinder
-        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        ovsdb = ArakoonManagementEx().getCluster('ovsdb').getClient()
         vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
         if ovsdb.exists(vpool_config_key):
             # Second node gets values saved by first node
@@ -666,7 +666,7 @@ if Service.has_service('{0}'):
 """.format(service))
 
         # Unconfigure Cinder
-        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        ovsdb = ArakoonManagementEx().getCluster('ovsdb').getClient()
         key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
         if ovsdb.exists(key):
             cinder_password, cinder_user, tenant_name, controller_ip, _ = json.loads(ovsdb.get(key))
@@ -700,7 +700,7 @@ if Service.has_service('{0}'):
         configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
 
         voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'volumedriver.arakoon.clusterid'))
-        voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+        voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
         for arakoon_node in voldrv_arakoon_client_config.keys():

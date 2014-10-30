@@ -15,19 +15,20 @@ limitations under the License.
 """
 
 
+
 # This module is taken from the Pyrakoon_ project, retrieved from version
 # 5ce9f77ea376b91cddfdcab1d7bd294c327b7265.
 #
 # Unused functions were removed.
 #
 # .. _Pyrakoon: https://github.com/Incubaid/pyrakoon
+
 import __builtin__
 import uuid
 import functools
 import itertools
 
-
-def update_argspec(*argnames):  # pylint: disable-msg=R0912
+def update_argspec(*argnames): #pylint: disable-msg=R0912
     '''Wrap a callable to use real argument names
 
     When generating functions at runtime, one often needs to fall back to
@@ -102,7 +103,7 @@ def update_argspec(*argnames):  # pylint: disable-msg=R0912
     :rtype: `callable`
     '''
 
-    argnames_ = tuple(itertools.chain(argnames, ('',)))
+    argnames_ = tuple(itertools.chain(argnames, ('', )))
 
     # Standard execution context, contains only what we actually need in the
     # function template
@@ -142,8 +143,8 @@ def update_argspec(*argnames):  # pylint: disable-msg=R0912
                 yield '%s=%s' % (arg, _format(default))
 
     template_signature = ', '.join(_generate_signature(argnames_))
-    template_args = ', '.join(name if isinstance(name, str) else name[0]
-                              for name in argnames_) if argnames_ else ''
+    template_args = ', '.join(name if isinstance(name, str) else name[0] \
+        for name in argnames_) if argnames_ else ''
     template_argnames = ', '.join(
         '\'%s\'' % (name if isinstance(name, str) else name[0])
         for name in argnames_) if argnames_ else ''
@@ -181,6 +182,7 @@ def %%(name)s(%(signature)s):
         kwargs_name = None
         while (not kwargs_name) or (kwargs_name in argnames_):
             kwargs_name = '_kwargs_%s' % random_suffix()
+
 
         # Fill in function template
         fun_def = fun_def_template % {

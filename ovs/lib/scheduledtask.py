@@ -30,7 +30,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
@@ -285,7 +285,7 @@ class ScheduledTaskController(object):
                                os.walk(arakoon_dir).next()[1])
         for cluster in arakoon_clusters:
             logger.info('  Collapsing cluster: {}'.format(cluster))
-            cluster_instance = ArakoonManagement().getCluster(cluster)
+            cluster_instance = ArakoonManagementEx().getCluster(cluster)
             for node in cluster_instance.listNodes():
                 logger.info('    Collapsing node: {}'.format(node))
                 try:
