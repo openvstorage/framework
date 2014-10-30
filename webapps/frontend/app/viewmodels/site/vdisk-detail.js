@@ -34,9 +34,10 @@ define([
             { key: 'is_automatic',  value: $.t('ovs:generic.type'),        width: 110       },
             { key: 'is_consistent', value: $.t('ovs:generic.consistent'),  width: 100       }
         ];
-        self.snapshotsInitialLoad = ko.observable(true);
+
         // Observables
-        self.vDisk = ko.observable();
+        self.snapshotsInitialLoad = ko.observable(true);
+        self.vDisk                = ko.observable();
 
         // Functions
         self.load = function() {

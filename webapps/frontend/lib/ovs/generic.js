@@ -112,9 +112,19 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return undefined;
     }
+    function formatPercentage(value) {
+        value = Math.round(value * 10000) / 100;
+        return formatNumber(value) + ' %';
+    }
     function padRight(value, character, length) {
         while (value.length < length) {
             value += character;
+        }
+        return value;
+    }
+    function padLeft(value, character, length) {
+        while (value.length < length) {
+            value = character + value;
         }
         return value;
     }
@@ -311,33 +321,35 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
 
     return {
-        getTimestamp    : getTimestamp,
-        formatBytes     : formatBytes,
-        formatSpeed     : formatSpeed,
-        formatRatio     : formatRatio,
-        formatShort     : formatShort,
-        formatNumber    : formatNumber,
-        padRight        : padRight,
-        tryGet          : tryGet,
-        trySet          : trySet,
-        lower           : lower,
-        alert           : alert,
-        alertInfo       : alertInfo,
-        alertSuccess    : alertSuccess,
-        alertError      : alertError,
-        keys            : keys,
-        xhrAbort        : xhrAbort,
-        xhrCompleted    : xhrCompleted,
-        removeElement   : removeElement,
-        smooth          : smooth,
-        round           : round,
-        ceil            : ceil,
-        buildString     : buildString,
-        setDecimals     : setDecimals,
-        crossFiller     : crossFiller,
-        deg2rad         : deg2rad,
-        numberSort      : numberSort,
-        advancedSort    : advancedSort,
-        validate        : validate
+        getTimestamp     : getTimestamp,
+        formatBytes      : formatBytes,
+        formatSpeed      : formatSpeed,
+        formatRatio      : formatRatio,
+        formatShort      : formatShort,
+        formatNumber     : formatNumber,
+        formatPercentage : formatPercentage,
+        padRight         : padRight,
+        padLeft          : padLeft,
+        tryGet           : tryGet,
+        trySet           : trySet,
+        lower            : lower,
+        alert            : alert,
+        alertInfo        : alertInfo,
+        alertSuccess     : alertSuccess,
+        alertError       : alertError,
+        keys             : keys,
+        xhrAbort         : xhrAbort,
+        xhrCompleted     : xhrCompleted,
+        removeElement    : removeElement,
+        smooth           : smooth,
+        round            : round,
+        ceil             : ceil,
+        buildString      : buildString,
+        setDecimals      : setDecimals,
+        crossFiller      : crossFiller,
+        deg2rad          : deg2rad,
+        numberSort       : numberSort,
+        advancedSort     : advancedSort,
+        validate         : validate
     };
 });

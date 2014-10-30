@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define, window */
+/*global define, window, require */
 define([
     'jquery', 'plugins/router', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
@@ -60,31 +60,34 @@ define([
 
             self.shared.authentication.onLoggedIn.push(self.shared.messaging.start);
             self.shared.authentication.onLoggedIn.push(function() {
-                $.ajax('/api/?timestamp=' + generic.getTimestamp(), {
-                    type: 'get',
-                    contentType: 'application/json',
-                    headers: { Authorization: self.shared.authentication.header() }
-                })
-                    .then(function(metadata) {
-                        self.shared.user.username(undefined);
-                        self.shared.user.guid(undefined);
-                        if (!metadata.authenticated) {
-                            window.localStorage.removeItem('accesstoken');
-                            self.shared.authentication.accessToken(undefined);
-                            router.navigate('/');
-                            return $.Deferred(function(deferred) { deferred.reject(); }).promise();
-                        }
-                        self.shared.user.username(metadata.username);
-                        self.shared.user.guid(metadata.userguid);
-                        self.shared.user.roles(metadata.roles);
-                    })
-                    .then(function() {
-                        return api.get('users/' + self.shared.user.guid());
-                    })
-                    .then(function(data) {
-                        self.shared.language = data.language;
-                    })
-                    .then(self._translate);
+                return $.Deferred(function(deferred) {
+                    api.get('')
+                        .then(function(metadata) {
+                            return $.Deferred(function(mdDeferred) {
+                                self.shared.user.username(undefined);
+                                self.shared.user.guid(undefined);
+                                self.shared.user.roles([]);
+                                if (!metadata.authenticated) {
+                                    window.localStorage.removeItem('accesstoken');
+                                    self.shared.authentication.accessToken(undefined);
+                                    router.navigate('/');
+                                    return mdDeferred.reject();
+                                }
+                                self.shared.user.username(metadata.username);
+                                self.shared.user.guid(metadata.userguid);
+                                self.shared.user.roles(metadata.roles);
+                                mdDeferred.resolve();
+                            }).promise();
+                        })
+                        .then(function() {
+                            return api.get('users/' + self.shared.user.guid());
+                        })
+                        .then(function(data) {
+                            self.shared.language = data.language;
+                        })
+                        .then(self._translate)
+                        .always(deferred.resolve);
+                }).promise();
             });
             self.shared.authentication.onLoggedIn.push(function() {
                 self.shared.messaging.subscribe('EVENT', notifications.handleEvent);
@@ -93,12 +96,50 @@ define([
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
-            var token = window.localStorage.getItem('accesstoken');
+            var activationTasks = [],
+                token = window.localStorage.getItem('accesstoken');
             if (token !== null) {
                 self.shared.authentication.accessToken(token);
-                self.shared.authentication.dispatch(true);
+                activationTasks.push(self.shared.authentication.dispatch(true));
             }
-            return router.activate();
+            activationTasks.push($.Deferred(function(deferred) {
+                api.get('')
+                    .then(function(metadata) {
+                        var pluginHandlers = [], backendsActive = false;
+                        $.each(metadata.plugins, function(plugin, types) {
+                            if ($.inArray('gui', types) !== -1) {
+                                pluginHandlers.push($.Deferred(function(moduleDeferred) {
+                                    require(['ovs/routes/' + plugin], function(routes) {
+                                        routing.extraRoutes.push(routes.routes);
+                                        moduleDeferred.resolve();
+                                    });
+                                }).promise());
+                                pluginHandlers.push($.Deferred(function(translationDeferred) {
+                                    i18n.loadNamespace(plugin, function () {
+                                        translationDeferred.resolve();
+                                    });
+                                }).promise());
+                            }
+                            if ($.inArray('backend', types) !== -1 && !backendsActive) {
+                                routing.siteRoutes.push({
+                                    route: 'backends',
+                                    moduleId: 'backends',
+                                    title: $.t('ovs:backends.title'),
+                                    titlecode: 'ovs:backends.title',
+                                    nav: true,
+                                    main: true
+                                });
+                                backendsActive = true;
+                            }
+                        });
+                        $.when.apply($, pluginHandlers).always(deferred.resolve);
+                    });
+            }).promise());
+            return $.Deferred(function(deferred) {
+                $.when.apply($, activationTasks)
+                    .then(router.activate)
+                    .always(deferred.resolve);
+            }).promise();
         };
     };
 });
