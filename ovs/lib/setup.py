@@ -487,7 +487,7 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
                   '<WORKER_QUEUE>': unique_id}
-        for service in SetupController.master_node_services + ['watcher']:
+        for service in SetupController.master_node_services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
             SetupController._add_service(target_client, service, params)
 
@@ -634,8 +634,9 @@ EOF
             # Neither running
             target_client.run('service ovs-rabbitmq start', quiet=True)
 
-        SetupController._enable_service(target_client, 'watcher')
-        SetupController._change_service_state(target_client, 'watcher', 'start')
+        for service in ['watcher-framework', 'watcher-volumedriver']:
+            SetupController._enable_service(target_client, service)
+            SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
         SetupController._enable_service(target_client, 'workers')
@@ -683,7 +684,7 @@ EOF
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
                   '<WORKER_QUEUE>': unique_id}
-        for service in SetupController.extra_node_services + ['watcher']:
+        for service in SetupController.extra_node_services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
             SetupController._add_service(target_client, service, params)
 
@@ -751,8 +752,9 @@ EOF
         SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
 
         print 'Starting services'
-        SetupController._enable_service(target_client, 'watcher')
-        SetupController._change_service_state(target_client, 'watcher', 'start')
+        for service in ['watcher-framework', 'watcher-volumedriver']:
+            SetupController._enable_service(target_client, service)
+            SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
         for node in nodes:
@@ -889,7 +891,7 @@ EOF
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
                   '<WORKER_QUEUE>': unique_id}
-        for service in SetupController.master_node_services + ['watcher']:
+        for service in SetupController.master_node_services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
             SetupController._add_service(target_client, service, params)
 
@@ -1101,7 +1103,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             if SetupController._has_service(target_client, service):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
-        SetupController._change_service_state(target_client, 'watcher', 'restart')
+        for service in ['watcher-framework', 'watcher-volumedriver']:
+            SetupController._change_service_state(target_client, service, 'restart')
 
         logger.debug('Restarting workers')
         SetupController._change_service_state(target_client, 'workers', 'restart')
@@ -1330,7 +1333,8 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             for service in [s for s in SetupController.master_node_services if s not in SetupController.master_services]:
                 SetupController._change_service_state(node_client, service, 'restart')
         target_client = SSHClient.load(cluster_ip)
-        SetupController._change_service_state(target_client, 'watcher', 'restart')
+        for service in ['watcher-framework', 'watcher-volumedriver']:
+            SetupController._change_service_state(target_client, service, 'restart')
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
         print '\n+++ Announcing service +++\n'
