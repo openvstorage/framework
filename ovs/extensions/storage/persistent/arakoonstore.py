@@ -20,8 +20,8 @@ import json
 import time
 from threading import Lock
 
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonNotFound, ArakoonSockReadNoBytes
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 
 

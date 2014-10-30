@@ -595,7 +595,7 @@ Service.start_service('{0}')
         vpool.save()
 
         # Configure Cinder
-        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        ovsdb = ArakoonManagementEx().getCluster('ovsdb').getClient()
         vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
         if ovsdb.exists(vpool_config_key):
             # Second node gets values saved by first node
@@ -666,7 +666,7 @@ if Service.has_service('{0}'):
 """.format(service))
 
         # Unconfigure Cinder
-        ovsdb = ArakoonManagement().getCluster('ovsdb').getClient()
+        ovsdb = ArakoonManagementEx().getCluster('ovsdb').getClient()
         key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
         if ovsdb.exists(key):
             cinder_password, cinder_user, tenant_name, controller_ip, _ = json.loads(ovsdb.get(key))

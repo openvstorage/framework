@@ -455,8 +455,8 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
                                                       arakoon_mountpoint)
             # Setup cluster directories
             arakoon_create_directories = """
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+arakoon_management = ArakoonManagementEx()
 arakoon_cluster = arakoon_management.getCluster('{0}')
 arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 """.format(cluster)
@@ -947,8 +947,8 @@ EOF
         target_client = SSHClient.load(cluster_ip)
         for cluster in SetupController.arakoon_clusters.keys():
             arakoon_create_directories = """
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+arakoon_management = ArakoonManagementEx()
 arakoon_cluster = arakoon_management.getCluster('{0}')
 arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
 """.format(cluster)
@@ -1074,8 +1074,8 @@ EOF
 import os
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+arakoon_management = ArakoonManagementEx()
 voldrv_arakoon_cluster_id = 'voldrv'
 voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
 voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
@@ -1256,8 +1256,8 @@ EOF
 import os
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-arakoon_management = ArakoonManagement()
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+arakoon_management = ArakoonManagementEx()
 voldrv_arakoon_cluster_id = 'voldrv'
 voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
 voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
@@ -1516,14 +1516,14 @@ print Service.stop_service('{0}')
         """
         Waits for an Arakoon cluster to catch up (by sending a nop)
         """
-        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
-        from ovs.extensions.db.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+        from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
 
         last_exception = None
         tries = 3
         while tries > 0:
             try:
-                cluster_object = ArakoonManagement().getCluster(cluster)
+                cluster_object = ArakoonManagementEx().getCluster(cluster)
                 client = cluster_object.getClient()
                 client.nop()
                 return
