@@ -23,7 +23,7 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
-from backend.decorators import return_object, return_list, load, required_roles
+from backend.decorators import return_object, return_list, load, required_roles, log
 
 
 class BackendTypeViewSet(viewsets.ViewSet):
@@ -34,6 +34,7 @@ class BackendTypeViewSet(viewsets.ViewSet):
     prefix = r'backendtypes'
     base_name = 'backendtypes'
 
+    @log()
     @required_roles(['read'])
     @return_list(BackendType)
     @load()
@@ -49,6 +50,7 @@ class BackendTypeViewSet(viewsets.ViewSet):
             return DataObjectList(query_result, BackendType)
         return BackendTypeList.get_backend_types()
 
+    @log()
     @required_roles(['read'])
     @return_object(BackendType)
     @load(BackendType)

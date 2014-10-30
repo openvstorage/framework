@@ -22,7 +22,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from ovs.dal.lists.backendlist import BackendList
 from ovs.dal.hybrids.backend import Backend
-from backend.decorators import return_object, return_list, load, required_roles
+from backend.decorators import return_object, return_list, load, required_roles, log
 
 
 class BackendViewSet(viewsets.ViewSet):
@@ -33,6 +33,7 @@ class BackendViewSet(viewsets.ViewSet):
     prefix = r'backends'
     base_name = 'backends'
 
+    @log()
     @required_roles(['read'])
     @return_list(Backend)
     @load()
@@ -42,6 +43,7 @@ class BackendViewSet(viewsets.ViewSet):
         """
         return BackendList.get_backends()
 
+    @log()
     @required_roles(['read'])
     @return_object(Backend)
     @load(Backend)
@@ -51,6 +53,7 @@ class BackendViewSet(viewsets.ViewSet):
         """
         return backend
 
+    @log()
     @required_roles(['read', 'write', 'manage'])
     @load()
     def create(self, request):
