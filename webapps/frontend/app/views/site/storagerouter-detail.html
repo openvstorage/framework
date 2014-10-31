@@ -127,9 +127,9 @@ limitations under the License.
                                             <span data-bind="text: name" style="display: inline-block; width: 50px;"></span>
                                             <span data-bind="foreach: $parents[0].storageDrivers()">
                                                 <span data-bind="if: $.inArray(guid(), $parent.storageDriverGuids()) !== -1">
-                                                    (<span data-i18n="ovs:generic.mgmtport"></span>: <span data-bind="text: port() - 1"></span>,
-                                                     <span data-i18n="ovs:generic.xmlrpcport"></span>: <span data-bind="text: port()"></span>,
-                                                     <span data-i18n="ovs:generic.focport"></span>: <span data-bind="text: port() + 1"></span>,
+                                                    (<span data-i18n="ovs:generic.mgmtport"></span>: <span data-bind="text: ports()[0]"></span>,
+                                                     <span data-i18n="ovs:generic.xmlrpcport"></span>: <span data-bind="text: ports()[1]"></span>,
+                                                     <span data-i18n="ovs:generic.focport"></span>: <span data-bind="text: ports()[2]"></span>,
                                                     <span data-i18n="ovs:generic.storageip"></span>: <span data-bind="text: storageIP()"></span>)
                                                 </span>
                                             </span>

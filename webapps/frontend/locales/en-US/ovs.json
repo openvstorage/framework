@@ -472,7 +472,7 @@
                 "portsinuse": "Ports in use:",
                 "bfsexclusive": "The BFS mountpoint must have exclusive use",
                 "bfsnotshared": "The BFS mountpoint should not be shared between vPools",
-                "portinuse": "The given port is already in use",
+                "portinuse": "The ports are already in use.",
                 "vpoolnotallowed": "A vPool cannot be added to this Storage Router: Prerequisites not met.",
                 "invalidmtpt": "The mountpoint __what__ is invalid."
             },

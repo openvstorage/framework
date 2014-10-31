@@ -81,7 +81,6 @@ define([
             self.loaded         = ko.observable(false);
             self.allowVPool     = ko.observable(true);
             self.mtptOK         = ko.observable(true);
-            self.vRouterPort    = ko.observable();
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
             self.ipAddresses    = ko.observableArray([]);
@@ -132,7 +131,7 @@ define([
                             fields.push('temp');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                         }
-                        if (self.storageDriver().port() === storageDriver.port() && $.inArray('port', fields) === -1) {
+                        if (generic.overlap(self.storageDriver().ports(), storageDriver.ports()) && $.inArray('port', fields) === -1) {
                             valid = false;
                             fields.push('port');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.portinuse'));
@@ -167,7 +166,6 @@ define([
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
                                 self.ipAddresses(data.ipaddresses);
-                                self.vRouterPort(data.xmlrpcport);
                                 self.allowVPool(data.allow_vpool);
                             })
                             .done(physicalDeferred.resolve)

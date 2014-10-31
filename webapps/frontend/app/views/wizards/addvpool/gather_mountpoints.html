@@ -91,23 +91,6 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('port', canContinue().fields) !== -1 }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.port"></label>
-            <div class="col-lg-2">
-                <input type="text" id="name" class="autofocus form-control"
-                       data-bind="value: data.vRouterPort,
-                                  attr: { id: (data.vRouterPort.hasOwnProperty('identifier') ? ('gmtptp-' + data.vRouterPort.identifier) : undefined) }">
-            </div>
-            <div class="col-lg-7" style="margin-top: 7px;" data-bind="visible: data.storageDrivers().length > 0">
-                <span data-i18n="ovs:wizards.addvpool.gathermountpoints.portsinuse"></span>
-                <!-- ko foreach: data.storageDrivers() -->
-                    <span data-bind="visible: $index() > 0">,</span>
-                    <span data-bind="text: (parseInt($data.port(), 10) - 1).toString()"></span>,
-                    <span data-bind="text: $data.port()"></span>,
-                    <span data-bind="text: (parseInt($data.port(), 10) + 1).toString()"></span>
-                <!-- /ko -->
-            </div>
-        </div>
     </form>
     <div class="alert alert-danger" data-bind="visible: canContinue().value === false" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>

@@ -45,7 +45,6 @@ define([
         data.host('');
         data.port(80);
         data.timeout(600);
-        data.vRouterPort(12322);
         data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.storageRouters([]);
         data.storageDrivers([]);

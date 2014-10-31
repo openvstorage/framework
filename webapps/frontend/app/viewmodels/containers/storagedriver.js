@@ -28,7 +28,7 @@ define([
         self.loaded               = ko.observable(false);
         self.guid                 = ko.observable(guid);
         self.name                 = ko.observable();
-        self.port                 = ko.observable();
+        self.ports                = ko.observableArray([0, 0, 0]);
         self.clusterIP            = ko.observable();
         self.storageIP            = ko.observable();
         self.storageDriverID      = ko.observable();
@@ -44,7 +44,7 @@ define([
         // Functions
         self.fillData = function(data) {
             self.name(data.name);
-            self.port(data.port);
+            self.ports(data.ports);
             self.clusterIP(data.cluster_ip);
             self.storageIP(data.storage_ip);
             self.storageDriverID(data.storageDriverID);

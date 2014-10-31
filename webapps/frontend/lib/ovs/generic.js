@@ -319,6 +319,17 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 }, 5000);
             });
     }
+    function overlap(array1, array2) {
+        var i, j;
+        for (i = 0; i < array1.length; i += 1) {
+            for (j = 0; j < array2.length; j += 1) {
+                if (array1[i] === array2[j]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     return {
         getTimestamp     : getTimestamp,
@@ -350,6 +361,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         deg2rad          : deg2rad,
         numberSort       : numberSort,
         advancedSort     : advancedSort,
-        validate         : validate
+        validate         : validate,
+        overlap          : overlap
     };
 });
