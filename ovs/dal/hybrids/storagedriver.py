@@ -30,7 +30,7 @@ class StorageDriver(DataObject):
     """
     __properties = [Property('name', str, doc='Name of the Storage Driver.'),
                     Property('description', str, mandatory=False, doc='Description of the Storage Driver.'),
-                    Property('port', int, doc='Port on which the Storage Driver is listening.'),
+                    Property('ports', list, doc='Ports on which the Storage Driver is listening [mgmt, xmlrpc, foc].'),
                     Property('cluster_ip', str, doc='IP address on which the Storage Driver is listening.'),
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
                     Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),

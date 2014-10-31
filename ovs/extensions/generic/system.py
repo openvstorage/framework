@@ -114,3 +114,16 @@ from ovs.plugin.provider.configuration import Configuration
 print Configuration.get('{0}')
 """.format(key)
         return System.exec_remote_python(client, read)
+
+    @staticmethod
+    def ports_in_use(client=None):
+        """
+        Returns the ports in use
+        """
+        cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
+        if client is None:
+            output = check_output(cmd, shell=True).strip()
+        else:
+            output = client.run(cmd).strip()
+        for found_port in output.split('\n'):
+            yield int(found_port.strip())

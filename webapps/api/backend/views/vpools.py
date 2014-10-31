@@ -123,8 +123,7 @@ class VPoolViewSet(viewsets.ViewSet):
                       'mountpoint_readcache2': storagedriver.mountpoint_readcache2,
                       'mountpoint_writecache': storagedriver.mountpoint_writecache,
                       'mountpoint_foc':        storagedriver.mountpoint_foc,
-                      'storage_ip':            storagedriver.storage_ip,
-                      'vrouter_port':          storagedriver.port}
+                      'storage_ip':            storagedriver.storage_ip}
         for field in parameters:
             if not parameters[field] is int:
                 parameters[field] = str(parameters[field])

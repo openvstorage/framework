@@ -132,7 +132,6 @@ define([
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
                                 self.data.ipAddresses(data.ipaddresses);
-                                self.data.vRouterPort(data.xmlrpcport);
                                 self.data.files(data.files);
                                 self.data.allowVPool(data.allow_vpool);
                             })

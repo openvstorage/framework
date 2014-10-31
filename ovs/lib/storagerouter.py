@@ -71,14 +71,12 @@ class StorageRouterController(object):
             ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
             ipaddresses = [ip.strip() for ip in ipaddresses]
             ipaddresses.remove('127.0.0.1')
-        xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
         allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
-                'xmlrpcport': xmlrpcport,
                 'files': file_existence,
                 'allow_vpool': allow_vpool}
 
@@ -392,15 +390,36 @@ for directory in {0}:
             readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
             readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
         if new_storagedriver:
-            ports_used_in_model = [port_storagedriver.port for port_storagedriver in
-                                   StorageDriverList.get_storagedrivers_by_storagerouter(storagerouter.guid)]
-            vrouter_port_in_hrd = int(System.read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
-            if vrouter_port_in_hrd in ports_used_in_model:
-                vrouter_port = int(parameters['vrouter_port'])
-            else:
-                vrouter_port = int(vrouter_port_in_hrd)
+            ports_in_use = System.ports_in_use(client)
+            ports_reserved = []
+            ports_in_use_model = {}
+            for port_storagedriver in StorageDriverList.get_storagedrivers():
+                if port_storagedriver.vpool_guid not in ports_in_use_model:
+                    ports_in_use_model[port_storagedriver.vpool_guid] = port_storagedriver.ports
+                    ports_reserved += port_storagedriver.ports
+            if vpool.guid in ports_in_use_model:  # The vPool is extended to another StorageRouter. We need to use these ports.
+                ports = ports_in_use_model[vpool.guid]
+                if any(port in ports_in_use for port in ports):
+                    raise RuntimeError('The required ports are in use')
+            else:  # First StorageDriver for this vPool, so generating new ports
+                ports = []
+                for port_range in System.read_remote_config(client, 'volumedriver.filesystem.ports').split(','):
+                    port_range = port_range.strip()
+                    if '-' in port_range:
+                        current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
+                    else:
+                        current_range = (int(port_range), 65536)
+                    current_port = current_range[0]
+                    while len(ports) < 3:
+                        if current_port not in ports_in_use and current_port not in ports_reserved:
+                            ports.append(current_port)
+                        current_port += 1
+                        if current_port > current_range[1]:
+                            break
+                if len(ports) != 3:
+                    raise RuntimeError('Could not find enough free ports')
         else:
-            vrouter_port = int(storagedriver.port)
+            ports = storagedriver.ports
 
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
         ipaddresses = client.run(cmd).strip().split('\n')
@@ -439,12 +458,11 @@ for directory in {0}:
             if existing_storagedriver.vpool_guid == vpool.guid:
                 node_configs.append(ClusterNodeConfig(str(existing_storagedriver.storagedriver_id),
                                                       str(existing_storagedriver.cluster_ip),
-                                                      existing_storagedriver.port - 1,
-                                                      existing_storagedriver.port,
-                                                      existing_storagedriver.port + 1))
+                                                      existing_storagedriver.ports[0],
+                                                      existing_storagedriver.ports[1],
+                                                      existing_storagedriver.ports[2]))
         if new_storagedriver:
-            node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip,
-                                                  vrouter_port - 1, vrouter_port, vrouter_port + 1))
+            node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip, ports[0], ports[1], ports[2]))
         vrouter_clusterregistry.set_node_configs(node_configs)
         readcaches = [{'path': readcache1, 'size': readcache1_size}]
         if readcache2:
@@ -505,7 +523,7 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.description = storagedriver.name
         storagedriver.storage_ip = volumedriver_storageip
         storagedriver.cluster_ip = grid_ip
-        storagedriver.port = vrouter_port
+        storagedriver.ports = ports
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.mountpoint_temp = mountpoint_temp
         storagedriver.mountpoint_readcache1 = mountpoint_readcache1
@@ -716,8 +734,9 @@ if Service.has_service('{0}'):
                 if current_storagedriver.guid != storagedriver_guid:
                     node_configs.append(ClusterNodeConfig(str(current_storagedriver.storagedriver_id),
                                                           str(current_storagedriver.cluster_ip),
-                                                          current_storagedriver.port - 1, current_storagedriver.port,
-                                                          current_storagedriver.port + 1))
+                                                          current_storagedriver.ports[0],
+                                                          current_storagedriver.ports[1],
+                                                          current_storagedriver.ports[2]))
             vrouter_clusterregistry.set_node_configs(node_configs)
         else:
             try:

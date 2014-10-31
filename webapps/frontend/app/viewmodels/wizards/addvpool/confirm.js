@@ -49,7 +49,6 @@ define([
                         mountpoint_writecache: self.data.mtptWriteCache(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        vrouter_port: self.data.vRouterPort(),
                         config_cinder: self.data.configCinder(),
                         cinder_user: self.data.cinderUser(),
                         cinder_pass: self.data.cinderPassword(),

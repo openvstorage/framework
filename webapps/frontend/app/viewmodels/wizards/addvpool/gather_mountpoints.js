@@ -114,11 +114,6 @@ define([
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsexclusive'));
                 }
-                if ($.inArray(self.data.vRouterPort(), [storageDriver.port() - 1, storageDriver.port(), storageDriver.port() + 1]) !== -1 && $.inArray('port', fields) === -1) {
-                    valid = false;
-                    fields.push('port');
-                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.portinuse'));
-                }
                 return true;
             });
             if ((self.data.mtptBFS() === self.data.mtptReadCache1() ||
