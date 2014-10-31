@@ -307,7 +307,7 @@ class CheckArakoonTlogMark():
         if cluster._getStatusOne(localnode) == 'running':
             estatus = self._waitandcheck(self._initialwait, localnode, cluster)
         else:
-            cluster._startOne(localnode, True)
+            cluster._startOne(localnode)
             estatus = self._waitandcheck(self._initialwait, localnode, cluster)
         return estatus
 
