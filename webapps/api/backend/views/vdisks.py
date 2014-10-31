@@ -73,3 +73,12 @@ class VDiskViewSet(viewsets.ViewSet):
         return VDiskController.rollback.delay(diskguid=vdisk.guid,
                                               timestamp=timestamp)
 
+    @action()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VDisk)
+    def set_configparams(self, vdisk, configparams):
+        """
+        Sets configuration parameters to a given vdisk. Items not passed are (re)set.
+        """
+        return VDiskController.set_configparams.delay(vdisk_guid=vdisk.guid, configparams=configparams)

@@ -35,10 +35,12 @@ class TestDisk(DataObject):
                    Relation('one', TestMachine, 'one', mandatory=False, onetoone=True),
                    Relation('parent', None, 'children', mandatory=False)]
     __dynamics = [Dynamic('used_size', int, 5),
-                  Dynamic('wrong_type', int, 5)]
+                  Dynamic('wrong_type', int, 5),
+                  Dynamic('updatable', int, 5)]
 
     # For testing purposes
     wrong_type_data = 0
+    dynamic_value = 0
 
     def _used_size(self):
         """
@@ -52,3 +54,9 @@ class TestDisk(DataObject):
         Returns the wrong type, should always fail
         """
         return self.wrong_type_data
+
+    def _updatable(self):
+        """
+        Returns an external settable value
+        """
+        return self.dynamic_value

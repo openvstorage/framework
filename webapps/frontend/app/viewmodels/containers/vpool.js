@@ -32,6 +32,8 @@ define([
         self.loaded             = ko.observable(false);
         self.guid               = ko.observable(guid);
         self.name               = ko.observable();
+        self.configuration      = ko.observable();
+        self._configuration     = ko.observable();
         self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -52,6 +54,8 @@ define([
         self.vMachines          = ko.observableArray([]);
         self.storageRouterGuids = ko.observableArray([]);
         self.storageDriverGuids = ko.observableArray([]);
+        self.cacheStrategies    = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
+        self.hasFOC             = ko.observableArray([undefined, { value: true }, { value: false }]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -65,6 +69,92 @@ define([
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
         });
+        self.configIops = ko.computed({
+            read: function() {
+                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('iops')) {
+                    return self._configuration().iops;
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self._configuration();
+                if (value === '') {
+                    delete target.iops;
+                } else {
+                    target.iops = parseInt(value, 10);
+                    if (isNaN(target.iops)) {
+                        delete target.iops;
+                    }
+                }
+                self._configuration(target);
+            }
+        }).extend({ notify: 'always' });
+        self.configCacheStrategy = ko.computed({
+            read: function() {
+                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('cache_strategy')) {
+                    return { name: self._configuration().cache_strategy };
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self._configuration();
+                if (value === undefined) {
+                    delete target.cache_strategy;
+                } else {
+                    target.cache_strategy = value.name;
+                }
+                self._configuration(target);
+            }
+        });
+        self.configCacheSize = ko.computed({
+            read: function() {
+                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('cache_size')) {
+                    return self._configuration().cache_size;
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self._configuration();
+                if (value === '') {
+                    delete target.cache_size;
+                } else {
+                    target.cache_size = parseInt(value, 10);
+                    if (isNaN(target.cache_size)) {
+                        delete target.cache_size;
+                    }
+                }
+                self._configuration(target);
+            }
+        }).extend({ notify: 'always' });
+        self.configFoc = ko.computed({
+            read: function() {
+                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('foc')) {
+                    return { value: self._configuration().foc };
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self._configuration();
+                if (value === undefined) {
+                    delete target.foc;
+                } else {
+                    target.foc = value.value;
+                }
+                self._configuration(target);
+            }
+        });
+        self.configChanged = ko.computed(function() {
+            var changed = false;
+            if (self._configuration() !== undefined && self.configuration() !== undefined) {
+                $.each(['iops', 'cache_strategy', 'cache_size', 'foc'], function (i, key) {
+                    if (self._configuration()[key] !== self.configuration()[key]) {
+                        changed = true;
+                        return false;
+                    }
+                });
+            }
+            return changed;
+        });
 
         // Functions
         self.fillData = function(data, options) {
@@ -74,6 +164,18 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.backendConnection, data, 'connection');
             generic.trySet(self.backendLogin, data, 'login');
+            if (data.hasOwnProperty('configuration')) {
+                if (self._configuration() === undefined) {
+                    self._configuration($.extend({}, data.configuration));
+                }
+                if (self.configuration() === undefined) {
+                    self.configuration($.extend({}, data.configuration));
+                }
+                var target = self._configuration();
+                generic.merge(self.configuration(), data.configuration, target, ['iops', 'cache_strategy', 'cache_size', 'foc']);
+                self._configuration(target);
+                self.configuration($.extend({}, data.configuration));
+            }
             if (data.hasOwnProperty('type')) {
                 self.backendType(data.type);
             } else {
@@ -87,9 +189,7 @@ define([
                     }, 'guid'
                 );
             }
-            if (data.hasOwnProperty('storagedrivers_guids')) {
-                self.storageDriverGuids(data.storagedrivers_guids);
-            }
+            generic.trySet(self.storageDriverGuids, data, 'storagedrivers_guids');
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
                 self.iops(stats.write_operations_ps + stats.read_operations_ps);

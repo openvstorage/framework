@@ -330,6 +330,24 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function merge(originalObject, newObject, targetObject, keys) {
+        // If the target equals the original, the target wasn't updated, so it can updated with the new.
+        $.each(keys, function(i, key) {
+            if (originalObject.hasOwnProperty(key) && targetObject.hasOwnProperty(key)) {
+                if (originalObject[key] === targetObject[key]) {
+                    if (newObject.hasOwnProperty(key)) {
+                        targetObject[key] = newObject[key];
+                    } else {
+                        delete targetObject[key];
+                    }
+                }
+            } else if (!originalObject.hasOwnProperty(key) && !targetObject.hasOwnProperty(key)) {
+                if (newObject.hasOwnProperty(key)) {
+                    targetObject[key] = newObject[key];
+                }
+            }
+        });
+    }
 
     return {
         getTimestamp     : getTimestamp,
@@ -362,6 +380,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         numberSort       : numberSort,
         advancedSort     : advancedSort,
         validate         : validate,
-        overlap          : overlap
+        overlap          : overlap,
+        merge            : merge
     };
 });

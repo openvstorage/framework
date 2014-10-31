@@ -36,7 +36,8 @@ class VMachine(DataObject):
                     Property('hypervisor_id', str, mandatory=False, doc='The identifier of the vMachine on the Hypervisor.'),
                     Property('devicename', str, doc='The name of the container file (e.g. the VMX-file) describing the vMachine.'),
                     Property('is_vtemplate', bool, default=False, doc='Indicates whether this vMachine is a vTemplate.'),
-                    Property('status', ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], default='OK', doc='Internal status of the vMachine')]
+                    Property('status', ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], default='OK', doc='Internal status of the vMachine'),
+                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specifc fallback configurations')]
     __relations = [Relation('pmachine', PMachine, 'vmachines'),
                    Relation('vpool', VPool, 'vmachines', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),

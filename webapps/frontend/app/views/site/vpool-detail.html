@@ -185,7 +185,7 @@ limitations under the License.
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
-                            <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
+                            <td style="width: 90px; padding: 10px 0 20px 0;">
                                 <button id="btn.vpool.management" type="button" class="btn btn-lg" data-bind="enable: false">
                                     <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storageroutervpoollink"></span>
                                 </button>
@@ -229,18 +229,64 @@ limitations under the License.
                             </td>
                         </tr>
                         <tr>
-                            <td style="width: 90px; vertical-align: middle; padding: 0;">
+                            <td style="width: 90px; padding: 10px 0 20px 0;">
                                 <button type="button" class="btn btn-lg" data-bind="enable: false">
                                     <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.logs"></span>
                                 </button>
                             </td>
-                            <td style="padding: 0;">
+                            <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:vpools.detail.logging"></h4>
                                 <p>
                                     <span data-i18n="ovs:vpools.detail.logginginfo1"></span>
                                     <a class="hand" data-bind="attr: { href: '/logging/index.html#/dashboard/file/logstash.json?query=(tags:*volumedriver*%20OR%20tags:*failovercache*)%20AND%20path:*' + name() + '.log*'  }"><span data-i18n="ovs:vpools.detail.logginginfo2"></span><i style="color: lightgrey; padding-left: 5px; padding-right: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a>
                                     <span data-i18n="ovs:vpools.detail.logginginfo3"></span>
                                 </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="width: 90px; padding: 10px 0 20px 0;">
+                                <button type="button" class="btn btn-lg" data-bind="enable: false">
+                                    <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.configuration"></span>
+                                </button>
+                            </td>
+                            <td style="padding: 0 0 20px 0;">
+                                <h4 data-i18n="ovs:vpools.detail.configuration"></h4>
+                                <p data-i18n="ovs:vpools.detail.configurationinfo"></p>
+                                <ul>
+                                    <li>
+                                        <span data-i18n="ovs:generic.limitiops"></span>:
+                                        <input data-bind="value: configIops, valueUpdate: 'afterkeydown'" placeholder=" -" style="margin: 5px;" />
+                                    </li>
+                                    <li>
+                                        <span data-i18n="ovs:generic.cachestrategy"></span>:
+                                        <span data-bind="dropdown: {
+                                                             items: cacheStrategies, target: configCacheStrategy,
+                                                             text: function(item) {
+                                                                 if (item === undefined) {
+                                                                     return '-';
+                                                                 }
+                                                                 return $.t('ovs:generic.cachestrategies.' + item.name);
+                                                             }, key: 'name', keyisfunction: false, small: true
+                                                         }" style="margin-left: 5px;"></span>
+                                    </li>
+                                    <li>
+                                        <span data-i18n="ovs:generic.maxnondispcachesize"></span>:
+                                        <input data-bind="value: configCacheSize, valueUpdate: 'afterkeydown'" placeholder=" -" style="margin: 5px;" />
+                                    </li>
+                                    <li>
+                                        <span data-i18n="ovs:generic.hasfailovercache"></span>:
+                                        <span data-bind="dropdown: {
+                                                             items: hasFOC, target: configFoc,
+                                                             text: function(item) {
+                                                                 if (item === undefined) {
+                                                                     return '-';
+                                                                 }
+                                                                 return $.t('ovs:generic.' + (item.value ? 'yes' : 'no'));
+                                                             }, key: 'value', keyisfunction: false, small: true
+                                                         }" style="margin-left: 5px;"></span>
+                                    </li>
+                                </ul>
+                                <button data-bind="click: function() { $root.saveConfiguration() }, enable: configChanged()" class="btn btn-default" data-i18n="ovs:generic.save"></button>
                             </td>
                         </tr>
                     </tbody>

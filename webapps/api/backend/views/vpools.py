@@ -129,3 +129,13 @@ class VPoolViewSet(viewsets.ViewSet):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
+
+    @action()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(VPool)
+    def set_configparams(self, vpool, configparams):
+        """
+        Sets configuration parameters to a given vpool/vdisk. Items not passed are (re)set.
+        """
+        return VPoolController.set_configparams.delay(vpool_guid=vpool.guid, configparams=configparams)

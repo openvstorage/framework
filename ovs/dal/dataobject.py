@@ -682,7 +682,22 @@ class DataObject(object):
         """
         for dynamic in self._dynamics:
             if properties is None or dynamic.name in properties:
-                self._volatile.delete('{0}_{1}'.format(self._key, dynamic.name))
+                key = '{0}_{1}'.format(self._key, dynamic.name)
+                mutex = VolatileMutex(key)
+                try:
+                    if dynamic.locked:
+                        mutex.acquire()
+                    self._volatile.delete(key)
+                finally:
+                    mutex.release()
+
+    def invalidate_cached_objects(self):
+        """
+        Invalidates cached objects so they are reloaded when used.
+        """
+        for relation in self._relations:
+            if relation.name in self._objects:
+                del self._objects[relation.name]
 
     def serialize(self, depth=0):
         """

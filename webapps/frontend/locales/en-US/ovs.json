@@ -62,6 +62,11 @@
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"
         },
+        "cachestrategies": {
+            "onread": "On read",
+            "onwrite": "On write",
+            "none": "No cache"
+        },
         "username": "Username",
         "password": "Password",
         "logout": "Log out",
@@ -175,7 +180,13 @@
         "group": "Group",
         "backendtype": "Type",
         "storageip": "Storage IP",
-        "namespace": "Backend location"
+        "namespace": "Backend location",
+        "limitiops": "Limit IOPS",
+        "cachestrategy": "Cache strategy",
+        "maxnondispcachesize": "Max non-disposable cache size",
+        "hasfailovercache": "Has FOC",
+        "save": "Save",
+        "fallbackvalue": "Fallback value"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -223,7 +234,9 @@
             "logging": "vPool logs",
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this vPool's logs."
+            "logginginfo3": "to view this vPool's logs.",
+            "configuration": "vDisk configuration defaults",
+            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -235,6 +248,11 @@
             "done": "vPool synced",
             "donemsg": "All vMachines using vPool __what__ synced",
             "errormsg": "syncing all vMachines using __what__"
+        },
+        "saveconfig": {
+            "done": "Save complete",
+            "donemsg": "The configuration details for __what__ are saved.",
+            "errormsg": "while saving __what__"
         },
         "add": "Add new vPool"
     },
@@ -288,7 +306,14 @@
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "setastemplate": "Set as vTemplate",
-            "snapshot": "Take snapshot"
+            "snapshot": "Take snapshot",
+            "configuration": "vDisk configuration defaults",
+            "configurationinfo": "Below are the default/fallback values for this vMachine's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+        },
+        "saveconfig": {
+            "done": "Save complete",
+            "donemsg": "The configuration details for __what__ are saved.",
+            "errormsg": "while saving __what__"
         }
     },
     "vdisks": {
@@ -298,7 +323,14 @@
         "detail": {
             "title": "vDisk",
             "snapshots": "Snapshots",
-            "rollback": "Rollback"
+            "rollback": "Rollback",
+            "configuration": "vDisk configuration",
+            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+        },
+        "saveconfig": {
+            "done": "Save complete",
+            "donemsg": "The configuration details for __what__ are saved.",
+            "errormsg": "while saving __what__"
         }
     },
     "vtemplates": {
@@ -692,6 +724,7 @@
         "logs": "&#xf02d;",
         "externallink": "&#xf08e;",
         "password": "&#xf084;",
-        "vpools": "&#xf0c2;"
+        "vpools": "&#xf0c2;",
+        "configuration": "&#xf013;"
     }
 }

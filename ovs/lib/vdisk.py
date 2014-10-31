@@ -379,3 +379,27 @@ class VDiskController(object):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         client = SSHClient.load('127.0.0.1')
         client.run_local('truncate -s %sG %s' % (size, location))
+
+    @staticmethod
+    @celery.task(name='ovs.disk.set_configparams')
+    def set_configparams(vdisk_guid, configparams):
+        """
+        Sets configuration parameters to a given vdisk. Items not passed are (re)set.
+        """
+        vdisk = VDisk(vdisk_guid)
+        raw_config = vdisk.configuration
+        resolved_config = vdisk.resolved_configuration
+        keys = ['iops', 'cache_strategy', 'cache_size', 'foc']
+        for key in keys:
+            if key not in configparams and key in raw_config:
+                del raw_config[key]
+            if key in configparams:
+                raw_config[key] = configparams[key]
+        vdisk.configuration = raw_config
+        vdisk.save()
+        vdisk.invalidate_dynamics(['resolved_configuration'])
+        new_resolved_config = vdisk.resolved_configuration
+        for key in keys:
+            if resolved_config.get(key) != new_resolved_config.get(key):
+                # @TODO: update the 'key' property on the disk.
+                logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk_guid, new_resolved_config.get(key)))
