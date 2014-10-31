@@ -54,7 +54,7 @@ class VolatileMutex(object):
                 logger.error('Lock for {0} could not be aquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
                 raise RuntimeError('Could not aquire lock %s' % self.key())
         passed = time.time() - self._start
-        if passed > 0.025:  # More than 25 ms is a long time to wait!
+        if passed > 0.1:  # More than 100 ms is a long time to wait!
             logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))
         self._start = time.time()
         self._has_lock = True
