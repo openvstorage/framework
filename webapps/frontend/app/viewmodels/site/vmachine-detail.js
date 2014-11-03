@@ -192,8 +192,11 @@ define([
         self.activate = function(mode, guid) {
             self.vMachine(new VMachine(guid));
             self.refresher.init(self.load, 5000);
-            self.refresher.run();
             self.refresher.start();
+            self.load()
+                .then(function() {
+                    self.refreshVDisks(1);
+                });
             self.shared.footerData(self.vMachine);
         };
         self.deactivate = function() {
