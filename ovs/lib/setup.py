@@ -1805,6 +1805,7 @@ print blk_devices
             pass  # The above might fail sometimes. We don't mind and will try again
         client.run('swapoff --all')
         client.run('mountall -q')
+        client.run('chmod 1777 /var/tmp')
 
     @staticmethod
     def apply_flexible_disk_layout(client, auto_config=False, default=dict()):
