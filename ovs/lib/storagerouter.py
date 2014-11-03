@@ -94,7 +94,7 @@ class StorageRouterController(object):
         if StorageRouterController._validate_ip(ip) is False:
             raise ValueError('The entered ip address is invalid')
 
-        if not re.match('^[0-9a-zA-Z]+(\-+[0-9a-zA-Z]+)*$', vpool_name):
+        if not re.match('^[0-9a-z]+(\-+[0-9a-z]+)*$', vpool_name):
             raise ValueError('Invalid vpool_name given')
 
         client = SSHClient.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
