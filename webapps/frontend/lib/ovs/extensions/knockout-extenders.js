@@ -55,16 +55,16 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                         );
                         stepSize = generic.ceil(diff / generic.tryGet(settings, 'steps', 3), decimals);
                         stepSize = stepSize === 0 ? 1 : stepSize;
-                        execute = function() {
-                            if (Math.abs(newValue - currentValue) > Math.abs(stepSize)) {
+                        execute = function(safety) {
+                            if (Math.abs(newValue - currentValue) > Math.abs(stepSize) && safety >= 0) {
                                 currentValue += stepSize;
                                 target(currentValue);
-                                window.setTimeout(execute, 75);
+                                window.setTimeout(function() { execute(safety - 1); }, 75);
                             } else {
                                 target(newValue);
                             }
                         };
-                        window.setTimeout(execute, 75);
+                        window.setTimeout(function() { execute(stepSize); }, 75);
                     }
                 }
             }
