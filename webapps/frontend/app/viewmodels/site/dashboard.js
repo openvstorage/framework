@@ -202,7 +202,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     self.loadStorageRoutersHandle = api.get('storagerouters', {
                         queryparams: {
-                            contents: 'status',
+                            contents: 'status,vdisks_guids',
                             sort: 'name,vdisks_guids'
                         }
                     })
