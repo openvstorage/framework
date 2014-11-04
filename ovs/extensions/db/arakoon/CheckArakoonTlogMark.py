@@ -420,7 +420,7 @@ class CheckArakoonTlogMark():
             raise CheckArakoonError(
                 'Starting Arakoon Failed on these Nodes:\n * {0}'.format('\n * '.join(failednodesset)))
 
-    def fixtlogs(self, clustername):
+    def fixtlogs(self, clustername, always_stop=False):
         """
         fix tlog for a specific cluster
         returns list of nodes for which it was not possible to fix tlogs
@@ -457,6 +457,8 @@ class CheckArakoonTlogMark():
                     failmessage = 'Tlogs are missing - now attempting failover'
                     CheckArakoonTlogMark._speak(failmessage)
                     if self._failover(localnode, cluster):
+                        if always_stop:
+                            cluster._stopOne(localnode)
                         continue
 
                 else:

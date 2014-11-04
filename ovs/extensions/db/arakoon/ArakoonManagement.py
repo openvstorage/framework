@@ -276,7 +276,7 @@ class ArakoonClusterEx(ArakoonCluster):
         """
         rcs = {}
         from ovs.extensions.db.arakoon.CheckArakoonTlogMark import CheckArakoonTlogMark
-        CheckArakoonTlogMark().fixtlogs(self._clusterName)
+        CheckArakoonTlogMark().fixtlogs(self._clusterName, always_stop=True)
         for name in self.listLocalNodes():
             rcs[name] = self._startOneEx(name, daemon)
 
