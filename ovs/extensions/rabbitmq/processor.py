@@ -115,7 +115,7 @@ def process(queue, body, mapping):
 
 def _log(task, kwargs, storagedriver_id):
     log = Log()
-    log.source = 'VOLUEMDRIVER_EVENT'
+    log.source = 'VOLUMEDRIVER_EVENT'
     log.module = task.__class__.__module__
     log.method = task.__class__.__name__
     log.method_kwargs = kwargs
