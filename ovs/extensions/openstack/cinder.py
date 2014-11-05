@@ -15,7 +15,8 @@
 """
 This module contains OpenStack Cinder commands
 """
-import os, time
+import os
+import time
 from ovs.extensions.generic.sshclient import SSHClient
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
@@ -29,7 +30,7 @@ class OpenStackCinder(object):
     Represent the Cinder service
     """
 
-    def __init__(self, cinder_password = None, cinder_user = 'admin', tenant_name = 'admin', controller_ip = '127.0.0.1'):
+    def __init__(self, cinder_password=None, cinder_user='admin', tenant_name='admin', controller_ip='127.0.0.1'):
         self.client = SSHClient.load('127.0.0.1')
         auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
         self.cinder_client = None
@@ -52,15 +53,15 @@ class OpenStackCinder(object):
         """
         if self.is_devstack:
             if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/ovs_volume_driver.py'):
-                self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/tip/openstack/cinder-volume-driver/ovs_volume_driver.py -P /opt/stack/devstack/cinder/cinder/volume/drivers')
+                self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/ovs_volume_driver.py -P /opt/stack/devstack/cinder/cinder/volume/drivers')
         elif self.is_openstack:
             if not os.path.exists('/usr/lib/python2.7/dist-packages/cinder/volume/drivers/ovs_volume_driver.py'):
-                self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/tip/openstack/cinder-volume-driver/ovs_volume_driver.py -P /usr/lib/python2.7/dist-packages/cinder/volume/drivers')
+                self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/ovs_volume_driver.py -P /usr/lib/python2.7/dist-packages/cinder/volume/drivers')
 
     def _is_devstack(self):
         try:
             return 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep'))
-        except SystemExit: #ssh client raises system exit 1
+        except SystemExit:  # ssh client raises system exit 1
             return False
 
     def _is_openstack(self):
@@ -196,8 +197,8 @@ if vpool_name in enabled_backends:
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "cd /opt/stack/cinder && /opt/stack/cinder/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
             time.sleep(3)
-        except SystemExit as sex: # failed command or non-zero exit codes raise SystemExit
-            raise RuntimeError(str(sex))
+        except SystemExit as se:  # failed command or non-zero exit codes raise SystemExit
+            raise RuntimeError(str(se))
         return self._is_cinder_running()
 
     def _patch_etc_init_cindervolume_conf(self):
@@ -244,7 +245,7 @@ if vpool_name in enabled_backends:
                 if v.name == volume_type_name:
                     return False
             volume_type = self.cinder_client.volume_types.create(volume_type_name)
-            volume_type.set_keys(metadata = {'volume_backend_name': volume_type_name})
+            volume_type.set_keys(metadata={'volume_backend_name': volume_type_name})
 
     def _delete_volume_type(self, volume_type_name):
         """
@@ -256,6 +257,5 @@ if vpool_name in enabled_backends:
                 if v.name == volume_type_name:
                     try:
                         self.cinder_client.volume_types.delete(v.id)
-                    except Exception as ex:
+                    except Exception:
                         pass
-
