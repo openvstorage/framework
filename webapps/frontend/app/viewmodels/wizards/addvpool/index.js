@@ -24,7 +24,7 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new GatherVPool(), new GatherMountPoints(), new GatherCinder(self), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherMountPoints(), new GatherCinder(), new Confirm()]);
         self.step(0);
         self.activateStep();
 

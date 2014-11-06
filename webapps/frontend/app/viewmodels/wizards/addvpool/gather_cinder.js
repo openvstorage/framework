@@ -16,22 +16,21 @@ define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
     '../../containers/storagerouter', '../../containers/storagedriver', './data'
-], function($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
+], function ($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
     "use strict";
-    return function(wizard) {
+    return function() {
         var self = this;
 
         // Variables
-        self.shared                   = shared;
-        self.data                     = data;
-        self.checkCinderHandle        = undefined;
-        self.wizard                   = wizard;
+        self.shared = shared;
+        self.data = data;
+        self.checkCinderHandle = undefined;
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
 
         // Computed
-        self.canContinue = ko.computed(function() {
+        self.canContinue = ko.computed(function () {
             var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult();
 
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
@@ -39,30 +38,31 @@ define([
 
         // Functions
         self.preValidate = function() {
+            // @todo: add connection validation using filled out keystone credentials
             var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
-                deferred.resolve();}).promise();
+                deferred.resolve();
+            }).promise();
         };
         self.next = function() {
-            return $.Deferred(function(deferred) {
-            	deferred.resolve();});
+            return true;
         };
 
         // Durandal
         self.activate = function() {
-        	generic.xhrAbort(self.checkCinderHandle);
+            self.data.hasCinder(undefined);
+            generic.xhrAbort(self.checkCinderHandle);
             self.checkCinderHandle = api.post('storagerouters/' + self.data.target().guid() + '/check_cinder')
-            	.then(self.shared.tasks.wait)
-            	.done(function(data) {
-            		if (data) {
-            			self.data.hasCinder(true);
-            			self.data.configCinder(true);
-            		}
-            		else {
-            			self.wizard.next();
-            			}
-            });
-
-       };
+                .then(self.shared.tasks.wait)
+                .done(function (data) {
+                    if (data) {
+                        self.data.hasCinder(true);
+                        self.data.configCinder(true);
+                     } else {
+                        self.data.hasCinder(false);
+                        self.data.configCinder(false);
+                     }
+                });
+        };
     };
 });

@@ -15,49 +15,64 @@ limitations under the License.
 -->
 <div>
     <form id="form.gather.cinder" role="form form-horizontal" class="form-horizontal">
-        <div data-bind="visible: data.hasCinder() === false">
+        <div data-bind="visible: data.hasCinder() === undefined" class="alert alert-info" style="margin-top: 5px;">
+            <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+            <span data-i18n="ovs:wizards.addvpool.gathercinder.detecting"></span>
+        </div>
+        <div data-bind="visible: data.hasCinder() === false" class="alert alert-success" style="margin-top: 5px;">
             <p data-i18n="ovs:wizards.addvpool.gathercinder.nocinder"></p>
         </div>
-        <div data-bind="visible: data.hasCinder() === true">
+        <div data-bind="visible: data.hasCinder() === true" style="margin-top: 5px;">
             <p data-i18n="ovs:wizards.addvpool.gathercinder.basicinfo"></p>
-	        <div class="form-group">
-	            <label class="col-lg-3 control-label">&nbsp;</label>
-	            <div class="col-lg-7">
-	                <input type="checkbox" id="configCinder" data-bind="checked: data.configCinder">
-	                 <label for="configCinder" data-i18n="ovs:wizards.addvpool.gathercinder.configCinder"></label>
-	            </div>
-	        </div>
-	        <div data-bind="visible: data.configCinder() === true">
-		        <div class="form-group">
-		            <label class="col-lg-3 control-label" for="cinderUser" data-i18n="ovs:wizards.addvpool.gathercinder.cinderUser"></label>
-		            <div class="col-lg-7">
-		                <input type="text" id="inputcinderUser" class="autofocus form-control" data-bind="value: data.cinderUser, valueUpdate: 'input'">
-		            </div>
-		        </div>
-		        <div class="form-group">
-		            <label class="col-lg-3 control-label" for="cinderPassword" data-i18n="ovs:wizards.addvpool.gathercinder.cinderPassword"></label>
-		            <div class="col-lg-7">
-		                <input type="password" id="inputcinderPassword" class="autofocus form-control" data-bind="value: data.cinderPassword, valueUpdate: 'input'">
-		            </div>
-		        </div>
-		        <div class="form-group">
-		            <label class="col-lg-3 control-label" for="cinderTenant" data-i18n="ovs:wizards.addvpool.gathercinder.cinderTenant"></label>
-		            <div class="col-lg-7">
-		                <input type="text" id="inputcinderTenant" class="autofocus form-control" data-bind="value: data.cinderTenant, valueUpdate: 'input'">
-		            </div>
-		        </div>
-		        <div class="form-group">
-		            <label class="col-lg-3 control-label" for="cinderCtrlIP" data-i18n="ovs:wizards.addvpool.gathercinder.cinderCtrlIP"></label>
-		            <div class="col-lg-7">
-		                <input type="text" id="inputcinderCtrlIP" class="autofocus form-control" data-bind="value: data.cinderCtrlIP, valueUpdate: 'input'">
-		            </div>
-		        </div>
-	        </div>
-      </div>
+            <div class="form-group">
+                <label class="col-lg-4 control-label">&nbsp;</label>
+                <div class="col-lg-6">
+                    <input type="checkbox" id="configCinder" data-bind="checked: data.configCinder">
+                    <label for="configCinder" data-i18n="ovs:wizards.addvpool.gathercinder.configcinder"></label>
+                </div>
+            </div>
+            <div data-bind="visible: data.configCinder() === true">
+                <div class="form-group">
+                    <label class="col-lg-4 control-label" for="cinderUser"
+                           data-i18n="ovs:wizards.addvpool.gathercinder.cinderuser"></label>
+                    <div class="col-lg-6">
+                        <input type="text" id="inputcinderUser" class="autofocus form-control"
+                               data-bind="value: data.cinderUser, valueUpdate: 'input'">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-lg-4 control-label" for="cinderPassword"
+                           data-i18n="ovs:wizards.addvpool.gathercinder.cinderpassword"></label>
+                    <div class="col-lg-6">
+                        <input type="password" id="inputcinderPassword" class="autofocus form-control"
+                               data-bind="value: data.cinderPassword, valueUpdate: 'input'">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-lg-4 control-label" for="cinderTenant"
+                           data-i18n="ovs:wizards.addvpool.gathercinder.cindertenant"></label>
+                    <div class="col-lg-6">
+                        <input type="text" id="inputcinderTenant" class="autofocus form-control"
+                               data-bind="value: data.cinderTenant, valueUpdate: 'input'">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="col-lg-4 control-label" for="cinderCtrlIP"
+                           data-i18n="ovs:wizards.addvpool.gathercinder.cinderctrlip"></label>
+                    <div class="col-lg-6">
+                        <input type="text" id="inputcinderCtrlIP" class="autofocus form-control"
+                               data-bind="value: data.cinderCtrlIP, valueUpdate: 'input'">
+                    </div>
+                </div>
+            </div>
+        </div>
     </form>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors" style="margin-bottom: -10px;">
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors"
+         style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
-        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+
+        <p data-bind="visible: canContinue().reasons.length > 0"><span
+                data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
             <li data-bind="text: $data"></li>
         </ul>

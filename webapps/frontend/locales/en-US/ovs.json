@@ -478,12 +478,13 @@
             },
             "gathercinder": {
                 "basicinfo": "Configure Cinder credentials (Keystone authentication)",
-                "cinderUser": "User name:",
-                "cinderPassword": "Password:",
-                "cinderTenant": "Tenant name",
-                "cinderCtrlIP": "Keystone Public IP:",
-                "configCinder": "Configure this vpool with Cinder",
-                "nocinder": "(Detecting Cinder process, please wait...)"
+                "cinderuser": "User name:",
+                "cinderpassword": "Password:",
+                "cindertenant": "Tenant name:",
+                "cinderctrlip": "Keystone public IP:",
+                "configcinder": "Configure this vpool with Cinder",
+                "nocinder": "No Cinder process detected, press next to continue",
+                "detecting": "Detecting Cinder process, please wait ..."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
