@@ -178,6 +178,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
 
     @action()
+    @log()
     @required_roles(['read'])
     @return_task()
     @load(StorageRouter)

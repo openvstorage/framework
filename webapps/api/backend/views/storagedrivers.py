@@ -54,8 +54,8 @@ class StorageDriverViewSet(viewsets.ViewSet):
         """
         return storagedriver
 
-    @log()
     @action()
+    @log()
     @required_roles(['read'])
     @load(StorageDriver)
     def can_be_deleted(self, storagedriver):
