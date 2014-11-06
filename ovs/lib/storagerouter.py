@@ -771,7 +771,7 @@ if Service.has_service('{0}'):
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
 
         # First model cleanup
-        storagedriver.delete()
+        storagedriver.delete(abandon=True)  # Detach from the log entries
 
         if storagedrivers_left:
             # Restart leftover services
