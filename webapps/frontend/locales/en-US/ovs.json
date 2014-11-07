@@ -484,7 +484,8 @@
                 "cinderctrlip": "Keystone public IP:",
                 "configcinder": "Configure this vpool with Cinder",
                 "nocinder": "No Cinder process detected, press next to continue",
-                "detecting": "Detecting Cinder process, please wait ..."
+                "detecting": "Detecting Cinder process, please wait ...",
+                "invalidcinderinfo": "Could not connect to specified Keystone server or wrong credentials"
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",

@@ -187,3 +187,15 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Checks whether cinder process is running on the specified machine
         """
         return StorageRouterController.check_cinder.s().apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+
+    @action()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def valid_cinder_credentials(self, storagerouter, cinder_password, cinder_user, tenant_name, controller_ip):
+        """
+        Checks whether cinder process is running on the specified machine
+        """
+        return StorageRouterController.valid_cinder_credentials.s(cinder_password, cinder_user, tenant_name, controller_ip).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id))

@@ -90,6 +90,15 @@ class DummyPersistentStore(object):
         else:
             raise KeyNotFoundException(key)
 
+    def exists(self, key):
+        """
+        Check if key exists
+        """
+        try:
+            self.get(key)
+            return True
+        except KeyNotFoundException:
+            return False
     def nop(self):
         """
         Executes a nop command

@@ -25,6 +25,7 @@ define([
         self.shared = shared;
         self.data = data;
         self.checkCinderHandle = undefined;
+        self.checkCinderCredentialsHandle = undefined;
 
         // Observables
         self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
@@ -32,16 +33,56 @@ define([
         // Computed
         self.canContinue = ko.computed(function () {
             var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult();
-
+            if (preValidation.valid === false) {
+                showErrors = true;
+                reasons = reasons.concat(preValidation.reasons);
+                fields = fields.concat(preValidation.fields);
+            }
             return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
         });
 
         // Functions
         self.preValidate = function() {
-            // @todo: add connection validation using filled out keystone credentials
+            // connection validation using filled out keystone credentials
             var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
-                deferred.resolve();
+            	$.when.apply($, [
+            	    $.Deferred(function(cinderDeffered) {
+            	    	if (self.data.hasCinder() === true) {
+	            	    	generic.xhrAbort(self.checkCinderCredentialsHandle);
+	                        var postData = {
+	                            	cinder_user: self.data.cinderUser(),
+	                                cinder_password: self.data.cinderPassword(),
+	                                tenant_name: self.data.cinderTenant(),
+	                                controller_ip: self.data.cinderCtrlIP()
+	                        };
+	                    	self.checkCinderCredentialsHandle = api.post('storagerouters/' + self.data.target().guid() + '/valid_cinder_credentials', { data: postData })
+	                			.then(self.shared.tasks.wait)
+	                			.done(function(data) {
+	                				if (!data) {
+	                    				validationResult.valid = false;
+	                    				validationResult.reasons.push($.t('ovs:wizards.addvpool.gathercinder.invalidcinderinfo'));
+	                                    validationResult.fields.push('cinderUser');
+	                                    validationResult.fields.push('cinderPassword');
+	                                    validationResult.fields.push('cinderTenant');
+	                                    validationResult.fields.push('cinderCtrlIP');
+	                    			}
+	                				cinderDeffered.resolve();
+	                			})
+	                			.fail(cinderDeffered.reject);
+            	    	} else {
+            	    		cinderDeffered.resolve();
+            	    	}
+            	    }).promise()
+            	])
+            	.always(function() {
+            		self.preValidateResult(validationResult);
+            		if (validationResult.valid) {
+            			deferred.resolve();
+	                } else {
+	                	deferred.reject();
+	                }
+            	});
             }).promise();
         };
         self.next = function() {

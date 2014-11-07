@@ -101,6 +101,13 @@ class ArakoonStore(object):
         """
         return ArakoonStore._try(self._client.nop)
 
+    @locked()
+    def exists(self, key):
+        """
+        Check if key exists
+        """
+        return ArakoonStore._try(self._client.exists, key)
+
     @staticmethod
     def _try(method, *args, **kwargs):
         """

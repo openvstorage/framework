@@ -19,7 +19,6 @@ import copy
 import os
 import re
 import uuid
-import json
 
 from subprocess import check_output
 from ovs.celery_run import celery
@@ -34,6 +33,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
@@ -614,11 +614,11 @@ Service.start_service('{0}')
         vpool.save()
 
         # Configure Cinder
-        ovsdb = ArakoonManagementEx().getCluster('ovsdb').getClient()
+        ovsdb = PersistentFactory.get_client()
         vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
         if ovsdb.exists(vpool_config_key):
             # Second node gets values saved by first node
-            cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = json.loads(ovsdb.get(vpool_config_key))
+            cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = ovsdb.get(vpool_config_key)
         else:
             config_cinder = parameters.get('config_cinder', False)
             cinder_password = ''
@@ -639,7 +639,7 @@ Service.start_service('{0}')
                 osc.configure_vpool(vpool_name, storagedriver.mountpoint)
                 # Save values for first node to use
                 ovsdb.set(vpool_config_key,
-                          json.dumps([cinder_password, cinder_user, tenant_name, controller_ip, config_cinder]))
+                          [cinder_password, cinder_user, tenant_name, controller_ip, config_cinder])
 
 
     @staticmethod
@@ -685,10 +685,10 @@ if Service.has_service('{0}'):
 """.format(service))
 
         # Unconfigure Cinder
-        ovsdb = ArakoonManagementEx().getCluster('ovsdb').getClient()
+        ovsdb = PersistentFactory.get_client()
         key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
         if ovsdb.exists(key):
-            cinder_password, cinder_user, tenant_name, controller_ip, _ = json.loads(ovsdb.get(key))
+            cinder_password, cinder_user, tenant_name, controller_ip, _ = ovsdb.get(key)
             client = SSHClient.load(ip)
             System.exec_remote_python(client, """
 from ovs.extensions.openstack.cinder import OpenStackCinder
@@ -898,6 +898,15 @@ if Service.has_service('{0}'):
         """
         osc = OpenStackCinder()
         return osc.is_cinder_installed
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.valid_cinder_credentials')
+    def valid_cinder_credentials(cinder_password, cinder_user, tenant_name, controller_ip):
+        """
+        Checks whether the cinder credentials are valid
+        """
+        osc = OpenStackCinder()
+        return osc.valid_credentials(cinder_password, cinder_user, tenant_name, controller_ip)
 
     @staticmethod
     def _validate_ip(ip):

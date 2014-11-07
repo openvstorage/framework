@@ -47,13 +47,34 @@ class OpenStackCinder(object):
         self.is_cinder_running = self._is_cinder_running()
         self.is_cinder_installed = self._is_cinder_installed()
 
+    def valid_credentials(self, cinder_password, cinder_user, tenant_name, controller_ip):
+        """
+        Validate credentials
+        """
+        try:
+            from cinderclient.v1 import client as cinder_client
+        except ImportError:
+            return False
+        else:
+            try:
+                auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
+                cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
+                cinder_client.authenticate()
+                return True
+            except:
+                return False
+
     def _get_driver_code(self):
         """
         WGET driver, temporary, until driver is included in openstack
         """
         if self.is_devstack:
-            if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/ovs_volume_driver.py'):
-                self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/ovs_volume_driver.py -P /opt/stack/devstack/cinder/cinder/volume/drivers')
+            if os.path.exists('/opt/stack/devstack/cinder'):
+                if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/ovs_volume_driver.py'):
+                    self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/ovs_volume_driver.py -P /opt/stack/devstack/cinder/cinder/volume/drivers')
+            elif os.path.exists('/opt/stack/cinder'):
+                if not os.path.exists('/opt/stack/cinder/cinder/volume/drivers/ovs_volume_driver.py'):
+                    self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/ovs_volume_driver.py -P /opt/stack/cinder/cinder/volume/drivers')
         elif self.is_openstack:
             if not os.path.exists('/usr/lib/python2.7/dist-packages/cinder/volume/drivers/ovs_volume_driver.py'):
                 self.client.run('wget https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/ovs_volume_driver.py -P /usr/lib/python2.7/dist-packages/cinder/volume/drivers')
