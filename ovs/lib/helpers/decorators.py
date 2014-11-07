@@ -19,6 +19,7 @@ Contains various decorators
 import time
 from ovs.dal.hybrids.log import Log
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.dal.exceptions import ObjectNotFoundException
 
 
 def log(event_type):
@@ -44,8 +45,13 @@ def log(event_type):
             log_entry.method_kwargs = kwargs
             log_entry.time = time.time()
             if event_type == 'VOLUMEDRIVER_TASK':
-                log_entry.storagedriver = StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id'])
-            log_entry.save()
+                try:
+                    log_entry.storagedriver = StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id'])
+                    log_entry.save()
+                except ObjectNotFoundException:
+                    pass
+            else:
+                log_entry.save()
 
             # Call the function
             return f(*args, **kwargs)
