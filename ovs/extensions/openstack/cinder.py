@@ -102,11 +102,7 @@ class OpenStackCinder(object):
         return False
 
     def _is_cinder_installed(self):
-        try:
-            out = self.client.run('ls %s' % CINDER_CONF)
-            return 'cannot access' not in out
-        except SystemExit:
-            return False
+        return self.client.file_exists(CINDER_CONF)
 
     def configure_vpool(self, vpool_name, mountpoint):
         if self.is_devstack or self.is_openstack:
