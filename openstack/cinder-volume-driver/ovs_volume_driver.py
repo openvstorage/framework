@@ -21,17 +21,27 @@ OpenStack Cinder driver - interface to OVS api
 import socket
 import time
 
-# OVS
-from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.lists.pmachinelist import PMachineList
-from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.vpoollist import VPoolList
-from ovs.lib.vdisk import VDiskController
+# External libs: OVS
+try:
+    from ovs.dal.hybrids.vdisk import VDisk
+    from ovs.dal.lists.pmachinelist import PMachineList
+    from ovs.dal.lists.vdisklist import VDiskList
+    from ovs.dal.lists.vpoollist import VPoolList
+    from ovs.lib.vdisk import VDiskController
+except ImportError:
+    # CI Testing, all external libs are mocked
+    # or using the driver without all required libs
+    VDisk = None
+    PMachineList = None
+    VDiskList = None
+    VPoolList = None
+    VDiskController = None
 
 #Third party
 from oslo.config import cfg
 
 #Cinder
+from cinder import exception
 from cinder.image import image_utils
 from cinder.openstack.common import log as logging
 from cinder.volume import api
@@ -463,7 +473,10 @@ class OVSVolumeDriver(driver.VolumeDriver):
     def check_for_setup_error(self):
         """Just to override parent behavior.
         """
-        LOG.info('CHECK FOR SETUP ERROR')
+        if VDisk is None or PMachineList is None or VDiskList is None or\
+           VPoolList is None or VDiskController is None:
+            msg = 'Open vStorage libraries not found'
+            raise exception.VolumeBackendAPIException(data=msg)
 
     def do_setup(self, context):
         """Any initialization the volume driver does while starting
