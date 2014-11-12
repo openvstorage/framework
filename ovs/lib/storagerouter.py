@@ -641,7 +641,6 @@ Service.start_service('{0}')
                 ovsdb.set(vpool_config_key,
                           [cinder_password, cinder_user, tenant_name, controller_ip, config_cinder])
 
-
     @staticmethod
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid):
