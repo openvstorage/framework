@@ -522,16 +522,17 @@ class OVSVolumeDriver(driver.VolumeDriver):
                   % (location, hostname))
         attempt = 0
         while attempt <= retry:
-            model_disks = [(vd.guid, "{0}/{1}".format(
-                [vsr for vsr in vd.vpool.storagedrivers
-                 if vsr.storagerouter.name == hostname][0].mountpoint,
-                vd.devicename)) for vd in VDiskList.get_vdisks()]
-            for model_disk in model_disks:
-                if model_disk[1] == location:
-                    LOG.info('[_FIND OVS DISK] Location %s Disk found %s'
-                             % (location, model_disk[0]))
-                    disk = VDisk(model_disk[0])
-                    return disk
+            for vd in VDiskList.get_vdisks():
+                if vd.vpool:
+                    for vsr in vd.vpool.storagedrivers:
+                        if vsr.storagerouter.name == hostname:
+                            _location = "{0}/{1}".format(vsr.mountpoint,
+                                                         vd.devicename)
+                            if _location == location:
+                                LOG.info('Location %s Disk found %s'
+                                         % (location, vd.guid))
+                                disk = VDisk(vd.guid)
+                                return disk
             msg = ' NO RESULT Attempt %s timeout %s max attempts %s'
             LOG.debug(msg % (attempt, timeout, retry))
             if timeout:
