@@ -48,7 +48,7 @@ define([
             return $.Deferred(function(deferred) {
             	$.when.apply($, [
             	    $.Deferred(function(cinderDeffered) {
-            	    	if (self.data.hasCinder() === true) {
+            	    	if (self.data.hasCinder() === true && self.data.configCinder() === true) {
 	            	    	generic.xhrAbort(self.checkCinderCredentialsHandle);
 	                        var postData = {
 	                            	cinder_user: self.data.cinderUser(),
