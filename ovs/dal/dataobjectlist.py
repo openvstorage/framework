@@ -110,7 +110,7 @@ class DataObjectList(object):
         """
         self._guids.reverse()
 
-    def load(self):
+    def loadunsafe(self):
         """
         Loads all objects (to use on e.g. sorting)
         """
@@ -118,24 +118,22 @@ class DataObjectList(object):
             if guid not in self._objects:
                 self._get_object(guid)
 
-    def iterloaded(self):
+    def loadsafe(self):
         """
-        Allows to iterate only over the objects that are already loaded
-        preventing unnessesary object loading
+        Loads all objects (to use on e.g. sorting), but not caring about objects that doesn't exist
         """
         for guid in self._guids:
-            if guid in self._objects:
-                yield self._objects[guid]
+            if guid not in self._objects:
+                try:
+                    self._get_object(guid)
+                except ObjectNotFoundException:
+                    pass
 
-    def itersafe(self):
+    def load(self):
         """
-        Allows to iterate over all objects, but not caring about objects that doesn't exist
+        Loads all objects
         """
-        for guid in self._guids:
-            try:
-                yield self._get_object(guid)
-            except ObjectNotFoundException:
-                pass
+        return self.loadsafe()
 
     def __add__(self, other):
         if not isinstance(other, DataObjectList):
@@ -156,12 +154,37 @@ class DataObjectList(object):
         new_dol.merge(other._query_result)
         return new_dol
 
-    def __iter__(self):
+    def iterloaded(self):
+        """
+        Allows to iterate only over the objects that are already loaded
+        preventing unnessesary object loading
+        """
+        for guid in self._guids:
+            if guid in self._objects:
+                yield self._objects[guid]
+
+    def iterunsafe(self):
         """
         Yields object instances
         """
         for guid in self._guids:
             yield self._get_object(guid)
+
+    def itersafe(self):
+        """
+        Yields object instances, but not caring about objects that doesn't exist
+        """
+        for guid in self._guids:
+            try:
+                yield self._get_object(guid)
+            except ObjectNotFoundException:
+                pass
+
+    def __iter__(self):
+        """
+        Yields object instances
+        """
+        return self.itersafe()
 
     def __len__(self):
         """
