@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'knockout', 'jquery',
     'ovs/generic'
@@ -74,7 +74,7 @@ define([
             return $.inArray(item, self.target()) !== -1;
         };
         self.translate = function() {
-            $('html').i18n();
+            window.setTimeout(function() { $('html').i18n(); }, 250);
         };
 
         // Durandal
