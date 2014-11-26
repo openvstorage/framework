@@ -73,6 +73,9 @@ define([
         self.contains = function(item) {
             return $.inArray(item, self.target()) !== -1;
         };
+        self.translate = function() {
+            $('html').i18n();
+        };
 
         // Durandal
         self.activate = function(settings) {
