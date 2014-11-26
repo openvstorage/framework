@@ -1726,14 +1726,15 @@ print blk_devices
 
     @staticmethod
     def _partition_disks(client, partition_layout):
-        fstab_entry = 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2 \n'
+        fstab_entry = 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2'
+        fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
         mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().split('\n')]
 
         unique_disks = set()
         for mp, values in partition_layout.iteritems():
             unique_disks.add(values['device'])
 
-            # umount partitions
+            # Umount partitions
             if mp in mounted:
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
@@ -1745,13 +1746,13 @@ print blk_devices
                     print 'Unmounting {0}'.format(mounted_device)
                     client.run('umount {0}'.format(mounted_device))
 
-        # wipe disks
+        # Wipe disks
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
                 continue
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
-        # pre process partition info (disk as key)
+        # Pre process partition info (disk as key)
         mountpoints = partition_layout.keys()
         mountpoints.sort()
         partitions_by_disk = dict()
@@ -1765,8 +1766,8 @@ print blk_devices
             else:
                 partitions_by_disk[disk] = [(mp, percentage, label)]
 
-        # partition and format disks
-        fstab = '# BEGIN Open vStorage \n'
+        # Partition and format disks
+        fstab_entries = ['{0} - Do not edit anything in this block'.format(fstab_separator[0])]
         for disk, partitions in partitions_by_disk.iteritems():
             if disk == 'DIR_ONLY':
                 for directory, _, _ in partitions:
@@ -1783,21 +1784,26 @@ print blk_devices
                     size_in_percentage = int(start) + int(percentage)
                     client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
                 client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
-                fstab = fstab + fstab_entry.format(label, mp)
+                fstab_entries.append(fstab_entry.format(label, mp))
                 count += 1
                 start = size_in_percentage
 
-        fstab += '# END OPENVSTORAGE \n'
+        fstab_entries.append(fstab_separator[1])
 
-        # update fstab
-        must_update = False
-        fstab_content = client.file_read('/etc/fstab')
-        if not '# BEGIN Open vStorage' in fstab_content:
-            fstab_content += '\n'
-            fstab_content += fstab
-            must_update = True
-        if must_update:
-            client.file_write('/etc/fstab', fstab_content)
+        # Update fstab
+        original_content = [line.strip() for line in client.file_read('/etc/fstab').strip().split('\n')]
+        new_content = []
+        skip = False
+        for line in original_content:
+            if skip is False:
+                if line.startswith(fstab_separator[0]):
+                    skip = True
+                else:
+                    new_content.append(line)
+            elif line.startswith(fstab_separator[1]):
+                skip = False
+        new_content += fstab_entries
+        client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
         try:
             client.run('timeout -k 9 5s mountall -q || true')
