@@ -24,10 +24,10 @@ import ConfigParser
 import urllib2
 import base64
 import logging
-from subprocess import check_output
 
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
+from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
 
@@ -146,9 +146,8 @@ class SetupController(object):
             logger.info('Collecting cluster information')
 
             # Check whether running local or remote
-            command = "ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'"
-            unique_id = sorted(target_client.run(command).strip().split('\n'))[0][:12]
-            local_unique_id = sorted(check_output(command, shell=True).strip().split('\n'))[0][:12]
+            unique_id = System.get_my_machine_id(target_client)
+            local_unique_id = System.get_my_machine_id()
             remote_install = unique_id != local_unique_id
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
             if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):

@@ -29,9 +29,9 @@ from ovs.lib.messaging import MessageController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.generic.system import System
 from ovs.plugin.provider.configuration import Configuration
 from configobj import ConfigObj
-from subprocess import check_output
 
 memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
 memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'], ]
@@ -41,7 +41,7 @@ rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmq
 rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'], ]
 rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
 
-unique_id = sorted(check_output("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g'", shell=True).strip().split('\n'))[0]
+unique_id = System.get_my_machine_id()
 
 include = []
 path = os.path.join(os.path.dirname(__file__), 'lib')
