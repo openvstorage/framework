@@ -766,6 +766,7 @@ EOF
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
+
         target_client = SSHClient.load(cluster_ip)
         target_client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>
@@ -1105,11 +1106,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
             SetupController._change_service_state(target_client, service, 'restart')
 
         logger.debug('Restarting workers')
-        SetupController._change_service_state(target_client, 'workers', 'restart')
+        for node in nodes:
+            node_client = SSHClient.load(node)
+            SetupController._change_service_state(node_client, 'workers', 'restart')
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
+        target_client = SSHClient.load(cluster_ip)
         target_client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>
 <!--*-nxml-*-->
@@ -1331,11 +1335,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
         target_client = SSHClient.load(cluster_ip)
         for service in ['watcher-framework', 'watcher-volumedriver']:
             SetupController._change_service_state(target_client, service, 'restart')
-        SetupController._change_service_state(target_client, 'workers', 'restart')
+        for node in nodes:
+            node_client = SSHClient.load(node)
+            SetupController._change_service_state(node_client, 'workers', 'restart')
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
+        target_client = SSHClient.load(cluster_ip)
         target_client.run("""cat > {3} <<EOF
 <?xml version="1.0" standalone='no'?>
 <!--*-nxml-*-->
