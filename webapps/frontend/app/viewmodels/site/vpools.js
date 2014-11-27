@@ -51,7 +51,7 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_dynamics'
+                        contents: '_dynamics,backend_type'
                     };
                     self.vPoolsHandle[page] = api.get('vpools', { queryparams: options })
                         .done(function(data) {
@@ -59,9 +59,12 @@ define([
                                 data: data,
                                 loader: function(guid) {
                                     if (!self.vPoolCache.hasOwnProperty(guid)) {
-                                         self.vPoolCache[guid] = new VPool(guid);
+                                        self.vPoolCache[guid] = new VPool(guid);
                                     }
                                     return self.vPoolCache[guid];
+                                },
+                                dependencyLoader: function(item) {
+                                    item.loadBackendType();
                                 }
                             });
                         })
@@ -81,7 +84,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle[undefined])) {
-                    self.vPoolsHandle[undefined] = api.get('vpools', { contents: 'statistics,stored_data' })
+                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: {contents: 'statistics,stored_data,backend_type' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {
