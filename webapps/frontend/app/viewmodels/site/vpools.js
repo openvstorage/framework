@@ -84,7 +84,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle[undefined])) {
-                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: {contents: 'statistics,stored_data,backend_type' }})
+                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: { contents: 'statistics,stored_data,backend_type' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {

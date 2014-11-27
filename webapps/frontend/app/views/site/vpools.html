@@ -37,8 +37,7 @@ limitations under the License.
                 <td><span data-bind="text: iops"></span></td>
                 <td>
                     <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
-                        <span data-part="lazy-entry"
-                              data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
+                        <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
                     </span>
                 </td>
                 <td><span data-bind="text: backendConnection"></span></td>
