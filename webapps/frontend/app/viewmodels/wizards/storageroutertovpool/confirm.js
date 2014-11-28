@@ -330,7 +330,12 @@ define([
                             self.storageDriver().fillData(storageDriverData);
                             self.storageDriverLoading.resolve();
                         })
-                        .fail(self.storageDriverLoading.reject);
+                        .fail(function() {
+                            self.storageDriverLoading.reject();
+                        });
+                })
+                .fail(function() {
+                    self.storageDriverLoading.reject();
                 });
             self.refresher.init(function() {
                 $.each(self.data.pendingStorageRouters(), function(index, storageRouter) {

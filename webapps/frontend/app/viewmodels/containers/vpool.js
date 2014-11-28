@@ -127,7 +127,7 @@ define([
                                 })
                                 .fail(mainDeferred.reject);
                         } else {
-                            mainDeferred.reject();
+                            mainDeferred.resolve();
                         }
                     }).promise(),
                     $.Deferred(function(machineDeferred) {
@@ -159,7 +159,7 @@ define([
                                 })
                                 .fail(machineDeferred.reject);
                         } else {
-                            machineDeferred.reject();
+                            machineDeferred.resolve();
                         }
                     }).promise()];
                 $.when.apply($, calls)
@@ -183,7 +183,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };
