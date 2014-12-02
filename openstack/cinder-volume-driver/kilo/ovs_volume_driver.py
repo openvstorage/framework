@@ -74,27 +74,9 @@ def _debug_vol_info(call, volume):
 
 class OVSVolumeDriver(driver.VolumeDriver):
     """OVS Volume Driver plugin for Cinder
-    (support for Icehouse (stable) , Juno (RC) and Kilo (unstable))
-    Configuration file: /etc/cinder/cinder.conf
-    Required parameters in config file:
-
-    # single driver
-    volume_driver = cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver
-    volume_backend_name = <VPOOLNAME>
-    vpool_name = <VPOOLNAME>
-
-    # multiple drivers
-    enabled backends: Open vStorage
-    [Open vStorage]
-    volume_driver = cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver
-    volume_backend_name = <VPOOLNAME>
-    vpool_name = <VPOOLNAME>
-
-    Required configuration:
-        cinder type-create <TYPENAME> # e.g. Open vStorage
-        cinder type-key <TYPENAME> set volume_backend_name=<VPOOLNAME>
+    (support for Kilo only)
     """
-    VERSION = '1.0.4b'
+    VERSION = '1.0.5'
 
     def __init__(self, *args, **kwargs):
         """Init: args, kwargs pass through;
@@ -116,7 +98,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         """
         _debug_vol_info("INIT_CONN", volume)
 
-        return {'driver_volume_type': 'local',
+        return {'driver_volume_type': 'file',
                 'data': {'vpoolname': self._vpool_name,
                          'device_path': volume.provider_location}}
 
@@ -140,7 +122,13 @@ class OVSVolumeDriver(driver.VolumeDriver):
                                       size = size)
         volume['provider_location'] = location
 
-        ovs_disk = self._find_ovs_model_disk_by_location(location, hostname)
+        try:
+            ovs_disk = self._find_ovs_model_disk_by_location(location,
+                                                             hostname)
+        except RuntimeError:
+            VDiskController.delete_volume(location = location)
+            raise
+
         ovs_disk.cinder_id = volume.id
         ovs_disk.name = name
         ovs_disk.save()
@@ -187,7 +175,8 @@ class OVSVolumeDriver(driver.VolumeDriver):
                                          image_id,
                                          destination_path,
                                          '1M',
-                                         size = volume['size'])
+                                         size = volume['size'],
+                                         run_as_root=False)
                 LOG.info('CP_IMG_TO_VOL Resizing volume to size %s'
                          % volume['size'])
                 self.extend_volume(volume = volume, size_gb = volume['size'])

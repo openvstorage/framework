@@ -36,6 +36,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.extensions.openstack.cinder import OpenStackCinder
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -336,7 +337,11 @@ class VDiskController(object):
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
         client = SSHClient.load('127.0.0.1')
-        client.run_local('truncate -s %sG %s' % (size, location))
+        output = client.run_local('truncate -s %sG %s' % (size, location))
+        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        if not os.path.exists(location):
+            raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
+        VDiskController.own_volume(location)
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_volume')
@@ -378,4 +383,22 @@ class VDiskController(object):
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         client = SSHClient.load('127.0.0.1')
-        client.run_local('truncate -s %sG %s' % (size, location))
+        print(client.run_local('truncate -s %sG %s' % (size, location)))
+        VDiskController.own_volume(location)
+
+    @staticmethod
+    def own_volume(location):
+        """
+        Change permissions and ownership of file
+        """
+        if not os.path.exists(location):
+            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
+
+        client = SSHClient.load('127.0.0.1')
+        osc = OpenStackCinder()
+        print(client.run_local('chmod 664 %s' % location))
+        if osc.is_devstack:
+            print(client.run_local('chown stack %s' % location))
+        elif osc.is_openstack:
+            print(client.run_local('chown cinder %s' % location))
+
