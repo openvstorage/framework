@@ -28,7 +28,7 @@ find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;
 usermod -a -G adm logstash
 echo manual >/etc/init/logstash-web.override
 
-chmod 755 /opt/OpenvStorage/scripts/rotate-storagedriver-logs.sh
+chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh
 
 # Adding crontabs
 if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 * * * * /usr/sbin/ntpdate pool.ntp.org'; } | crontab -; fi
