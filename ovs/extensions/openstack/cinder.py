@@ -79,7 +79,7 @@ class OpenStackCinder(object):
         """
         Get openstack cinder version
         """
-        output = self.client.run_local('cinder-manage --version').strip()
+        output = self.client.run_local('cinder-manage --version 2>&1').strip()
         if output.startswith('2015.1'):
             return 'kilo'
         elif output.startswith('2014.2'):
@@ -239,8 +239,10 @@ if vpool_name in enabled_backends:
         try:
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X kill' ''')
             self.client.run('''su stack -c 'screen -S stack -X screen -t c-vol' ''')
+            time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-api -X kill' ''')
             self.client.run('''su stack -c 'screen -S stack -X screen -t n-api' ''')
+            time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X kill' ''')
             self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
             time.sleep(3)
@@ -248,6 +250,7 @@ if vpool_name in enabled_backends:
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "cd /opt/stack/cinder && /opt/stack/cinder/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\"\012"' ''')
+            time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\"\012"' ''')
         except SystemExit as se:  # failed command or non-zero exit codes raise SystemExit
             raise RuntimeError(str(se))
