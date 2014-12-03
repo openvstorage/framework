@@ -9,3 +9,4 @@ config/logrotate/openvstorage-logs             etc/logrotate.d
 config/templates                               opt/OpenvStorage/config
 scripts/install/openvstorage-core.postinst.py  opt/OpenvStorage/scripts/install
 scripts/system/ovs                             usr/bin
+scripts/system/rotate-storagedriver-logs.sh    opt/OpenvStorage/scripts/system
