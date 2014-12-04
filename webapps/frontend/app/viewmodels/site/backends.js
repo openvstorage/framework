@@ -42,86 +42,39 @@ define([
         self.backendTypesInitialLoad = ko.observable(true);
 
         // Handles
-        self.loadBackendsHandle     = undefined;
-        self.refreshBackendsHandle  = {};
         self.loadBackendTypesHandle = undefined;
+        self.backendsHandle         = {};
 
         // Functions
-        self.fetchBackends = function() {
+        self.loadBackends = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadBackendsHandle)) {
-                    var options = {
-                        sort: 'name',
-                        contents: '_relations'
-                    };
-                    self.loadBackendsHandle = api.get('backends', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], bdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                bdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.backends,
-                                function(guid) {
-                                    var backend = new Backend(guid), bt, backendTypeGuid;
-                                    if ($.inArray(guid, guids) !== -1) {
-                                        backend.fillData(bdata[guid]);
-                                        backendTypeGuid = backend.backendTypeGuid();
-                                        if (backendTypeGuid && (backend.backendType() === undefined || backend.backendType().guid() !== backendTypeGuid)) {
-                                            if (!self.backendTypeCache.hasOwnProperty(backendTypeGuid)) {
-                                                bt = new BackendType(backendTypeGuid);
-                                                bt.load();
-                                                self.backendTypeCache[backendTypeGuid] = bt;
-                                            }
-                                            backend.backendType(self.backendTypeCache[backendTypeGuid]);
-                                        }
-                                    }
-                                    backend.loading(true);
-                                    return backend;
-                                }, 'guid'
-                            );
-                            self.backendsInitialLoad(false);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.refreshBackends = function(page) {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshBackendsHandle[page])) {
+                if (generic.xhrCompleted(self.backendsHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
                         contents: '_relations'
                     };
-                    self.refreshBackendsHandle[page] = api.get('backends', { queryparams: options })
+                    self.backendsHandle[page] = api.get('backends', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], bdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                bdata[item.guid] = item;
-                            });
-                            $.each(self.backends(), function(index, be) {
-                                if ($.inArray(be.guid(), guids) !== -1) {
-                                    be.fillData(bdata[be.guid()]);
-                                    var bt, backendTypeGuid = be.backendTypeGuid();
-                                    if (backendTypeGuid && (be.backendType() === undefined || be.backendType().guid() !== backendTypeGuid)) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    return new Backend(guid);
+                                },
+                                dependencyLoader: function(item) {
+                                    var backendTypeGuid = item.backendTypeGuid(), bt;
+                                    if (backendTypeGuid && (item.backendType() === undefined || item.backendType().guid() !== backendTypeGuid)) {
                                         if (!self.backendTypeCache.hasOwnProperty(backendTypeGuid)) {
                                             bt = new BackendType(backendTypeGuid);
                                             bt.load();
                                             self.backendTypeCache[backendTypeGuid] = bt;
                                         }
-                                        be.backendType(self.backendTypeCache[backendTypeGuid]);
+                                        item.backendType(self.backendTypeCache[backendTypeGuid]);
                                     }
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
@@ -141,7 +94,7 @@ define([
                     self.loadBackendTypesHandle = api.get('backendtypes', { queryparams: options })
                         .done(function(data) {
                             var guids = [], btdata = {};
-                            $.each(data, function(index, item) {
+                            $.each(data.data, function(index, item) {
                                 guids.push(item.guid);
                                 btdata[item.guid] = item;
                             });
@@ -173,15 +126,17 @@ define([
         };
         self.saveBackend = function() {
             api.post('backends', {
-                name: self.newBackend().name(),
-                backend_type_guid: self.newBackend().backendType().guid()
+                data: {
+                    name: self.newBackend().name(),
+                    backend_type_guid: self.newBackend().backendType().guid()
+                }
             })
                 .done(function() {
                     generic.alertSuccess(
                         $.t('ovs:backends.new.complete'),
                         $.t('ovs:backends.new.addsuccess')
                     );
-                    self.fetchBackends();
+                    self.loadBackends();
                 })
                 .fail(function(error) {
                     error = $.parseJSON(error.responseText);
@@ -197,16 +152,9 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(function() {
-                self.fetchBackends();
-                self.fetchBackendTypes();
-            }, 5000);
+            self.refresher.init(self.fetchBackendTypes, 5000);
             self.refresher.start();
-
-            self.fetchBackends().then(function() {
-                self.refreshBackends(1);
-            });
-            self.fetchBackendTypes();
+            return self.fetchBackendTypes();
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {
