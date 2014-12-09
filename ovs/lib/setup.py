@@ -307,7 +307,7 @@ class SetupController(object):
         - Request hypervisor information
         """
 
-        print '\n+++ Peparing node +++\n'
+        print '\n+++ Preparing node +++\n'
         logger.info('Preparing node')
 
         # Exchange ssh keys
@@ -347,9 +347,10 @@ class SetupController(object):
             node_client = SSHClient.load(node, passwords[node])
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            node_client.run('ssh-keyscan -t rsa {0} >> {1}'.format(' '.join(nodes), known_hosts_filename.format(root_ssh_folder)))
-            node_client.run('su - ovs -c "ssh-keyscan -t rsa {0} >> {1}"'.format(' '.join(nodes),
-                                                                             known_hosts_filename.format(ovs_ssh_folder)))
+            node_client.run('cp {1} {1}.tmp;ssh-keyscan -t rsa {0} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}'.format(' '.join(nodes),
+                                                                                                                    known_hosts_filename.format(root_ssh_folder)))
+            node_client.run('su - ovs -c "cp {1} {1}.tmp;ssh-keyscan -t rsa {0} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}"'.format(' '.join(nodes),
+                                                                                                                                  known_hosts_filename.format(ovs_ssh_folder)))
 
         print 'Updating hosts files'
         logger.debug('Updating hosts files')
