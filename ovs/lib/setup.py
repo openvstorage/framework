@@ -340,14 +340,12 @@ class SetupController(object):
         authorized_keys = ''
         mapping = {}
         for node in nodes:
-            node_client = SSHClient.load(node)
-            node_hostname = node_client.run('hostname')
-            mapping[node] = node_hostname
-        for node in nodes:
             node_client = SSHClient.load(node, passwords[node])
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
             authorized_keys += '{0}\n{1}\n'.format(root_pub_key, ovs_pub_key)
+            node_hostname = node_client.run('hostname')
+            mapping[node] = node_hostname
         for node in nodes:
             node_client = SSHClient.load(node, passwords[node])
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
