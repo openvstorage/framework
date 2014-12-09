@@ -38,7 +38,7 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.log.logHandler import LogHandler
-from ovs.extensions.openstack.cinder import OpenStackCinder
+from ovs.extensions.openstack.oscinder import OpenStackCinder
 
 logger = LogHandler('lib', name='storagerouter')
 
@@ -690,7 +690,7 @@ if Service.has_service('{0}'):
             cinder_password, cinder_user, tenant_name, controller_ip, _ = ovsdb.get(key)
             client = SSHClient.load(ip)
             System.exec_remote_python(client, """
-from ovs.extensions.openstack.cinder import OpenStackCinder
+from ovs.extensions.openstack.oscinder import OpenStackCinder
 osc = OpenStackCinder(cinder_password = '{0}', cinder_user = '{1}', tenant_name = '{2}', controller_ip = '{3}')
 osc.unconfigure_vpool('{4}', '{5}', {6})
 """.format(cinder_password, cinder_user, tenant_name, controller_ip, vpool.name, storagedriver.mountpoint, not storagedrivers_left))

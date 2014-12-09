@@ -381,28 +381,23 @@ class OVSVolumeDriver(driver.VolumeDriver):
 
         LOG.info('[CLONE FROM SNAP] %s %s %s %s'
                  % (ovs_snap_disk.guid, snapshot.id, devicename, pmachineguid))
-        try:
-            disk_meta = VDiskController.clone(diskguid = ovs_snap_disk.guid,
-                                              snapshotid = snapshot.id,
-                                              devicename = devicename,
-                                              pmachineguid = pmachineguid,
-                                              machinename = "",
-                                              machineguid=None)
-            volume['provider_location'] = '{}{}'.format(
-                mountpoint, disk_meta['backingdevice'])
 
-            LOG.debug('[CLONE FROM SNAP] Meta: %s' % str(disk_meta))
-            LOG.debug('[CLONE FROM SNAP] New volume %s'
-                      % volume['provider_location'])
-            vdisk = VDisk(disk_meta['diskguid'])
-            vdisk.cinder_id = volume.id
-            vdisk.name = devicename
-            vdisk.save()
-        except Exception as ex:
-            LOG.error('CLONE FROM SNAP: Internal error %s ' % str(ex))
-            self.delete_volume(volume)
-            self.delete_snapshot(snapshot)
-            raise
+        disk_meta = VDiskController.clone(diskguid = ovs_snap_disk.guid,
+                                          snapshotid = snapshot.id,
+                                          devicename = devicename,
+                                          pmachineguid = pmachineguid,
+                                          machinename = "",
+                                          machineguid=None)
+        volume['provider_location'] = '{}{}'.format(
+            mountpoint, disk_meta['backingdevice'])
+
+        LOG.debug('[CLONE FROM SNAP] Meta: %s' % str(disk_meta))
+        LOG.debug('[CLONE FROM SNAP] New volume %s'
+                  % volume['provider_location'])
+        vdisk = VDisk(disk_meta['diskguid'])
+        vdisk.cinder_id = volume.id
+        vdisk.name = devicename
+        vdisk.save()
 
         return {'provider_location': volume['provider_location'],
                 'display_name': volume['display_name']}

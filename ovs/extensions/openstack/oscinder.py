@@ -79,30 +79,35 @@ class OpenStackCinder(object):
         """
         Get openstack cinder version
         """
-        output = self.client.run_local('cinder-manage --version 2>&1').strip()
-        if output.startswith('2015.1'):
-            return 'kilo'
-        elif output.startswith('2014.2'):
-            return 'juno'
-        else:
-            raise ValueError('Unknown cinder version: %s' % output)
+        try:
+            from cinder import version
+            version = version.version_string()
+            if version.startswith('2015.1'):
+                return 'kilo'
+            elif version.startswith('2014.2'):
+                return 'juno'
+            else:
+                raise ValueError('Unknown cinder version: %s' % version)
+        except Exception as ex:
+            raise ValueError('Cannot determine cinder version: %s' % str(ex))
+
 
     def _get_driver_code(self):
         """
         WGET driver, temporary, until driver is included in openstack
         """
         version = self._get_version()
-        driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/ovs_volume_driver.py" % version
+        driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
         print('Using driver %s' % driver)
         if self.is_devstack:
             if os.path.exists('/opt/stack/devstack/cinder'):
-                if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/ovs_volume_driver.py'):
+                if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/openvstorage.py'):
                     self.client.run('wget %s -P /opt/stack/devstack/cinder/cinder/volume/drivers' % driver)
             elif os.path.exists('/opt/stack/cinder'):
-                if not os.path.exists('/opt/stack/cinder/cinder/volume/drivers/ovs_volume_driver.py'):
+                if not os.path.exists('/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'):
                     self.client.run('wget %s -P /opt/stack/cinder/cinder/volume/drivers' % driver)
         elif self.is_openstack:
-            if not os.path.exists('/usr/lib/python2.7/dist-packages/cinder/volume/drivers/ovs_volume_driver.py'):
+            if not os.path.exists('/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'):
                 self.client.run('wget %s -P /usr/lib/python2.7/dist-packages/cinder/volume/drivers' % driver)
 
     def _is_devstack(self):

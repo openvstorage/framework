@@ -35,8 +35,9 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.openstack.cinder import OpenStackCinder
+from ovs.extensions.openstack.oscinder import OpenStackCinder
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -318,6 +319,15 @@ class VDiskController(object):
             new_disk.delete()
             raise
 
+        # Allow "regular" users to use this volume
+        # Do not use run for other user than ovs as it blocks asking for root password
+        # Do not use run_local for other user as it doesn't have permission
+        # So this method only works if this is called by root or ovs
+        mountpoint = System.get_storagedriver(new_disk.vpool.name).mountpoint
+        location = "{0}{1}".format(mountpoint, disk_path)
+        client = SSHClient.load('127.0.0.1')
+        print(client.run('chmod 664 {0}'.format(location)))
+        print(client.run('chown ovs:ovs {0}'.format(location)))
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': disk_path}
 
