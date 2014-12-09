@@ -338,6 +338,11 @@ class SetupController(object):
         authorized_keys_filename = '{0}/authorized_keys'
         known_hosts_filename = '{0}/known_hosts'
         authorized_keys = ''
+        mapping = {}
+        for node in nodes:
+            node_client = SSHClient.load(node)
+            node_hostname = node_client.run('hostname')
+            mapping[node] = node_hostname
         for node in nodes:
             node_client = SSHClient.load(node, passwords[node])
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
@@ -347,18 +352,13 @@ class SetupController(object):
             node_client = SSHClient.load(node, passwords[node])
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            node_client.run('cp {1} {1}.tmp;ssh-keyscan -t rsa {0} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}'.format(' '.join(nodes),
-                                                                                                                    known_hosts_filename.format(root_ssh_folder)))
-            node_client.run('su - ovs -c "cp {1} {1}.tmp;ssh-keyscan -t rsa {0} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}"'.format(' '.join(nodes),
-                                                                                                                                  known_hosts_filename.format(ovs_ssh_folder)))
+            cmd = 'cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}'
+            node_client.run(cmd.format(' '.join(nodes), known_hosts_filename.format(root_ssh_folder), mapping[node]))
+            cmd = 'su - ovs -c "cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}"'
+            node_client.run(cmd.format(' '.join(nodes), known_hosts_filename.format(ovs_ssh_folder), mapping[node]))
 
         print 'Updating hosts files'
         logger.debug('Updating hosts files')
-        mapping = {}
-        for node in nodes:
-            node_client = SSHClient.load(node)
-            node_hostname = node_client.run('hostname')
-            mapping[node] = node_hostname
         for node in nodes:
             node_client = SSHClient.load(node)
             for ip in mapping.keys():
