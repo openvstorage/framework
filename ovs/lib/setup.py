@@ -347,8 +347,8 @@ class SetupController(object):
             node_client = SSHClient.load(node, passwords[node])
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            node_client.run('ssh-keyscan -H {0} >> {1}'.format(' '.join(nodes), known_hosts_filename.format(root_ssh_folder)))
-            node_client.run('su - ovs -c "ssh-keyscan -H {0} >> {1}"'.format(' '.join(nodes),
+            node_client.run('ssh-keyscan -t rsa {0} >> {1}'.format(' '.join(nodes), known_hosts_filename.format(root_ssh_folder)))
+            node_client.run('su - ovs -c "ssh-keyscan -t rsa {0} >> {1}"'.format(' '.join(nodes),
                                                                              known_hosts_filename.format(ovs_ssh_folder)))
 
         print 'Updating hosts files'
