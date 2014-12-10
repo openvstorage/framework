@@ -65,6 +65,9 @@ class SetupController(object):
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
 
+    discovered_nodes = {}
+    host_ips = set()
+
     @staticmethod
     def setup_node(ip=None, force_type=None, verbose=False):
         """
@@ -191,6 +194,7 @@ class SetupController(object):
                     cluster_name = Interactive.ask_choice(clusters, 'Select a cluster to join', default_value=local_cluster_name, sort_choices=False)
                     if cluster_name != dont_join:
                         logger.debug('Cluster {0} selected'.format(cluster_name))
+                        SetupController.discovered_nodes = discovery_result[cluster_name]
                         nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
                         if node_name in discovery_result[cluster_name].keys():
                             continue_install = Interactive.ask_yesno(
@@ -204,6 +208,7 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+                        #@todo: we should be able to choose the ip here too in a multiple nic setup?
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
                         known_passwords[master_ip] = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
                         first_node = False
@@ -225,6 +230,8 @@ class SetupController(object):
             else:  # Automated install
                 logger.debug('Automated installation')
                 if cluster_name in discovery_result:
+                    SetupController.discovered_nodes = discovery_result[cluster_name]
+                    #@todo: update the ip to the chosen one in autoconfig file?
                     nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
                 first_node = not join_cluster
             if not cluster_name:
@@ -339,32 +346,41 @@ class SetupController(object):
         known_hosts_filename = '{0}/known_hosts'
         authorized_keys = ''
         mapping = {}
+        logger.debug('Nodes: {0}'.format(nodes))
+        logger.debug('Discovered nodes: \n{0}'.format(SetupController.discovered_nodes))
+        all_ips = set()
+        all_hostnames = set()
+        for hostname, node_details in SetupController.discovered_nodes.iteritems():
+            for ip in node_details['ip_list']:
+                all_ips.add(ip)
+            all_hostnames.add(hostname)
+        all_ips.update(SetupController.host_ips)
+
         for node in nodes:
             node_client = SSHClient.load(node, passwords[node])
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
             authorized_keys += '{0}\n{1}\n'.format(root_pub_key, ovs_pub_key)
             node_hostname = node_client.run('hostname')
+            all_hostnames.add(node_hostname)
             mapping[node] = node_hostname
+
         for node in nodes:
             node_client = SSHClient.load(node, passwords[node])
-            node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
-            node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            cmd = 'cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}'
-            node_client.run(cmd.format(' '.join(nodes), known_hosts_filename.format(root_ssh_folder), mapping[node]))
-            cmd = 'su - ovs -c "cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}"'
-            node_client.run(cmd.format(' '.join(nodes), known_hosts_filename.format(ovs_ssh_folder), mapping[node]))
-
-        print 'Updating hosts files'
-        logger.debug('Updating hosts files')
-        for node in nodes:
-            node_client = SSHClient.load(node)
+            print 'Updating hosts files'
+            logger.debug('Updating hosts files')
             for ip in mapping.keys():
                 update_hosts_file = """
 from ovs.extensions.generic.system import System
 System.update_hosts_file(hostname='{0}', ip='{1}')
 """.format(mapping[ip], ip)
                 SetupController._exec_python(node_client, update_hosts_file)
+            node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
+            node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
+            cmd = 'cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}'
+            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(root_ssh_folder), ' '.join(all_hostnames)))
+            cmd = 'su - ovs -c "cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}"'
+            node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder), ' '.join(all_hostnames)))
 
         # Creating filesystems
         print 'Creating filesystems'
@@ -2028,9 +2044,11 @@ print blk_devices
         nodes = {}
         ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().split('\n')
         ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
+        SetupController.host_ips = set(ipaddresses)
         SetupController._change_service_state(client, 'dbus', 'start')
         SetupController._change_service_state(client, 'avahi-daemon', 'start')
         discover_result = client.run('avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
+        logger.debug('Avahi discovery result:\n{0}'.format(discover_result))
         for entry in discover_result.split('\n'):
             entry_parts = entry.split(';')
             if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in ipaddresses:
@@ -2046,9 +2064,10 @@ print blk_devices
                 if cluster_name not in nodes:
                     nodes[cluster_name] = {}
                 if node_name not in nodes[cluster_name]:
-                    nodes[cluster_name][node_name] = {}
+                    nodes[cluster_name][node_name] = { 'ip': '', 'type': '', 'ip_list': []}
                 nodes[cluster_name][node_name]['ip'] = entry_parts[7]
                 nodes[cluster_name][node_name]['type'] = entry_parts[4].split('_')[2]
+                nodes[cluster_name][node_name]['ip_list'].append(entry_parts[7])
         return nodes
 
     @staticmethod
