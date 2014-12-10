@@ -184,7 +184,7 @@ cfg.read([CINDER_CONF]);
 if not cfg.has_section(vpool_name):
     changed = True
     cfg.add_section(vpool_name)
-    cfg.set(vpool_name, "volume_driver", "cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver")
+    cfg.set(vpool_name, "volume_driver", "cinder.volume.drivers.openvstorage.OVSVolumeDriver")
     cfg.set(vpool_name, "volume_backend_name", vpool_name)
     cfg.set(vpool_name, "vpool_name", vpool_name)
 enabled_backends = []
@@ -252,7 +252,7 @@ if vpool_name in enabled_backends:
             self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "cd /opt/stack/cinder && /opt/stack/cinder/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
+            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\"\012"' ''')
             time.sleep(3)

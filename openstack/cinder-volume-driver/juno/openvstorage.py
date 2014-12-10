@@ -74,7 +74,9 @@ def _debug_vol_info(call, volume):
 
 class OVSVolumeDriver(driver.VolumeDriver):
     """OVS Volume Driver plugin for Cinder
-    (support for Icehouse (stable), Juno (stable))
+    (UNOFFICIAL support for Icehouse (stable), Juno (stable))
+    This is an unsupported (by OpenStack) driver since Icehouse and Juno
+    no longer accept drivers
     Configuration file: /etc/cinder/cinder.conf
     Required parameters in config file:
 

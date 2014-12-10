@@ -385,7 +385,7 @@ class OVSPluginTestCase(test.TestCase):
     def _set_cinder_driver_config(self):
         cfg = self._get_cinder_config()
         changed = False
-        config_map = {'volume_driver': 'cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver',
+        config_map = {'volume_driver': 'cinder.volume.drivers.openvstorage.OVSVolumeDriver',
                       'volume_backend_name': VPOOL_NAME,
                       'vpool_name': VPOOL_NAME,
                       'default_volume_type': VOLUME_TYPE}
@@ -413,7 +413,7 @@ class OVSPluginTestCase(test.TestCase):
             self.shell_client('''screen -S stack -X screen -t c-vol''')
             time.sleep(3)
             self.shell_client('''screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"''')
-            self.shell_client('''screen -S stack -p c-vol -X stuff "cd /opt/stack/cinder && /opt/stack/cinder/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"''')
+            self.shell_client('''screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"''')
             time.sleep(3)
         elif PROCESS == 'service':
             # restart service

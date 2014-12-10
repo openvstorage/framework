@@ -18,7 +18,7 @@ Mock basic unit tests for the OVS Cinder Plugin
 import mock
 
 from cinder import test
-import cinder.volume.drivers.ovs_volume_driver as ovsvd
+import cinder.volume.drivers.openvstorage as ovsvd
 
 
 #MOCKUPS
@@ -174,7 +174,7 @@ class MOCK_ImageService():
 
 class MOCK_ImageUtils():
     def fetch_to_raw(self, context, image_service, image_id, destination_path,
-                     block_size, size):
+                     block_size, size, run_as_root=False):
         CALLED['ImageUtils_fetch_to_raw'] = (destination_path, size)
 
 
@@ -208,6 +208,28 @@ class MOCK_snapshot():
     id = MOCK_snapshot_id
 
 
+# Fake Modules
+class vdiskhybrid():
+    VDisk = MockVDisk
+
+
+class pmachinelist():
+    PMachineList = MockPMachineList()
+
+
+class vdisklist():
+    def __init__(self, vdisks):
+        self.VDiskList = MockVDiskList(vdisks)
+
+
+class vpoollist():
+    VPoolList = MockVPoolList()
+
+
+class vdisklib():
+    VDiskController = MockVDiskController()
+
+
 class OVSPluginBaseTestCase(test.TestCase):
     """Basic tests - mocked
     """
@@ -217,11 +239,11 @@ class OVSPluginBaseTestCase(test.TestCase):
         vdisk2 = MockVDisk(MOCK_vdisk_guid2, MOCK_vdisk_devicename2)
         vdisk3 = MockVDisk(MOCK_vdisk_guid3, MOCK_vdisk_devicename3)
         super(OVSPluginBaseTestCase, self).setUp()
-        ovsvd.VDiskController = MockVDiskController()
-        ovsvd.VPoolList = MockVPoolList()
-        ovsvd.VDiskList = MockVDiskList([vdisk1, vdisk2, vdisk3])
-        ovsvd.VDisk = MockVDisk
-        ovsvd.PMachineList = MockPMachineList()
+        ovsvd.vdiskhybrid = vdiskhybrid()
+        ovsvd.vpoollist = vpoollist()
+        ovsvd.vdisklist = vdisklist([vdisk1, vdisk2, vdisk3])
+        ovsvd.vdisklib = vdisklib()
+        ovsvd.pmachinelist = pmachinelist()
         ovsvd.LOG = MOCK_log()
         ovsvd.image_utils = MOCK_ImageUtils()
         self.driver = ovsvd.OVSVolumeDriver(configuration = mock.Mock())
