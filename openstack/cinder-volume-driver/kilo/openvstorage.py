@@ -68,7 +68,7 @@ def _debug_vol_info(call, volume):
                 vol_info.append("%s: %s" % (item, getattr(volume, item)))
             except Exception as ex:
                 msg = (_('DEBUG failed %s') % str(ex))
-                LOG.info(msg)
+                LOG.debug(msg)
     LOG.debug('[%s] %s' % (call, str(vol_info)))
 
 
@@ -104,7 +104,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         """
         _debug_vol_info("INIT_CONN", volume)
 
-        return {'driver_volume_type': 'local',
+        return {'driver_volume_type': 'file',
                 'data': {'vpoolname': self._vpool_name,
                          'device_path': volume.provider_location}}
 
@@ -303,7 +303,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         """Get volumedriver stats
         If 'refresh' is True, update the stats first.
         """
-        LOG.info('VOLUMEDRIVER STATS')
+        LOG.debug('VOLUMEDRIVER STATS')
         data = {}
         data['volume_backend_name'] = self._vpool_name
         data['vendor_name'] = 'Open vStorage'
@@ -464,7 +464,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         Connection is always allowed based on POSIX permissions.
         """
         _debug_vol_info("TERM_CONN", volume)
-        LOG.info('TERM_CONN %s %s ' % (str(connector), force))
+        LOG.debug('TERM_CONN %s %s ' % (str(connector), force))
 
     def check_for_setup_error(self):
         """Validate driver setup
@@ -530,8 +530,8 @@ class OVSVolumeDriver(driver.VolumeDriver):
                             _location = "{0}/{1}".format(vsr.mountpoint,
                                                          vd.devicename)
                             if _location == location:
-                                LOG.info('Location %s Disk found %s'
-                                         % (location, vd.guid))
+                                LOG.debug('Location %s Disk found %s'
+                                          % (location, vd.guid))
                                 disk = vdiskhybrid.VDisk(vd.guid)
                                 return disk
             msg = ' NO RESULT Attempt %s timeout %s max attempts %s'
@@ -554,7 +554,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         for item in mapping:
             if item[1] == str(hostname):
                 msg = 'Found pmachineguid %s for Hostname %s'
-                LOG.info(msg % (item[0], hostname))
+                LOG.debug(msg % (item[0], hostname))
                 return item[0]
         msg = (_('No PMachine guid found for Hostname %s') % hostname)
         raise RuntimeError(msg)
@@ -567,8 +567,8 @@ class OVSVolumeDriver(driver.VolumeDriver):
         for disk in vdisklist.VDiskList.get_vdisks():
             snaps_guid = [s['guid'] for s in disk.snapshots]
             if str(snapshotid) in snaps_guid:
-                LOG.info('[_FIND OVS DISK] Snapshot id %s Disk found %s'
-                         % (snapshotid, disk))
+                LOG.debug('[_FIND OVS DISK] Snapshot id %s Disk found %s'
+                          % (snapshotid, disk))
                 return disk
         msg = (_('No disk found for snapshotid %s') % snapshotid)
         raise RuntimeError(msg)
