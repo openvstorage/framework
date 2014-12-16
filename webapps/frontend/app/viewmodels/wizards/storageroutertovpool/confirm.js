@@ -81,7 +81,6 @@ define([
             self.loaded         = ko.observable(false);
             self.allowVPool     = ko.observable(true);
             self.mtptOK         = ko.observable(true);
-            self.vRouterPort    = ko.observable();
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
             self.ipAddresses    = ko.observableArray([]);
@@ -116,7 +115,8 @@ define([
                             fields.push('foc');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                         }
-                        if (self.storageDriver().mountpointBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.vPool().backendType() === 'LOCAL' || self.data.vPool().backendType() === 'DISTRIBUTED')) {
+                        if (self.storageDriver().mountpointBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 &&
+                            (self.data.vPool().backendType() === 'local' || self.data.vPool().backendType() === 'distributed')) {
                             valid = false;
                             fields.push('bfs');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
@@ -131,7 +131,7 @@ define([
                             fields.push('temp');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.tempfs') }));
                         }
-                        if (self.storageDriver().port() === storageDriver.port() && $.inArray('port', fields) === -1) {
+                        if (generic.overlap(self.storageDriver().ports(), storageDriver.ports()) && $.inArray('port', fields) === -1) {
                             valid = false;
                             fields.push('port');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.portinuse'));
@@ -166,7 +166,6 @@ define([
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
                                 self.ipAddresses(data.ipaddresses);
-                                self.vRouterPort(data.xmlrpcport);
                                 self.allowVPool(data.allow_vpool);
                             })
                             .done(physicalDeferred.resolve)
@@ -331,7 +330,12 @@ define([
                             self.storageDriver().fillData(storageDriverData);
                             self.storageDriverLoading.resolve();
                         })
-                        .fail(self.storageDriverLoading.reject);
+                        .fail(function() {
+                            self.storageDriverLoading.reject();
+                        });
+                })
+                .fail(function() {
+                    self.storageDriverLoading.reject();
                 });
             self.refresher.init(function() {
                 $.each(self.data.pendingStorageRouters(), function(index, storageRouter) {

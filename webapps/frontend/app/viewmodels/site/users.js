@@ -43,9 +43,7 @@ define([
         // Observables
         self._selectedUserGuid  = ko.observable();
         self.users              = ko.observableArray([]);
-        self.usersInitialLoad   = ko.observable(true);
         self.clients            = ko.observableArray([]);
-        self.clientsInitialLoad = ko.observable(true);
         self.roles              = ko.observableArray([]);
         self.rolesInitialLoad   = ko.observable(true);
         self.roleMapping        = ko.observable({});
@@ -59,7 +57,6 @@ define([
                 self._selectedUserGuid(guid);
                 self.newUser(self.buildUser());
                 self.newClient(self.buildClient());
-                self.fetchClients();
             },
             read: function() {
                 return self._selectedUserGuid();
@@ -93,12 +90,10 @@ define([
         });
 
         // Handles
-        self.loadUsersHandle      = undefined;
-        self.refreshUsersHandle   = {};
-        self.loadClientsHandle    = undefined;
-        self.refreshClientsHandle = {};
-        self.loadGroupsHandle     = undefined;
-        self.loadRolesHandles     = undefined;
+        self.usersHandle      = {};
+        self.clientsHandle    = {};
+        self.loadGroupsHandle = undefined;
+        self.loadRolesHandles = undefined;
 
         // Functions
         self.buildUser = function() {
@@ -133,36 +128,28 @@ define([
             }, client);
             return client;
         };
-        self.fetchUsers = function() {
+        self.loadUsers = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadUsersHandle)) {
+                if (generic.xhrCompleted(self.usersHandle[page])) {
                     var options = {
                         sort: 'username',
                         contents: '_relations'
                     };
-                    self.loadUsersHandle = api.get('users', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], udata = {};
-                            $.each(data, function(i, item) {
-                                guids.push(item.guid);
-                                udata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.users,
-                                function(guid) {
+                    self.usersHandle[page] = api.get('users', { queryparams: options })
+                        .then(function(data) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
                                     var user = new User(guid);
-                                    if ($.inArray(guid, guids) !== -1) {
-                                        user.fillData(udata[guid]);
-                                    }
                                     user.group = ko.computed({
-                                        write: function(group) {
+                                        write: function (group) {
                                             if (group === undefined) {
                                                 this.groupGuid(undefined);
                                             } else {
                                                 this.groupGuid(group.guid());
                                             }
                                         },
-                                        read: function() {
+                                        read: function () {
                                             if (self.groupMapping().hasOwnProperty(this.groupGuid())) {
                                                 return self.groupMapping()[this.groupGuid()];
                                             }
@@ -170,72 +157,36 @@ define([
                                         },
                                         owner: user
                                     });
-                                    user.loading(true);
                                     return user;
-                                }, 'guid'
-                            );
-                            if (self.selectedUserGuid() === undefined || $.inArray(self.selectedUserGuid(), guids) === -1) {
-                                self.selectedUserGuid(guids[0]);
-                            }
-                            self.usersInitialLoad(false);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.refreshUsers = function(page) {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshUsersHandle[page])) {
-                    var options = {
-                        sort: 'username',
-                        page: page,
-                        contents: '_relations'
-                    };
-                    self.refreshUsersHandle[page] = api.get('users', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], udata = {};
-                            $.each(data, function(i, item) {
-                                guids.push(item.guid);
-                                udata[item.guid] = item;
-                            });
-                            $.each(self.users(), function(i, user) {
-                                if ($.inArray(user.guid(), guids) !== -1) {
-                                    user.fillData(udata[user.guid()]);
+                                },
+                                overviewLoader: function(guids) {
+                                    if (self.selectedUserGuid() === undefined || $.inArray(self.selectedUserGuid(), guids) === -1) {
+                                        self.selectedUserGuid(guids[0]);
+                                    }
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
             }).promise();
         };
-        self.fetchClients = function() {
+        self.loadClients = function(page) {
             return $.Deferred(function(deferred) {
-                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.loadClientsHandle)) {
-                    $.each(self.clients(), function(i, client) {
-                        client.loading(true);
-                    });
+                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.clientsHandle[page])) {
                     var options = {
                         sort: 'name',
+                        page: page,
                         contents: '_relations',
                         userguid: self.selectedUserGuid(),
                         type: 'USER'
                     };
-                    self.loadClientsHandle = api.get('clients', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], cdata = {};
-                            $.each(data, function(i, item) {
-                                guids.push(item.guid);
-                                cdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.clients,
-                                function(guid) {
+                    self.clientsHandle[page] = api.get('clients', { queryparams: options })
+                        .then(function(data) {
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
                                     var client = new Client(guid);
                                     client.roles = ko.computed(function() {
                                         var roles = [];
@@ -250,45 +201,11 @@ define([
                                         });
                                         return roles;
                                     });
-                                    if ($.inArray(guid, guids) !== -1) {
-                                        client.fillData(cdata[guid]);
-                                    }
                                     return client;
-                                }, 'guid'
-                            );
-                            self.clientsInitialLoad(false);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.refreshClients = function(page) {
-            return $.Deferred(function(deferred) {
-                if (self.selectedUserGuid() !== undefined && generic.xhrCompleted(self.refreshClientsHandle[page])) {
-                    var options = {
-                        sort: 'name',
-                        page: page,
-                        contents: '_relations',
-                        userguid: self.selectedUserGuid()
-                    };
-                    self.refreshClientsHandle[page] = api.get('clients', { querystring: options })
-                        .done(function(data) {
-                            var guids = [], cdata = {};
-                            $.each(data, function(i, item) {
-                                guids.push(item.guid);
-                                cdata[item.guid] = item;
-                            });
-                            $.each(self.clients(), function(i, client) {
-                                if ($.inArray(client.guid(), guids) !== -1) {
-                                    client.fillData(cdata[client.guid()]);
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
@@ -304,7 +221,7 @@ define([
                     self.loadGroupsHandle = api.get('groups', { queryparams: options })
                         .done(function(data) {
                             var guids = [], gdata = {};
-                            $.each(data, function(index, item) {
+                            $.each(data.data, function(index, item) {
                                 guids.push(item.guid);
                                 gdata[item.guid] = item;
                             });
@@ -344,7 +261,7 @@ define([
                     self.loadRolesHandles = api.get('roles', { queryparams: options })
                         .done(function(data) {
                             var guids = [], rdata = {};
-                            $.each(data, function(index, item) {
+                            $.each(data.data, function(index, item) {
                                 guids.push(item.guid);
                                 rdata[item.guid] = item;
                             });
@@ -401,7 +318,6 @@ define([
                                         $.t('ovs:users.clients.deletesuccess')
                                     );
                                     self.clients.remove(client);
-                                    self.fetchClients();
                                 })
                                 .fail(function (error) {
                                     error = $.parseJSON(error.responseText);
@@ -429,7 +345,6 @@ define([
                         $.t('ovs:users.clients.complete'),
                         $.t('ovs:users.clients.addsuccess')
                     );
-                    self.fetchClients();
                 })
                 .fail(function(error) {
                     error = $.parseJSON(error.responseText);
@@ -456,7 +371,6 @@ define([
                         $.t('ovs:users.new.complete'),
                         $.t('ovs:users.new.addsuccess')
                     );
-                    self.fetchUsers();
                 })
                 .fail(function(error) {
                     error = $.parseJSON(error.responseText);
@@ -486,7 +400,6 @@ define([
                                         $.t('ovs:users.delete.deletesuccess')
                                     );
                                     self.users.remove(user);
-                                    self.fetchUsers();
                                 })
                                 .fail(function (error) {
                                     error = $.parseJSON(error.responseText);
@@ -508,20 +421,11 @@ define([
         // Durandal
         self.activate = function() {
             self.refresher.init(function() {
-                self.fetchClients();
-                self.fetchUsers();
                 self.fetchGroups();
                 self.fetchRoles();
             }, 5000);
             self.refresher.start();
-            self.fetchClients().then(function() {
-                self.refreshClients(1);
-            });
-            self.fetchUsers().then(function() {
-                self.refreshUsers(1);
-            });
-            self.fetchGroups();
-            self.fetchRoles();
+            self.refresher.run();
         };
         self.deactivate = function() {
             $.each(self.widgets, function(i, item) {

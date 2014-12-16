@@ -135,7 +135,7 @@ define([
                                 self.loadVMachinesHandle = api.get('vmachines', { queryparams: filter })
                                     .done(function(data) {
                                         var vms = [], vm;
-                                        $.each(data, function(index, vmdata) {
+                                        $.each(data.data, function(index, vmdata) {
                                             vm = new VMachine(vmdata.guid);
                                             vm.fillData(vmdata);
                                             vms.push(vm);
@@ -152,7 +152,7 @@ define([
                             if (generic.xhrCompleted(self.loadVMachineGuidsHandle)) {
                                 self.loadVMachineGuidsHandle = api.get('vmachines', { queryparams: { query: JSON.stringify(self.query) } })
                                     .done(function(data) {
-                                        self.vMachineGuids(data);
+                                        self.vMachineGuids(data.data);
                                         vmg_dfr.resolve();
                                     })
                                     .fail(vmg_dfr.reject);
@@ -179,7 +179,7 @@ define([
                     self.loadVPoolsHandle = api.get('vpools', { queryparams: filter })
                         .done(function(data) {
                             var vpools = [], vpool;
-                            $.each(data, function(index, vpdata) {
+                            $.each(data.data, function(index, vpdata) {
                                 vpool = new VPool(vpdata.guid);
                                 vpool.fillData(vpdata);
                                 vpools.push(vpool);
@@ -202,13 +202,13 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     self.loadStorageRoutersHandle = api.get('storagerouters', {
                         queryparams: {
-                            contents: 'status',
+                            contents: 'status,vdisks_guids',
                             sort: 'name,vdisks_guids'
                         }
                     })
                         .done(function(data) {
                             var guids = [], sadata = {};
-                            $.each(data, function(index, item) {
+                            $.each(data.data, function(index, item) {
                                 guids.push(item.guid);
                                 sadata[item.guid] = item;
                             });

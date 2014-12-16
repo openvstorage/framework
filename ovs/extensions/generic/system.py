@@ -19,7 +19,7 @@ Generic system module, executing statements on local node
 from subprocess import check_output
 
 
-class System():
+class System(object):
     """
     Generic helper class
     """
@@ -74,6 +74,18 @@ class System():
         return vpool_name + System.get_my_machine_id()
 
     @staticmethod
+    def get_storagedriver(vpool_name):
+        """
+        Returns storagedriver object based on vpool_name
+        """
+        my_storagedriver_id = System.get_my_storagedriver_id(vpool_name)
+        my_storagerouter = System.get_my_storagerouter()
+        for storagedriver in my_storagerouter.storagedrivers:
+            if storagedriver.name == my_storagedriver_id:
+                return storagedriver
+        raise ValueError('No storagedriver found for vpool_name: {0}'.format(vpool_name))
+
+    @staticmethod
     def update_hosts_file(hostname, ip):
         """
         Update/add entry for hostname ip in /etc/hosts
@@ -114,3 +126,16 @@ from ovs.plugin.provider.configuration import Configuration
 print Configuration.get('{0}')
 """.format(key)
         return System.exec_remote_python(client, read)
+
+    @staticmethod
+    def ports_in_use(client=None):
+        """
+        Returns the ports in use
+        """
+        cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
+        if client is None:
+            output = check_output(cmd, shell=True).strip()
+        else:
+            output = client.run(cmd).strip()
+        for found_port in output.split('\n'):
+            yield int(found_port.strip())

@@ -36,73 +36,39 @@ define([
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100       },
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined }
         ];
-
-        // Observables
-        self.vPools            = ko.observableArray([]);
-        self.vPoolsInitialLoad = ko.observable(true);
+        self.vPoolCache = {};
 
         // Handles
-        self.loadVPoolsHandle    = undefined;
-        self.refreshVPoolsHandle = {};
+        self.vPoolsHandle = {};
+
+        // Observables
+        self.vPools = ko.observableArray([]);
 
         // Functions
-        self.fetchVPools = function() {
+        self.loadVPools = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.loadVPoolsHandle)) {
-                    var options = {
-                        sort: 'name',
-                        contents: ''
-                    };
-                    self.loadVPoolsHandle = api.get('vpools', { queryparams: options })
-                        .done(function(data) {
-                            var guids = [], vpdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vpdata[item.guid] = item;
-                            });
-                            generic.crossFiller(
-                                guids, self.vPools,
-                                function(guid) {
-                                    var vpool = new VPool(guid);
-                                    if ($.inArray(guid, guids) !== -1) {
-                                        vpool.fillData(vpdata[guid]);
-                                    }
-                                    vpool.loading(true);
-                                    return vpool;
-                                }, 'guid'
-                            );
-                            self.vPoolsInitialLoad(false);
-                            deferred.resolve();
-                        })
-                        .fail(deferred.reject);
-                } else {
-                    deferred.reject();
-                }
-            }).promise();
-        };
-        self.refreshVPools = function(page) {
-            return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVPoolsHandle[page])) {
+                if (generic.xhrCompleted(self.vPoolsHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_dynamics'
+                        contents: '_dynamics,backend_type'
                     };
-                    self.refreshVPoolsHandle[page] = api.get('vpools', { queryparams: options })
+                    self.vPoolsHandle[page] = api.get('vpools', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], vpdata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vpdata[item.guid] = item;
-                            });
-                            $.each(self.vPools(), function(index, vpool) {
-                                if ($.inArray(vpool.guid(), guids) !== -1) {
-                                    vpool.fillData(vpdata[vpool.guid()]);
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    if (!self.vPoolCache.hasOwnProperty(guid)) {
+                                        self.vPoolCache[guid] = new VPool(guid);
+                                    }
+                                    return self.vPoolCache[guid];
+                                },
+                                dependencyLoader: function(item) {
+                                    item.loadBackendType();
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
@@ -116,13 +82,35 @@ define([
 
         // Durandal
         self.activate = function() {
-            self.refresher.init(self.fetchVPools, 5000);
+            self.refresher.init(function() {
+                if (generic.xhrCompleted(self.vPoolsHandle[undefined])) {
+                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: { contents: 'statistics,stored_data,backend_type' }})
+                        .done(function(data) {
+                            var guids = [], vpdata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                vpdata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.vPools,
+                                function(guid) {
+                                    if (!self.vPoolCache.hasOwnProperty(guid)) {
+                                         self.vPoolCache[guid] = new VPool(guid);
+                                    }
+                                    return self.vPoolCache[guid];
+                                }, 'guid'
+                            );
+                            $.each(self.vPools(), function(index, item) {
+                                if (vpdata.hasOwnProperty(item.guid())) {
+                                    item.fillData(vpdata[item.guid()]);
+                                }
+                            });
+                        });
+                }
+            }, 5000);
             self.refresher.start();
+            self.refresher.run();
             self.shared.footerData(self.vPools);
-
-            self.fetchVPools().then(function() {
-                self.refreshVPools(1);
-            });
         };
         self.deactivate = function() {
             $.each(self.widgets, function(index, item) {

@@ -32,6 +32,8 @@ from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.dal.hybrids.log import Log
+
 
 logger = LogHandler('api')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
@@ -60,6 +62,7 @@ def required_roles(roles):
             return f(*args, **kw)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -72,6 +75,16 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
         """
         Wrapper function
         """
+        def _try_parse(value):
+            """
+            Tries to parse a value to a pythonic value
+            """
+            if value == 'true':
+                return True
+            if value == 'false':
+                return False
+            return value
+
         def new_function(self, request, **kwargs):
             """
             Wrapped function
@@ -89,12 +102,13 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             version = regex.match(request.META['HTTP_ACCEPT']).groupdict()['version']
             versions = (max(min_version, settings.VERSION[0]), min(max_version, settings.VERSION[-1]))
             if version == '*':  # If accepting all versions, it defaults to the highest one
-                version = settings.VERSION[-1]
+                version = versions[1]
             version = int(version)
             if version < versions[0] or version > versions[1]:
-                raise NotAcceptable('API version requirements: {0} <= <version> <= {1}'.format(versions[0], versions[1]))
+                raise NotAcceptable('API version requirements: {0} <= <version> <= {1}. Got {2}'.format(versions[0], versions[1], version))
             if 'version' in mandatory_vars:
                 new_kwargs['version'] = version
+                mandatory_vars.remove('version')
             # Fill request parameter, if available
             if 'request' in mandatory_vars:
                 new_kwargs['request'] = request
@@ -117,22 +131,23 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                     if name not in request.DATA:
                         if name not in request.QUERY_PARAMS:
                             raise NotAcceptable('Invalid data passed: {0} is missing'.format(name))
-                        new_kwargs[name] = request.QUERY_PARAMS[name]
+                        new_kwargs[name] = _try_parse(request.QUERY_PARAMS[name])
                     else:
-                        new_kwargs[name] = request.DATA[name]
+                        new_kwargs[name] = _try_parse(request.DATA[name])
             # Try to fill optional parameters
             for name in optional_vars:
                 if name in kwargs:
                     new_kwargs[name] = kwargs[name]
                 else:
                     if name in request.DATA:
-                        new_kwargs[name] = request.DATA[name]
+                        new_kwargs[name] = _try_parse(request.DATA[name])
                     elif name in request.QUERY_PARAMS:
-                        new_kwargs[name] = request.QUERY_PARAMS[name]
+                        new_kwargs[name] = _try_parse(request.QUERY_PARAMS[name])
             # Call the function
             return f(self, **new_kwargs)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -155,7 +170,7 @@ def return_list(object_type, default_sort=None):
             sort = request.QUERY_PARAMS.get('sort')
             if sort is None and default_sort is not None:
                 sort = default_sort
-            sort = None if sort is None else reversed(sort.split(','))
+            sort = None if sort is None else [s for s in reversed(sort.split(','))]
             page = request.QUERY_PARAMS.get('page')
             page = int(page) if page is not None and page.isdigit() else None
             contents = request.QUERY_PARAMS.get('contents')
@@ -181,12 +196,28 @@ def return_list(object_type, default_sort=None):
                     data_list.sort(key=lambda e: Toolbox.extract_key(e, field), reverse=desc)
 
             # 5. Paging
+            items_pp = 10
+            total_items = len(data_list)
+            page_metadata = {'total_items': total_items,
+                             'current_page': 1,
+                             'max_page': 1,
+                             'start_number': min(1, total_items),
+                             'end_number': total_items}
             if page is not None:
-                max_page = int(math.ceil(len(data_list) / 10.0))
+                max_page = int(math.ceil(total_items / (items_pp * 1.0)))
                 if page > max_page:
                     page = max_page
-                page -= 1
-                data_list = data_list[page * 10: (page + 1) * 10]
+                if page == 0:
+                    start_number = -1
+                    end_number = 0
+                else:
+                    start_number = (page - 1) * items_pp  # Index - e.g. 0 for page 1, 10 for page 2
+                    end_number = start_number + items_pp  # Index - e.g. 10 for page 1, 20 for page 2
+                data_list = data_list[start_number: end_number]
+                page_metadata = dict(page_metadata.items() + {'current_page': max(1, page),
+                                                              'max_page': max(1, max_page),
+                                                              'start_number': start_number + 1,
+                                                              'end_number': min(total_items, end_number)}.items())
 
             # 6. Serializing
             if contents is not None:
@@ -198,10 +229,16 @@ def return_list(object_type, default_sort=None):
                     data_list = [item.guid for item in data_list]
                 data = data_list
 
+            result = {'data': data,
+                      '_paging': page_metadata,
+                      '_contents': contents,
+                      '_sorting': [s for s in reversed(sort)] if sort else sort}
+
             # 7. Building response
-            return Response(data, status=status.HTTP_200_OK)
+            return Response(result, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -229,6 +266,7 @@ def return_object(object_type):
             return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -250,6 +288,7 @@ def return_task():
             return Response(task.id, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -295,5 +334,44 @@ def limit(amount, per, timeout):
             return f(self, request, *args, **kwargs)
 
         new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
+    return wrap
+
+
+def log():
+    """
+    Task logger
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(self, request, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            # Log the call
+            log_entry = Log()
+            log_entry.source = 'API'
+            log_entry.module = f.__module__
+            log_entry.method = f.__name__
+            log_entry.method_args = list(args)
+            log_entry.method_kwargs = kwargs
+            log_entry.time = time.time()
+            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
+            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            log_entry.save()
+
+            # Call the function
+            return f(self, request, *args, **kwargs)
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
     return wrap

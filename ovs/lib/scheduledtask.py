@@ -16,7 +16,6 @@
 ScheduledTaskController module
 """
 
-from celery import group
 from celery.task.control import inspect
 import copy
 import time
@@ -25,12 +24,13 @@ import traceback
 from time import mktime
 from datetime import datetime
 from ovs.plugin.provider.configuration import Configuration
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+from ovs.dal.lists.loglist import LogList
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
@@ -285,7 +285,7 @@ class ScheduledTaskController(object):
                                os.walk(arakoon_dir).next()[1])
         for cluster in arakoon_clusters:
             logger.info('  Collapsing cluster: {}'.format(cluster))
-            cluster_instance = ArakoonManagement().getCluster(cluster)
+            cluster_instance = ArakoonManagementEx().getCluster(cluster)
             for node in cluster_instance.listNodes():
                 logger.info('    Collapsing node: {}'.format(node))
                 try:
@@ -297,3 +297,16 @@ class ScheduledTaskController(object):
                         )
                     )
         logger.info('Arakoon collapse finished')
+
+    @staticmethod
+    @celery.task(name='ovs.scheduled.clean_logs', bind=True)
+    @ensure_single(['ovs.scheduled.clean_logs'])
+    def clean_logs():
+        """
+        Cleans audit trail logs
+        """
+        days = int(Configuration.get('ovs.core.audittrails.keep'))
+        mark = time.time() - days * 24 * 60 * 60
+        for log in LogList.get_logs():
+            if log.time < mark:
+                log.delete()

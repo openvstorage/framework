@@ -115,7 +115,7 @@ class DataObject(object):
     __metaclass__ = MetaClass
 
     #######################
-    ## Attributes
+    # Attributes
     #######################
 
     # Properties that needs to be overwritten by implementation
@@ -258,7 +258,7 @@ class DataObject(object):
                 setattr(self, field, value)
 
     #######################
-    ## Helper methods for dynamic getting and setting
+    # Helper methods for dynamic getting and setting
     #######################
 
     def _add_property(self, prop):
@@ -423,7 +423,7 @@ class DataObject(object):
             raise RuntimeError('Property {0} does not exist on this object.'.format(key))
 
     #######################
-    ## Saving data to persistent store and invalidating volatile store
+    # Saving data to persistent store and invalidating volatile store
     #######################
 
     def save(self, recursive=False, skip=None):
@@ -550,6 +550,7 @@ class DataObject(object):
                 self._volatile.set(reverse_key, reverse_index)
         finally:
             self._mutex_reverseindex.release()
+
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
@@ -570,7 +571,6 @@ class DataObject(object):
 
         # Save the data
         self._persistent.set(self._key, self._data)
-        DataList.add_pk(self._namespace, self._name, self._guid)
 
         # Invalidate the cache
         self._volatile.delete(self._key)
@@ -580,7 +580,7 @@ class DataObject(object):
         self._new = False
 
     #######################
-    ## Other CRUDs
+    # Other CRUDs
     #######################
 
     def delete(self, abandon=False):
@@ -615,6 +615,12 @@ class DataObject(object):
                     else:
                         raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
 
+        # Delete the object out of the persistent store
+        try:
+            self._persistent.delete(self._key)
+        except KeyNotFoundException:
+            pass
+
         # First, update reverse index
         try:
             self._mutex_reverseindex.acquire(60)
@@ -638,6 +644,7 @@ class DataObject(object):
             self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._name, self.guid))
         finally:
             self._mutex_reverseindex.release()
+
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
@@ -656,16 +663,9 @@ class DataObject(object):
         finally:
             self._mutex_listcache.release()
 
-        # Delete the object out of the persistent store
-        try:
-            self._persistent.delete(self._key)
-        except KeyNotFoundException:
-            pass
-
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-        DataList.delete_pk(self._namespace, self._name, self._guid)
 
     # Discard all pending changes
     def discard(self):
@@ -737,7 +737,7 @@ class DataObject(object):
             setattr(self, key, getattr(other_object, key))
 
     #######################
-    ## Properties
+    # Properties
     #######################
 
     @property
@@ -748,7 +748,7 @@ class DataObject(object):
         return self._guid
 
     #######################
-    ## Helper methods
+    # Helper methods
     #######################
 
     def _backend_property(self, function, dynamic):
@@ -787,3 +787,25 @@ class DataObject(object):
         The string representation of a DataObject is the serialized value
         """
         return json.dumps(self.serialize(), indent=4)
+
+    def __hash__(self):
+        """
+        Defines a hashing equivalent for a given object. The key (object type and guid) is considered to be identifying
+        """
+        return hash(self._key)
+
+    def __eq__(self, other):
+        """
+        Checks whether two objects are the same.
+        """
+        if not isinstance(other, DataObject):
+            return False
+        return self.__hash__() == other.__hash__()
+
+    def __ne__(self, other):
+        """
+        Checks whether to objects are not the same.
+        """
+        if not isinstance(other, DataObject):
+            return False
+        return not self.__eq__(other)

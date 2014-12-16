@@ -117,14 +117,32 @@ if __name__ == '__main__':
                 logger.debug('{0}: {1}'.format(mapping[key][0]['property'], [current_map['task'].__name__ for current_map in mapping[key]]))
 
             # Starting connection and handling
-            connection = pika.BlockingConnection(
-                pika.ConnectionParameters(host=Configuration.get('ovs.grid.ip'),
-                                          port=int(Configuration.get('ovs.core.broker.port')),
-                                          credentials=pika.PlainCredentials(
-                                              Configuration.get('ovs.core.broker.login'),
-                                              Configuration.get('ovs.core.broker.password')
-                                          )))
-            channel = connection.channel()
+            rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+            rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
+            this_server = '{0}:{1}'.format(Configuration.get('ovs.grid.ip'), Configuration.get('ovs.core.broker.port'))
+            rmq_servers = [this_server] + [server for server in map(lambda m: rmq_ini.get(m)['location'], rmq_nodes) if server != this_server]
+            channel = None
+            server = ''
+            loglevel = logging.root.manager.disable  # Workaround for disabling logging
+            logging.disable('WARNING')
+            for server in rmq_servers:
+                try:
+                    connection = pika.BlockingConnection(
+                        pika.ConnectionParameters(host=server.split(':')[0],
+                                                  port=int(server.split(':')[1]),
+                                                  credentials=pika.PlainCredentials(
+                                                      Configuration.get('ovs.core.broker.login'),
+                                                      Configuration.get('ovs.core.broker.password')
+                                                  ))
+                    )
+                    channel = connection.channel()
+                    break
+                except:
+                    pass
+            logging.disable(loglevel)  # Restore workaround
+            if channel is None:
+                raise RuntimeError('Could not connect to any available RabbitMQ endpoint.')
+            logger.debug('Connected to: {0}'.format(server))
 
             queue = sys.argv[1] if len(sys.argv) == 2 else 'default'
             channel.queue_declare(queue=queue, durable=True)

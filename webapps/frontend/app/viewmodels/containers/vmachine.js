@@ -94,7 +94,7 @@ define([
                 if (generic.xhrCompleted(self.loadChildrenGuid)) {
                     self.loadChildrenGuid = api.get('vmachines/' + self.guid() + '/get_children')
                         .done(function(data) {
-                            self.templateChildrenGuids(data);
+                            self.templateChildrenGuids(data.data);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);

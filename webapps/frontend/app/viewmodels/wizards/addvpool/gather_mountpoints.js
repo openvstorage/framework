@@ -26,7 +26,7 @@ define([
         // Computed
         self.canContinue = ko.computed(function() {
             var valid = true, reasons = [], fields = [];
-            if (self.data.backend() !== 'LOCAL' && self.data.backend() !== 'DISTRIBUTED') {
+            if (self.data.backend() !== 'local' && self.data.backend() !== 'distributed') {
                 self.data.mtptBFS('/'); // BFS isn't used, so it set to a non-conflicting value
             }
             if (self.data.mtptFOC() === '/' && $.inArray('foc', fields) === -1) {
@@ -34,7 +34,7 @@ define([
                 fields.push('foc');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
             }
-            if (self.data.mtptBFS() === '/' && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
+            if (self.data.mtptBFS() === '/' && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'local' || self.data.backend() === 'distributed')) {
                 valid = false;
                 fields.push('bfs');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
@@ -89,7 +89,7 @@ define([
                     fields.push('foc');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
                 }
-                if (self.data.mtptBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
+                if (self.data.mtptBFS() === storageDriver.mountpointBFS() && $.inArray('bfs', fields) === -1 && (self.data.backend() === 'local' || self.data.backend() === 'distributed')) {
                     valid = false;
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.bfs') }));
@@ -114,18 +114,13 @@ define([
                     fields.push('bfs');
                     reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsexclusive'));
                 }
-                if ($.inArray(self.data.vRouterPort(), [storageDriver.port() - 1, storageDriver.port(), storageDriver.port() + 1]) !== -1 && $.inArray('port', fields) === -1) {
-                    valid = false;
-                    fields.push('port');
-                    reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.portinuse'));
-                }
                 return true;
             });
             if ((self.data.mtptBFS() === self.data.mtptReadCache1() ||
                  self.data.mtptBFS() === self.data.mtptReadCache2() ||
                  self.data.mtptBFS() === self.data.mtptMD() ||
                  self.data.mtptBFS() === self.data.mtptTemp()) && $.inArray('bfs', fields) === -1 &&
-                    (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
+                    (self.data.backend() === 'local' || self.data.backend() === 'distributed')) {
                 valid = false;
                 fields.push('bfs');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.bfsnotshared'));
@@ -160,7 +155,7 @@ define([
                 fields.push('temp');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.tempfs') }));
             }
-            if (!self.data.mtptBFS.valid() && (self.data.backend() === 'LOCAL' || self.data.backend() === 'DISTRIBUTED')) {
+            if (!self.data.mtptBFS.valid() && (self.data.backend() === 'local' || self.data.backend() === 'distributed')) {
                 valid = false;
                 fields.push('bfs');
                 reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.invalidmtpt', { what: $.t('ovs:generic.bfs') }));

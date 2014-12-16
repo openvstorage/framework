@@ -156,7 +156,10 @@ class HybridRunner(object):
                                 for this_class in current_class.__mro__:
                                     if 'DataObject' in this_class.__name__:
                                         break
-                                    structure.append(Descriptor(this_class).descriptor['identifier'])
+                                    try:
+                                        structure.append(Descriptor(this_class).descriptor['identifier'])
+                                    except TypeError:
+                                        break  # This means we reached one of the built-in classes.
                                 if 'DataObject' in this_class.__name__:
                                     for index in reversed(range(1, len(structure))):
                                         if structure[index] in inherit_table:

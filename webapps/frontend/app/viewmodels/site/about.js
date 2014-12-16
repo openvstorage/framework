@@ -53,7 +53,7 @@ define([
                 api.get('storagerouters', { queryparams: options })
                     .done(function(data) {
                         var guids = [], sadata = {};
-                        $.each(data, function(index, item) {
+                        $.each(data.data, function(index, item) {
                             guids.push(item.guid);
                             sadata[item.guid] = item;
                         });

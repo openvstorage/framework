@@ -30,7 +30,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.vmachine import VMachineController
 from ovs.dal.exceptions import ObjectNotFoundException
-from backend.decorators import required_roles, load, return_list, return_object, return_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 
 
 class VMachineViewSet(viewsets.ViewSet):
@@ -41,6 +41,7 @@ class VMachineViewSet(viewsets.ViewSet):
     prefix = r'vmachines'
     base_name = 'vmachines'
 
+    @log()
     @required_roles(['read'])
     @return_list(VMachine, 'name,vpool_guid')
     @load()
@@ -67,6 +68,7 @@ class VMachineViewSet(viewsets.ViewSet):
             vmachines = VMachineList.get_vmachines()
         return vmachines
 
+    @log()
     @required_roles(['read'])
     @return_object(VMachine)
     @load(VMachine)
@@ -77,6 +79,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return vmachine
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
@@ -89,6 +92,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.delete.delay(machineguid=vmachine.guid)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
@@ -102,6 +106,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  timestamp=timestamp)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
@@ -119,6 +124,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                  is_automatic=False)
 
     @link()
+    @log()
     @required_roles(['read'])
     @return_list(VMachine)
     @load(VMachine)
@@ -140,6 +146,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return children_vmachines if hints['full'] is True else children_vmachine_guids
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
@@ -150,6 +157,7 @@ class VMachineViewSet(viewsets.ViewSet):
         return VMachineController.set_as_template.delay(machineguid=vmachine.guid)
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
@@ -169,6 +177,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                              description=str(description))
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VMachine)
@@ -197,6 +206,7 @@ class VMachineViewSet(viewsets.ViewSet):
                                                                       description=str(description))
 
     @link()
+    @log()
     @required_roles(['read'])
     @return_list(PMachine)
     @load(VMachine)

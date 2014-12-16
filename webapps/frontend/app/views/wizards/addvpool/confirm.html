@@ -20,11 +20,11 @@ limitations under the License.
             <li><b data-i18n="ovs:wizards.addvpool.gathervpool.name"></b> <span data-bind="text: data.name"></span></li>
             <li>
                 <b data-i18n="ovs:wizards.addvpool.gathervpool.backendtype"></b> <span data-bind="translate: 'ovs:generic.backendtypes.' + data.backend()"></span>
-                <ul data-bind="visible: data.backend() !== 'LOCAL' && data.backend() !== 'DISTRIBUTED'">
+                <ul data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed'">
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.host"></b> <span data-bind="text: data.host"></span></li>
                     <li><b data-i18n="ovs:wizards.addvpool.gathervpool.port"></b> <span data-bind="text: data.port"></span></li>
-                    <li data-bind="visible: data.backend() === 'REST'"><b data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></b> <span data-bind="text: data.timeout"></span></li>
-                    <li data-bind="visible: data.backend().match(/^.+_S3$/) !== null"><b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span></li>
+                    <li data-bind="visible: data.backend() === 'rest'"><b data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></b> <span data-bind="text: data.timeout"></span></li>
+                    <li data-bind="visible: data.backend().match(/^.+_s3$/) !== null"><b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span></li>
                 </ul>
             </li>
         </ul>
@@ -33,7 +33,7 @@ limitations under the License.
             <li><b data-i18n="ovs:wizards.addvpool.gathervpool.initialstoragerouter"></b> <span data-bind="text: data.target() !== undefined ? data.target().name() : ''"></span></li>
         </ul>
         <p data-i18n="ovs:wizards.addvpool.confirm.mountpoints"></p>
-        <ul data-bind="visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+        <ul data-bind="visible: data.backend() === 'local' || data.backend() === 'distributed'">
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></b> <span data-bind="text: data.mtptBFS"></span></li>
         </ul>
         <ul>
@@ -44,7 +44,6 @@ limitations under the License.
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.writecache"></b> <span data-bind="text: data.mtptWriteCache"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.foc"></b> <span data-bind="text: data.mtptFOC"></span></li>
             <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></b> <span data-bind="text: data.storageIP"></span></li>
-            <li><b data-i18n="ovs:wizards.addvpool.gathermountpoints.port"></b> <span data-bind="text: data.vRouterPort"></span></li>
         </ul>
         <p data-i18n="[html]ovs:wizards.addvpool.confirm.extra"></p>
     </form>

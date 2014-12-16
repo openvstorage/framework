@@ -20,37 +20,32 @@ limitations under the License.
                 <th data-bind="style: { width: width !== undefined ? width + 'px' : 'auto' }, html: value"></th>
             </tr>
         </thead>
-        <!-- ko if: initialLoad() -->
-            <tbody>
+        <tbody>
+            <!-- ko if: loading() -->
                 <tr>
                     <td data-bind="attr: { colspan: headers().length }">
                         <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </td>
                 </tr>
-            </tbody>
-        <!-- /ko -->
-        <!-- ko if: !initialLoad() -->
-            <!-- ko if: viewportItems().length == 0 -->
-                <tbody>
+            <!-- /ko -->
+            <!-- ko if: !loading() -->
+                <!-- ko if: viewportItems().length == 0 -->
                     <tr>
                         <td data-bind="attr: { colspan: headers().length }">
                             <i data-i18n="ovs:generic.noentries"></i>
                         </td>
                     </tr>
-                    <tr data-part="vfirst" style="display: none;"></tr>
-                </tbody>
-            <!-- /ko -->
-            <!-- ko if: viewportItems().length > 0 -->
-                <tbody>
+                <!-- /ko -->
+                <!-- ko if: viewportItems().length > 0 -->
                     <!-- ko foreach: viewportItems -->
                         <tr data-part="vitem" data-bind="foreach: $parent.headers">
                             <td data-bind="html: $parent[key]"></td>
                         </tr>
                     <!-- /ko -->
-                    <tr data-part="vnew" style="display: none;"></tr>
-                </tbody>
+                <!-- /ko -->
             <!-- /ko -->
-        <!-- /ko -->
+            <tr data-part="vnew" style="display: none;"></tr>
+        </tbody>
     </table>
     <div data-bind="if: showControls()">
         <p style="margin-bottom: -15px;">

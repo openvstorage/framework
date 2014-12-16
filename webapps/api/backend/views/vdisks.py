@@ -24,7 +24,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.lib.vdisk import VDiskController
-from backend.decorators import required_roles, load, return_list, return_object, return_task
+from backend.decorators import required_roles, load, return_list, return_object, return_task, log
 
 
 class VDiskViewSet(viewsets.ViewSet):
@@ -35,6 +35,7 @@ class VDiskViewSet(viewsets.ViewSet):
     prefix = r'vdisks'
     base_name = 'vdisks'
 
+    @log()
     @required_roles(['read'])
     @return_list(VDisk)
     @load()
@@ -50,6 +51,7 @@ class VDiskViewSet(viewsets.ViewSet):
             return vpool.vdisks
         return VDiskList.get_vdisks()
 
+    @log()
     @required_roles(['read'])
     @return_object(VDisk)
     @load(VDisk)
@@ -60,6 +62,7 @@ class VDiskViewSet(viewsets.ViewSet):
         return vdisk
 
     @action()
+    @log()
     @required_roles(['read', 'write'])
     @return_task()
     @load(VDisk)

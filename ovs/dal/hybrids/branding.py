@@ -23,10 +23,10 @@ class Branding(DataObject):
     """
     The Branding class represents the specific OEM information.
     """
-    __properties = {Property('name', str, doc='Name of the Brand.'),
+    __properties = [Property('name', str, doc='Name of the Brand.'),
                     Property('description', str, mandatory=False, doc='Description of the Brand.'),
                     Property('css', str, doc='CSS file used by the Brand.'),
                     Property('productname', str, doc='Commercial product name.'),
-                    Property('is_default', bool, doc='Indicates whether this Brand is the default one.')}
+                    Property('is_default', bool, doc='Indicates whether this Brand is the default one.')]
     __relations = []
     __dynamics = []

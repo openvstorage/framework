@@ -112,9 +112,19 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return undefined;
     }
+    function formatPercentage(value) {
+        value = Math.round(value * 10000) / 100;
+        return formatNumber(value) + ' %';
+    }
     function padRight(value, character, length) {
         while (value.length < length) {
             value += character;
+        }
+        return value;
+    }
+    function padLeft(value, character, length) {
+        while (value.length < length) {
+            value = character + value;
         }
         return value;
     }
@@ -217,9 +227,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
-    function crossFiller(newKeyList, objectList, objectLoader, key) {
+    function crossFiller(newKeyList, objectList, objectLoader, key, clean) {
         //               Arr.        Obs. Arr    Function      Obs.
-        var i, j, currentKeyList = [];
+        var i, j, currentKeyList = [], loadedObject;
         for (i = 0; i < objectList().length; i += 1) {
             currentKeyList.push(objectList()[i][key]());
         }
@@ -227,17 +237,22 @@ define(['jquery', 'jqp/pnotify'], function($) {
             if ($.inArray(newKeyList[i], currentKeyList) === -1) {
                 // One of the new keys is not yet in our current key list. This means
                 // we'll have to load the object.
-                objectList.push(objectLoader(newKeyList[i]));
+                loadedObject = objectLoader(newKeyList[i]);
+                if (loadedObject !== undefined) {
+                    objectList.push(loadedObject);
+                }
             }
         }
-        for (i = 0; i < currentKeyList.length; i += 1) {
-            if ($.inArray(currentKeyList[i], newKeyList) === -1) {
-                // One of the existing keys is not in the new key list anymore. This means
-                // we'll have to remove the object
-                for (j = 0; j < objectList().length; j += 1) {
-                    if (objectList()[j][key]() === currentKeyList[i]) {
-                        objectList.splice(j, 1);
-                        break;
+        if (clean !== false) {
+            for (i = 0; i < currentKeyList.length; i += 1) {
+                if ($.inArray(currentKeyList[i], newKeyList) === -1) {
+                    // One of the existing keys is not in the new key list anymore. This means
+                    // we'll have to remove the object
+                    for (j = 0; j < objectList().length; j += 1) {
+                        if (objectList()[j][key]() === currentKeyList[i]) {
+                            objectList.splice(j, 1);
+                            break;
+                        }
                     }
                 }
             }
@@ -304,35 +319,49 @@ define(['jquery', 'jqp/pnotify'], function($) {
                 }, 5000);
             });
     }
+    function overlap(array1, array2) {
+        var i, j;
+        for (i = 0; i < array1.length; i += 1) {
+            for (j = 0; j < array2.length; j += 1) {
+                if (array1[i] === array2[j]) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
     return {
-        getTimestamp    : getTimestamp,
-        formatBytes     : formatBytes,
-        formatSpeed     : formatSpeed,
-        formatRatio     : formatRatio,
-        formatShort     : formatShort,
-        formatNumber    : formatNumber,
-        padRight        : padRight,
-        tryGet          : tryGet,
-        trySet          : trySet,
-        lower           : lower,
-        alert           : alert,
-        alertInfo       : alertInfo,
-        alertSuccess    : alertSuccess,
-        alertError      : alertError,
-        keys            : keys,
-        xhrAbort        : xhrAbort,
-        xhrCompleted    : xhrCompleted,
-        removeElement   : removeElement,
-        smooth          : smooth,
-        round           : round,
-        ceil            : ceil,
-        buildString     : buildString,
-        setDecimals     : setDecimals,
-        crossFiller     : crossFiller,
-        deg2rad         : deg2rad,
-        numberSort      : numberSort,
-        advancedSort    : advancedSort,
-        validate        : validate
+        getTimestamp     : getTimestamp,
+        formatBytes      : formatBytes,
+        formatSpeed      : formatSpeed,
+        formatRatio      : formatRatio,
+        formatShort      : formatShort,
+        formatNumber     : formatNumber,
+        formatPercentage : formatPercentage,
+        padRight         : padRight,
+        padLeft          : padLeft,
+        tryGet           : tryGet,
+        trySet           : trySet,
+        lower            : lower,
+        alert            : alert,
+        alertInfo        : alertInfo,
+        alertSuccess     : alertSuccess,
+        alertError       : alertError,
+        keys             : keys,
+        xhrAbort         : xhrAbort,
+        xhrCompleted     : xhrCompleted,
+        removeElement    : removeElement,
+        smooth           : smooth,
+        round            : round,
+        ceil             : ceil,
+        buildString      : buildString,
+        setDecimals      : setDecimals,
+        crossFiller      : crossFiller,
+        deg2rad          : deg2rad,
+        numberSort       : numberSort,
+        advancedSort     : advancedSort,
+        validate         : validate,
+        overlap          : overlap
     };
 });

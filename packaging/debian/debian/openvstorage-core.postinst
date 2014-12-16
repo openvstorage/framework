@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Post install deps
-easy_install -U cuisine
+pip install cuisine
 pip install pysnmp==4.2.5
 
 # Activate kibana
@@ -19,5 +19,20 @@ service nginx stop
 update-rc.d nginx disable
 service memcached stop
 update-rc.d memcached disable
+
+# Cleanup *.pyc files
+chown -R ovs:ovs /opt/OpenvStorage
+find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;
+
+# Few logstash cleanups
+usermod -a -G adm logstash
+echo manual >/etc/init/logstash-web.override
+
+chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh
+
+# Adding crontabs
+if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 * * * * /usr/sbin/ntpdate pool.ntp.org'; } | crontab -; fi
+if crontab -l | grep -q 'ovs monitor heartbeat'; then true; else crontab -l | { cat; echo '* * * * * ovs monitor heartbeat'; } | crontab -; fi
+if crontab -l | grep -q 'rotate-storagedriver-logs'; then true; else crontab -l | { cat; echo '59 23 * * * /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh'; } | crontab -; fi
 
 python /opt/OpenvStorage/scripts/install/openvstorage-core.postinst.py "__NEW_VERSION__" "$@"

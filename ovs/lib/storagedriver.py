@@ -16,11 +16,12 @@
 StorageDriver module
 """
 
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+from ovs.lib.helpers.decorators import log
 
 
 class StorageDriverController(object):
@@ -42,6 +43,7 @@ class StorageDriverController(object):
 
     @staticmethod
     @celery.task(name='ovs.storagedriver.update_status')
+    @log('VOLUMEDRIVER_TASK')
     def update_status(storagedriver_id):
         """
         Sets Storage Driver offline in case hypervisor management Center

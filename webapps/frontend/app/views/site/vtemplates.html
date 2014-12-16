@@ -15,8 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:vtemplates.title"></h2>
-    <div data-bind="pager: { items: vTemplates, headers: vTemplateHeaders, initialLoad: vTemplatesInitialLoad,
-                             viewportRefresh: refreshVTemplates, viewportRefreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: loadVTemplates, headers: vTemplateHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>

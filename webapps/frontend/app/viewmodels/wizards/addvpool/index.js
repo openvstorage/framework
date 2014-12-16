@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_vpool', './gather_mountpoints', './confirm'
-], function($, generic, build, data, GatherVPool, GatherMountPoints, Confirm) {
+    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_cinder', './confirm'
+], function($, generic, build, data, GatherVPool, GatherMountPoints, GatherCinder, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -24,7 +24,7 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new GatherVPool(), new GatherMountPoints(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherMountPoints(), new GatherCinder(), new Confirm()]);
         self.step(0);
         self.activateStep();
 
@@ -32,7 +32,7 @@ define([
         data.target(undefined);
         data.accesskey('');
         data.secretkey('');
-        data.backend('LOCAL');
+        data.backend('local');
         data.mtptTemp(undefined);
         data.mtptBFS(undefined);
         data.mtptMD(undefined);
@@ -45,11 +45,16 @@ define([
         data.host('');
         data.port(80);
         data.timeout(600);
-        data.vRouterPort(12322);
-        data.backends(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']);
+        data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
         data.storageRouters([]);
         data.storageDrivers([]);
         data.mountpoints([]);
         data.ipAddresses([]);
+        data.cinderUser('admin');
+        data.cinderPassword('');
+        data.cinderTenant('admin');
+        data.cinderCtrlIP('127.0.0.1');
+        data.configCinder(false);
+        data.hasCinder(false);
     };
 });

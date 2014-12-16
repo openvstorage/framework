@@ -51,7 +51,11 @@ limitations under the License.
                             <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
                             <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
                             <td style="width: 15%;" data-i18n="ovs:vpools.backendtype"></td>
-                            <td style="width: 35%;"><span data-bind="translate: 'ovs:generic.backendtypes.' + backendType()"></span></td>
+                            <td style="width: 35%;">
+                                <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
+                                </span>
+                            </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.cache"></td>
@@ -107,8 +111,7 @@ limitations under the License.
         <div class="tab-content">
             <div class="tab-pane active" id="vmachines" style="padding: 15px;">
                 <h4 data-i18n="ovs:vmachines.title"></h4>
-                <div data-bind="pager: { items: vMachines, headers: $parent.vMachineHeaders, initialLoad: $parent.vMachinesInitialLoad,
-                                         viewportRefresh: $parent.refreshVMachines, viewportRefreshInterval: 5000, controls: true }">
+                <div data-bind="pager: { loadData: $parent.loadVMachines, headers: $parent.vMachineHeaders, refreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
                         <tr data-part="vitem" data-bind="attr: { id: 'vmachine_' + guid() }">
                             <td>
@@ -145,8 +148,7 @@ limitations under the License.
             </div>
             <div class="tab-pane" id="vdisks" style="padding: 15px;">
                 <h4 data-i18n="ovs:vdisks.title"></h4>
-                <div data-bind="pager: { items: vDisks, headers: $parent.vDiskHeaders, initialLoad: $parent.vDisksInitialLoad,
-                                         viewportRefresh: $parent.refreshVDisks, viewportRefreshInterval: 5000, controls: true }">
+                <div data-bind="pager: { loadData: $parent.loadVDisks, headers: $parent.vDiskHeaders, refreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
                         <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
                             <td>
@@ -204,7 +206,7 @@ limitations under the License.
                                               style="padding: 2px 5px 3px 5px;">
                                             <input type="checkbox" data-bind="attr: { id: 'storagerouter_' + guid() }, checkedValue: guid(),
                                                                               checked: $root.checkedStorageRouterGuids,
-                                                                              disable: $parent.backendType() === 'LOCAL' && $.inArray(guid(), $parent.storageRouterGuids()) === -1"
+                                                                              disable: $parent.backendType() === 'local' && $.inArray(guid(), $parent.storageRouterGuids()) === -1"
                                                     style="vertical-align: text-bottom;">
                                             <label data-bind="attr: { for: 'storagerouter_' + guid() }" style="font-weight: normal; margin-left: 7px;">
                                                 <span data-bind="text: name"></span>
@@ -215,13 +217,13 @@ limitations under the License.
                                                   class="fa" data-i18n="[html]ovs:icons.add" style="margin-left: 7px;"></span>
                                         </span>
                                         <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin-left: 10px;"
-                                              data-bind="visible: $root.updatingStorageRouters() && $parent.backendType() !== 'LOCAL' && (
+                                              data-bind="visible: $root.updatingStorageRouters() && $parent.backendType() !== 'local' && (
                                                              ($.inArray(guid(), $root.checkedStorageRouterGuids()) !== -1 && $.inArray(guid(), $parent.storageRouterGuids()) === -1) ||
                                                              ($.inArray(guid(), $root.checkedStorageRouterGuids()) === -1 && $.inArray(guid(), $parent.storageRouterGuids()) !== -1)
                                                          )" ></span>
                                     </div>
                                 </div>
-                                <div data-bind="visible: backendType() === 'LOCAL'" class="alert alert-warning"
+                                <div data-bind="visible: backendType() === 'local'" class="alert alert-warning"
                                      data-i18n="ovs:vpools.detail.localvpool" style="margin-top: 10px;"></div>
                                 <button class="btn btn-default" id="buttonVpoolSaveChanges" data-bind="click: $root.updateStorageRouterServing,
                                                                            enable: $root.pendingStorageRouters().length > 0 || $root.removingStorageRouters().length > 0"

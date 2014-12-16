@@ -20,9 +20,9 @@ from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import link
-from backend.decorators import required_roles, load
+from backend.decorators import required_roles, load, log
 from celery.task.control import inspect
-from ovs.celery import celery
+from ovs.celery_run import celery
 
 
 class TaskViewSet(viewsets.ViewSet):
@@ -33,6 +33,7 @@ class TaskViewSet(viewsets.ViewSet):
     prefix = r'tasks'
     base_name = 'tasks'
 
+    @log()
     @required_roles(['read'])
     @load()
     def list(self):
@@ -46,6 +47,7 @@ class TaskViewSet(viewsets.ViewSet):
                 'revoked'  : inspector.revoked()}
         return Response(data, status=status.HTTP_200_OK)
 
+    @log()
     @required_roles(['read'])
     @load()
     def retrieve(self, pk):
@@ -66,6 +68,7 @@ class TaskViewSet(viewsets.ViewSet):
         return Response(data, status=status.HTTP_200_OK)
 
     @link()
+    @log()
     @required_roles(['read'])
     @load()
     def get(self, pk):

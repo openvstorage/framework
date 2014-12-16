@@ -15,9 +15,10 @@
 define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/vmachine', '../containers/pmachine', '../containers/vpool', '../containers/storagerouter',
+    '../containers/vdisk', '../containers/vmachine', '../containers/pmachine',
+    '../containers/vpool', '../containers/storagerouter',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, VMachine, PMachine, VPool, StorageRouter, RollbackWizard, SnapshotWizard) {
+], function($, app, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, PMachine, VPool, StorageRouter, RollbackWizard, SnapshotWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -49,11 +50,9 @@ define([
         ];
 
         // Handles
-        self.loadVDisksHandle    = undefined;
-        self.refreshVDisksHandle = {};
+        self.vDisksHandle = {};
 
         // Observables
-        self.vDisksInitialLoad    = ko.observable(true);
         self.snapshotsInitialLoad = ko.observable(true);
         self.vMachine             = ko.observable();
 
@@ -63,7 +62,6 @@ define([
                 var vm = self.vMachine();
                 vm.load()
                     .then(function() {
-                        self.vDisksInitialLoad(false);
                         self.snapshotsInitialLoad(false);
                         generic.crossFiller(
                             vm.vPoolGuids, vm.vPools,
@@ -103,30 +101,25 @@ define([
         self.refreshSnapshots = function() {
             // Not un use, for mapping only
         };
-        self.refreshVDisks = function(page) {
+        self.loadVDisks = function(page) {
             return $.Deferred(function(deferred) {
-                if (generic.xhrCompleted(self.refreshVDisksHandle[page])) {
+                if (generic.xhrCompleted(self.vDisksHandle[page])) {
                     var options = {
                         sort: 'name',
                         page: page,
                         contents: '_dynamics,-snapshots',
                         vmachineguid: self.vMachine().guid()
                     };
-                    self.refreshVDisksHandle[page] = api.get('vdisks', { queryparams: options })
+                    self.vDisksHandle[page] = api.get('vdisks', { queryparams: options })
                         .done(function(data) {
-                            var guids = [], vddata = {};
-                            $.each(data, function(index, item) {
-                                guids.push(item.guid);
-                                vddata[item.guid] = item;
-                            });
-                            $.each(self.vMachine().vDisks(), function(index, vdisk) {
-                                if ($.inArray(vdisk.guid(), guids) !== -1) {
-                                    vdisk.fillData(vddata[vdisk.guid()]);
+                            deferred.resolve({
+                                data: data,
+                                loader: function(guid) {
+                                    return new VDisk(guid);
                                 }
                             });
-                            deferred.resolve();
                         })
-                        .fail(deferred.reject);
+                        .fail(function() { deferred.reject(); });
                 } else {
                     deferred.resolve();
                 }
@@ -199,8 +192,11 @@ define([
         self.activate = function(mode, guid) {
             self.vMachine(new VMachine(guid));
             self.refresher.init(self.load, 5000);
-            self.refresher.run();
             self.refresher.start();
+            self.load()
+                .then(function() {
+                    self.refreshVDisks(1);
+                });
             self.shared.footerData(self.vMachine);
         };
         self.deactivate = function() {

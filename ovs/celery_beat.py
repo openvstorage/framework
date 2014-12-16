@@ -18,7 +18,8 @@ Celery beat module
 
 import time
 import cPickle
-from celery import Scheduler, current_app
+from celery.beat import Scheduler
+from celery import current_app
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import VolatileMutex

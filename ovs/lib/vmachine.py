@@ -16,8 +16,8 @@
 VMachine module
 """
 import time
-
-from ovs.celery import celery
+from ovs.lib.helpers.decorators import log
+from ovs.celery_run import celery
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vdisk import VDisk
@@ -272,6 +272,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.delete_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(name, storagedriver_id):
         """
         This method will delete a vmachine based on the name of the vmx given
@@ -295,6 +296,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def rename_from_voldrv(old_name, new_name, storagedriver_id):
         """
         This machine will handle the rename of a vmx file
@@ -324,12 +326,12 @@ class VMachineController(object):
             if vm is None:
                 # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
                 # Let's create it anyway
-                VMachineController.update_from_voldrv(new_name, storagedriver_id)
+                VMachineController.update_from_voldrv(new_name, storagedriver_id=storagedriver_id)
             vm = VMachineList.get_by_devicename_and_vpool(new_name, vpool)
             if vm is None:
                 raise RuntimeError('Could not create vMachine on rename. Aborting.')
             try:
-                VMachineController.sync_with_hypervisor(vm.guid, storagedriver_id)
+                VMachineController.sync_with_hypervisor(vm.guid, storagedriver_id=storagedriver_id)
                 vm.status = 'SYNC'
             except:
                 vm.status = 'SYNC_NOK'
@@ -439,6 +441,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.sync_with_hypervisor')
+    @log('VOLUMEDRIVER_TASK')
     def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
         """
         Updates a given vmachine with data retreived from a given pmachine
@@ -484,6 +487,7 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')
+    @log('VOLUMEDRIVER_TASK')
     def update_from_voldrv(name, storagedriver_id):
         """
         This method will update/create a vmachine based on a given vmx/xml file
@@ -519,7 +523,7 @@ class VMachineController(object):
                     logger.info('Could not locate vmachine with name {0} on vpool {1}'.format(name, vpool))
                     vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
                     if vmachine is not None:
-                        VMachineController.delete_from_voldrv(name, storagedriver_id)
+                        VMachineController.delete_from_voldrv(name, storagedriver_id=storagedriver_id)
                     return
             finally:
                 mutex.release()
@@ -538,7 +542,7 @@ class VMachineController(object):
 
             if pmachine.hvtype == 'KVM':
                 try:
-                    VMachineController.sync_with_hypervisor(vmachine.guid, storagedriver_id)
+                    VMachineController.sync_with_hypervisor(vmachine.guid, storagedriver_id=storagedriver_id)
                     vmachine.status = 'SYNC'
                 except:
                     vmachine.status = 'SYNC_NOK'

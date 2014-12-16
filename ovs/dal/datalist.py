@@ -33,6 +33,9 @@ class DataList(object):
     The DataList is a class that provide query functionality for the hybrid DAL
     """
 
+    # Test hooks for unit tests
+    test_hooks = {}
+
     class Select(object):
         """
         The Select class provides enum-alike properties for what to select
@@ -66,7 +69,7 @@ class DataList(object):
     cachelink = 'ovs_listcache'
     partsize_pks = 5000
 
-    def __init__(self, query, key=None, load=True, post_query_hook=None):
+    def __init__(self, query, key=None, load=True):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         """
@@ -83,7 +86,6 @@ class DataList(object):
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query
-        self._post_query_hook = post_query_hook
         self.data = None
         self.from_cache = False
         self._can_cache = True
@@ -238,8 +240,8 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
-            if self._post_query_hook is not None:
-                self._post_query_hook(self)
+            if 'post_query' in DataList.test_hooks:
+                DataList.test_hooks['post_query'](self)
 
             if self._key is not None and len(guids) > 0 and self._can_cache:
                 invalidated = False
@@ -416,81 +418,6 @@ class DataList(object):
         """
         This method will load the primary keys for a given namespace and name
         """
-        #return DataList._get_pks(namespace, name)
         persistent = PersistentFactory.get_client()
         prefix = '{0}_{1}_'.format(namespace, name)
         return set([key.replace(prefix, '') for key in persistent.prefix(prefix, max_elements=-1)])
-
-    @staticmethod
-    def add_pk(namespace, name, key):
-        """
-        This adds the current primary key to the primary key index
-        """
-        #mutex = VolatileMutex('primarykeys_{0}'.format(name))
-        #try:
-        #    mutex.acquire(10)
-        #    keys = DataList._get_pks(namespace, name)
-        #    keys.add(key)
-        #    DataList._save_pks(name, keys)
-        #finally:
-        #    mutex.release()
-        pass
-
-    @staticmethod
-    def delete_pk(namespace, name, key):
-        """
-        This deletes the current primary key from the primary key index
-        """
-        #mutex = VolatileMutex('primarykeys_{0}'.format(name))
-        #try:
-        #    mutex.acquire(10)
-        #    keys = DataList._get_pks(namespace, name)
-        #    try:
-        #        keys.remove(key)
-        #    except KeyError:
-        #        pass
-        #    DataList._save_pks(name, keys)
-        #finally:
-        #    mutex.release()
-        pass
-
-    @staticmethod
-    def _get_pks(namespace, name):
-        """
-        Loads the primary key set information and pages, merges them to a single set
-        and returns it
-        """
-        internal_key = 'ovs_primarykeys_{0}_{{0}}'.format(name)
-        volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
-        pointer = internal_key.format(0)
-        keys = set()
-        while pointer is not None:
-            subset = volatile.get(pointer)
-            if subset is None:
-                prefix = '{0}_{1}_'.format(namespace, name)
-                keys = set([key.replace(prefix, '') for key in persistent.prefix(prefix, max_elements=-1)])
-                DataList._save_pks(name, keys)
-                return keys
-            keys = keys.union(subset[0])
-            pointer = subset[1]
-        return keys
-
-    @staticmethod
-    def _save_pks(name, keys):
-        """
-        Pages and saves a set
-        """
-        internal_key = 'ovs_primarykeys_{0}_{{0}}'.format(name)
-        volatile = VolatileFactory.get_client()
-        keys = list(keys)
-        if len(keys) <= DataList.partsize_pks:
-            volatile.set(internal_key.format(0), [keys, None])
-        else:
-            sets = range(0, len(keys), DataList.partsize_pks)
-            sets.reverse()
-            pointer = None
-            for i in sets:
-                data = [keys[i:i + DataList.partsize_pks], pointer]
-                pointer = internal_key.format(i)
-                volatile.set(pointer, data)

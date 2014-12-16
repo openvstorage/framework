@@ -23,8 +23,7 @@ limitations under the License.
             <span data-i18n="ovs:vpools.add"></span>
         </button>
     </div>
-    <div data-bind="pager: { items: vPools, headers: vPoolHeaders, initialLoad: vPoolsInitialLoad,
-                             viewportRefresh: refreshVPools, viewportRefreshInterval: 5000, controls: true }"
+    <div data-bind="pager: { loadData: loadVPools, headers: vPoolHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
          style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
@@ -36,7 +35,11 @@ limitations under the License.
                 <td><span data-bind="text: storedData"></span></td>
                 <td><span data-bind="text: cacheRatio"></span></td>
                 <td><span data-bind="text: iops"></span></td>
-                <td><span data-bind="translate: 'ovs:generic.backendtypes.' + backendType()"></span></td>
+                <td>
+                    <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
+                        <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
+                    </span>
+                </td>
                 <td><span data-bind="text: backendConnection"></span></td>
                 <td><span data-bind="text: backendLogin"></span></td>
             </tr>

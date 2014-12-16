@@ -32,7 +32,7 @@ define(['knockout', 'jquery'], function(ko, $){
             accesskey:      ko.observable(''),
             secretkey:      ko.observable(''),
             allowVPool:     ko.observable(true),
-            backend:        ko.observable('LOCAL'),
+            backend:        ko.observable('local'),
             mtptTemp:       ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
             mtptBFS:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
             mtptMD:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
@@ -45,12 +45,17 @@ define(['knockout', 'jquery'], function(ko, $){
             host:           ko.observable('').extend({ regex: hostRegex }),
             port:           ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
             timeout:        ko.observable(600).extend({ numeric: {}}),
-            vRouterPort:    ko.observable(12322).extend({ numeric: { min: 1, max: 65536 }, identifier: 'vrouterport' }),
-            backends:       ko.observableArray(['LOCAL', 'CEPH_S3', 'AMAZON_S3', 'SWIFT_S3', 'DISTRIBUTED']),
+            backends:       ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']),
             storageRouters: ko.observableArray([]),
             storageDrivers: ko.observableArray([]),
             mountpoints:    ko.observableArray([]),
-            ipAddresses:    ko.observableArray([])
+            ipAddresses:    ko.observableArray([]),
+            hasCinder:      ko.observable(),
+            configCinder:   ko.observable(),
+            cinderUser:     ko.observable('admin'),
+            cinderPassword: ko.observable(''),
+            cinderTenant:   ko.observable('admin'),
+            cinderCtrlIP:   ko.observable('').extend({ regex: ipRegex })
         };
 
         mtptData.mountpoints2 = ko.computed(function() {

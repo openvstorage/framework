@@ -16,11 +16,13 @@
 Contains the process method for processing rabbitmq messages
 """
 
+import time
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
+from ovs.dal.hybrids.log import Log
 
 logger = LogHandler('extensions', name='processor')
 
@@ -80,6 +82,7 @@ def process(queue, body, mapping):
                             # If task is already running, the revoke message will
                             # be ignored
                             revoke(task_id)
+                        _log(task, kwargs, data.node_id)
                         async_result = task.s(**kwargs).apply_async(
                             countdown=delay,
                             routing_key=routing_key
@@ -87,6 +90,7 @@ def process(queue, body, mapping):
                         cache.set(key, async_result.id, 600)  # Store the task id
                         new_task_id = async_result.id
                     else:
+                        _log(task, kwargs, data.node_id)
                         async_result = task.s(**kwargs).apply_async(
                             countdown=delay,
                             routing_key=routing_key
@@ -107,3 +111,14 @@ def process(queue, body, mapping):
             logger.info('Message type {0} was received. Skipped.'.format(str(data.type)))
     else:
         raise NotImplementedError('Queue {} is not yet implemented'.format(queue))
+
+
+def _log(task, kwargs, storagedriver_id):
+    log = Log()
+    log.source = 'VOLUMEDRIVER_EVENT'
+    log.module = task.__class__.__module__
+    log.method = task.__class__.__name__
+    log.method_kwargs = kwargs
+    log.time = time.time()
+    log.storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+    log.save()

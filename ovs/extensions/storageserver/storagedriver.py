@@ -66,7 +66,7 @@ class StorageDriverClient(object):
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
-                cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.port))
+                cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports[1]))
             client = SRClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]

@@ -21,21 +21,24 @@ import re
 import uuid
 
 from subprocess import check_output
-from ovs.celery import celery
+from ovs.celery_run import celery
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
+from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.extensions.generic.system import System
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagement
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.openstack.oscinder import OpenStackCinder
 
 logger = LogHandler('lib', name='storagerouter')
 
@@ -68,14 +71,12 @@ class StorageRouterController(object):
             ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
             ipaddresses = [ip.strip() for ip in ipaddresses]
             ipaddresses.remove('127.0.0.1')
-        xmlrpcport = Configuration.get('volumedriver.filesystem.xmlrpc.port')
         allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
         return {'mountpoints': mountpoints,
                 'ipaddresses': ipaddresses,
-                'xmlrpcport': xmlrpcport,
                 'files': file_existence,
                 'allow_vpool': allow_vpool}
 
@@ -93,7 +94,7 @@ class StorageRouterController(object):
         if StorageRouterController._validate_ip(ip) is False:
             raise ValueError('The entered ip address is invalid')
 
-        if not re.match('^[0-9a-zA-Z]+(\-+[0-9a-zA-Z]+)*$', vpool_name):
+        if not re.match('^[0-9a-z]+(\-+[0-9a-z]+)*$', vpool_name):
             raise ValueError('Invalid vpool_name given')
 
         client = SSHClient.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
@@ -110,7 +111,7 @@ class StorageRouterController(object):
         vpool = VPoolList.get_vpool_by_name(vpool_name)
         storagedriver = None
         if vpool is not None:
-            if vpool.type == 'LOCAL':
+            if vpool.backend_type.code == 'local':
                 # Might be an issue, investigating whether it's on the same not or not
                 if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machine_id != unique_id:
                     raise RuntimeError('A local vPool with name {0} already exists'.format(vpool_name))
@@ -160,16 +161,17 @@ if Service.has_service('{0}'):
         if vpool is None:
             vpool = VPool()
             supported_backends = System.read_remote_config(client, 'volumedriver.supported.backends').split(',')
-            if 'REST' in supported_backends:
-                supported_backends.remove('REST')  # REST is not supported for now
-            vpool.type = parameters['type']
+            if 'rest' in supported_backends:
+                supported_backends.remove('rest')  # REST is not supported for now
+            backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
+            vpool.backend_type = backend_type
             connection_host = connection_port = connection_username = connection_password = None
-            if vpool.type in ['LOCAL', 'DISTRIBUTED']:
+            if vpool.backend_type.code in ['local', 'distributed']:
                 vpool.metadata = {'backend_type': 'LOCAL'}
                 mountpoint_bfs = parameters['mountpoint_bfs']
                 directories_to_create.append(mountpoint_bfs)
                 vpool.metadata['local_connection_path'] = mountpoint_bfs
-            if vpool.type == 'REST':
+            if vpool.backend_type.code == 'rest':
                 connection_host = parameters['connection_host']
                 connection_port = parameters['connection_port']
                 rest_connection_timeout_secs = parameters['connection_timeout']
@@ -179,12 +181,12 @@ if Service.has_service('{0}'):
                                   'rest_connection_verbose_logging': rest_connection_timeout_secs,
                                   'rest_connection_metadata_format': "JSON",
                                   'backend_type': 'REST'}
-            elif vpool.type in ('CEPH_S3', 'AMAZON_S3', 'SWIFT_S3'):
+            elif vpool.backend_type.code in ('ceph_s3', 'amazon_s3', 'swift_s3'):
                 connection_host = parameters['connection_host']
                 connection_port = parameters['connection_port']
                 connection_username = parameters['connection_username']
                 connection_password = parameters['connection_password']
-                if vpool.type in ['SWIFT_S3']:
+                if vpool.backend_type.code in ['swift_s3']:
                     strict_consistency = 'false'
                     s3_connection_flavour = 'SWIFT'
                 else:
@@ -201,7 +203,7 @@ if Service.has_service('{0}'):
                                   'backend_type': 'S3'}
 
             vpool.name = vpool_name
-            vpool.description = "{} {}".format(vpool.type, vpool_name)
+            vpool.description = "{} {}".format(vpool.backend_type.code, vpool_name)
             vpool.login = connection_username
             vpool.password = connection_password
             if not connection_host:
@@ -388,15 +390,36 @@ for directory in {0}:
             readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
             readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
         if new_storagedriver:
-            ports_used_in_model = [port_storagedriver.port for port_storagedriver in
-                                   StorageDriverList.get_storagedrivers_by_storagerouter(storagerouter.guid)]
-            vrouter_port_in_hrd = int(System.read_remote_config(client, 'volumedriver.filesystem.xmlrpc.port'))
-            if vrouter_port_in_hrd in ports_used_in_model:
-                vrouter_port = int(parameters['vrouter_port'])
-            else:
-                vrouter_port = int(vrouter_port_in_hrd)
+            ports_in_use = System.ports_in_use(client)
+            ports_reserved = []
+            ports_in_use_model = {}
+            for port_storagedriver in StorageDriverList.get_storagedrivers():
+                if port_storagedriver.vpool_guid not in ports_in_use_model:
+                    ports_in_use_model[port_storagedriver.vpool_guid] = port_storagedriver.ports
+                    ports_reserved += port_storagedriver.ports
+            if vpool.guid in ports_in_use_model:  # The vPool is extended to another StorageRouter. We need to use these ports.
+                ports = ports_in_use_model[vpool.guid]
+                if any(port in ports_in_use for port in ports):
+                    raise RuntimeError('The required ports are in use')
+            else:  # First StorageDriver for this vPool, so generating new ports
+                ports = []
+                for port_range in System.read_remote_config(client, 'volumedriver.filesystem.ports').split(','):
+                    port_range = port_range.strip()
+                    if '-' in port_range:
+                        current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
+                    else:
+                        current_range = (int(port_range), 65536)
+                    current_port = current_range[0]
+                    while len(ports) < 3:
+                        if current_port not in ports_in_use and current_port not in ports_reserved:
+                            ports.append(current_port)
+                        current_port += 1
+                        if current_port > current_range[1]:
+                            break
+                if len(ports) != 3:
+                    raise RuntimeError('Could not find enough free ports')
         else:
-            vrouter_port = int(storagedriver.port)
+            ports = storagedriver.ports
 
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
         ipaddresses = client.run(cmd).strip().split('\n')
@@ -422,7 +445,7 @@ for directory in {0}:
                           'vrouter_min_workers': 4,
                           'vrouter_max_workers': 16}
         voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'volumedriver.arakoon.clusterid'))
-        voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+        voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
         for arakoon_node in voldrv_arakoon_client_config.keys():
@@ -435,12 +458,11 @@ for directory in {0}:
             if existing_storagedriver.vpool_guid == vpool.guid:
                 node_configs.append(ClusterNodeConfig(str(existing_storagedriver.storagedriver_id),
                                                       str(existing_storagedriver.cluster_ip),
-                                                      existing_storagedriver.port - 1,
-                                                      existing_storagedriver.port,
-                                                      existing_storagedriver.port + 1))
+                                                      existing_storagedriver.ports[0],
+                                                      existing_storagedriver.ports[1],
+                                                      existing_storagedriver.ports[2]))
         if new_storagedriver:
-            node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip,
-                                                  vrouter_port - 1, vrouter_port, vrouter_port + 1))
+            node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip, ports[0], ports[1], ports[2]))
         vrouter_clusterregistry.set_node_configs(node_configs)
         readcaches = [{'path': readcache1, 'size': readcache1_size}]
         if readcache2:
@@ -501,7 +523,7 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.description = storagedriver.name
         storagedriver.storage_ip = volumedriver_storageip
         storagedriver.cluster_ip = grid_ip
-        storagedriver.port = vrouter_port
+        storagedriver.ports = ports
         storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
         storagedriver.mountpoint_temp = mountpoint_temp
         storagedriver.mountpoint_readcache1 = mountpoint_readcache1
@@ -591,6 +613,34 @@ Service.start_service('{0}')
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
+        # Configure Cinder
+        ovsdb = PersistentFactory.get_client()
+        vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        if ovsdb.exists(vpool_config_key):
+            # Second node gets values saved by first node
+            cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = ovsdb.get(vpool_config_key)
+        else:
+            config_cinder = parameters.get('config_cinder', False)
+            cinder_password = ''
+            cinder_user = ''
+            tenant_name = ''
+            controller_ip = ''
+        if config_cinder:
+            cinder_password = parameters.get('cinder_pass', cinder_password)
+            cinder_user = parameters.get('cinder_user', cinder_user)
+            tenant_name = parameters.get('cinder_tenant', tenant_name)
+            controller_ip = parameters.get('cinder_controller', controller_ip) # Keystone host
+            if cinder_password:
+                osc = OpenStackCinder(cinder_password = cinder_password,
+                                      cinder_user = cinder_user,
+                                      tenant_name = tenant_name,
+                                      controller_ip = controller_ip)
+
+                osc.configure_vpool(vpool_name, storagedriver.mountpoint)
+                # Save values for first node to use
+                ovsdb.set(vpool_config_key,
+                          [cinder_password, cinder_user, tenant_name, controller_ip, config_cinder])
+
     @staticmethod
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid):
@@ -633,6 +683,20 @@ if Service.has_service('{0}'):
     Service.stop_service('{0}')
 """.format(service))
 
+        # Unconfigure Cinder
+        ovsdb = PersistentFactory.get_client()
+        key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        if ovsdb.exists(key):
+            cinder_password, cinder_user, tenant_name, controller_ip, _ = ovsdb.get(key)
+            client = SSHClient.load(ip)
+            System.exec_remote_python(client, """
+from ovs.extensions.openstack.oscinder import OpenStackCinder
+osc = OpenStackCinder(cinder_password = '{0}', cinder_user = '{1}', tenant_name = '{2}', controller_ip = '{3}')
+osc.unconfigure_vpool('{4}', '{5}', {6})
+""".format(cinder_password, cinder_user, tenant_name, controller_ip, vpool.name, storagedriver.mountpoint, not storagedrivers_left))
+            if not storagedrivers_left:
+                ovsdb.delete(key)
+
         # KVM pool
         client = SSHClient.load(ip)
         if pmachine.hvtype == 'KVM':
@@ -654,7 +718,7 @@ if Service.has_service('{0}'):
         configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
 
         voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'volumedriver.arakoon.clusterid'))
-        voldrv_arakoon_cluster = ArakoonManagement().getCluster(voldrv_arakoon_cluster_id)
+        voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
         for arakoon_node in voldrv_arakoon_client_config.keys():
@@ -669,8 +733,9 @@ if Service.has_service('{0}'):
                 if current_storagedriver.guid != storagedriver_guid:
                     node_configs.append(ClusterNodeConfig(str(current_storagedriver.storagedriver_id),
                                                           str(current_storagedriver.cluster_ip),
-                                                          current_storagedriver.port - 1, current_storagedriver.port,
-                                                          current_storagedriver.port + 1))
+                                                          current_storagedriver.ports[0],
+                                                          current_storagedriver.ports[1],
+                                                          current_storagedriver.ports[2]))
             vrouter_clusterregistry.set_node_configs(node_configs)
         else:
             try:
@@ -705,7 +770,7 @@ if Service.has_service('{0}'):
         client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
 
         # First model cleanup
-        storagedriver.delete()
+        storagedriver.delete(abandon=True)  # Detach from the log entries
 
         if storagedrivers_left:
             # Restart leftover services
@@ -823,6 +888,24 @@ if Service.has_service('{0}'):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.check_cinder')
+    def check_cinder():
+        """
+        Checks whether cinder is running
+        """
+        osc = OpenStackCinder()
+        return osc.is_cinder_installed
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.valid_cinder_credentials')
+    def valid_cinder_credentials(cinder_password, cinder_user, tenant_name, controller_ip):
+        """
+        Checks whether the cinder credentials are valid
+        """
+        osc = OpenStackCinder()
+        return osc.valid_credentials(cinder_password, cinder_user, tenant_name, controller_ip)
 
     @staticmethod
     def _validate_ip(ip):

@@ -17,10 +17,10 @@ limitations under the License.
     <form role="form form-horizontal" class="form-horizontal">
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.basicinfo"></p>
         <p data-i18n="ovs:wizards.addvpool.gathermountpoints.bfsinfo"
-           data-bind="visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+           data-bind="visible: data.backend() === 'local' || data.backend() === 'distributed'">
         </p>
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('bfs', canContinue().fields) !== -1 },
-                                           visible: data.backend() === 'LOCAL' || data.backend() === 'DISTRIBUTED'">
+                                           visible: data.backend() === 'local' || data.backend() === 'distributed'">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptBFS,
@@ -89,23 +89,6 @@ limitations under the License.
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.ipAddresses, target: data.storageIP }">
                 </span>
-            </div>
-        </div>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('port', canContinue().fields) !== -1 }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathermountpoints.port"></label>
-            <div class="col-lg-2">
-                <input type="text" id="name" class="autofocus form-control"
-                       data-bind="value: data.vRouterPort,
-                                  attr: { id: (data.vRouterPort.hasOwnProperty('identifier') ? ('gmtptp-' + data.vRouterPort.identifier) : undefined) }">
-            </div>
-            <div class="col-lg-7" style="margin-top: 7px;" data-bind="visible: data.storageDrivers().length > 0">
-                <span data-i18n="ovs:wizards.addvpool.gathermountpoints.portsinuse"></span>
-                <!-- ko foreach: data.storageDrivers() -->
-                    <span data-bind="visible: $index() > 0">,</span>
-                    <span data-bind="text: (parseInt($data.port(), 10) - 1).toString()"></span>,
-                    <span data-bind="text: $data.port()"></span>,
-                    <span data-bind="text: (parseInt($data.port(), 10) + 1).toString()"></span>
-                <!-- /ko -->
             </div>
         </div>
     </form>

@@ -21,6 +21,7 @@ import time
 from unittest import TestCase
 from ovs.dal.exceptions import *
 from ovs.dal.dataobjectlist import DataObjectList
+from ovs.extensions.generic import fakesleep
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -54,6 +55,8 @@ class Basic(TestCase):
         VolatileFactory.store.clean()
         VolatileFactory.store.clean()
 
+        fakesleep.monkey_patch()
+
     @classmethod
     def setUp(cls):
         """
@@ -63,13 +66,14 @@ class Basic(TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store = DummyVolatileStore()
         VolatileFactory.store.clean()
+        DataList.test_hooks = {}
 
     @classmethod
     def tearDownClass(cls):
         """
         Clean up the unittest
         """
-        pass
+        fakesleep.monkey_restore()
 
     def test_invalidobject(self):
         """
@@ -871,64 +875,64 @@ class Basic(TestCase):
             disk_2.name = 'x'
             disk_2.save()
 
-        disk_z = None
+        disk_z = None  # Needs to be there
         disk_1 = TestDisk()
         disk_1.name = 'test'
         disk_1.save()
         disk_2 = TestDisk()
         disk_2.name = 'test'
         disk_2.save()
-
         # Validates new object creation
+        DataList.test_hooks['post_query'] = inject_new
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
-                                   'items': [('name', DataList.operator.EQUALS, 'test')]}},
-                        post_query_hook=inject_new).data
+                                   'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
+        del DataList.test_hooks['post_query']
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
-
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_6ea1af78996c9eb24a92c968ccc5f16b16686a8134212ea562135046ba146db4')
-
         # Validates object change
+        DataList.test_hooks['post_query'] = inject_update
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
-                                   'items': [('name', DataList.operator.EQUALS, 'test')]}},
-                        post_query_hook=inject_update).data
+                                   'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
+        del DataList.test_hooks['post_query']
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 2, 'Two disk should be found ({0})'.format(len(disks)))
-
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_6ea1af78996c9eb24a92c968ccc5f16b16686a8134212ea562135046ba146db4')
-
         # Validates object deletion
-        data = DataList({'object': TestDisk,
-                         'data': DataList.select.GUIDS,
-                         'query': {'type': DataList.where_operator.AND,
-                                   'items': [('name', DataList.operator.EQUALS, 'test')]}},
-                        post_query_hook=inject_delete).data
-        disks = DataObjectList(data, TestDisk)
-        self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
+        DataList.test_hooks['post_query'] = inject_delete
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
-        self.assertEqual(len(disks), 1, 'One disks should be found ({0})'.format(len(disks)))
+        self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
+        del DataList.test_hooks['post_query']
+        iterated_list = [d for d in disks]
+        self.assertEqual(len(iterated_list), 1, 'One disk should be found ({0})'.format(len(iterated_list)))
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.GUIDS,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
+        disks = DataObjectList(data, TestDisk)
+        self.assertEqual(len(disks), 1, 'One disk should be found ({0})'.format(len(disks)))
         _ = disk_z  # Ignore this object not being used
 
     def test_guid_query(self):
