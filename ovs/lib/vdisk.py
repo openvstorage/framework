@@ -326,8 +326,8 @@ class VDiskController(object):
         mountpoint = System.get_storagedriver(new_disk.vpool.name).mountpoint
         location = "{0}{1}".format(mountpoint, disk_path)
         client = SSHClient.load('127.0.0.1')
-        print(client.run('chmod 664 {0}'.format(location)))
-        print(client.run('chown ovs:ovs {0}'.format(location)))
+        print(client.run('chmod 664 "{0}"'.format(location)))
+        print(client.run('chown ovs:ovs "{0}"'.format(location)))
         return {'diskguid': new_disk.guid, 'name': new_disk.name,
                 'backingdevice': disk_path}
 
@@ -347,7 +347,7 @@ class VDiskController(object):
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
         client = SSHClient.load('127.0.0.1')
-        output = client.run_local('truncate -s %sG %s' % (size, location))
+        output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
@@ -369,7 +369,7 @@ class VDiskController(object):
             logger.error('File already deleted at %s' % location)
             return
         client = SSHClient.load('127.0.0.1')
-        output = client.run_local('rm -f %s' % (location))
+        output = client.run_local('rm -f "{0}"'.format(location))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
@@ -393,7 +393,7 @@ class VDiskController(object):
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         client = SSHClient.load('127.0.0.1')
-        print(client.run_local('truncate -s %sG %s' % (size, location)))
+        print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
         VDiskController.own_volume(location)
 
     @staticmethod
@@ -406,9 +406,9 @@ class VDiskController(object):
 
         client = SSHClient.load('127.0.0.1')
         osc = OpenStackCinder()
-        print(client.run_local('chmod 664 %s' % location))
+        print(client.run_local('chmod 664 "{0}"'.format(location)))
         if osc.is_devstack:
-            print(client.run_local('chown stack %s' % location))
+            print(client.run_local('chown stack "{0}"'.format(location)))
         elif osc.is_openstack:
-            print(client.run_local('chown cinder %s' % location))
+            print(client.run_local('chown cinder "{0}"'.format(location)))
 

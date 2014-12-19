@@ -24,11 +24,13 @@ CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
 EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 
+
 def file_exists(ssh_client, location):
     """
     Cuisine's file_exists uses "run" which asks for password when run as user stack
     """
-    return ssh_client.run_local('test -e %s && echo OK ; true' % location).endswith('OK')
+    return ssh_client.run_local('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
+
 
 class OpenStackCinder(object):
     """
@@ -90,7 +92,6 @@ class OpenStackCinder(object):
                 raise ValueError('Unknown cinder version: %s' % version)
         except Exception as ex:
             raise ValueError('Cannot determine cinder version: %s' % str(ex))
-
 
     def _get_driver_code(self):
         """
@@ -159,14 +160,14 @@ class OpenStackCinder(object):
 
     def _chown_mountpoint(self, mountpoint):
         if self.is_devstack:
-            self.client.run('chown stack %s' % mountpoint)
+            self.client.run('chown stack "{0}"'.format(mountpoint))
             self.client.run('usermod -a -G stack libvirt-qemu')
         elif self.is_openstack:
-            self.client.run('chown cinder %s' % mountpoint)
+            self.client.run('chown cinder "{0}"'.format(mountpoint))
             self.client.run('usermod -a -G cinder libvirt-qemu')
 
     def _unchown_mountpoint(self, mountpoint):
-        self.client.run('chown root %s' % mountpoint)
+        self.client.run('chown root "{0}"'.format(mountpoint))
 
     def _configure_cinder_driver(self, vpool_name):
         """
