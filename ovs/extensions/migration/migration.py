@@ -17,9 +17,10 @@
 """
 Migration module
 """
+import os
+import imp
+import inspect
 import ConfigParser
-from model import Model
-from brander import Brander
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='migrations')
@@ -52,14 +53,23 @@ class Migration(object):
         parser = ConfigParser.RawConfigParser()
         parser.read(filename)
 
-        base_version = int(parser.get('migration', 'version'))
-        new_version = 0
-
-        new_version = execute(Model.migrate, base_version, new_version)
-        new_version = execute(Brander.migrate, base_version, new_version)
-        logger.debug('Migration from %s to %s completed' % (base_version, new_version))
-
-        parser.set('migration', 'version', str(new_version))
+        # Load mapping
+        migrators = []
+        path = os.path.join(os.path.dirname(__file__), 'migrators')
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                name = filename.replace('.py', '')
+                module = imp.load_source(name, os.path.join(path, filename))
+                for member in inspect.getmembers(module):
+                    if inspect.isclass(member[1]) \
+                            and member[1].__module__ == name \
+                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                        migrators.append((member[1].identifier, member[1].migrate))
+        for identifier, method in migrators:
+            base_version = int(parser.get('migration', identifier) if parser.has_option('migration', identifier) else 0)
+            new_version = execute(method, base_version, 0)
+            parser.set('migration', identifier, str(new_version))
+        logger.debug('Migrations completed')
 
         with open(filename, 'wb') as configfile:
             parser.write(configfile)

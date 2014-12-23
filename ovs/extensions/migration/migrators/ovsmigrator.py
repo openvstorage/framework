@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Model migration module
+OVS migration module
 """
 
 import hashlib
@@ -24,12 +24,16 @@ from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.branding import Branding
 
 
-class Model():
+class OVSMigrator():
     """
     Handles all model related migrations
     """
+
+    identifier = 'ovs'
 
     def __init__(self):
         """ Init method """
@@ -39,10 +43,10 @@ class Model():
     def migrate(previous_version):
         """
         Migrates from any version to any version, running all migrations required
-        If previous_version is for example 0 (0.0.1) and this script is at
-        verison 3 (0.0.3) it will execute two steps:
-          - 0.0.1 > 0.0.2
-          - 0.0.2 > 0.0.3
+        If previous_version is for example 0 and this script is at
+        verison 3 it will execute two steps:
+          - 1 > 2
+          - 2 > 3
         @param previous_version: The previous version from which to start the migration.
         """
 
@@ -117,6 +121,28 @@ class Model():
                 backend_type.name = backend_type_info[0]
                 backend_type.code = backend_type_info[1]
                 backend_type.save()
+
+            # Add service types
+            for service_type_info in ['MetadataServer']:
+                service_type = ServiceType()
+                service_type.name = service_type_info
+                service_type.save()
+
+            # Brandings
+            branding = Branding()
+            branding.name = 'Default'
+            branding.description = 'Default bootstrap theme'
+            branding.css = 'bootstrap-default.min.css'
+            branding.productname = 'Open vStorage'
+            branding.is_default = True
+            branding.save()
+            slate = Branding()
+            slate.name = 'Slate'
+            slate.description = 'Dark bootstrap theme'
+            slate.css = 'bootstrap-slate.min.css'
+            slate.productname = 'Open vStorage'
+            slate.is_default = False
+            slate.save()
 
             # We're now at version 0.0.1
             working_version = 1
