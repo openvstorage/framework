@@ -74,6 +74,18 @@ class System(object):
         return vpool_name + System.get_my_machine_id()
 
     @staticmethod
+    def get_storagedriver(vpool_name):
+        """
+        Returns storagedriver object based on vpool_name
+        """
+        my_storagedriver_id = System.get_my_storagedriver_id(vpool_name)
+        my_storagerouter = System.get_my_storagerouter()
+        for storagedriver in my_storagerouter.storagedrivers:
+            if storagedriver.name == my_storagedriver_id:
+                return storagedriver
+        raise ValueError('No storagedriver found for vpool_name: {0}'.format(vpool_name))
+
+    @staticmethod
     def update_hosts_file(hostname, ip):
         """
         Update/add entry for hostname ip in /etc/hosts

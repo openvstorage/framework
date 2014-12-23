@@ -92,7 +92,7 @@ define([
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
                 $.when.apply($, [
-                    vpool.load('storagedrivers,_dynamics', { skipDisks: true }),
+                    vpool.load('storagedrivers,_dynamics,backend_type', { skipDisks: true }),
                     vpool.loadStorageRouters()
                         .then(function() {
                             if (self.checksInit === false) {
@@ -102,8 +102,9 @@ define([
                         }),
                     self.loadStorageRouters()
                 ])
+                    .then(vpool.loadBackendType)
                     .fail(function(error) {
-                        if (error.status === 404) {
+                        if (error !== undefined && error.status === 404) {
                             router.navigate(shared.routing.loadHash('vpools'));
                         }
                     })
@@ -140,7 +141,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };

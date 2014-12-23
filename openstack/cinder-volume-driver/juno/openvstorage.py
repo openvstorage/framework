@@ -74,7 +74,9 @@ def _debug_vol_info(call, volume):
 
 class OVSVolumeDriver(driver.VolumeDriver):
     """OVS Volume Driver plugin for Cinder
-    (support for Icehouse (stable) , Juno (RC) and Kilo (unstable))
+    (UNOFFICIAL support for Icehouse (stable), Juno (stable))
+    This is an unsupported (by OpenStack) driver since Icehouse and Juno
+    no longer accept drivers
     Configuration file: /etc/cinder/cinder.conf
     Required parameters in config file:
 
@@ -116,7 +118,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         """
         _debug_vol_info("INIT_CONN", volume)
 
-        return {'driver_volume_type': 'local',
+        return {'driver_volume_type': 'file',
                 'data': {'vpoolname': self._vpool_name,
                          'device_path': volume.provider_location}}
 
@@ -140,7 +142,13 @@ class OVSVolumeDriver(driver.VolumeDriver):
                                       size = size)
         volume['provider_location'] = location
 
-        ovs_disk = self._find_ovs_model_disk_by_location(location, hostname)
+        try:
+            ovs_disk = self._find_ovs_model_disk_by_location(location,
+                                                             hostname)
+        except RuntimeError:
+            VDiskController.delete_volume(location = location)
+            raise
+
         ovs_disk.cinder_id = volume.id
         ovs_disk.name = name
         ovs_disk.save()

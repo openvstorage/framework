@@ -1,4 +1,5 @@
 /var/log/ovs/*.log {
+    su ovs ovs
     weekly
     rotate 4
     size 100M

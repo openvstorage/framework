@@ -18,6 +18,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
 from ovs.plugin.provider.configuration import Configuration
 
+ARP_TIMEOUT = 30
 current_time = int(time.time())
 machine_id = System.get_my_machine_id()
 amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'),
@@ -34,4 +35,9 @@ for node in routers:
         node.heartbeats['celery'] = current_time
     if node.machine_id == machine_id:
         node.heartbeats['process'] = current_time
+    else:
+        # check timeout of other nodes and clear arp cache
+        if node.heartbeats and 'process' in node.heartbeats:
+            if current_time - node.heartbeats['process'] >= ARP_TIMEOUT:
+                check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
     node.save()

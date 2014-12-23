@@ -111,7 +111,7 @@ class Model():
                         roleclient.save()
 
             # Add backends
-            for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amason_s3'), ('Swift', 'swift_s3'),
+            for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),
                                       ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
                 backend_type = BackendType()
                 backend_type.name = backend_type_info[0]

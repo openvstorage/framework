@@ -15,8 +15,7 @@ limitations under the License.
 -->
 <section>
     <h2 data-i18n="ovs:backends.title"></h2>
-    <div data-bind="pager: { items: backends, headers: backendHeaders, initialLoad: backendsInitialLoad,
-                             viewportRefresh: refreshBackends, viewportRefreshInterval: 5000, controls: true }">
+    <div data-bind="pager: { loadData: loadBackends, headers: backendHeaders, refreshInterval: 5000, controls: true }">
         <table data-dummy="dummy">
             <tr data-part="vitem">
                 <td>
@@ -47,28 +46,6 @@ limitations under the License.
                 </td>
             </tr>
             <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newBackend()">
-                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
-                <td>
-                    <span data-bind="dropdown: {
-                                         items: $root.backendTypes, target: backendType,
-                                         text: function(item) {
-                                             if (item !== undefined) {
-                                                 return $.t('ovs:generic.backendtypes.' + item.code());
-                                             }
-                                         }, key: 'guid', keyisfunction: true, small: true
-                                     }"></span>
-                </td>
-                <td>
-                    <i data-bind="click: function() {
-                                      if (name() !== undefined && name() !== '') {
-                                          $root.saveBackend();
-                                      }
-                                  },
-                                  style: { color: name() !== undefined && name() !== '' ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
-                </td>
-            </tr>
-            <tr data-part="vfirst" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newBackend()">
                 <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
                 <td>
                     <span data-bind="dropdown: {
