@@ -13,20 +13,16 @@
 # limitations under the License.
 
 """
-Service module
+ServiceType module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Property, Relation
-from ovs.dal.hybrids.storagerouter import StorageRouter
-from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.structures import Property
 
 
-class Service(DataObject):
+class ServiceType(DataObject):
     """
-    A Service represents some kind of service that needs to be managed by the framework.
+    A ServiceType represents some kind of service that needs to be managed by the framework.
     """
-    __properties = [Property('name', str, doc='Name of the Service.'),
-                    Property('port', int, doc='Ip of the Service.')]
-    __relations = [Relation('storagerouter', StorageRouter, 'services', doc='The StorageRouter running the service.'),
-                   Relation('type', ServiceType, 'services', doc='The type of the service.')]
+    __properties = [Property('name', str, doc='Name of the ServiceType.')]
+    __relations = []
     __dynamics = []
