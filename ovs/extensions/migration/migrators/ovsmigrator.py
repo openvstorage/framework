@@ -116,7 +116,7 @@ class OVSMigrator():
 
             # Add backends
             for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),
-                                      ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
+                                      ('Local', 'local'), ('Distributed', 'distributed')]:
                 backend_type = BackendType()
                 backend_type.name = backend_type_info[0]
                 backend_type.code = backend_type_info[1]
