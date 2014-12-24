@@ -25,11 +25,14 @@ from ovs.celery_run import celery
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
@@ -135,23 +138,21 @@ class StorageRouterController(object):
                 nodes.add(vpool_storagedriver.storagerouter.ip)
         nodes = list(nodes)
 
-        services = ['volumedriver_{0}'.format(vpool_name),
-                    'failovercache_{0}'.format(vpool_name)]
+        voldrv_service = 'volumedriver_{0}'.format(vpool_name)
 
         # Stop services
         for node in nodes:
             node_client = SSHClient.load(node)
-            for service in services:
-                System.exec_remote_python(node_client, """
+            System.exec_remote_python(node_client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.disable_service('{0}')
-""".format(service))
-                System.exec_remote_python(node_client, """
+""".format(voldrv_service))
+            System.exec_remote_python(node_client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.stop_service('{0}')
-""".format(service))
+""".format(voldrv_service))
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         client = SSHClient.load(ip)
@@ -272,12 +273,13 @@ for directory in {0}:
                 if directory == mountpoint:
                     return True
             return False
+
         # Cache sizes
         # 20% = scocache
         # 20% = failovercache (@TODO: check if this can possibly consume more than 20%)
         # 60% = readcache
 
-        # safety values:
+        # Safety values:
         readcache1_factor = 0.2
         readcache2_factor = 0.2
         writecache_factor = 0.1
@@ -310,7 +312,7 @@ for directory in {0}:
             delta.add(mountpoint_writecache if is_partition(mountpoint_writecache) else '/dummy')
             delta.add(mountpoint_foc if is_partition(mountpoint_foc) else '/dummy')
             if len(delta) == 1:
-                # consider them all to be directories
+                # Consider them all to be directories
                 readcache1_factor = 0.24
                 readcache2_factor = 0.24
                 writecache_factor = 0.24
@@ -352,7 +354,7 @@ for directory in {0}:
                 readcache2_factor = 0.98
                 writecache_factor = 0.98
 
-        # summarize caching on root partition (directory only)
+        # Summarize caching on root partition (directory only)
         root_assigned = dict()
         if not is_partition(mountpoint_readcache1):
             root_assigned['readcache1_factor'] = readcache1_factor
@@ -363,7 +365,7 @@ for directory in {0}:
         if not is_partition(mountpoint_foc):
             root_assigned['foc_factor'] = min(readcache1_factor, readcache2_factor, writecache_factor)
 
-        # always leave at least 20% of free space
+        # Always leave at least 20% of free space
         division_factor = 1.0
         total_size = sum(root_assigned.values()) + .02 * len(root_assigned)
         if 0.8 < total_size < 1.6:
@@ -389,9 +391,22 @@ for directory in {0}:
         else:
             readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
             readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
+
+        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
+        service = None
+        mdsservice = None
+        for current_service in mdsservice_type.services:
+            if current_service.storagerouter_guid == storagerouter.guid and current_service.mds_service.vpool_guid == vpool.guid:
+                if current_service.mds_service.number == 0:
+                    service = current_service
+                    mdsservice = current_service.mds_service
+                    break
+                else:
+                    raise RuntimeError('A MDS service was found with number other than 0, aborting.')
+
+        ports_in_use = System.ports_in_use(client)
+        ports_reserved = []
         if new_storagedriver:
-            ports_in_use = System.ports_in_use(client)
-            ports_reserved = []
             ports_in_use_model = {}
             for port_storagedriver in StorageDriverList.get_storagedrivers():
                 if port_storagedriver.vpool_guid not in ports_in_use_model:
@@ -402,24 +417,14 @@ for directory in {0}:
                 if any(port in ports_in_use for port in ports):
                     raise RuntimeError('The required ports are in use')
             else:  # First StorageDriver for this vPool, so generating new ports
-                ports = []
-                for port_range in System.read_remote_config(client, 'volumedriver.filesystem.ports').split(','):
-                    port_range = port_range.strip()
-                    if '-' in port_range:
-                        current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
-                    else:
-                        current_range = (int(port_range), 65536)
-                    current_port = current_range[0]
-                    while len(ports) < 3:
-                        if current_port not in ports_in_use and current_port not in ports_reserved:
-                            ports.append(current_port)
-                        current_port += 1
-                        if current_port > current_range[1]:
-                            break
-                if len(ports) != 3:
-                    raise RuntimeError('Could not find enough free ports')
+                ports = StorageRouterController._get_free_ports(client, ports_in_use + ports_reserved, 3)
         else:
             ports = storagedriver.ports
+
+        ports_in_use += ports
+        if service is None:
+            service = Service()
+            service.port = StorageRouterController._get_free_ports(client, ports_in_use + ports_reserved, 1)
 
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
         ipaddresses = client.run(cmd).strip().split('\n')
@@ -516,6 +521,8 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver_configuration.configure_event_publisher(queue_config)
 """.format(vpool_name if vpool_name is None else "'{0}'".format(vpool_name))
         System.exec_remote_python(client, remote_script)
+        # @TODO: Create the metadataserver configuration.
+        # @TODO: Update voldrv config to point to the default MDS (a local one)
 
         # Updating the model
         storagedriver.storagedriver_id = vrouter_id
@@ -536,6 +543,17 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.vpool = vpool
         storagedriver.save()
 
+        # The `service` was created and pre-filled with a free port above
+        service.name = 'metadataserver_0_{0}'.format(vpool_name)
+        service.type = mdsservice_type
+        service.save()
+        if mdsservice is None:
+            mdsservice = MDSService()
+        mdsservice.service = service
+        mdsservice.vpool = vpool
+        mdsservice.number = 0
+        mdsservice.save()
+
         dirs2create.append(storagedriver.mountpoint)
         dirs2create.append(mountpoint_writecache + '/' + '/fd_' + vpool_name)
         dirs2create.append('{0}/fd_{1}'.format(mountpoint_writecache, vpool_name))
@@ -551,21 +569,6 @@ for filename in {1}:
 """.format(dirs2create, files2create)
         System.exec_remote_python(client, file_create_script)
 
-        voldrv_config_file = '{0}/voldrv_vpools/{1}.json'.format(System.read_remote_config(client, 'ovs.core.cfgdir'),
-                                                                 vpool_name)
-        log_file = '/var/log/ovs/volumedriver/{0}.log'.format(vpool_name)
-        vd_cmd = '/usr/bin/volumedriver_fs -f --config-file={0} --mountpoint {1} --logrotation --logfile {2} -o big_writes -o sync_read -o allow_other'.format(
-            voldrv_config_file, storagedriver.mountpoint, log_file)
-        if storagerouter.pmachine.hvtype == 'KVM':
-            vd_stopcmd = 'umount {0}'.format(storagedriver.mountpoint)
-        else:
-            vd_stopcmd = 'exportfs -u *:{0}; umount {0}'.format(storagedriver.mountpoint)
-        vd_name = 'volumedriver_{}'.format(vpool_name)
-
-        log_file = '/var/log/ovs/volumedriver/foc_{0}.log'.format(vpool_name)
-        fc_cmd = '/usr/bin/failovercachehelper --config-file={0} --logfile={1}'.format(voldrv_config_file, log_file)
-        fc_name = 'failovercache_{0}'.format(vpool_name)
-
         params = {'<VPOOL_MOUNTPOINT>': storagedriver.mountpoint,
                   '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
@@ -574,15 +577,14 @@ for filename in {1}:
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
+            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-metadataserver.conf /opt/OpenvStorage/config/templates/upstart/ovs-metadataserver_0_{0}.conf'.format(vpool_name))
 
         service_script = """
 from ovs.plugin.provider.service import Service
-Service.add_service(package=('openvstorage', 'volumedriver'), name='{0}', command='{1}', stop_command='{2}', params={5})
-Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', command='{4}', stop_command=None, params={5})
-""".format(
-            vd_name, vd_cmd, vd_stopcmd,
-            fc_name, fc_cmd, params
-        )
+Service.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}', command=None, stop_command=None, params={1})
+Service.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}', command=None, stop_command=None, params={1})
+Service.add_service(package=('openvstorage', 'metadataserver'), name='metadataserver_0_{0}', command=None, stop_command=None, params={1})
+""".format(vpool_name, params)
         System.exec_remote_python(client, service_script)
 
         if storagerouter.pmachine.hvtype == 'VMWARE':
@@ -598,15 +600,14 @@ Service.add_service(package=('openvstorage', 'failovercache'), name='{3}', comma
         # Start services
         for node in nodes:
             node_client = SSHClient.load(node)
-            for service in services:
-                System.exec_remote_python(node_client, """
+            System.exec_remote_python(node_client, """
 from ovs.plugin.provider.service import Service
 Service.enable_service('{0}')
-""".format(service))
-                System.exec_remote_python(node_client, """
+""".format(voldrv_service))
+            System.exec_remote_python(node_client, """
 from ovs.plugin.provider.service import Service
 Service.start_service('{0}')
-""".format(service))
+""".format(voldrv_service))
 
         # Fill vPool size
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
@@ -629,7 +630,7 @@ Service.start_service('{0}')
             cinder_password = parameters.get('cinder_pass', cinder_password)
             cinder_user = parameters.get('cinder_user', cinder_user)
             tenant_name = parameters.get('cinder_tenant', tenant_name)
-            controller_ip = parameters.get('cinder_controller', controller_ip) # Keystone host
+            controller_ip = parameters.get('cinder_controller', controller_ip)  # Keystone host
             if cinder_password:
                 osc = OpenStackCinder(cinder_password = cinder_password,
                                       cinder_user = cinder_user,
@@ -645,7 +646,7 @@ Service.start_service('{0}')
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
     def remove_storagedriver(storagedriver_guid):
         """
-        Removes a Storage Driver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
+        Removes a StorageDriver (and, if it was the last Storage Driver for a vPool, the vPool is removed as well)
         """
         # Get objects & Make some checks
         storagedriver = StorageDriver(storagedriver_guid)
@@ -661,9 +662,13 @@ Service.start_service('{0}')
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
+        # @TODO: Check whether disks are configured to have this MDS as master/slave and act appropriate
+        #        If the MDS is master for a vdisk, failover. If the MDS is slave, reconfigure
+        #        to use other slave or delete slave.
 
-        services = ['volumedriver_{0}'.format(vpool.name),
-                    'failovercache_{0}'.format(vpool.name)]
+        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
+        voldrv_service = 'volumedriver_{0}'.format(vpool.name)
+        foc_service = 'failovercache_{0}'.format(vpool.name)
         storagedrivers_left = False
 
         # Stop services
@@ -671,17 +676,16 @@ Service.start_service('{0}')
             if current_storagedriver.guid != storagedriver_guid:
                 storagedrivers_left = True
             client = SSHClient.load(current_storagedriver.storagerouter.ip)
-            for service in services:
-                System.exec_remote_python(client, """
+            System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.disable_service('{0}')
-""".format(service))
-                System.exec_remote_python(client, """
+""".format(voldrv_service))
+            System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.stop_service('{0}')
-""".format(service))
+""".format(voldrv_service))
 
         # Unconfigure Cinder
         ovsdb = PersistentFactory.get_client()
@@ -708,8 +712,11 @@ osc.unconfigure_vpool('{4}', '{5}', {6})
                 pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
+        removal_mdsservices = [service for service in mdsservice_type.services
+                               if service.mds_service.vpool_guid == vpool.guid
+                               and service.storagerouter_guid == storagerouter.guid]
         client = SSHClient.load(ip)
-        for service in services:
+        for service in [voldrv_service, foc_service] + [mdsservice.name for mdsservice in removal_mdsservices]:
             System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
@@ -758,36 +765,39 @@ if Service.has_service('{0}'):
         client.run('rm -rf /var/rsp/{}'.format(vpool.name))
 
         # Remove files
-        client.run('rm -f {0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
+        for config_file in ['{0}.json'] + ['{0}.json'.format(mdsservice.name) for mdsservice in removal_mdsservices]:
+            client.run('rm -f {0}/voldrv_vpools/{1}'.format(configuration_dir, config_file.format(vpool.name)))
 
         # Remove top directories
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_readcache1))
-        if storagedriver.mountpoint_readcache2:
-            client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_readcache2))
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_writecache))
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_foc))
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint_md))
-        client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(storagedriver.mountpoint))
+        for directory in [storagedriver.mountpoint_readcache1, storagedriver.mountpoint_readcache2,
+                          storagedriver.mountpoint_writecache, storagedriver.mountpoint_foc,
+                          storagedriver.mountpoint_md, storagedriver.mountpoint]:
+            if directory:
+                client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         # First model cleanup
         storagedriver.delete(abandon=True)  # Detach from the log entries
+        for service in removal_mdsservices:
+            for junction in service.mds_service.vdisks:
+                junction.delete()
+            service.mds_service.delete()
+            service.delete()
 
         if storagedrivers_left:
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
                 if current_storagedriver.guid != storagedriver_guid:
                     client = SSHClient.load(current_storagedriver.storagerouter.ip)
-                    for service in services:
-                        System.exec_remote_python(client, """
+                    System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.enable_service('{0}')
-""".format(service))
-                        System.exec_remote_python(client, """
+""".format(voldrv_service))
+                    System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
     Service.start_service('{0}')
-""".format(service))
+""".format(voldrv_service))
         else:
             # Final model cleanup
             vpool.delete()
@@ -909,6 +919,32 @@ if Service.has_service('{0}'):
 
     @staticmethod
     def _validate_ip(ip):
+        """
+        Validates an ip address
+        """
         regex = '^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$'
         match = re.search(regex, ip)
         return match is not None
+
+    @staticmethod
+    def _get_free_ports(client, ports_in_use, number):
+        """
+        Gets `number` free ports ports that are not in use and not reserved
+        """
+        ports = []
+        for port_range in System.read_remote_config(client, 'volumedriver.filesystem.ports').split(','):
+            port_range = port_range.strip()
+            if '-' in port_range:
+                current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
+            else:
+                current_range = (int(port_range), 65536)
+            current_port = current_range[0]
+            while len(ports) < number:
+                if current_port not in ports_in_use:
+                    ports.append(current_port)
+                current_port += 1
+                if current_port > current_range[1]:
+                    break
+        if len(ports) != number:
+            raise RuntimeError('Could not find enough free ports')
+        return ports if number != 1 else ports[0]

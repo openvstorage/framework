@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-MetadataService module
+MDSServiceVDisk module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation
@@ -21,14 +21,14 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.service import Service
 
 
-class MetadataService(DataObject):
+class MDSServiceVDisk(DataObject):
     """
-    The MetadataService class represents the junction table between the (metadata)Service and VDisk.
+    The MDSServiceVDisk class represents the junction table between the MetadataServerService and VDisk.
     Examples:
-    * my_vdisk.metadata_services[0].service
-    * my_metadata_service.vdisks[0].vdisk
+    * my_vdisk.mds_services[0].mds_service
+    * my_mds_service.vdisks[0].vdisk
     """
-    __properties = [Property('is_master', bool, default=False, doc='Is this the master MetadataService for this VDisk.')]
-    __relations = [Relation('vdisk', VDisk, 'metadata_services'),
-                   Relation('service', Service, 'vdisks')]
+    __properties = [Property('is_master', bool, default=False, doc='Is this the master MDSService for this VDisk.')]
+    __relations = [Relation('vdisk', VDisk, 'mds_services'),
+                   Relation('mds_service', Service, 'vdisks')]
     __dynamics = []
