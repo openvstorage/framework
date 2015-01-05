@@ -18,7 +18,7 @@ MDSServiceVDisk module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation
 from ovs.dal.hybrids.vdisk import VDisk
-from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.j_mdsservice import MDSService
 
 
 class MDSServiceVDisk(DataObject):
@@ -30,5 +30,5 @@ class MDSServiceVDisk(DataObject):
     """
     __properties = [Property('is_master', bool, default=False, doc='Is this the master MDSService for this VDisk.')]
     __relations = [Relation('vdisk', VDisk, 'mds_services'),
-                   Relation('mds_service', Service, 'vdisks')]
+                   Relation('mds_service', MDSService, 'vdisks')]
     __dynamics = []
