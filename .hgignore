@@ -1,0 +1,13 @@
+.settings/
+.pyc$
+.swp$
+~$
+.project
+.idea
+.pydevproject
+.metadata
+.project
+webapps/frontend/tests/coverage
+syntax: regexp
+\._.*
+.orig$

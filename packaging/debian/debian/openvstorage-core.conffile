@@ -1,0 +1,5 @@
+/etc/profile.d/OpenvStorage.sh
+opt/OpenvStorage/config/main.cfg
+opt/OpenvStorage/config/ovs.cfg
+opt/OpenvStorage/config/volumedriver.cfg
+etc/logstash/conf.d/indexer.conf
