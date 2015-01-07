@@ -58,11 +58,11 @@ class ArakoonManagementEx(ArakoonManagement):
 
 class ArakoonClusterEx(ArakoonCluster):
     """
-    Overrides Incbaid's ArakoonCluster class.
+    Overrides Incubaid's ArakoonCluster class.
 
     A few remarks:
     * Don't call super, as it makes a lot of assumptions
-    * Make sure to validate all inherited calls before usage, as they might not work, or make wrong assuptions
+    * Make sure to validate all inherited calls before usage, as they might not work, or make wrong assumptions
     """
 
     def __init__(self, cluster_name):
@@ -73,7 +73,8 @@ class ArakoonClusterEx(ArakoonCluster):
         self.__validateName(cluster_name)
         # There's a difference between the clusterId and the cluster's name.
         # The name is used to construct the path to find the config file.
-        # the id is what's inside the cfg file and what you need to provide to a client that want's to talk to the cluster.
+        # the id is what's inside the cfg file and what you need to provide
+        # to a client that want's to talk to the cluster.
         self._clusterName = cluster_name
         self._binary = which_arakoon()
         self._arakoonDir = '{0}/arakoon'.format(config_dir)
@@ -273,11 +274,13 @@ class ArakoonClusterEx(ArakoonCluster):
     def start(self, daemon=True):
         """
         start all nodes in the cluster
+        first do a catchup
         """
         rcs = {}
         from ovs.extensions.db.arakoon.CheckArakoonTlogMark import CheckArakoonTlogMark
         CheckArakoonTlogMark().fixtlogs(self._clusterName, always_stop=True)
         for name in self.listLocalNodes():
+            self._catchupNode(name)
             rcs[name] = self._startOneEx(name, daemon)
 
         return rcs
@@ -364,6 +367,23 @@ class ArakoonClusterEx(ArakoonCluster):
                     pass
             raise Exception('multiple matches', pid_list)
         return result
+
+    def _catchupNode(self, name):
+        """
+        arakoon -catchup-only --node <NODEID> -config <CONFIGFILE>
+        """
+        status = self._getStatusOne(name)
+        if status is True:
+            self._stopOne(name)
+        status = self._getStatusOne(name)
+        if status is True:
+            raise RuntimeError('Cannot stop node %s' % name)
+        cmd = [self._binary, '--node', name, '-config',
+               '%s/%s.cfg' % (self._getConfigFilePath(), self._clusterName),
+               '-catchup-only']
+        rc = subprocess.call(cmd)
+        status = self._getStatusOne(name)
+        return rc
 
     def writeClientConfig(self, config=None, config_filename=None):
         """
