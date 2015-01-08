@@ -258,6 +258,36 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         }
     }
+    function syncObservableArray(newArray, objectList, key, clean) {
+        var i, j, newKeyList = [], currentKeyList = [];
+        for (i = 0; i < objectList().length; i += 1) {
+            currentKeyList.push(objectList()[i].key);
+        }
+        for (i = 0; i < newArray.length; i += 1) {
+            newKeyList.push(newArray[i].key);
+        }
+        for (i = 0; i < newKeyList.length; i += 1) {
+            if ($.inArray(newKeyList[i], currentKeyList) === -1) {
+                // One of the new keys is not yet in our current key list. This means
+                // we'll have to load the object.
+                objectList.push(newArray[i]);
+            }
+        }
+        if (clean !== false) {
+            for (i = 0; i < currentKeyList.length; i += 1) {
+                if ($.inArray(currentKeyList[i], newKeyList) === -1) {
+                    // One of the existing keys is not in the new key list anymore. This means
+                    // we'll have to remove the object
+                    for (j = 0; j < objectList().length; j += 1) {
+                        if (objectList()[j].key === currentKeyList[i]) {
+                            objectList.splice(j, 1);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
     function numberSort(itemA, itemB) {
         if ((itemA === undefined || itemA === null) && (itemB !== undefined && itemB !== null)) {
             return -1;
@@ -332,36 +362,37 @@ define(['jquery', 'jqp/pnotify'], function($) {
     }
 
     return {
-        getTimestamp     : getTimestamp,
-        formatBytes      : formatBytes,
-        formatSpeed      : formatSpeed,
-        formatRatio      : formatRatio,
-        formatShort      : formatShort,
-        formatNumber     : formatNumber,
-        formatPercentage : formatPercentage,
-        padRight         : padRight,
-        padLeft          : padLeft,
-        tryGet           : tryGet,
-        trySet           : trySet,
-        lower            : lower,
-        alert            : alert,
-        alertInfo        : alertInfo,
-        alertSuccess     : alertSuccess,
-        alertError       : alertError,
-        keys             : keys,
-        xhrAbort         : xhrAbort,
-        xhrCompleted     : xhrCompleted,
-        removeElement    : removeElement,
-        smooth           : smooth,
-        round            : round,
-        ceil             : ceil,
-        buildString      : buildString,
-        setDecimals      : setDecimals,
-        crossFiller      : crossFiller,
-        deg2rad          : deg2rad,
-        numberSort       : numberSort,
-        advancedSort     : advancedSort,
-        validate         : validate,
-        overlap          : overlap
+        getTimestamp             : getTimestamp,
+        formatBytes              : formatBytes,
+        formatSpeed              : formatSpeed,
+        formatRatio              : formatRatio,
+        formatShort              : formatShort,
+        formatNumber             : formatNumber,
+        formatPercentage         : formatPercentage,
+        padRight                 : padRight,
+        padLeft                  : padLeft,
+        tryGet                   : tryGet,
+        trySet                   : trySet,
+        lower                    : lower,
+        alert                    : alert,
+        alertInfo                : alertInfo,
+        alertSuccess             : alertSuccess,
+        alertError               : alertError,
+        keys                     : keys,
+        xhrAbort                 : xhrAbort,
+        xhrCompleted             : xhrCompleted,
+        removeElement            : removeElement,
+        smooth                   : smooth,
+        round                    : round,
+        ceil                     : ceil,
+        buildString              : buildString,
+        setDecimals              : setDecimals,
+        crossFiller              : crossFiller,
+        syncObservableArray      : syncObservableArray,
+        deg2rad                  : deg2rad,
+        numberSort               : numberSort,
+        advancedSort             : advancedSort,
+        validate                 : validate,
+        overlap                  : overlap
     };
 });
