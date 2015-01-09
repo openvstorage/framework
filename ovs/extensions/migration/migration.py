@@ -49,9 +49,9 @@ class Migration(object):
             logger.debug('Migrated %s.%s from %s to %s' % (function.__module__, function.__name__, start, end))
             return end
 
-        filename = '/opt/OpenvStorage/config/main.cfg'
+        cfg_filename = '/opt/OpenvStorage/config/main.cfg'
         parser = ConfigParser.RawConfigParser()
-        parser.read(filename)
+        parser.read(cfg_filename)
 
         # Load mapping
         migrators = []
@@ -71,7 +71,7 @@ class Migration(object):
             parser.set('migration', identifier, str(new_version))
         logger.debug('Migrations completed')
 
-        with open(filename, 'wb') as configfile:
+        with open(cfg_filename, 'wb') as configfile:
             parser.write(configfile)
 
 

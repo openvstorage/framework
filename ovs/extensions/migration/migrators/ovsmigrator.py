@@ -28,7 +28,7 @@ from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.branding import Branding
 
 
-class OVSMigrator():
+class OVSMigrator(object):
     """
     Handles all model related migrations
     """
