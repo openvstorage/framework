@@ -13,22 +13,5 @@
 # limitations under the License.
 
 """
-RoleGroup module
+This package contains migrators
 """
-from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Relation
-from ovs.dal.hybrids.role import Role
-from ovs.dal.hybrids.group import Group
-
-
-class RoleGroup(DataObject):
-    """
-    The RoleGroup class represents the junction table between Role and Group.
-    Examples:
-    * my_role.groups[0].group
-    * my_group.roles[0].role
-    """
-    __properties = []
-    __relations = [Relation('role', Role, 'groups'),
-                   Relation('group', Group, 'roles')]
-    __dynamics = []

@@ -13,22 +13,22 @@
 # limitations under the License.
 
 """
-RoleGroup module
+MDSServiceVDisk module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Relation
-from ovs.dal.hybrids.role import Role
-from ovs.dal.hybrids.group import Group
+from ovs.dal.structures import Property, Relation
+from ovs.dal.hybrids.vdisk import VDisk
+from ovs.dal.hybrids.j_mdsservice import MDSService
 
 
-class RoleGroup(DataObject):
+class MDSServiceVDisk(DataObject):
     """
-    The RoleGroup class represents the junction table between Role and Group.
+    The MDSServiceVDisk class represents the junction table between the MetadataServerService and VDisk.
     Examples:
-    * my_role.groups[0].group
-    * my_group.roles[0].role
+    * my_vdisk.mds_services[0].mds_service
+    * my_mds_service.vdisks[0].vdisk
     """
-    __properties = []
-    __relations = [Relation('role', Role, 'groups'),
-                   Relation('group', Group, 'roles')]
+    __properties = [Property('is_master', bool, default=False, doc='Is this the master MDSService for this VDisk.')]
+    __relations = [Relation('vdisk', VDisk, 'mds_services'),
+                   Relation('mds_service', MDSService, 'vdisks')]
     __dynamics = []

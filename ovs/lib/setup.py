@@ -231,7 +231,7 @@ class SetupController(object):
                 logger.debug('Automated installation')
                 if cluster_name in discovery_result:
                     SetupController.discovered_nodes = discovery_result[cluster_name]
-                    #@todo: update the ip to the chosen one in autoconfig file?
+                    # @TODO: update the ip to the chosen one in autoconfig file?
                     nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
                 first_node = not join_cluster
             if not cluster_name:

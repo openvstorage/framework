@@ -26,8 +26,10 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.dal.lists.mdsservicelist import MDSServiceList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.hybrids.vpool import VPool
@@ -133,6 +135,15 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
+        mdsservice = MDSServiceList.get_by_storagedriver(storagedriver.guid)
+        if mdsservice is None:
+            raise RuntimeError("No MDS service was found for this StorageDriver")
+        if disk.guid not in mdsservice.vdisks_guids:
+            mdsservice_vdisk = MDSServiceVDisk()
+            mdsservice_vdisk.is_master = True
+            mdsservice_vdisk.mds_service = mdsservice
+            mdsservice_vdisk.vdisk = disk
+            mdsservice_vdisk.save()
 
     @staticmethod
     @celery.task(name='ovs.disk.rename_from_voldrv')
@@ -184,6 +195,7 @@ class VDiskController(object):
         _id = '{}'.format(disk.volume_id)
         _snap = '{}'.format(snapshotid)
         logger.info(_log.format(_snap, disk.name, _location))
+        # @TODO: Add code to specify the correct MDS, and create the MDSServiceVDisk
         volume_id = disk.storagedriver_client.create_clone(_location, _id, _snap)
         new_disk.copy(disk, include=properties_to_clone)
         new_disk.parent_vdisk = disk
@@ -306,6 +318,7 @@ class VDiskController(object):
         new_disk.description = description
         new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
         new_disk.save()
+        # @TODO: Add code to specify the correct MDS, and create the MDSServiceVDisk
 
         logger.info('Create disk from template {} to new disk {} to location {}'.format(
             disk.name, new_disk.name, disk_path

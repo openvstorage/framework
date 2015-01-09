@@ -13,22 +13,20 @@
 # limitations under the License.
 
 """
-RoleGroup module
+Service module
 """
 from ovs.dal.dataobject import DataObject
-from ovs.dal.structures import Relation
-from ovs.dal.hybrids.role import Role
-from ovs.dal.hybrids.group import Group
+from ovs.dal.structures import Property, Relation
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.hybrids.servicetype import ServiceType
 
 
-class RoleGroup(DataObject):
+class Service(DataObject):
     """
-    The RoleGroup class represents the junction table between Role and Group.
-    Examples:
-    * my_role.groups[0].group
-    * my_group.roles[0].role
+    A Service represents some kind of service that needs to be managed by the framework.
     """
-    __properties = []
-    __relations = [Relation('role', Role, 'groups'),
-                   Relation('group', Group, 'roles')]
+    __properties = [Property('name', str, doc='Name of the Service.'),
+                    Property('port', int, doc='Ip of the Service.')]
+    __relations = [Relation('storagerouter', StorageRouter, 'services', doc='The StorageRouter running the Service.'),
+                   Relation('type', ServiceType, 'services', doc='The type of the Service.')]
     __dynamics = []

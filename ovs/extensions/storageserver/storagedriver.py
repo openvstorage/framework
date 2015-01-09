@@ -18,6 +18,8 @@ Wrapper class for the storagedriverclient of the voldrv team
 
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
+#from volumedriver.something.metadataserverclient import MetadataServerClient as MDSClient
+#from volumedriver.something.metadataserverclient import MDSNodeConfig
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.generic.system import System
 import json
@@ -25,6 +27,7 @@ import os
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}
+mdsclient_service_cache = {}
 
 
 class StorageDriverClient(object):
@@ -70,6 +73,30 @@ class StorageDriverClient(object):
             client = SRClient(str(vpool.guid), cluster_contacts)
             client_vpool_cache[key] = client
         return client_vpool_cache[key]
+
+
+class MetadataServerClient(object):
+    """
+    Builds a MDSClient
+    """
+
+    def __init__(self):
+        """
+        Init method
+        """
+        pass
+
+    def load(self, service):
+        """
+        Loads a MDSClient
+        """
+
+        _ = self
+        key = service.guid
+        if key not in mdsclient_service_cache:
+            client = None  # MDSClient(something)
+            mdsclient_service_cache[key] = client
+        return mdsclient_service_cache[key]
 
 
 class StorageDriverConfiguration(object):
