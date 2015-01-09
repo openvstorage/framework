@@ -4,7 +4,7 @@ pip install celery
 pip install suds-jurko==0.5
 pip install configobj==4.7.2
 pip install pika
-pip install protobuf
+pip install protobuf==2.6.1
 pip install choice
 pip install pyudev
 pip install datadiff

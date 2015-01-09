@@ -404,7 +404,7 @@ for directory in {0}:
                 else:
                     raise RuntimeError('A MDS service was found with number other than 0, aborting.')
 
-        ports_in_use = System.ports_in_use(client)
+        ports_in_use = list(System.ports_in_use(client))
         ports_reserved = []
         if new_storagedriver:
             ports_in_use_model = {}
@@ -546,6 +546,7 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         # The `service` was created and pre-filled with a free port above
         service.name = 'metadataserver_0_{0}'.format(vpool_name)
         service.type = mdsservice_type
+        service.storagerouter = storagerouter
         service.save()
         if mdsservice is None:
             mdsservice = MDSService()
