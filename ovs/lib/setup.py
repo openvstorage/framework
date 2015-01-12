@@ -668,14 +668,14 @@ EOF
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <!-- $Id$ -->
 <service-group>
-    <name replace-wildcards="yes">ovs_cluster_{0}_{1}</name>
+    <name replace-wildcards="yes">ovs_cluster_{0}_{1}_{4}</name>
     <service>
         <type>_ovs_{2}_node._tcp</type>
         <port>443</port>
     </service>
 </service-group>
 EOF
-""".format(cluster_name, node_name, 'master', SetupController.avahi_filename))
+""".format(cluster_name, node_name, 'master', SetupController.avahi_filename, hypervisor_info['ip'].replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
         logger.info('First node complete')
@@ -789,14 +789,14 @@ EOF
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <!-- $Id$ -->
 <service-group>
-    <name replace-wildcards="yes">ovs_cluster_{0}_{1}</name>
+    <name replace-wildcards="yes">ovs_cluster_{0}_{1}_{4}</name>
     <service>
         <type>_ovs_{2}_node._tcp</type>
         <port>443</port>
     </service>
 </service-group>
 EOF
-    """.format(cluster_name, node_name, 'extra', SetupController.avahi_filename))
+    """.format(cluster_name, node_name, 'extra', SetupController.avahi_filename, hypervisor_info['ip'].replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
         logger.info('Extra node complete')
@@ -1133,14 +1133,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <!-- $Id$ -->
 <service-group>
-    <name replace-wildcards="yes">ovs_cluster_{0}_{1}</name>
+    <name replace-wildcards="yes">ovs_cluster_{0}_{1}_{4}</name>
     <service>
         <type>_ovs_{2}_node._tcp</type>
         <port>443</port>
     </service>
 </service-group>
 EOF
-""".format(cluster_name, node_name, 'master', SetupController.avahi_filename))
+""".format(cluster_name, node_name, 'master', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
         logger.info('Promote complete')
@@ -1362,14 +1362,14 @@ for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <!-- $Id$ -->
 <service-group>
-    <name replace-wildcards="yes">ovs_cluster_{0}_{1}</name>
+    <name replace-wildcards="yes">ovs_cluster_{0}_{1}_{4}</name>
     <service>
         <type>_ovs_{2}_node._tcp</type>
         <port>443</port>
     </service>
 </service-group>
 EOF
-""".format(cluster_name, node_name, 'extra', SetupController.avahi_filename))
+""".format(cluster_name, node_name, 'extra', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
         logger.info('Demote complete')
@@ -2059,15 +2059,19 @@ print blk_devices
                 # split('_') -> [-1] = ovs100 (node name)
                 #               [-2] = kenneth (cluster name)
                 cluster_info = entry_parts[3].split('_')
-                cluster_name = cluster_info[-2]
-                node_name = cluster_info[-1]
+                cluster_name = cluster_info[2]
+                node_name = cluster_info[3]
                 if cluster_name not in nodes:
                     nodes[cluster_name] = {}
                 if node_name not in nodes[cluster_name]:
                     nodes[cluster_name][node_name] = { 'ip': '', 'type': '', 'ip_list': []}
-                nodes[cluster_name][node_name]['ip'] = entry_parts[7]
+                try:
+                    ip = '{}.{}.{}.{}'.format(cluster_info[4], cluster_info[5], cluster_info[6], cluster_info[7])
+                except IndexError:
+                    ip = entry_parts[7]
+                nodes[cluster_name][node_name]['ip'] = ip
                 nodes[cluster_name][node_name]['type'] = entry_parts[4].split('_')[2]
-                nodes[cluster_name][node_name]['ip_list'].append(entry_parts[7])
+                nodes[cluster_name][node_name]['ip_list'].append(ip)
         return nodes
 
     @staticmethod
