@@ -675,7 +675,7 @@ EOF
     </service>
 </service-group>
 EOF
-""".format(cluster_name, node_name, 'master', SetupController.avahi_filename, hypervisor_info['ip'].replace('.', '_')))
+""".format(cluster_name, node_name, 'master', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
         logger.info('First node complete')
@@ -796,7 +796,7 @@ EOF
     </service>
 </service-group>
 EOF
-    """.format(cluster_name, node_name, 'extra', SetupController.avahi_filename, hypervisor_info['ip'].replace('.', '_')))
+    """.format(cluster_name, node_name, 'extra', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
         logger.info('Extra node complete')
