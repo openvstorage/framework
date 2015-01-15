@@ -30,7 +30,8 @@ class StorageRouter(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the vMachine.'),
                     Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
                     Property('ip', str, doc='IP Address of the vMachine, if available'),
-                    Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors')]
+                    Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
+                    Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type')]
     __relations = [Relation('pmachine', PMachine, 'storagerouters')]
     __dynamics = [Dynamic('statistics', dict, 0),
                   Dynamic('stored_data', int, 60),

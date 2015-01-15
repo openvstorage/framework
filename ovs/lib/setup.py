@@ -533,7 +533,7 @@ EOF
         target_client.run('rabbitmq-server -detached; sleep 5;')
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
-        if not 'ovs' in users:
+        if 'ovs' not in users:
             target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
                                                              ovs_config.get('core', 'broker.password')))
             target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
@@ -1090,17 +1090,20 @@ import os
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-arakoon_management = ArakoonManagementEx()
-voldrv_arakoon_cluster_id = 'voldrv'
-voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
-voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
-configuration_dir = Configuration.get('ovs.core.cfgdir')
-if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
-    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
-for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
+arakoon_cluster_config = ArakoonManagementEx().getCluster('voldrv').getClientConfig()
+arakoon_nodes = []
+for node_id, node_config in arakoon_cluster_config.iteritems():
+    arakoon_nodes.append({'node_id': node_id, 'host': node_config[0][0], 'port': node_config[1]})
+configuration_dir = '{0}/storagedriver/storagedriver'.format(Configuration.get('ovs.core.cfgdir'))
+if not os.path.exists(configuration_dir):
+    os.makedirs(configuration_dir)
+for json_file in os.listdir(configuration_dir):
     if json_file.endswith('.json'):
-        storagedriver_config = StorageDriverConfiguration(json_file.replace('.json', ''))
-        storagedriver_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', json_file.replace('.json', ''))
+        storagedriver_config.load()
+        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
+                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
+        storagedriver_config.save()
 """
             SetupController._exec_python(client_node, update_voldrv)
 
@@ -1273,17 +1276,20 @@ import os
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-arakoon_management = ArakoonManagementEx()
-voldrv_arakoon_cluster_id = 'voldrv'
-voldrv_arakoon_cluster = arakoon_management.getCluster(voldrv_arakoon_cluster_id)
-voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
-configuration_dir = Configuration.get('ovs.core.cfgdir')
-if not os.path.exists('{0}/voldrv_vpools'.format(configuration_dir)):
-    os.makedirs('{0}/voldrv_vpools'.format(configuration_dir))
-for json_file in os.listdir('{0}/voldrv_vpools'.format(configuration_dir)):
+arakoon_cluster_config = ArakoonManagementEx().getCluster('voldrv').getClientConfig()
+arakoon_nodes = []
+for node_id, node_config in arakoon_cluster_config.iteritems():
+    arakoon_nodes.append({'node_id': node_id, 'host': node_config[0][0], 'port': node_config[1]})
+configuration_dir = '{0}/storagedriver/storagedriver'.format(Configuration.get('ovs.core.cfgdir'))
+if not os.path.exists(configuration_dir):
+    os.makedirs(configuration_dir)
+for json_file in os.listdir(configuration_dir):
     if json_file.endswith('.json'):
-        storagedriver_config = StorageDriverConfiguration(json_file.replace('.json', ''))
-        storagedriver_config.configure_arakoon_cluster(voldrv_arakoon_cluster_id, voldrv_arakoon_client_config)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', json_file.replace('.json', ''))
+        storagedriver_config.load()
+        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
+                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
+        storagedriver_config.save()
 """
             SetupController._exec_python(client_node, update_voldrv)
 
@@ -2182,6 +2188,7 @@ print blk_devices
 import os
 import ConfigParser
 from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 protocol = Configuration.get('ovs.core.broker.protocol')
 login = Configuration.get('ovs.core.broker.login')
 password = Configuration.get('ovs.core.broker.password')
@@ -2192,14 +2199,17 @@ cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
 nodes = [n.strip() for n in cfg.get('main', 'nodes').split(',')]
 for node in nodes:
     uris.append({{'amqp_uri': '{{0}}://{{1}}:{{2}}@{{3}}'.format(protocol, login, password, cfg.get(node, 'location'))}})
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
-                 'events_amqp_uris': uris}}
-for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
-    this_vpool_name = config_file.replace('.json', '')
-    if config_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
-        storagedriver_configuration = StorageDriverConfiguration(this_vpool_name)
-        storagedriver_configuration.configure_event_publisher(queue_config)"""
+configuration_dir = '{0}/storagedriver/storagedriver'.format(Configuration.get('ovs.core.cfgdir'))
+if not os.path.exists(configuration_dir):
+    os.makedirs(configuration_dir)
+for json_file in os.listdir(configuration_dir):
+    this_vpool_name = json_file.replace('.json', '')
+    if json_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
+        storagedriver_configuration = StorageDriverConfiguration('storagedriver', this_vpool_name)
+        storagedriver_configuration.load()
+        storagedriver_configuration.configure_event_publisher(events_amqp_routing_key=Configuration.get('ovs.core.broker.volumerouter.queue'),
+                                                              events_amqp_uris=uris)
+        storagedriver_configuration.save()"""
         SetupController._exec_python(client, remote_script.format(vpname if vpname is None else "'{0}'".format(vpname)))
 
     @staticmethod

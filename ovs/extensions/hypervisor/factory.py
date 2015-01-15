@@ -61,8 +61,6 @@ class Factory(object):
         @param pmachine: pmachine hybrid from DAL
         @param mgmt_center: mgmtcenter hybrid from DAL
         Returns the appropriate sdk client for the management center of the node
-        Implemented only for VMWare / vCenter Server
-        TODO: KVM
         """
         if not ((pmachine is None) ^ (mgmt_center is None)):
             raise ValueError('Either a pMachine or a Management center should be passed')
