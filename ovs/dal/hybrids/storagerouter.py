@@ -45,9 +45,8 @@ class StorageRouter(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        client = StorageDriverClient()
         vdiskstatsdict = {}
-        for key in client.stat_keys:
+        for key in StorageDriverClient.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         for storagedriver in self.storagedrivers:
@@ -80,7 +79,7 @@ class StorageRouter(DataObject):
             for vdisk in storagedriver.vpool.vdisks:
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     mode = vdisk.info['failover_mode']
-                    current_status_code = StorageDriverClient.FOC_STATUS[mode.lower()]
+                    current_status_code = StorageDriverClient.foc_status[mode.lower()]
                     if current_status_code > status_code:
                         status = mode
                         status_code = current_status_code

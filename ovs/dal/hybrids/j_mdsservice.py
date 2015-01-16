@@ -50,5 +50,5 @@ class MDSService(DataObject):
         """
         if self.service:
             self._frozen = False
-            self.metadataserver_client = MetadataServerClient().load(self.service)
+            self.metadataserver_client = MetadataServerClient.load(self.service)
             self._frozen = True

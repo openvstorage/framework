@@ -16,10 +16,8 @@
 Wrapper class for the storagedriverclient of the voldrv team
 """
 
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
-#from volumedriver.something.metadataserverclient import MetadataServerClient as MDSClient
-#from volumedriver.something.metadataserverclient import MDSNodeConfig
 from ovs.plugin.provider.configuration import Configuration
 import json
 import os
@@ -35,36 +33,37 @@ class StorageDriverClient(object):
     Client to access storagedriverclient
     """
 
-    FOC_STATUS = {'': 0,
+    foc_status = {'': 0,
                   'ok_standalone': 10,
                   'ok_sync': 10,
                   'catch_up': 20,
                   'degraded': 30}
+    empty_statistics = lambda: Statistics()
+    empty_info = lambda: VolumeInfo()
+    stat_counters = ['backend_data_read', 'backend_data_written',
+                     'backend_read_operations', 'backend_write_operations',
+                     'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
+                     'data_written', 'metadata_store_hits', 'metadata_store_misses',
+                     'read_operations', 'sco_cache_hits', 'sco_cache_misses',
+                     'write_operations']
+    stat_sums = {'operations': ['write_operations', 'read_operations'],
+                 'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
+                 'data_transferred': ['data_written', 'data_read']}
+    stat_keys = stat_counters + stat_sums.keys()
 
     def __init__(self):
         """
-        Init method
+        Dummy init method
         """
-        self.empty_statistics = lambda: Statistics()
-        self.empty_info = lambda: VolumeInfo()
-        self.stat_counters = ['backend_data_read', 'backend_data_written',
-                              'backend_read_operations', 'backend_write_operations',
-                              'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
-                              'data_written', 'metadata_store_hits', 'metadata_store_misses',
-                              'read_operations', 'sco_cache_hits', 'sco_cache_misses',
-                              'write_operations']
-        self.stat_sums = {'operations': ['write_operations', 'read_operations'],
-                          'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
-                          'data_transferred': ['data_written', 'data_read']}
-        self.stat_keys = self.stat_counters + self.stat_sums.keys()
+        pass
 
-    def load(self, vpool):
+    @staticmethod
+    def load(vpool):
         """
         Initializes the wrapper given a vpool name for which it finds the corresponding Storage Driver
         Loads and returns the client
         """
 
-        _ = self
         key = vpool.guid
         if key not in client_vpool_cache:
             cluster_contacts = []
@@ -82,19 +81,19 @@ class MetadataServerClient(object):
 
     def __init__(self):
         """
-        Init method
+        Dummy init method
         """
         pass
 
-    def load(self, service):
+    @staticmethod
+    def load(service):
         """
         Loads a MDSClient
         """
 
-        _ = self
         key = service.guid
         if key not in mdsclient_service_cache:
-            client = None  # MDSClient(something)
+            client = MDSClient(MDSNodeConfig(service.ip, service.port))
             mdsclient_service_cache[key] = client
         return mdsclient_service_cache[key]
 

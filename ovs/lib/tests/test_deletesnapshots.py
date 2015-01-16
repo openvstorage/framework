@@ -366,11 +366,11 @@ class StorageDriverClient():
         """
         pass
 
-    def load(self):
+    @staticmethod
+    def load():
         """
         Returns the mocked SRClient
         """
-        _ = self
         return SRClient()
 
 

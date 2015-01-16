@@ -260,9 +260,10 @@ for directory in {0}:
             readcache2 = ''
         failovercache = '{}/foc_{}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
+        mdspath = '{}/mds_{}_0'.format(mountpoint_md, vpool_name)
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
         rsppath = '/var/rsp/{}'.format(vpool_name)
-        dirs2create = [scocache, failovercache, metadatapath, tlogpath, rsppath,
+        dirs2create = [scocache, failovercache, metadatapath, tlogpath, rsppath,  # @TODO: this folder should be created at the end of OVS-1605: mdspath,
                        System.read_remote_config(client, 'volumedriver.readcache.serialization.path')]
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
@@ -523,7 +524,7 @@ for directory in {0}:
         metadataserver_config.configure_backend_connection_manager(**vpool.metadata)
         metadataserver_config.configure_metadata_server(mds_port=service.port,
                                                         mds_scratch_dir=mountpoint_temp,
-                                                        mds_rocksdb_path=mountpoint_md)
+                                                        mds_rocksdb_path=mdspath)
         metadataserver_config.save(client)
 
         # Updating the model
@@ -682,6 +683,12 @@ Service.start_service('{0}')
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
+
+        for vdisk in vpool.vdisks:
+            logger.info(vdisk.info)
+
+        raise RuntimeError("p00f")
+
         # @TODO: Check whether disks are configured to have this MDS as master/slave and act appropriate
         #        If the MDS is master for a vdisk, failover. If the MDS is slave, reconfigure
         #        to use other slave or delete slave.

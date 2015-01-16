@@ -37,7 +37,7 @@ class StorageDriverController(object):
         """
         storagedrivers = StorageRouter(storagerouter_guid).storagedrivers
         if len(storagedrivers) > 0:
-            storagedriver_client = StorageDriverClient().load(storagedrivers[0].vpool)
+            storagedriver_client = StorageDriverClient.load(storagedrivers[0].vpool)
             for storagedriver in storagedrivers:
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
 
@@ -58,7 +58,7 @@ class StorageDriverController(object):
             if host_status != 'RUNNING':
                 # Host is stopped
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                storagedriver_client = StorageDriverClient().load(storagedriver.vpool)
+                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
         else:
             # No management Center, cannot update status via api

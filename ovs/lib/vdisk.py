@@ -57,12 +57,12 @@ class VDiskController(object):
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
-            storagedriver_client = StorageDriverClient().load(vpool)
+            storagedriver_client = StorageDriverClient.load(vpool)
             response = storagedriver_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                storagedriver_client = StorageDriverClient().load(vpool)
+                storagedriver_client = StorageDriverClient.load(vpool)
                 response.extend(storagedriver_client.list_volumes())
         return response
 
