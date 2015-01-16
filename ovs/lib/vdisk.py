@@ -135,6 +135,8 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
+        # @TODO: We need to add multiple MDSses to the disk, if possible. So this might be quite complex code to
+        # check the currently configured MDSses and add them and/or figure some stuff out
         mdsservice = MDSServiceList.get_by_storagedriver(storagedriver.guid)
         if mdsservice is None:
             raise RuntimeError("No MDS service was found for this StorageDriver")

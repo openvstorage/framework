@@ -604,6 +604,7 @@ EOF
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
+        storagerouter.node_type = 'MASTER'
         storagerouter.pmachine = pmachine
         storagerouter.save()
 
@@ -759,6 +760,7 @@ EOF
             storagerouter.name = node_name
             storagerouter.machine_id = unique_id
             storagerouter.ip = cluster_ip
+        storagerouter.node_type = 'EXTRA'
         storagerouter.pmachine = pmachine
         storagerouter.save()
 
@@ -865,11 +867,17 @@ EOF
         """
         Promotes a given node
         """
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+
         print '\n+++ Promoting node +++\n'
         logger.info('Promoting node')
 
         target_client = SSHClient.load(cluster_ip)
         node_name = target_client.run('hostname')
+
+        storagerouter = StorageRouterList.get_by_machine_id(unique_id)
+        storagerouter.node_type = 'MASTER'
+        storagerouter.save()
 
         # Find other (arakoon) master nodes
         master_client = SSHClient.load(master_ip)
@@ -1213,11 +1221,17 @@ EOF
         """
         Demotes a given node
         """
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+
         print '\n+++ Demoting node +++\n'
         logger.info('Demoting node')
 
         target_client = SSHClient.load(cluster_ip)
         node_name = target_client.run('hostname')
+
+        storagerouter = StorageRouterList.get_by_machine_id(unique_id)
+        storagerouter.node_type = 'EXTRA'
+        storagerouter.save()
 
         # Find other (arakoon) master nodes
         master_client = SSHClient.load(master_ip)

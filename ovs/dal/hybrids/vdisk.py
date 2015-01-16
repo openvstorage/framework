@@ -23,6 +23,7 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
 import pickle
 import time
 
@@ -98,9 +99,18 @@ class VDisk(DataObject):
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
             if type(value) is property:
-                vdiskinfodict[key] = getattr(vdiskinfo, key)
+                objectvalue = getattr(vdiskinfo, key)
                 if key == 'object_type':
-                    vdiskinfodict[key] = str(vdiskinfodict[key])
+                    vdiskinfodict[key] = str(objectvalue)
+                elif key == 'metadata_backend_config':
+                    vdiskinfodict[key] = {}
+                    if type(objectvalue) is MDSMetaDataBackendConfig:
+                        vdiskinfodict[key] = []
+                        for nodeconfig in objectvalue.node_configs():
+                            vdiskinfodict[key].append({'address': nodeconfig.address(),
+                                                       'port': nodeconfig.port()})
+                else:
+                    vdiskinfodict[key] = objectvalue
         return vdiskinfodict
 
     def _statistics(self, dynamic):

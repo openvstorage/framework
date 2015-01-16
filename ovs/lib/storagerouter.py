@@ -480,7 +480,8 @@ for directory in {0}:
         scocaches = [{'path': scocache, 'size': scocache_size}]
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
-                                  'fs_metadata_backend_mds_nodes': []})
+                                  'fs_metadata_backend_mds_nodes': [],
+                                  'fs_metadata_backend_type': 'MDS'})
         readcache_serialization_path = System.read_remote_config(client, 'volumedriver.readcache.serialization.path')
         queue_protocol = Configuration.get('ovs.core.broker.protocol')
         queue_login = Configuration.get('ovs.core.broker.login')
@@ -522,7 +523,8 @@ for directory in {0}:
         metadataserver_config.load(client)
         metadataserver_config.clean()  # Clean out obsolete values
         metadataserver_config.configure_backend_connection_manager(**vpool.metadata)
-        metadataserver_config.configure_metadata_server(mds_port=service.port,
+        metadataserver_config.configure_metadata_server(mds_address=grid_ip,
+                                                        mds_port=service.port,
                                                         mds_scratch_dir=mountpoint_temp,
                                                         mds_rocksdb_path=mdspath)
         metadataserver_config.save(client)
@@ -634,6 +636,8 @@ Service.start_service('{0}')
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
+
+        # @TODO: All vdisks on this vpool need to get the new MDS added in case they have only one (2, 3, ... configurable?)
 
         # Configure Cinder
         ovsdb = PersistentFactory.get_client()

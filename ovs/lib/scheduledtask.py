@@ -31,10 +31,10 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from volumedriver.scrubber.scrubber import Scrubber
+# @TODO: from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
-_storagedriver_scrubber = Scrubber()
+_storagedriver_scrubber = None  # @TODO: Scrubber()
 logger = LogHandler('lib', name='scheduled tasks')
 
 
