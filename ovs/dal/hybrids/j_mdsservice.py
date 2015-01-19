@@ -29,7 +29,8 @@ class MDSService(DataObject):
     * my_vpool.mds_services[0].service
     * my_service.mds_service.vpool
     """
-    __properties = [Property('number', int, doc='The number of the service in case there are more than one')]
+    __properties = [Property('number', int, doc='The number of the service in case there are more than one'),
+                    Property('capacity', int, default=-1, doc='The capacity of this MDS, negative means infinite')]
     __relations = [Relation('vpool', VPool, 'mds_services'),
                    Relation('service', Service, 'mds_service', onetoone=True)]
     __dynamics = []

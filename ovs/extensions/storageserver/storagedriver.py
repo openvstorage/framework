@@ -93,7 +93,7 @@ class MetadataServerClient(object):
 
         key = service.guid
         if key not in mdsclient_service_cache:
-            client = MDSClient(MDSNodeConfig(service.ip, service.port))
+            client = MDSClient(MDSNodeConfig(address=service.storagerouter.ip, port=service.port))
             mdsclient_service_cache[key] = client
         return mdsclient_service_cache[key]
 

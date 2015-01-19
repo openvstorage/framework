@@ -107,7 +107,7 @@ class VDisk(DataObject):
                     if type(objectvalue) is MDSMetaDataBackendConfig:
                         vdiskinfodict[key] = []
                         for nodeconfig in objectvalue.node_configs():
-                            vdiskinfodict[key].append({'address': nodeconfig.address(),
+                            vdiskinfodict[key].append({'ip': nodeconfig.address(),
                                                        'port': nodeconfig.port()})
                 else:
                     vdiskinfodict[key] = objectvalue

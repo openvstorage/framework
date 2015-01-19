@@ -30,6 +30,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 # @TODO: from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
@@ -310,3 +311,40 @@ class ScheduledTaskController(object):
         for log in LogList.get_logs():
             if log.time < mark:
                 log.delete()
+
+    @staticmethod
+    @celery.task(name='ovs.scheduled.mds_checkup', bind=True)
+    @ensure_single(['ovs.scheduled.mds_checkup'])
+    def mds_checkup():
+        """
+        Validates the current MDS setup/configuration and takes actions where required
+        """
+        # 1. First, make sure the MDS services are not overloaded, create new services when required
+        mds_dict = {}
+        for vpool in VPoolList.get_vpools():
+            for mds_service in vpool.mds_services:
+                storagerouter = mds_service.service.storagerouter
+                if vpool not in mds_dict:
+                    mds_dict[vpool] = {}
+                if storagerouter not in mds_dict[vpool]:
+                    mds_dict[vpool][storagerouter] = []
+                mds_dict[vpool][storagerouter].append(mds_service)
+        for vpool in mds_dict:
+            for storagerouter in mds_dict[vpool]:
+                mds_services = mds_dict[vpool][storagerouter]
+                has_room = False
+                for mds_service in mds_services:
+                    load = VDiskController.get_mds_load(mds_service)
+                    if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
+                        has_room = True
+                        break
+                if has_room is False:
+                    # @TODO: Setup new MDS for this StorageRouter/VPool
+                    pass
+            # Per VPool, execute a safety check so slaves are rebalanced where possible
+            for vdisk in vpool.vdisks:
+                VDiskController.ensure_safety(vdisk)
+        # 2. Execute gracefull move between master to a better suited slave @TODO
+        # 2.1. An overloaded master should be moved to a more appropriate location @TODO
+        # 2.2. A remote master should be moved to a local slave @TODO
+        # 3. Rebalancing (remove volumes from overloaded slaves) if possible @TODO

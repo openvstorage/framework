@@ -33,6 +33,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.lib.vdisk import VDiskController
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
@@ -40,6 +41,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
+from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.openstack.oscinder import OpenStackCinder
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
@@ -637,7 +639,8 @@ Service.start_service('{0}')
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
 
-        # @TODO: All vdisks on this vpool need to get the new MDS added in case they have only one (2, 3, ... configurable?)
+        for vdisk in vpool.vdisks:
+            VDiskController.ensure_safety(vdisk)
 
         # Configure Cinder
         ovsdb = PersistentFactory.get_client()
@@ -688,19 +691,19 @@ Service.start_service('{0}')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
 
-        for vdisk in vpool.vdisks:
-            logger.info(vdisk.info)
-
-        raise RuntimeError("p00f")
-
-        # @TODO: Check whether disks are configured to have this MDS as master/slave and act appropriate
-        #        If the MDS is master for a vdisk, failover. If the MDS is slave, reconfigure
-        #        to use other slave or delete slave.
-
-        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
         voldrv_service = 'volumedriver_{0}'.format(vpool.name)
         foc_service = 'failovercache_{0}'.format(vpool.name)
         storagedrivers_left = False
+        removal_mdsservices = [mds_service for mds_service in vpool.mds_services
+                               if mds_service.service.storagerouter_guid == storagerouter.guid]
+
+        # Unconfigure or reconfigure the MDSses
+        vdisks = []
+        for mds in removal_mdsservices:
+            for junction in mds.vdisks:
+                vdisks.append(junction.vdisk)
+        for vdisk in vdisks:
+            VDiskController.ensure_safety(vdisk, [storagerouter])
 
         # Stop services
         for current_storagedriver in vpool.storagedrivers:
@@ -743,11 +746,8 @@ osc.unconfigure_vpool('{4}', '{5}', {6})
                 pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
-        removal_mdsservices = [service for service in mdsservice_type.services
-                               if service.mds_service.vpool_guid == vpool.guid
-                               and service.storagerouter_guid == storagerouter.guid]
         client = SSHClient.load(ip)
-        for service in [voldrv_service, foc_service] + [mdsservice.name for mdsservice in removal_mdsservices]:
+        for service in [voldrv_service, foc_service] + [mdsservice.service.name for mdsservice in removal_mdsservices]:
             System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
@@ -809,8 +809,7 @@ if Service.has_service('{0}'):
         # First model cleanup
         storagedriver.delete(abandon=True)  # Detach from the log entries
         for service in removal_mdsservices:
-            for junction in service.mds_service.vdisks:
-                junction.delete()
+            # All MDSServiceVDisk object should have been deleted above
             service.mds_service.delete()
             service.delete()
 
