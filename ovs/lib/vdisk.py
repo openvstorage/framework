@@ -100,6 +100,9 @@ class VDiskController(object):
                         logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
                         return
                 logger.info('Delete disk {}'.format(disk.name))
+                # @TODO: The MDS services need to be deconfigured?
+                for mds_service in disk.mds_services:
+                    mds_service.delete()
                 disk.delete()
             finally:
                 mutex.release()

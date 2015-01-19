@@ -162,7 +162,7 @@ if Service.has_service('{0}'):
 
         if vpool is None:
             vpool = VPool()
-            supported_backends = System.read_remote_config(client, 'volumedriver.supported.backends').split(',')
+            supported_backends = System.read_remote_config(client, 'ovs.storagedriver.backends').split(',')
             if 'rest' in supported_backends:
                 supported_backends.remove('rest')  # REST is not supported for now
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
@@ -264,7 +264,7 @@ for directory in {0}:
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
         rsppath = '/var/rsp/{}'.format(vpool_name)
         dirs2create = [scocache, failovercache, metadatapath, tlogpath, rsppath,  # @TODO: this folder should be created at the end of OVS-1605: mdspath,
-                       System.read_remote_config(client, 'volumedriver.readcache.serialization.path')]
+                       System.read_remote_config(client, 'ovs.storagedriver.readcache.serialization.path')]
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
         mountpoints = [device.strip() for device in client.run(cmd).strip().split('\n')]
@@ -451,7 +451,7 @@ for directory in {0}:
                           'vrouter_file_write_threshold': 1024,
                           'vrouter_min_workers': 4,
                           'vrouter_max_workers': 16}
-        voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'volumedriver.arakoon.clusterid'))
+        voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'ovs.storagedriver.db.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_nodes = []
@@ -482,7 +482,7 @@ for directory in {0}:
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        readcache_serialization_path = System.read_remote_config(client, 'volumedriver.readcache.serialization.path')
+        readcache_serialization_path = System.read_remote_config(client, 'ovs.storagedriver.readcache.serialization.path')
         queue_protocol = Configuration.get('ovs.core.broker.protocol')
         queue_login = Configuration.get('ovs.core.broker.login')
         queue_password = Configuration.get('ovs.core.broker.password')
@@ -755,7 +755,7 @@ if Service.has_service('{0}'):
 """.format(service))
         configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
 
-        voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'volumedriver.arakoon.clusterid'))
+        voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'ovs.storagedriver.db.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
@@ -963,7 +963,7 @@ if Service.has_service('{0}'):
         Gets `number` free ports ports that are not in use and not reserved
         """
         ports = []
-        for port_range in System.read_remote_config(client, 'volumedriver.filesystem.ports').split(','):
+        for port_range in System.read_remote_config(client, 'ovs.ports.storagedriver').split(','):
             port_range = port_range.strip()
             if '-' in port_range:
                 current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
