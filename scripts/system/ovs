@@ -1,0 +1,41 @@
+#!/bin/sh
+cd /opt/OpenvStorage
+export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
+export DISPLAY=:0
+if [ "$1" = "setup" ] ; then
+  if [ "$#" -ne 2 ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
+  elif [ "$2" = "master" ] || [ "$2" = "extra" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.setup_node(force_type='$2')"
+  elif [ "$2" = "promote" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.promote_node()"
+  elif [ "$2" = "demote" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.demote_node()"
+  fi
+elif [ "$1" = "monitor" ] ; then
+  if [ "$2" = "services" ] ; then
+    watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
+  elif [ "$2" = "heartbeat" ] ; then
+    python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
+  fi
+elif [ "$1" = "collect" ] ; then
+  if [ "$2" = "logs" ] ; then
+    LOGFILE=/var/tmp/ovs-`hostname`-logs.tar
+    rm -f $LOGFILE
+    rm -f $LOGFILE.gz
+    touch $LOGFILE
+    tar uvf $LOGFILE /var/log/arakoon*
+    tar uvf $LOGFILE /var/log/elasticsearch*
+    tar uvf $LOGFILE /var/log/installer*
+    tar uvf $LOGFILE /var/log/logstash*
+    tar uvf $LOGFILE /var/log/nginx*
+    tar uvf $LOGFILE /var/log/ovs*
+    tar uvf $LOGFILE /var/log/rabbitmq*
+    tar uvf $LOGFILE /var/log/upstart*
+    tar uvf $LOGFILE /var/log/*log
+    tar uvf $LOGFILE /var/log/dmesg*
+    gzip $LOGFILE
+  fi
+else
+  ipython
+fi
