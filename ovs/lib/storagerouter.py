@@ -906,20 +906,7 @@ if Service.has_service('{0}'):
         """
         Gets `number` free ports ports that are not in use and not reserved
         """
-        ports = []
-        for port_range in System.read_remote_config(client, 'ovs.ports.storagedriver').split(','):
-            port_range = port_range.strip()
-            if '-' in port_range:
-                current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
-            else:
-                current_range = (int(port_range), 65536)
-            current_port = current_range[0]
-            while len(ports) < number:
-                if current_port not in ports_in_use:
-                    ports.append(current_port)
-                current_port += 1
-                if current_port > current_range[1]:
-                    break
-        if len(ports) != number:
-            raise RuntimeError('Could not find enough free ports')
+        port_range = System.read_remote_config(client, 'ovs.ports.storagedriver')
+        ports = System.get_free_ports(port_range, ports_in_use, number, client)
+
         return ports if number != 1 else ports[0]

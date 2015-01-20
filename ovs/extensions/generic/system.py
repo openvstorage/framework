@@ -17,6 +17,8 @@ Generic system module, executing statements on local node
 """
 
 from subprocess import check_output
+from ovs.log.logHandler import LogHandler
+logger = LogHandler('lib', name='system')
 
 
 class System(object):
@@ -139,3 +141,49 @@ print Configuration.get('{0}')
             output = client.run(cmd).strip()
         for found_port in output.split('\n'):
             yield int(found_port.strip())
+
+    @staticmethod
+    def get_free_ports(selected_range, exclude=None, nr=1, client=None):
+        """
+        Return requested nr of free ports not currently in use and not within excluded range
+        :param selected_range: e.g. '2000-2010' or '50000-6000, 8000-8999' ; note single port extends to [port -> 65535]
+        :param exclude: excluded list
+        :param nr: nr of free ports requested
+        :return: sorted incrementing list of nr of free ports
+        """
+
+        requested_range = list()
+        selected_range = str(selected_range)
+        for port_range in str(selected_range).split(','):
+            port_range = port_range.strip()
+            if '-' in port_range:
+                current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
+            else:
+                current_range = (int(port_range), 65535)
+            if 0 <= current_range[0] <= 1024:
+                current_range = (1025, current_range[1])
+            requested_range.extend(xrange(current_range[0], current_range[1] + 1))
+        free_ports = list()
+
+        if exclude is None:
+            exclude = list()
+        exclude_list = list(exclude)
+
+        ports_in_use = System.ports_in_use(client)
+        for port in ports_in_use:
+            exclude_list.append(port)
+
+        cmd = """cat /proc/sys/net/ipv4/ip_local_port_range"""
+        if client is None:
+            output = check_output(cmd, shell=True).strip()
+        else:
+            output = client.run(cmd).strip()
+        start_end = list(output.split())
+        ephemeral_port_range = xrange(int(min(start_end)), int(max(start_end)))
+
+        for possible_free_port in requested_range:
+            if possible_free_port not in ephemeral_port_range and possible_free_port not in exclude_list:
+                free_ports.append(possible_free_port)
+            if len(free_ports) == nr:
+                return free_ports
+        raise ValueError('Unable to find requested nr of free ports')

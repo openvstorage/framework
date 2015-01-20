@@ -178,7 +178,7 @@ class OVSPluginTestCase(test.TestCase):
         fields = ['storage_ip', 'vrouter_port']
         parameters = {'storagerouter_ip': IP,
                       'vpool_name': VPOOL_NAME,
-                      'type': 'LOCAL',
+                      'type': 'local',
                       'mountpoint_bfs': VPOOL_BFS,
                       'mountpoint_temp': VPOOL_TEMP,
                       'mountpoint_md': VPOOL_MD,
@@ -197,7 +197,8 @@ class OVSPluginTestCase(test.TestCase):
                 self._debug('vpool %s created' % VPOOL_NAME)
                 try:
                     self._get_shell_client()
-                    self.shell_client('chown %s %s' % (self.current_user_id, VPOOL_MOUNTPOINT))
+                    self.shell_client('sudo chown %s %s' % (self.current_user_id, VPOOL_MOUNTPOINT))
+                    self.shell_client('sudo chmod 775 %s' % (VPOOL_MOUNTPOINT))
                     os.listdir(VPOOL_MOUNTPOINT)
                     return vpool
                 except Exception as ex:
