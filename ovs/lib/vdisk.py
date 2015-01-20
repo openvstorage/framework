@@ -26,22 +26,20 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.pmachinelist import PMachineList
-from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.plugin.provider.configuration import Configuration
 from ovs.log.logHandler import LogHandler
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.openstack.oscinder import OpenStackCinder
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
+from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -139,8 +137,8 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
-        VDiskController.sync_vdisk_to_reality(disk)
-        VDiskController.ensure_safety(disk)
+        MDSServiceController.sync_vdisk_to_reality(disk)
+        MDSServiceController.ensure_safety(disk)
 
     @staticmethod
     @celery.task(name='ovs.disk.rename_from_voldrv')
@@ -171,12 +169,6 @@ class VDiskController(object):
     def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
         """
         Clone a disk
-
-        @param location: location where virtual device should be created (eg: myVM)
-        @param devicename: device file name for the vdisk (eg: mydisk-flat.vmdk)
-        @param parentdiskguid: guid of the disk
-        @param snapshotid: guid of the snapshot
-        @param machineguid: guid of the machine to assign disk to
         """
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
@@ -198,7 +190,7 @@ class VDiskController(object):
         new_vdisk.save()
 
         storagedriver = StorageDriver(vdisk.storagedriver_id)
-        mds_service = VDiskController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
@@ -213,8 +205,8 @@ class VDiskController(object):
         )
         new_vdisk.volume_id = volume_id
         new_vdisk.save()
-        VDiskController.sync_vdisk_to_reality(new_vdisk)
-        VDiskController.ensure_safety(new_vdisk)
+        MDSServiceController.sync_vdisk_to_reality(new_vdisk)
+        MDSServiceController.ensure_safety(new_vdisk)
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,
@@ -249,7 +241,7 @@ class VDiskController(object):
         Delete a disk snapshot
 
         @param diskguid: guid of the disk
-        @param snapshotguid: guid of the snapshot
+        @param snapshotid: id of the snapshot
 
         @todo: Check if new volumedriver storagedriver upon deletion
         of a snapshot has built-in protection to block it from being deleted
@@ -329,7 +321,7 @@ class VDiskController(object):
         new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
         new_vdisk.save()
 
-        mds_service = VDiskController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
 
@@ -346,8 +338,8 @@ class VDiskController(object):
             )
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
-            VDiskController.sync_vdisk_to_reality(new_vdisk)
-            VDiskController.ensure_safety(new_vdisk)
+            MDSServiceController.sync_vdisk_to_reality(new_vdisk)
+            MDSServiceController.ensure_safety(new_vdisk)
 
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
@@ -446,111 +438,3 @@ class VDiskController(object):
             print(client.run_local('chown stack "{0}"'.format(location)))
         elif osc.is_openstack:
             print(client.run_local('chown cinder "{0}"'.format(location)))
-
-    @staticmethod
-    def sync_vdisk_to_reality(vdisk):
-        """
-        Syncs a vdisk to reality (except hypervisor)
-        """
-        vdisk.invalidate_dynamics(['info'])
-        config = vdisk.info['metadata_backend_config']
-        config_dict = {}
-        for item in config:
-            if item['ip'] not in config_dict:
-                config_dict[item['ip']] = []
-            config_dict[item['ip']].append(item['port'])
-        mds_dict = {}
-        for junction in vdisk.mds_services:
-            service = junction.mds_service.service
-            storagerouter = service.storagerouter
-            if config[0]['ip'] == storagerouter.ip and config[0]['port'] == service.port:
-                junction.is_master = True
-                junction.save()
-                if storagerouter.ip not in mds_dict:
-                    mds_dict[storagerouter.ip] = []
-                mds_dict[storagerouter.ip].append(service.port)
-            elif storagerouter.ip in config_dict and service.port in config_dict[storagerouter.ip]:
-                junction.is_master = False
-                junction.save()
-                if storagerouter.ip not in mds_dict:
-                    mds_dict[storagerouter.ip] = []
-                mds_dict[storagerouter.ip].append(service.port)
-            else:
-                junction.delete()
-        for ip, ports in config_dict.iteritems():
-            for port in ports:
-                if ip not in mds_dict or port not in mds_dict[ip]:
-                    service = ServiceList.get_by_ip_port(ip, port)
-                    if service is not None:
-                        mds_service_vdisk = MDSServiceVDisk()
-                        mds_service_vdisk.vdisk = vdisk
-                        mds_service_vdisk.mds_service = service.mds_service
-                        mds_service_vdisk.save()
-
-    @staticmethod
-    def ensure_safety(vdisk, excluded_storagerouters=None):
-        """
-        Ensures (or tries to ensure) the safety of a given vdisk (except hypervisor)
-        """
-        changes = True
-        if excluded_storagerouters is None:
-            excluded_storagerouters = []
-        vdisk.invalidate_dynamics(['info'])
-        config = vdisk.info['metadata_backend_config']
-        storagerouters = [storagedriver.storagerouter for storagedriver in vdisk.vpool.storagedrivers
-                          if storagedriver.storagerouter not in excluded_storagerouters]
-        mds_services_with_namespace = []
-        node_configs = []
-        nodes = []
-        is_master = True
-        for item in config:
-            if item['ip'] not in nodes:
-                if is_master is False:
-                    mds_service = ServiceList.get_by_ip_port(item['ip'], item['port'])
-                    if VDiskController.get_mds_load(mds_service) > Configuration.getInt('ovs.storagedriver.mds.maxload'):
-                        mds_services_with_namespace.append(mds_service)
-                        continue
-                nodes.append(item['ip'])
-                node_configs.append(MDSNodeConfig(address=item['ip'], port=item['port']))
-            else:
-                changes = True
-            is_master = False
-        while len(nodes) < len(storagerouters) and len(nodes) < Configuration.getInt('ovs.storagedriver.mds.safety'):
-            for storagerouter in storagerouters:
-                mds_service = VDiskController.get_preferred_mds(storagerouter, vdisk.vpool)
-                service = mds_service.service
-                if storagerouter.ip not in nodes:
-                    nodes.append(storagerouter.ip)
-                    node_configs.append(MDSNodeConfig(address=storagerouter.ip, port=service.port))
-                    if mds_service not in mds_services_with_namespace:
-                        mds_service.metadataserver_client.create_namespace(vdisk.volume_id)
-                    changes = True
-        if changes is True:
-            vdisk.storagedriver_client.update_metadata_backend_config(
-                volume_id=vdisk.volume_id,
-                metadata_backend_config=MDSMetaDataBackendConfig(node_configs)
-            )
-            VDiskController.sync_vdisk_to_reality(vdisk)
-
-    @staticmethod
-    def get_preferred_mds(storagerouter, vpool):
-        """
-        Gets the MDS on this StorageRouter/VPool pair which is preferred to achieve optimal balancing
-        """
-
-        mds_service = None
-        for current_mds_service in vpool.mds_services:
-            if current_mds_service.service.storagerouter_guid == storagerouter.guid:
-                load = VDiskController.get_mds_load(current_mds_service)
-                if mds_service is None or load < mds_service[1]:
-                    mds_service = (current_mds_service, load)
-        return mds_service[0] if mds_service is not None else None
-
-    @staticmethod
-    def get_mds_load(mds_service):
-        """
-        Gets a 'load' for an MDS service based on its capacity and the amount of assinged VDisks
-        """
-        if mds_service.capacity < 0:
-            return 50
-        return int(len(mds_service.vdisks_guids) / float(mds_service.capacity) * 100.0)

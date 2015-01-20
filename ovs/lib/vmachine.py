@@ -29,6 +29,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
@@ -590,8 +591,8 @@ class VMachineController(object):
                             vdisk.devicename = disk['filename']
                             vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
                             vdisk.size = vdisk.info['volume_size']
-                            VDiskController.sync_vdisk_to_reality(vdisk)
-                            VDiskController.ensure_safety(vdisk)
+                            MDSServiceController.sync_vdisk_to_reality(vdisk)
+                            MDSServiceController.ensure_safety(vdisk)
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:
                             MessageController.fire(MessageController.Type.EVENT,

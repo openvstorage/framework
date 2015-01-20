@@ -27,11 +27,14 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
 from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 # @TODO: from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
@@ -334,16 +337,26 @@ class ScheduledTaskController(object):
                 mds_services = mds_dict[vpool][storagerouter]
                 has_room = False
                 for mds_service in mds_services:
-                    load = VDiskController.get_mds_load(mds_service)
+                    load = MDSServiceController.get_mds_load(mds_service)
                     if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
                         has_room = True
                         break
                 if has_room is False:
-                    # @TODO: Setup new MDS for this StorageRouter/VPool
-                    pass
+                    client = SSHClient.load(storagerouter.ip)
+                    MDSServiceController.prepare_mds_service(client, storagerouter, vpool,
+                                                             fresh_only=False, start=True)
+            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
+            for storagerouter in mds_dict[vpool]:
+                client = SSHClient.load(storagerouter.ip)
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+                storagedriver_config.load(client)
+                if storagedriver_config.is_new is False:
+                    storagedriver_config.clean()  # Clean out obsolete values
+                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[storagerouter.guid])
+                    storagedriver_config.save(client)
             # Per VPool, execute a safety check so slaves are rebalanced where possible
             for vdisk in vpool.vdisks:
-                VDiskController.ensure_safety(vdisk)
+                MDSServiceController.ensure_safety(vdisk)
         # 2. Execute gracefull move between master to a better suited slave @TODO
         # 2.1. An overloaded master should be moved to a more appropriate location @TODO
         # 2.2. A remote master should be moved to a local slave @TODO
