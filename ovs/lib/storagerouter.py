@@ -932,7 +932,7 @@ if Service.has_service('{0}'):
         """
         Gets `number` free ports ports that are not in use and not reserved
         """
-        port_range = System.read_remote_config(client, 'ovs.ports.storagedriver').split(',')
+        port_range = System.read_remote_config(client, 'ovs.ports.storagedriver')
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]

@@ -20,8 +20,6 @@ from ovs.extensions.generic.sshclient import SSHClient
 class TestSystem(TestCase):
     multiple_port_range = '5000-6000,7000-7500,8000-9000'
     single_port = '1500'
-    single_port_list_as_string = "['1500']"
-    single_port_list_as_object = ['1500']
     single_port_range = '8870-8880'
     ip = '127.0.0.1'
 
@@ -56,11 +54,3 @@ class TestSystem(TestCase):
         client = SSHClient.load(self.ip)
         remote_result = System.get_free_ports(self.single_port_range, client=client)
         self.assertEqual(local_result, remote_result)
-
-    def test_single_port_within_list(self):
-        result = System.get_free_ports(self.single_port_list_as_string)
-        self.assertTrue(result == [1500], 'Expected: {0}, got: {1}'.format(self.single_port, result))
-
-    def test_single_port_within_object(self):
-        result = System.get_free_ports(self.single_port_list_as_object)
-        self.assertTrue(result == [1500], 'Expected: {0}, got: {1}'.format(self.single_port, result))

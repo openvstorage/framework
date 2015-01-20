@@ -146,7 +146,7 @@ print Configuration.get('{0}')
     def get_free_ports(selected_range, exclude=None, nr=1, client=None):
         """
         Return requested nr of free ports not currently in use and not within excluded range
-        :param selected_range: e.g. 1000 or 1500-1549 or 1000, 50000-6000, 8000-8999
+        :param selected_range: e.g. '2000-2010' or '50000-6000, 8000-8999' ; note single port extends to [port -> 65535]
         :param exclude: excluded list
         :param nr: nr of free ports requested
         :return: sorted incrementing list of nr of free ports
@@ -159,10 +159,6 @@ print Configuration.get('{0}')
             if '-' in port_range:
                 current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
             else:
-                if isinstance(port_range, list):
-                    port_range = port_range[0]
-                elif isinstance(eval(port_range), list):
-                    port_range = eval(port_range)[0]
                 current_range = (int(port_range), 65535)
             if 0 <= current_range[0] <= 1024:
                 current_range = (1025, current_range[1])
