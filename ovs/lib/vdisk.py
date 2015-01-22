@@ -137,7 +137,6 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
-        MDSServiceController.sync_vdisk_to_reality(disk)
         MDSServiceController.ensure_safety(disk)
 
     @staticmethod
@@ -205,7 +204,6 @@ class VDiskController(object):
         )
         new_vdisk.volume_id = volume_id
         new_vdisk.save()
-        MDSServiceController.sync_vdisk_to_reality(new_vdisk)
         MDSServiceController.ensure_safety(new_vdisk)
 
         return {'diskguid': new_vdisk.guid,
@@ -338,7 +336,6 @@ class VDiskController(object):
             )
             new_vdisk.volume_id = volume_id
             new_vdisk.save()
-            MDSServiceController.sync_vdisk_to_reality(new_vdisk)
             MDSServiceController.ensure_safety(new_vdisk)
 
         except Exception as ex:

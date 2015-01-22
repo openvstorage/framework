@@ -591,7 +591,6 @@ class VMachineController(object):
                             vdisk.devicename = disk['filename']
                             vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
                             vdisk.size = vdisk.info['volume_size']
-                            MDSServiceController.sync_vdisk_to_reality(vdisk)
                             MDSServiceController.ensure_safety(vdisk)
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:

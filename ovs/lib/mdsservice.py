@@ -15,6 +15,7 @@
 """
 MDSService module
 """
+import math
 import random
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.service import Service
@@ -52,7 +53,7 @@ class MDSServiceController(object):
                 service_number = max(mds_service.number, service_number)
 
         if fresh_only is True and service_number >= 0:
-            return  # There are already one or more MDS services running, aborting
+            return None  # There are already one or more MDS services running, aborting
         service_number += 1
 
         # Find free port
@@ -114,6 +115,8 @@ from ovs.plugin.provider.service import Service
 Service.start_service('{0}')
 """.format(service.name))
 
+        return mds_service
+
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
         """
@@ -159,45 +162,122 @@ Service.start_service('{0}')
         """
         Ensures (or tries to ensure) the safety of a given vdisk (except hypervisor)
         """
-        changes = True
+
         if excluded_storagerouters is None:
             excluded_storagerouters = []
+        maxload = Configuration.getInt('ovs.storagedriver.mds.maxload')
+        safety = Configuration.getInt('ovs.storagedriver.mds.safety')
+        services = [mds_service.service for mds_service in vdisk.vpool.mds_services
+                    if mds_service.service.storagerouter not in excluded_storagerouters]
+        services_per_load = {}
+        services_load = {}
+        service_per_key = {}
+        for service in services:
+            load = MDSServiceController.get_mds_load(service.mds_service)
+            if load not in services_per_load:
+                services_per_load[load] = []
+            services_per_load[load].append(service)
+            services_load[service.guid] = load
+            service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.port)] = service
+
+        # List current configuration and filter out excluded services
         vdisk.invalidate_dynamics(['info'])
-        config = vdisk.info['metadata_backend_config']
-        storagerouters = [storagedriver.storagerouter for storagedriver in vdisk.vpool.storagedrivers
-                          if storagedriver.storagerouter not in excluded_storagerouters]
-        mds_services_with_namespace = []
-        node_configs = []
-        nodes = []
-        is_master = True
-        for item in config:
-            if item['ip'] not in nodes:
-                if is_master is False:
-                    mds_service = ServiceList.get_by_ip_port(item['ip'], item['port'])
-                    if MDSServiceController.get_mds_load(mds_service) > Configuration.getInt('ovs.storagedriver.mds.maxload'):
-                        mds_services_with_namespace.append(mds_service)
-                        continue
-                nodes.append(item['ip'])
-                node_configs.append(MDSNodeConfig(address=item['ip'], port=item['port']))
+        configs = vdisk.info['metadata_backend_config']
+        for config in configs:
+            config['key'] = '{0}:{1}'.format(config['ip'], config['port'])
+        master_service = service_per_key.get(configs[0]['key'])
+        slave_services = []
+        for config in configs[1:]:
+            if config['key'] in service_per_key:
+                slave_services.append(service_per_key[config['key']])
+
+        # Prepare fresh configuration
+        new_services = []
+
+        # Check whether the master (if available) is non-local to the vdisk and/or is overloaded
+        master_ok = master_service is not None
+        if master_ok is True:
+            master_ok = master_service.storagerouter_guid == vdisk.storagerouter_guid \
+                        and services_load[master_service.guid] <= maxload
+
+        if master_ok:
+            # Add this master to the fresh configuration
+            new_services.append(master_service)
+        else:
+            # Try to find the best non-overloaded local MDS (slave)
+            candidate_master = None
+            candidate_master_load = 0
+            local_mds = None
+            local_mds_load = 0
+            for service in services:
+                load = services_load[service.guid]
+                if load <= maxload and service.storagerouter_guid == vdisk.storagerouter_guid:
+                    if local_mds is None or local_mds_load > load:
+                        # This service is a non-overloaded local MDS
+                        local_mds = service
+                        local_mds_load = load
+                    if service in slave_services:
+                        if candidate_master is None or candidate_master_load > load:
+                            # This service is a non-overloaded local slave
+                            candidate_master = service
+                            candidate_master_load = load
+            if candidate_master is not None:
+                # A non-overloaded local slave was found.
+                up_to_date = True  # @TODO: Call storagedriver to figure out whether its (more or less) up to date
+                if up_to_date is True:
+                    # It's up to date, so add it as a new master
+                    new_services.append(candidate_master)
+                    if master_service is not None:
+                        # The current master (if available) is now candidate for become one of the slaves
+                        slave_services.append(master_service)
+                else:
+                    # It's not up to date, keep the previous master (if available) and give the local slave
+                    # some more time to catch up
+                    if master_service is not None:
+                        new_services.append(master_service)
+                    new_services.append(candidate_master)
+                slave_services.remove(candidate_master)
             else:
-                changes = True
-            is_master = False
-        while len(nodes) < len(storagerouters) and len(nodes) < Configuration.getInt('ovs.storagedriver.mds.safety'):
-            for storagerouter in storagerouters:
-                mds_service = MDSServiceController.get_preferred_mds(storagerouter, vdisk.vpool)
-                service = mds_service.service
-                if storagerouter.ip not in nodes:
-                    nodes.append(storagerouter.ip)
-                    node_configs.append(MDSNodeConfig(address=storagerouter.ip, port=service.port))
-                    if mds_service not in mds_services_with_namespace:
-                        mds_service.metadataserver_client.create_namespace(vdisk.volume_id)
-                    changes = True
-        if changes is True:
-            vdisk.storagedriver_client.update_metadata_backend_config(
-                volume_id=vdisk.volume_id,
-                metadata_backend_config=MDSMetaDataBackendConfig(node_configs)
-            )
-            MDSServiceController.sync_vdisk_to_reality(vdisk)
+                # There's no non-overloaded local slave found. Keep the current master (if available) and add
+                # a local MDS (if available) as slave
+                if master_service is not None:
+                    new_services.append(master_service)
+                if local_mds is not None:
+                    new_services.append(local_mds)
+                    slave_services.remove(local_mds)
+
+        # At this point, there might (or might not) be a (new) master, and a (catching up) slave. The rest of the non-local
+        # MDS nodes must now be added to the configuration until the safety is reached. It is preferred to recycle at
+        # least floor(safety/2) current slaves to prevent to much fresh slaves that still have to sync all data
+        recycle_count = math.floor(safety / 2.0)
+        loads = sorted(services_per_load.keys())
+        nodes = [service.storagerouter.ip for service in new_services]
+        if len(new_services) < recycle_count:
+            for load in loads:
+                for service in services_per_load[load]:
+                    if service in slave_services:
+                        if len(new_services) < recycle_count:
+                            if service.storagerouter.ip not in nodes:
+                                new_services.append(service)
+                                slave_services.remove(service)
+                                nodes.append(service.storagerouter.ip)
+        if len(new_services) < safety:
+            for load in loads:
+                for service in services_per_load[load]:
+                    if len(new_services) < safety and service.storagerouter.ip not in nodes:
+                        new_services.append(service)
+                        nodes.append(service.storagerouter.ip)
+
+        # Build the new configuration and update the vdisk
+        configs = []
+        for service in new_services:
+            configs.append(MDSNodeConfig(address=service.storagerouter.ip,
+                                         port=service.port))
+        vdisk.storagedriver_client.update_metadata_backend_config(
+            volume_id=vdisk.volume_id,
+            metadata_backend_config=MDSMetaDataBackendConfig(configs)
+        )
+        MDSServiceController.sync_vdisk_to_reality(vdisk)
 
     @staticmethod
     def get_preferred_mds(storagerouter, vpool, include_load=False):

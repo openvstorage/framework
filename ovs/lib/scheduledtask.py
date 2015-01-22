@@ -322,7 +322,6 @@ class ScheduledTaskController(object):
         """
         Validates the current MDS setup/configuration and takes actions where required
         """
-        # 1. First, make sure the MDS services are not overloaded, create new services when required
         mds_dict = {}
         for vpool in VPoolList.get_vpools():
             for mds_service in vpool.mds_services:
@@ -333,6 +332,8 @@ class ScheduledTaskController(object):
                     mds_dict[vpool][storagerouter] = []
                 mds_dict[vpool][storagerouter].append(mds_service)
         for vpool in mds_dict:
+            # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
+            #    If not, create an extra MDS for that StorageRouter
             for storagerouter in mds_dict[vpool]:
                 mds_services = mds_dict[vpool][storagerouter]
                 has_room = False
@@ -343,8 +344,11 @@ class ScheduledTaskController(object):
                         break
                 if has_room is False:
                     client = SSHClient.load(storagerouter.ip)
-                    MDSServiceController.prepare_mds_service(client, storagerouter, vpool,
-                                                             fresh_only=False, start=True)
+                    mds_service = MDSServiceController.prepare_mds_service(client, storagerouter, vpool,
+                                                                           fresh_only=False, start=True)
+                    if mds_service is None:
+                        raise RuntimeError('Could not add MDS node')
+                    mds_dict[vpool][storagerouter].append(mds_service)
             mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
             for storagerouter in mds_dict[vpool]:
                 client = SSHClient.load(storagerouter.ip)
@@ -354,10 +358,6 @@ class ScheduledTaskController(object):
                     storagedriver_config.clean()  # Clean out obsolete values
                     storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[storagerouter.guid])
                     storagedriver_config.save(client)
-            # Per VPool, execute a safety check so slaves are rebalanced where possible
+            # 2. Per VPool, execute a safety check, making sure the master/slave configuration is optimal.
             for vdisk in vpool.vdisks:
                 MDSServiceController.ensure_safety(vdisk)
-        # 2. Execute gracefull move between master to a better suited slave @TODO
-        # 2.1. An overloaded master should be moved to a more appropriate location @TODO
-        # 2.2. A remote master should be moved to a local slave @TODO
-        # 3. Rebalancing (remove volumes from overloaded slaves) if possible @TODO
