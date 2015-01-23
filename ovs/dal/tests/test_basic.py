@@ -1093,6 +1093,46 @@ class Basic(TestCase):
         disk2_2.save()
         self.assertEqual(len(machine2.disks), 2, 'There should be two disks. {0}'.format(len(machine2.disks)))
 
+    def test_versioning(self):
+        """
+        Validates whether the versioning system works
+        """
+        machine = TestMachine()
+        machine.name = 'machine0'
+        machine.save()
+        self.assertEqual(machine._data['_version'], 1, 'Version should be 1, is {0}'.format(machine._data['_version']))
+        machine.save()
+        self.assertEqual(machine._data['_version'], 2, 'Version should be 2, is {0}'.format(machine._data['_version']))
+        machine_x = TestMachine(machine.guid)
+        machine_x.name = 'machine1'
+        machine_x.save()
+        self.assertTrue(machine.updated_on_datastore(), 'Machine is updated on datastore')
+        machine.name = 'machine2'
+        machine.save()
+        self.assertEqual(machine._data['_version'], 4, 'Version should be 4, is {0}'.format(machine._data['_version']))
+        self.assertFalse(machine.updated_on_datastore(), 'Machine is not updated on datastore')
+
+    def test_outdated_listobjects(self):
+        """
+        Validates whether elements in a (cached) list are reloaded if they are changed externally
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        self.assertListEqual(['disk1', 'disk2'], sorted([disk.name for disk in machine.disks]), 'Names should be disk1 and disk2')
+        disk2.name = 'disk_'
+        self.assertListEqual(['disk1', 'disk2'], sorted([disk.name for disk in machine.disks]), 'Names should still be disk1 and disk2')
+        disk2.save()
+        self.assertListEqual(['disk1', 'disk_'], sorted([disk.name for disk in machine.disks]), 'Names should be disk1 and disk_')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

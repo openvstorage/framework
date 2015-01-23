@@ -20,7 +20,7 @@ import copy
 import re
 import json
 import inspect
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException, SaveRaceConditionException
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
@@ -192,6 +192,9 @@ class DataObject(object):
 
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)
+
+        # Version mutex
+        self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._name, self._guid))
 
         # Load data from cache or persistent backend where appropriate
         self._volatile = VolatileFactory.get_client()
@@ -433,149 +436,169 @@ class DataObject(object):
         It will also invalidate certain caches if required. For example lists pointing towards this
         object
         """
-        invalid_fields = []
-        for prop in self._properties:
-            if prop.mandatory is True and self._data[prop.name] is None:
-                invalid_fields.append(prop.name)
-        for relation in self._relations:
-            if relation.mandatory is True and self._data[relation.name]['guid'] is None:
-                invalid_fields.append(relation.name)
-        if len(invalid_fields) > 0:
-            raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._name, ', '.join(invalid_fields)))
-
-        if recursive:
-            # Save objects that point to us (e.g. disk.vmachine - if this is disk)
+        tries = 0
+        successful = False
+        while successful is False:
+            invalid_fields = []
+            for prop in self._properties:
+                if prop.mandatory is True and self._data[prop.name] is None:
+                    invalid_fields.append(prop.name)
             for relation in self._relations:
-                if relation.name != skip:  # disks will be skipped
-                    item = getattr(self, relation.name)
-                    if item is not None:
-                        item.save(recursive=True, skip=relation.foreign_key)
+                if relation.mandatory is True and self._data[relation.name]['guid'] is None:
+                    invalid_fields.append(relation.name)
+            if len(invalid_fields) > 0:
+                raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._name, ', '.join(invalid_fields)))
 
-            # Save object we point at (e.g. machine.disks - if this is machine)
-            relations = RelationMapper.load_foreign_relations(self.__class__)
-            if relations is not None:
-                for key, info in relations.iteritems():
-                    if key != skip:  # machine will be skipped
-                        if info['list'] is True:
-                            for item in getattr(self, key).iterloaded():
-                                item.save(recursive=True, skip=info['key'])
-                        else:
-                            item = getattr(self, key)
-                            if item is not None:
-                                item.save(recursive=True, skip=info['key'])
+            if recursive:
+                # Save objects that point to us (e.g. disk.vmachine - if this is disk)
+                for relation in self._relations:
+                    if relation.name != skip:  # disks will be skipped
+                        item = getattr(self, relation.name)
+                        if item is not None:
+                            item.save(recursive=True, skip=relation.foreign_key)
 
-        try:
-            data = self._persistent.get(self._key)
-        except KeyNotFoundException:
-            if self._new:
-                data = {}
-            else:
-                raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
-                    self.__class__.__name__, self._guid
-                ))
-        changed_fields = []
-        data_conflicts = []
-        for attribute in self._data.keys():
-            if self._data[attribute] != self._original[attribute]:
-                # We changed this value
-                changed_fields.append(attribute)
-                if attribute in data and self._original[attribute] != data[attribute]:
-                    # Some other process also wrote to the database
-                    if self._datastore_wins is None:
-                        # In case we didn't set a policy, we raise the conflicts
-                        data_conflicts.append(attribute)
-                    elif self._datastore_wins is False:
-                        # If the datastore should not win, we just overwrite the data
-                        data[attribute] = self._data[attribute]
-                    # If the datastore should win, we discard/ignore our change
-                else:
-                    # Normal scenario, saving data
-                    data[attribute] = self._data[attribute]
-            elif attribute not in data:
-                data[attribute] = self._data[attribute]
-        if data_conflicts:
-            raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
-                self._name, ', '.join(data_conflicts)
-            ))
-
-        # Refresh internal data structure
-        self._data = copy.deepcopy(data)
-
-        # First, update reverse index
-        try:
-            self._mutex_reverseindex.acquire(60)
-            for relation in self._relations:
-                key = relation.name
-                original_guid = self._original[key]['guid']
-                new_guid = self._data[key]['guid']
-                if original_guid != new_guid:
-                    if relation.foreign_type is None:
-                        classname = self.__class__.__name__.lower()
-                    else:
-                        classname = relation.foreign_type.__name__.lower()
-                    if original_guid is not None:
-                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
-                        reverse_index = self._volatile.get(reverse_key)
-                        if reverse_index is not None:
-                            if relation.foreign_key in reverse_index:
-                                entries = reverse_index[relation.foreign_key]
-                                if self.guid in entries:
-                                    entries.remove(self.guid)
-                                    reverse_index[relation.foreign_key] = entries
-                                    self._volatile.set(reverse_key, reverse_index)
-                    if new_guid is not None:
-                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
-                        reverse_index = self._volatile.get(reverse_key)
-                        if reverse_index is not None:
-                            if relation.foreign_key in reverse_index:
-                                entries = reverse_index[relation.foreign_key]
-                                if self.guid not in entries:
-                                    entries.append(self.guid)
-                                    reverse_index[relation.foreign_key] = entries
-                                    self._volatile.set(reverse_key, reverse_index)
-                            else:
-                                reverse_index[relation.foreign_key] = [self.guid]
-                                self._volatile.set(reverse_key, reverse_index)
-                        else:
-                            reverse_index = {relation.foreign_key: [self.guid]}
-                            self._volatile.set(reverse_key, reverse_index)
-            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._name, self.guid)
-            reverse_index = self._volatile.get(reverse_key)
-            if reverse_index is None:
-                reverse_index = {}
+                # Save object we point at (e.g. machine.disks - if this is machine)
                 relations = RelationMapper.load_foreign_relations(self.__class__)
                 if relations is not None:
-                    for key, _ in relations.iteritems():
-                        reverse_index[key] = []
-                self._volatile.set(reverse_key, reverse_index)
-        finally:
-            self._mutex_reverseindex.release()
+                    for key, info in relations.iteritems():
+                        if key != skip:  # machine will be skipped
+                            if info['list'] is True:
+                                for item in getattr(self, key).iterloaded():
+                                    item.save(recursive=True, skip=info['key'])
+                            else:
+                                item = getattr(self, key)
+                                if item is not None:
+                                    item.save(recursive=True, skip=info['key'])
 
-        # Second, invalidate property lists
-        try:
-            self._mutex_listcache.acquire(60)
-            cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
-            cache_list = Toolbox.try_get(cache_key, {})
-            change = False
-            for list_key in cache_list.keys():
-                fields = cache_list[list_key]
-                if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
-                    change = True
-                    self._volatile.delete(list_key)
-                    del cache_list[list_key]
-            if change is True:
-                self._volatile.set(cache_key, cache_list)
-                self._persistent.set(cache_key, cache_list)
-        finally:
-            self._mutex_listcache.release()
+            try:
+                data = self._persistent.get(self._key)
+            except KeyNotFoundException:
+                if self._new:
+                    data = {'_version': 0}
+                else:
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
+                        self.__class__.__name__, self._guid
+                    ))
+            changed_fields = []
+            data_conflicts = []
+            for attribute in self._data.keys():
+                if attribute == '_version':
+                    continue
+                if self._data[attribute] != self._original[attribute]:
+                    # We changed this value
+                    changed_fields.append(attribute)
+                    if attribute in data and self._original[attribute] != data[attribute]:
+                        # Some other process also wrote to the database
+                        if self._datastore_wins is None:
+                            # In case we didn't set a policy, we raise the conflicts
+                            data_conflicts.append(attribute)
+                        elif self._datastore_wins is False:
+                            # If the datastore should not win, we just overwrite the data
+                            data[attribute] = self._data[attribute]
+                        # If the datastore should win, we discard/ignore our change
+                    else:
+                        # Normal scenario, saving data
+                        data[attribute] = self._data[attribute]
+                elif attribute not in data:
+                    data[attribute] = self._data[attribute]
+            if data_conflicts:
+                raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
+                    self._name, ', '.join(data_conflicts)
+                ))
 
-        # Save the data
-        self._persistent.set(self._key, self._data)
+            # Refresh internal data structure
+            self._data = copy.deepcopy(data)
 
-        # Invalidate the cache
-        self._volatile.delete(self._key)
+            # First, update reverse index
+            try:
+                self._mutex_reverseindex.acquire(60)
+                for relation in self._relations:
+                    key = relation.name
+                    original_guid = self._original[key]['guid']
+                    new_guid = self._data[key]['guid']
+                    if original_guid != new_guid:
+                        if relation.foreign_type is None:
+                            classname = self.__class__.__name__.lower()
+                        else:
+                            classname = relation.foreign_type.__name__.lower()
+                        if original_guid is not None:
+                            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                            reverse_index = self._volatile.get(reverse_key)
+                            if reverse_index is not None:
+                                if relation.foreign_key in reverse_index:
+                                    entries = reverse_index[relation.foreign_key]
+                                    if self.guid in entries:
+                                        entries.remove(self.guid)
+                                        reverse_index[relation.foreign_key] = entries
+                                        self._volatile.set(reverse_key, reverse_index)
+                        if new_guid is not None:
+                            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
+                            reverse_index = self._volatile.get(reverse_key)
+                            if reverse_index is not None:
+                                if relation.foreign_key in reverse_index:
+                                    entries = reverse_index[relation.foreign_key]
+                                    if self.guid not in entries:
+                                        entries.append(self.guid)
+                                        reverse_index[relation.foreign_key] = entries
+                                        self._volatile.set(reverse_key, reverse_index)
+                                else:
+                                    reverse_index[relation.foreign_key] = [self.guid]
+                                    self._volatile.set(reverse_key, reverse_index)
+                            else:
+                                reverse_index = {relation.foreign_key: [self.guid]}
+                                self._volatile.set(reverse_key, reverse_index)
+                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._name, self.guid)
+                reverse_index = self._volatile.get(reverse_key)
+                if reverse_index is None:
+                    reverse_index = {}
+                    relations = RelationMapper.load_foreign_relations(self.__class__)
+                    if relations is not None:
+                        for key, _ in relations.iteritems():
+                            reverse_index[key] = []
+                    self._volatile.set(reverse_key, reverse_index)
+            finally:
+                self._mutex_reverseindex.release()
+
+            # Second, invalidate property lists
+            try:
+                self._mutex_listcache.acquire(60)
+                cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
+                cache_list = Toolbox.try_get(cache_key, {})
+                change = False
+                for list_key in cache_list.keys():
+                    fields = cache_list[list_key]
+                    if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
+                        change = True
+                        self._volatile.delete(list_key)
+                        del cache_list[list_key]
+                if change is True:
+                    self._volatile.set(cache_key, cache_list)
+                    self._persistent.set(cache_key, cache_list)
+            finally:
+                self._mutex_listcache.release()
+
+            # Save the data
+            try:
+                self._mutex_version.acquire(5)
+                this_version = self._data['_version']
+                try:
+                    store_version = self._persistent.get(self._key)['_version']
+                except KeyNotFoundException:
+                    store_version = 0
+                if this_version == store_version:
+                    self._data['_version'] = this_version + 1
+                    self._persistent.set(self._key, self._data)
+                    self._volatile.delete(self._key)
+                    successful = True
+                else:
+                    tries += 1
+            finally:
+                self._mutex_version.release()
+            if tries > 5:
+                raise SaveRaceConditionException()
 
         self._original = copy.deepcopy(self._data)
+
         self.dirty = False
         self._new = False
 
@@ -735,6 +758,17 @@ class DataObject(object):
 
         for key in properties_to_copy:
             setattr(self, key, getattr(other_object, key))
+
+    def updated_on_datastore(self):
+        """
+        Checks whether this object has been modified on the datastore
+        """
+        this_version = self._data['_version']
+        try:
+            store_version = self._persistent.get(self._key)['_version']
+        except KeyNotFoundException:
+            store_version = -1
+        return this_version != store_version
 
     #######################
     # Properties
