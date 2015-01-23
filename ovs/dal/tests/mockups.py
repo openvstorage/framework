@@ -167,11 +167,45 @@ class StorageDriverClient():
         return SRClient()
 
 
+class MDSClient():
+    """
+    Mocks the MDSClient
+    """
+
+    def __init__(self, service):
+        """
+        Dummy init method
+        """
+        self.service = service
+
+
+class MetadataServerClient():
+    """
+    Mocks the MetadataServerClient
+    """
+
+    mds_data = {}
+
+    def __init__(self):
+        """
+        Dummy init method
+        """
+        pass
+
+    @staticmethod
+    def load(service):
+        """
+        Returns the mocked MDSClient
+        """
+        return MDSClient(service)
+
+
 class StorageDriver():
     """
     Mocks the StorageDriver
     """
     StorageDriverClient = StorageDriverClient
+    MetadataServerClient = MetadataServerClient
 
     def __init__(self):
         """

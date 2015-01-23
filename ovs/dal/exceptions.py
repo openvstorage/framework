@@ -50,3 +50,10 @@ class MissingMandatoryFieldsException(Exception):
     Raised when there are mandatory fields missing
     """
     pass
+
+
+class SaveRaceConditionException(Exception):
+    """
+    Raised when an object could not be saved in X attempts
+    """
+    pass

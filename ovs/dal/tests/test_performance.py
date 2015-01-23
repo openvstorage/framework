@@ -133,7 +133,7 @@ class LotsOfObjects(TestCase):
                     disk.delete()
                 machine.delete()
             except (ObjectNotFoundException, ValueError):
-                DataList.delete_pk(machine._namespace, machine._name, guid)
+                pass
         disk = TestDisk()
         keys = DataList.get_pks(disk._namespace, disk._name)
         for guid in keys:
@@ -141,7 +141,7 @@ class LotsOfObjects(TestCase):
                 disk = TestDisk(guid)
                 disk.delete()
             except (ObjectNotFoundException, ValueError):
-                DataList.delete_pk(disk._namespace, disk._name, guid)
+                pass
 
 if __name__ == '__main__':
     import unittest
