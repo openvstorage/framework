@@ -15,11 +15,13 @@
 """
 Delete snapshots test module
 """
+import logging
 import sys
 import unittest
 from time import mktime
 from datetime import datetime
 from unittest import TestCase
+from ovs.lib.tests.mockups import StorageDriver
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -33,10 +35,14 @@ class DeleteSnapshots(TestCase):
 
     VDisk = None
     VMachine = None
+    PMachine = None
+    VPool = None
+    BackendType = None
     VolatileMutex = None
     VMachineController = None
     VDiskController = None
     ScheduledTaskController = None
+    logLevel = None
 
     @classmethod
     def setUpClass(cls):
@@ -52,6 +58,9 @@ class DeleteSnapshots(TestCase):
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.vmachine import VMachine
         from ovs.dal.hybrids.vdisk import VDisk
+        from ovs.dal.hybrids.pmachine import PMachine
+        from ovs.dal.hybrids.vpool import VPool
+        from ovs.dal.hybrids.backendtype import BackendType
         from ovs.extensions.generic.volatilemutex import VolatileMutex
         from ovs.lib.vmachine import VMachineController
         from ovs.lib.vdisk import VDiskController
@@ -59,15 +68,23 @@ class DeleteSnapshots(TestCase):
         # Globalize mocked classes
         global VDisk
         global VMachine
+        global PMachine
+        global VPool
+        global BackendType
         global VolatileMutex
         global VMachineController
         global VDiskController
         global ScheduledTaskController
-        _ = VDisk(), VolatileMutex('dummy'), VMachine(), VMachineController, VDiskController, ScheduledTaskController
+        _ = VDisk(), VolatileMutex('dummy'), VMachine(), PMachine(), VPool(), BackendType(), \
+            VMachineController, VDiskController, ScheduledTaskController
 
         # Cleaning storage
         VolatileFactory.store.clean()
         PersistentFactory.store.clean()
+
+        # Logging
+        DeleteSnapshots.logLevel = logging.root.manager.disable
+        logging.disable('INFO')
 
     @classmethod
     def setUp(cls):
@@ -75,14 +92,16 @@ class DeleteSnapshots(TestCase):
         (Re)Sets the stores on every test
         """
         PersistentFactory.store = DummyPersistentStore()
+        PersistentFactory.store.clean()
         VolatileFactory.store = DummyVolatileStore()
+        VolatileFactory.store.clean()
 
     @classmethod
     def tearDownClass(cls):
         """
         Clean up the unittest
         """
-        pass
+        logging.disable(DeleteSnapshots.logLevel)
 
     def test_happypath(self):
         """
@@ -91,31 +110,55 @@ class DeleteSnapshots(TestCase):
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and an additional disk
+        vpool = VPool()
+        vpool.name = 'vpool'
+        vpool.backend_type = BackendType()
+        vpool.save()
         vmachine_1 = VMachine()
         vmachine_1.name = 'vmachine_1'
+        vmachine_1.devicename = 'dummy'
+        vmachine_1.pmachine = PMachine()
         vmachine_1.save()
         vdisk_1_1 = VDisk()
         vdisk_1_1.name = 'vdisk_1_1'
         vdisk_1_1.volume_id = 'vdisk_1_1'
         vdisk_1_1.vmachine = vmachine_1
+        vdisk_1_1.vpool = vpool
+        vdisk_1_1.devicename = 'dummy'
+        vdisk_1_1.size = 0
         vdisk_1_1.save()
+        vdisk_1_1.reload_client()
         vdisk_1_2 = VDisk()
         vdisk_1_2.name = 'vdisk_1_2'
         vdisk_1_2.volume_id = 'vdisk_1_2'
         vdisk_1_2.vmachine = vmachine_1
+        vdisk_1_2.vpool = vpool
+        vdisk_1_2.devicename = 'dummy'
+        vdisk_1_2.size = 0
         vdisk_1_2.save()
+        vdisk_1_2.reload_client()
         vmachine_2 = VMachine()
         vmachine_2.name = 'vmachine_2'
+        vmachine_2.devicename = 'dummy'
+        vmachine_2.pmachine = PMachine()
         vmachine_2.save()
         vdisk_2_1 = VDisk()
         vdisk_2_1.name = 'vdisk_2_1'
         vdisk_2_1.volume_id = 'vdisk_2_1'
         vdisk_2_1.vmachine = vmachine_2
+        vdisk_2_1.vpool = vpool
+        vdisk_2_1.devicename = 'dummy'
+        vdisk_2_1.size = 0
         vdisk_2_1.save()
+        vdisk_2_1.reload_client()
         vdisk_3 = VDisk()
         vdisk_3.name = 'vdisk_3'
         vdisk_3.volume_id = 'vdisk_3'
+        vdisk_3.vpool = vpool
+        vdisk_3.devicename = 'dummy'
+        vdisk_3.size = 0
         vdisk_3.save()
+        vdisk_3.reload_client()
 
         for disk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
             [dynamic for dynamic in disk._dynamics if dynamic.name == 'snapshots'][0].timeout = 0
@@ -174,14 +217,6 @@ class DeleteSnapshots(TestCase):
                                                               'is_consistent': True,
                                                               'timestamp': ts,
                                                               'machineguid': None})
-
-        for vdisk in vmachine_1.vdisks:
-            vdisk.delete()
-        vmachine_1.delete()
-        for vdisk in vmachine_2.vdisks:
-            vdisk.delete()
-        vmachine_2.delete()
-        vdisk_3.delete()
 
     def _validate(self, vdisk, current_day, initial_timestamp, amount_of_days, debug):
         """
@@ -280,111 +315,6 @@ class DeleteSnapshots(TestCase):
                     )
                 )
 
-
-# Mocking classes
-class Snapshot():
-    """
-    Dummy snapshot class
-    """
-
-    def __init__(self, metadata):
-        """
-        Init method
-        """
-        self.metadata = metadata
-
-
-class SRClient():
-    """
-    Mocks the SRClient
-    """
-
-    snapshots = {}
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-    @staticmethod
-    def list_snapshots(volume_id):
-        """
-        Return fake info
-        """
-        snapshots = StorageDriverClient.snapshots.get(volume_id, {})
-        return snapshots.keys()
-
-    @staticmethod
-    def create_snapshot(volume_id, snapshot_id, metadata):
-        """
-        Create snapshot mockup
-        """
-        snapshots = StorageDriverClient.snapshots.get(volume_id, {})
-        snapshots[snapshot_id] = Snapshot(metadata)
-        StorageDriverClient.snapshots[volume_id] = snapshots
-
-    @staticmethod
-    def info_snapshot(volume_id, guid):
-        """
-        Info snapshot mockup
-        """
-        return StorageDriverClient.snapshots[volume_id][guid]
-
-    @staticmethod
-    def delete_snapshot(volume_id, guid):
-        """
-        Delete snapshot mockup
-        """
-        del StorageDriverClient.snapshots[volume_id][guid]
-
-    @staticmethod
-    def info_volume(volume_id):
-        """
-        Info volume mockup
-        """
-        _ = volume_id
-        return type('Info', (), {'object_type': 'BASE'})()
-
-    @staticmethod
-    def get_scrubbing_workunits(volume_id):
-        """
-        Get scrubbing workload mockup
-        """
-        _ = volume_id
-        return []
-
-
-class StorageDriverClient():
-    """
-    Mocks the StorageDriverClient
-    """
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
-
-    @staticmethod
-    def load():
-        """
-        Returns the mocked SRClient
-        """
-        return SRClient()
-
-
-class StorageDriver():
-    """
-    Mocks the StorageDriver
-    """
-    StorageDriverClient = StorageDriverClient
-
-    def __init__(self):
-        """
-        Dummy init method
-        """
-        pass
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(DeleteSnapshots)

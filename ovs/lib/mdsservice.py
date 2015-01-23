@@ -302,7 +302,7 @@ Service.start_service('{0}')
         """
         if mds_service.capacity < 0:
             return 50
-        return int(len(mds_service.vdisks_guids) / float(mds_service.capacity) * 100.0)
+        return len(mds_service.vdisks_guids) / float(mds_service.capacity) * 100.0
 
     @staticmethod
     def get_mds_storagedriver_config_set(vpool):
