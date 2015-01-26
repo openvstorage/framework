@@ -38,8 +38,8 @@ class StorageDriverClient(object):
                   'ok_sync': 10,
                   'catch_up': 20,
                   'degraded': 30}
-    empty_statistics = lambda: Statistics()
-    empty_info = lambda: VolumeInfo()
+    empty_statistics = staticmethod(lambda: Statistics())
+    empty_info = staticmethod(lambda: VolumeInfo())
     stat_counters = ['backend_data_read', 'backend_data_written',
                      'backend_read_operations', 'backend_write_operations',
                      'cluster_cache_hits', 'cluster_cache_misses', 'data_read',
@@ -93,8 +93,11 @@ class MetadataServerClient(object):
 
         key = service.guid
         if key not in mdsclient_service_cache:
-            client = MDSClient(MDSNodeConfig(address=service.storagerouter.ip, port=service.port))
-            mdsclient_service_cache[key] = client
+            try:
+                client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.port))
+                mdsclient_service_cache[key] = client
+            except RuntimeError:
+                return None
         return mdsclient_service_cache[key]
 
 

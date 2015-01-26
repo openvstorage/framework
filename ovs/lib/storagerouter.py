@@ -131,7 +131,9 @@ class StorageRouterController(object):
                             'At least one vMachine using this vPool is still running or paused. Make sure there are no active vMachines'
                         )
 
-        all_storagerouters = [storagerouter] + [sd.storagerouter for sd in vpool.storagedrivers]
+        all_storagerouters = [storagerouter]
+        if vpool is not None:
+            all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
         voldrv_service = 'volumedriver_{0}'.format(vpool_name)
 
         # Stop services
@@ -464,10 +466,10 @@ for directory in {0}:
         queue_volumerouterqueue = Configuration.get('ovs.core.broker.volumerouter.queue')
         queue_urls = []
         for current_storagerouter in StorageRouterList.get_masters():
-            queue_urls.append({'amqp_uri': '{{0}}://{{1}}:{{2}}@{{3}}'.format(queue_protocol,
-                                                                              queue_login,
-                                                                              queue_password,
-                                                                              current_storagerouter.ip)})
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(queue_protocol,
+                                                                      queue_login,
+                                                                      queue_password,
+                                                                      current_storagerouter.ip)})
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
         storagedriver_config.load(client)

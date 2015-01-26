@@ -196,7 +196,7 @@ class VDiskController(object):
         logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
         volume_id = vdisk.storagedriver_client.create_clone(
             target_path=location,
-            metadata_backend_config=[MDSNodeConfig(address=mds_service.service.storagerouter.ip,
+            metadata_backend_config=[MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                    port=mds_service.service.port)],
             parent_volume_id=str(vdisk.volume_id),
             parent_snapshot_id=str(snapshotid),
@@ -307,7 +307,9 @@ class VDiskController(object):
             storagedriver_id = StorageDriver(storagedriver_guid).storagedriver_id
         else:
             storagedriver_id = vdisk.storagedriver_id
-        storagedriver = StorageDriver(storagedriver_id)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('Could not find StorageDriver with id {0}'.format(storagedriver_id))
 
         new_vdisk = VDisk()
         new_vdisk.copy(vdisk, include=properties_to_clone)
@@ -329,7 +331,7 @@ class VDiskController(object):
         try:
             volume_id = vdisk.storagedriver_client.create_clone_from_template(
                 target_path=disk_path,
-                metadata_backend_config=[MDSNodeConfig(address=mds_service.service.storagerouter.ip,
+                metadata_backend_config=[MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
                                                        port=mds_service.service.port)],
                 parent_volume_id=str(vdisk.volume_id),
                 node_id=str(storagedriver_id)

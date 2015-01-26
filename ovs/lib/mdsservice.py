@@ -122,6 +122,8 @@ Service.start_service('{0}')
         """
         Syncs a vdisk to reality (except hypervisor)
         """
+
+        vdisk.reload_client()
         vdisk.invalidate_dynamics(['info'])
         config = vdisk.info['metadata_backend_config']
         config_dict = {}
@@ -163,6 +165,7 @@ Service.start_service('{0}')
         Ensures (or tries to ensure) the safety of a given vdisk (except hypervisor)
         """
 
+        vdisk.reload_client()
         if excluded_storagerouters is None:
             excluded_storagerouters = []
         maxload = Configuration.getInt('ovs.storagedriver.mds.maxload')
@@ -185,11 +188,14 @@ Service.start_service('{0}')
         configs = vdisk.info['metadata_backend_config']
         for config in configs:
             config['key'] = '{0}:{1}'.format(config['ip'], config['port'])
-        master_service = service_per_key.get(configs[0]['key'])
+        master_service = None
+        if len(configs) > 0:
+            master_service = service_per_key.get(configs[0]['key'])
         slave_services = []
-        for config in configs[1:]:
-            if config['key'] in service_per_key:
-                slave_services.append(service_per_key[config['key']])
+        if len(configs) > 1:
+            for config in configs[1:]:
+                if config['key'] in service_per_key:
+                    slave_services.append(service_per_key[config['key']])
 
         # Prepare fresh configuration
         new_services = []
@@ -271,10 +277,10 @@ Service.start_service('{0}')
         # Build the new configuration and update the vdisk
         configs = []
         for service in new_services:
-            configs.append(MDSNodeConfig(address=service.storagerouter.ip,
+            configs.append(MDSNodeConfig(address=str(service.storagerouter.ip),
                                          port=service.port))
         vdisk.storagedriver_client.update_metadata_backend_config(
-            volume_id=vdisk.volume_id,
+            volume_id=str(vdisk.volume_id),
             metadata_backend_config=MDSMetaDataBackendConfig(configs)
         )
         MDSServiceController.sync_vdisk_to_reality(vdisk)
