@@ -77,8 +77,8 @@ class SRClient():
         """
         Info volume mockup
         """
-        _ = volume_id
-        return type('Info', (), {'object_type': property(lambda s: 'BASE')})()
+        return type('Info', (), {'object_type': property(lambda s: 'BASE'),
+                                 'metadata_backend_config': property(lambda s: StorageDriverClient.metadata_backend_config.get(volume_id))})()
 
     @staticmethod
     def get_scrubbing_workunits(volume_id):
@@ -95,6 +95,7 @@ class StorageDriverClient():
     """
 
     snapshots = {}
+    metadata_backend_config = {}
 
     def __init__(self):
         """
@@ -109,6 +110,14 @@ class StorageDriverClient():
         """
         _ = vpool
         return SRClient()
+
+    @staticmethod
+    def empty_info():
+        """
+        Returns an empty info object
+        """
+        return type('Info', (), {'object_type': property(lambda s: 'BASE'),
+                                 'metadata_backend_config': property(lambda s: None)})()
 
 
 class MDSClient():
@@ -156,7 +165,7 @@ class StorageDriverConfiguration():
         pass
 
 
-class StorageDriver():
+class StorageDriverModule():
     """
     Mocks the StorageDriver
     """

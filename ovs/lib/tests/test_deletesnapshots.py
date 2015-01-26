@@ -21,7 +21,7 @@ import unittest
 from time import mktime
 from datetime import datetime
 from unittest import TestCase
-from ovs.lib.tests.mockups import StorageDriver
+from ovs.lib.tests.mockups import StorageDriverModule
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -54,7 +54,7 @@ class DeleteSnapshots(TestCase):
         PersistentFactory.store = DummyPersistentStore()
         VolatileFactory.store = DummyVolatileStore()
         # Replace mocked classes
-        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriver
+        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriverModule
         # Import required modules/classes after mocking is done
         from ovs.dal.hybrids.vmachine import VMachine
         from ovs.dal.hybrids.vdisk import VDisk

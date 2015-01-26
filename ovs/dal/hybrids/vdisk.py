@@ -104,7 +104,7 @@ class VDisk(DataObject):
                     vdiskinfodict[key] = str(objectvalue)
                 elif key == 'metadata_backend_config':
                     vdiskinfodict[key] = {}
-                    if type(objectvalue) is MDSMetaDataBackendConfig:
+                    if hasattr(objectvalue, 'node_configs') and callable(objectvalue.node_configs):
                         vdiskinfodict[key] = []
                         for nodeconfig in objectvalue.node_configs():
                             vdiskinfodict[key].append({'ip': nodeconfig.address(),

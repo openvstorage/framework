@@ -328,12 +328,12 @@ Service.start_service('{0}')
         for storagerouter_guid in mds_per_storagerouter:
             config_set[storagerouter_guid] = [mds_per_storagerouter[storagerouter_guid]]
             for load in sorted(mds_per_load.keys()):
-                if len(config_set[storagerouter_guid]) > safety:
+                if len(config_set[storagerouter_guid]) >= safety:
                     break
                 sr_guids = mds_per_load[load]
                 random.shuffle(sr_guids)
                 for sr_guid in sr_guids:
-                    if len(config_set[storagerouter_guid]) > safety:
+                    if len(config_set[storagerouter_guid]) >= safety:
                         break
                     if sr_guid != storagerouter_guid:
                         config_set[storagerouter_guid].append(mds_per_storagerouter[sr_guid])
