@@ -78,8 +78,8 @@ class MDSServiceController(object):
         mds_service.save()
 
         # Prepare some directores
-        scratch_dir = '{0}/mds_{0}_{1}'.format(storagedriver.mountpoint_temp, vpool.name, service_number)
-        rocksdb_dir = '{0}/mds_{0}_{1}'.format(storagedriver.mountpoint_md, vpool.name, service_number)
+        scratch_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, service_number)
+        rocksdb_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, service_number)
         client.run('mkdir -p {0}'.format(scratch_dir))
         # @TODO (after OVS-1605): client.run('mkdir -p {0}'.format(rocksdb_dir))
 
@@ -96,7 +96,7 @@ class MDSServiceController(object):
 
         # Create system services
         params = {'<VPOOL_NAME>': vpool.name,
-                  '<SERVICE_NUMBER>': '0'}
+                  '<SERVICE_NUMBER>': str(service_number)}
         template_dir = '/opt/OpenvStorage/config/templates/upstart'
         client.run('cp -f {0}/ovs-metadataserver.conf {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
         service_script = """
@@ -203,8 +203,7 @@ Service.start_service('{0}')
         # Check whether the master (if available) is non-local to the vdisk and/or is overloaded
         master_ok = master_service is not None
         if master_ok is True:
-            master_ok = master_service.storagerouter_guid == vdisk.storagerouter_guid \
-                        and services_load[master_service.guid] <= maxload
+            master_ok = master_service.storagerouter_guid == vdisk.storagerouter_guid and services_load[master_service.guid] <= maxload
 
         if master_ok:
             # Add this master to the fresh configuration
@@ -242,7 +241,8 @@ Service.start_service('{0}')
                     if master_service is not None:
                         new_services.append(master_service)
                     new_services.append(candidate_master)
-                slave_services.remove(candidate_master)
+                if candidate_master in slave_services:
+                    slave_services.remove(candidate_master)
             else:
                 # There's no non-overloaded local slave found. Keep the current master (if available) and add
                 # a local MDS (if available) as slave
@@ -250,7 +250,8 @@ Service.start_service('{0}')
                     new_services.append(master_service)
                 if local_mds is not None:
                     new_services.append(local_mds)
-                    slave_services.remove(local_mds)
+                    if local_mds in slave_services:
+                        slave_services.remove(local_mds)
 
         # At this point, there might (or might not) be a (new) master, and a (catching up) slave. The rest of the non-local
         # MDS nodes must now be added to the configuration until the safety is reached. It is preferred to recycle at
@@ -308,6 +309,8 @@ Service.start_service('{0}')
         """
         if mds_service.capacity < 0:
             return 50
+        if mds_service.capacity == 0:
+            return float('inf')
         return len(mds_service.vdisks_guids) / float(mds_service.capacity) * 100.0
 
     @staticmethod
@@ -344,3 +347,46 @@ Service.start_service('{0}')
                     if sr_guid != storagerouter_guid:
                         config_set[storagerouter_guid].append(mds_per_storagerouter[sr_guid])
         return config_set
+
+
+if __name__ == '__main__':
+    import time
+    from ovs.dal.lists.storagerouterlist import StorageRouterList
+    try:
+        while True:
+            output = ['',
+                      'Open vStorage - MDS debug information',
+                      '=====================================',
+                      'timestamp: {0}'.format(time.time()),
+                      '']
+            for _sr in StorageRouterList.get_storagerouters():
+                output.append('+ {0} ({1})'.format(_sr.name, _sr.ip))
+                vpools = set(sd.vpool for sd in _sr.storagedrivers)
+                for _vpool in vpools:
+                    output.append('  + {0}'.format(_vpool.name))
+                    for _mds_service in _vpool.mds_services:
+                        if _mds_service.service.storagerouter_guid == _sr.guid:
+                            masters, slaves = 0, 0
+                            for _junction in _mds_service.vdisks:
+                                if _junction.is_master:
+                                    masters += 1
+                                else:
+                                    slaves += 1
+                            capacity = _mds_service.capacity
+                            if capacity == -1:
+                                capacity = 'infinite'
+                            _load = MDSServiceController.get_mds_load(_mds_service)
+                            if _load == float('inf'):
+                                _load = 'infinite'
+                            else:
+                                _load = '{0}%'.format(round(_load, 2))
+                            output.append('    + {0} - port {1} - {2} master(s), {3} slave(s) - capacity: {4}, load: {5}'.format(
+                                _mds_service.number, _mds_service.service.port, masters, slaves, capacity, _load
+                            ))
+            output += ['',
+                       'Press ^C to exit',
+                       '']
+            print '\x1b[2J\x1b[H' + '\n'.join(output)
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass

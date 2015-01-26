@@ -198,6 +198,10 @@ class StorageDriverConfiguration(object):
             self.path = '{0}/{1}.json'.format(self.base_path, self.vpool_name)
         else:
             self.path = '{0}/{1}_{2}.json'.format(self.base_path, self.vpool_name, self.number)
+        # Fix some manual "I know what I'm doing" overrides
+        backend_connection_manager = 'backend_connection_manager'
+        self.params[self.config_type][backend_connection_manager]['optional'].append('s3_connection_strict_consistency')
+        # Generate configure_* methods
         for section in self.params[self.config_type]:
             setattr(self, 'configure_{0}'.format(section), make_configure(section))
 
@@ -265,10 +269,15 @@ class StorageDriverConfiguration(object):
         """
         Validates the loaded configuration agains the mandatory and optional parameters
         """
-        # Fix backend type depending mandatory/optional parameters
-        if self.configuration.get('backend_connection_manager', {}).get('backend_type', '') != 'REST':
-            self.params[self.config_type]['backend_connection_manager']['mandatory'].remove('rest_connection_policy_id')
-            self.params[self.config_type]['backend_connection_manager']['optional'].append('rest_connection_policy_id')
+        # Fix some manual "I know what I'm doing" overrides
+        backend_connection_manager = 'backend_connection_manager'
+        backend_type = 'backend_type'
+        if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'REST':
+            self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
+            self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
+        if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'LOCAL':
+            self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
+            self.params[self.config_type][backend_connection_manager]['optional'].append('local_connection_path')
         # Validation
         errors = []
         for section, entries in self.params[self.config_type].iteritems():

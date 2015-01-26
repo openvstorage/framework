@@ -39,7 +39,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.openstack.oscinder import OpenStackCinder
-from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -196,8 +196,8 @@ class VDiskController(object):
         logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
         volume_id = vdisk.storagedriver_client.create_clone(
             target_path=location,
-            metadata_backend_config=[MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                   port=mds_service.service.port)],
+            metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                            port=mds_service.service.port)]),
             parent_volume_id=str(vdisk.volume_id),
             parent_snapshot_id=str(snapshotid),
             node_id=str(vdisk.storagedriver_id)
@@ -331,8 +331,8 @@ class VDiskController(object):
         try:
             volume_id = vdisk.storagedriver_client.create_clone_from_template(
                 target_path=disk_path,
-                metadata_backend_config=[MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                       port=mds_service.service.port)],
+                metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                                port=mds_service.service.port)]),
                 parent_volume_id=str(vdisk.volume_id),
                 node_id=str(storagedriver_id)
             )
