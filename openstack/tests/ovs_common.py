@@ -349,8 +349,8 @@ class OVSPluginTestCase(test.TestCase):
             except ValueError:
                 not_found += 1
             time.sleep(2)
-            if not_found > 10:
-                raise RuntimeError('Image %s not created after 10 seconds' % image_name)
+            if not_found > 20:
+                raise RuntimeError('Image %s not created after 40 seconds' % image_name)
         raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, timeout_sec, image.status))
 
     # CINDER
