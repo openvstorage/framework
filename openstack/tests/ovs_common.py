@@ -350,7 +350,7 @@ class OVSPluginTestCase(test.TestCase):
                 pass
             time.sleep(2)
         images = self._glance_list_images_names()
-        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s. Images found:'
+        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s. Images found: %s'
                            % (image_name, state, 2*timeout_sec, image.status if image else "Unknown", str(images)))
 
     # CINDER
