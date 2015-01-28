@@ -349,7 +349,9 @@ class OVSPluginTestCase(test.TestCase):
             except ValueError as ve:
                 pass
             time.sleep(2)
-        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, 2*timeout_sec, image.status if image else "Unknown"))
+        images = self._glance_list_images_names()
+        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s. Images found:'
+                           % (image_name, state, 2*timeout_sec, image.status if image else "Unknown", str(images)))
 
     # CINDER
     def _get_cinder_config(self):
