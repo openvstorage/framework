@@ -338,6 +338,7 @@ class OVSPluginTestCase(test.TestCase):
         start = time.time()
         initial_state = None
         self._debug('wait until image %s becomes %s' % (image_name, state))
+        image = None
         while time.time() < start + timeout_sec:
             try:
                 image = self._glance_get_image_by_name(image_name)
@@ -345,10 +346,10 @@ class OVSPluginTestCase(test.TestCase):
                     raise RuntimeError('Image %s in error state' % image_name)
                 if image.status == state:
                     return image
-            except ValueError:
-                pass
+            except ValueError as ve:
+                print(str(ve))
             time.sleep(2)
-        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, timeout_sec, image.status))
+        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, 2*timeout_sec, image.status if image else "Unknown"))
 
     # CINDER
     def _get_cinder_config(self):
