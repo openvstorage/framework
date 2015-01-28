@@ -48,7 +48,7 @@ class OVSPluginTestCase(test.TestCase):
     shell_client = None
     current_user_id = os.getuid()
 
-    _profiled = False
+    _profiled = True
 
     def _debug(self, message):
         """
@@ -347,7 +347,7 @@ class OVSPluginTestCase(test.TestCase):
                 if image.status == state:
                     return image
             except ValueError as ve:
-                print(str(ve))
+                pass
             time.sleep(2)
         raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, 2*timeout_sec, image.status if image else "Unknown"))
 
