@@ -336,7 +336,6 @@ class OVSPluginTestCase(test.TestCase):
 
     def _glance_wait_until_image_state(self, image_name, state='active', timeout_sec=600):
         start = time.time()
-        not_found = 0
         initial_state = None
         self._debug('wait until image %s becomes %s' % (image_name, state))
         while time.time() < start + timeout_sec:
@@ -347,10 +346,8 @@ class OVSPluginTestCase(test.TestCase):
                 if image.status == state:
                     return image
             except ValueError:
-                not_found += 1
+                pass
             time.sleep(2)
-            if not_found > 20:
-                raise RuntimeError('Image %s not created after 40 seconds' % image_name)
         raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, timeout_sec, image.status))
 
     # CINDER
@@ -583,8 +580,8 @@ class OVSPluginTestCase(test.TestCase):
             if volume.status != initial_state:
                 self._debug('volume %s changed state from %s to %s' % (volume_id, initial_state, volume.status))
                 initial_state = volume.status
-            time.sleep(1)
-        raise RuntimeError('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, timeout_sec, volume.status))
+            time.sleep(3)
+        raise RuntimeError('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, 3*timeout_sec, volume.status))
 
     def _cinder_wait_until_snapshot_state(self, snapshot_id, status, timeout_sec=600):
         """
