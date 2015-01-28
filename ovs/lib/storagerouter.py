@@ -484,7 +484,9 @@ for directory in {0}:
         storagedriver_config.configure_filesystem(**filesystem_config)
         storagedriver_config.configure_volume_manager(clean_interval=1,
                                                       metadata_path=metadatapath,
-                                                      tlog_path=tlogpath)
+                                                      tlog_path=tlogpath,
+                                                      foc_throttle_usecs=4000,
+                                                      read_cache_default_behaviour='CacheOnWrite')
         storagedriver_config.configure_volume_router(**vrouter_config)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
