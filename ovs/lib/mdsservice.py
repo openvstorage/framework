@@ -29,7 +29,7 @@ from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 
 
-logger = LogHandler('lib', name='mds service controller')
+logger = LogHandler('lib', name='mds')
 
 
 class MDSServiceController(object):
@@ -175,6 +175,7 @@ Service.start_service('{0}')
         * Too much safety is not wanted (it adds loads to nodes while not required)
         """
 
+        logger.debug('Ensuring MDS safety for vdisk {0}'.format(vdisk.guid))
         vdisk.reload_client()
         if excluded_storagerouters is None:
             excluded_storagerouters = []
@@ -229,7 +230,7 @@ Service.start_service('{0}')
         if amount_of_services > safety:
             # Too much safety
             reconfigure_required = True
-        if amount_of_services < safety <= len(nodes):
+        if amount_of_services < safety and amount_of_services <= len(nodes):
             # Insufficient MDS services configured while there should be sufficient nodes available
             reconfigure_required = True
         if master_service is not None and services_load[master_service.guid] > maxload:
@@ -240,8 +241,11 @@ Service.start_service('{0}')
             reconfigure_required = True
 
         if reconfigure_required is False:
+            logger.debug('No reconfiguration required for vdisk {0}'.format(vdisk.guid))
+            MDSServiceController.sync_vdisk_to_reality(vdisk)
             return
 
+        logger.debug('Reconfiguration required for vdisk {0}'.format(vdisk.guid))
         # Prepare fresh configuration
         new_services = []
 
@@ -274,12 +278,12 @@ Service.start_service('{0}')
             if candidate_master is not None:
                 # A non-overloaded local slave was found.
                 client = MetadataServerClient.load(candidate_master)
-                amount_of_tlogs = client.catch_up(vdisk.volume_id, True)
+                amount_of_tlogs = tlogs - 1  # @TODO: client.catch_up(str(vdisk.volume_id), True)
                 if amount_of_tlogs < tlogs:
                     # Almost there. Catching up right now, and continue as soon as it's up-to-date
                     start = time.time()
-                    client.catch_up(vdisk.volume_id, False)
-                    logger.debug('MDS catch up for volume {0} took {1}s'.format(vdisk.volume_id, round(time.time() - start, 2)))
+                    # @TODO: client.catch_up(str(vdisk.volume_id), False)
+                    logger.debug('MDS catch up for vdisk {0} took {1}s'.format(vdisk.guid, round(time.time() - start, 2)))
                     # It's up to date, so add it as a new master
                     new_services.append(candidate_master)
                     if master_service is not None:
@@ -327,6 +331,8 @@ Service.start_service('{0}')
         # Build the new configuration and update the vdisk
         configs = []
         for service in new_services:
+            client = MetadataServerClient.load(service)
+            client.create_namespace(str(vdisk.volume_id))
             configs.append(MDSNodeConfig(address=str(service.storagerouter.ip),
                                          port=service.port))
         vdisk.storagedriver_client.update_metadata_backend_config(
@@ -334,6 +340,7 @@ Service.start_service('{0}')
             metadata_backend_config=MDSMetaDataBackendConfig(configs)
         )
         MDSServiceController.sync_vdisk_to_reality(vdisk)
+        logger.debug('Ensuring MDS safety for vdisk {0} completed'.format(vdisk.guid))
 
     @staticmethod
     def get_preferred_mds(storagerouter, vpool, include_load=False):
@@ -401,7 +408,6 @@ Service.start_service('{0}')
 
 
 if __name__ == '__main__':
-    import time
     from ovs.dal.lists.storagerouterlist import StorageRouterList
     try:
         while True:
