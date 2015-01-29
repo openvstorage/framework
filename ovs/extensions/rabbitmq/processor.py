@@ -46,6 +46,7 @@ def process(queue, body, mapping):
         # - [TASK_NAME]: Task method name
         # - [<argument value>]: Any value of the `arguments` dictionary.
 
+        logger.info('Got event, processing...')
         if data.type in mapping:
             for current_map in mapping[data.type]:
                 task = current_map['task']

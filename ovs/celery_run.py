@@ -94,6 +94,13 @@ celery.conf.CELERYBEAT_SCHEDULE = {
         'task': 'ovs.scheduled.clean_logs',
         'schedule': crontab(minute='30', hour='0'),
         'args': []
+    },
+    # Validate MDS service configuration every day
+    # > Executes every day at 00:30
+    'mds-checkup': {
+        'task': 'ovs.scheduled.mds_checkup',
+        'schedule': crontab(minute='30', hour='0'),
+        'args': []
     }
 }
 

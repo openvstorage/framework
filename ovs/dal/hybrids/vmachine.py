@@ -91,9 +91,8 @@ class VMachine(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        client = StorageDriverClient()
         vdiskstatsdict = {}
-        for key in client.stat_keys:
+        for key in StorageDriverClient.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
@@ -117,7 +116,7 @@ class VMachine(DataObject):
         status_code = 0
         for vdisk in self.vdisks:
             mode = vdisk.info['failover_mode']
-            current_status_code = StorageDriverClient.FOC_STATUS[mode.lower()]
+            current_status_code = StorageDriverClient.foc_status[mode.lower()]
             if current_status_code > status_code:
                 status = mode
                 status_code = current_status_code
