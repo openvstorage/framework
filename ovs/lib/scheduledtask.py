@@ -338,7 +338,7 @@ class ScheduledTaskController(object):
                 mds_services = mds_dict[vpool][storagerouter]
                 has_room = False
                 for mds_service in mds_services:
-                    load = MDSServiceController.get_mds_load(mds_service)
+                    load, _ = MDSServiceController.get_mds_load(mds_service)
                     if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
                         has_room = True
                         break

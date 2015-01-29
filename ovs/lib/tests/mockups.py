@@ -88,6 +88,13 @@ class SRClient():
         _ = volume_id
         return []
 
+    @staticmethod
+    def update_metadata_backend_config(volume_id, metadata_backend_config):
+        """
+        Stores the given config
+        """
+        StorageDriverClient.metadata_backend_config[volume_id] = metadata_backend_config
+
 
 class StorageDriverClient():
     """
@@ -96,6 +103,7 @@ class StorageDriverClient():
 
     snapshots = {}
     metadata_backend_config = {}
+    catch_up = {}
 
     def __init__(self):
         """
@@ -130,6 +138,10 @@ class MDSClient():
         Dummy init method
         """
         self.service = service
+
+    def catch_up(self, volume_id, dry_run):
+        _ = self, dry_run
+        return StorageDriverClient.catch_up[volume_id]
 
 
 class MetadataServerClient():

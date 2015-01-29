@@ -15,7 +15,7 @@
 """
 MDSService module
 """
-import math
+import time
 import random
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
 from ovs.dal.hybrids.service import Service
@@ -23,9 +23,13 @@ from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
+from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
+
+
+logger = LogHandler('lib', name='mds service controller')
 
 
 class MDSServiceController(object):
@@ -157,12 +161,18 @@ Service.start_service('{0}')
                         mds_service_vdisk = MDSServiceVDisk()
                         mds_service_vdisk.vdisk = vdisk
                         mds_service_vdisk.mds_service = service.mds_service
+                        mds_service_vdisk.is_master = config[0]['ip'] == service.storagerouter.ip and config[0]['port'] == service.port
                         mds_service_vdisk.save()
 
     @staticmethod
     def ensure_safety(vdisk, excluded_storagerouters=None):
         """
-        Ensures (or tries to ensure) the safety of a given vdisk (except hypervisor)
+        Ensures (or tries to ensure) the safety of a given vdisk (except hypervisor).
+        Assumptions:
+        * A local overloaded master is better than a non-local non-overloaded master
+        * Prefer master/services to be on different hosts, a subsequent slave on the same node doesn't add safety
+        * Don't actively overload services (e.g. configure an MDS as slave causing it to get overloaded)
+        * Too much safety is not wanted (it adds loads to nodes while not required)
         """
 
         vdisk.reload_client()
@@ -170,32 +180,67 @@ Service.start_service('{0}')
             excluded_storagerouters = []
         maxload = Configuration.getInt('ovs.storagedriver.mds.maxload')
         safety = Configuration.getInt('ovs.storagedriver.mds.safety')
+        tlogs = Configuration.getInt('ovs.storagedriver.mds.tlogs')
         services = [mds_service.service for mds_service in vdisk.vpool.mds_services
                     if mds_service.service.storagerouter not in excluded_storagerouters]
-        services_per_load = {}
+        nodes = set(service.storagerouter.ip for service in services)
         services_load = {}
         service_per_key = {}
         for service in services:
-            load = MDSServiceController.get_mds_load(service.mds_service)
-            if load not in services_per_load:
-                services_per_load[load] = []
-            services_per_load[load].append(service)
-            services_load[service.guid] = load
+            load, load_plus = MDSServiceController.get_mds_load(service.mds_service)
+            services_load[service.guid] = load, load_plus
             service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.port)] = service
 
         # List current configuration and filter out excluded services
+        reconfigure_required = False
         vdisk.invalidate_dynamics(['info'])
         configs = vdisk.info['metadata_backend_config']
         for config in configs:
             config['key'] = '{0}:{1}'.format(config['ip'], config['port'])
         master_service = None
         if len(configs) > 0:
-            master_service = service_per_key.get(configs[0]['key'])
+            config = configs[0]
+            if config['key'] in service_per_key:
+                master_service = service_per_key.get(config['key'])
+                configs.remove(config)
+            else:
+                reconfigure_required = True
         slave_services = []
-        if len(configs) > 1:
-            for config in configs[1:]:
-                if config['key'] in service_per_key:
-                    slave_services.append(service_per_key[config['key']])
+        for config in configs:
+            if config['key'] in service_per_key:
+                slave_services.append(service_per_key[config['key']])
+            else:
+                reconfigure_required = True
+
+        # Fix services_load
+        services_per_load = {}
+        for service in services:
+            if service == master_service or service in slave_services:
+                load = services_load[service.guid][0]
+            else:
+                load = services_load[service.guid][1]
+            services_load[service.guid] = load
+            if load not in services_per_load:
+                services_per_load[load] = []
+            services_per_load[load].append(service)
+
+        # Further checks if a reconfiguration is required.
+        amount_of_services = len(slave_services) + (1 if master_service is not None else 0)
+        if amount_of_services > safety:
+            # Too much safety
+            reconfigure_required = True
+        if amount_of_services < safety <= len(nodes):
+            # Insufficient MDS services configured while there should be sufficient nodes available
+            reconfigure_required = True
+        if master_service is not None and services_load[master_service.guid] > maxload:
+            # The master service is overloaded
+            reconfigure_required = True
+        if any(service for service in slave_services if services_load[service.guid] > maxload):
+            # There's a slave service overloaded
+            reconfigure_required = True
+
+        if reconfigure_required is False:
+            return
 
         # Prepare fresh configuration
         new_services = []
@@ -228,8 +273,13 @@ Service.start_service('{0}')
                             candidate_master_load = load
             if candidate_master is not None:
                 # A non-overloaded local slave was found.
-                up_to_date = True  # @TODO: Call storagedriver to figure out whether its (more or less) up to date
-                if up_to_date is True:
+                client = MetadataServerClient.load(candidate_master)
+                amount_of_tlogs = client.catch_up(vdisk.volume_id, True)
+                if amount_of_tlogs < tlogs:
+                    # Almost there. Catching up right now, and continue as soon as it's up-to-date
+                    start = time.time()
+                    client.catch_up(vdisk.volume_id, False)
+                    logger.debug('MDS catch up for volume {0} took {1}s'.format(vdisk.volume_id, round(time.time() - start, 2)))
                     # It's up to date, so add it as a new master
                     new_services.append(candidate_master)
                     if master_service is not None:
@@ -254,26 +304,25 @@ Service.start_service('{0}')
                         slave_services.remove(local_mds)
 
         # At this point, there might (or might not) be a (new) master, and a (catching up) slave. The rest of the non-local
-        # MDS nodes must now be added to the configuration until the safety is reached. It is preferred to recycle at
-        # least floor(safety/2) current slaves to prevent to much fresh slaves that still have to sync all data
-        recycle_count = math.floor(safety / 2.0)
-        loads = sorted(services_per_load.keys())
-        nodes = [service.storagerouter.ip for service in new_services]
-        if len(new_services) < recycle_count:
+        # MDS nodes must now be added to the configuration until the safety is reached. There's always one extra
+        # slave recycled to make sure there's always an (almost) up-to-date slave ready for failover
+        loads = sorted(load for load in services_per_load.keys() if load <= maxload)
+        nodes = set(service.storagerouter.ip for service in new_services)
+        slave_added = False
+        if len(nodes) < safety:
             for load in loads:
                 for service in services_per_load[load]:
-                    if service in slave_services:
-                        if len(new_services) < recycle_count:
-                            if service.storagerouter.ip not in nodes:
-                                new_services.append(service)
-                                slave_services.remove(service)
-                                nodes.append(service.storagerouter.ip)
-        if len(new_services) < safety:
-            for load in loads:
-                for service in services_per_load[load]:
-                    if len(new_services) < safety and service.storagerouter.ip not in nodes:
+                    if slave_added is False and service in slave_services and service.storagerouter.ip not in nodes:
                         new_services.append(service)
-                        nodes.append(service.storagerouter.ip)
+                        slave_services.remove(service)
+                        nodes.add(service.storagerouter.ip)
+                        slave_added = True
+        if len(nodes) < safety:
+            for load in loads:
+                for service in services_per_load[load]:
+                    if len(nodes) < safety and service.storagerouter.ip not in nodes:
+                        new_services.append(service)
+                        nodes.add(service.storagerouter.ip)
 
         # Build the new configuration and update the vdisk
         configs = []
@@ -307,11 +356,13 @@ Service.start_service('{0}')
         """
         Gets a 'load' for an MDS service based on its capacity and the amount of assinged VDisks
         """
-        if mds_service.capacity < 0:
-            return 50
-        if mds_service.capacity == 0:
-            return float('inf')
-        return len(mds_service.vdisks_guids) / float(mds_service.capacity) * 100.0
+        service_capacity = float(mds_service.capacity)
+        if service_capacity < 0:
+            return 50, 50
+        if service_capacity == 0:
+            return float('inf'), float('inf')
+        usage = len(mds_service.vdisks_guids)
+        return round(usage / service_capacity * 100.0, 5), round((usage + 1) / service_capacity * 100.0, 5)
 
     @staticmethod
     def get_mds_storagedriver_config_set(vpool):
@@ -375,7 +426,7 @@ if __name__ == '__main__':
                             capacity = _mds_service.capacity
                             if capacity == -1:
                                 capacity = 'infinite'
-                            _load = MDSServiceController.get_mds_load(_mds_service)
+                            _load, _ = MDSServiceController.get_mds_load(_mds_service)
                             if _load == float('inf'):
                                 _load = 'infinite'
                             else:

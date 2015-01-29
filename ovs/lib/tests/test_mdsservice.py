@@ -121,6 +121,22 @@ class MDSServices(TestCase):
         """
         pass
 
+    def _generate_nc_function(self, address, mds_service):
+        """
+        Generates the lambda that will return the address or ip
+        """
+        _ = self
+        if address is True:
+            return lambda s: mds_service.service.storagerouter.ip
+        return lambda s: int(mds_service.service.port)
+
+    def _generate_bc_function(self, _configs):
+        """
+        Generates the lambda that will return the config list
+        """
+        _ = self
+        return lambda s: _configs
+
     def _build_service_structure(self, structure):
         """
         Builds an MDS service structure
@@ -185,12 +201,18 @@ class MDSServices(TestCase):
             mds_service.vpool = sd.vpool
             mds_service.save()
             mds_services[mds_id] = mds_service
-        return vpools, storagerouters, storagedrivers, services, mds_services
+        return vpools, storagerouters, storagedrivers, services, mds_services, service_type
 
     def _create_vdisks_for_mds_service(self, amount, start_id, mds_service=None, vpool=None):
         """
         Generates vdisks and appends them to a given mds_service
         """
+        def _generate_storagerouter_lambda(_mds_service):
+            """
+            Generates a lambda that always returns this mds_service' storagerouter_guid
+            """
+            return lambda: _mds_service.service.storagerouter_guid
+
         vdisks = {}
         for i in xrange(start_id, start_id + amount):
             disk = VDisk()
@@ -202,10 +224,21 @@ class MDSServices(TestCase):
             disk.save()
             disk.reload_client()
             if mds_service is not None:
+                disk._frozen = False
+                disk._storagerouter_guid = _generate_storagerouter_lambda(mds_service)
+                disk._frozen = True
                 junction = MDSServiceVDisk()
                 junction.vdisk = disk
                 junction.mds_service = mds_service
+                junction.is_master = True
                 junction.save()
+                config = type('MDSNodeConfig', (),
+                              {'address': self._generate_nc_function(True, mds_service),
+                               'port': self._generate_nc_function(False, mds_service)})()
+                mds_backend_config = type('MDSMetaDataBackendConfig', (),
+                                          {'node_configs': self._generate_bc_function([config])})()
+                StorageDriverClient.metadata_backend_config['disk_{0}'.format(i)] = mds_backend_config
+                StorageDriverClient.catch_up['disk_{0}'.format(i)] = 50
             vdisks[i] = disk
         return vdisks
 
@@ -213,7 +246,7 @@ class MDSServices(TestCase):
         """
         Validates whether the load calculation works
         """
-        vpools, storagerouters, storagedrivers, services, mds_services = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, services, mds_services, _ = self._build_service_structure(
             {'vpools': [1],
              'storagerouters': [1],
              'storagedrivers': [(1, 1, 1)],  # (<id>, <vpool_id>, <sr_id>)
@@ -221,25 +254,34 @@ class MDSServices(TestCase):
         )
         mds_service = mds_services[1]
         self._create_vdisks_for_mds_service(2, 1, mds_service=mds_service)
-        load = MDSServiceController.get_mds_load(mds_service)
-        self.assertEqual(load, 20, 'There should be a 100% load. {0}'.format(load))
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
+        self.assertEqual(load, 20, 'There should be a 20% load. {0}'.format(load))
+        self.assertEqual(load_plus, 30, 'There should be a 30% plus load. {0}'.format(load_plus))
         self._create_vdisks_for_mds_service(3, 3, mds_service=mds_service)
-        load = MDSServiceController.get_mds_load(mds_service)
-        self.assertEqual(load, 50, 'There should be a 100% load. {0}'.format(load))
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
+        self.assertEqual(load, 50, 'There should be a 50% load. {0}'.format(load))
+        self.assertEqual(load_plus, 60, 'There should be a 60% plus load. {0}'.format(load_plus))
         self._create_vdisks_for_mds_service(5, 6, mds_service=mds_service)
-        load = MDSServiceController.get_mds_load(mds_service)
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
         self.assertEqual(load, 100, 'There should be a 100% load. {0}'.format(load))
+        self.assertEqual(load_plus, 110, 'There should be a 110% plus load. {0}'.format(load_plus))
         mds_service.capacity = -1
         mds_service.save()
-        load = MDSServiceController.get_mds_load(mds_service)
-        self.assertEqual(load, 50, 'There should be a 100% load. {0}'.format(load))
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
+        self.assertEqual(load, 50, 'There should be a 50% load. {0}'.format(load))
+        self.assertEqual(load_plus, 50, 'There should be a 50% plus load. {0}'.format(load_plus))
+        mds_service.capacity = 0
+        mds_service.save()
+        load, load_plus = MDSServiceController.get_mds_load(mds_service)
+        self.assertEqual(load, float('inf'), 'There should be infinite load. {0}'.format(load))
+        self.assertEqual(load_plus, float('inf'), 'There should be infinite plus load. {0}'.format(load_plus))
 
     def test_storagedriver_config_set(self):
         """
         Validates whether storagedriver configuration is generated as expected
         """
         PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
-        vpools, storagerouters, storagedrivers, services, mds_services = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, services, mds_services, _ = self._build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3, 4, 5, 6],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4), (5, 2, 4), (6, 2, 5), (7, 2, 6)],  # (<id>, <vpool_id>, <sr_id>)
@@ -307,27 +349,13 @@ class MDSServices(TestCase):
             """
             Injects a backend config that would be returned by the storagedriver
             """
-            def _generate_nc_function(address, mds_service):
-                """
-                Generates the lambda that will return the address or ip
-                """
-                if address is True:
-                    return lambda s: mds_service.service.storagerouter.ip
-                return lambda s: int(mds_service.service.port)
-
-            def _generate_bc_function(_configs):
-                """
-                Generates the lambda that will return the config list
-                """
-                return lambda s: _configs
-
             for disk_id in _scenario:
                 configs = []
                 for mds_id in _scenario[disk_id]:
-                    config = type('MDSNodeConfig', (), {'address': _generate_nc_function(True, _mds_services[mds_id]),
-                                                        'port': _generate_nc_function(False, _mds_services[mds_id])})()
+                    config = type('MDSNodeConfig', (), {'address': self._generate_nc_function(True, _mds_services[mds_id]),
+                                                        'port': self._generate_nc_function(False, _mds_services[mds_id])})()
                     configs.append(config)
-                mds_backend_config = type('MDSMetaDataBackendConfig', (), {'node_configs': _generate_bc_function(configs)})()
+                mds_backend_config = type('MDSMetaDataBackendConfig', (), {'node_configs': self._generate_bc_function(configs)})()
                 StorageDriverClient.metadata_backend_config[_vdisks[disk_id].volume_id] = mds_backend_config
 
         def _validate_scenario(_scenario, _vdisks, _mds_services):
@@ -352,7 +380,7 @@ class MDSServices(TestCase):
                 MDSServiceController.sync_vdisk_to_reality(_vdisks[vdisk_id])
             _validate_scenario(scenario, _vdisks, _mds_services)
 
-        vpools, _, _, _, mds_services = self._build_service_structure(
+        vpools, _, _, _, mds_services, _ = self._build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3, 4],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <sr_id>)
@@ -363,6 +391,205 @@ class MDSServices(TestCase):
                        vdisks, mds_services)
         _test_scenario({1: [1, 2], 2: [1, 2, 3, 4, 5], 3: [1, 2], 4: [5], 5: [1, 4, 5]},
                        vdisks, mds_services)
+
+    def test_ensure_safety(self):
+        """
+        Validates whether the ensure_safety call works as expected
+        """
+        def _generate_mds_service_load_repr(_mds_service):
+            """
+            Generates a load representing thing for a given mds_service
+            """
+            masters, slaves = 0, 0
+            for _junction in _mds_service.vdisks:
+                if _junction.is_master:
+                    masters += 1
+                else:
+                    slaves += 1
+            capacity = _mds_service.capacity
+            if capacity == -1:
+                capacity = 'infinite'
+            _load, _ = MDSServiceController.get_mds_load(_mds_service)
+            if _load == float('inf'):
+                _load = 'infinite'
+            else:
+                _load = round(_load, 2)
+            return [_mds_service.service.storagerouter.ip, _mds_service.service.port, masters, slaves, capacity, _load]
+
+        def _check_reality(_configs, _loads, _vdisks, _mds_services, test=True, display=False):
+            """
+            Validates 'reality' with an expected config/load
+            """
+            reality_configs = []
+            for _vdisk_id in _vdisks:
+                reality_configs.append(_vdisks[_vdisk_id].info['metadata_backend_config'])
+            if display is True:
+                for c in reality_configs:
+                    print c
+            if test is True:
+                self.assertListEqual(reality_configs, _configs)
+            reality_loads = []
+            for mds_id in _mds_services:
+                reality_loads.append(_generate_mds_service_load_repr(_mds_services[mds_id]))
+            if display is True:
+                for l in reality_loads:
+                    print l
+            if test is True:
+                self.assertListEqual(reality_loads, _loads)
+
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', '75')
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', '100')
+        vpools, storagerouters, _, _, mds_services, service_type = self._build_service_structure(
+            {'vpools': [1],
+             'storagerouters': [1, 2, 3, 4],
+             'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <sr_id>)
+             'mds_services': [(1, 1), (2, 2), (3, 3), (4, 4)]}  # (<id>, <sd_id>)
+        )
+        vdisks = {}
+        start_id = 1
+        for mds_service in mds_services.itervalues():
+            vdisks.update(self._create_vdisks_for_mds_service(2, start_id, mds_service=mds_service))
+            start_id += 2
+
+        # Validate the start configuration which is simple, each disk has only its default local master
+        configs = [[{'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.4', 'port': 4}]]
+        loads = [['10.0.0.1', 1, 2, 0, 10, 20.0],
+                 ['10.0.0.2', 2, 2, 0, 10, 20.0],
+                 ['10.0.0.3', 3, 2, 0, 10, 20.0],
+                 ['10.0.0.4', 4, 2, 0, 10, 20.0]]
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # Validate first run. Each disk should now have sufficient nodes, since there are plenty of MDS services available
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.2', 'port': 2}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 2, 2, 4, 10, 60.0],
+                 ['10.0.0.3', 3, 2, 4, 10, 60.0],
+                 ['10.0.0.4', 4, 2, 3, 10, 50.0]]
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # Validate whether this extra (unnessecairy) run doesn't change anything, preventing reconfiguring over and
+        # over again
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # Validating whether an overloaded node will cause correct rebalancing
+        mds_services[2].capacity = 2
+        mds_services[2].save()
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 2, 2, 0, 2, 100.0],
+                 ['10.0.0.3', 3, 2, 5, 10, 70.0],
+                 ['10.0.0.4', 4, 2, 5, 10, 70.0]]
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # Validate whether the overloaded services are still handled. In this case, causing a reoder of the slaves as
+        # ordered in the model
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 2, 2, 0, 2, 100.0],
+                 ['10.0.0.3', 3, 2, 5, 10, 70.0],
+                 ['10.0.0.4', 4, 2, 5, 10, 70.0]]
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # Again, validating whether a subsequent run doesn't give unexpected changes
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # A MDS service will be added (next to the overloaded service), this should cause the expected rebalancing
+        s_id = '{0}-5'.format(storagerouters[2].name)
+        service = Service()
+        service.name = s_id
+        service.storagerouter = storagerouters[2]
+        service.port = 5
+        service.type = service_type
+        service.save()
+        mds_service = MDSService()
+        mds_service.service = service
+        mds_service.number = 0
+        mds_service.capacity = 10
+        mds_service.vpool = vpools[1]
+        mds_service.save()
+        mds_services[5] = mds_service
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.2', 'port': 5}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 2, 2, 0, 2, 100.0],
+                 ['10.0.0.3', 3, 2, 5, 10, 70.0],
+                 ['10.0.0.4', 4, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 5, 0, 3, 10, 30.0]]
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # If the tlogs are not catched up, nothing should be changed
+        for vdisk_id in [3, 4]:
+            StorageDriverClient.catch_up[vdisks[vdisk_id].volume_id] = 1000
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # The next run, after tlogs are catched up, a master switch should be executed
+        for vdisk_id in [3, 4]:
+            StorageDriverClient.catch_up[vdisks[vdisk_id].volume_id] = 50
+        configs = [[{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.2', 'port': 5}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 2, 1, 0, 2,  50.0],
+                 ['10.0.0.3', 3, 2, 5, 10, 70.0],
+                 ['10.0.0.4', 4, 2, 5, 10, 70.0],
+                 ['10.0.0.2', 5, 1, 1, 10, 20.0]]
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
 
 
 if __name__ == '__main__':
