@@ -27,14 +27,18 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
+from ovs.dal.lists.vpoollist import VPoolList
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from volumedriver.scrubber.scrubber import Scrubber
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+# @TODO: from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
-_storagedriver_scrubber = Scrubber()
+_storagedriver_scrubber = None  # @TODO: Scrubber()
 logger = LogHandler('lib', name='scheduled tasks')
 
 
@@ -310,3 +314,50 @@ class ScheduledTaskController(object):
         for log in LogList.get_logs():
             if log.time < mark:
                 log.delete()
+
+    @staticmethod
+    @celery.task(name='ovs.scheduled.mds_checkup', bind=True)
+    @ensure_single(['ovs.scheduled.mds_checkup'])
+    def mds_checkup():
+        """
+        Validates the current MDS setup/configuration and takes actions where required
+        """
+        mds_dict = {}
+        for vpool in VPoolList.get_vpools():
+            for mds_service in vpool.mds_services:
+                storagerouter = mds_service.service.storagerouter
+                if vpool not in mds_dict:
+                    mds_dict[vpool] = {}
+                if storagerouter not in mds_dict[vpool]:
+                    mds_dict[vpool][storagerouter] = []
+                mds_dict[vpool][storagerouter].append(mds_service)
+        for vpool in mds_dict:
+            # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
+            #    If not, create an extra MDS for that StorageRouter
+            for storagerouter in mds_dict[vpool]:
+                mds_services = mds_dict[vpool][storagerouter]
+                has_room = False
+                for mds_service in mds_services:
+                    load, _ = MDSServiceController.get_mds_load(mds_service)
+                    if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
+                        has_room = True
+                        break
+                if has_room is False:
+                    client = SSHClient.load(storagerouter.ip)
+                    mds_service = MDSServiceController.prepare_mds_service(client, storagerouter, vpool,
+                                                                           fresh_only=False, start=True)
+                    if mds_service is None:
+                        raise RuntimeError('Could not add MDS node')
+                    mds_dict[vpool][storagerouter].append(mds_service)
+            mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
+            for storagerouter in mds_dict[vpool]:
+                client = SSHClient.load(storagerouter.ip)
+                storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+                storagedriver_config.load(client)
+                if storagedriver_config.is_new is False:
+                    storagedriver_config.clean()  # Clean out obsolete values
+                    storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[storagerouter.guid])
+                    storagedriver_config.save(client)
+            # 2. Per VPool, execute a safety check, making sure the master/slave configuration is optimal.
+            for vdisk in vpool.vdisks:
+                MDSServiceController.ensure_safety(vdisk)

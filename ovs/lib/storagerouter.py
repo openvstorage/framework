@@ -25,14 +25,11 @@ from ovs.celery_run import celery
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
-from ovs.dal.hybrids.service import Service
-from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
-from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
@@ -41,7 +38,9 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.log.logHandler import LogHandler
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.extensions.openstack.oscinder import OpenStackCinder
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 
 logger = LogHandler('lib', name='storagerouter')
 
@@ -132,17 +131,14 @@ class StorageRouterController(object):
                             'At least one vMachine using this vPool is still running or paused. Make sure there are no active vMachines'
                         )
 
-        nodes = {ip}  # Set comprehension
+        all_storagerouters = [storagerouter]
         if vpool is not None:
-            for vpool_storagedriver in vpool.storagedrivers:
-                nodes.add(vpool_storagedriver.storagerouter.ip)
-        nodes = list(nodes)
-
+            all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
         voldrv_service = 'volumedriver_{0}'.format(vpool_name)
 
         # Stop services
-        for node in nodes:
-            node_client = SSHClient.load(node)
+        for sr in all_storagerouters:
+            node_client = SSHClient.load(sr.ip)
             System.exec_remote_python(node_client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
@@ -392,18 +388,6 @@ for directory in {0}:
             readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
             readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
 
-        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
-        service = None
-        mdsservice = None
-        for current_service in mdsservice_type.services:
-            if current_service.storagerouter_guid == storagerouter.guid and current_service.mds_service.vpool_guid == vpool.guid:
-                if current_service.mds_service.number == 0:
-                    service = current_service
-                    mdsservice = current_service.mds_service
-                    break
-                else:
-                    raise RuntimeError('A MDS service was found with number other than 0, aborting.')
-
         ports_in_use = list(System.ports_in_use(client))
         ports_reserved = []
         if new_storagedriver:
@@ -420,11 +404,6 @@ for directory in {0}:
                 ports = StorageRouterController._get_free_ports(client, ports_in_use + ports_reserved, 3)
         else:
             ports = storagedriver.ports
-
-        ports_in_use += ports
-        if service is None:
-            service = Service()
-            service.port = StorageRouterController._get_free_ports(client, ports_in_use + ports_reserved, 1)
 
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
         ipaddresses = client.run(cmd).strip().split('\n')
@@ -452,6 +431,9 @@ for directory in {0}:
         voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'ovs.storagedriver.db.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
+        arakoon_nodes = []
+        for node_id, node_config in voldrv_arakoon_client_config.iteritems():
+            arakoon_nodes.append({'node_id': node_id, 'host': node_config[0][0], 'port': node_config[1]})
         arakoon_node_configs = []
         for arakoon_node in voldrv_arakoon_client_config.keys():
             arakoon_node_configs.append(ArakoonNodeConfig(arakoon_node,
@@ -473,56 +455,48 @@ for directory in {0}:
         if readcache2:
             readcaches.append({'path': readcache2, 'size': readcache2_size})
         scocaches = [{'path': scocache, 'size': scocache_size}]
-        filesystem_config = {'fs_backend_path': mountpoint_bfs}
-        volumemanager_config = {'metadata_path': metadatapath, 'tlog_path': tlogpath}
-        storagedriver_config_script = """
-from ovs.plugin.provider.configuration import Configuration
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+        filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
+        filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
+                                  'fs_metadata_backend_mds_nodes': [],
+                                  'fs_metadata_backend_type': 'MDS'})
+        readcache_serialization_path = System.read_remote_config(client, 'ovs.storagedriver.readcache.serialization.path')
+        queue_protocol = Configuration.get('ovs.core.broker.protocol')
+        queue_login = Configuration.get('ovs.core.broker.login')
+        queue_password = Configuration.get('ovs.core.broker.password')
+        queue_volumerouterqueue = Configuration.get('ovs.core.broker.volumerouter.queue')
+        queue_urls = []
+        for current_storagerouter in StorageRouterList.get_masters():
+            queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(queue_protocol,
+                                                                      queue_login,
+                                                                      queue_password,
+                                                                      current_storagerouter.ip)})
 
-fd_config = {{'fd_cache_path': '{11}',
-              'fd_extent_cache_capacity': '1024',
-              'fd_namespace' : 'fd-{0}-{12}'}}
-storagedriver_configuration = StorageDriverConfiguration('{0}')
-storagedriver_configuration.configure_backend({1})
-storagedriver_configuration.configure_readcache({2}, Configuration.get('ovs.storagedriver.readcache.serialization.path') + '/{0}')
-storagedriver_configuration.configure_scocache({3}, '1GB', '2GB')
-storagedriver_configuration.configure_failovercache('{4}')
-storagedriver_configuration.configure_filesystem({5})
-storagedriver_configuration.configure_volumemanager({6})
-storagedriver_configuration.configure_volumerouter('{12}', {7})
-storagedriver_configuration.configure_arakoon_cluster('{8}', {9})
-storagedriver_configuration.configure_hypervisor('{10}')
-storagedriver_configuration.configure_filedriver(fd_config)
-""".format(vpool_name, vpool.metadata, readcaches, scocaches, failovercache, filesystem_config,
-           volumemanager_config, vrouter_config, voldrv_arakoon_cluster_id, voldrv_arakoon_client_config,
-           storagerouter.pmachine.hvtype, fdcache, vpool.guid)
-        System.exec_remote_python(client, storagedriver_config_script)
-        remote_script = """
-import os
-from configobj import ConfigObj
-from ovs.plugin.provider.configuration import Configuration
-protocol = Configuration.get('ovs.core.broker.protocol')
-login = Configuration.get('ovs.core.broker.login')
-password = Configuration.get('ovs.core.broker.password')
-vpool_name = {0}
-uris = []
-cfg = ConfigObj('/opt/OpenvStorage/config/rabbitmqclient.cfg')
-main_section = cfg.get('main')
-nodes = main_section['nodes'] if type(main_section['nodes']) == list else [main_section['nodes']]
-for node in nodes:
-    uris.append({{'amqp_uri': '{{0}}://{{1}}:{{2}}@{{3}}'.format(protocol, login, password, cfg.get(node)['location'])}})
-from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-queue_config = {{'events_amqp_routing_key': Configuration.get('ovs.core.broker.volumerouter.queue'),
-                 'events_amqp_uris': uris}}
-for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
-    this_vpool_name = config_file.replace('.json', '')
-    if config_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
-        storagedriver_configuration = StorageDriverConfiguration(this_vpool_name)
-        storagedriver_configuration.configure_event_publisher(queue_config)
-""".format(vpool_name if vpool_name is None else "'{0}'".format(vpool_name))
-        System.exec_remote_python(client, remote_script)
-        # @TODO: Create the metadataserver configuration.
-        # @TODO: Update voldrv config to point to the default MDS (a local one)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
+        storagedriver_config.load(client)
+        storagedriver_config.clean()  # Clean out obsolete values
+        storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
+        storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
+                                                               read_cache_serialization_path=readcache_serialization_path)
+        storagedriver_config.configure_scocache(scocache_mount_points=scocaches,
+                                                trigger_gap='1GB',
+                                                backoff_gap='2GB')
+        storagedriver_config.configure_failovercache(failovercache_path=failovercache)
+        storagedriver_config.configure_filesystem(**filesystem_config)
+        storagedriver_config.configure_volume_manager(clean_interval=1,
+                                                      metadata_path=metadatapath,
+                                                      tlog_path=tlogpath,
+                                                      foc_throttle_usecs=4000,
+                                                      read_cache_default_behaviour='CacheOnWrite')
+        storagedriver_config.configure_volume_router(**vrouter_config)
+        storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
+        storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
+                                                       vregistry_arakoon_cluster_nodes=arakoon_nodes)
+        storagedriver_config.configure_file_driver(fd_cache_path=fdcache,
+                                                   fd_extent_cache_capacity='1024',
+                                                   fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
+        storagedriver_config.configure_event_publisher(events_amqp_routing_key=queue_volumerouterqueue,
+                                                       events_amqp_uris=queue_urls)
+        storagedriver_config.save(client)
 
         # Updating the model
         storagedriver.storagedriver_id = vrouter_id
@@ -543,20 +517,21 @@ for config_file in os.listdir('/opt/OpenvStorage/config/voldrv_vpools'):
         storagedriver.vpool = vpool
         storagedriver.save()
 
-        # The `service` was created and pre-filled with a free port above
-        service.name = 'metadataserver_0_{0}'.format(vpool_name)
-        service.type = mdsservice_type
-        service.storagerouter = storagerouter
-        service.save()
-        if mdsservice is None:
-            mdsservice = MDSService()
-        mdsservice.service = service
-        mdsservice.vpool = vpool
-        mdsservice.number = 0
-        mdsservice.save()
+        MDSServiceController.prepare_mds_service(client, storagerouter, vpool)
+
+        mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
+        for sr in all_storagerouters:
+            node_client = SSHClient.load(sr.ip)
+            storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
+            storagedriver_config.load(node_client)
+            if storagedriver_config.is_new is False:
+                storagedriver_config.clean()  # Clean out obsolete values
+                storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
+                storagedriver_config.save(node_client)
+        client = SSHClient.load(ip)
 
         dirs2create.append(storagedriver.mountpoint)
-        dirs2create.append(mountpoint_writecache + '/' + '/fd_' + vpool_name)
+        dirs2create.append(mountpoint_writecache + '/fd_' + vpool_name)
         dirs2create.append('{0}/fd_{1}'.format(mountpoint_writecache, vpool_name))
 
         file_create_script = """
@@ -578,13 +553,11 @@ for filename in {1}:
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
-            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-metadataserver.conf /opt/OpenvStorage/config/templates/upstart/ovs-metadataserver_0_{0}.conf'.format(vpool_name))
 
         service_script = """
 from ovs.plugin.provider.service import Service
 Service.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}', command=None, stop_command=None, params={1})
 Service.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}', command=None, stop_command=None, params={1})
-Service.add_service(package=('openvstorage', 'metadataserver'), name='metadataserver_0_{0}', command=None, stop_command=None, params={1})
 """.format(vpool_name, params)
         System.exec_remote_python(client, service_script)
 
@@ -599,8 +572,8 @@ Service.add_service(package=('openvstorage', 'metadataserver'), name='metadatase
             client.run('virsh pool-autostart {0}'.format(vpool_name))
 
         # Start services
-        for node in nodes:
-            node_client = SSHClient.load(node)
+        for sr in all_storagerouters:
+            node_client = SSHClient.load(sr.ip)
             System.exec_remote_python(node_client, """
 from ovs.plugin.provider.service import Service
 Service.enable_service('{0}')
@@ -614,6 +587,9 @@ Service.start_service('{0}')
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
         vpool.size = vfs_info.f_blocks * vfs_info.f_bsize
         vpool.save()
+
+        for vdisk in vpool.vdisks:
+            MDSServiceController.ensure_safety(vdisk)
 
         # Configure Cinder
         ovsdb = PersistentFactory.get_client()
@@ -663,14 +639,20 @@ Service.start_service('{0}')
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
-        # @TODO: Check whether disks are configured to have this MDS as master/slave and act appropriate
-        #        If the MDS is master for a vdisk, failover. If the MDS is slave, reconfigure
-        #        to use other slave or delete slave.
 
-        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
         voldrv_service = 'volumedriver_{0}'.format(vpool.name)
         foc_service = 'failovercache_{0}'.format(vpool.name)
         storagedrivers_left = False
+        removal_mdsservices = [mds_service for mds_service in vpool.mds_services
+                               if mds_service.service.storagerouter_guid == storagerouter.guid]
+
+        # Unconfigure or reconfigure the MDSses
+        vdisks = []
+        for mds in removal_mdsservices:
+            for junction in mds.vdisks:
+                vdisks.append(junction.vdisk)
+        for vdisk in vdisks:
+            MDSServiceController.ensure_safety(vdisk, [storagerouter])
 
         # Stop services
         for current_storagedriver in vpool.storagedrivers:
@@ -713,11 +695,8 @@ osc.unconfigure_vpool('{4}', '{5}', {6})
                 pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
-        removal_mdsservices = [service for service in mdsservice_type.services
-                               if service.mds_service.vpool_guid == vpool.guid
-                               and service.storagerouter_guid == storagerouter.guid]
         client = SSHClient.load(ip)
-        for service in [voldrv_service, foc_service] + [mdsservice.name for mdsservice in removal_mdsservices]:
+        for service in [voldrv_service, foc_service] + [mdsservice.service.name for mdsservice in removal_mdsservices]:
             System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
@@ -747,7 +726,7 @@ if Service.has_service('{0}'):
             vrouter_clusterregistry.set_node_configs(node_configs)
         else:
             try:
-                storagedriver_client = LocalStorageRouterClient('{0}/voldrv_vpools/{1}.json'.format(configuration_dir, vpool.name))
+                storagedriver_client = LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
                 storagedriver_client.destroy_filesystem()
                 vrouter_clusterregistry.erase_node_configs()
             except RuntimeError as ex:
@@ -767,7 +746,7 @@ if Service.has_service('{0}'):
 
         # Remove files
         for config_file in ['{0}.json'] + ['{0}.json'.format(mdsservice.name) for mdsservice in removal_mdsservices]:
-            client.run('rm -f {0}/voldrv_vpools/{1}'.format(configuration_dir, config_file.format(vpool.name)))
+            client.run('rm -f {0}/storagedriver/storagedriver/{1}'.format(configuration_dir, config_file.format(vpool.name)))
 
         # Remove top directories
         for directory in [storagedriver.mountpoint_readcache1, storagedriver.mountpoint_readcache2,
@@ -779,8 +758,7 @@ if Service.has_service('{0}'):
         # First model cleanup
         storagedriver.delete(abandon=True)  # Detach from the log entries
         for service in removal_mdsservices:
-            for junction in service.mds_service.vdisks:
-                junction.delete()
+            # All MDSServiceVDisk object should have been deleted above
             service.mds_service.delete()
             service.delete()
 

@@ -40,6 +40,7 @@ from datadiff.tools import assert_equal
 import sys
 import pexpect
 
+
 class PartitionLayout(unittest.TestCase):
     full_map = {
         '12-8': {'/mnt/cache8': {'sip': '100', 'DIR_ONLY': False}, '/mnt/bfs': {'sip': '100', 'DIR_ONLY': False},

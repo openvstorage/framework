@@ -31,7 +31,7 @@ class ClientList(object):
         Returns a list of all Clients, except frontend types
         """
         clients = DataList({'object': Client,
-                          'data': DataList.select.GUIDS,
-                          'query': {'type': DataList.where_operator.AND,
-                                    'items': [('ovs_type', DataList.operator.NOT_EQUALS, 'FRONTEND')]}}).data
+                            'data': DataList.select.GUIDS,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('ovs_type', DataList.operator.NOT_EQUALS, 'FRONTEND')]}}).data
         return DataObjectList(clients, Client)

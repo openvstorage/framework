@@ -35,3 +35,30 @@ class StorageRouterList(object):
                                    'query': {'type': DataList.where_operator.AND,
                                              'items': []}}).data
         return DataObjectList(storagerouters, StorageRouter)
+
+    @staticmethod
+    def get_masters():
+        """
+        Get all MASTER StorageRouters
+        """
+        storagerouters = DataList({'object': StorageRouter,
+                                   'data': DataList.select.GUIDS,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': [('node_type', DataList.operator.EQUALS, 'MASTER')]}}).data
+        return DataObjectList(storagerouters, StorageRouter)
+
+    @staticmethod
+    def get_by_machine_id(machine_id):
+        """
+        Returns a StorageRouter by its machine_id
+        """
+        storagerouters = DataList({'object': StorageRouter,
+                                   'data': DataList.select.GUIDS,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': [('machine_id', DataList.operator.EQUALS, machine_id)]}}).data
+        srs = DataObjectList(storagerouters, StorageRouter)
+        if len(srs) == 0:
+            return None
+        if len(srs) == 1:
+            return srs[0]
+        raise RuntimeError('There should be only one StorageRouter with machine_id: {0}'.format(machine_id))
