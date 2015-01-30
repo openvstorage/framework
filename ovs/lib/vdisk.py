@@ -188,7 +188,10 @@ class VDiskController(object):
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
-        storagedriver = StorageDriver(vdisk.storagedriver_id)
+        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
+
         mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
         if mds_service is None:
             raise RuntimeError('Could not find a MDS service')
