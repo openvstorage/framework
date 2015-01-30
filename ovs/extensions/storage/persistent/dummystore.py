@@ -99,6 +99,7 @@ class DummyPersistentStore(object):
             return True
         except KeyNotFoundException:
             return False
+
     def nop(self):
         """
         Executes a nop command

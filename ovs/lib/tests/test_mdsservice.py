@@ -207,12 +207,6 @@ class MDSServices(TestCase):
         """
         Generates vdisks and appends them to a given mds_service
         """
-        def _generate_storagerouter_lambda(_mds_service):
-            """
-            Generates a lambda that always returns this mds_service' storagerouter_guid
-            """
-            return lambda: _mds_service.service.storagerouter_guid
-
         vdisks = {}
         for i in xrange(start_id, start_id + amount):
             disk = VDisk()
@@ -224,9 +218,10 @@ class MDSServices(TestCase):
             disk.save()
             disk.reload_client()
             if mds_service is not None:
-                disk._frozen = False
-                disk._storagerouter_guid = _generate_storagerouter_lambda(mds_service)
-                disk._frozen = True
+                storagedriver_id = None
+                for sd in mds_service.vpool.storagedrivers:
+                    if sd.storagerouter_guid == mds_service.service.storagerouter_guid:
+                        storagedriver_id = sd.storagedriver_id
                 junction = MDSServiceVDisk()
                 junction.vdisk = disk
                 junction.mds_service = mds_service
@@ -239,6 +234,7 @@ class MDSServices(TestCase):
                                           {'node_configs': self._generate_bc_function([config])})()
                 StorageDriverClient.metadata_backend_config['disk_{0}'.format(i)] = mds_backend_config
                 StorageDriverClient.catch_up['disk_{0}'.format(i)] = 50
+                StorageDriverClient.vrouter_id['disk_{0}'.format(i)] = storagedriver_id
             vdisks[i] = disk
         return vdisks
 
@@ -440,7 +436,7 @@ class MDSServices(TestCase):
         PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
         PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', '75')
         PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', '100')
-        vpools, storagerouters, _, _, mds_services, service_type = self._build_service_structure(
+        vpools, storagerouters, storagedrivers, _, mds_services, service_type = self._build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3, 4],
              'storagedrivers': [(1, 1, 1), (2, 1, 2), (3, 1, 3), (4, 1, 4)],  # (<id>, <vpool_id>, <sr_id>)
@@ -591,7 +587,31 @@ class MDSServices(TestCase):
             MDSServiceController.ensure_safety(vdisks[vdisk_id])
         _check_reality(configs, loads, vdisks, mds_services)
 
+        # Validate whether a volume migration makes the master follow
+        StorageDriverClient.vrouter_id[vdisks[1].volume_id] = storagedrivers[3].storagedriver_id
+        configs = [[{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.2', 'port': 5}],
+                   [{'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 5}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.3', 'port': 3}],
+                   [{'ip': '10.0.0.2', 'port': 2}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}, {'ip': '10.0.0.4', 'port': 4}],
+                   [{'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.1', 'port': 1}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.2', 'port': 5}],
+                   [{'ip': '10.0.0.4', 'port': 4}, {'ip': '10.0.0.3', 'port': 3}, {'ip': '10.0.0.1', 'port': 1}]]
+        loads = [['10.0.0.1', 1, 1, 6, 10, 70.0],
+                 ['10.0.0.2', 2, 1, 0, 2,  50.0],
+                 ['10.0.0.3', 3, 3, 4, 10, 70.0],
+                 ['10.0.0.4', 4, 2, 4, 10, 60.0],
+                 ['10.0.0.2', 5, 1, 2, 10, 30.0]]
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
+        # Validates if a second run doesn't change anything
+        for vdisk_id in sorted(vdisks.keys()):
+            MDSServiceController.ensure_safety(vdisks[vdisk_id])
+        _check_reality(configs, loads, vdisks, mds_services)
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(MDSServices)
-    unittest.TextTestRunner().run(suite)
+    unittest.TextTestRunner(verbosity=2).run(suite)

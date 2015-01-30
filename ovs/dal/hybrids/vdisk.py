@@ -23,7 +23,6 @@ from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
 import pickle
 import time
 

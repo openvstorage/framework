@@ -78,7 +78,8 @@ class SRClient():
         Info volume mockup
         """
         return type('Info', (), {'object_type': property(lambda s: 'BASE'),
-                                 'metadata_backend_config': property(lambda s: StorageDriverClient.metadata_backend_config.get(volume_id))})()
+                                 'metadata_backend_config': property(lambda s: StorageDriverClient.metadata_backend_config.get(volume_id)),
+                                 'vrouter_id': property(lambda s: StorageDriverClient.vrouter_id.get(volume_id))})()
 
     @staticmethod
     def get_scrubbing_workunits(volume_id):
@@ -104,6 +105,7 @@ class StorageDriverClient():
     snapshots = {}
     metadata_backend_config = {}
     catch_up = {}
+    vrouter_id = {}
 
     def __init__(self):
         """
@@ -125,7 +127,8 @@ class StorageDriverClient():
         Returns an empty info object
         """
         return type('Info', (), {'object_type': property(lambda s: 'BASE'),
-                                 'metadata_backend_config': property(lambda s: None)})()
+                                 'metadata_backend_config': property(lambda s: None),
+                                 'vrouter_id': property(lambda s: None)})()
 
 
 class MDSClient():
@@ -140,8 +143,17 @@ class MDSClient():
         self.service = service
 
     def catch_up(self, volume_id, dry_run):
+        """
+        Dummy catchup
+        """
         _ = self, dry_run
         return StorageDriverClient.catch_up[volume_id]
+
+    def create_namespace(self, volume_id):
+        """
+        Dummy create namespace method
+        """
+        _ = self, volume_id
 
 
 class MetadataServerClient():
