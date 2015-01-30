@@ -278,11 +278,11 @@ Service.start_service('{0}')
             if candidate_master is not None:
                 # A non-overloaded local slave was found.
                 client = MetadataServerClient.load(candidate_master)
-                amount_of_tlogs = tlogs - 1  # @TODO: client.catch_up(str(vdisk.volume_id), True)
+                amount_of_tlogs = client.catch_up(str(vdisk.volume_id), True)
                 if amount_of_tlogs < tlogs:
                     # Almost there. Catching up right now, and continue as soon as it's up-to-date
                     start = time.time()
-                    # @TODO: client.catch_up(str(vdisk.volume_id), False)
+                    client.catch_up(str(vdisk.volume_id), False)
                     logger.debug('MDS catch up for vdisk {0} took {1}s'.format(vdisk.guid, round(time.time() - start, 2)))
                     # It's up to date, so add it as a new master
                     new_services.append(candidate_master)
