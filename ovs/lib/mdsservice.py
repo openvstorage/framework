@@ -194,7 +194,8 @@ Service.start_service('{0}')
 
         # List current configuration and filter out excluded services
         reconfigure_required = False
-        vdisk.invalidate_dynamics(['info'])
+        reconfigure_reasons = []
+        vdisk.invalidate_dynamics(['info', 'storagedriver_id', 'storagerouter_guid'])
         configs = vdisk.info['metadata_backend_config']
         for config in configs:
             config['key'] = '{0}:{1}'.format(config['ip'], config['port'])
@@ -206,12 +207,14 @@ Service.start_service('{0}')
                 configs.remove(config)
             else:
                 reconfigure_required = True
+                reconfigure_reasons.append('Master ({0}:{1}) cannot be used anymore'.format(config['ip'], config['port']))
         slave_services = []
         for config in configs:
             if config['key'] in service_per_key:
                 slave_services.append(service_per_key[config['key']])
             else:
                 reconfigure_required = True
+                reconfigure_reasons.append('Slave ({0}:{1}) cannot be used anymore'.format(config['ip'], config['port']))
 
         # Fix services_load
         services_per_load = {}
@@ -226,26 +229,45 @@ Service.start_service('{0}')
             services_per_load[load].append(service)
 
         # Further checks if a reconfiguration is required.
-        amount_of_services = len(slave_services) + (1 if master_service is not None else 0)
-        if amount_of_services > safety:
+        service_nodes = []
+        if master_service is not None:
+            service_nodes.append(master_service.storagerouter.ip)
+        for service in slave_services:
+            ip = service.storagerouter.ip
+            if ip in service_nodes:
+                reconfigure_required = True
+                reconfigure_reasons.append('Multiple MDS services on the same node')
+            else:
+                service_nodes.append(ip)
+        if len(service_nodes) > safety:
             # Too much safety
             reconfigure_required = True
-        if amount_of_services < safety and amount_of_services <= len(nodes):
+            reconfigure_reasons.append('Too much safety')
+        if len(service_nodes) < safety and len(service_nodes) < len(nodes):
             # Insufficient MDS services configured while there should be sufficient nodes available
             reconfigure_required = True
+            reconfigure_reasons.append('Not enough safety')
         if master_service is not None and services_load[master_service.guid] > maxload:
             # The master service is overloaded
             reconfigure_required = True
+            reconfigure_reasons.append('Master overloaded')
+        if master_service is not None and master_service.storagerouter_guid != vdisk.storagerouter_guid:
+            # The master is not local
+            reconfigure_required = True
+            reconfigure_reasons.append('Master is not local')
         if any(service for service in slave_services if services_load[service.guid] > maxload):
             # There's a slave service overloaded
             reconfigure_required = True
+            reconfigure_reasons.append('One or more slaves overloaded')
 
         if reconfigure_required is False:
             logger.debug('No reconfiguration required for vdisk {0}'.format(vdisk.guid))
             MDSServiceController.sync_vdisk_to_reality(vdisk)
             return
 
-        logger.debug('Reconfiguration required for vdisk {0}'.format(vdisk.guid))
+        logger.debug('Reconfiguration required for vdisk {0}:'.format(vdisk.guid))
+        for reason in reconfigure_reasons:
+            logger.debug('Reason: {0} - vdisk {1}'.format(reason, vdisk.guid))
         # Prepare fresh configuration
         new_services = []
 
