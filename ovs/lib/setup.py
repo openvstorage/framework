@@ -679,6 +679,8 @@ EOF
 """.format(cluster_name, node_name, 'master', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
+        target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config', quiet=True)
+
         logger.info('First node complete')
 
     @staticmethod
@@ -801,6 +803,7 @@ EOF
     """.format(cluster_name, node_name, 'extra', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
 
+        target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config', quiet=True)
         logger.info('Extra node complete')
 
     @staticmethod
@@ -1153,6 +1156,8 @@ for json_file in os.listdir(configuration_dir):
 EOF
 """.format(cluster_name, node_name, 'master', SetupController.avahi_filename, cluster_ip.replace('.', '_')))
         SetupController._change_service_state(target_client, 'avahi-daemon', 'restart')
+
+        target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config', quiet=True)
 
         logger.info('Promote complete')
 

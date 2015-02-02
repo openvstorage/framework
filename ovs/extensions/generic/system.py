@@ -16,7 +16,10 @@
 Generic system module, executing statements on local node
 """
 
+from ConfigParser import ConfigParser
 from subprocess import check_output
+from StringIO import StringIO
+
 from ovs.log.logHandler import LogHandler
 logger = LogHandler('lib', name='system')
 
@@ -25,6 +28,8 @@ class System(object):
     """
     Generic helper class
     """
+
+    OVS_CONFIG = '/opt/OpenvStorage/config/ovs.cfg'
 
     my_machine_id = ''
     my_storagerouter_guid = ''
@@ -37,16 +42,26 @@ class System(object):
         _ = self
 
     @staticmethod
+    def get_my_ips(client=None):
+        """
+        Returns configured ip addresses for this host
+        """
+
+        cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
+        output = System.run(cmd, client)
+        my_ips = output.split('\n')
+        my_ips = [found_ip.strip() for found_ip in my_ips if found_ip.strip() != '127.0.0.1']
+
+        return my_ips
+
+    @staticmethod
     def get_my_machine_id(client=None):
         """
         Returns unique machine id based on mac address
         """
         if not System.my_machine_id:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            if client is None:
-                output = check_output(cmd, shell=True).strip()
-            else:
-                output = client.run(cmd).strip()
+            output = System.run(cmd, client)
             for mac in output.split('\n'):
                 if mac.strip() != '000000000000':
                     System.my_machine_id = mac.strip()
@@ -135,10 +150,7 @@ print Configuration.get('{0}')
         Returns the ports in use
         """
         cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
-        if client is None:
-            output = check_output(cmd, shell=True).strip()
-        else:
-            output = client.run(cmd).strip()
+        output = System.run(cmd, client)
         for found_port in output.split('\n'):
             yield int(found_port.strip())
 
@@ -174,10 +186,7 @@ print Configuration.get('{0}')
             exclude_list.append(port)
 
         cmd = """cat /proc/sys/net/ipv4/ip_local_port_range"""
-        if client is None:
-            output = check_output(cmd, shell=True).strip()
-        else:
-            output = client.run(cmd).strip()
+        output = System.run(cmd, client)
         start_end = list(output.split())
         ephemeral_port_range = xrange(int(min(start_end)), int(max(start_end)))
 
@@ -187,3 +196,43 @@ print Configuration.get('{0}')
             if len(free_ports) == nr:
                 return free_ports
         raise ValueError('Unable to find requested nr of free ports')
+
+    @staticmethod
+    def run(cmd, client=None):
+        if client is None:
+            output = check_output(cmd, shell=True).strip()
+        else:
+            output = client.run(cmd).strip()
+        return output
+
+    @staticmethod
+    def get_arakoon_cluster_names(client=None, arakoon_config_dir=None):
+        """
+        :param client: optional remote client
+        :param arakoon_config_dir: default /opt/OpenvStorage/config/arakoon for ovs
+        :return: list of configured arakoon cluster names on this client
+        """
+
+        if arakoon_config_dir is None:
+            arakoon_config_dir = '/opt/OpenvStorage/config/arakoon'
+
+        cmd = """ls {0} """.format(arakoon_config_dir)
+        output = System.run(cmd, client)
+        return list(output.split())
+
+    @staticmethod
+    def read_config(filename):
+        cp = ConfigParser()
+        with open(filename, 'r') as config_file:
+            cfg = config_file.read()
+        cp.readfp(StringIO(cfg))
+        return cp
+
+    @staticmethod
+    def write_config(config, filename):
+        with open(filename, 'w') as config_file:
+            config.write(config_file)
+
+    @staticmethod
+    def read_ovs_config():
+        return System.read_config(System.OVS_CONFIG)
