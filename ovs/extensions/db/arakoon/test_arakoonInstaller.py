@@ -94,7 +94,7 @@ class TestArakoonInstaller(TestCase):
     def test_1_node_install(self):
         self.ai.clear_config()
         self._create_config()
-        self.ai.generate_config()
+        self.ai.generate_configs()
 
         self.ai.load_config_from(self.base_dir, self.cluster_name, self.ip)
         self.ai.generate_config()
@@ -118,21 +118,12 @@ class TestArakoonInstaller(TestCase):
         print "### Three node configuration files:"
         self._print_config_files_for(self.cluster_name)
 
-    def test_clone_config_from(self):
+    def test_duplicate_cluster(self):
+        src_cluster = 'abm_0'
+        tgt_cluster = 'abm_2'
         self.ai.clear_config()
         self._create_config()
-        self.ai.generate_config()
+        self.ai.generate_configs()
 
-        self.ai.clone_config_from(self.base_dir, self.cluster_name, self.ip, 'new_' + self.cluster_name)
-
-        new_ports = self.ai.get_nr_of_free_ports_for_config(2)
-        self.assertTrue(len(new_ports) == 2, 'Expected 2 results, got {0}'.format(len(new_ports)))
-
-        for node in self.ai.config.nodes:
-            node.client_port = min(new_ports)
-            node.messaging_port = max(new_ports)
-        self.ai.generate_config()
-        self.ai.generate_client_config()
-        self.ai.generate_local_nodes_config()
-        print "### Single node cloned configuration files:"
-        self._print_config_files_for('new_' + self.cluster_name)
+        self.ai.clone_cluster('10.100.131.61', src_cluster, tgt_cluster)
+        self._print_config_files_for(tgt_cluster)

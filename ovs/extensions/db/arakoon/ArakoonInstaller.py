@@ -55,9 +55,16 @@ class ClusterConfig():
         self.tlog_dir = base_dir + '/tlogs/' + self.cluster_name
         self.base_dir = base_dir
 
+    def set_cluster_name(self, cluster_name):
+        self.log_dir = "/var/log/arakoon/" + cluster_name
+        self.home_dir = "/".join([self.base_dir, 'arakoon', cluster_name])
+        self.tlog_dir = "/".join([self.base_dir, 'tlogs', cluster_name])
+        self.cluster_name = cluster_name
+
 
 class ArakoonInstaller():
     """
+    class to dynamically install/(re)configure arakoon cluster
     """
 
     ARAKOON_LIB = '/opt/alba/lib'
@@ -139,10 +146,11 @@ class ArakoonInstaller():
 
     def clone_config_from(self, base_dir, cluster_name, master_ip, new_cluster_name, master_password=None):
         self.load_config_from(base_dir, cluster_name, master_ip, master_password)
-        self.config.cluster_name = new_cluster_name
+        self.config.set_cluster_name(new_cluster_name)
         self.generate_config()
         self.generate_client_config()
         self.generate_local_nodes_config()
+        self.upload_config_for(new_cluster_name)
 
     def upload_config_for(self, cluster_name):
         if self.config.cluster_name != cluster_name:
@@ -151,24 +159,25 @@ class ArakoonInstaller():
         client_ips = System.get_my_ips()
         cluster_ips = list()
         for node in self.config.nodes:
-            cluster_ips.append(int(node.ip))
+            cluster_ips.append(node.ip)
+
+        print client_ips
+        print cluster_ips
 
         self.generate_config()
         self.generate_client_config()
+        self.generate_local_nodes_config()
 
-        # No need to update _local_nodes.cfg as this should be ok at first setup
-
-        # upload _client.cfg file to all ovs nodes
-        config_file = self.get_config_file('_client.cfg')
-        for ip in client_ips:
-            client = SSHClient.load(ip)
-            client.file_upload(config_file)
-
-        # upload .cfg file to all arakoon cluster members
-        config_file = self.get_config_file('.cfg')
-        for ip in cluster_ips:
-            client = SSHClient.load(ip)
-            client.file_upload(config_file)
+        for config_suffix in ['.cfg', '_client.cfg', '_local_nodes.cfg']:
+            # upload _client.cfg file to all ovs nodes
+            config_file = self.get_config_file(config_suffix)
+            print config_file
+            for ip in cluster_ips:
+                if ip in client_ips:
+                    continue
+                client = SSHClient.load(ip)
+                client.dir_ensure(os.path.dirname(config_file))
+                client.file_upload(config_file, config_file)
 
     def clear_config(self):
         self.config = None
@@ -187,12 +196,14 @@ class ArakoonInstaller():
 
         saved_current_config = self.config
         saved_ip = self.config.nodes[0].ip
+        print 'saved ip:' + str(saved_ip)
 
         client = SSHClient.load(saved_ip)
         arakoon_cluster_names = System.get_arakoon_cluster_names(client)
         for name in arakoon_cluster_names:
             self.load_config_from(saved_current_config.base_dir, name, saved_ip)
             for node in self.config.nodes:
+                print node
                 ports_in_use.add(int(node.client_port))
                 ports_in_use.add(int(node.messaging_port))
 
@@ -269,3 +280,9 @@ mkdir -p /var/log/arakoon/{1}
         ai.create_config(base_dir, cluster_name, ip, client_port, messaging_port, plugins)
         ai.generate_configs()
         ai.create_dir_structure(cluster_name)
+
+    @staticmethod
+    def clone_cluster(ip, src_name, tgt_name):
+        ai = ArakoonInstaller()
+        ai.clone_config_from('/mnt/db', src_name, ip, tgt_name)
+        ai.upload_config_for(tgt_name)
