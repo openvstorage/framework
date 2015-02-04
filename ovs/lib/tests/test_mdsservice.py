@@ -128,7 +128,7 @@ class MDSServices(TestCase):
         _ = self
         if address is True:
             return lambda s: mds_service.service.storagerouter.ip
-        return lambda s: int(mds_service.service.port)
+        return lambda s: int(mds_service.service.ports[0])
 
     def _generate_bc_function(self, _configs):
         """
@@ -190,7 +190,7 @@ class MDSServices(TestCase):
             service = Service()
             service.name = s_id
             service.storagerouter = sd.storagerouter
-            service.port = mds_id
+            service.ports = [mds_id]
             service.type = service_type
             service.save()
             services[s_id] = service
@@ -410,7 +410,7 @@ class MDSServices(TestCase):
                 _load = 'infinite'
             else:
                 _load = round(_load, 2)
-            return [_mds_service.service.storagerouter.ip, _mds_service.service.port, masters, slaves, capacity, _load]
+            return [_mds_service.service.storagerouter.ip, _mds_service.service.ports[0], masters, slaves, capacity, _load]
 
         def _check_reality(_configs, _loads, _vdisks, _mds_services, test=True, display=False):
             """
@@ -533,7 +533,7 @@ class MDSServices(TestCase):
         service = Service()
         service.name = s_id
         service.storagerouter = storagerouters[2]
-        service.port = 5
+        service.ports = [5]
         service.type = service_type
         service.save()
         mds_service = MDSService()

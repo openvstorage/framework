@@ -16,6 +16,7 @@
 ServiceList module
 """
 from ovs.dal.datalist import DataList
+from ovs.dal.dataobjectlist import DataObjectList
 from ovs.dal.hybrids.service import Service
 from ovs.dal.helpers import Descriptor
 
@@ -26,15 +27,26 @@ class ServiceList(object):
     """
 
     @staticmethod
-    def get_by_ip_port(ip, port):
+    def get_services():
         """
-        Returns a single Service for the ip/port. Returns None if no Service was found
+        Get all services of all types
+        """
+        services = DataList({'object': Service,
+                             'data': DataList.select.GUIDS,
+                             'query': {'type': DataList.where_operator.AND,
+                                       'items': []}}).data
+        return DataObjectList(services, Service)
+
+    @staticmethod
+    def get_by_ip_ports(ip, ports):
+        """
+        Returns a single Service for the ip/ports. Returns None if no Service was found
         """
         services = DataList({'object': Service,
                              'data': DataList.select.GUIDS,
                              'query': {'type': DataList.where_operator.AND,
                                        'items': [('storagerouter.ip', DataList.operator.EQUALS, ip),
-                                                 ('port', DataList.operator.EQUALS, port)]}}).data
+                                                 ('ports', DataList.operator.EQUALS, ports)]}}).data
         if len(services) == 1:
             return Descriptor(Service, services[0]).get_object(True)
         return None

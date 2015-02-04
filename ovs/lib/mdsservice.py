@@ -64,7 +64,7 @@ class MDSServiceController(object):
         occupied_ports = []
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
-                occupied_ports.append(service.port)
+                occupied_ports.append(service.ports[0])
         port = System.get_free_ports(Configuration.get('ovs.ports.mds'),
                                      exclude=occupied_ports, nr=1, client=client)[0]
 
@@ -73,7 +73,7 @@ class MDSServiceController(object):
         service.name = 'metadataserver_{0}_{1}'.format(vpool.name, service_number)
         service.type = mdsservice_type
         service.storagerouter = storagerouter
-        service.port = port
+        service.ports = [port]
         service.save()
         mds_service = MDSService()
         mds_service.service = service
@@ -93,7 +93,7 @@ class MDSServiceController(object):
         metadataserver_config.clean()  # Clean out obsolete values
         metadataserver_config.configure_backend_connection_manager(**vpool.metadata)
         metadataserver_config.configure_metadata_server(mds_address=storagerouter.ip,
-                                                        mds_port=service.port,
+                                                        mds_port=service.ports[0],
                                                         mds_scratch_dir=scratch_dir,
                                                         mds_rocksdb_path=rocksdb_dir)
         metadataserver_config.save(client)
@@ -139,29 +139,29 @@ Service.start_service('{0}')
         for junction in vdisk.mds_services:
             service = junction.mds_service.service
             storagerouter = service.storagerouter
-            if config[0]['ip'] == storagerouter.ip and config[0]['port'] == service.port:
+            if config[0]['ip'] == storagerouter.ip and config[0]['port'] == service.ports[0]:
                 junction.is_master = True
                 junction.save()
                 if storagerouter.ip not in mds_dict:
                     mds_dict[storagerouter.ip] = []
-                mds_dict[storagerouter.ip].append(service.port)
-            elif storagerouter.ip in config_dict and service.port in config_dict[storagerouter.ip]:
+                mds_dict[storagerouter.ip].append(service.ports[0])
+            elif storagerouter.ip in config_dict and service.ports[0] in config_dict[storagerouter.ip]:
                 junction.is_master = False
                 junction.save()
                 if storagerouter.ip not in mds_dict:
                     mds_dict[storagerouter.ip] = []
-                mds_dict[storagerouter.ip].append(service.port)
+                mds_dict[storagerouter.ip].append(service.ports[0])
             else:
                 junction.delete()
         for ip, ports in config_dict.iteritems():
             for port in ports:
                 if ip not in mds_dict or port not in mds_dict[ip]:
-                    service = ServiceList.get_by_ip_port(ip, port)
+                    service = ServiceList.get_by_ip_ports(ip, [port])
                     if service is not None:
                         mds_service_vdisk = MDSServiceVDisk()
                         mds_service_vdisk.vdisk = vdisk
                         mds_service_vdisk.mds_service = service.mds_service
-                        mds_service_vdisk.is_master = config[0]['ip'] == service.storagerouter.ip and config[0]['port'] == service.port
+                        mds_service_vdisk.is_master = config[0]['ip'] == service.storagerouter.ip and config[0]['port'] == service.ports[0]
                         mds_service_vdisk.save()
 
     @staticmethod
@@ -190,7 +190,7 @@ Service.start_service('{0}')
         for service in services:
             load, load_plus = MDSServiceController.get_mds_load(service.mds_service)
             services_load[service.guid] = load, load_plus
-            service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.port)] = service
+            service_per_key['{0}:{1}'.format(service.storagerouter.ip, service.ports[0])] = service
 
         # List current configuration and filter out excluded services
         reconfigure_required = False
@@ -356,7 +356,7 @@ Service.start_service('{0}')
             client = MetadataServerClient.load(service)
             client.create_namespace(str(vdisk.volume_id))
             configs.append(MDSNodeConfig(address=str(service.storagerouter.ip),
-                                         port=service.port))
+                                         port=service.ports[0]))
         vdisk.storagedriver_client.update_metadata_backend_config(
             volume_id=str(vdisk.volume_id),
             metadata_backend_config=MDSMetaDataBackendConfig(configs)
@@ -407,7 +407,7 @@ Service.start_service('{0}')
         for storagedriver in vpool.storagedrivers:
             storagerouter = storagedriver.storagerouter
             mds_service, load = MDSServiceController.get_preferred_mds(storagerouter, vpool, include_load=True)
-            mds_per_storagerouter[storagerouter.guid] = {'host': storagerouter.ip, 'port': mds_service.service.port}
+            mds_per_storagerouter[storagerouter.guid] = {'host': storagerouter.ip, 'port': mds_service.service.ports[0]}
             if load not in mds_per_load:
                 mds_per_load[load] = []
             mds_per_load[load].append(storagerouter.guid)
@@ -460,7 +460,7 @@ if __name__ == '__main__':
                             else:
                                 _load = '{0}%'.format(round(_load, 2))
                             output.append('    + {0} - port {1} - {2} master(s), {3} slave(s) - capacity: {4}, load: {5}'.format(
-                                _mds_service.number, _mds_service.service.port, masters, slaves, capacity, _load
+                                _mds_service.number, _mds_service.service.ports[0], masters, slaves, capacity, _load
                             ))
             output += ['',
                        'Press ^C to exit',

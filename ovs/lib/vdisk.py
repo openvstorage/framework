@@ -200,7 +200,7 @@ class VDiskController(object):
         volume_id = vdisk.storagedriver_client.create_clone(
             target_path=location,
             metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                                            port=mds_service.service.port)]),
+                                                                            port=mds_service.service.ports[0])]),
             parent_volume_id=str(vdisk.volume_id),
             parent_snapshot_id=str(snapshotid),
             node_id=str(vdisk.storagedriver_id)
@@ -335,7 +335,7 @@ class VDiskController(object):
             volume_id = vdisk.storagedriver_client.create_clone_from_template(
                 target_path=disk_path,
                 metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                                                port=mds_service.service.port)]),
+                                                                                port=mds_service.service.ports[0])]),
                 parent_volume_id=str(vdisk.volume_id),
                 node_id=str(storagedriver_id)
             )
