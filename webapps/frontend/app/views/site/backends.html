@@ -38,10 +38,14 @@ limitations under the License.
                 <td>
                     <div data-bind="status: {
                                         colors: {
-                                            green: false
+                                            blue: status() == 'new',
+                                            green: status() == 'running',
+                                            orange: status() == 'installing',
+                                            red: status() == 'failure',
+                                            black: status() == 'stopped'
                                         },
                                         defaultColor: 'lightgrey'
-                                    }"
+                                    }, tooltip: 'ovs:generic.states.backend.' + status()"
                          style="width: 14px; height: 14px;"></div>
                 </td>
             </tr>

@@ -132,7 +132,7 @@ limitations under the License.
                                 <div data-bind="status: {
                                                     colors: {
                                                         green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                                        yellow: failoverMode() == 'catch_up',
+                                                        orange: failoverMode() == 'catch_up',
                                                         red: failoverMode() == 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'
@@ -177,7 +177,7 @@ limitations under the License.
                                 <div data-bind="status: {
                                                     colors: {
                                                         green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                                        yellow: failoverMode() == 'catch_up',
+                                                        orange: failoverMode() == 'catch_up',
                                                         red: failoverMode() == 'degraded'
                                                     },
                                                     defaultColor: 'lightgrey'

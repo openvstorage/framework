@@ -30,6 +30,14 @@
                 "degraded": "Degraded",
                 "unknown": "Unknown",
                 "undefined": "Unknown"
+            },
+            "backend": {
+                "new": "New",
+                "installing": "Installing",
+                "running": "Running",
+                "stopped": "Stopped",
+                "failure": "Failure",
+                "unknown": "Unknown"
             }
         },
         "messages": {
