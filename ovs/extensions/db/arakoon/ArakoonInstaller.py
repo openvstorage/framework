@@ -68,7 +68,7 @@ class ArakoonInstaller():
     """
 
     ARAKOON_LIB = '/opt/alba/lib'
-    ARAKOON_BIN = '/opt/alba/bin/arakoon'
+    ARAKOON_BIN = '/usr/bin/arakoon'
     ARAKOON_PLUGIN_DIR = '/opt/alba/plugins'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_BASE_DIR = '/mnt/db'
@@ -267,9 +267,9 @@ class ArakoonInstaller():
 
     def create_dir_structure(self, cluster_name):
         cmd = """
-mkdir -p {0}/arakoon/{1}
-mkdir -p {0}/tlogs/{1}
-mkdir -p /var/log/arakoon/{1}
+sudo mkdir -p {0}/arakoon/{1}
+sudo mkdir -p {0}/tlogs/{1}
+sudo mkdir -p /var/log/arakoon/{1}
 """.format(ArakoonInstaller.ARAKOON_BASE_DIR, cluster_name)
         check_output(cmd, shell=True).strip()
 
@@ -280,6 +280,8 @@ mkdir -p /var/log/arakoon/{1}
         ai.create_config(base_dir, cluster_name, ip, client_port, messaging_port, plugins)
         ai.generate_configs()
         ai.create_dir_structure(cluster_name)
+        return {'client_port': client_port,
+                'messaging_port': messaging_port}
 
     @staticmethod
     def clone_cluster(ip, src_name, tgt_name):
