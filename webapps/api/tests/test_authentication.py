@@ -320,7 +320,7 @@ class Authentication(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.content, json.dumps({'error': 'missing_header'}))
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format('foo', 'bar')))
-        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
+        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.2', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
         # Fails because there is no such client
         self.assertEqual(response.status_code, 400)
@@ -333,14 +333,14 @@ class Authentication(TestCase):
         admin_na_client.user = admin_na
         admin_na_client.save()
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format(admin_na_client.guid, admin_na_client.client_secret)))
-        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
+        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.3', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
         # Fails because the grant is of type Resource Owner Password Credentials
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.content, json.dumps({'error': 'invalid_grant'}))
         admin_na_client.grant_type = 'CLIENT_CREDENTIALS'
         admin_na_client.save()
-        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
+        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.4', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
         # Fails because the grant is of type Resource Owner Password Credentials
         self.assertEqual(response.status_code, 400)
@@ -352,8 +352,14 @@ class Authentication(TestCase):
         admin_client.client_secret = OAuth2Toolbox.create_hash(64)
         admin_client.user = admin
         admin_client.save()
+        header = 'Basic {0}'.format(base64.encodestring('{0}:foobar'.format(admin_client.guid)))
+        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.5', HTTP_AUTHORIZATION=header)
+        response = OAuth2TokenView.as_view()(request)
+        # Fails because it's an invalid secret
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.content, json.dumps({'error': 'invalid_client'}))
         header = 'Basic {0}'.format(base64.encodestring('{0}:{1}'.format(admin_client.guid, admin_client.client_secret)))
-        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.1', HTTP_AUTHORIZATION=header)
+        request = Authentication.factory.post('/', data=data, HTTP_X_REAL_IP='127.0.0.6', HTTP_AUTHORIZATION=header)
         response = OAuth2TokenView.as_view()(request)
         # Succeeds
         self.assertEqual(response.status_code, 200)
@@ -492,6 +498,7 @@ class Authentication(TestCase):
         response = MetadataView.as_view()(request)
         response_content = json.loads(response.content)
         self.assertDictContainsSubset(dict(result_data.items() + {'authenticated': True,
+                                                                  'authentication_state': 'authenticated',
                                                                   'username': user.username,
                                                                   'userguid': user.guid}.items()), response_content)
         time.sleep(180)  # Make sure to not hit the rate limit

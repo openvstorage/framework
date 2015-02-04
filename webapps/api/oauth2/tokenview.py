@@ -84,6 +84,8 @@ class OAuth2TokenView(View):
                 client = Client(client_id)
                 if client.grant_type != 'CLIENT_CREDENTIALS':
                     return HttpResponseBadRequest, {'error': 'invalid_grant'}
+                if client.client_secret != client_secret:
+                    return HttpResponseBadRequest, {'error': 'invalid_client'}
                 if not client.user.is_active:
                     return HttpResponseBadRequest, {'error': 'inactive_user'}
                 try:
