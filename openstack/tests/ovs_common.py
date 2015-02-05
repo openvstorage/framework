@@ -491,7 +491,7 @@ class OVSPluginTestCase(test.TestCase):
         try:
             self._cinder_wait_until_volume_state(volume.id, 'available') #allow changes to propagate, model to update
         except WaitTimedOut:
-            volume = self._cinder_get_volume_by_id(volume_id)
+            volume = self._cinder_get_volume_by_display_name(name)
             if volume.status == 'creating':
                 self._cinder_delete_volume(volume)
                 return self._cinder_create_volume(name, snapshot_id, volume_id, image_id, size, attempt+1)
