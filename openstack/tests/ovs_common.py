@@ -481,7 +481,7 @@ class OVSPluginTestCase(test.TestCase):
                                                    snapshot_id = snapshot_id,
                                                    source_volid = volume_id,
                                                    imageRef = image_id)
-        self._cinder_wait_until_volume_state(volume.id, 'available') #allow changes to propagate, model to update
+        self._cinder_wait_until_volume_state(volume.id, 'available', timeout_sec=1200) #allow changes to propagate, model to update
         self._debug('volume %s is available' % name)
         return volume
 
@@ -576,7 +576,7 @@ class OVSPluginTestCase(test.TestCase):
             if volume.status == 'error':
                 raise RuntimeError('Volume %s in error state' % volume_id)
             if volume.status == status:
-                self._debug('volume entered expected state')
+                self._debug('volume entered expected state after %s' % 3*timeout_sec)
                 return
             if initial_state is None:
                 initial_state = volume.status
