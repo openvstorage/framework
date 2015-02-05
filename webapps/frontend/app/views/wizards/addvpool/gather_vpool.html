@@ -19,7 +19,7 @@ limitations under the License.
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('name', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.name"></label>
             <div class="col-lg-7">
-                <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input'">
+                <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input'" />
             </div>
         </div>
         <div class="form-group">
@@ -34,35 +34,81 @@ limitations under the License.
                 </span>
             </div>
         </div>
-        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed'">
-            <div class="form-group" data-bind="css: { 'has-error': $.inArray('host', canContinue().fields) !== -1 }">
-                <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.host"></label>
-                <div class="col-lg-4">
-                    <input type="text" id="inputVpoolHost" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'input'">
+        <div data-bind="visible: data.backend() === 'alba'">
+            <div class="form-group" data-bind="css: { 'has-error': $.inArray('clientid', canContinue().fields) !== -1 }">
+                <div class="col-lg-3"></div>
+                <div class="col-lg-7">
+                    <input type="checkbox" id="inputVpoolLocalHost" class="autofocus" data-bind="checked: data.localHost" />
+                    <label for="inputVpoolLocalHost" data-i18n="ovs:wizards.addvpool.gathervpool.localhost" style="font-weight: normal;"></label>
                 </div>
-                <label class="col-lg-1 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.port"></label>
+            </div>
+        </div>
+        <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost())">
+            <div class="form-group" data-bind="css: { 'has-error': $.inArray('host', canContinue().fields) !== -1 }">
+                <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.addvpool.gathervpool.host"></label>
+                <div class="col-lg-4">
+                    <input type="text" id="inputVpoolHost" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'input'" />
+                </div>
+                <label class="col-lg-1 control-label" for="inputVpoolPort" data-i18n="ovs:wizards.addvpool.gathervpool.port"></label>
                 <div class="col-lg-2">
-                    <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port">
+                    <input type="text" id="inputVpoolPort" class="autofocus form-control" data-bind="value: data.port" />
                 </div>
             </div>
         </div>
         <div class="form-group" data-bind="visible: data.backend() === 'rest'">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></label>
+            <label class="col-lg-3 control-label" for="inputVpoolTimeout" data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></label>
             <div class="col-lg-7">
-                <input type="text" id="inputVpoolTimeout" class="autofocus form-control" data-bind="value: data.timeout">
+                <input type="text" id="inputVpoolTimeout" class="autofocus form-control" data-bind="value: data.timeout" />
             </div>
         </div>
         <div data-bind="visible: data.backend().match(/^.+_s3$/) !== null">
             <div class="form-group" data-bind="css: { 'has-error': $.inArray('accesskey', canContinue().fields) !== -1 }">
-                <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></label>
+                <label class="col-lg-3 control-label" for="inputVpoolAccessKey" data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></label>
                 <div class="col-lg-7">
-                    <input type="text" id="inputVpoolAccessKey" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'">
+                    <input type="text" id="inputVpoolAccessKey" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
                 </div>
             </div>
             <div class="form-group" data-bind="css: { 'has-error': $.inArray('secretkey', canContinue().fields) !== -1 }">
-                <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.secretkey"></label>
+                <label class="col-lg-3 control-label" for="inputVpoolSecretKey" data-i18n="ovs:wizards.addvpool.gathervpool.secretkey"></label>
                 <div class="col-lg-7">
-                    <input type="password" id="inputVpoolSecretKey" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'">
+                    <input type="password" id="inputVpoolSecretKey" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'" />
+                </div>
+            </div>
+        </div>
+        <div data-bind="visible: data.backend() === 'alba'">
+            <div data-bind="visible: !data.localHost()">
+                <div class="form-group" data-bind="css: { 'has-error': $.inArray('clientid', canContinue().fields) !== -1 }">
+                    <label class="col-lg-3 control-label" for="inputVpoolClientId" data-i18n="ovs:wizards.addvpool.gathervpool.clientid"></label>
+                    <div class="col-lg-7">
+                        <input type="text" id="inputVpoolClientId" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
+                    </div>
+                </div>
+                <div class="form-group" data-bind="css: { 'has-error': $.inArray('clientsecret', canContinue().fields) !== -1 }">
+                    <label class="col-lg-3 control-label" for="inputVpoolClientSecret" data-i18n="ovs:wizards.addvpool.gathervpool.clientsecret"></label>
+                    <div class="col-lg-7">
+                        <input type="password" id="inputVpoolClientSecret" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="" data-i18n="ovs:wizards.addvpool.gathervpool.albabackend"></label>
+                <div class="col-lg-7">
+                    <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
+                        <i data-i18n="[html]ovs:wizards.addvpool.gathervpool.nobackends"
+                           style="display: inline-block; margin-top: 6px;"></i>
+                    <!-- /ko -->
+                    <!-- ko if: data.albaBackends() !== undefined && data.albaBackends().length > 0 -->
+                        <span data-bind="dropdown: {
+                                             key: 'guid', keyisfunction: false,
+                                             items: data.albaBackends, target: data.albaBackend,
+                                             text: function(item) {
+                                                 if (item !== undefined) {
+                                                     return item.name;
+                                                 }
+                                             }
+                                         }">
+                        </span>
+                    <!-- /ko -->
                 </div>
             </div>
         </div>

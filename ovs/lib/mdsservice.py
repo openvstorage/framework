@@ -91,7 +91,12 @@ class MDSServiceController(object):
         metadataserver_config = StorageDriverConfiguration('metadataserver', vpool.name, number=service_number)
         metadataserver_config.load(client)
         metadataserver_config.clean()  # Clean out obsolete values
-        metadataserver_config.configure_backend_connection_manager(**vpool.metadata)
+        if vpool.backend_type.code == 'alba':
+            metadataserver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
+                                                                       alba_connection_port=storagedriver.alba_proxy.service.ports[0],
+                                                                       backend_type='ALBA')
+        else:
+            metadataserver_config.configure_backend_connection_manager(**vpool.metadata)
         metadataserver_config.configure_metadata_server(mds_address=storagerouter.ip,
                                                         mds_port=service.ports[0],
                                                         mds_scratch_dir=scratch_dir,

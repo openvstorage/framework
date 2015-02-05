@@ -43,13 +43,16 @@ define([
         data.storageIP(undefined);
         data.name('');
         data.host('');
+        data.localHost(true);
         data.port(80);
         data.timeout(600);
-        data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
+        data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']);
         data.storageRouters([]);
         data.storageDrivers([]);
         data.mountpoints([]);
         data.ipAddresses([]);
+        data.albaBackends(undefined);
+        data.albaBackend(undefined);
         data.cinderUser('admin');
         data.cinderPassword('');
         data.cinderTenant('admin');

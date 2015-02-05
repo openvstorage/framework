@@ -16,6 +16,7 @@
 Generic system module, executing statements on local node
 """
 
+import os
 from ConfigParser import ConfigParser
 from subprocess import check_output
 from StringIO import StringIO
@@ -221,17 +222,30 @@ print Configuration.get('{0}')
         return list(output.split())
 
     @staticmethod
-    def read_config(filename):
-        cp = ConfigParser()
-        with open(filename, 'r') as config_file:
-            cfg = config_file.read()
-        cp.readfp(StringIO(cfg))
-        return cp
+    def read_config(filename, client=None):
+        if client is None:
+            cp = ConfigParser()
+            with open(filename, 'r') as config_file:
+                cfg = config_file.read()
+            cp.readfp(StringIO(cfg))
+            return cp
+        else:
+            contents = client.file_read(filename)
+            cp = ConfigParser()
+            cp.readfp(StringIO(contents))
+            return cp
 
     @staticmethod
-    def write_config(config, filename):
-        with open(filename, 'w') as config_file:
-            config.write(config_file)
+    def write_config(config, filename, client=None):
+        if client is None:
+            with open(filename, 'w') as config_file:
+                config.write(config_file)
+        else:
+            temp_filename = '/var/tmp/_{0}'.format(filename.replace('/', ''))
+            with open(temp_filename, 'w') as config_file:
+                config.write(config_file)
+            client.file_upload(filename, temp_filename)
+            os.remove(temp_filename)
 
     @staticmethod
     def read_ovs_config():

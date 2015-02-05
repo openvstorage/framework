@@ -27,6 +27,7 @@ define([
         self.loadStorageRoutersHandle = undefined;
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
+        self.fetchAlbaVPoolHandle     = undefined;
         self.loadStorageRouterHandle  = undefined;
         self.loadStorageDriversHandle = {};
 
@@ -92,6 +93,42 @@ define([
                                 .fail(s3deferred.reject);
                         } else {
                             s3deferred.resolve();
+                        }
+                    }).promise(),
+                    $.Deferred(function(albaDeferred) {
+                        if (self.data.backend() === 'alba' && self.data.albaBackend() === undefined) {
+                            generic.xhrAbort(self.fetchAlbaVPoolHandle);
+                            var getData = {
+                                backend_type: 'alba',
+                                contents: '_dynamics'
+                            };
+                            if (!self.data.localHost()) {
+                                getData.ip = self.data.host();
+                                getData.port = self.data.port();
+                                getData.client_id = self.data.accesskey();
+                                getData.client_secret = self.data.secretkey();
+                            }
+                            self.fetchAlbaVPoolHandle = api.get('backends', { queryparams: getData })
+                                .done(function(data) {
+                                    self.data.albaBackend(undefined);
+                                    self.data.albaBackends(data.data);
+                                    validationResult.valid = false;
+                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.choosebackend'));
+                                    validationResult.fields.push('backend');
+                                    albaDeferred.resolve();
+                                })
+                                .fail(function() {
+                                    self.data.albaBackends(undefined);
+                                    self.data.albaBackend(undefined);
+                                    validationResult.valid = false;
+                                    validationResult.reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidalbainfo'));
+                                    validationResult.fields.push('clientid');
+                                    validationResult.fields.push('clientsecret');
+                                    validationResult.fields.push('host');
+                                    albaDeferred.resolve();
+                                });
+                        } else {
+                            albaDeferred.resolve();
                         }
                     }).promise(),
                     $.Deferred(function(mtptDeferred) {

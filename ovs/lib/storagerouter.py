@@ -20,16 +20,20 @@ import os
 import re
 import uuid
 
+from ConfigParser import RawConfigParser
 from subprocess import check_output
 from ovs.celery_run import celery
 from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
+from ovs.dal.hybrids.j_albaproxy import AlbaProxy
+from ovs.dal.hybrids.service import Service
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
+from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
@@ -41,6 +45,7 @@ from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.extensions.openstack.oscinder import OpenStackCinder
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.extensions.api.client import OVSClient
 
 logger = LogHandler('lib', name='storagerouter')
 
@@ -168,7 +173,17 @@ if Service.has_service('{0}'):
                 mountpoint_bfs = parameters['mountpoint_bfs']
                 directories_to_create.append(mountpoint_bfs)
                 vpool.metadata['local_connection_path'] = mountpoint_bfs
-            if vpool.backend_type.code == 'rest':
+            elif vpool.backend_type.code == 'alba':
+                client = OVSClient(parameters['connection_host'],
+                                   parameters['connection_port'],
+                                   parameters['connection_username'],
+                                   parameters['connection_password'])
+                task_id = client.call('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
+                successfull, metadata = client.wait_for_task(task_id, timeout=300)
+                if successfull is False:
+                    raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
+                vpool.metadata = metadata
+            elif vpool.backend_type.code == 'rest':
                 connection_host = parameters['connection_host']
                 connection_port = parameters['connection_port']
                 rest_connection_timeout_secs = parameters['connection_timeout']
@@ -178,7 +193,7 @@ if Service.has_service('{0}'):
                                   'rest_connection_verbose_logging': rest_connection_timeout_secs,
                                   'rest_connection_metadata_format': "JSON",
                                   'backend_type': 'REST'}
-            elif vpool.backend_type.code in ('ceph_s3', 'amazon_s3', 'swift_s3'):
+            elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 connection_host = parameters['connection_host']
                 connection_port = parameters['connection_port']
                 connection_username = parameters['connection_username']
@@ -388,22 +403,18 @@ for directory in {0}:
             readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
             readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
 
-        ports_in_use = list(System.ports_in_use(client))
-        ports_reserved = []
+        model_ports_in_use = []
+        for port_storagedriver in StorageDriverList.get_storagedrivers():
+            if port_storagedriver.storagerouter_guid == storagerouter.guid:
+                # Local storagedrivers
+                model_ports_in_use += port_storagedriver.ports
+                if port_storagedriver.alba_proxy is not None:
+                    model_ports_in_use.append(port_storagedriver.alba_proxy.service.ports[0])
         if new_storagedriver:
-            ports_in_use_model = {}
-            for port_storagedriver in StorageDriverList.get_storagedrivers():
-                if port_storagedriver.vpool_guid not in ports_in_use_model:
-                    ports_in_use_model[port_storagedriver.vpool_guid] = port_storagedriver.ports
-                    ports_reserved += port_storagedriver.ports
-            if vpool.guid in ports_in_use_model:  # The vPool is extended to another StorageRouter. We need to use these ports.
-                ports = ports_in_use_model[vpool.guid]
-                if any(port in ports_in_use for port in ports):
-                    raise RuntimeError('The required ports are in use')
-            else:  # First StorageDriver for this vPool, so generating new ports
-                ports = StorageRouterController._get_free_ports(client, ports_in_use + ports_reserved, 3)
+            ports = StorageRouterController._get_free_ports(client, model_ports_in_use, 3)
         else:
             ports = storagedriver.ports
+        model_ports_in_use += ports
 
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
         ipaddresses = client.run(cmd).strip().split('\n')
@@ -471,10 +482,37 @@ for directory in {0}:
                                                                       queue_password,
                                                                       current_storagerouter.ip)})
 
+        alba_proxy = storagedriver.alba_proxy
+        if alba_proxy is None:
+            service = Service()
+            service.storagerouter = storagerouter
+            service.ports = [StorageRouterController._get_free_ports(client, model_ports_in_use, 1)]
+            service.name = 'albaproxy_{0}'.format(vpool_name)
+            service.type = ServiceTypeList.get_by_name('AlbaProxy')
+            service.save()
+            alba_proxy = AlbaProxy()
+            alba_proxy.service = service
+            alba_proxy.storagedriver = storagedriver
+            alba_proxy.save()
+            config = RawConfigParser()
+            for section in vpool.metadata:
+                config.add_section(section)
+                for key, value in vpool.metadata[section].iteritems():
+                    config.set(section, key, value)
+            System.write_config(config, '{0}/storagedriver/storagedriver/{1}.alba'.format(
+                System.read_remote_config(client, 'ovs.core.cfgdir'),
+                vpool_name
+            ), client)
+
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
         storagedriver_config.load(client)
         storagedriver_config.clean()  # Clean out obsolete values
-        storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
+        if vpool.backend_type.code == 'alba':
+            storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
+                                                                      alba_connection_port=alba_proxy.service.ports[0],
+                                                                      backend_type='ALBA')
+        else:
+            storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=readcache_serialization_path)
         storagedriver_config.configure_scocache(scocache_mount_points=scocaches,
@@ -549,16 +587,26 @@ for filename in {1}:
                   '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
                   '<UUID>': str(uuid.uuid4())}
+        if vpool.backend_type.code == 'alba':
+            params['<ALBA_PROXY_PORT>'] = alba_proxy.service.ports[0]
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
+            if vpool.backend_type.code == 'alba':
+                client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-albaproxy.conf /opt/OpenvStorage/config/templates/upstart/ovs-albaproxy_{0}.conf'.format(vpool_name))
 
+        extra_service = ''
+        if vpool.backend_type.code == 'alba':
+            extra_service = "Service.add_service(package=('openvstorage', 'albaproxy'), name='albaproxy_{0}', command=None, stop_command=None, params={1})".format(
+                vpool_name, params
+            )
         service_script = """
 from ovs.plugin.provider.service import Service
 Service.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}', command=None, stop_command=None, params={1})
 Service.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}', command=None, stop_command=None, params={1})
-""".format(vpool_name, params)
+{2}
+""".format(vpool_name, params, extra_service)
         System.exec_remote_python(client, service_script)
 
         if storagerouter.pmachine.hvtype == 'VMWARE':

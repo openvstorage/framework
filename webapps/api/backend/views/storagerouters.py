@@ -159,14 +159,14 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Adds a vPool to a given Storage Router
         """
-        fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
+        fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout', 'connection_backend',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
                   'storage_ip', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
         parameters = {'storagerouter_ip': storagerouter.ip }
         for field in fields:
             if field not in call_parameters:
-                if field == 'mountpoint_readcache2':
+                if field in ['mountpoint_readcache2', 'connection_backend']:
                     parameters[field] = ''
                     continue
                 else:

@@ -32,6 +32,7 @@ define(['knockout', 'jquery'], function(ko, $){
             accesskey:      ko.observable(''),
             secretkey:      ko.observable(''),
             allowVPool:     ko.observable(true),
+            localHost:      ko.observable(true),
             backend:        ko.observable('local'),
             mtptTemp:       ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
             mtptBFS:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
@@ -45,17 +46,22 @@ define(['knockout', 'jquery'], function(ko, $){
             host:           ko.observable('').extend({ regex: hostRegex }),
             port:           ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
             timeout:        ko.observable(600).extend({ numeric: {}}),
-            backends:       ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']),
+            albaBackend:    ko.observable(),
+            backends:       ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']),
             storageRouters: ko.observableArray([]),
             storageDrivers: ko.observableArray([]),
             mountpoints:    ko.observableArray([]),
             ipAddresses:    ko.observableArray([]),
+            albaBackends:   ko.observableArray(),
             hasCinder:      ko.observable(),
             configCinder:   ko.observable(),
             cinderUser:     ko.observable('admin'),
             cinderPassword: ko.observable(''),
             cinderTenant:   ko.observable('admin'),
             cinderCtrlIP:   ko.observable('').extend({ regex: ipRegex })
+        }, resetAlbaBackends = function() {
+            mtptData.albaBackends(undefined);
+            mtptData.albaBackend(undefined);
         };
 
         mtptData.mountpoints2 = ko.computed(function() {
@@ -80,6 +86,13 @@ define(['knockout', 'jquery'], function(ko, $){
             }
         }, mtptData);
         mtptData.mtptReadCache1Filter.identifier = 'mtpt-readcache1';
+
+        mtptData.accesskey.subscribe(resetAlbaBackends);
+        mtptData.secretkey.subscribe(resetAlbaBackends);
+        mtptData.host.subscribe(resetAlbaBackends);
+        mtptData.port.subscribe(resetAlbaBackends);
+        mtptData.localHost.subscribe(resetAlbaBackends);
+
         return mtptData;
     };
     return singleton();

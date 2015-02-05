@@ -460,7 +460,14 @@
                 "initialstoragerouter": "Initial Storage Router:",
                 "invalidpassword": "Invalid Storage Router root password",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
-                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",
+                "clientid": "Client ID",
+                "clientsecret": "Client secret",
+                "albabackend": "Backend",
+                "nobackends": "No backends, press &quot;Next &raquo;&quot; to (re)load",
+                "choosebackend": "Choose one of the available backends",
+                "invalidalbainfo": "The entered connection info and credentials are invalid",
+                "localhost": "Use local ALBA backends"
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",

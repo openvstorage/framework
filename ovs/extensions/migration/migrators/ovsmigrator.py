@@ -17,6 +17,8 @@ OVS migration module
 """
 
 import hashlib
+import random
+import string
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.role import Role
@@ -26,6 +28,7 @@ from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.backendtype import BackendType
 from ovs.dal.hybrids.servicetype import ServiceType
 from ovs.dal.hybrids.branding import Branding
+from ovs.dal.lists.backendtypelist import BackendTypeList
 
 
 class OVSMigrator(object):
@@ -78,6 +81,16 @@ class OVSMigrator(object):
             admin_client.grant_type = 'PASSWORD'
             admin_client.user = admin
             admin_client.save()
+            admin_client = Client()
+            admin_client.name = 'default'
+            admin_client.ovs_type = 'USER'
+            admin_client.grant_type = 'CLIENT_CREDENTIALS'
+            admin_client.client_secret = ''.join(random.choice(string.ascii_letters +
+                                                               string.digits +
+                                                               '|_=+*#@!/-[]{}<>.?,\'";:~')
+                                                 for _ in range(64))
+            admin_client.user = admin
+            admin_client.save()
 
             # Create roles
             read_role = Role()
@@ -116,14 +129,17 @@ class OVSMigrator(object):
 
             # Add backends
             for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),
-                                      ('Local', 'local'), ('Distributed', 'distributed')]:
-                backend_type = BackendType()
+                                      ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
+                code = backend_type_info[1]
+                backend_type = BackendTypeList.get_backend_type_by_code(code)
+                if backend_type is None:
+                    backend_type = BackendType()
                 backend_type.name = backend_type_info[0]
-                backend_type.code = backend_type_info[1]
+                backend_type.code = code
                 backend_type.save()
 
             # Add service types
-            for service_type_info in ['MetadataServer']:
+            for service_type_info in ['MetadataServer', 'AlbaProxy']:
                 service_type = ServiceType()
                 service_type.name = service_type_info
                 service_type.save()
