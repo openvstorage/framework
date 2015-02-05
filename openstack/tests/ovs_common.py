@@ -33,6 +33,11 @@ from ovs.lib.storagerouter import StorageRouterController
 from ovs_config import *
 from ConfigParser import ConfigParser
 
+class OVSPluginTestException(Exception): pass
+class WaitTimedOut(OVSPluginTestException): pass
+class VolumeInErrorState(OVSPluginTestException): pass
+class TooManyAttempts(OVSPluginTestException): pass
+
 class OVSPluginTestCase(test.TestCase):
     """
     Base Class for OVS Test cases
@@ -468,12 +473,14 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         return self.cinder_client.volume_snapshots.get(snapshot_id)
 
-    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None, size = VOLUME_SIZE):
+    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None, size = VOLUME_SIZE, attempt = 0):
         """
         Creates a volume based partially on DEFAULT values
         - can be created from snapshot or another volume or an image
         """
-        self._debug('new volume %s %s %s %s' % (name, snapshot_id, volume_id, image_id))
+        if attempt > 3:
+            raise TooManyAttempts('Cannot create volume after %s attempts' % attempt)
+        self._debug('new volume %s %s %s %s (attempt %s)' % (name, snapshot_id, volume_id, image_id, attempt))
         self._get_cinder_client()
         volume = self.cinder_client.volumes.create(size = size,
                                                    display_name = name,
@@ -481,7 +488,13 @@ class OVSPluginTestCase(test.TestCase):
                                                    snapshot_id = snapshot_id,
                                                    source_volid = volume_id,
                                                    imageRef = image_id)
-        self._cinder_wait_until_volume_state(volume.id, 'available', timeout_sec=1200) #allow changes to propagate, model to update
+        try:
+            self._cinder_wait_until_volume_state(volume.id, 'available') #allow changes to propagate, model to update
+        except WaitTimedOut:
+            volume = self._cinder_get_volume_by_id(volume_id)
+            if volume.status == 'creating':
+                self._cinder_delete_volume(volume)
+                return self._cinder_create_volume(name, snapshot_id, volume_id, image_id, size, attempt+1)
         self._debug('volume %s is available' % name)
         return volume
 
