@@ -178,13 +178,17 @@ if Service.has_service('{0}'):
                 vpool.metadata['local_connection_path'] = mountpoint_bfs
             elif vpool.backend_type.code == 'alba':
                 if parameters['connection_host'] == '':
+                    connection_host = Configuration.get('ovs.grid.ip')
+                    connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
-                    client = OVSClient(Configuration.get('ovs.grid.ip'), 443, oauth_client.client_id, oauth_client.client_secret)
+                    client = OVSClient(connection_host, connection_port, oauth_client.client_id, oauth_client.client_secret)
                 else:
-                    client = OVSClient(parameters['connection_host'],
-                                       parameters['connection_port'],
-                                       parameters['connection_username'],
-                                       parameters['connection_password'])
+                    connection_host = parameters['connection_host']
+                    connection_port = parameters['connection_port']
+                    connection_username = parameters['connection_username']
+                    connection_password = parameters['connection_password']
+                    client = OVSClient(connection_host, connection_port,
+                                       connection_username, connection_password)
                 task_id = client.call('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successfull, metadata = client.wait_for_task(task_id, timeout=300)
                 if successfull is False:
