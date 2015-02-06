@@ -45,7 +45,7 @@ class ClusterConfig():
         self.tlog_dir = "/".join([self.base_dir, 'tlogs', cluster_name])
         self.target_ip = '127.0.0.1'
         if plugins is None:
-            self.plugins = []
+            self.plugins = ""
         else:
             self.plugins = plugins
         self.nodes = []
@@ -85,8 +85,8 @@ class ArakoonInstaller():
     ARAKOON_PLUGIN_DIR = '/opt/alba/plugins'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_BASE_DIR = '/mnt/db'
-    ABM_PLUGIN = 'albamgr_plugin.cmxs'
-    NSM_PLUGIN = 'nsm_host_plugin.cmxs'
+    ABM_PLUGIN = 'albamgr_plugin'
+    NSM_PLUGIN = 'nsm_host_plugin'
 
     ARAKOON_UPSTART = """
 description "Arakoon upstart"
@@ -199,9 +199,6 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         for node in self.config.nodes:
             cluster_ips.append(node.ip)
 
-        print client_ips
-        print cluster_ips
-
         self.generate_config()
         self.generate_client_config()
         self.generate_local_nodes_config()
@@ -235,6 +232,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         contents.add_section('global')
         contents.set('global', 'cluster_id', self.config.cluster_name)
         contents.set('global', 'cluster', '')
+        contents.set('global', 'plugins', self.config.plugins)
         for node in self.config.nodes:
             contents.add_section(node.name)
             contents.set(node.name, 'name', node.name)
@@ -311,13 +309,22 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             client.file_upload(config_file, temp_filename)
         os.remove(temp_filename)
 
-    def create_dir_structure(self, cluster_name, client=None):
+    def create_dir_structure(self, client=None, cluster_name=None):
+        if cluster_name is None:
+            cluster_name = self.config.cluster_name
         cmd = """
-sudo mkdir -p {0}/arakoon/{1}
-sudo mkdir -p {0}/tlogs/{1}
-sudo mkdir -p /var/log/arakoon/{1}
-""".format(ArakoonInstaller.ARAKOON_BASE_DIR, cluster_name)
+mkdir -p {0}/arakoon/{1}
+mkdir -p {0}/tlogs/{1}
+mkdir -p /var/log/arakoon/{1}
+""".format(self.config.base_dir, cluster_name)
         System.run(cmd, client)
+
+    def link_plugins(self, client=None):
+        for plugin in self.config.plugins.split():
+            cmd = """
+ln -s /opt/alba/plugins/{2}.cmxs {0}/arakoon/{1}/
+""".format(self.config.base_dir, self.config.cluster_name, plugin)
+            System.run(cmd, client)
 
     def generate_configs(self, client=None):
         self.generate_config(client)
@@ -334,9 +341,34 @@ sudo mkdir -p /var/log/arakoon/{1}
         ports_used = ai.create_config(base_dir, cluster_name, ip, client_port, messaging_port, exclude_ports, plugins)
         client = SSHClient.load(ip)
         ai.generate_configs(client)
-        ai.create_dir_structure(cluster_name, client)
+        ai.create_dir_structure(client)
+        ai.link_plugins(client)
         return {'client_port': ports_used[0],
                 'messaging_port': ports_used[1]}
+
+    @staticmethod
+    def start(cluster_name, ip):
+        client = SSHClient.load(ip)
+        cmd = """
+start ovs-arakoon-{0}
+""".format(cluster_name)
+        System.run(cmd, client)
+
+    @staticmethod
+    def stop(cluster_name, ip):
+        client = SSHClient.load(ip)
+        cmd = """
+stop ovs-arakoon-{0}
+""".format(cluster_name)
+        System.run(cmd, client)
+
+    @staticmethod
+    def status(cluster_name, ip):
+        client = SSHClient.load(ip)
+        cmd = """
+status ovs-arakoon-{0}
+""".format(cluster_name)
+        System.run(cmd, client)
 
     @staticmethod
     def clone_cluster(ip, src_name, tgt_name, exclude_ports=None):
@@ -345,7 +377,7 @@ sudo mkdir -p /var/log/arakoon/{1}
         ai = ArakoonInstaller()
         ai.clone_config_from('/mnt/db', src_name, ip, tgt_name, exclude_ports)
         client = SSHClient.load(ip)
-        ai.create_dir_structure(tgt_name, client)
+        ai.create_dir_structure(client, tgt_name)
         ai.upload_config_for(tgt_name)
 
     @staticmethod
@@ -366,3 +398,15 @@ sudo mkdir -p /var/log/arakoon/{1}
             contents.set('global', 'cluster', ','.join([contents.get('global', 'cluster'), node.name]))
         contents.set('global', 'cluster', ai.node_id)
         return contents
+
+    @staticmethod
+    def register_nsm(abm_name, nsm_name, ip):
+        client = SSHClient.load(ip)
+        abm_config_file = "/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg".format(abm_name)
+        nsm_config_file = "/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg".format(nsm_name)
+
+        cmd = """
+export LD_LIBRARY_PATH=/opt/alba/lib
+/opt/alba/bin/alba add-nsm-host --config={0} {1}
+""".format(abm_config_file, nsm_config_file)
+        System.run(cmd, client)

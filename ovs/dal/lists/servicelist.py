@@ -54,7 +54,7 @@ class ServiceList(object):
     @staticmethod
     def get_service_ports_in_use():
         """
-        Returns a list of ports in use by all registered servcies. Returns empty list if no Service was found
+        Returns a list of ports in use by all registered services. Returns empty list if no Service was found
         """
         services = DataList({'object': Service,
                              'data': DataList.select.GUIDS,
