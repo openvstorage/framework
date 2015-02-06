@@ -587,7 +587,7 @@ class OVSPluginTestCase(test.TestCase):
         while time.time() < start + timeout_sec:
             volume = self._cinder_get_volume_by_id(volume_id)
             if volume.status == 'error':
-                raise RuntimeError('Volume %s in error state' % volume_id)
+                raise VolumeInErrorState('Volume %s in error state' % volume_id)
             if volume.status == status:
                 self._debug('volume entered expected state after %s' % 3*timeout_sec)
                 return
@@ -597,7 +597,7 @@ class OVSPluginTestCase(test.TestCase):
                 self._debug('volume %s changed state from %s to %s' % (volume_id, initial_state, volume.status))
                 initial_state = volume.status
             time.sleep(3)
-        raise RuntimeError('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, 3*timeout_sec, volume.status))
+        raise WaitTimedOut('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, 3*timeout_sec, volume.status))
 
     def _cinder_wait_until_snapshot_state(self, snapshot_id, status, timeout_sec=600):
         """
