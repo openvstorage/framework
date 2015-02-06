@@ -26,13 +26,12 @@ class TestArakoonInstaller(TestCase):
         self.ai = ArakoonInstaller()
         self.base_dir = '/mnt/db'
         self.cluster_name = 'abm_0'
-        self.ip = '10.100.131.61'
-        self.ip2 = '10.100.131.62'
+        self.ip = '10.100.131.62'
+        self.ip2 = '10.100.131.61'
         self.ip3 = '10.100.131.63'
         self.name2 = '005056a3f5a7'
         self.name3 = '005056a33fa8'
         self.node_id = 'abm_0'
-        # self.password = 'rooter'
         self.client_port = 8870
         self.messaging_port = 8871
         self._create_config()
@@ -61,7 +60,7 @@ class TestArakoonInstaller(TestCase):
 
     def _create_config(self):
         self.ai.clear_config()
-        self.ai.create_config('/mnt/db', 'abm_0', '10.100.131.61', '8870', '8871',
+        self.ai.create_config('/mnt/db', 'abm_0', '10.100.131.62', '8870', '8871',
                               ArakoonInstaller.ABM_PLUGIN)
 
     def _print_config_files_for(self, cluster_name):
@@ -125,5 +124,13 @@ class TestArakoonInstaller(TestCase):
         self._create_config()
         self.ai.generate_configs()
 
-        self.ai.clone_cluster('10.100.131.61', src_cluster, tgt_cluster)
+        self.ai.clone_cluster('10.100.131.62', src_cluster, tgt_cluster)
         self._print_config_files_for(tgt_cluster)
+
+    def test_exclude_ports(self):
+        # @todo: to implement
+        pass
+
+    def test_get_client_config(self):
+        self.ai.clear_config()
+        self._print(self.ai.get_client_config_from('10.100.131.62', 'abm_2'))

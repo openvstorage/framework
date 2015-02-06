@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ConfigParser import ConfigParser
+from ConfigParser import RawConfigParser
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.lib.setup import System
 from StringIO import StringIO
-from subprocess import check_output
 
 import os
+import tempfile
 
 
 class ClusterNode(object):
@@ -43,6 +43,7 @@ class ClusterConfig():
         self.log_dir = "/var/log/arakoon/" + cluster_name
         self.home_dir = "/".join([self.base_dir, 'arakoon', cluster_name])
         self.tlog_dir = "/".join([self.base_dir, 'tlogs', cluster_name])
+        self.target_ip = '127.0.0.1'
         if plugins is None:
             self.plugins = []
         else:
@@ -55,11 +56,23 @@ class ClusterConfig():
         self.tlog_dir = base_dir + '/tlogs/' + self.cluster_name
         self.base_dir = base_dir
 
-    def set_cluster_name(self, cluster_name):
+    def set_cluster_name(self, cluster_name, exclude_ports):
         self.log_dir = "/var/log/arakoon/" + cluster_name
         self.home_dir = "/".join([self.base_dir, 'arakoon', cluster_name])
         self.tlog_dir = "/".join([self.base_dir, 'tlogs', cluster_name])
         self.cluster_name = cluster_name
+        ports_used = set()
+        for node in self.nodes:
+            ports_used.add(node.client_port)
+            ports_used.add(node.messaging_port)
+        print "ports used: {0}".format(ports_used)
+        exclude_ports.extend(list(ports_used))
+        print "excluded ports: {0}".format(exclude_ports)
+        free_ports = System.get_free_ports(min(ports_used), exclude_ports, 2)
+        print "new ports: {0}".format(free_ports)
+        for node in self.nodes:
+            node.client_port = free_ports[0]
+            node.messaging_port = free_ports[1]
 
 
 class ArakoonInstaller():
@@ -75,6 +88,26 @@ class ArakoonInstaller():
     ABM_PLUGIN = 'albamgr_plugin.cmxs'
     NSM_PLUGIN = 'nsm_host_plugin.cmxs'
 
+    ARAKOON_UPSTART = """
+description "Arakoon upstart"
+
+start on (local-filesystems and started networking)
+stop on runlevel [016]
+
+kill timeout 60
+respawn
+respawn limit 10 5
+console log
+setuid root
+setgid root
+
+env PYTHONPATH=/opt/OpenvStorage
+env LD_LIBRARY_PATH=/opt/alba/lib
+chdir /opt/OpenvStorage
+
+exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagement.py --start --cluster {0}
+"""
+
     def __init__(self, password=None):
         self.master_password = password
         self.node_id = System.get_my_machine_id()
@@ -87,7 +120,7 @@ class ArakoonInstaller():
             os.makedirs(config_dir)
         return filename
 
-    def create_config(self, base_dir, cluster_name, ip, client_port, messaging_port, plugins=None):
+    def create_config(self, base_dir, cluster_name, ip, client_port, messaging_port, exclude_ports=None, plugins=None):
         """
         Creates initial config object causing this host to be master
         :param base_dir: mountpoint of arakoon database(s)
@@ -98,6 +131,8 @@ class ArakoonInstaller():
         :param plugins: optional arakoon plugins
         :return:
         """
+        if exclude_ports is None:
+            exclude_ports = list()
 
         if plugins is None:
             plugins = list()
@@ -105,9 +140,12 @@ class ArakoonInstaller():
         client = SSHClient.load(ip)
         node_name = System.get_my_machine_id(client)
         self.clear_config()
-        cm = ClusterNode(node_name, ip, client_port, messaging_port)
+        free_ports = System.get_free_ports(min([client_port, messaging_port]), exclude_ports, 2)
+        cm = ClusterNode(node_name, ip, free_ports[0], free_ports[1])
         self.config = ClusterConfig(base_dir, cluster_name, 'info', plugins)
         self.config.nodes.append(cm)
+        self.config.target_ip = ip
+        return free_ports
 
     def load_config_from(self, base_dir, cluster_name, master_ip, master_password=None):
         """
@@ -118,7 +156,7 @@ class ArakoonInstaller():
 
         client = SSHClient.load(master_ip, master_password)
         cfg_file = client.file_read(self.ARAKOON_CONFIG_DIR + '/{0}/{0}.cfg'.format(cluster_name))
-        cfg = ConfigParser()
+        cfg = RawConfigParser()
         cfg.readfp(StringIO(cfg_file))
 
         nodes = cfg.sections()
@@ -137,19 +175,19 @@ class ArakoonInstaller():
 
         master_node = nodes.pop()
         master_config = dict(cfg.items(master_node))
-        self.create_config(base_dir, cluster_name, master_node, master_config['ip'],
+        self.create_config(base_dir, cluster_name, master_config['ip'],
                            master_config['client_port'], master_config['messaging_port'])
 
         for node_id in nodes:
             node = dict(cfg.items(node_id))
             ClusterNode(node_id, node['ip'], node['client_port'], node['messaging_port'])
 
-    def clone_config_from(self, base_dir, cluster_name, master_ip, new_cluster_name, master_password=None):
+    def clone_config_from(self, base_dir, cluster_name, master_ip, new_cluster_name, exclude_ports=None, master_password=None):
         self.load_config_from(base_dir, cluster_name, master_ip, master_password)
-        self.config.set_cluster_name(new_cluster_name)
-        self.generate_config()
-        self.generate_client_config()
-        self.generate_local_nodes_config()
+        if exclude_ports is None:
+            exclude_ports = list()
+        self.config.set_cluster_name(new_cluster_name, exclude_ports)
+        self.generate_configs()
         self.upload_config_for(new_cluster_name)
 
     def upload_config_for(self, cluster_name):
@@ -168,10 +206,11 @@ class ArakoonInstaller():
         self.generate_client_config()
         self.generate_local_nodes_config()
 
+        config_files = list()
         for config_suffix in ['.cfg', '_client.cfg', '_local_nodes.cfg']:
-            # upload _client.cfg file to all ovs nodes
-            config_file = self.get_config_file(config_suffix)
-            print config_file
+            config_files.append(self.get_config_file(config_suffix))
+        config_files.append('/etc/init/ovs-arakoon_{0}.conf'.format(cluster_name))
+        for config_file in config_files:
             for ip in cluster_ips:
                 if ip in client_ips:
                     continue
@@ -189,32 +228,10 @@ class ArakoonInstaller():
         node = ClusterNode(node_id, ip, client_port, messaging_port)
         self.config.nodes.append(node)
 
-    def get_nr_of_free_ports_for_config(self, nr):
-        if len(self.config.nodes) == 0:
-            raise RuntimeError('Configuration should be present before requesting new ports')
-        ports_in_use = set()
-
-        saved_current_config = self.config
-        saved_ip = self.config.nodes[0].ip
-        print 'saved ip:' + str(saved_ip)
-
-        client = SSHClient.load(saved_ip)
-        arakoon_cluster_names = System.get_arakoon_cluster_names(client)
-        for name in arakoon_cluster_names:
-            self.load_config_from(saved_current_config.base_dir, name, saved_ip)
-            for node in self.config.nodes:
-                print node
-                ports_in_use.add(int(node.client_port))
-                ports_in_use.add(int(node.messaging_port))
-
-        self.config = saved_current_config
-
-        ports_in_use = list(ports_in_use)
-        return System.get_free_ports(min(ports_in_use), ports_in_use, nr)
-
-    def generate_config(self):
+    def generate_config(self, client=None):
+        (temp_handle, temp_filename) = tempfile.mkstemp()
         config_file = self.get_config_file('.cfg')
-        contents = ConfigParser()
+        contents = RawConfigParser()
         contents.add_section('global')
         contents.set('global', 'cluster_id', self.config.cluster_name)
         contents.set('global', 'cluster', '')
@@ -231,12 +248,19 @@ class ArakoonInstaller():
             contents.set(node.name, 'fsync', str(self.config.fsync).lower())
             contents.set('global', 'cluster', ','.join([contents.get('global', 'cluster'), node.name]))
         contents.set('global', 'cluster', self.node_id)
-        with open(config_file, 'wb') as f:
-            contents.write(f)
+        if client is None:
+            with open(config_file, 'wb') as f:
+                contents.write(f)
+        else:
+            with open(temp_filename, 'wb') as f:
+                contents.write(f)
+            client.file_upload(config_file, temp_filename)
+        os.remove(temp_filename)
 
-    def generate_client_config(self):
+    def generate_client_config(self, client=None):
+        (temp_handle, temp_filename) = tempfile.mkstemp()
         config_file = self.get_config_file('_client.cfg')
-        contents = ConfigParser()
+        contents = RawConfigParser()
         contents.add_section('global')
         contents.set('global', 'cluster_id', self.config.cluster_name)
         contents.set('global', 'cluster', '')
@@ -248,43 +272,97 @@ class ArakoonInstaller():
             contents.set(node.name, 'client_port', node.client_port)
             contents.set('global', 'cluster', ','.join([contents.get('global', 'cluster'), node.name]))
         contents.set('global', 'cluster', self.node_id)
-        with open(config_file, 'wb') as f:
-            contents.write(f)
+        if client is None:
+            with open(config_file, 'wb') as f:
+                contents.write(f)
+        else:
+            with open(temp_filename, 'wb') as f:
+                contents.write(f)
+            client.file_upload(config_file, temp_filename)
+        os.remove(temp_filename)
 
-    def generate_local_nodes_config(self):
+    def generate_local_nodes_config(self, client=None):
+        (temp_handle, temp_filename) = tempfile.mkstemp()
         config_file = self.get_config_file('_local_nodes.cfg')
 
-        contents = ConfigParser()
+        contents = RawConfigParser()
         contents.add_section('global')
         contents.set('global', 'cluster', self.node_id)
-        with open(config_file, 'wb') as f:
-            contents.write(f)
+        if client is None:
+            with open(config_file, 'wb') as f:
+                contents.write(f)
+        else:
+            with open(temp_filename, 'wb') as f:
+                contents.write(f)
+            client.file_upload(config_file, temp_filename)
+        os.remove(temp_filename)
 
-    def generate_configs(self):
-        self.generate_config()
-        self.generate_client_config()
-        self.generate_local_nodes_config()
+    def generate_upstart_config(self, client=None):
+        (temp_handle, temp_filename) = tempfile.mkstemp()
+        config_file = '/etc/init/ovs-arakoon-{0}.conf'.format(self.config.cluster_name)
+        contents = ArakoonInstaller.ARAKOON_UPSTART.format(self.config.cluster_name)
 
-    def create_dir_structure(self, cluster_name):
+        if client is None:
+            with open(config_file, 'wb') as f:
+                f.write(contents)
+        else:
+            with open(temp_filename, 'wb') as f:
+                f.write(contents)
+            client.file_upload(config_file, temp_filename)
+        os.remove(temp_filename)
+
+    def create_dir_structure(self, cluster_name, client=None):
         cmd = """
 sudo mkdir -p {0}/arakoon/{1}
 sudo mkdir -p {0}/tlogs/{1}
 sudo mkdir -p /var/log/arakoon/{1}
 """.format(ArakoonInstaller.ARAKOON_BASE_DIR, cluster_name)
-        check_output(cmd, shell=True).strip()
+        System.run(cmd, client)
+
+    def generate_configs(self, client=None):
+        self.generate_config(client)
+        self.generate_client_config(client)
+        self.generate_local_nodes_config(client)
+        self.generate_upstart_config(client)
 
     @staticmethod
-    def create_cluster(base_dir, cluster_name, ip, client_port, messaging_port, plugins=None):
+    def create_cluster(cluster_name, ip, base_dir='/mnt/db', client_port=8870, messaging_port=8871, exclude_ports=None, plugins=None):
         ai = ArakoonInstaller()
         ai.clear_config()
-        ai.create_config(base_dir, cluster_name, ip, client_port, messaging_port, plugins)
-        ai.generate_configs()
-        ai.create_dir_structure(cluster_name)
-        return {'client_port': client_port,
-                'messaging_port': messaging_port}
+        if exclude_ports is None:
+            exclude_ports = list()
+        ports_used = ai.create_config(base_dir, cluster_name, ip, client_port, messaging_port, exclude_ports, plugins)
+        client = SSHClient.load(ip)
+        ai.generate_configs(client)
+        ai.create_dir_structure(cluster_name, client)
+        return {'client_port': ports_used[0],
+                'messaging_port': ports_used[1]}
 
     @staticmethod
-    def clone_cluster(ip, src_name, tgt_name):
+    def clone_cluster(ip, src_name, tgt_name, exclude_ports=None):
+        if exclude_ports is None:
+            exclude_ports = list()
         ai = ArakoonInstaller()
-        ai.clone_config_from('/mnt/db', src_name, ip, tgt_name)
+        ai.clone_config_from('/mnt/db', src_name, ip, tgt_name, exclude_ports)
+        client = SSHClient.load(ip)
+        ai.create_dir_structure(tgt_name, client)
         ai.upload_config_for(tgt_name)
+
+    @staticmethod
+    def get_client_config_from(ip, cluster_name):
+        ai = ArakoonInstaller()
+        ai.load_config_from('/mnt/db', cluster_name, ip)
+        contents = RawConfigParser()
+        contents.add_section('global')
+        contents.set('global', 'cluster_id', ai.config.cluster_name)
+        contents.set('global', 'cluster', '')
+
+        for node in ai.config.nodes:
+            contents.add_section(node.name)
+            contents.set(node.name, 'name', node.name)
+            contents.set(node.name, 'ip', node.ip)
+            contents.set(node.name, 'client_port', node.client_port)
+            contents.set(node.name, 'messaging_port', node.client_port)
+            contents.set('global', 'cluster', ','.join([contents.get('global', 'cluster'), node.name]))
+        contents.set('global', 'cluster', ai.node_id)
+        return contents
