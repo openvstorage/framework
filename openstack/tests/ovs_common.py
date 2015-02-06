@@ -489,16 +489,16 @@ class OVSPluginTestCase(test.TestCase):
                                                    source_volid = volume_id,
                                                    imageRef = image_id)
         try:
-            self._cinder_wait_until_volume_state(volume.id, 'available') #allow changes to propagate, model to update
+            self._cinder_wait_until_volume_state(volume.id, 'available', timeout_sec=300) #allow changes to propagate, model to update
         except WaitTimedOut:
             volume = self._cinder_get_volume_by_display_name(name)
             if volume.status == 'creating':
-                self._cinder_delete_volume(volume)
+                self._cinder_delete_volume(volume, force=True)
                 return self._cinder_create_volume(name, snapshot_id, volume_id, image_id, size, attempt+1)
         self._debug('volume %s is available' % name)
         return volume
 
-    def _cinder_delete_volume(self, volume, timeout=600):
+    def _cinder_delete_volume(self, volume, timeout=600, force=False):
         """
         Delete volume, wait(volume might not be yet in state to be deleted)
         If volume is in-use we will raise error immediately
@@ -510,11 +510,13 @@ class OVSPluginTestCase(test.TestCase):
         except cinder_client_exceptions.NotFound:
             self._debug('Volume %s not found, already deleted' % volume.id)
             return
+
         if volume.status == 'in-use':
             raise RuntimeError('Cannot delete volume %s while it is in use' % volume.id)
 
-        self._cinder_wait_until_volume_state(volume.id, status='available')
-        self._debug('volume is now available')
+        if not force:
+            self._cinder_wait_until_volume_state(volume.id, status='available')
+            self._debug('volume is now available')
         volume = self._cinder_get_volume_by_id(volume.id)
         self.cinder_client.volumes.delete(volume)
         self._cinder_wait_until_volume_not_found(volume.id, timeout)
@@ -597,7 +599,7 @@ class OVSPluginTestCase(test.TestCase):
                 self._debug('volume %s changed state from %s to %s' % (volume_id, initial_state, volume.status))
                 initial_state = volume.status
             time.sleep(3)
-        raise WaitTimedOut('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, 3*timeout_sec, volume.status))
+        raise WaitTimedOut('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, timeout_sec, volume.status))
 
     def _cinder_wait_until_snapshot_state(self, snapshot_id, status, timeout_sec=600):
         """
