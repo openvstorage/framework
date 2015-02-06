@@ -129,6 +129,8 @@ class StorageRouterController(object):
             # Check whether there are running machines on this vPool
             machine_guids = []
             for vdisk in vpool.vdisks:
+                if vdisk.vmachine_guid is None:
+                    continue
                 if vdisk.vmachine_guid not in machine_guids:
                     machine_guids.append(vdisk.vmachine_guid)
                     if vdisk.vmachine.hypervisor_status in ['RUNNING', 'PAUSED']:
