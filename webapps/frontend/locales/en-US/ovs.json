@@ -219,7 +219,7 @@
         "backendconnection": "Connection",
         "backendlogin": "Login",
         "statistics": "Statistics",
-        "backend": "BackendType",
+        "backend": "Backend",
         "freespace": "Free space",
         "detail": {
             "title": "vPool",
@@ -471,11 +471,11 @@
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",
-                "bfsinfo": "BackendType Filesystem location which will contain all data for this vPool:",
+                "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
                 "mtptinfo": "Required locations:",
                 "otherinfo": "Other information:",
                 "tempfs": "Temporary FS:",
-                "bfs": "BackendType FS:",
+                "bfs": "Backend FS:",
                 "md": "Metadata:",
                 "readcache1": "Read Cache 1:",
                 "readcache2": "Read Cache 2:",
@@ -663,8 +663,8 @@
     },
     "footer" : {
         "cachereads": "Reads served from the Cache:",
-        "datawritten": "Data written to the BackendType:",
-        "dataread": "Data read from the BackendType:",
+        "datawritten": "Data written to the Backend:",
+        "dataread": "Data read from the Backend:",
         "bandwidthsaved": "Bandwidth Saved:"
     },
     "events": {

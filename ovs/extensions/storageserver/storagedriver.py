@@ -48,6 +48,7 @@ class StorageDriverClient(object):
                      'write_operations']
     stat_sums = {'operations': ['write_operations', 'read_operations'],
                  'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
+                 'cache_misses': ['sco_cache_misses'],
                  'data_transferred': ['data_written', 'data_read']}
     stat_keys = stat_counters + stat_sums.keys()
 
