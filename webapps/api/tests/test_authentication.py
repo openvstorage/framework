@@ -97,17 +97,17 @@ class Authentication(TestCase):
 
         # Create internal OAuth 2 clients
         admin_client = Client()
-        admin_client.ovs_type = 'FRONTEND'
+        admin_client.ovs_type = 'INTERNAL'
         admin_client.grant_type = 'PASSWORD'
         admin_client.user = admin
         admin_client.save()
         admin_na_client = Client()
-        admin_na_client.ovs_type = 'FRONTEND'
+        admin_na_client.ovs_type = 'INTERNAL'
         admin_na_client.grant_type = 'PASSWORD'
         admin_na_client.user = admin_na
         admin_na_client.save()
         user_client = Client()
-        user_client.ovs_type = 'FRONTEND'
+        user_client.ovs_type = 'INTERNAL'
         user_client.grant_type = 'PASSWORD'
         user_client.user = user
         user_client.save()

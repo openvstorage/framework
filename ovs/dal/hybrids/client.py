@@ -28,7 +28,7 @@ class Client(DataObject):
     __properties = [Property('name', str, mandatory=False, doc='Name of the client'),
                     Property('client_secret', str, mandatory=False, doc='Client secret (application password)'),
                     Property('grant_type', ['PASSWORD', 'CLIENT_CREDENTIALS'], doc='Grant type of the Client'),
-                    Property('ovs_type', ['FRONTEND', 'REPLICATION', 'USER'], doc='The type of the client within Open vStorage')]
+                    Property('ovs_type', ['INTERNAL', 'REPLICATION', 'USER'], doc='The type of the client within Open vStorage')]
     __relations = [Relation('user', User, 'clients')]
     __dynamics = [Dynamic('client_id', str, 86400)]
 

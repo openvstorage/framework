@@ -91,7 +91,13 @@ define(['knockout', 'jquery'], function(ko, $){
         mtptData.secretkey.subscribe(resetAlbaBackends);
         mtptData.host.subscribe(resetAlbaBackends);
         mtptData.port.subscribe(resetAlbaBackends);
-        mtptData.localHost.subscribe(resetAlbaBackends);
+        mtptData.localHost.subscribe(function() {
+            mtptData.host('');
+            mtptData.port(80);
+            mtptData.accesskey('');
+            mtptData.secretkey('');
+            resetAlbaBackends();
+        });
 
         return mtptData;
     };

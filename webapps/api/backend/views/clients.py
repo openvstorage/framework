@@ -49,10 +49,10 @@ class ClientViewSet(viewsets.ViewSet):
         if Toolbox.is_client_in_roles(request.client, ['manage']):
             client_list = ClientList.get_clients()
         else:
-            if ovs_type is not None and ovs_type != 'FRONTEND':
+            if ovs_type is not None and ovs_type != 'INTERNAL':
                 client_list = [client for client in request.client.user.clients if client.ovs_type == ovs_type]
             else:
-                client_list = [client for client in request.client.user.clients if client.ovs_type != 'FRONTEND']
+                client_list = [client for client in request.client.user.clients if client.ovs_type != 'INTERNAL']
         if userguid is not None:
             return [client for client in client_list if client.user_guid == userguid]
         return client_list

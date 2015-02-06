@@ -163,7 +163,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
                   'storage_ip', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
-        parameters = {'storagerouter_ip': storagerouter.ip }
+        parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
             if field not in call_parameters:
                 if field in ['mountpoint_readcache2', 'connection_backend']:

@@ -17,6 +17,8 @@ Generic system module, executing statements on local node
 """
 
 import os
+import uuid
+import time
 from ConfigParser import ConfigParser
 from subprocess import check_output
 from StringIO import StringIO
@@ -241,9 +243,10 @@ print Configuration.get('{0}')
             with open(filename, 'w') as config_file:
                 config.write(config_file)
         else:
-            temp_filename = '/var/tmp/_{0}'.format(filename.replace('/', ''))
+            temp_filename = '/var/tmp/{0}'.format(str(uuid.uuid4()).replace('-', ''))
             with open(temp_filename, 'w') as config_file:
                 config.write(config_file)
+            time.sleep(1)
             client.file_upload(filename, temp_filename)
             os.remove(temp_filename)
 

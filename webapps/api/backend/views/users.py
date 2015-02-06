@@ -17,6 +17,8 @@ Module for users
 """
 
 import hashlib
+import random
+import string
 from backend.serializers.user import PasswordSerializer
 from backend.serializers.serializers import FullSerializer
 from backend.decorators import required_roles, load, return_object, return_list, log
@@ -80,16 +82,26 @@ class UserViewSet(viewsets.ViewSet):
             if UserList.get_user_by_username(user.username) is not None:
                 return Response('User already exists', status=status.HTTP_303_SEE_OTHER)
             user.save()
-            client = Client()
-            client.ovs_type = 'FRONTEND'
-            client.grant_type = 'PASSWORD'
-            client.user = user
-            client.save()
+            pw_client = Client()
+            pw_client.ovs_type = 'INTERNAL'
+            pw_client.grant_type = 'PASSWORD'
+            pw_client.user = user
+            pw_client.save()
+            cc_client = Client()
+            cc_client.ovs_type = 'INTERNAL'
+            cc_client.grant_type = 'CLIENT_CREDENTIALS'
+            cc_client.client_secret = ''.join(random.choice(string.ascii_letters +
+                                                            string.digits +
+                                                            '|_=+*#@!/-[]{}<>.?,\'";:~')
+                                              for _ in range(128))
+            cc_client.user = user
+            cc_client.save()
             for junction in user.group.roles:
-                roleclient = RoleClient()
-                roleclient.client = client
-                roleclient.role = junction.role
-                roleclient.save()
+                for client in [cc_client, pw_client]:
+                    roleclient = RoleClient()
+                    roleclient.client = client
+                    roleclient.role = junction.role
+                    roleclient.save()
             serializer = FullSerializer(User, instance=user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         else:

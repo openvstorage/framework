@@ -42,7 +42,7 @@ class OVSClient(object):
         Authenticates to the api
         """
         headers = {'Accept': 'application/json',
-                   'Authorization': 'basic {0}'.format(base64.encodestring('{0}:{1}'.format(self.client_id, self.client_secret)).strip())}
+                   'Authorization': 'Basic {0}'.format(base64.b64encode('{0}:{1}'.format(self.client_id, self.client_secret)).strip())}
         request = urllib2.Request('{0}/oauth2/token/'.format(self._url),
                                   data=urllib.urlencode({'grant_type': 'client_credentials'}),
                                   headers=headers)

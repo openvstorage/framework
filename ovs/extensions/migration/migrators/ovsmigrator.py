@@ -76,21 +76,20 @@ class OVSMigrator(object):
             admin.save()
 
             # Create internal OAuth 2 clients
-            admin_client = Client()
-            admin_client.ovs_type = 'FRONTEND'
-            admin_client.grant_type = 'PASSWORD'
-            admin_client.user = admin
-            admin_client.save()
-            admin_client = Client()
-            admin_client.name = 'default'
-            admin_client.ovs_type = 'USER'
-            admin_client.grant_type = 'CLIENT_CREDENTIALS'
-            admin_client.client_secret = ''.join(random.choice(string.ascii_letters +
-                                                               string.digits +
-                                                               '|_=+*#@!/-[]{}<>.?,\'";:~')
-                                                 for _ in range(64))
-            admin_client.user = admin
-            admin_client.save()
+            admin_pw_client = Client()
+            admin_pw_client.ovs_type = 'INTERNAL'
+            admin_pw_client.grant_type = 'PASSWORD'
+            admin_pw_client.user = admin
+            admin_pw_client.save()
+            admin_cc_client = Client()
+            admin_cc_client.ovs_type = 'INTERNAL'
+            admin_cc_client.grant_type = 'CLIENT_CREDENTIALS'
+            admin_cc_client.client_secret = ''.join(random.choice(string.ascii_letters +
+                                                                  string.digits +
+                                                                  '|_=+*#@!/-[]{}<>.?,\'";:~')
+                                                    for _ in range(128))
+            admin_cc_client.user = admin
+            admin_cc_client.save()
 
             # Create roles
             read_role = Role()
@@ -122,10 +121,11 @@ class OVSMigrator(object):
                     rolegroup.save()
                 for user in setting[0].users:
                     for role in setting[1]:
-                        roleclient = RoleClient()
-                        roleclient.client = user.clients[0]
-                        roleclient.role = role
-                        roleclient.save()
+                        for client in user.clients:
+                            roleclient = RoleClient()
+                            roleclient.client = client
+                            roleclient.role = role
+                            roleclient.save()
 
             # Add backends
             for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),

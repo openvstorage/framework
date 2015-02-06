@@ -28,10 +28,22 @@ class ClientList(object):
     @staticmethod
     def get_clients():
         """
-        Returns a list of all Clients, except frontend types
+        Returns a list of all Clients, except internal types
         """
         clients = DataList({'object': Client,
                             'data': DataList.select.GUIDS,
                             'query': {'type': DataList.where_operator.AND,
-                                      'items': [('ovs_type', DataList.operator.NOT_EQUALS, 'FRONTEND')]}}).data
+                                      'items': [('ovs_type', DataList.operator.NOT_EQUALS, 'INTERNAL')]}}).data
+        return DataObjectList(clients, Client)
+
+    @staticmethod
+    def get_by_types(ovs_type, grant_type):
+        """
+        Returns a list of all internal Clients
+        """
+        clients = DataList({'object': Client,
+                            'data': DataList.select.GUIDS,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('ovs_type', DataList.operator.EQUALS, ovs_type),
+                                                ('grant_type', DataList.operator.EQUALS, grant_type)]}}).data
         return DataObjectList(clients, Client)

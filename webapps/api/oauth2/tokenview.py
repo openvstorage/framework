@@ -60,7 +60,7 @@ class OAuth2TokenView(View):
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
             if user.is_active is False:
                 return HttpResponseBadRequest, {'error': 'inactive_user'}
-            clients = [client for client in user.clients if client.ovs_type == 'FRONTEND' and client.grant_type == 'PASSWORD']
+            clients = [client for client in user.clients if client.ovs_type == 'INTERNAL' and client.grant_type == 'PASSWORD']
             if len(clients) != 1:
                 return HttpResponseBadRequest, {'error': 'unauthorized_client'}
             client = clients[0]
@@ -79,7 +79,7 @@ class OAuth2TokenView(View):
             if 'HTTP_AUTHORIZATION' not in request.META:
                 return HttpResponseBadRequest, {'error': 'missing_header'}
             _, password_hash = request.META['HTTP_AUTHORIZATION'].split(' ')
-            client_id, client_secret = base64.decodestring(password_hash).split(':', 1)
+            client_id, client_secret = base64.b64decode(password_hash).split(':', 1)
             try:
                 client = Client(client_id)
                 if client.grant_type != 'CLIENT_CREDENTIALS':
