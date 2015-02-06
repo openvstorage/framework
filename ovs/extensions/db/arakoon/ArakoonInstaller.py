@@ -140,12 +140,10 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         client = SSHClient.load(ip)
         node_name = System.get_my_machine_id(client)
         self.clear_config()
-        free_ports = System.get_free_ports(min([client_port, messaging_port]), exclude_ports, 2)
-        cm = ClusterNode(node_name, ip, free_ports[0], free_ports[1])
+        cm = ClusterNode(node_name, ip, client_port, messaging_port)
         self.config = ClusterConfig(base_dir, cluster_name, 'info', plugins)
         self.config.nodes.append(cm)
         self.config.target_ip = ip
-        return free_ports
 
     def load_config_from(self, base_dir, cluster_name, master_ip, master_password=None):
         """
@@ -338,7 +336,8 @@ ln -s /opt/alba/plugins/{2}.cmxs {0}/arakoon/{1}/
         ai.clear_config()
         if exclude_ports is None:
             exclude_ports = list()
-        ports_used = ai.create_config(base_dir, cluster_name, ip, client_port, messaging_port, exclude_ports, plugins)
+        ports_used = System.get_free_ports(min([client_port, messaging_port]), exclude_ports, 2)
+        ai.create_config(base_dir, cluster_name, ip, ports_used[0], ports_used[1], exclude_ports, plugins)
         client = SSHClient.load(ip)
         ai.generate_configs(client)
         ai.create_dir_structure(client)
@@ -394,7 +393,6 @@ status ovs-arakoon-{0}
             contents.set(node.name, 'name', node.name)
             contents.set(node.name, 'ip', node.ip)
             contents.set(node.name, 'client_port', node.client_port)
-            contents.set(node.name, 'messaging_port', node.client_port)
             contents.set('global', 'cluster', ','.join([contents.get('global', 'cluster'), node.name]))
         contents.set('global', 'cluster', ai.node_id)
         return contents
