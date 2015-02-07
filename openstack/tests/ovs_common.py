@@ -493,6 +493,7 @@ class OVSPluginTestCase(test.TestCase):
         except WaitTimedOut:
             volume = self._cinder_get_volume_by_display_name(name)
             if volume.status == 'creating':
+                self._cinder_reset_volume_state(volume, 'error')
                 self._cinder_delete_volume(volume, force=True)
                 return self._cinder_create_volume(name, snapshot_id, volume_id, image_id, size, attempt+1)
         self._debug('volume %s is available' % name)
