@@ -519,7 +519,10 @@ class OVSPluginTestCase(test.TestCase):
             self._cinder_wait_until_volume_state(volume.id, status='available')
             self._debug('volume is now available')
         volume = self._cinder_get_volume_by_id(volume.id)
-        self.cinder_client.volumes.delete(volume)
+        if force:
+            self.cinder_client.volumes.force_delete(volume)
+        else:
+            self.cinder_client.volumes.delete(volume)
         self._cinder_wait_until_volume_not_found(volume.id, timeout)
         self._debug('deleted volume %s' % volume.id)
 
