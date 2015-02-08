@@ -589,8 +589,9 @@ class OVSPluginTestCase(test.TestCase):
         initial_state = None
         while time.time() < start + timeout_sec:
             volume = self._cinder_get_volume_by_id(volume_id)
-            if volume.status == 'error':
-                raise VolumeInErrorState('Volume %s in error state' % volume_id)
+            if status != 'error':
+                if volume.status == 'error':
+                    raise VolumeInErrorState('Volume %s in error state' % volume_id)
             if volume.status == status:
                 self._debug('volume entered expected state after %s' % 3*timeout_sec)
                 return
