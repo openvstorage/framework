@@ -494,12 +494,12 @@ class OVSPluginTestCase(test.TestCase):
             volume = self._cinder_get_volume_by_display_name(name)
             if volume.status == 'creating':
                 self._cinder_reset_volume_state(volume, 'error')
-                self._cinder_delete_volume(volume, force=True)
+                self._cinder_delete_volume(volume, force=True, wait=False)
                 return self._cinder_create_volume(name, snapshot_id, volume_id, image_id, size, attempt+1)
         self._debug('volume %s is available' % name)
         return volume
 
-    def _cinder_delete_volume(self, volume, timeout=600, force=False):
+    def _cinder_delete_volume(self, volume, timeout=600, force=False, wait=False):
         """
         Delete volume, wait(volume might not be yet in state to be deleted)
         If volume is in-use we will raise error immediately
@@ -523,7 +523,8 @@ class OVSPluginTestCase(test.TestCase):
             self.cinder_client.volumes.force_delete(volume)
         else:
             self.cinder_client.volumes.delete(volume)
-        self._cinder_wait_until_volume_not_found(volume.id, timeout)
+        if wait:
+            self._cinder_wait_until_volume_not_found(volume.id, timeout)
         self._debug('deleted volume %s' % volume.id)
 
     def _cinder_create_snapshot(self, volume, snap_name):
