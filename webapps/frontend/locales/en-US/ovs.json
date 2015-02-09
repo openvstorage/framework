@@ -447,7 +447,7 @@
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
-                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPoolnames.",
+                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPool names.",
                 "backendtype": "BackendType:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
@@ -457,7 +457,7 @@
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "nocredentials": "No credentials were entered",
                 "extendedinfo": "Extended vPool information",
-                "initialstoragerouter": "Initial Storage Router:",
+                "initialstoragerouter": "Storage Router:",
                 "invalidpassword": "Invalid Storage Router root password",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
                 "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",
