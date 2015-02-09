@@ -85,7 +85,7 @@ class MDSServiceController(object):
         scratch_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, service_number)
         rocksdb_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, service_number)
         client.run('mkdir -p {0}'.format(scratch_dir))
-        # @TODO (after OVS-1605): client.run('mkdir -p {0}'.format(rocksdb_dir))
+        client.run('mkdir -p {0}'.format(rocksdb_dir))
 
         # Generate the configuration file
         metadataserver_config = StorageDriverConfiguration('metadataserver', vpool.name, number=service_number)
