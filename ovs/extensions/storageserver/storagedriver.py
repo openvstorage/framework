@@ -214,7 +214,7 @@ class StorageDriverConfiguration(object):
         if client is None:
             if os.path.isfile(self.path):
                 with open(self.path, 'r') as config_file:
-                    contents = config_file.readall()
+                    contents = config_file.read()
                     self.is_new = False
         else:
             if client.file_exists(self.path):
