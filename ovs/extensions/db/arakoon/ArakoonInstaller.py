@@ -77,9 +77,9 @@ class ArakoonInstaller():
     class to dynamically install/(re)configure arakoon cluster
     """
 
-    ARAKOON_LIB = '/opt/alba/lib'
+    ARAKOON_LIB = '/usr/lib/alba'
     ARAKOON_BIN = '/usr/bin/arakoon'
-    ARAKOON_PLUGIN_DIR = '/opt/alba/plugins'
+    ARAKOON_PLUGIN_DIR = '/usr/lib/alba'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_BASE_DIR = '/mnt/db'
     ABM_PLUGIN = 'albamgr_plugin'
@@ -99,10 +99,10 @@ setuid root
 setgid root
 
 env PYTHONPATH=/opt/OpenvStorage
-env LD_LIBRARY_PATH=/opt/alba/lib
+env LD_LIBRARY_PATH={0}
 chdir /opt/OpenvStorage
 
-exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagement.py --start --cluster {0}
+exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagement.py --start --cluster {1}
 """
 
     def __init__(self, password=None):
@@ -289,7 +289,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
     def generate_upstart_config(self, client=None):
         (temp_handle, temp_filename) = tempfile.mkstemp()
         config_file = '/etc/init/ovs-arakoon-{0}.conf'.format(self.config.cluster_name)
-        contents = ArakoonInstaller.ARAKOON_UPSTART.format(self.config.cluster_name)
+        contents = ArakoonInstaller.ARAKOON_UPSTART.format(ArakoonInstaller.ARAKOON_LIB, self.config.cluster_name)
 
         if client is None:
             with open(config_file, 'wb') as f:
@@ -314,8 +314,8 @@ mkdir -p /var/log/arakoon/{1}
     def link_plugins(self, client=None):
         for plugin in self.config.plugins.split():
             cmd = """
-ln -s /opt/alba/plugins/{2}.cmxs {0}/arakoon/{1}/
-""".format(self.config.base_dir, self.config.cluster_name, plugin)
+ln -s {0}/{3}.cmxs {1}/arakoon/{2}/
+""".format(ArakoonInstaller.ARAKOON_PLUGIN_DIR, self.config.base_dir, self.config.cluster_name, plugin)
             System.run(cmd, client)
 
     def generate_configs(self, client=None):
@@ -399,9 +399,9 @@ status ovs-arakoon-{0}
         nsm_config_file = "/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg".format(nsm_name)
 
         cmd = """
-export LD_LIBRARY_PATH=/opt/alba/lib
-/opt/alba/bin/alba add-nsm-host --config={0} {1}
-""".format(abm_config_file, nsm_config_file)
+export LD_LIBRARY_PATH={0}
+/usr/bin/alba add-nsm-host --config={1} {2}
+""".format(ArakoonInstaller.ARAKOON_LIB, abm_config_file, nsm_config_file)
         System.run(cmd, client)
 
     @staticmethod
