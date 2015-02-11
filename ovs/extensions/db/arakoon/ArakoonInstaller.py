@@ -19,6 +19,7 @@ from StringIO import StringIO
 
 import os
 import tempfile
+import time
 
 
 class ClusterNode(object):
@@ -85,6 +86,9 @@ class ArakoonInstaller():
     ABM_PLUGIN = 'albamgr_plugin'
     NSM_PLUGIN = 'nsm_host_plugin'
 
+    STARTUP_DELAY_COUNT = 5
+    STARTUP_DELAY_SLEEP = 2
+
     ARAKOON_UPSTART = """
 description "Arakoon upstart"
 
@@ -145,7 +149,6 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         Assumes this node is up-to-date and is considered valid
         :param base_dir: base_dir should be identical across multiple nodes
         """
-
         client = SSHClient.load(master_ip, master_password)
         cfg_file = client.file_read(self.ARAKOON_CONFIG_DIR + '/{0}/{0}.cfg'.format(cluster_name))
         cfg = RawConfigParser()
@@ -398,11 +401,14 @@ status ovs-arakoon-{0}
         abm_config_file = "/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg".format(abm_name)
         nsm_config_file = "/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg".format(nsm_name)
 
-        cmd = """
+        if ArakoonInstaller.is_cluster_up(ip, abm_name) and ArakoonInstaller.is_cluster_up(ip, nsm_name):
+            cmd = """
 export LD_LIBRARY_PATH={0}
 /usr/bin/alba add-nsm-host --config={1} {2}
 """.format(ArakoonInstaller.ARAKOON_LIB, abm_config_file, nsm_config_file)
-        System.run(cmd, client)
+            System.run(cmd, client)
+        else:
+            raise RuntimeError('Unable to register nsm {0} with abm {1}'.format(nsm_name, abm_name))
 
     @staticmethod
     def extend_cluster(src_ip, tgt_ip, cluster_name, client_port, messaging_port, exclude_ports=None):
@@ -432,3 +438,27 @@ export LD_LIBRARY_PATH={0}
         client.dir_ensure(os.path.dirname(config_file))
         client.file_upload(config_file, temp_filename)
         os.remove(temp_filename)
+
+    @staticmethod
+    def is_cluster_up(ip, cluster_name):
+        ai = ArakoonInstaller()
+        ai.load_config_from('/mnt/db', cluster_name, ip)
+        master_list = list()
+        for node in ai.config.nodes:
+            master_list.append(node.name)
+        config_file = ai.get_config_file('.cfg')
+        client = SSHClient.load(ip)
+        cmd = """
+/usr/bin/arakoon --who-master -config {0}
+""".format(config_file)
+        for count in range(ArakoonInstaller.STARTUP_DELAY_COUNT):
+            output = 'unknown'
+            try:
+                output = System.run(cmd, client)
+            except:
+                print 'Validating cluster {0} is up - {1} time(s)'.format(cluster_name, count + 1)
+            if str(output) in master_list:
+                'cluster {0} is up - master is {1}'.format(cluster_name, output)
+                return True
+            time.sleep(ArakoonInstaller.STARTUP_DELAY_SLEEP)
+        return False
