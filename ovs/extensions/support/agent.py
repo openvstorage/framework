@@ -26,7 +26,7 @@ from ovs.plugin.provider.package import Package
 from ovs.log.logHandler import LogHandler
 
 
-logger = LogHandler('extensions', name='support agent')
+logger = LogHandler('support', name='agent')
 
 
 class SupportAgent(object):
@@ -93,7 +93,7 @@ class SupportAgent(object):
         """
         logger.debug('Processing heartbeat')
 
-        data = {'gid': Configuration.get('ovs.support.gid'),
+        data = {'cid': Configuration.get('ovs.support.cid'),
                 'nid': Configuration.get('ovs.support.nid'),
                 'metadata': {},
                 'errors': []}

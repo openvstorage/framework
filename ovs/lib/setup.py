@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import time
+import uuid
 import ConfigParser
 import urllib2
 import base64
@@ -611,6 +612,8 @@ EOF
         print 'Updating configuration files'
         logger.info('Updating configuration files')
         ovs_config.set('grid', 'ip', cluster_ip)
+        ovs_config.set('support', 'cid', str(uuid.uuid4()))
+        ovs_config.set('support', 'nid', str(uuid.uuid4()))
         SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
 
         print 'Starting services'
@@ -768,9 +771,14 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
+        config_filename = '/opt/OpenvStorage/config/ovs.cfg'
+        master_client = SSHClient.load(master_ip)
+        master_config = SetupController._remote_config_read(master_client, config_filename)
         ovs_config.set('grid', 'ip', cluster_ip)
+        ovs_config.set('support', 'cid', master_config.get('support', 'cid'))
+        ovs_config.set('support', 'nid', str(uuid.uuid4()))
         target_client = SSHClient.load(cluster_ip)
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        SetupController._remote_config_write(target_client, config_filename, ovs_config)
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
