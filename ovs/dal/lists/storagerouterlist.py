@@ -37,6 +37,17 @@ class StorageRouterList(object):
         return DataObjectList(storagerouters, StorageRouter)
 
     @staticmethod
+    def get_slaves():
+        """
+        Get all SLAVE StorageRouters
+        """
+        storagerouters = DataList({'object': StorageRouter,
+                                   'data': DataList.select.GUIDS,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': [('node_type', DataList.operator.EQUALS, 'EXTRA')]}}).data
+        return DataObjectList(storagerouters, StorageRouter)
+
+    @staticmethod
     def get_masters():
         """
         Get all MASTER StorageRouters
