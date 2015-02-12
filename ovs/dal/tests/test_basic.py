@@ -1133,6 +1133,26 @@ class Basic(TestCase):
         disk2.save()
         self.assertListEqual(['disk1', 'disk_'], sorted([disk.name for disk in machine.disks]), 'Names should be disk1 and disk_')
 
+    def test_invalidonetoone(self):
+        """
+        Validates that if a one-to-one is used as a one-to-many an exception will be raised
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        self.assertIsNone(machine.one, 'There should not be any disk(s)')
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.one = machine
+        disk1.save()
+        self.assertEqual(machine.one, disk1, 'The correct disk should be returned')
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.one = machine
+        disk2.save()
+        with self.assertRaises(InvalidRelationException):
+            _ = machine.one
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
