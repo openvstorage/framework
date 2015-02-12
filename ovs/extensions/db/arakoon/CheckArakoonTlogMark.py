@@ -138,7 +138,7 @@ class CheckArakoonTlogMark():
         for loop in range(loops):
             duration -= self._waitduration
             if arakoonstatus:
-                continue
+                return arakoonstatus
             else:
                 CheckArakoonTlogMark._speak(
                     'Remaining Wait Duration: {0} Seconds'.format(duration))
@@ -278,7 +278,7 @@ class CheckArakoonTlogMark():
             for dbfile in dbfiles:
                 os.rename(dbfile, budir)
         else:
-            CheckArakoonTlogMark._speak('Db files do not exist')
+            CheckArakoonTlogMark._speak('Db files do not exist on {0}'.format(dbdir))
 
         if headdb:
             headdb = os.path.join(tlogdir, 'head.db')
@@ -315,7 +315,7 @@ class CheckArakoonTlogMark():
         """ failover arakoon """
 
         if not self._isgrid:
-            CheckArakoonTlogMark._speak('Failover cannot be accmoplished without grid env')
+            CheckArakoonTlogMark._speak('Failover cannot be accomplished without grid env')
             return False
 
         self._movearakoondb(localnode, failover=True)
@@ -369,17 +369,21 @@ class CheckArakoonTlogMark():
         failednode = list()
         finalmessage = self._finalmessage
         CheckArakoonTlogMark._speak('Initial Starting Arakoon Node {0}'.format(localnode))
-        status = self._startreturnstatus(localnode, cluster)
+        # Do not try to start at this point, just check
+        status = self._checkarakoonstatus(localnode, cluster)
         if status:
             CheckArakoonTlogMark._speak(finalmessage.format(localnode))
         else:
             message = 'Node {0} not running'
             CheckArakoonTlogMark._speak(message.format(localnode))
 
+            # Move the db files
             self._movearakoondb(localnode)
 
             CheckArakoonTlogMark._speak(
                 'Tlog Replay: Catching up on Arakoon Node {0}'.format(localnode))
+
+            # Try to replay local tlogs
             self._managetlog(localnode, cluster)
 
             CheckArakoonTlogMark._speak(
