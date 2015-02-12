@@ -503,7 +503,7 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
         logger.info('Adding services')
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
-                  '<WORKER_QUEUE>': unique_id}
+                  '<WORKER_QUEUE>': '{0},ovs_masters'.format(unique_id)}
         for service in SetupController.master_node_services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
             SetupController._add_service(target_client, service, params)
@@ -919,7 +919,7 @@ EOF
         logger.info('Adding services')
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
-                  '<WORKER_QUEUE>': unique_id}
+                  '<WORKER_QUEUE>': '{0},ovs_masters'.format(unique_id)}
         for service in SetupController.master_node_services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
             SetupController._add_service(target_client, service, params)
@@ -1363,6 +1363,12 @@ for json_file in os.listdir(configuration_dir):
             if SetupController._has_service(target_client, service):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._remove_service(target_client, service)
+
+        params = {'<ARAKOON_NODE_ID>': unique_id,
+                  '<MEMCACHE_NODE_IP>': cluster_ip,
+                  '<WORKER_QUEUE>': '{0}'.format(unique_id)}
+        if SetupController._has_service(target_client, 'workers'):
+            SetupController._add_service(target_client, 'workers', params)
 
         print 'Restarting services'
         logger.debug('Restarting services')
