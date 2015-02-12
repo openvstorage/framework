@@ -229,7 +229,8 @@ class StorageDriverConfiguration(object):
         self._validate()
         contents = json.dumps(self.configuration, indent=2)
         if client is None:
-            os.makedirs(self.base_path)
+            if not os.path.exists(self.base_path):
+                os.makedirs(self.base_path)
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
                 self.is_new = False
