@@ -17,9 +17,13 @@ Contains various decorators
 """
 
 import time
+from celery.task.control import inspect
 from ovs.dal.hybrids.log import Log
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('lib', name='scheduled tasks')
 
 
 def log(event_type):
@@ -60,4 +64,77 @@ def log(event_type):
         new_function.__module__ = f.__module__
         return new_function
 
+    return wrap
+
+
+def ensure_single(tasknames):
+    """
+    Decorator ensuring a new task cannot be started in case a certain task is
+    running, scheduled or reserved.
+
+    The task using this decorator on, must be a bound task (with bind=True argument). Keep also in
+    mind that validation will be executed by the worker itself, so if the task is scheduled on
+    a worker currently processing a "duplicate" task, it will only get validated after the first
+    one completes, which will result in the fact that the task will execute normally.
+
+    @param tasknames: list of names to check
+    @type tasknames: list
+    """
+    def wrap(function):
+        """
+        Wrapper function
+        """
+        def wrapped(self=None, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            if not hasattr(self, 'request'):
+                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
+            task_id = self.request.id
+
+            reason = ''
+            def can_run():
+                global reason
+                """
+                Checks whether a task is running/scheduled/reserved.
+                The check is executed in stages, as querying the inspector is a slow call.
+                """
+                if tasknames:
+                    inspector = inspect()
+                    active = inspector.active()
+                    if active:
+                        for taskname in tasknames:
+                            for worker in active.values():
+                                for task in worker:
+                                    if task['id'] != task_id and taskname == task['name']:
+                                        reason = 'active'
+                                        return False
+                    scheduled = inspector.scheduled()
+                    if scheduled:
+                        for taskname in tasknames:
+                            for worker in scheduled.values():
+                                for task in worker:
+                                    request = task['request']
+                                    if request['id'] != task_id and taskname == request['name']:
+                                        reason = 'scheduled'
+                                        return False
+                    reserved = inspector.reserved()
+                    if reserved:
+                        for taskname in tasknames:
+                            for worker in reserved.values():
+                                for task in worker:
+                                    if task['id'] != task_id and taskname == task['name']:
+                                        reason = 'reserved'
+                                        return False
+                return True
+
+            if can_run():
+                return function(*args, **kwargs)
+            else:
+                logger.debug('Execution of task {0}[{1}] discarded'.format(
+                    self.name, reason #self.request.id
+                ))
+                return None
+
+        return wrapped
     return wrap

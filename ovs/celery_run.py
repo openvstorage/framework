@@ -23,7 +23,6 @@ sys.path.append('/opt/OpenvStorage')
 import os
 from kombu import Queue
 from celery import Celery
-from celery.schedules import crontab
 from celery.signals import task_postrun, worker_process_init
 from ovs.lib.messaging import MessageController
 from ovs.log.logHandler import LogHandler
@@ -68,44 +67,7 @@ celery.conf.CELERY_DEFAULT_EXCHANGE_TYPE = 'topic'
 celery.conf.CELERY_DEFAULT_ROUTING_KEY = 'generic.default'
 celery.conf.CELERY_ACKS_LATE = True          # This, together with the below PREFETCH_MULTIPLIER, makes sure that the
 celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # workers basically won't be prefetching tasks, to prevent deadlocks
-
-celery.conf.CELERYBEAT_SCHEDULE = {
-    # Snapshot policy
-    # > Executes every day, hourly between 02:00 and 22:00 hour
-    'take-snapshots': {
-        'task': 'ovs.scheduled.snapshotall',
-        'schedule': crontab(minute='0', hour='2-22'),
-        'args': []
-    },
-    # Delete snapshot policy
-    # > Excutes every day at 00:30
-    'delete-scrub-snapshots': {
-        'task': 'ovs.scheduled.deletescrubsnapshots',
-        'schedule': crontab(minute='30', hour='0'),
-        'args': []
-    },
-    # Collapse arakoon tlogs
-    # > Executes every day at 00:30
-    'arakoon-collapse': {
-        'task': 'ovs.scheduled.collapse_arakoon',
-        'schedule': crontab(minute='30', hour='0'),
-        'args': []
-    },
-    # Clean audit trail logs after 30 days
-    # > Executes every day at 00:30
-    'logs-cleanup': {
-        'task': 'ovs.scheduled.clean_logs',
-        'schedule': crontab(minute='30', hour='0'),
-        'args': []
-    },
-    # Validate MDS service configuration every day
-    # > Executes every day at 00:30
-    'mds-checkup': {
-        'task': 'ovs.scheduled.mds_checkup',
-        'schedule': crontab(minute='30', hour='0'),
-        'args': []
-    }
-}
+celery.conf.CELERYBEAT_SCHEDULE = {}
 
 loghandler = LogHandler('celery', name='celery')
 
