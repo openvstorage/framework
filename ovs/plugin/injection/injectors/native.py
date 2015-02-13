@@ -35,17 +35,26 @@ class Injector(object):
     @staticmethod
     def inject_configuration(provider):
         """ Injects the Config module """
-        def get(key):
+        def _get(key):
             filename, section, item = key.split('.', 2)
             config = ConfigParser.ConfigParser()
             config.read('/opt/OpenvStorage/config/{0}.cfg'.format(filename))
             return config.get(section, item)
 
-        def get_int(key):
-            return int(get(key))
+        def _set(key, value):
+            filename, section, item = key.split('.', 2)
+            config = ConfigParser.RawConfigParser()
+            config.read('/opt/OpenvStorage/config/{0}.cfg'.format(filename))
+            config.set(section, item, value)
+            with open('/opt/OpenvStorage/config/{0}.cfg'.format(filename), 'w') as config_file:
+                config.write(config_file)
 
-        provider.get = staticmethod(get)
-        provider.getInt = staticmethod(get_int)
+        def _get_int(key):
+            return int(_get(key))
+
+        provider.get = staticmethod(_get)
+        provider.getInt = staticmethod(_get_int)
+        provider.set = staticmethod(_set)
         return provider
 
     @staticmethod

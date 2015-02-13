@@ -30,6 +30,7 @@ class Configuration(object):
 
     get = None
     getInt = None
+    set = None
 
 from ovs.plugin.injection.injector import Injector
 Configuration = Injector.inject(Configuration)
