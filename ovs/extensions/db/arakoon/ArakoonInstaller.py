@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.lib.setup import System
@@ -32,6 +33,27 @@ class ClusterNode(object):
         self.client_port = client_port
         self.messaging_port = messaging_port
 
+    def __hash__(self):
+        """
+        Defines a hashing equivalent for a given ClusterNode
+        """
+        return hash('{0}_{1}_{2}_{3}'.format(self.name, self.ip, self.client_port, self.messaging_port))
+
+    def __eq__(self, other):
+        """
+        Checks whether two objects are the same.
+        """
+        if not isinstance(other, ClusterNode):
+            return False
+        return self.__hash__() == other.__hash__()
+
+    def __ne__(self, other):
+        """
+        Checks whether to objects are not the same.
+        """
+        if not isinstance(other, ClusterNode):
+            return True
+        return not self.__eq__(other)
 
 class ClusterConfig():
     """
@@ -210,6 +232,10 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         node = ClusterNode(node_id, ip, client_port, messaging_port)
         self.config.nodes.append(node)
 
+    def remove_node_from_config(self, node_id, ip, client_port, messaging_port):
+        node = ClusterNode(node_id, ip, client_port, messaging_port)
+        self.config.nodes.remove(node)
+
     def generate_config(self, client=None):
         (temp_handle, temp_filename) = tempfile.mkstemp()
         config_file = self.get_config_file('.cfg')
@@ -311,6 +337,16 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
 mkdir -p {0}/arakoon/{1}
 mkdir -p {0}/tlogs/{1}
 mkdir -p /var/log/arakoon/{1}
+""".format(self.config.base_dir, cluster_name)
+        System.run(cmd, client)
+
+    def delete_dir_structure(self, client=None, cluster_name=None):
+        if cluster_name is None:
+            cluster_name = self.config.cluster_name
+        cmd = """
+rm -rf {0}/arakoon/{1}
+rm -rf {0}/tlogs/{1}
+rm -rf /var/log/arakoon/{1}
 """.format(self.config.base_dir, cluster_name)
         System.run(cmd, client)
 
@@ -462,3 +498,69 @@ export LD_LIBRARY_PATH={0}
                 return True
             time.sleep(ArakoonInstaller.STARTUP_DELAY_SLEEP)
         return False
+
+    @staticmethod
+    def shrink_cluster(remaining_node_ip, deleted_node_ip, cluster_name, client_port, messaging_port):
+        ai = ArakoonInstaller()
+        ai.load_config_from('/mnt/db', cluster_name, remaining_node_ip)
+        client = SSHClient.load(deleted_node_ip)
+        deleted_node_id = System.get_my_machine_id(client)
+        ai.delete_dir_structure(client)
+        ai.remove_node_from_config(deleted_node_id, deleted_node_ip, client_port, messaging_port)
+        ai.upload_config_for(cluster_name)
+
+    @staticmethod
+    def wait_for_cluster(cluster_name):
+        """
+        Waits for an Arakoon cluster to catch up (by sending a nop)
+        """
+        from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+        from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
+
+        last_exception = None
+        tries = 3
+        while tries > 0:
+            try:
+                cluster_object = ArakoonManagementEx().getCluster(str(cluster_name))
+                client = cluster_object.getClient()
+                client.nop()
+                return
+            except ArakoonSockReadNoBytes as exception:
+                last_exception = exception
+                tries -= 1
+                time.sleep(1)
+        raise last_exception
+
+    @staticmethod
+    def restart_cluster_add(cluster_name, current_ips, new_ip):
+        """
+        Execute a (re)start sequence after adding a new node to a cluster.
+        """
+        # Make sure all nodes are correctly (re)started
+        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
+        logging.disable('WARNING')
+        threshold = 2 if new_ip in current_ips else 1
+        for ip in current_ips:
+            if ip == new_ip:
+                continue
+            ArakoonInstaller.stop(cluster_name, ip)
+            ArakoonInstaller.start(cluster_name, ip)
+            if len(current_ips) > threshold:  # A two node cluster needs all nodes running
+                ArakoonInstaller.wait_for_cluster(cluster_name)
+        ArakoonInstaller.start(cluster_name, new_ip)
+        ArakoonInstaller.wait_for_cluster(cluster_name)
+        logging.disable(loglevel)  # Restore workaround
+
+    @staticmethod
+    def restart_cluster_remove(cluster_name, remaining_ips):
+        """
+        Execute a restart sequence after removing a node from a cluster
+        """
+        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
+        logging.disable('WARNING')
+        for ip in remaining_ips:
+            ArakoonInstaller.stop(cluster_name, ip)
+            ArakoonInstaller.start(cluster_name, ip)
+            if len(remaining_ips) > 2:  # A two node cluster needs all nodes running
+                ArakoonInstaller.wait_for_cluster(cluster_name)
+        logging.disable(loglevel)  # Restore workaround

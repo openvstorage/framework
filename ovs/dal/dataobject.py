@@ -843,5 +843,5 @@ class DataObject(object):
         Checks whether to objects are not the same.
         """
         if not isinstance(other, DataObject):
-            return False
+            return True
         return not self.__eq__(other)

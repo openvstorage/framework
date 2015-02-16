@@ -19,16 +19,20 @@ Module for SetupController
 import os
 import re
 import sys
+import imp
 import time
 import ConfigParser
 import urllib2
 import base64
 import logging
+import inspect
 
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.storage.volatilefactory import VolatileFactory
 
 
 logger = LogHandler('lib', name='setup')
@@ -660,6 +664,8 @@ EOF
         SetupController._enable_service(target_client, 'workers')
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
+        SetupController._run_firstnode_hooks(cluster_ip)
+
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
@@ -782,6 +788,8 @@ EOF
             node_client = SSHClient.load(node)
             SetupController._enable_service(node_client, 'workers')
             SetupController._change_service_state(node_client, 'workers', 'restart')
+
+        SetupController._run_extranode_hooks(cluster_ip, master_ip)
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
@@ -1011,6 +1019,8 @@ arakoon_cluster.createDirs(arakoon_cluster.listLocalNodes()[0])
             SetupController._wait_for_cluster(cluster)
         logging.disable(loglevel)  # Restore workaround
         SetupController._change_service_state(target_client, 'memcached', 'restart')
+        PersistentFactory.store = None
+        VolatileFactory.store = None
 
         print 'Setting up RabbitMQ'
         logger.debug('Setting up RMQ')
@@ -1038,7 +1048,7 @@ EOF
         target_client.run('rabbitmq-server -detached; sleep 5;')
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
-        if not 'ovs' in users:
+        if 'ovs' not in users:
             target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
                                                                     ovs_config.get('core', 'broker.password')))
             target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
@@ -1136,6 +1146,8 @@ for json_file in os.listdir(configuration_dir):
         for node in nodes:
             node_client = SSHClient.load(node)
             SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
+
+        SetupController._run_promote_hooks(cluster_ip, master_ip)
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
@@ -1346,6 +1358,8 @@ for json_file in os.listdir(configuration_dir):
         if SetupController._has_service(target_client, 'memcached'):
             SetupController._change_service_state(target_client, 'memcached', 'stop')
             SetupController._remove_service(target_client, 'memcached')
+        PersistentFactory.store = None
+        VolatileFactory.store = None
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
@@ -1382,6 +1396,8 @@ for json_file in os.listdir(configuration_dir):
         for node in nodes:
             node_client = SSHClient.load(node)
             SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
+
+        SetupController._run_demote_hooks(cluster_ip, master_ip)
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
@@ -2269,3 +2285,70 @@ for json_file in os.listdir(configuration_dir):
         if check_ovs:
             return rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process
         return rabbitmq_running, rabbitmq_pid
+
+    @staticmethod
+    def _run_promote_hooks(cluster_ip, master_ip):
+        """
+        Execute promote hooks
+        """
+        functions = SetupController._fetch_hooks('promote')
+        if len(functions) > 0:
+            print '\n+++ Running plugin hooks +++\n'
+        for function in functions:
+            function(cluster_ip, master_ip)
+
+    @staticmethod
+    def _run_demote_hooks(cluster_ip, master_ip):
+        """
+        Execute demote hooks
+        """
+        functions = SetupController._fetch_hooks('demote')
+        if len(functions) > 0:
+            print '\n+++ Running plugin hooks +++\n'
+        for function in functions:
+            function(cluster_ip, master_ip)
+
+    @staticmethod
+    def _run_firstnode_hooks(cluster_ip):
+        """
+        Execute firstnode hooks
+        """
+        functions = SetupController._fetch_hooks('firstnode')
+        if len(functions) > 0:
+            print '\n+++ Running plugin hooks +++\n'
+        for function in functions:
+            function(cluster_ip)
+
+    @staticmethod
+    def _run_extranode_hooks(cluster_ip, master_ip):
+        """
+        Execute extranode hooks
+        """
+        functions = SetupController._fetch_hooks('extranode')
+        if len(functions) > 0:
+            print '\n+++ Running plugin hooks +++\n'
+        for function in functions:
+            function(cluster_ip, master_ip)
+
+    @staticmethod
+    def _fetch_hooks(hook_type):
+        """
+        Load hooks
+        """
+        functions = []
+        path = os.path.dirname(__file__)
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+                name = filename.replace('.py', '')
+                module = imp.load_source(name, os.path.join(path, filename))
+                for member in inspect.getmembers(module):
+                    if inspect.isclass(member[1]) \
+                            and member[1].__module__ == name \
+                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                        for submember in inspect.getmembers(member[1]):
+                            if hasattr(submember[1], 'hooks') \
+                                    and isinstance(submember[1].hooks, list) \
+                                    and hook_type in submember[1].hooks:
+                                functions.append(submember[1])
+
+        return functions

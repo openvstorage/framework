@@ -132,9 +132,26 @@ def ensure_single(tasknames):
                 return function(*args, **kwargs)
             else:
                 logger.debug('Execution of task {0}[{1}] discarded'.format(
-                    self.name, reason #self.request.id
+                    self.name, self.request.id
                 ))
                 return None
 
+        wrapped.__name__ = function.__name__
+        wrapped.__module__ = function.__module__
         return wrapped
+    return wrap
+
+
+def setup_hook(hook_type):
+    """
+    This decorator marks the decorated function to be interested in a certain hook
+    """
+    def wrap(function):
+        """
+        Wrapper function
+        """
+        if not hasattr(function, 'hooks'):
+            function.hooks = []
+        function.hooks.append(hook_type)
+        return function
     return wrap
