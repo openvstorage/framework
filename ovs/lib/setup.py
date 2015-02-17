@@ -260,7 +260,7 @@ class SetupController(object):
             promote = False
             if first_node is False:
                 for cluster in SetupController.arakoon_clusters:
-                    config = ArakoonInstaller().load_config_from(cluster, master_ip, known_passwords[master_ip])
+                    config = ArakoonInstaller.get_config_from(cluster, master_ip, known_passwords[master_ip])
                     cluster_nodes = [node.strip() for node in config.get('global', 'cluster').split(',')]
                     logger.debug('{0} nodes for cluster {1} found'.format(len(cluster_nodes), cluster))
                     if (len(cluster_nodes) < 3 or force_type == 'master') and force_type != 'extra':
@@ -458,6 +458,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
 
         print 'Setting up elastic search'
         logger.info('Setting up elastic search')
+        target_client = SSHClient.load(cluster_ip)
         SetupController._add_service(target_client, 'elasticsearch')
         config_file = '/etc/elasticsearch/elasticsearch.yml'
         SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
@@ -865,7 +866,7 @@ EOF
         # Find other (arakoon) master nodes
         master_nodes = []
         for cluster in SetupController.arakoon_clusters:
-            config = ArakoonInstaller().load_config_from(cluster, master_ip)
+            config = ArakoonInstaller.get_config_from(cluster, master_ip)
             master_nodes = [config.get(node.strip(), 'ip').strip() for node in config.get('global', 'cluster').split(',')]
             if cluster_ip in master_nodes:
                 master_nodes.remove(cluster_ip)
@@ -1180,10 +1181,9 @@ EOF
         storagerouter.save()
 
         # Find other (arakoon) master nodes
-        master_client = SSHClient.load(master_ip)
         master_nodes = []
         for cluster in SetupController.arakoon_clusters:
-            config = ArakoonInstaller().load_config_from(cluster, master_ip)
+            config = ArakoonInstaller.get_config_from(cluster, master_ip)
             master_nodes = [config.get(node.strip(), 'ip').strip() for node in
                             config.get('global', 'cluster').split(',')]
             if cluster_ip in master_nodes:
@@ -1264,6 +1264,7 @@ for json_file in os.listdir(configuration_dir):
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
+        target_client = SSHClient.load(cluster_ip)
         if SetupController._has_service(target_client, 'rabbitmq'):
             target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl reset; sleep 5;')

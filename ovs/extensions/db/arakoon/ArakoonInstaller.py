@@ -144,16 +144,24 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         self.config.nodes.append(ClusterNode(node_name, ip, client_port, messaging_port))
         self.config.target_ip = ip
 
-    def load_config_from(self, cluster_name, master_ip, master_password=None):
+    @staticmethod
+    def get_config_from(cluster_name, master_ip, master_password=None):
         """
-        Reads actual config from master node
-        Assumes this node is up-to-date and is considered valid
-        :param base_dir: base_dir should be identical across multiple nodes
+        Gets a config object representation for the cluster on master
         """
         client = SSHClient.load(master_ip, master_password)
         cfg_file = client.file_read(ArakoonInstaller.ARAKOON_CONFIG_FILE.format(cluster_name))
         cfg = RawConfigParser()
         cfg.readfp(StringIO(cfg_file))
+        return cfg
+
+    def load_config_from(self, cluster_name, master_ip):
+        """
+        Reads actual config from master node
+        Assumes this node is up-to-date and is considered valid
+        :param base_dir: base_dir should be identical across multiple nodes
+        """
+        cfg = ArakoonInstaller.get_config_from(cluster_name, master_ip)
 
         global_section = dict(cfg.items('global'))
         nodes = cfg.sections()
@@ -174,7 +182,6 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             else:
                 self.add_node_to_config(node_id, node_config['ip'],
                                         node_config['client_port'], node_config['messaging_port'])
-        return cfg
 
     def upload_config_for(self, cluster_name):
         if self.config.cluster_name != cluster_name:
