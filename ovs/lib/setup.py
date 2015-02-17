@@ -1072,12 +1072,17 @@ for json_file in os.listdir(configuration_dir):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
 
+        print 'Retarting services'
         SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         for node in nodes:
             node_client = SSHClient.load(node)
             SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
 
-        SetupController._run_promote_hooks(cluster_ip, master_ip)
+        if SetupController._run_promote_hooks(cluster_ip, master_ip):
+            print 'Retarting services'
+            for node in nodes:
+                node_client = SSHClient.load(node)
+                SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
@@ -1278,6 +1283,7 @@ for json_file in os.listdir(configuration_dir):
         for service in [s for s in SetupController.master_node_services if s not in SetupController.extra_node_services] :
             if SetupController._has_service(target_client, service):
                 logger.debug('Removing service {0}'.format(service))
+                SetupController._change_service_state(target_client, service, 'stop')
                 SetupController._remove_service(target_client, service)
 
         params = {'<ARAKOON_NODE_ID>': unique_id,
@@ -1299,7 +1305,11 @@ for json_file in os.listdir(configuration_dir):
             node_client = SSHClient.load(node)
             SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
 
-        SetupController._run_demote_hooks(cluster_ip, master_ip)
+        if SetupController._run_demote_hooks(cluster_ip, master_ip):
+            print 'Retarting services'
+            for node in nodes:
+                node_client = SSHClient.load(node)
+                SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
 
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
@@ -2114,6 +2124,7 @@ for json_file in os.listdir(configuration_dir):
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
             function(cluster_ip, master_ip)
+        return len(functions) > 0
 
     @staticmethod
     def _run_demote_hooks(cluster_ip, master_ip):
@@ -2125,6 +2136,7 @@ for json_file in os.listdir(configuration_dir):
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
             function(cluster_ip, master_ip)
+        return len(functions) > 0
 
     @staticmethod
     def _run_firstnode_hooks(cluster_ip):
@@ -2136,6 +2148,7 @@ for json_file in os.listdir(configuration_dir):
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
             function(cluster_ip)
+        return len(functions) > 0
 
     @staticmethod
     def _run_extranode_hooks(cluster_ip, master_ip):
@@ -2147,6 +2160,7 @@ for json_file in os.listdir(configuration_dir):
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
             function(cluster_ip, master_ip)
+        return len(functions) > 0
 
     @staticmethod
     def _fetch_hooks(hook_type):
