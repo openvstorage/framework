@@ -159,12 +159,18 @@ class OpenStackCinder(object):
             self._restart_processes()
 
     def _chown_mountpoint(self, mountpoint):
+        # Vpool owned by stack / cinder
+        # Give access to libvirt-qemu and ovs
         if self.is_devstack:
-            self.client.run('chown stack "{0}"'.format(mountpoint))
+            self.client.run('chown stack:stack "{0}"'.format(mountpoint))
             self.client.run('usermod -a -G stack libvirt-qemu')
+            self.client.run('usermod -a -G stack ovs')
+            self.client.run('usermod -a -G ovs stack')
         elif self.is_openstack:
-            self.client.run('chown cinder "{0}"'.format(mountpoint))
+            self.client.run('chown cinder:cinder "{0}"'.format(mountpoint))
             self.client.run('usermod -a -G cinder libvirt-qemu')
+            self.client.run('usermod -a -G cinder ovs')
+            self.client.run('usermod -a -G ovs cinder')
 
     def _unchown_mountpoint(self, mountpoint):
         self.client.run('chown root "{0}"'.format(mountpoint))
