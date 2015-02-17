@@ -19,6 +19,7 @@ import time
 import subprocess
 import shutil
 from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
+from ovs.extensions.generic.system import System
 from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler
 from ovs.plugin.provider.process import Process
@@ -154,7 +155,7 @@ class CheckArakoonTlogMark():
     def _gatherlocalnodes(self, cluster):
         """ gather all localnodes for all clusters """
 
-        localnodes = cluster.listLocalNodes()
+        localnodes = [System.get_my_machine_id()]  # cluster.listLocalNodes()
         CheckArakoonTlogMark._speak('Found local nodes {0}'.format(localnodes))
 
         for localnode in localnodes:
@@ -304,7 +305,7 @@ class CheckArakoonTlogMark():
     def _startreturnstatus(self, localnode, cluster):
         """ start one local node get and return status """
 
-        if cluster._getStatusOne(localnode) == 'running':
+        if cluster._getStatusOne(localnode):
             estatus = self._waitandcheck(self._initialwait, localnode, cluster)
         else:
             cluster._startOne(localnode)

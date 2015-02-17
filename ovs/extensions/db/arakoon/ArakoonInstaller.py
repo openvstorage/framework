@@ -15,7 +15,7 @@
 import logging
 from ConfigParser import RawConfigParser
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.lib.setup import System
+from ovs.extensions.generic.system import System
 from StringIO import StringIO
 
 import os
@@ -144,14 +144,14 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         self.config.nodes.append(ClusterNode(node_name, ip, client_port, messaging_port))
         self.config.target_ip = ip
 
-    def load_config_from(self, cluster_name, master_ip):
+    def load_config_from(self, cluster_name, master_ip, master_password=None):
         """
         Reads actual config from master node
         Assumes this node is up-to-date and is considered valid
         :param base_dir: base_dir should be identical across multiple nodes
         """
-        client = SSHClient.load(master_ip)
-        cfg_file = client.file_read(self.ARAKOON_CONFIG_FILE.format(cluster_name))
+        client = SSHClient.load(master_ip, master_password)
+        cfg_file = client.file_read(ArakoonInstaller.ARAKOON_CONFIG_FILE.format(cluster_name))
         cfg = RawConfigParser()
         cfg.readfp(StringIO(cfg_file))
 
@@ -174,6 +174,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             else:
                 self.add_node_to_config(node_id, node_config['ip'],
                                         node_config['client_port'], node_config['messaging_port'])
+        return cfg
 
     def upload_config_for(self, cluster_name):
         if self.config.cluster_name != cluster_name:
@@ -297,7 +298,7 @@ rm -rf /var/log/arakoon/{1}
 from ovs.plugin.provider.service import Service
 print Service.start_service('arakoon-{0}')
 """.format(cluster_name)
-        System.run(cmd, client)
+        System.exec_remote_python(client, cmd)
 
     @staticmethod
     def stop(cluster_name, ip):
@@ -306,7 +307,7 @@ print Service.start_service('arakoon-{0}')
 from ovs.plugin.provider.service import Service
 print Service.stop_service('arakoon-{0}')
 """.format(cluster_name)
-        System.run(cmd, client)
+        System.exec_remote_python(client, cmd)
 
     @staticmethod
     def status(cluster_name, ip):
@@ -315,7 +316,7 @@ print Service.stop_service('arakoon-{0}')
 from ovs.plugin.provider.service import Service
 print Service.get_service_status('arakoon-{0}')
 """.format(cluster_name)
-        System.run(cmd, client)
+        System.exec_remote_python(client, cmd)
 
     @staticmethod
     def extend_cluster(src_ip, tgt_ip, cluster_name, exclude_ports):

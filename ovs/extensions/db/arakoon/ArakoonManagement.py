@@ -17,7 +17,8 @@
 
 import os
 import time
-from subprocess import check_output
+import signal
+import subprocess
 from ConfigParser import RawConfigParser
 
 from arakoon.Arakoon import ArakoonClientConfig, ArakoonClient
@@ -187,60 +188,77 @@ class ArakoonClusterEx(ArakoonCluster):
         if self._getStatusOne(name):
             return
 
+        config = self.getNodeConfig(name)
+        cmd = []
+        if 'wrapper' in config:
+            cmd = config['wrapper'].split(' ')
+
         command = self._cmd(name)
+        cmd.extend(command)
         if daemon:
-            command.append('-daemonize')
-        command = ' '.join(command)
-        logging.debug('calling: {0}'.format(command))
-        return check_output(command, shell=True)
+            cmd.append('-daemonize')
+        logging.debug('calling: %s', str(cmd))
+        return subprocess.call(cmd, close_fds=True)
 
     def _stopOne(self, name):
-        command = 'pkill -f {0}'.format(' '.join(self._cmd(name)))
-        logging.debug("stopping '{0}' with: {1}".format(name, command))
-        result = check_output(command, shell=True)
-        logging.debug('{0} returned {1}'.format(command, result))
+        line = self._cmdLine(name)
+        cmd = ['pkill', '-f', line]
+        logging.debug("stopping '%s' with: %s" % (name, ' '.join(cmd)))
+        rc = subprocess.call(cmd, close_fds=True)
+        logging.debug('%s=>rc=%i' % (cmd, rc))
         i = 0
         while self._getStatusOne(name):
-            i += 1
-            logging.debug("'{0}' is still running... waiting".format(name))
+            rc = subprocess.call(cmd, close_fds=True)
+            logging.debug('%s=>rc=%i' % (cmd, rc))
             time.sleep(1)
-            result = check_output(command, shell=True)
-            logging.debug('{0} returned {1}'.format(command, result))
+            i += 1
+            logging.debug("'%s' is still running... waiting" % name)
 
             if i == 10:
-                logging.debug("Requesting '{0}' to dump crash log information".format(name))
-                command = 'pkill -12 -f {0}'.format(' '.join(self._cmd(name)))
-                check_output(command, shell=True)
+                msg = "Requesting '%s' to dump crash log information" % name
+                logging.debug(msg)
+                subprocess.call(['pkill', '-%d' % signal.SIGUSR2, '-f', line], close_fds=True)
                 time.sleep(1)
-                logging.debug("stopping '{0}' with kill -9".format(name))
-                command = 'pkill -9 -f {0}'.format(' '.join(self._cmd(name)))
-                check_output(command, shell=True)
-                ii = 0
+
+                logging.debug("stopping '%s' with kill -9" % name)
+                rc = subprocess.call(['pkill', '-9', '-f', line], close_fds=True)
+                if rc == 0:
+                    rc = 9
+                cnt = 0
                 while self._getStatusOne(name):
-                    logging.debug("'{0|' is STILL running... waiting".format(name))
+                    logging.debug("'%s' is STILL running... waiting" % name)
                     time.sleep(1)
-                    ii += 1
-                    if ii > 10:
+                    cnt += 1
+                    if cnt > 10:
                         break
                 break
+            else:
+                subprocess.call(cmd, close_fds=True)
+        if rc < 9:
+            rc = 0  # might be we looped one time too many.
+        return rc
 
     def _getStatusOne(self, name):
-        command = ' '.join(self._cmd(name))
-        pids = check_output('pgrep -fn {0}'.format(command), shell=True).strip()
+        line = self._cmdLine(name)
+        cmd = ['pgrep', '-fn', line]
+        proc = subprocess.Popen(cmd, close_fds=True, stdout=subprocess.PIPE)
+        pids = proc.communicate()[0]
         pid_list = pids.split()
-        if len(pid_list) == 1:
+        lenp = len(pid_list)
+        if lenp == 1:
             result = True
-        elif len(pid_list) == 0:
+        elif lenp == 0:
             result = False
         else:
             for pid in pid_list:
                 try:
-                    with open('/proc/{0}/cmdline'.format(pid), 'r') as pid_file:
-                        startup = pid_file.read()
-                        logging.debug('pid={0}; cmdline={1}'.format(pid, startup))
+                    f = open('/proc/%s/cmdline' % pid, 'r')
+                    startup = f.read()
+                    f.close()
+                    logging.debug('pid=%s; cmdline=%s', pid, startup)
                 except:
                     pass
-            raise Exception('Multiple matches', pid_list)
+            raise Exception('multiple matches', pid_list)
         return result
 
     def _catchup_node(self, name):
@@ -252,9 +270,13 @@ class ArakoonClusterEx(ArakoonCluster):
             self._stopOne(name)
         status = self._getStatusOne(name)
         if status is True:
-            raise RuntimeError('Cannot stop node {0}'.format(name))
-        cmd = self._cmd(name) + ['-catchup-only']
-        return check_output(' '.join(cmd), shell=True)
+            raise RuntimeError('Cannot stop node %s' % name)
+        cmd = self._cmd(name)
+        cmd.remove('-start')
+        cmd.append('-catchup-only')
+        rc = subprocess.call(cmd)
+        status = self._getStatusOne(name)
+        return rc
 
 if __name__ == '__main__':
     from optparse import OptionParser
