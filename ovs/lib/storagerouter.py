@@ -707,6 +707,7 @@ Service.start_service('{0}')
 
         voldrv_service = 'volumedriver_{0}'.format(vpool.name)
         foc_service = 'failovercache_{0}'.format(vpool.name)
+        albaproxy_service = 'albaproxy_{0}'.format(vpool.name)
         storagedrivers_left = False
         removal_mdsservices = [mds_service for mds_service in vpool.mds_services
                                if mds_service.service.storagerouter_guid == storagerouter.guid]
@@ -760,8 +761,11 @@ osc.unconfigure_vpool('{4}', '{5}', {6})
                     pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
+        services_to_remove = [voldrv_service, foc_service] + [mdsservice.service.name for mdsservice in removal_mdsservices]
+        if storagedriver.alba_proxy is not None:
+            services_to_remove.append(albaproxy_service)
         client = SSHClient.load(ip)
-        for service in [voldrv_service, foc_service] + [mdsservice.service.name for mdsservice in removal_mdsservices]:
+        for service in services_to_remove:
             System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
@@ -821,10 +825,13 @@ if Service.has_service('{0}'):
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         # First model cleanup
+        if storagedriver.alba_proxy is not None:
+            storagedriver.alba_proxy.delete()
         storagedriver.delete(abandon=True)  # Detach from the log entries
-        for service in removal_mdsservices:
+        for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
-            service.service.mds_service.delete()
+            service = mds_service.service
+            mds_service.delete()
             service.delete()
 
         if storagedrivers_left:
