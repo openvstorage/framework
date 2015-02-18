@@ -226,6 +226,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             contents.set(node.name, 'ip', node.ip)
             contents.set(node.name, 'client_port', node.client_port)
             contents.set(node.name, 'messaging_port', node.messaging_port)
+            contents.set(node.name, 'tlog_compression', 'snappy')
             contents.set(node.name, 'log_level', self.config.log_level)
             contents.set(node.name, 'log_dir', self.config.log_dir)
             contents.set(node.name, 'home', self.config.home_dir)

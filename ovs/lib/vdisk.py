@@ -26,6 +26,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -352,9 +353,10 @@ class VDiskController(object):
         # Do not use run for other user than ovs as it blocks asking for root password
         # Do not use run_local for other user as it doesn't have permission
         # So this method only works if this is called by root or ovs
-        mountpoint = System.get_storagedriver(new_vdisk.vpool.name).mountpoint
+        storagerouter = StorageRouter(new_vdisk.storagerouter_guid)
+        mountpoint = storagedriver.mountpoint
         location = "{0}{1}".format(mountpoint, disk_path)
-        client = SSHClient.load('127.0.0.1')
+        client = SSHClient.load(storagerouter.pmachine.ip)
         print(client.run('chmod 664 "{0}"'.format(location)))
         print(client.run('chown ovs:ovs "{0}"'.format(location)))
         return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
@@ -376,7 +378,10 @@ class VDiskController(object):
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
         client = SSHClient.load('127.0.0.1')
-        output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
+        try:
+            output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
+        except SystemExit as ex:
+            raise RuntimeError(str(ex))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
@@ -436,7 +441,10 @@ class VDiskController(object):
         client = SSHClient.load('127.0.0.1')
         osc = OpenStackCinder()
         print(client.run_local('chmod 664 "{0}"'.format(location)))
-        if osc.is_devstack:
-            print(client.run_local('chown stack "{0}"'.format(location)))
-        elif osc.is_openstack:
-            print(client.run_local('chown cinder "{0}"'.format(location)))
+        try:
+            if osc.is_devstack:
+                print(client.run_local('chgrp stack "{0}"'.format(location)))
+            elif osc.is_openstack:
+                print(client.run_local('chgrp cinder "{0}"'.format(location)))
+        except SystemExit as ex:
+            raise RuntimeError(str(ex))

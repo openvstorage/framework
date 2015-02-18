@@ -265,6 +265,13 @@ for directory in {0}:
 """.format(directories_to_create)
         System.exec_remote_python(client, dir_create_script)
 
+        if vpool.backend_type.code in ['local', 'distributed']:
+            bfs_chmod_script = """
+import os
+os.chmod('{0}', 0777)
+""".format(parameters['mountpoint_bfs'])
+            System.exec_remote_python(client, bfs_chmod_script)
+
         read_cache1_fs = os.statvfs(mountpoint_readcache1)
         read_cache2_fs = None
         if mountpoint_readcache2:
@@ -745,12 +752,12 @@ osc.unconfigure_vpool('{4}', '{5}', {6})
         # KVM pool
         client = SSHClient.load(ip)
         if pmachine.hvtype == 'KVM':
-            if vpool.name in client.run('virsh pool-list'):
+            if vpool.name in client.run('virsh pool-list --all'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
-            try:
-                client.run('virsh pool-undefine {0}'.format(vpool.name))
-            except:
-                pass  # Ignore undefine errors, since that can happen on re-entrance
+                try:
+                    client.run('virsh pool-undefine {0}'.format(vpool.name))
+                except:
+                    pass  # Ignore undefine errors, since that can happen on re-entrance
 
         # Remove services
         client = SSHClient.load(ip)
@@ -803,7 +810,7 @@ if Service.has_service('{0}'):
         client.run('rm -rf /var/rsp/{}'.format(vpool.name))
 
         # Remove files
-        for config_file in ['{0}.json'] + ['{0}.json'.format(mdsservice.name) for mdsservice in removal_mdsservices]:
+        for config_file in ['{0}.json'] + ['{0}.json'.format(mdsservice.service.name) for mdsservice in removal_mdsservices]:
             client.run('rm -f {0}/storagedriver/storagedriver/{1}'.format(configuration_dir, config_file.format(vpool.name)))
 
         # Remove top directories
@@ -817,7 +824,7 @@ if Service.has_service('{0}'):
         storagedriver.delete(abandon=True)  # Detach from the log entries
         for service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
-            service.mds_service.delete()
+            service.service.mds_service.delete()
             service.delete()
 
         if storagedrivers_left:
