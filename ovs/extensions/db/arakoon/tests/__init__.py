@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2015 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,24 +13,5 @@
 # limitations under the License.
 
 """
-This module contains configuration logic
+This package contains test related stuff
 """
-
-
-class Configuration(object):
-    """
-    Configuration class
-    """
-
-    def __init__(self):
-        """
-        Configuration should be a complete static class
-        """
-        raise RuntimeError('This class should not be instantiated.')
-
-    get = None
-    getInt = None
-    set = None
-
-from ovs.plugin.injection.injector import Injector
-Configuration = Injector.inject(Configuration)

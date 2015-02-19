@@ -50,23 +50,3 @@ class ServiceList(object):
         if len(services) == 1:
             return Descriptor(Service, services[0]).get_object(True)
         return None
-
-    @staticmethod
-    def get_service_ports_in_use():
-        """
-        Returns a list of ports in use by all registered services. Returns empty list if no Service was found
-        """
-        services = DataList({'object': Service,
-                             'data': DataList.select.GUIDS,
-                             'query': {'type': DataList.where_operator.AND,
-                                       'items': []}}).data
-        services = DataObjectList(services, Service)
-        ports_in_use = set()
-        for service in services:
-            for port in service.ports:
-                ports_in_use.add(int(port))
-
-        result = list(ports_in_use)
-        result.sort()
-
-        return result

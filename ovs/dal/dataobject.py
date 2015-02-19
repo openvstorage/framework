@@ -20,7 +20,7 @@ import copy
 import re
 import json
 import inspect
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException, SaveRaceConditionException
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException, SaveRaceConditionException, InvalidRelationException
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
@@ -350,6 +350,8 @@ class DataObject(object):
             return self._objects[attribute]['data']
         else:
             data = self._objects[attribute]['data']
+            if len(data) > 1:
+                raise InvalidRelationException('More than one element found in {0}'.format(attribute))
             return data[0] if len(data) == 1 else None
 
     def _get_list_guid_property(self, attribute):
@@ -841,5 +843,5 @@ class DataObject(object):
         Checks whether to objects are not the same.
         """
         if not isinstance(other, DataObject):
-            return False
+            return True
         return not self.__eq__(other)

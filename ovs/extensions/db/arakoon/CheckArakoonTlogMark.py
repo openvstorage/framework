@@ -19,6 +19,7 @@ import time
 import subprocess
 import shutil
 from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
+from ovs.extensions.generic.system import System
 from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler
 from ovs.plugin.provider.process import Process
@@ -138,7 +139,7 @@ class CheckArakoonTlogMark():
         for loop in range(loops):
             duration -= self._waitduration
             if arakoonstatus:
-                continue
+                return arakoonstatus
             else:
                 CheckArakoonTlogMark._speak(
                     'Remaining Wait Duration: {0} Seconds'.format(duration))
@@ -154,7 +155,7 @@ class CheckArakoonTlogMark():
     def _gatherlocalnodes(self, cluster):
         """ gather all localnodes for all clusters """
 
-        localnodes = cluster.listLocalNodes()
+        localnodes = [System.get_my_machine_id()]  # cluster.listLocalNodes()
         CheckArakoonTlogMark._speak('Found local nodes {0}'.format(localnodes))
 
         for localnode in localnodes:
@@ -278,7 +279,7 @@ class CheckArakoonTlogMark():
             for dbfile in dbfiles:
                 os.rename(dbfile, budir)
         else:
-            CheckArakoonTlogMark._speak('Db files do not exist')
+            CheckArakoonTlogMark._speak('Db files do not exist on {0}'.format(dbdir))
 
         if headdb:
             headdb = os.path.join(tlogdir, 'head.db')
@@ -304,7 +305,7 @@ class CheckArakoonTlogMark():
     def _startreturnstatus(self, localnode, cluster):
         """ start one local node get and return status """
 
-        if cluster._getStatusOne(localnode) == 'running':
+        if cluster._getStatusOne(localnode):
             estatus = self._waitandcheck(self._initialwait, localnode, cluster)
         else:
             cluster._startOne(localnode)
@@ -315,7 +316,7 @@ class CheckArakoonTlogMark():
         """ failover arakoon """
 
         if not self._isgrid:
-            CheckArakoonTlogMark._speak('Failover cannot be accmoplished without grid env')
+            CheckArakoonTlogMark._speak('Failover cannot be accomplished without grid env')
             return False
 
         self._movearakoondb(localnode, failover=True)
@@ -369,17 +370,21 @@ class CheckArakoonTlogMark():
         failednode = list()
         finalmessage = self._finalmessage
         CheckArakoonTlogMark._speak('Initial Starting Arakoon Node {0}'.format(localnode))
-        status = self._startreturnstatus(localnode, cluster)
+        # Do not try to start at this point, just check
+        status = self._checkarakoonstatus(localnode, cluster)
         if status:
             CheckArakoonTlogMark._speak(finalmessage.format(localnode))
         else:
             message = 'Node {0} not running'
             CheckArakoonTlogMark._speak(message.format(localnode))
 
+            # Move the db files
             self._movearakoondb(localnode)
 
             CheckArakoonTlogMark._speak(
                 'Tlog Replay: Catching up on Arakoon Node {0}'.format(localnode))
+
+            # Try to replay local tlogs
             self._managetlog(localnode, cluster)
 
             CheckArakoonTlogMark._speak(

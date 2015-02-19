@@ -62,13 +62,16 @@ class System(object):
         """
         Returns unique machine id based on mac address
         """
-        if not System.my_machine_id:
+        if not System.my_machine_id or client:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
             output = System.run(cmd, client)
             for mac in output.split('\n'):
                 if mac.strip() != '000000000000':
-                    System.my_machine_id = mac.strip()
-                    break
+                    if client:
+                        return mac.strip()
+                    else:
+                        System.my_machine_id = mac.strip()
+                        break
         return System.my_machine_id
 
     @staticmethod

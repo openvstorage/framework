@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ConfigParser
 import os
 import random
 import re
 import string
 import sys
+from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 
 SECRET_KEY_LENGTH = 50
@@ -26,7 +26,7 @@ SECRET_SELECTION = "{}{}{}".format(string.ascii_letters, string.digits, string.p
 secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in range(SECRET_KEY_LENGTH)])
 
 config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-config = ConfigParser.ConfigParser()
+config = RawConfigParser()
 config.read(config_filename)
 config.set('webapps', 'main.secret', secret_key)
 with open(config_filename, 'wb') as config_file:
