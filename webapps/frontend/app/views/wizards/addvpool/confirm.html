@@ -30,7 +30,7 @@ limitations under the License.
                         <b data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></b> <span data-bind="text: data.accesskey"></span>
                     </li>
                     <li data-bind="visible: data.backend() === 'alba'">
-                        <b data-i18n="ovs:wizards.addvpool.gathervpool.albabackend"></b> <span data-bind="text: data.albaBackend().name"></span>
+                        <b data-i18n="ovs:wizards.addvpool.gathervpool.albabackend"></b> <span data-bind="text: data.albaBackend() !== undefined ? data.albaBackend().name : ''"></span>
                     </li>
                 </ul>
             </li>
