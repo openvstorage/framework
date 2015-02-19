@@ -112,12 +112,12 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: metadata-server
-        # hg revision: afbe1c1a12ab
-        # buildTime: Fri Jan 16 10:55:56 CET 2015
+        # hg branch: 3.6
+        # hg revision: e5f56a826fe5
+        # buildTime: Wed Feb 18 19:55:45 CET 2015
         'metadataserver': {
             'metadata_server': {
-                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_address', ],
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', ],
                 'mandatory': ['mds_port', 'mds_scratch_dir', 'mds_rocksdb_path', ]
             },
             'backend_connection_manager': {
