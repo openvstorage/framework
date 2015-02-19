@@ -360,7 +360,7 @@ print Service.get_service_status('arakoon-{0}')
     @staticmethod
     def wait_for_cluster(cluster_name):
         """
-        Waits for an Arakoon cluster to catch up (by sending a nop)
+        Waits for an Arakoon cluster to be available (by sending a nop)
         """
         from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
         from ovs.extensions.db.arakoon.arakoon.ArakoonExceptions import ArakoonSockReadNoBytes
@@ -372,7 +372,7 @@ print Service.get_service_status('arakoon-{0}')
                 cluster_object = ArakoonManagementEx().getCluster(str(cluster_name))
                 client = cluster_object.getClient()
                 client.nop()
-                return
+                return True
             except ArakoonSockReadNoBytes as exception:
                 last_exception = exception
                 tries -= 1
