@@ -1,0 +1,67 @@
+﻿<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <nav class="navbar navbar-default navbar-fixed-top" data-bind="visible: shared.mode() == 'full'">
+        <div class="noise">
+            <div class="container">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-ex1-collapse">
+                        <span class="sr-only" data-i18n="ovs:generic.togglenavigation"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" data-bind="attr: { href: shared.routing.loadHash('dashboard') }" style="padding-top: 3px;">
+                        <img src="/lib/ovs/images/ovssmall.png" />
+                    </a>
+                </div>
+                <div class="collapse navbar-collapse navbar-ex1-collapse">
+                    <ul class="nav navbar-nav" data-bind="foreach: router.navigationModel">
+                        <li data-bind="if: main, css: { active: isActive }">
+                            <a data-bind="attr: { href: hash, 'data-i18n': titlecode }, text: title"></a>
+                        </li>
+                    </ul>
+                    <!-- below: navbar-right has float: right behavior -->
+                    <ul class="nav navbar-nav navbar-right" data-bind="visible: shared.authentication.loggedIn">
+                        <li class="dropdown">
+                            <a href="#" class="dropdown-toggle" data-toggle="dropdown"><span data-i18n="ovs:generic.administration"></span> <b class="caret"></b></a>
+                            <ul class="dropdown-menu">
+                                <!-- ko foreach: router.navigationModel -->
+                                    <li data-bind="if: !main, css: { active: isActive }">
+                                        <a data-bind="attr: { href: hash, 'data-i18n': titlecode }, text: title"></a>
+                                    </li>
+                                <!-- /ko -->
+                                <li class="divider"></li>
+                                <li><a class="hand" href="/api/"><span data-i18n="ovs:generic.api"></span> <i style="color: lightgrey; padding-left: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a></li>
+                                <li><a class="hand" href="/logging/index.html#/dashboard/file/logstash.json"><span data-i18n="ovs:generic.logging"></span> <i style="color: lightgrey; padding-left: 5px;" class="fa" data-i18n="[html]ovs:icons.externallink"></i></a></li>
+                                <li class="divider"></li>
+                                <li><a class="hand" data-bind="click: shared.authentication.logout"><span data-i18n="ovs:generic.logout"></span>: <i><span data-bind="text: shared.user.username"></span></i></a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <p class="navbar-text navbar-right" data-bind="visible: router.isNavigating">
+                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="wrapper">
+        <div class="container page-host" data-bind="css: { 'page-host': shared.mode() == 'full' }, router: { cacheViews: true }"></div>
+    </div>
+    <div class="footer" data-bind="footer: { data: shared.footerData }"></div>
+</div>

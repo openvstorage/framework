@@ -1,0 +1,32 @@
+--- ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
++++ ovs/extensions/db/arakoon/arakoon/ArakoonManagement.py
+@@ -26,8 +26,8 @@
+ import string
+ import logging
+
+-from arakoon import Arakoon
+-from arakoon.ArakoonExceptions import ArakoonNodeNotLocal
++import Arakoon
++from ArakoonExceptions import ArakoonNodeNotLocal
+
+ def which_arakoon():
+     path = '/'.join([X.appDir,"arakoon/bin/arakoon"])
+
+--- ovs/extensions/db/arakoon/arakoon/Compat.py
++++ ovs/extensions/db/arakoon/arakoon/Compat.py
+@@ -24,7 +24,6 @@
+ else:
+     logging.info("opting for normal client")
+-    print "arakoon"
+-    from arakoon import Arakoon
++    import Arakoon
+     arakoon_client = Arakoon
+
+
+@@ -213,5 +213,4 @@
+
+ def which_compat():
+-    print "which_compat"
+     g = globals()
+     if sys.prefix == '/opt/qbase3':
+         r = Q()
