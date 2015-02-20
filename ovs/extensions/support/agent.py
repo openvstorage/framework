@@ -16,6 +16,7 @@
 Module for the Support Agent
 """
 
+import sys
 import json
 import time
 import requests
@@ -42,7 +43,32 @@ class SupportAgent(object):
         self._api = Configuration.get('ovs.support.api')
         self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
         self.interval = int(Configuration.get('ovs.support.interval'))
-        self._url = 'http://{0}/{1}'.format(self._endpoint, self._api)  # @TODO: Use HTTPS
+        self._url = 'https://{0}/{1}'.format(self._endpoint, self._api)
+
+    @staticmethod
+    def get_heartbeat_data():
+        """
+        Returns heartbeat data
+        """
+        data = {'cid': Configuration.get('ovs.support.cid'),
+                'nid': Configuration.get('ovs.support.nid'),
+                'metadata': {},
+                'errors': []}
+
+        try:
+            # Versions
+            data['metadata']['versions'] = Package.get_versions()
+        except Exception, ex:
+            data['errors'].append(str(ex))
+        try:
+            # Service status
+            services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
+            servicedata = dict((service.split(' ')[0].strip(), service.split(' ', 1)[1].strip()) for service in services)
+            data['metadata']['services'] = servicedata
+        except Exception, ex:
+            data['errors'].append(str(ex))
+
+        return data
 
     @staticmethod
     def _update_config(key, value):
@@ -76,8 +102,8 @@ class SupportAgent(object):
                 else:
                     raise RuntimeError('Could not find ssh process')
             if task == 'UPLOAD_LOGFILES':
-                logfile = check_output('ovs collect logs')
-                return check_output('scp {0} {1}@{1}:/mnt/logs/{3}.tar.gz -p {4} -o UserKnownHostsFile=/dev/null'.format(
+                logfile = check_output('ovs collect logs', shell=True)
+                return check_output('scp {0} {1}@{1}:/mnt/logs/{3} -p {4} -o UserKnownHostsFile=/dev/null'.format(
                     logfile, metadata['user'], metadata['endpoint'], metadata['filename'], metadata['port']
                 ), shell=True)
             raise RuntimeError('Unknown task')
@@ -93,25 +119,8 @@ class SupportAgent(object):
         """
         logger.debug('Processing heartbeat')
 
-        data = {'cid': Configuration.get('ovs.support.cid'),
-                'nid': Configuration.get('ovs.support.nid'),
-                'metadata': {},
-                'errors': []}
         try:
-            # Versions
-            data['metadata']['versions'] = Package.get_versions()
-        except Exception, ex:
-            data['errors'].append(str(ex))
-        try:
-            # Service status
-            services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
-            servicedata = dict((service.split(' ')[0].strip(), service.split(' ', 1)[1].strip()) for service in services)
-            data['metadata']['services'] = servicedata
-        except Exception, ex:
-            data['errors'].append(str(ex))
-
-        try:
-            request = requests.post(self._url, data={'data': json.dumps(data)})
+            request = requests.post(self._url, data={'data': json.dumps(SupportAgent.get_heartbeat_data())})
             return_data = request.json()
         except Exception, ex:
             logger.exception('Unexpected error during support call: {0}'.format(ex))
@@ -134,6 +143,9 @@ class SupportAgent(object):
 
 if __name__ == '__main__':
     try:
+        if int(Configuration.get('ovs.support.enabled')) == 0:
+            print 'Support not enabled'
+            sys.exit(0)
         logger.info('Starting up')
         client = SupportAgent()
         while True:

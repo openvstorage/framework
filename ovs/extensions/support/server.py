@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 # Copyright 2015 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,12 +17,16 @@
 Tets server module
 """
 
+import os
+import time
 import json
+import datetime
+from subprocess import check_output
 from multiprocessing import Lock
 from flask import Flask, request, g
 app = Flask(__name__)
 
-DATABASE = '/tmp/support_agent.json'
+DATABASE = '/var/www/server/monitoring_portal.json'
 lock = Lock()
 
 
@@ -30,6 +35,8 @@ def read():
         lock.acquire()
         contents = '{}'
         try:
+            if not os.path.exists(DATABASE):
+                check_output('echo "{}" > {0}'.format(DATABASE), shell=True)
             with open(DATABASE, 'r') as database:
                 contents = database.read()
         except Exception, ex:
@@ -69,6 +76,7 @@ def after_request(response):
 @app.route('/api', methods=['POST'])
 def api():
     data = {'tasks': []}
+    now = time.time()
     try:
         rdata = json.loads(request.form['data'])
         cid = rdata['cid']
@@ -82,6 +90,9 @@ def api():
             g.data['envs'][cid][nid]['services'] = rdata['metadata']['services']
         if 'versions' in rdata['metadata']:
             g.data['envs'][cid][nid]['versions'] = rdata['metadata']['versions']
+        g.data['envs'][cid][nid]['heartbeat'] = {'last_seen_timestamp': now,
+                                                 'last_seen': datetime.datetime.fromtimestamp(now).strftime('%Y-%m-%d %H:%M:%S'),
+                                                 'remote_ip': request.environ.get('HTTP_X_REAL_IP', request.remote_addr)}
 
         if cid in g.data['tasks'] and nid in g.data['tasks'][cid]:
             for task in g.data['tasks'][cid][nid]:

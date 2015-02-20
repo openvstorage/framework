@@ -102,6 +102,7 @@ class SetupController(object):
         disk_layout = None
         arakoon_mountpoint = None
         join_cluster = False
+        enable_heartbeats = None
 
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
@@ -123,6 +124,7 @@ class SetupController(object):
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
+            enable_heartbeats = True
 
         try:
             if force_type is not None:
@@ -211,7 +213,7 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        #@todo: we should be able to choose the ip here too in a multiple nic setup?
+                        # @TODO: we should be able to choose the ip here too in a multiple nic setup?
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
                         known_passwords[master_ip] = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
                         first_node = False
@@ -280,7 +282,8 @@ class SetupController(object):
             )
             if first_node:
                 SetupController._setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config,
-                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint)
+                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
+                                                  enable_heartbeats)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
                                                   nodes, ovs_config, hypervisor_info)
@@ -436,7 +439,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         return mountpoints, hypervisor_info
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
         """
         Sets up the first node services. This node is always a master
         """
@@ -646,6 +649,23 @@ EOF
 
         SetupController._run_firstnode_hooks(cluster_ip)
 
+        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        if enable_heartbeats is None:
+            print '\n+++ Heartbeat +++\n'
+            logger.info('Heartbeat')
+
+            Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.',
+                                       'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services.',
+                                       'These heartbeats are optional and can be turned on/off at any time via the GUI.'])
+            enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
+        if enable_heartbeats is True:
+            System.set_remote_config(target_client, 'ovs.support.enabled', 1)
+            service = 'support-agent'
+            SetupController._add_service(target_client, service, {})
+            SetupController._enable_service(target_client, service)
+            SetupController._change_service_state(target_client, service, 'start')
+
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
@@ -703,6 +723,21 @@ EOF
             client_config = SetupController._remote_config_read(master_client, config)
             target_client = SSHClient.load(cluster_ip)
             SetupController._remote_config_write(target_client, config, client_config)
+
+        client = SSHClient.load(master_ip)
+        cid = System.read_remote_config(client, 'ovs.support.cid')
+        enabled = System.read_remote_config(client, 'ovs.support.enabled')
+        enablesupport = System.read_remote_config(client, 'ovs.support.enablesupport')
+        client = SSHClient.load(cluster_ip)
+        System.set_remote_config(client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(client, 'ovs.support.cid', cid)
+        System.set_remote_config(client, 'ovs.support.enabled', enabled)
+        System.set_remote_config(client, 'ovs.support.enablesupport', enablesupport)
+        if int(enabled) > 0:
+            service = 'support-agent'
+            SetupController._add_service(client, service, {})
+            SetupController._enable_service(client, service)
+            SetupController._change_service_state(client, service, 'start')
 
         client = SSHClient.load(cluster_ip)
         node_name = client.run('hostname')

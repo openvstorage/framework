@@ -118,6 +118,43 @@ class StorageRouterViewSet(viewsets.ViewSet):
             routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def get_support_info(self, storagerouter):
+        """
+        Gets support information of a given Storage Router
+        """
+        return StorageRouterController.get_support_info.s(storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def get_support_metadata(self, storagerouter):
+        """
+        Gets support metadata of a given Storage Router
+        """
+        return StorageRouterController.get_support_metadata.apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def configure_support(self, enable, enable_support):
+        """
+        Configures support
+        """
+        return StorageRouterController.configure_support.delay(enable, enable_support)
+
     @action()
     @log()
     @required_roles(['read'])

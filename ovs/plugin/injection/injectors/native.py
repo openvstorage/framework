@@ -195,13 +195,15 @@ class Injector(object):
         """ Injects the Package module """
 
         def _get_version(package):
-            return check_output("aptitude show {0} | grep Version | cut -d ' ' -f 2".format(package), shell=True).strip()
+            return check_output("dpkg -s {0} | grep Version | cut -d ' ' -f 2".format(package), shell=True).strip()
 
         def get_versions():
-            return {'openvstorage': _get_version('openvstorage'),
-                    'openvstorage-webapps': _get_version('openvstorage-webapps'),
-                    'openvstorage-core': _get_version('openvstorage-core'),
-                    'volumedriver': _get_version('volumedriver-server')}
+            versions = {}
+            for package in ['openvstorage', 'openvstorage-alba', 'volumedriver-server', 'volumedriver-base', 'alba']:
+                version_info = _get_version(package)
+                if version_info:
+                    versions[package] = version_info
+            return versions
 
         provider.get_versions = staticmethod(get_versions)
         return provider
