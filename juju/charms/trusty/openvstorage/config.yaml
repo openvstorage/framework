@@ -1,0 +1,13 @@
+options:
+  target_password:
+    type: string
+    default: "password"
+    description: "Node root password"
+  cluster_name:
+    type: string
+    default: "openstack-openvstorage-cluster"
+    description: "OVS Cluster name"
+  arakoon_mntp:
+    type: string
+    default: "/mnt/db"
+    description: "If you have an SSD device put here a mount point or that device"
