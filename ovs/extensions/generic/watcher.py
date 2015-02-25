@@ -115,11 +115,12 @@ def services_running(target):
             # RabbitMQ
             _log(target, 'Test rabbitMQ...', 0)
             import pika
-            from configobj import ConfigObj
+            from ConfigParser import RawConfigParser
             from ovs.plugin.provider.configuration import Configuration
-            rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-            rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
-            rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+            rmq_ini = RawConfigParser()
+            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+            rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
+            rmq_servers = map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes)
             good_node = False
             for server in rmq_servers:
                 try:

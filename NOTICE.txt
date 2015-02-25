@@ -1,4 +1,3 @@
-
                      Open vStorage
           Copyright 2013-2014 CloudFounders NV
 
@@ -54,13 +53,6 @@ INCLUDED AND/OR USED SOFTWARE
     Python-AMQP                 LGPL 2.1
     Suds-jurko                  LGPL 3
     Tornado                     Apache 2.0
-
-    ConfigObj                   BSD 3
-        Copyright (c) 2003-2010, Michael Foord. All rights reserved.
-        Copyright (c) 2014, Eli Courtwright, Rob Dennis. All rights reserved.
-        E-mails: fuzzyman AT voidspace DOT org DOT uk
-                 eli AT courtwright DOT org
-                 rdennis AT gmail DOT com
 
     Memcached                   BSD 3
         Copyright (c) 2003, Danga Interactive, Inc. All rights reserved.

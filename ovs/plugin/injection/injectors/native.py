@@ -15,8 +15,8 @@
 """
 Native Injector module
 """
-import ConfigParser
 import os
+from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 
 
@@ -37,7 +37,7 @@ class Injector(object):
         """ Injects the Config module """
         def _get(key):
             filename, section, item = key.split('.', 2)
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.read('/opt/OpenvStorage/config/{0}.cfg'.format(filename))
             return config.get(section, item)
 

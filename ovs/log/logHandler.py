@@ -18,10 +18,10 @@ Contains the loghandler module
 
 import logging
 import logging.handlers
-import ConfigParser
 import pwd
 import grp
 import os
+from ConfigParser import RawConfigParser
 
 
 def _ignore_formatting_errors():
@@ -66,7 +66,7 @@ class LogHandler(object):
         """
 
         filename = '/opt/OpenvStorage/config/main.cfg'
-        parser = ConfigParser.RawConfigParser()
+        parser = RawConfigParser()
         parser.read(filename)
 
         if name is None:

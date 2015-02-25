@@ -31,7 +31,7 @@ from ovs.lib.storagerouter import StorageRouterController
 
 #CONFIG
 from ovs_config import *
-from ConfigParser import ConfigParser
+from ConfigParser import RawConfigParser
 
 class OVSPluginTestException(Exception): pass
 class WaitTimedOut(OVSPluginTestException): pass
@@ -371,7 +371,7 @@ class OVSPluginTestCase(test.TestCase):
         cinder_backup = cinder_backup % i
         shutil.copy(cinder_conf, cinder_backup)
         self._debug('backup cinder.conf to %s' % cinder_backup)
-        cfg = ConfigParser()
+        cfg = RawConfigParser()
         cfg.read(cinder_conf)
         return cfg
 

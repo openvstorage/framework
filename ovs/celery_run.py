@@ -21,6 +21,7 @@ import sys
 sys.path.append('/opt/OpenvStorage')
 
 import os
+from ConfigParser import RawConfigParser
 from kombu import Queue
 from celery import Celery
 from celery.signals import task_postrun, worker_process_init
@@ -30,15 +31,16 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.system import System
 from ovs.plugin.provider.configuration import Configuration
-from configobj import ConfigObj
 
-memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-memcache_nodes = memcache_ini.get('main')['nodes'] if type(memcache_ini.get('main')['nodes']) == list else [memcache_ini.get('main')['nodes'], ]
-memcache_servers = map(lambda m: memcache_ini.get(m)['location'], memcache_nodes)
+memcache_ini = RawConfigParser()
+memcache_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+memcache_nodes = [node.strip() for node in memcache_ini.get('main', 'nodes').split(',')]
+memcache_servers = map(lambda n: memcache_ini.get(n, 'location'), memcache_nodes)
 
-rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'], ]
-rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+rmq_ini = RawConfigParser()
+rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
+rmq_servers = map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes)
 
 unique_id = System.get_my_machine_id()
 
