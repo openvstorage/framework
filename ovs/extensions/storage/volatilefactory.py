@@ -44,7 +44,7 @@ class VolatileFactory(object):
                 nodes = [node.strip() for node in memcache_config.get('main', 'nodes').split(',')]
                 nodes.sort()
                 for node in nodes:
-                    location = memcache_config.get(node)['location']
+                    location = memcache_config.get(node, 'location')
                     memcache_servers.append(location)
                 VolatileFactory.store = MemcacheStore(memcache_servers)
             if client_type == 'default':
