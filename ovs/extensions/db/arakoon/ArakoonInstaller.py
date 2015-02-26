@@ -332,7 +332,7 @@ print Service.get_service_status('arakoon-{0}')
         client = SSHClient.load(ip)
         cmd = """
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-cluster = ArakoonManagementEx().getCluster('arakoon-{0}')
+cluster = ArakoonManagementEx().getCluster('{0}')
 cluster.catchup_node()
 """.format(cluster_name)
         System.exec_remote_python(client, cmd)

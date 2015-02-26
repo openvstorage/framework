@@ -264,6 +264,8 @@ class ArakoonClusterEx(ArakoonCluster):
         arakoon -catchup-only --node <NODEID> -config <CONFIGFILE>
         """
         name = System.get_my_machine_id()
+        if not name in self.listNodes():
+            raise ValueError('Node {0} is not part of cluster {1}'.format(name, self._clusterName))
         status = self._getStatusOne(name)
         if status is True:
             self._stopOne(name)
