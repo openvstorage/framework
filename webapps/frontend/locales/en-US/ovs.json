@@ -207,10 +207,6 @@
             "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
             "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
-            "logging": "Storage Router logs",
-            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
-            "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this Storage Router's logs."
         }
     },
     "vpools" : {
@@ -433,6 +429,26 @@
             "addsuccess": "The backend was added. Please open the details to configure",
             "addfailed": "The backend could not be added: __why__"
         }
+    },
+    "support": {
+        "information": "Information",
+        "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
+        "identification": "Identification parameters",
+        "title": "Support",
+        "clusterid": "Cluster ID:",
+        "nodeid": "Node ID",
+        "nodes": "StorageRouters:",
+        "callhome": "Call Home settings",
+        "metadata": "Heartbeat data",
+        "enable": "Heartbeat enabled",
+        "enablesupport": "Remote Access enabled",
+        "save": "Save settings",
+        "saving": "Saving",
+        "savingmsg": "Your settings are being applied",
+        "saved": "Saved",
+        "savedmsg": "Settings applied",
+        "failed": "Error",
+        "failedmsg": "Error while applying your settings"
     },
     "notfound": {
         "title": "Page not found",

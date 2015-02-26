@@ -39,6 +39,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.support.agent import SupportAgent
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
@@ -917,6 +918,55 @@ if Service.has_service('{0}'):
         """
         return {'storagerouter_guid': storagerouter_guid,
                 'versions': Package.get_versions()}
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_support_info')
+    def get_support_info(storagerouter_guid):
+        """
+        Returns support information regarding a given StorageRouter
+        """
+        return {'storagerouter_guid': storagerouter_guid,
+                'nodeid': Configuration.get('ovs.support.nid'),
+                'clusterid': Configuration.get('ovs.support.cid'),
+                'enabled': int(Configuration.get('ovs.support.enabled')) > 0,
+                'enablesupport': int(Configuration.get('ovs.support.enablesupport')) > 0}
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_support_metadata')
+    def get_support_metadata():
+        """
+        Returns support metadata for a given storagerouter. This should be a routed task!
+        """
+        return SupportAgent.get_heartbeat_data()
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.configure_support')
+    def configure_support(enable, enable_support):
+        """
+        Configures support on all StorageRouters
+        """
+        for storagerouter in StorageRouterList.get_storagerouters():
+            client = SSHClient.load(storagerouter.ip)
+            System.set_remote_config(client, 'ovs.support.enabled', 1 if enable else 0)
+            System.set_remote_config(client, 'ovs.support.enablesupport', 1 if enable_support else 0)
+            if enable is True:
+                script = """
+from ovs.plugin.provider.service import Service
+if not Service.has_service('{0}'):
+    Service.add_service('', '{0}', '', '', {1})
+    Service.enable_service('{0}')
+if not Service.get_service_status('{0}'):
+    Service.start_service('{0}')"""
+                System.exec_remote_python(client, script.format('support-agent', {}))
+            else:
+                script = """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    if Service.get_service_status('{0}'):
+        Service.stop_service('{0}')
+    Service.remove_service('', '{0}')"""
+                System.exec_remote_python(client, script.format('support-agent'))
+        return True
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.check_s3')

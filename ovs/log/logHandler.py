@@ -58,7 +58,8 @@ class LogHandler(object):
                'extensions': 'extensions',
                'dal': 'dal',
                'celery': 'celery',
-               'arakoon': 'arakoon'}
+               'arakoon': 'arakoon',
+               'support': 'support'}
 
     def __init__(self, source, name=None):
         """

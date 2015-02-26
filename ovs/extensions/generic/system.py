@@ -151,6 +151,17 @@ print Configuration.get('{0}')
         return System.exec_remote_python(client, read)
 
     @staticmethod
+    def set_remote_config(client, key, value):
+        """
+        Sets remote configuration key
+        """
+        write = """
+from ovs.plugin.provider.configuration import Configuration
+Configuration.set('{0}', '{1}')
+""".format(key, value)
+        System.exec_remote_python(client, write)
+
+    @staticmethod
     def ports_in_use(client=None):
         """
         Returns the ports in use

@@ -21,6 +21,7 @@ import re
 import sys
 import imp
 import time
+import uuid
 import urllib2
 import base64
 import inspect
@@ -101,6 +102,7 @@ class SetupController(object):
         disk_layout = None
         arakoon_mountpoint = None
         join_cluster = False
+        enable_heartbeats = None
 
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
@@ -122,6 +124,7 @@ class SetupController(object):
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
+            enable_heartbeats = True
 
         try:
             if force_type is not None:
@@ -210,7 +213,7 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        #@todo: we should be able to choose the ip here too in a multiple nic setup?
+                        # @TODO: we should be able to choose the ip here too in a multiple nic setup?
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
                         known_passwords[master_ip] = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
                         first_node = False
@@ -279,7 +282,8 @@ class SetupController(object):
             )
             if first_node:
                 SetupController._setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config,
-                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint)
+                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
+                                                  enable_heartbeats)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
                                                   nodes, ovs_config, hypervisor_info)
@@ -435,7 +439,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         return mountpoints, hypervisor_info
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
         """
         Sets up the first node services. This node is always a master
         """
@@ -455,24 +459,6 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
-
-        print 'Setting up elastic search'
-        logger.info('Setting up elastic search')
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._add_service(target_client, 'elasticsearch')
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-        target_client.run('mkdir -p /opt/data/elasticsearch/work')
-        target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name),
-                                                 add=False)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NODE_NAME>', node_name)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NETWORK_PUBLISH>', cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'start')
 
         print 'Setting up logstash'
         logger.info('Setting up logstash')
@@ -536,8 +522,6 @@ EOF
             if SetupController._has_service(target_client, service):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(target_client, 'true')  # Also starts the services
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -592,6 +576,8 @@ EOF
         print 'Updating configuration files'
         logger.info('Updating configuration files')
         ovs_config.set('grid', 'ip', cluster_ip)
+        ovs_config.set('support', 'cid', str(uuid.uuid4()))
+        ovs_config.set('support', 'nid', str(uuid.uuid4()))
         SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
 
         print 'Starting services'
@@ -643,6 +629,22 @@ EOF
 
         SetupController._run_firstnode_hooks(cluster_ip)
 
+        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        if enable_heartbeats is None:
+            print '\n+++ Heartbeat +++\n'
+            logger.info('Heartbeat')
+
+            print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.',
+                                             'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'])
+            enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
+        if enable_heartbeats is True:
+            System.set_remote_config(target_client, 'ovs.support.enabled', 1)
+            service = 'support-agent'
+            SetupController._add_service(target_client, service, {})
+            SetupController._enable_service(target_client, service)
+            SetupController._change_service_state(target_client, service, 'start')
+
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
@@ -675,7 +677,7 @@ EOF
         print '\n+++ Adding extra node +++\n'
         logger.info('Adding extra node')
 
-        # Elastic search setup
+        # Logstash setup
         print 'Configuring logstash'
         target_client = SSHClient.load(cluster_ip)
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
@@ -700,6 +702,21 @@ EOF
             client_config = SetupController._remote_config_read(master_client, config)
             target_client = SSHClient.load(cluster_ip)
             SetupController._remote_config_write(target_client, config, client_config)
+
+        client = SSHClient.load(master_ip)
+        cid = System.read_remote_config(client, 'ovs.support.cid')
+        enabled = System.read_remote_config(client, 'ovs.support.enabled')
+        enablesupport = System.read_remote_config(client, 'ovs.support.enablesupport')
+        client = SSHClient.load(cluster_ip)
+        System.set_remote_config(client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(client, 'ovs.support.cid', cid)
+        System.set_remote_config(client, 'ovs.support.enabled', enabled)
+        System.set_remote_config(client, 'ovs.support.enablesupport', enablesupport)
+        if int(enabled) > 0:
+            service = 'support-agent'
+            SetupController._add_service(client, service, {})
+            SetupController._enable_service(client, service)
+            SetupController._change_service_state(client, service, 'start')
 
         client = SSHClient.load(cluster_ip)
         node_name = client.run('hostname')
@@ -747,9 +764,14 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
+        config_filename = '/opt/OpenvStorage/config/ovs.cfg'
+        master_client = SSHClient.load(master_ip)
+        master_config = SetupController._remote_config_read(master_client, config_filename)
         ovs_config.set('grid', 'ip', cluster_ip)
+        ovs_config.set('support', 'cid', master_config.get('support', 'cid'))
+        ovs_config.set('support', 'nid', str(uuid.uuid4()))
         target_client = SSHClient.load(cluster_ip)
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        SetupController._remote_config_write(target_client, config_filename, ovs_config)
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
@@ -873,24 +895,7 @@ EOF
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        # Elastic search setup
-        print 'Configuring elastic search'
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._add_service(target_client, 'elasticsearch')
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-        target_client.run('mkdir -p /opt/data/elasticsearch/work')
-        target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name),
-                                                 add=False)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NODE_NAME>', node_name)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NETWORK_PUBLISH>', cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'start')
-
+        # Logstash setup
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
                                                  '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
         SetupController._change_service_state(target_client, 'logstash', 'restart')
@@ -1064,8 +1069,6 @@ for json_file in os.listdir(configuration_dir):
 
         print 'Starting services'
         target_client = SSHClient.load(cluster_ip)
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(target_client, 'true')
         logger.info('Starting services')
         for service in SetupController.master_services:
             if SetupController._has_service(target_client, service):
@@ -1195,18 +1198,6 @@ EOF
                 master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
-
-        # Elastic search setup
-        print 'Unconfiguring elastic search'
-        target_client = SSHClient.load(cluster_ip)
-        if SetupController._has_service(target_client, 'elasticsearch'):
-            SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-            target_client.run('rm -f /etc/elasticsearch/elasticsearch.yml')
-            SetupController._remove_service(target_client, 'elasticsearch')
-
-            SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
-                                                     '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
-        SetupController._change_service_state(target_client, 'logstash', 'restart')
 
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
@@ -2035,18 +2026,6 @@ print blk_devices
             if safetycounter == timeout:
                 raise RuntimeError('Service {0} could not be {1} on node {2}'.format(name, action, client.ip))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
-
-    @staticmethod
-    def _update_es_configuration(es_client, value):
-        # update elasticsearch configuration
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(es_client, 'elasticsearch', 'stop')
-        SetupController._replace_param_in_config(es_client, config_file,
-                                                 '<IS_POTENTIAL_MASTER>', value)
-        SetupController._replace_param_in_config(es_client, config_file,
-                                                 '<IS_DATASTORE>', value)
-        SetupController._change_service_state(es_client, 'elasticsearch', 'start')
-        SetupController._change_service_state(es_client, 'logstash', 'restart')
 
     @staticmethod
     def _configure_amqp_to_volumedriver(client, vpname=None):

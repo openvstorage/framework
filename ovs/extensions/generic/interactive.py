@@ -129,7 +129,6 @@ class Interactive(object):
         """
         Embeds a set of lines into a box
         """
-        character = str(character)  # This must be a string
         corrected_lines = []
         for line in lines:
             if len(line) > maxlength:
@@ -151,9 +150,15 @@ class Interactive(object):
             else:
                 corrected_lines.append(line)
         maxlen = len(max(corrected_lines, key=len))
-        newlines = [character * (maxlen + 10)]
+        newlines  = []
+        if character is not None:
+            newlines.append(character * (maxlen + 10))
         for line in corrected_lines:
-            newlines.append('{0}  {1}{2}  {3}'.format(character * 3, line, ' ' * (maxlen - len(line)),
-                                                      character * 3))
-        newlines.append(character * (maxlen + 10))
+            if character is not None:
+                newlines.append('{0}  {1}{2}  {3}'.format(character * 3, line, ' ' * (maxlen - len(line)),
+                                                          character * 3))
+            else:
+                newlines.append(line)
+        if character is not None:
+            newlines.append(character * (maxlen + 10))
         return '\n'.join(newlines)
