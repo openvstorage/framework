@@ -897,6 +897,7 @@ EOF
             raise RuntimeError('There should be at least one other master node')
 
         # Logstash setup
+        target_client = SSHClient.load(cluster_ip)
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
                                                  '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
         SetupController._change_service_state(target_client, 'logstash', 'restart')
