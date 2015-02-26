@@ -221,7 +221,8 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         contents.set('global', 'cluster', '')
         contents.set('global', 'plugins', self.config.plugins)
         for node in self.config.nodes:
-            contents.add_section(node.name)
+            if not contents.has_section(node.name):
+                contents.add_section(node.name)
             contents.set(node.name, 'name', node.name)
             contents.set(node.name, 'ip', node.ip)
             contents.set(node.name, 'client_port', node.client_port)
@@ -327,6 +328,16 @@ print Service.get_service_status('arakoon-{0}')
         System.exec_remote_python(client, cmd)
 
     @staticmethod
+    def catchup_cluster_node(cluster_name, ip):
+        client = SSHClient.load(ip)
+        cmd = """
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+cluster = ArakoonManagementEx().getCluster('{0}')
+cluster.catchup_node()
+""".format(cluster_name)
+        System.exec_remote_python(client, cmd)
+
+    @staticmethod
     def extend_cluster(src_ip, tgt_ip, cluster_name, exclude_ports):
         ai = ArakoonInstaller()
         ai.load_config_from(cluster_name, src_ip)
@@ -387,7 +398,7 @@ print Service.get_service_status('arakoon-{0}')
         # Make sure all nodes are correctly (re)started
         loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
         logging.disable('WARNING')
-        # @TODO: Execute a catchup-only on new_ip, leaving it off afterwards
+        ArakoonInstaller.catchup_cluster_node(cluster_name, new_ip)
         threshold = 2 if new_ip in current_ips else 1
         for ip in current_ips:
             if ip == new_ip:

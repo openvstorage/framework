@@ -22,21 +22,20 @@ elif [ "$1" = "monitor" ] ; then
   fi
 elif [ "$1" = "collect" ] ; then
   if [ "$2" = "logs" ] ; then
-    LOGFILE=/var/tmp/ovs-`hostname`-logs.tar
+    LOGFILE=/tmp/ovs-`hostname`-`date "+%Y%m%d%H%M%S"`-logs.tar
     rm -f $LOGFILE
     rm -f $LOGFILE.gz
     touch $LOGFILE
-    tar uvf $LOGFILE /var/log/arakoon*
-    tar uvf $LOGFILE /var/log/elasticsearch*
-    tar uvf $LOGFILE /var/log/installer*
-    tar uvf $LOGFILE /var/log/logstash*
-    tar uvf $LOGFILE /var/log/nginx*
-    tar uvf $LOGFILE /var/log/ovs*
-    tar uvf $LOGFILE /var/log/rabbitmq*
-    tar uvf $LOGFILE /var/log/upstart*
-    tar uvf $LOGFILE /var/log/*log
-    tar uvf $LOGFILE /var/log/dmesg*
-    gzip $LOGFILE
+    tar uvf $LOGFILE /var/log/arakoon* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/logstash* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/nginx* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/ovs* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/rabbitmq* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/upstart* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/*log > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/dmesg* > /dev/null 2>&1
+    gzip $LOGFILE > /dev/null
+    echo $LOGFILE.gz
   fi
 else
   ipython
