@@ -64,7 +64,7 @@ class ArakoonClusterEx(ArakoonCluster):
 
     def __init__(self, cluster_name):
         """
-        Intitialize cluster constructor.
+        Initialize cluster constructor.
         """
 
         self.__validateName(cluster_name)
@@ -169,13 +169,11 @@ class ArakoonClusterEx(ArakoonCluster):
     def start(self, daemon=True):
         """
         start all nodes in the cluster
-        first do a catchup
         """
         from ovs.extensions.db.arakoon.CheckArakoonTlogMark import CheckArakoonTlogMark
 
         CheckArakoonTlogMark().fixtlogs(self._clusterName, always_stop=True)
         node_name = System.get_my_machine_id()
-        self._catchup_node(node_name)
         self._start_one_ex(node_name, daemon)
 
     def _cmd(self, name):
@@ -261,10 +259,13 @@ class ArakoonClusterEx(ArakoonCluster):
             raise Exception('multiple matches', pid_list)
         return result
 
-    def _catchup_node(self, name):
+    def catchup_node(self):
         """
         arakoon -catchup-only --node <NODEID> -config <CONFIGFILE>
         """
+        name = System.get_my_machine_id()
+        if not name in self.listNodes():
+            raise ValueError('Node {0} is not part of cluster {1}'.format(name, self._clusterName))
         status = self._getStatusOne(name)
         if status is True:
             self._stopOne(name)
@@ -276,7 +277,9 @@ class ArakoonClusterEx(ArakoonCluster):
         cmd.append('-catchup-only')
         rc = subprocess.call(cmd)
         status = self._getStatusOne(name)
-        return rc
+        if status is True:
+            self._stopOne(name)
+
 
 if __name__ == '__main__':
     from optparse import OptionParser
@@ -284,17 +287,21 @@ if __name__ == '__main__':
     parser = OptionParser(description='Arakoon Management')
     parser.add_option('--stop', dest='start', action='store_false', default=None, help='Stop arakoon')
     parser.add_option('--start', dest='start', action='store_true', default=None, help='Start arakoon')
+    parser.add_option('--catchup-only', dest='catchuponly', action='store_true', default=None,
+                      help='Start arakoon in catchup-only mode; once it finishes it will stop.')
     parser.add_option('-c', '--cluster', dest='cluster', help='Name of arakoon cluster')
     (options, args) = parser.parse_args()
 
     if not options.cluster:
         parser.error('No arakoon cluster specified')
-    if options.start is None:
+    if options.start is None and options.catchuponly is None:
         parser.error('No action specified')
 
     arakoonManagement = ArakoonManagementEx()
     arakoon_cluster = arakoonManagement.getCluster(options.cluster)
-    if options.start:
+    if options.start == True:
         arakoon_cluster.start(False)
-    else:
+    elif options.start == False:
         arakoon_cluster.stop()
+    elif options.catchuponly:
+        arakoon_cluster.catchup_node()
