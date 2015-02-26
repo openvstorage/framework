@@ -22,11 +22,11 @@ import sys
 import imp
 import time
 import uuid
-import ConfigParser
 import urllib2
 import base64
 import inspect
 
+from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
@@ -74,7 +74,8 @@ class SetupController(object):
     @staticmethod
     def setup_node(ip=None, force_type=None, verbose=False):
         """
-        Sets up a node.        1. Some magic figuring out here:
+        Sets up a node.
+        1. Some magic figuring out here:
            - Which cluster (new, joining)
            - Cluster role (master, extra)
         2. Prepare cluster
@@ -106,7 +107,7 @@ class SetupController(object):
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
         if os.path.exists(preconfig):
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.read(preconfig)
             ip = config.get('setup', 'target_ip')
             target_password = config.get('setup', 'target_password')
@@ -508,7 +509,7 @@ EOF
         print 'Build configuration files'
         logger.info('Build configuration files')
         for config_file, port in SetupController.generic_configfiles.iteritems():
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.add_section('main')
             config.set('main', 'nodes', unique_id)
             config.add_section(unique_id)
@@ -1962,7 +1963,7 @@ print blk_devices
         contents = client.file_read(filename)
         with open('/tmp/temp_read.cfg', 'w') as configfile:
             configfile.write(contents)
-        config = ConfigParser.ConfigParser()
+        config = RawConfigParser()
         config.read('/tmp/temp_read.cfg')
         return config
 
@@ -2033,7 +2034,7 @@ print blk_devices
         """
         remote_script = """
 import os
-import ConfigParser
+from ConfigParser import RawConfigParser
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 protocol = Configuration.get('ovs.core.broker.protocol')
@@ -2041,7 +2042,7 @@ login = Configuration.get('ovs.core.broker.login')
 password = Configuration.get('ovs.core.broker.password')
 vpool_name = {0}
 uris = []
-cfg = ConfigParser.ConfigParser()
+cfg = RawConfigParser()
 cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
 nodes = [n.strip() for n in cfg.get('main', 'nodes').split(',')]
 for node in nodes:

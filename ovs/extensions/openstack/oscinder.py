@@ -182,11 +182,11 @@ class OpenStackCinder(object):
         if not self.client.file_exists(CINDER_CONF):
             return False
 
-        self.client.run("""python -c '''from ConfigParser import ConfigParser
+        self.client.run("""python -c '''from ConfigParser import RawConfigParser
 changed = False
 vpool_name = "%s"
 CINDER_CONF = "%s"
-cfg = ConfigParser()
+cfg = RawConfigParser()
 cfg.read([CINDER_CONF]);
 if not cfg.has_section(vpool_name):
     changed = True
@@ -213,11 +213,11 @@ if not vpool_name in enabled_backends:
         if not self.client.file_exists(CINDER_CONF):
             return False
 
-        self.client.run("""python -c '''from ConfigParser import ConfigParser
+        self.client.run("""python -c '''from ConfigParser import RawConfigParser
 changed = False
 vpool_name = "%s"
 CINDER_CONF = "%s"
-cfg = ConfigParser()
+cfg = RawConfigParser()
 cfg.read([CINDER_CONF]);
 if cfg.has_section(vpool_name):
     changed = True

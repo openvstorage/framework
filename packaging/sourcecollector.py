@@ -17,9 +17,9 @@ SourceCollector module
 """
 
 import os
-import ConfigParser
 import time
 import re
+from ConfigParser import RawConfigParser
 from datetime import datetime
 from subprocess import check_output
 
@@ -137,7 +137,7 @@ class SourceCollector(object):
 
         # Build version
         filename = '{0}/packaging/version.cfg'.format(SourceCollector.repo_path_code)
-        parser = ConfigParser.RawConfigParser()
+        parser = RawConfigParser()
         parser.read(filename)
         version = '{0}.{1}.{2}'.format(parser.get('main', 'major'),
                                        parser.get('main', 'minor'),

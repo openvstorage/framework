@@ -24,8 +24,8 @@ import inspect
 import time
 import sys
 import logging
-from configobj import ConfigObj
 import pyinotify
+from ConfigParser import RawConfigParser
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
 from ovs.plugin.provider.configuration import Configuration
@@ -50,10 +50,10 @@ def run_event_consumer():
     """
     Check whether to run the event consumer
     """
-    rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-    rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'], ]
+    rmq_config = RawConfigParser()
+    rmq_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
     machine_id = System.get_my_machine_id()
-    return machine_id in rmq_nodes
+    return rmq_config.has_section(machine_id)
 
 
 def callback(ch, method, properties, body):
@@ -117,10 +117,11 @@ if __name__ == '__main__':
                 logger.debug('{0}: {1}'.format(mapping[key][0]['property'], [current_map['task'].__name__ for current_map in mapping[key]]))
 
             # Starting connection and handling
-            rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-            rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
+            rmq_ini = RawConfigParser()
+            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+            rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
             this_server = '{0}:{1}'.format(Configuration.get('ovs.grid.ip'), Configuration.get('ovs.core.broker.port'))
-            rmq_servers = [this_server] + [server for server in map(lambda m: rmq_ini.get(m)['location'], rmq_nodes) if server != this_server]
+            rmq_servers = [this_server] + [server for server in map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes) if server != this_server]
             channel = None
             server = ''
             loglevel = logging.root.manager.disable  # Workaround for disabling logging
