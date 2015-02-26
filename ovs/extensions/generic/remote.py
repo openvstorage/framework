@@ -11,26 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Remote RPyC wrapper module
+"""
 
 from types import ModuleType
 from subprocess import check_output
+from rpyc.utils.zerodeploy import DeployedServer
+from plumbum import SshMachine
 
 
 class Remote(object):
-    def __init__(self, ip, modules, allowed=None, username=None):
-        from rpyc.utils.zerodeploy import DeployedServer
-        from plumbum import SshMachine
+    """
+    Remote is a context-manager that allows code within its context to be executed through RPyC
+    """
 
+    def __init__(self, ip, modules, username=None):
+        """
+        Initializes the context.
+        """
         self.username = username if username is not None else check_output('whoami').strip()
+        self.connection = None
         self.machine = SshMachine(ip, user=self.username)
         self.server = DeployedServer(self.machine)
-        self.connection = None
-        self.modules = modules
-        for module in self.modules:
+        for module in modules:
             if not isinstance(module, ModuleType):
                 raise RuntimeError('A non-module was passed in as module: {0}'.format(module))
-        self.allowed = allowed if allowed is not None else []
-        self.globals = {}
+        self.modules = modules
 
     def __iter__(self):
         replacements = []
@@ -40,15 +47,8 @@ class Remote(object):
 
     def __enter__(self):
         self.connection = self.server.classic_connect()
-        _globals = globals()
-        for name in _globals.keys():
-            if name not in self.allowed:
-                self.globals[name] = _globals[name]
-                del _globals[name]
         return self
 
     def __exit__(self, *args):
-        self.connection.close()
         _ = args
-        for name in self.globals:
-            globals()[name] = self.globals[name]
+        self.server.close()
