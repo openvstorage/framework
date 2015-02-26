@@ -43,7 +43,7 @@ class Injector(object):
 
         def _set(key, value):
             filename, section, item = key.split('.', 2)
-            config = ConfigParser.RawConfigParser()
+            config = RawConfigParser()
             config.read('/opt/OpenvStorage/config/{0}.cfg'.format(filename))
             config.set(section, item, value)
             with open('/opt/OpenvStorage/config/{0}.cfg'.format(filename), 'w') as config_file:
