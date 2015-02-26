@@ -206,7 +206,7 @@
             },
             "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers"
         }
     },
     "vpools" : {
