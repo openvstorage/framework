@@ -66,18 +66,29 @@ class DataObjectList(object):
         if not self._reduced:
             self.reduced.merge(query_result)
 
-    def _get_object(self, guid):
+    def _get_object(self, requested_guid):
         """
         Yields an instance with a given guid, or a fake class with only a guid property in case
         of a reduced list
         """
-        if guid not in self._objects:
+        def load_and_cache(guid):
+            """
+            Loads and caches the object
+            """
             if self._reduced:
                 self._objects[guid] = type(self.type.__name__, (), {})()
                 setattr(self._objects[guid], 'guid', guid)
             else:
                 self._objects[guid] = self.type(guid)
-        return self._objects[guid]
+
+        if requested_guid not in self._objects:
+            load_and_cache(requested_guid)
+            return self._objects[requested_guid]
+        requested_object = self._objects[requested_guid]
+        if requested_object.updated_on_datastore():
+            load_and_cache(requested_guid)
+            return self._objects[requested_guid]
+        return requested_object
 
     def index(self, value):
         """

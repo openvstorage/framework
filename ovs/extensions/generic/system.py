@@ -16,13 +16,23 @@
 Generic system module, executing statements on local node
 """
 
+import os
+import uuid
+import time
+from ConfigParser import ConfigParser
 from subprocess import check_output
+from StringIO import StringIO
+
+from ovs.log.logHandler import LogHandler
+logger = LogHandler('lib', name='system')
 
 
 class System(object):
     """
     Generic helper class
     """
+
+    OVS_CONFIG = '/opt/OpenvStorage/config/ovs.cfg'
 
     my_machine_id = ''
     my_storagerouter_guid = ''
@@ -35,20 +45,33 @@ class System(object):
         _ = self
 
     @staticmethod
+    def get_my_ips(client=None):
+        """
+        Returns configured ip addresses for this host
+        """
+
+        cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
+        output = System.run(cmd, client)
+        my_ips = output.split('\n')
+        my_ips = [found_ip.strip() for found_ip in my_ips if found_ip.strip() != '127.0.0.1']
+
+        return my_ips
+
+    @staticmethod
     def get_my_machine_id(client=None):
         """
         Returns unique machine id based on mac address
         """
-        if not System.my_machine_id:
+        if not System.my_machine_id or client:
             cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            if client is None:
-                output = check_output(cmd, shell=True).strip()
-            else:
-                output = client.run(cmd).strip()
+            output = System.run(cmd, client)
             for mac in output.split('\n'):
                 if mac.strip() != '000000000000':
-                    System.my_machine_id = mac.strip()
-                    break
+                    if client:
+                        return mac.strip()
+                    else:
+                        System.my_machine_id = mac.strip()
+                        break
         return System.my_machine_id
 
     @staticmethod
@@ -133,9 +156,103 @@ print Configuration.get('{0}')
         Returns the ports in use
         """
         cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
+        output = System.run(cmd, client)
+        for found_port in output.split('\n'):
+            yield int(found_port.strip())
+
+    @staticmethod
+    def get_free_ports(selected_range, exclude=None, nr=1, client=None):
+        """
+        Return requested nr of free ports not currently in use and not within excluded range
+        :param selected_range: e.g. '2000-2010' or '50000-6000, 8000-8999' ; note single port extends to [port -> 65535]
+        :param exclude: excluded list
+        :param nr: nr of free ports requested
+        :return: sorted incrementing list of nr of free ports
+        """
+
+        requested_range = list()
+        selected_range = str(selected_range)
+        for port_range in str(selected_range).split(','):
+            port_range = port_range.strip()
+            if '-' in port_range:
+                current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
+            else:
+                current_range = (int(port_range), 65535)
+            if 0 <= current_range[0] <= 1024:
+                current_range = (1025, current_range[1])
+            requested_range.extend(xrange(current_range[0], current_range[1] + 1))
+        free_ports = list()
+
+        if exclude is None:
+            exclude = list()
+        exclude_list = list(exclude)
+
+        ports_in_use = System.ports_in_use(client)
+        for port in ports_in_use:
+            exclude_list.append(port)
+
+        cmd = """cat /proc/sys/net/ipv4/ip_local_port_range"""
+        output = System.run(cmd, client)
+        start_end = list(output.split())
+        ephemeral_port_range = xrange(int(min(start_end)), int(max(start_end)))
+
+        for possible_free_port in requested_range:
+            if possible_free_port not in ephemeral_port_range and possible_free_port not in exclude_list:
+                free_ports.append(possible_free_port)
+            if len(free_ports) == nr:
+                return free_ports
+        raise ValueError('Unable to find requested nr of free ports')
+
+    @staticmethod
+    def run(cmd, client=None):
         if client is None:
             output = check_output(cmd, shell=True).strip()
         else:
             output = client.run(cmd).strip()
-        for found_port in output.split('\n'):
-            yield int(found_port.strip())
+        return output
+
+    @staticmethod
+    def get_arakoon_cluster_names(client=None, arakoon_config_dir=None):
+        """
+        :param client: optional remote client
+        :param arakoon_config_dir: default /opt/OpenvStorage/config/arakoon for ovs
+        :return: list of configured arakoon cluster names on this client
+        """
+
+        if arakoon_config_dir is None:
+            arakoon_config_dir = '/opt/OpenvStorage/config/arakoon'
+
+        cmd = """ls {0} """.format(arakoon_config_dir)
+        output = System.run(cmd, client)
+        return list(output.split())
+
+    @staticmethod
+    def read_config(filename, client=None):
+        if client is None:
+            cp = ConfigParser()
+            with open(filename, 'r') as config_file:
+                cfg = config_file.read()
+            cp.readfp(StringIO(cfg))
+            return cp
+        else:
+            contents = client.file_read(filename)
+            cp = ConfigParser()
+            cp.readfp(StringIO(contents))
+            return cp
+
+    @staticmethod
+    def write_config(config, filename, client=None):
+        if client is None:
+            with open(filename, 'w') as config_file:
+                config.write(config_file)
+        else:
+            temp_filename = '/var/tmp/{0}'.format(str(uuid.uuid4()).replace('-', ''))
+            with open(temp_filename, 'w') as config_file:
+                config.write(config_file)
+            time.sleep(1)
+            client.file_upload(filename, temp_filename)
+            os.remove(temp_filename)
+
+    @staticmethod
+    def read_ovs_config():
+        return System.read_config(System.OVS_CONFIG)

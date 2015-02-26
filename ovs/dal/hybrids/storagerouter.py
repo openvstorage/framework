@@ -30,7 +30,8 @@ class StorageRouter(DataObject):
                     Property('description', str, mandatory=False, doc='Description of the vMachine.'),
                     Property('machine_id', str, mandatory=False, doc='The hardware identifier of the vMachine'),
                     Property('ip', str, doc='IP Address of the vMachine, if available'),
-                    Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors')]
+                    Property('heartbeats', dict, default={}, doc='Heartbeat information of various monitors'),
+                    Property('node_type', ['MASTER', 'EXTRA'], default='EXTRA', doc='Indicates the node\'s type')]
     __relations = [Relation('pmachine', PMachine, 'storagerouters')]
     __dynamics = [Dynamic('statistics', dict, 0),
                   Dynamic('stored_data', int, 60),
@@ -44,9 +45,8 @@ class StorageRouter(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        client = StorageDriverClient()
         vdiskstatsdict = {}
-        for key in client.stat_keys:
+        for key in StorageDriverClient.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         for storagedriver in self.storagedrivers:
@@ -79,7 +79,7 @@ class StorageRouter(DataObject):
             for vdisk in storagedriver.vpool.vdisks:
                 if vdisk.storagedriver_id == storagedriver.storagedriver_id:
                     mode = vdisk.info['failover_mode']
-                    current_status_code = StorageDriverClient.FOC_STATUS[mode.lower()]
+                    current_status_code = StorageDriverClient.foc_status[mode.lower()]
                     if current_status_code > status_code:
                         status = mode
                         status_code = current_status_code

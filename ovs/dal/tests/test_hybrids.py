@@ -20,7 +20,7 @@ import sys
 from unittest import TestCase
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
-from ovs.dal.tests.mockups import FactoryModule
+from ovs.dal.tests.mockups import FactoryModule, StorageDriver
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.helpers import HybridRunner, Descriptor
@@ -43,6 +43,7 @@ class Hybrid(TestCase):
         """
         # Replace mocked classes
         sys.modules['ovs.extensions.hypervisor.factory'] = FactoryModule
+        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriver
 
         PersistentFactory.store = DummyPersistentStore()
         PersistentFactory.store.clean()

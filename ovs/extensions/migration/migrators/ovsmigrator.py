@@ -13,10 +13,12 @@
 # limitations under the License.
 
 """
-Model migration module
+OVS migration module
 """
 
 import hashlib
+import random
+import string
 from ovs.dal.hybrids.user import User
 from ovs.dal.hybrids.group import Group
 from ovs.dal.hybrids.role import Role
@@ -24,12 +26,17 @@ from ovs.dal.hybrids.client import Client
 from ovs.dal.hybrids.j_rolegroup import RoleGroup
 from ovs.dal.hybrids.j_roleclient import RoleClient
 from ovs.dal.hybrids.backendtype import BackendType
+from ovs.dal.hybrids.servicetype import ServiceType
+from ovs.dal.hybrids.branding import Branding
+from ovs.dal.lists.backendtypelist import BackendTypeList
 
 
-class Model():
+class OVSMigrator(object):
     """
     Handles all model related migrations
     """
+
+    identifier = 'ovs'
 
     def __init__(self):
         """ Init method """
@@ -39,10 +46,10 @@ class Model():
     def migrate(previous_version):
         """
         Migrates from any version to any version, running all migrations required
-        If previous_version is for example 0 (0.0.1) and this script is at
-        verison 3 (0.0.3) it will execute two steps:
-          - 0.0.1 > 0.0.2
-          - 0.0.2 > 0.0.3
+        If previous_version is for example 0 and this script is at
+        verison 3 it will execute two steps:
+          - 1 > 2
+          - 2 > 3
         @param previous_version: The previous version from which to start the migration.
         """
 
@@ -69,11 +76,20 @@ class Model():
             admin.save()
 
             # Create internal OAuth 2 clients
-            admin_client = Client()
-            admin_client.ovs_type = 'FRONTEND'
-            admin_client.grant_type = 'PASSWORD'
-            admin_client.user = admin
-            admin_client.save()
+            admin_pw_client = Client()
+            admin_pw_client.ovs_type = 'INTERNAL'
+            admin_pw_client.grant_type = 'PASSWORD'
+            admin_pw_client.user = admin
+            admin_pw_client.save()
+            admin_cc_client = Client()
+            admin_cc_client.ovs_type = 'INTERNAL'
+            admin_cc_client.grant_type = 'CLIENT_CREDENTIALS'
+            admin_cc_client.client_secret = ''.join(random.choice(string.ascii_letters +
+                                                                  string.digits +
+                                                                  '|_=+*#@!/-[]{}<>.?,\'";:~')
+                                                    for _ in range(128))
+            admin_cc_client.user = admin
+            admin_cc_client.save()
 
             # Create roles
             read_role = Role()
@@ -105,18 +121,44 @@ class Model():
                     rolegroup.save()
                 for user in setting[0].users:
                     for role in setting[1]:
-                        roleclient = RoleClient()
-                        roleclient.client = user.clients[0]
-                        roleclient.role = role
-                        roleclient.save()
+                        for client in user.clients:
+                            roleclient = RoleClient()
+                            roleclient.client = client
+                            roleclient.role = role
+                            roleclient.save()
 
             # Add backends
             for backend_type_info in [('Ceph', 'ceph_s3'), ('Amazon', 'amazon_s3'), ('Swift', 'swift_s3'),
                                       ('Local', 'local'), ('Distributed', 'distributed'), ('ALBA', 'alba')]:
-                backend_type = BackendType()
+                code = backend_type_info[1]
+                backend_type = BackendTypeList.get_backend_type_by_code(code)
+                if backend_type is None:
+                    backend_type = BackendType()
                 backend_type.name = backend_type_info[0]
-                backend_type.code = backend_type_info[1]
+                backend_type.code = code
                 backend_type.save()
+
+            # Add service types
+            for service_type_info in ['MetadataServer', 'AlbaProxy']:
+                service_type = ServiceType()
+                service_type.name = service_type_info
+                service_type.save()
+
+            # Brandings
+            branding = Branding()
+            branding.name = 'Default'
+            branding.description = 'Default bootstrap theme'
+            branding.css = 'bootstrap-default.min.css'
+            branding.productname = 'Open vStorage'
+            branding.is_default = True
+            branding.save()
+            slate = Branding()
+            slate.name = 'Slate'
+            slate.description = 'Dark bootstrap theme'
+            slate.css = 'bootstrap-slate.min.css'
+            slate.productname = 'Open vStorage'
+            slate.is_default = False
+            slate.save()
 
             # We're now at version 0.0.1
             working_version = 1

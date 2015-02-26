@@ -33,10 +33,10 @@ define([
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
         }).extend({ throttle: 50 });
-        self.backendReads = ko.computed(function() {
+        self.cacheHits = ko.computed(function() {
             var total = 0;
             if (self.hasData()) {
-                total = self._fetchData(self.data()(), 'backendReads');
+                total = self._fetchData(self.data()(), 'cacheHits');
             }
             return generic.formatNumber(total);
         });

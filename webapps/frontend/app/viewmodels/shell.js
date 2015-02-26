@@ -68,9 +68,8 @@ define([
                                 self.shared.user.guid(undefined);
                                 self.shared.user.roles([]);
                                 if (!metadata.authenticated) {
-                                    window.localStorage.removeItem('accesstoken');
-                                    self.shared.authentication.accessToken(undefined);
-                                    router.navigate('/');
+                                    // This shouldn't be the case, but is checked anyway.
+                                    self.shared.authentication.logout();
                                     return mdDeferred.reject();
                                 }
                                 self.shared.user.username(metadata.username);
@@ -96,49 +95,50 @@ define([
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
-            var activationTasks = [],
-                token = window.localStorage.getItem('accesstoken');
+            var token = window.localStorage.getItem('accesstoken');
             if (token !== null) {
                 self.shared.authentication.accessToken(token);
-                activationTasks.push(self.shared.authentication.dispatch(true));
             }
-            activationTasks.push($.Deferred(function(deferred) {
-                api.get('')
-                    .then(function(metadata) {
-                        var pluginHandlers = [], backendsActive = false;
-                        $.each(metadata.plugins, function(plugin, types) {
-                            if ($.inArray('gui', types) !== -1) {
-                                pluginHandlers.push($.Deferred(function(moduleDeferred) {
-                                    require(['ovs/routes/' + plugin], function(routes) {
-                                        routing.extraRoutes.push(routes.routes);
-                                        moduleDeferred.resolve();
+            return $.Deferred(function(activateDeferred) {
+                $.Deferred(function(metadataCheckDeferred) {
+                    api.get('')
+                        .done(function(metadata) {
+                            var metadataHandlers = [], backendsActive = false;
+                            $.each(metadata.plugins, function(plugin, types) {
+                                if ($.inArray('gui', types) !== -1) {
+                                    metadataHandlers.push($.Deferred(function(moduleDeferred) {
+                                        require(['ovs/routes/' + plugin], function(routes) {
+                                            routing.extraRoutes.push(routes.routes);
+                                            moduleDeferred.resolve();
+                                        });
+                                    }).promise());
+                                    metadataHandlers.push($.Deferred(function(translationDeferred) {
+                                        i18n.loadNamespace(plugin, function () {
+                                            translationDeferred.resolve();
+                                        });
+                                    }).promise());
+                                }
+                                if ($.inArray('backend', types) !== -1 && !backendsActive) {
+                                    routing.siteRoutes.push({
+                                        route: 'backends',
+                                        moduleId: 'backends',
+                                        title: $.t('ovs:backends.title'),
+                                        titlecode: 'ovs:backends.title',
+                                        nav: true,
+                                        main: true
                                     });
-                                }).promise());
-                                pluginHandlers.push($.Deferred(function(translationDeferred) {
-                                    i18n.loadNamespace(plugin, function () {
-                                        translationDeferred.resolve();
-                                    });
-                                }).promise());
+                                    backendsActive = true;
+                                }
+                            });
+                            if (metadata.authenticated) {
+                                metadataHandlers.push(self.shared.authentication.dispatch(true));
                             }
-                            if ($.inArray('backend', types) !== -1 && !backendsActive) {
-                                routing.siteRoutes.push({
-                                    route: 'backends',
-                                    moduleId: 'backends',
-                                    title: $.t('ovs:backends.title'),
-                                    titlecode: 'ovs:backends.title',
-                                    nav: true,
-                                    main: true
-                                });
-                                backendsActive = true;
-                            }
-                        });
-                        $.when.apply($, pluginHandlers).always(deferred.resolve);
-                    });
-            }).promise());
-            return $.Deferred(function(deferred) {
-                $.when.apply($, activationTasks)
+                            $.when.apply($, metadataHandlers).always(metadataCheckDeferred.resolve);
+                        })
+                        .fail(metadataCheckDeferred.resolve);
+                }).promise()
                     .then(router.activate)
-                    .always(deferred.resolve);
+                    .always(activateDeferred.resolve);
             }).promise();
         };
     };

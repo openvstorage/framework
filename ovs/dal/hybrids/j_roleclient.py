@@ -24,6 +24,9 @@ from ovs.dal.hybrids.client import Client
 class RoleClient(DataObject):
     """
     The RoleClient class represents the junction table between Role and Client.
+    Examples:
+    * my_role.clients[0].client
+    * my_client.roles[0].role
     """
     __properties = []
     __relations = [Relation('role', Role, 'clients'),

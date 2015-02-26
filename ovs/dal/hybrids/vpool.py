@@ -50,9 +50,8 @@ class VPool(DataObject):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        client = StorageDriverClient()
         vdiskstatsdict = {}
-        for key in client.stat_keys:
+        for key in StorageDriverClient.stat_keys:
             vdiskstatsdict[key] = 0
             vdiskstatsdict['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:

@@ -16,7 +16,7 @@
 ScheduledTaskController module
 """
 
-from celery.task.control import inspect
+from celery.schedules import crontab
 import copy
 import time
 import os
@@ -27,83 +27,16 @@ from ovs.plugin.provider.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.helpers.decorators import ensure_single
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from volumedriver.scrubber.scrubber import Scrubber
+# @TODO: from volumedriver.scrubber.scrubber import Scrubber
 from ovs.log.logHandler import LogHandler
 
-_storagedriver_scrubber = Scrubber()
+_storagedriver_scrubber = None  # @TODO: Scrubber()
 logger = LogHandler('lib', name='scheduled tasks')
-
-
-def ensure_single(tasknames):
-    """
-    Decorator ensuring a new task cannot be started in case a certain task is
-    running, scheduled or reserved.
-
-    The task using this decorator on, must be a bound task (with bind=True argument). Keep also in
-    mind that validation will be executed by the worker itself, so if the task is scheduled on
-    a worker currently processing a "duplicate" task, it will only get validated after the first
-    one completes, which will result in the fact that the task will execute normally.
-
-    @param tasknames: list of names to check
-    @type tasknames: list
-    """
-    def wrap(function):
-        """
-        Wrapper function
-        """
-        def wrapped(self=None, *args, **kwargs):
-            """
-            Wrapped function
-            """
-            if not hasattr(self, 'request'):
-                raise RuntimeError('The decorator ensure_single can only be applied to bound tasks (with bind=True argument)')
-            task_id = self.request.id
-
-            def can_run():
-                """
-                Checks whether a task is running/scheduled/reserved.
-                The check is executed in stages, as querying the inspector is a slow call.
-                """
-                if tasknames:
-                    inspector = inspect()
-                    active = inspector.active()
-                    if active:
-                        for taskname in tasknames:
-                            for worker in active.values():
-                                for task in worker:
-                                    if task['id'] != task_id and taskname == task['name']:
-                                        return False
-                    scheduled = inspector.scheduled()
-                    if scheduled:
-                        for taskname in tasknames:
-                            for worker in scheduled.values():
-                                for task in worker:
-                                    request = task['request']
-                                    if request['id'] != task_id and taskname == request['name']:
-                                        return False
-                    reserved = inspector.reserved()
-                    if reserved:
-                        for taskname in tasknames:
-                            for worker in reserved.values():
-                                for task in worker:
-                                    if task['id'] != task_id and taskname == task['name']:
-                                        return False
-                return True
-
-            if can_run():
-                return function(*args, **kwargs)
-            else:
-                logger.debug('Execution of task {0}[{1}] discarded'.format(
-                    self.name, self.request.id
-                ))
-                return None
-
-        return wrapped
-    return wrap
 
 
 class ScheduledTaskController(object):
@@ -113,7 +46,7 @@ class ScheduledTaskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.snapshotall', bind=True)
+    @celery.task(name='ovs.scheduled.snapshotall', bind=True, schedule=crontab(minute='0', hour='2-22'))
     @ensure_single(['ovs.scheduled.snapshotall', 'ovs.scheduled.deletescrubsnapshots'])
     def snapshot_all_vms():
         """
@@ -137,7 +70,7 @@ class ScheduledTaskController(object):
         ))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True)
+    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True, schedule=crontab(minute='30', hour='0'))
     @ensure_single(['ovs.scheduled.deletescrubsnapshots'])
     def deletescrubsnapshots(timestamp=None):
         """
@@ -276,7 +209,7 @@ class ScheduledTaskController(object):
         ))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.collapse_arakoon', bind=True)
+    @celery.task(name='ovs.scheduled.collapse_arakoon', bind=True, schedule=crontab(minute='30', hour='0'))
     @ensure_single(['ovs.scheduled.collapse_arakoon'])
     def collapse_arakoon():
         logger.info('Starting arakoon collapse')
@@ -299,7 +232,7 @@ class ScheduledTaskController(object):
         logger.info('Arakoon collapse finished')
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.clean_logs', bind=True)
+    @celery.task(name='ovs.scheduled.clean_logs', bind=True, schedule=crontab(minute='30', hour='0'))
     @ensure_single(['ovs.scheduled.clean_logs'])
     def clean_logs():
         """

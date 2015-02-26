@@ -25,7 +25,7 @@ OVS-1330:
  Expect RuntimeError, investigate actual error.
 
 """
-from ovs_common import OVSPluginTestCase, IMAGE_NAME, VPOOL_MOUNTPOINT, FILE_TYPE
+from ovs_common import OVSPluginTestCase, IMAGE_NAME, VPOOL_MOUNTPOINT, FILE_TYPE, VolumeInErrorState
 
 class OVSBugfixingTestCase(OVSPluginTestCase):
     """
@@ -43,7 +43,7 @@ class OVSBugfixingTestCase(OVSPluginTestCase):
         self._debug('new volume from image %s' % image)
         volume_name = self._random_volume_name()
         file_name = '%s.%s' % (volume_name, FILE_TYPE)
-        self.assertRaises(RuntimeError, self._cinder_create_volume, volume_name, image_id = image.id, size = 1)
+        self.assertRaises(VolumeInErrorState, self._cinder_create_volume, volume_name, image_id = image.id, size = 1)
         # OVS Cinder driver catches the error and handles the cleanup
         # Not possible to catch the exact type of error, need to read the c-vol screen / cinder logs
         self.assertFalse(self._file_exists_on_mountpoint(file_name), 'File %s not deleted from mountpoint %s ' % (file_name, VPOOL_MOUNTPOINT))

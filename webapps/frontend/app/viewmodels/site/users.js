@@ -33,8 +33,8 @@ define([
             { key: undefined,  value: $.t('ovs:generic.actions'),  width: 60        }
         ];
         self.clientHeaders = [
-            { key: 'name',         value: $.t('ovs:generic.name'),               width: 250       },
-            { key: 'clientid',     value: $.t('ovs:users.clients.clientid'),     width: 300       },
+            { key: 'name',         value: $.t('ovs:generic.name'),               width: 240       },
+            { key: 'clientid',     value: $.t('ovs:users.clients.clientid'),     width: 330       },
             { key: 'clientsecret', value: $.t('ovs:users.clients.clientsecret'), width: 270       },
             { key: 'granttype',    value: $.t('ovs:users.clients.roles'),        width: undefined },
             { key: undefined,      value: $.t('ovs:generic.actions'),            width: 60        }

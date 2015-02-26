@@ -104,7 +104,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         """
         _debug_vol_info("INIT_CONN", volume)
 
-        return {'driver_volume_type': 'file',
+        return {'driver_volume_type': 'local',
                 'data': {'vpoolname': self._vpool_name,
                          'device_path': volume.provider_location}}
 

@@ -32,11 +32,13 @@ define([
         self.guid            = ko.observable(guid);
         self.name            = ko.observable();
         self.backendTypeGuid = ko.observable();
+        self.status          = ko.observable();
 
         // Functions
         self.fillData = function(data) {
             self.name(data.name);
             generic.trySet(self.backendTypeGuid, data, 'backend_type_guid');
+            self.status(data.status !== undefined ? data.status.toLowerCase() : 'unknown');
 
             self.loaded(true);
             self.loading(false);

@@ -16,13 +16,17 @@
 Contains the BackendViewSet
 """
 
+from urllib2 import HTTPError, URLError
 from backend.serializers.serializers import FullSerializer
 from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.exceptions import NotAcceptable
 from ovs.dal.lists.backendlist import BackendList
+from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.hybrids.backend import Backend
 from backend.decorators import return_object, return_list, load, required_roles, log
+from ovs.extensions.api.client import OVSClient
 
 
 class BackendViewSet(viewsets.ViewSet):
@@ -37,11 +41,25 @@ class BackendViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(Backend)
     @load()
-    def list(self):
+    def list(self, backend_type=None, ip=None, port=None, client_id=None, client_secret=None, contents=None):
         """
-        Overview of all backends
+        Overview of all backends (from a certain type, if given) on the local node (or a remote one)
         """
-        return BackendList.get_backends()
+        if ip is None:
+            if backend_type is None:
+                return BackendList.get_backends()
+            return BackendTypeList.get_backend_type_by_code(backend_type).backends
+        client = OVSClient(ip, port, client_id, client_secret)
+        try:
+            remote_backends = client.call('/backends/', get_data={'backend_type': backend_type,
+                                                                  'contents': '' if contents is None else contents})
+        except (HTTPError, URLError):
+            raise NotAcceptable('Could not load remote backends')
+        backend_list = []
+        for entry in remote_backends['data']:
+            backend = type('Backend', (), entry)()
+            backend_list.append(backend)
+        return backend_list
 
     @log()
     @required_roles(['read'])

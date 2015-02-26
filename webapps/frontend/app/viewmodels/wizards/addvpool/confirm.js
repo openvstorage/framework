@@ -14,9 +14,9 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    '../../containers/vmachine', './data',
+    './data',
     'ovs/api', 'ovs/generic', 'ovs/shared'
-], function($, ko, VMachine, data, api, generic, shared) {
+], function($, ko, data, api, generic, shared) {
     "use strict";
     return function() {
         var self = this;
@@ -41,6 +41,7 @@ define([
                         connection_timeout: self.data.timeout(),
                         connection_username: self.data.accesskey(),
                         connection_password: self.data.secretkey(),
+                        connection_backend: (self.data.albaBackend() !== undefined ? self.data.albaBackend().linked_guid : undefined),
                         mountpoint_temp: self.data.mtptTemp(),
                         mountpoint_bfs: self.data.mtptBFS(),
                         mountpoint_md: self.data.mtptMD(),

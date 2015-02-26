@@ -26,6 +26,7 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -34,10 +35,12 @@ from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.openstack.oscinder import OpenStackCinder
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
 logger = LogHandler('lib', name='vdisk')
 
@@ -55,12 +58,12 @@ class VDiskController(object):
         """
         if vpool_guid is not None:
             vpool = VPool(vpool_guid)
-            storagedriver_client = StorageDriverClient().load(vpool)
+            storagedriver_client = StorageDriverClient.load(vpool)
             response = storagedriver_client.list_volumes()
         else:
             response = []
             for vpool in VPoolList.get_vpools():
-                storagedriver_client = StorageDriverClient().load(vpool)
+                storagedriver_client = StorageDriverClient.load(vpool)
                 response.extend(storagedriver_client.list_volumes())
         return response
 
@@ -98,6 +101,8 @@ class VDiskController(object):
                         logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
                         return
                 logger.info('Delete disk {}'.format(disk.name))
+                for mds_service in disk.mds_services:
+                    mds_service.delete()
                 disk.delete()
             finally:
                 mutex.release()
@@ -133,6 +138,7 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
+        MDSServiceController.ensure_safety(disk)
 
     @staticmethod
     @celery.task(name='ovs.disk.rename_from_voldrv')
@@ -160,44 +166,53 @@ class VDiskController(object):
 
     @staticmethod
     @celery.task(name='ovs.disk.clone')
-    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None, **kwargs):
+    def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
         """
         Clone a disk
-
-        @param location: location where virtual device should be created (eg: myVM)
-        @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
-        @param parentdiskguid: guid of the disk
-        @param snapshotid: guid of the snapshot
-        @param machineguid: guid of the machine to assign disk to
         """
-        _ = kwargs
         pmachine = PMachine(pmachineguid)
         hypervisor = Factory.get(pmachine)
         description = '{} {}'.format(machinename, devicename)
         properties_to_clone = ['description', 'size', 'type', 'retentionpolicyguid',
                                'snapshotpolicyguid', 'autobackup']
+        vdisk = VDisk(diskguid)
+        location = hypervisor.get_backing_disk_path(machinename, devicename)
 
-        new_disk = VDisk()
-        disk = VDisk(diskguid)
-        _log = 'Clone snapshot {} of disk {} to location {}'
-        _location = hypervisor.get_backing_disk_path(machinename, devicename)
-        _id = '{}'.format(disk.volume_id)
-        _snap = '{}'.format(snapshotid)
-        logger.info(_log.format(_snap, disk.name, _location))
-        volume_id = disk.storagedriver_client.create_clone(_location, _id, _snap)
-        new_disk.copy(disk, include=properties_to_clone)
-        new_disk.parent_vdisk = disk
-        new_disk.name = '{}-clone'.format(disk.name)
-        new_disk.description = description
-        new_disk.volume_id = volume_id
-        new_disk.devicename = hypervisor.clean_backing_disk_filename(_location)
-        new_disk.parentsnapshot = snapshotid
-        new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
-        new_disk.vpool = disk.vpool
-        new_disk.save()
-        return {'diskguid': new_disk.guid,
-                'name': new_disk.name,
-                'backingdevice': _location}
+        new_vdisk = VDisk()
+        new_vdisk.copy(vdisk, include=properties_to_clone)
+        new_vdisk.parent_vdisk = vdisk
+        new_vdisk.name = '{0}-clone'.format(vdisk.name)
+        new_vdisk.description = description
+        new_vdisk.devicename = hypervisor.clean_backing_disk_filename(location)
+        new_vdisk.parentsnapshot = snapshotid
+        new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
+        new_vdisk.vpool = vdisk.vpool
+        new_vdisk.save()
+
+        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
+
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+        if mds_service is None:
+            raise RuntimeError('Could not find a MDS service')
+
+        logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
+        volume_id = vdisk.storagedriver_client.create_clone(
+            target_path=location,
+            metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                            port=mds_service.service.ports[0])]),
+            parent_volume_id=str(vdisk.volume_id),
+            parent_snapshot_id=str(snapshotid),
+            node_id=str(vdisk.storagedriver_id)
+        )
+        new_vdisk.volume_id = volume_id
+        new_vdisk.save()
+        MDSServiceController.ensure_safety(new_vdisk)
+
+        return {'diskguid': new_vdisk.guid,
+                'name': new_vdisk.name,
+                'backingdevice': location}
 
     @staticmethod
     @celery.task(name='ovs.disk.create_snapshot')
@@ -228,7 +243,7 @@ class VDiskController(object):
         Delete a disk snapshot
 
         @param diskguid: guid of the disk
-        @param snapshotguid: guid of the snapshot
+        @param snapshotid: id of the snapshot
 
         @todo: Check if new volumedriver storagedriver upon deletion
         of a snapshot has built-in protection to block it from being deleted
@@ -287,48 +302,64 @@ class VDiskController(object):
             'description', 'size', 'type', 'retentionpolicyid',
             'snapshotpolicyid', 'vmachine', 'vpool']
 
-        disk = VDisk(diskguid)
-        if disk.vmachine and not disk.vmachine.is_vtemplate:
+        vdisk = VDisk(diskguid)
+        if vdisk.vmachine and not vdisk.vmachine.is_vtemplate:
             # Disk might not be attached to a vmachine, but still be a template
-            raise RuntimeError('The given disk does not belong to a template')
+            raise RuntimeError('The given vdisk does not belong to a template')
 
         if storagedriver_guid is not None:
             storagedriver_id = StorageDriver(storagedriver_guid).storagedriver_id
         else:
-            storagedriver_id = disk.storagedriver_id
+            storagedriver_id = vdisk.storagedriver_id
+        storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+        if storagedriver is None:
+            raise RuntimeError('Could not find StorageDriver with id {0}'.format(storagedriver_id))
 
-        new_disk = VDisk()
-        new_disk.copy(disk, include=properties_to_clone)
-        new_disk.vpool = disk.vpool
-        new_disk.devicename = hypervisor.clean_backing_disk_filename(disk_path)
-        new_disk.parent_vdisk = disk
-        new_disk.name = '{}-clone'.format(disk.name)
-        new_disk.description = description
-        new_disk.vmachine = VMachine(machineguid) if machineguid else disk.vmachine
-        new_disk.save()
+        new_vdisk = VDisk()
+        new_vdisk.copy(vdisk, include=properties_to_clone)
+        new_vdisk.vpool = vdisk.vpool
+        new_vdisk.devicename = hypervisor.clean_backing_disk_filename(disk_path)
+        new_vdisk.parent_vdisk = vdisk
+        new_vdisk.name = '{}-clone'.format(vdisk.name)
+        new_vdisk.description = description
+        new_vdisk.vmachine = VMachine(machineguid) if machineguid else vdisk.vmachine
+        new_vdisk.save()
+
+        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+        if mds_service is None:
+            raise RuntimeError('Could not find a MDS service')
 
         logger.info('Create disk from template {} to new disk {} to location {}'.format(
-            disk.name, new_disk.name, disk_path
+            vdisk.name, new_vdisk.name, disk_path
         ))
         try:
-            volume_id = disk.storagedriver_client.create_clone_from_template(disk_path, str(disk.volume_id), node_id=str(storagedriver_id))
-            new_disk.volume_id = volume_id
-            new_disk.save()
+            volume_id = vdisk.storagedriver_client.create_clone_from_template(
+                target_path=disk_path,
+                metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                                port=mds_service.service.ports[0])]),
+                parent_volume_id=str(vdisk.volume_id),
+                node_id=str(storagedriver_id)
+            )
+            new_vdisk.volume_id = volume_id
+            new_vdisk.save()
+            MDSServiceController.ensure_safety(new_vdisk)
+
         except Exception as ex:
             logger.error('Clone disk on volumedriver level failed with exception: {0}'.format(str(ex)))
-            new_disk.delete()
+            new_vdisk.delete()
             raise
 
         # Allow "regular" users to use this volume
         # Do not use run for other user than ovs as it blocks asking for root password
         # Do not use run_local for other user as it doesn't have permission
         # So this method only works if this is called by root or ovs
-        mountpoint = System.get_storagedriver(new_disk.vpool.name).mountpoint
+        storagerouter = StorageRouter(new_vdisk.storagerouter_guid)
+        mountpoint = storagedriver.mountpoint
         location = "{0}{1}".format(mountpoint, disk_path)
-        client = SSHClient.load('127.0.0.1')
-        print(client.run('chmod 664 {0}'.format(location)))
-        print(client.run('chown ovs:ovs {0}'.format(location)))
-        return {'diskguid': new_disk.guid, 'name': new_disk.name,
+        client = SSHClient.load(storagerouter.pmachine.ip)
+        print(client.run('chmod 664 "{0}"'.format(location)))
+        print(client.run('chown ovs:ovs "{0}"'.format(location)))
+        return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
                 'backingdevice': disk_path}
 
     @staticmethod
@@ -347,7 +378,10 @@ class VDiskController(object):
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
         client = SSHClient.load('127.0.0.1')
-        output = client.run_local('truncate -s %sG %s' % (size, location))
+        try:
+            output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
+        except SystemExit as ex:
+            raise RuntimeError(str(ex))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
@@ -369,7 +403,7 @@ class VDiskController(object):
             logger.error('File already deleted at %s' % location)
             return
         client = SSHClient.load('127.0.0.1')
-        output = client.run_local('rm -f %s' % (location))
+        output = client.run_local('rm -f "{0}"'.format(location))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
@@ -393,7 +427,7 @@ class VDiskController(object):
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         client = SSHClient.load('127.0.0.1')
-        print(client.run_local('truncate -s %sG %s' % (size, location)))
+        print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
         VDiskController.own_volume(location)
 
     @staticmethod
@@ -406,9 +440,11 @@ class VDiskController(object):
 
         client = SSHClient.load('127.0.0.1')
         osc = OpenStackCinder()
-        print(client.run_local('chmod 664 %s' % location))
-        if osc.is_devstack:
-            print(client.run_local('chown stack %s' % location))
-        elif osc.is_openstack:
-            print(client.run_local('chown cinder %s' % location))
-
+        print(client.run_local('chmod 664 "{0}"'.format(location)))
+        try:
+            if osc.is_devstack:
+                print(client.run_local('chgrp stack "{0}"'.format(location)))
+            elif osc.is_openstack:
+                print(client.run_local('chgrp cinder "{0}"'.format(location)))
+        except SystemExit as ex:
+            raise RuntimeError(str(ex))

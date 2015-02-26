@@ -42,7 +42,6 @@ define([
         self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReads      = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -79,12 +78,11 @@ define([
                 var stats = data.statistics;
                 self.iops(stats.operations_ps);
                 self.cacheHits(stats.cache_hits_ps);
-                self.cacheMisses(stats.sco_cache_misses_ps);
+                self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
                 self.writeSpeed(stats.data_written_ps);
                 self.backendWritten(stats.backend_data_written);
                 self.backendRead(stats.backend_data_read);
-                self.backendReads(stats.sco_cache_hits + stats.cluster_cache_hits);
                 self.bandwidthSaved(Math.max(0, stats.data_read - stats.backend_data_read));
             }
 

@@ -30,6 +30,14 @@
                 "degraded": "Degraded",
                 "unknown": "Unknown",
                 "undefined": "Unknown"
+            },
+            "backend": {
+                "new": "New",
+                "installing": "Installing",
+                "running": "Running",
+                "stopped": "Stopped",
+                "failure": "Failure",
+                "unknown": "Unknown"
             }
         },
         "messages": {
@@ -129,7 +137,7 @@
         "yes": "Yes",
         "no": "No",
         "size": "Size",
-        "customerapi": "Customer API",
+        "api": "API",
         "focstatus": "FOC",
         "performance": "Performance",
         "current": "Current",
@@ -211,7 +219,7 @@
         "backendconnection": "Connection",
         "backendlogin": "Login",
         "statistics": "Statistics",
-        "backend": "BackendType",
+        "backend": "Backend",
         "freespace": "Free space",
         "detail": {
             "title": "vPool",
@@ -439,7 +447,7 @@
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
-                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPoolnames.",
+                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPool names.",
                 "backendtype": "BackendType:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
@@ -449,18 +457,25 @@
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
                 "nocredentials": "No credentials were entered",
                 "extendedinfo": "Extended vPool information",
-                "initialstoragerouter": "Initial Storage Router:",
+                "initialstoragerouter": "Storage Router:",
                 "invalidpassword": "Invalid Storage Router root password",
                 "invalids3info": "Could not connect to the given host/port, or wrong credentials.",
-                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use."
+                "mtptinuse": "The mountpoint /mnt/__what__ for the vPool is already in use.",
+                "clientid": "Client ID",
+                "clientsecret": "Client secret",
+                "albabackend": "Backend",
+                "nobackends": "No backends, press &quot;Next &raquo;&quot; to (re)load",
+                "choosebackend": "Choose one of the available backends",
+                "invalidalbainfo": "The entered connection info and credentials are invalid",
+                "localhost": "Use local ALBA backends"
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",
-                "bfsinfo": "BackendType Filesystem location which will contain all data for this vPool:",
+                "bfsinfo": "Backend Filesystem location which will contain all data for this vPool:",
                 "mtptinfo": "Required locations:",
                 "otherinfo": "Other information:",
                 "tempfs": "Temporary FS:",
-                "bfs": "BackendType FS:",
+                "bfs": "Backend FS:",
                 "md": "Metadata:",
                 "readcache1": "Read Cache 1:",
                 "readcache2": "Read Cache 2:",
@@ -648,8 +663,8 @@
     },
     "footer" : {
         "cachereads": "Reads served from the Cache:",
-        "datawritten": "Data written to the BackendType:",
-        "dataread": "Data read from the BackendType:",
+        "datawritten": "Data written to the Backend:",
+        "dataread": "Data read from the Backend:",
         "bandwidthsaved": "Bandwidth Saved:"
     },
     "events": {

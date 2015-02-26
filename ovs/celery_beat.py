@@ -16,10 +16,14 @@
 Celery beat module
 """
 
+import os
 import time
 import cPickle
+import inspect
+import imp
 from celery.beat import Scheduler
 from celery import current_app
+from celery.schedules import crontab
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
@@ -54,9 +58,30 @@ class DistributedScheduler(Scheduler):
         """
         logger.debug('DS setting up schedule')
         self._load_schedule()
-        self.merge_inplace(self.app.conf.CELERYBEAT_SCHEDULE)
+        self.merge_inplace(DistributedScheduler._discover_schedule())
         self.install_default_entries(self.schedule)
+        for entry in self.schedule:
+            logger.debug('* {0}'.format(entry))
         logger.debug('DS setting up schedule - done')
+
+    @staticmethod
+    def _discover_schedule():
+        schedule = {}
+        path = os.path.join(os.path.dirname(__file__), 'lib')
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
+                name = filename.replace('.py', '')
+                module = imp.load_source(name, os.path.join(path, filename))
+                for member in inspect.getmembers(module):
+                    if inspect.isclass(member[1]) \
+                            and member[1].__module__ == name \
+                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                        for submember in inspect.getmembers(member[1]):
+                            if hasattr(submember[1], 'schedule') and isinstance(submember[1].schedule, crontab):
+                                schedule[submember[1].name] = {'task': submember[1].name,
+                                                               'schedule': submember[1].schedule,
+                                                               'args': []}
+        return schedule
 
     def _load_schedule(self):
         """
@@ -67,8 +92,7 @@ class DistributedScheduler(Scheduler):
             logger.debug('DS loading schedule entries')
             self._mutex.acquire(wait=10)
             try:
-                self.schedule = cPickle.loads(
-                    str(self._persistent.get('{0}_entries'.format(self._namespace))))
+                self.schedule = cPickle.loads(str(self._persistent.get('{0}_entries'.format(self._namespace))))
             except:
                 # In case an exception occurs during loading the schedule, it is ignored and the default schedule
                 # will be used/restored.
