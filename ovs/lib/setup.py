@@ -636,7 +636,8 @@ EOF
             logger.info('Heartbeat')
 
             print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.',
-                                             'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'])
+                                             'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],
+                                            character=None)
             enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
         if enable_heartbeats is True:
             System.set_remote_config(target_client, 'ovs.support.enabled', 1)
