@@ -19,6 +19,7 @@ Module for the Support Agent
 import sys
 import json
 import time
+import base64
 import requests
 from subprocess import check_output
 from ConfigParser import RawConfigParser
@@ -90,23 +91,22 @@ class SupportAgent(object):
         try:
             logger.debug('Processing: {0}'.format(task))
             if task == 'OPEN_TUNNEL':
-                return check_output('autossh {0}@{1} -fNR {2}:127.0.0.1:22'.format(
-                    metadata['user'], metadata['endpoint'], metadata['port']
-                ), shell=True)
-            if task == 'CLOSE_TUNNEL':
-                ssh_pid = check_output("ps aux | grep '{0}@{1} -NR  {2}:127.0.0.1:22' | grep -v grep | sed 's/\s\s*/ /g' | cut -d ' ' -f 2 || true".format(
-                    metadata['user'], metadata['endpoint'], metadata['port']
-                ), shell=True).strip()
-                if ssh_pid != '':
-                    return check_output('kill {0}'.format(ssh_pid), shell=True)
-                else:
-                    raise RuntimeError('Could not find ssh process')
-            if task == 'UPLOAD_LOGFILES':
+                check_output('service openvpn stop', shell=True)
+                check_output('rm -f /etc/openvpn/ovs_*', shell=True)
+                for filename, contents in metadata['files'].iteritems():
+                    with open(filename, 'w') as the_file:
+                        the_file.write(base64.b64decode(contents))
+                check_output('service openvpn start', shell=True)
+            elif task == 'CLOSE_TUNNEL':
+                check_output('service openvpn stop', shell=True)
+                check_output('rm -f /etc/openvpn/ovs_*', shell=True)
+            elif task == 'UPLOAD_LOGFILES':
                 logfile = check_output('ovs collect logs', shell=True)
-                return check_output('scp {0} {1}@{1}:/mnt/logs/{3} -p {4} -o UserKnownHostsFile=/dev/null'.format(
-                    logfile, metadata['user'], metadata['endpoint'], metadata['filename'], metadata['port']
+                check_output('mv {0} /tmp/{1}; curl -T /tmp/{1} ftp://{2} --user {3}:{4}; rm -f {0} /tmp/{1}'.format(
+                    logfile, metadata['filename'], metadata['endpoint'], metadata['user'], metadata['password']
                 ), shell=True)
-            raise RuntimeError('Unknown task')
+            else:
+                raise RuntimeError('Unknown task')
         except Exception, ex:
             logger.exception('Unexpected error while processing task {0} (data: {1}): {2}'.format(task, json.dumps(metadata), ex))
             raise

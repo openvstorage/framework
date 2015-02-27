@@ -949,6 +949,9 @@ if Service.has_service('{0}'):
             client = SSHClient.load(storagerouter.ip)
             System.set_remote_config(client, 'ovs.support.enabled', 1 if enable else 0)
             System.set_remote_config(client, 'ovs.support.enablesupport', 1 if enable_support else 0)
+            if enable_support is False:
+                System.run('service openvpn stop', client)
+                System.run('rm -f /etc/openvpn/ovs_*', client)
             if enable is True:
                 script = """
 from ovs.plugin.provider.service import Service
