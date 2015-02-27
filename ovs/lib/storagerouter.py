@@ -190,7 +190,7 @@ if Service.has_service('{0}'):
                     connection_password = parameters['connection_password']
                     client = OVSClient(connection_host, connection_port,
                                        connection_username, connection_password)
-                task_id = client.call('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
+                task_id = client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successfull, metadata = client.wait_for_task(task_id, timeout=300)
                 if successfull is False:
                     raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
