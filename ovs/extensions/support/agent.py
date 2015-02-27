@@ -101,7 +101,7 @@ class SupportAgent(object):
                 check_output('service openvpn stop', shell=True)
                 check_output('rm -f /etc/openvpn/ovs_*', shell=True)
             elif task == 'UPLOAD_LOGFILES':
-                logfile = check_output('ovs collect logs', shell=True)
+                logfile = check_output('ovs collect logs', shell=True).strip()
                 check_output('mv {0} /tmp/{1}; curl -T /tmp/{1} ftp://{2} --user {3}:{4}; rm -f {0} /tmp/{1}'.format(
                     logfile, metadata['filename'], metadata['endpoint'], metadata['user'], metadata['password']
                 ), shell=True)
