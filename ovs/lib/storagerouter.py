@@ -940,6 +940,18 @@ if Service.has_service('{0}'):
         return SupportAgent.get_heartbeat_data()
 
     @staticmethod
+    @celery.task(name='ovs.storagerouter.get_logfiles')
+    def get_logfiles():
+        """
+        Collects logs, moves them to a web-accessible location and returns log tgz's filename
+        """
+        webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
+        logfile = check_output('ovs collect logs', shell=True).strip()
+        logfilename = logfile.split('/')[-1]
+        check_output('mkdir -p {0}; mv {1} {0}/; chmod 666 {0}/{2}'.format(webpath, logfile, logfilename), shell=True)
+        return logfilename
+
+    @staticmethod
     @celery.task(name='ovs.storagerouter.configure_support')
     def configure_support(enable, enable_support):
         """

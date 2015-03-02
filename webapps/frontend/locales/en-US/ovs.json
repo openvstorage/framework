@@ -448,7 +448,9 @@
         "saved": "Saved",
         "savedmsg": "Settings applied",
         "failed": "Error",
-        "failedmsg": "Error while applying your settings"
+        "failedmsg": "Error while applying your settings",
+        "downloadinglogs": "collecting...",
+        "downloadlogs": "download logfiles"
     },
     "notfound": {
         "title": "Page not found",

@@ -24,11 +24,13 @@ limitations under the License.
                 </div>
                 <div class="panel-body">
                     <p data-i18n="[html]ovs:support.description"></p>
-                    <p></p><b data-i18n="ovs:support.identification"></b></p>
                     <span data-i18n="ovs:support.clusterid"></span> <span data-bind="text: clusterid"></span><br />
                     <span data-i18n="ovs:support.nodes"></span><br />
                     <ul data-bind="foreach: storageRouters">
-                        <li><span data-bind="text: name"></span>: <span data-bind="text: nodeid"></span></li>
+                        <li>
+                            <span data-bind="text: name"></span>: <span data-bind="text: nodeid"></span>
+                            &nbsp; &nbsp; (<a href="#" data-bind="click: downloadLogfiles, text: downloadLogState"></a>)
+                        </li>
                     </ul>
                 </div>
             </div>
