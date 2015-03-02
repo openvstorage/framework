@@ -160,10 +160,7 @@ class SetupController(object):
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
             if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
-            ovs_config.set('core', 'uniqueid', unique_id)
-            SetupController._remote_config_write(target_client, config_filename, ovs_config)
+            System.set_remote_config(target_client, 'ovs.core.uniqueid', unique_id)
 
             # Getting cluster information
             current_cluster_names = []
@@ -259,7 +256,6 @@ class SetupController(object):
             # Deciding master/extra
             print 'Analyzing cluster layout'
             logger.info('Analyzing cluster layout')
-            unique_id = ovs_config.get('core', 'uniqueid')
             promote = False
             if first_node is False:
                 for cluster in SetupController.arakoon_clusters:
@@ -281,15 +277,15 @@ class SetupController(object):
                 auto_config, disk_layout
             )
             if first_node:
-                SetupController._setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config,
+                SetupController._setup_first_node(cluster_ip, unique_id, mountpoints,
                                                   cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
                                                   enable_heartbeats)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
-                                                  nodes, ovs_config, hypervisor_info)
+                                                  nodes, hypervisor_info)
                 if promote:
                     SetupController._promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id,
-                                                  ovs_config, mountpoints, arakoon_mountpoint)
+                                                  mountpoints, arakoon_mountpoint)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -439,7 +435,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         return mountpoints, hypervisor_info
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
         """
         Sets up the first node services. This node is always a master
         """
@@ -454,8 +450,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         if arakoon_mountpoint is None:
             arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
                                                         default_value=Interactive.find_in_list(mountpoints, 'db'))
-        ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
-        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
+        System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
@@ -484,9 +479,9 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
               {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
-""".format(ovs_config.get('core', 'broker.port'),
-           ovs_config.get('core', 'broker.login'),
-           ovs_config.get('core', 'broker.password')))
+""".format(System.read_remote_config(target_client, 'ovs.core.broker.port'),
+           System.read_remote_config(target_client, 'ovs.core.broker.login'),
+           System.read_remote_config(target_client, 'ovs.core.broker.password')))
         rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
         if rabbitmq_running and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
@@ -501,9 +496,9 @@ EOF
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:
-            target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
-                                                             ovs_config.get('core', 'broker.password')))
-            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl add_user {0} {1}'.format(System.read_remote_config(target_client, 'ovs.core.broker.login'),
+                                                                    System.read_remote_config(target_client, 'ovs.core.broker.password')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(System.read_remote_config(target_client, 'ovs.core.broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         print 'Build configuration files'
@@ -575,10 +570,9 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        ovs_config.set('grid', 'ip', cluster_ip)
-        ovs_config.set('support', 'cid', str(uuid.uuid4()))
-        ovs_config.set('support', 'nid', str(uuid.uuid4()))
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        System.set_remote_config(target_client, 'ovs.grid.ip', cluster_ip)
+        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
 
         print 'Starting services'
         logger.info('Starting services for join master')
@@ -670,7 +664,7 @@ EOF
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, ovs_config, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info):
         """
         Sets up an additional node
         """
@@ -765,14 +759,7 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-        master_client = SSHClient.load(master_ip)
-        master_config = SetupController._remote_config_read(master_client, config_filename)
-        ovs_config.set('grid', 'ip', cluster_ip)
-        ovs_config.set('support', 'cid', master_config.get('support', 'cid'))
-        ovs_config.set('support', 'nid', str(uuid.uuid4()))
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._remote_config_write(target_client, config_filename, ovs_config)
+        System.set_remote_config(client, 'ovs.grid.ip', cluster_ip)
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
@@ -850,7 +837,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config, None, None)
+            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None)
 
             print ''
             print Interactive.boxed_message(['Promote complete.'])
@@ -870,7 +857,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config, mountpoints, arakoon_mountpoint):
+    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint):
         """
         Promotes a given node
         """
@@ -932,8 +919,7 @@ EOF
                         break
                     else:
                         print '  Invalid path, please retry'
-        ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
-        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
+        System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, ports)
@@ -969,9 +955,9 @@ EOF
               {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
-""".format(ovs_config.get('core', 'broker.port'),
-           ovs_config.get('core', 'broker.login'),
-           ovs_config.get('core', 'broker.password')))
+""".format(System.read_remote_config(target_client, 'ovs.core.broker.port'),
+           System.read_remote_config(target_client, 'ovs.core.broker.login'),
+           System.read_remote_config(target_client, 'ovs.core.broker.password')))
         rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
         if rabbitmq_running and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
@@ -986,9 +972,9 @@ EOF
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:
-            target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
-                                                                    ovs_config.get('core', 'broker.password')))
-            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl add_user {0} {1}'.format(System.read_remote_config(target_client, 'ovs.core.broker.login'),
+                                                                    System.read_remote_config(target_client, 'ovs.core.broker.password')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(System.read_remote_config(target_client, 'ovs.core.broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         # Copy rabbitmq cookie
@@ -1154,7 +1140,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config)
+            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id)
 
             print ''
             print Interactive.boxed_message(['Demote complete.'])
@@ -1174,7 +1160,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config):
+    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id):
         """
         Demotes a given node
         """
