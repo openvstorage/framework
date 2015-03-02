@@ -160,11 +160,11 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @required_roles(['read', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def get_logfiles(self, storagerouter):
+    def get_logfiles(self, local_storagerouter, storagerouter):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
         """
-        return StorageRouterController.get_logfiles.apply_async(
+        return StorageRouterController.get_logfiles.s(local_storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 

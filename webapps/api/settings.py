@@ -21,6 +21,7 @@ from ovs.plugin.provider.configuration import Configuration
 DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
+UNIQUE_ID = Configuration.get('ovs.core.uniqueid')
 UI_NAME = Configuration.get('ovs.webapps.main.uiname')
 APP_NAME = Configuration.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
