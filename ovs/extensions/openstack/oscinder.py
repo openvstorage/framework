@@ -129,15 +129,16 @@ class OpenStackCinder(object):
 
         existing_version = self._get_existing_driver_version()
         remote_version = self._get_remote_driver_version(temp_location)
-
+        if self.is_devstack:
+            local_driver = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'
+        elif self.is_openstack:
+            local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
         if remote_version > existing_version:
             print('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
             if self.is_devstack:
                 self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
-                local_driver = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'
             elif self.is_openstack:
                 self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
-                local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
         else:
             print('Using driver {0} version {1}'.format(local_driver, existing_version))
         self.client.run('rm {0}'.format(temp_location))
