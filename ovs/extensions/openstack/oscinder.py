@@ -84,7 +84,9 @@ class OpenStackCinder(object):
         try:
             from cinder import version
             version = version.version_string()
-            if version.startswith('2015.1'):
+            if version.startswith('2015.2'):
+                return 'kilo'  # For the moment use K driver
+            elif version.startswith('2015.1'):
                 return 'kilo'
             elif version.startswith('2014.2'):
                 return 'juno'
@@ -93,23 +95,52 @@ class OpenStackCinder(object):
         except Exception as ex:
             raise ValueError('Cannot determine cinder version: %s' % str(ex))
 
+    def _get_existing_driver_version(self):
+        """
+        Get VERSION string from existing driver
+        """
+        try:
+            from cinder.volume.drivers import openvstorage
+        except ImportError:
+            pass
+        else:
+            if hasattr(openvstorage, 'OVSVolumeDriver'):
+                return getattr(openvstorage.OVSVolumeDriver, 'VERSION', '0.0.0')
+        return '0.0.0'
+
+    def _get_remote_driver_version(self, location):
+        """
+        Get VERSION string from downloaded driver
+        """
+        with open(location, 'r') as f:
+            for line in f.readlines():
+                if 'VERSION = ' in line:
+                    return line.split('VERSION = ')[-1].strip().replace("'", "").replace('"', "")
+        return '0.0.0'
+
     def _get_driver_code(self):
         """
-        WGET driver, temporary, until driver is included in openstack
+        WGET driver, compare versions, allow local code to be updated from OVS repo until driver is patched upstream
         """
         version = self._get_version()
-        driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
-        print('Using driver %s' % driver)
-        if self.is_devstack:
-            if os.path.exists('/opt/stack/devstack/cinder'):
-                if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/openvstorage.py'):
-                    self.client.run('wget %s -P /opt/stack/devstack/cinder/cinder/volume/drivers' % driver)
-            elif os.path.exists('/opt/stack/cinder'):
-                if not os.path.exists('/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'):
-                    self.client.run('wget %s -P /opt/stack/cinder/cinder/volume/drivers' % driver)
-        elif self.is_openstack:
-            if not os.path.exists('/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'):
-                self.client.run('wget %s -P /usr/lib/python2.7/dist-packages/cinder/volume/drivers' % driver)
+        remote_driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
+        temp_location = "/tmp/openvstorage.py"
+        self.client.run('wget {0} -P /tmp'.format(remote_driver))
+
+        existing_version = self._get_existing_driver_version()
+        remote_version = self._get_remote_driver_version(temp_location)
+
+        if remote_version > existing_version:
+            print('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
+            if self.is_devstack:
+                self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
+                local_driver = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'
+            elif self.is_openstack:
+                self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
+                local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
+        else:
+            print('Using driver {0} version {1}'.format(local_driver, existing_version))
+        self.client.run('rm {0}'.format(temp_location))
 
     def _is_devstack(self):
         try:
