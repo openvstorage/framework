@@ -146,6 +146,8 @@ class MockVDiskList():
     def get_vdisks(self):
         return self.vdisks
 
+    def get_by_parentsnapshot(self, snapshotid):
+        return []
 
 class MockPMachineList():
 
