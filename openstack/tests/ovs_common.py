@@ -691,7 +691,7 @@ class OVSPluginTestCase(test.TestCase):
 
     def _remove_snapshot(self, snap_name, snapshot, timeout=300):
         self._debug('delete snapshot %s' % snap_name)
-        self._cinder_delete_snapshot(snapshot, timeout)
+        self._cinder_delete_snapshot(snapshot, timeout = timeout)
         self.unregister_tearDown(snap_name)
         self._cinder_wait_until_snapshot_not_found(snapshot.id, timeout)
         self._debug('snapshot %s deleted' % snap_name)
