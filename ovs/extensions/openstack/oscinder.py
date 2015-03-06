@@ -130,7 +130,8 @@ class OpenStackCinder(object):
         existing_version = self._get_existing_driver_version()
         remote_version = self._get_remote_driver_version(temp_location)
         if self.is_devstack:
-            local_driver = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'
+            cinder_base_path = self._get_base_path('cinder')
+            local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
         elif self.is_openstack:
             local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
         if remote_version > existing_version:
@@ -350,18 +351,17 @@ if vpool_name in enabled_backends:
 
     def _apply_patches(self):
         # fix run_as_root issue
+        cinder_base_path = self._get_base_path('cinder')
+        nova_base_path = self._get_base_path('nova')
         if self.is_devstack:
-            if os.path.exists('/opt/stack/devstack/cinder'):
-                self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /opt/stack/devstack/cinder/cinder/image/image_utils.py''')
-            elif os.path.exists('/opt/stack/cinder'):
-                self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /opt/stack/cinder/cinder/image/image_utils.py''')
+            self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' {0}/image/image_utils.py'''.format(cinder_base_path))
         elif self.is_openstack:
             self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /usr/lib/python2.7/dist-packages/cinder/image/image_utils.py''')
 
         # fix "blockdev" issue
         if self.is_devstack:
-            nova_volume_file = '/opt/stack/nova/nova/virt/libvirt/volume.py'
-            nova_driver_file = '/opt/stack/nova/nova/virt/libvirt/driver.py'
+            nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
+            nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
         elif self.is_openstack:
             nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
             nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
@@ -425,3 +425,8 @@ if not patched:
                         self.cinder_client.volume_types.delete(v.id)
                     except Exception:
                         pass
+
+    def _get_base_path(self, component):
+        exec('import %s' % component, locals())
+        module = locals().get(component)
+        return os.path.dirname(module.__file__)
