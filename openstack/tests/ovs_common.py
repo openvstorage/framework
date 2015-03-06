@@ -53,7 +53,7 @@ class OVSPluginTestCase(test.TestCase):
     shell_client = None
     current_user_id = os.getuid()
 
-    _profiled = True
+    _profiled = False
 
     def _debug(self, message):
         """
