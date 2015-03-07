@@ -599,7 +599,7 @@ class OVSPluginTestCase(test.TestCase):
                 if volume.status == 'error':
                     raise VolumeInErrorState('Volume %s in error state' % volume_id)
             if volume.status == status:
-                self._debug('volume entered expected state after %s' % 3*timeout_sec)
+                self._debug('volume entered expected state after %s seconds' % (3*timeout_sec))
                 return
             if initial_state is None:
                 initial_state = volume.status
@@ -689,9 +689,9 @@ class OVSPluginTestCase(test.TestCase):
         self._debug('snapshot %s created' % snap_name)
         return snapshot, snap_name
 
-    def _remove_snapshot(self, snap_name, snapshot, timeout=300):
+    def _remove_snapshot(self, snap_name, snapshot, timeout=300, force=False):
         self._debug('delete snapshot %s' % snap_name)
-        self._cinder_delete_snapshot(snapshot, timeout = timeout)
+        self._cinder_delete_snapshot(snapshot, timeout = timeout, force = force)
         self.unregister_tearDown(snap_name)
         self._cinder_wait_until_snapshot_not_found(snapshot.id, timeout)
         self._debug('snapshot %s deleted' % snap_name)
