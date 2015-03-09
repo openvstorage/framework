@@ -53,4 +53,24 @@ define(['knockout'], function(ko) {
         result.raw = rawValue;
         return result;
     };
+    ko.splitRows = function(columns, array) {
+        return ko.computed(function () {
+            var result = [], row;
+            // Loop through items and push each item to a row array that gets pushed to the final result
+            for (var i = 0, j = array().length; i < j; i++) {
+                if (i % columns === 0) {
+                    if (row) {
+                        result.push({ items: row });
+                    }
+                    row = [];
+                }
+                row.push(array()[i]);
+            }
+            // Push the final row
+            if (row) {
+                result.push({ items: row });
+            }
+            return result;
+        });
+    };
 });

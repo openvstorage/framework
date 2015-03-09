@@ -183,7 +183,8 @@
         "group": "Group",
         "backendtype": "Type",
         "storageip": "Storage IP",
-        "namespace": "Backend location"
+        "namespace": "Backend location",
+        "usage": "Usage"
     },
     "storagerouters": {
         "title": "Storage Routers",

@@ -623,6 +623,7 @@ EOF
 
         SetupController._run_firstnode_hooks(cluster_ip)
 
+        target_client = SSHClient.load(cluster_ip)
         System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
         System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
         if enable_heartbeats is None:
@@ -2090,7 +2091,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2102,7 +2103,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2114,7 +2115,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip)
+            function(cluster_ip=cluster_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2126,7 +2127,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
