@@ -19,7 +19,7 @@ import copy
 import os
 import re
 import uuid
-
+import json
 from ConfigParser import RawConfigParser
 from subprocess import check_output
 from ovs.celery_run import celery
@@ -520,7 +520,13 @@ os.chmod('{0}', 0777)
                     config.set(section, key, value)
             config_dir = '{0}/storagedriver/storagedriver'.format(System.read_remote_config(client, 'ovs.core.cfgdir'))
             client.dir_ensure(config_dir, recursive=True)
-            System.write_config(config, '{0}/{1}.alba'.format(config_dir, vpool_name), client)
+            System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
+            client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
+                'log_level': 'debug',
+                'port': alba_proxy.service.ports[0],
+                'ips': ['127.0.0.1'],
+                'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
+            }))
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
         storagedriver_config.load(client)
@@ -605,8 +611,6 @@ for filename in {1}:
                   '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
                   '<UUID>': str(uuid.uuid4())}
-        if vpool.backend_type.code == 'alba':
-            params['<ALBA_PROXY_PORT>'] = str(alba_proxy.service.ports[0])
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
