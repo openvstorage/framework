@@ -21,6 +21,7 @@ import re
 import inspect
 import time
 from ovs.dal.lists.userlist import UserList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from rest_framework.response import Response
 from toolbox import Toolbox
 from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
@@ -123,6 +124,11 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                         mandatory_vars.remove(typename)
                 except ObjectNotFoundException:
                     raise Http404()
+            # Fill local storagerouter, if requested
+            if 'local_storagerouter' in mandatory_vars:
+                storagerouter = StorageRouterList.get_by_machine_id(settings.UNIQUE_ID)
+                new_kwargs['local_storagerouter'] = storagerouter
+                mandatory_vars.remove('local_storagerouter')
             # Fill mandatory parameters
             for name in mandatory_vars:
                 if name in kwargs:

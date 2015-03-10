@@ -21,11 +21,12 @@ import re
 import sys
 import imp
 import time
-import ConfigParser
+import uuid
 import urllib2
 import base64
 import inspect
 
+from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
@@ -101,11 +102,12 @@ class SetupController(object):
         disk_layout = None
         arakoon_mountpoint = None
         join_cluster = False
+        enable_heartbeats = None
 
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
         if os.path.exists(preconfig):
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.read(preconfig)
             ip = config.get('setup', 'target_ip')
             target_password = config.get('setup', 'target_password')
@@ -122,6 +124,7 @@ class SetupController(object):
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
+            enable_heartbeats = True
 
         try:
             if force_type is not None:
@@ -157,10 +160,7 @@ class SetupController(object):
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
             if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
-            ovs_config.set('core', 'uniqueid', unique_id)
-            SetupController._remote_config_write(target_client, config_filename, ovs_config)
+            System.set_remote_config(target_client, 'ovs.core.uniqueid', unique_id)
 
             # Getting cluster information
             current_cluster_names = []
@@ -210,7 +210,7 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        #@todo: we should be able to choose the ip here too in a multiple nic setup?
+                        # @TODO: we should be able to choose the ip here too in a multiple nic setup?
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
                         known_passwords[master_ip] = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
                         first_node = False
@@ -256,7 +256,6 @@ class SetupController(object):
             # Deciding master/extra
             print 'Analyzing cluster layout'
             logger.info('Analyzing cluster layout')
-            unique_id = ovs_config.get('core', 'uniqueid')
             promote = False
             if first_node is False:
                 for cluster in SetupController.arakoon_clusters:
@@ -278,14 +277,15 @@ class SetupController(object):
                 auto_config, disk_layout
             )
             if first_node:
-                SetupController._setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config,
-                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint)
+                SetupController._setup_first_node(cluster_ip, unique_id, mountpoints,
+                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
+                                                  enable_heartbeats)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
-                                                  nodes, ovs_config, hypervisor_info)
+                                                  nodes, hypervisor_info)
                 if promote:
                     SetupController._promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id,
-                                                  ovs_config, mountpoints, arakoon_mountpoint)
+                                                  mountpoints, arakoon_mountpoint)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -435,7 +435,7 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         return mountpoints, hypervisor_info
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
         """
         Sets up the first node services. This node is always a master
         """
@@ -450,29 +450,10 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         if arakoon_mountpoint is None:
             arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
                                                         default_value=Interactive.find_in_list(mountpoints, 'db'))
-        ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
-        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
+        System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
-
-        print 'Setting up elastic search'
-        logger.info('Setting up elastic search')
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._add_service(target_client, 'elasticsearch')
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-        target_client.run('mkdir -p /opt/data/elasticsearch/work')
-        target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name),
-                                                 add=False)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NODE_NAME>', node_name)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NETWORK_PUBLISH>', cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'start')
 
         print 'Setting up logstash'
         logger.info('Setting up logstash')
@@ -498,9 +479,9 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
               {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
-""".format(ovs_config.get('core', 'broker.port'),
-           ovs_config.get('core', 'broker.login'),
-           ovs_config.get('core', 'broker.password')))
+""".format(System.read_remote_config(target_client, 'ovs.core.broker.port'),
+           System.read_remote_config(target_client, 'ovs.core.broker.login'),
+           System.read_remote_config(target_client, 'ovs.core.broker.password')))
         rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
         if rabbitmq_running and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
@@ -515,15 +496,15 @@ EOF
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:
-            target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
-                                                             ovs_config.get('core', 'broker.password')))
-            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl add_user {0} {1}'.format(System.read_remote_config(target_client, 'ovs.core.broker.login'),
+                                                                    System.read_remote_config(target_client, 'ovs.core.broker.password')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(System.read_remote_config(target_client, 'ovs.core.broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         print 'Build configuration files'
         logger.info('Build configuration files')
         for config_file, port in SetupController.generic_configfiles.iteritems():
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.add_section('main')
             config.set('main', 'nodes', unique_id)
             config.add_section(unique_id)
@@ -536,8 +517,6 @@ EOF
             if SetupController._has_service(target_client, service):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(target_client, 'true')  # Also starts the services
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -591,8 +570,9 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        ovs_config.set('grid', 'ip', cluster_ip)
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        System.set_remote_config(target_client, 'ovs.grid.ip', cluster_ip)
+        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
 
         print 'Starting services'
         logger.info('Starting services for join master')
@@ -643,6 +623,24 @@ EOF
 
         SetupController._run_firstnode_hooks(cluster_ip)
 
+        target_client = SSHClient.load(cluster_ip)
+        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        if enable_heartbeats is None:
+            print '\n+++ Heartbeat +++\n'
+            logger.info('Heartbeat')
+
+            print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.',
+                                             'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],
+                                            character=None)
+            enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
+        if enable_heartbeats is True:
+            System.set_remote_config(target_client, 'ovs.support.enabled', 1)
+            service = 'support-agent'
+            SetupController._add_service(target_client, service, {})
+            SetupController._enable_service(target_client, service)
+            SetupController._change_service_state(target_client, service, 'start')
+
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
@@ -667,7 +665,7 @@ EOF
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, ovs_config, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info):
         """
         Sets up an additional node
         """
@@ -675,7 +673,7 @@ EOF
         print '\n+++ Adding extra node +++\n'
         logger.info('Adding extra node')
 
-        # Elastic search setup
+        # Logstash setup
         print 'Configuring logstash'
         target_client = SSHClient.load(cluster_ip)
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
@@ -700,6 +698,21 @@ EOF
             client_config = SetupController._remote_config_read(master_client, config)
             target_client = SSHClient.load(cluster_ip)
             SetupController._remote_config_write(target_client, config, client_config)
+
+        client = SSHClient.load(master_ip)
+        cid = System.read_remote_config(client, 'ovs.support.cid')
+        enabled = System.read_remote_config(client, 'ovs.support.enabled')
+        enablesupport = System.read_remote_config(client, 'ovs.support.enablesupport')
+        client = SSHClient.load(cluster_ip)
+        System.set_remote_config(client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(client, 'ovs.support.cid', cid)
+        System.set_remote_config(client, 'ovs.support.enabled', enabled)
+        System.set_remote_config(client, 'ovs.support.enablesupport', enablesupport)
+        if int(enabled) > 0:
+            service = 'support-agent'
+            SetupController._add_service(client, service, {})
+            SetupController._enable_service(client, service)
+            SetupController._change_service_state(client, service, 'start')
 
         client = SSHClient.load(cluster_ip)
         node_name = client.run('hostname')
@@ -747,9 +760,7 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        ovs_config.set('grid', 'ip', cluster_ip)
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        System.set_remote_config(client, 'ovs.grid.ip', cluster_ip)
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
@@ -827,7 +838,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config, None, None)
+            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None)
 
             print ''
             print Interactive.boxed_message(['Promote complete.'])
@@ -847,7 +858,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config, mountpoints, arakoon_mountpoint):
+    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint):
         """
         Promotes a given node
         """
@@ -873,24 +884,8 @@ EOF
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        # Elastic search setup
-        print 'Configuring elastic search'
+        # Logstash setup
         target_client = SSHClient.load(cluster_ip)
-        SetupController._add_service(target_client, 'elasticsearch')
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-        target_client.run('mkdir -p /opt/data/elasticsearch/work')
-        target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name),
-                                                 add=False)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NODE_NAME>', node_name)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NETWORK_PUBLISH>', cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'start')
-
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
                                                  '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
         SetupController._change_service_state(target_client, 'logstash', 'restart')
@@ -925,8 +920,7 @@ EOF
                         break
                     else:
                         print '  Invalid path, please retry'
-        ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
-        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
+        System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, ports)
@@ -962,9 +956,9 @@ EOF
               {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
-""".format(ovs_config.get('core', 'broker.port'),
-           ovs_config.get('core', 'broker.login'),
-           ovs_config.get('core', 'broker.password')))
+""".format(System.read_remote_config(target_client, 'ovs.core.broker.port'),
+           System.read_remote_config(target_client, 'ovs.core.broker.login'),
+           System.read_remote_config(target_client, 'ovs.core.broker.password')))
         rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
         if rabbitmq_running and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
@@ -979,9 +973,9 @@ EOF
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:
-            target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
-                                                                    ovs_config.get('core', 'broker.password')))
-            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl add_user {0} {1}'.format(System.read_remote_config(target_client, 'ovs.core.broker.login'),
+                                                                    System.read_remote_config(target_client, 'ovs.core.broker.password')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(System.read_remote_config(target_client, 'ovs.core.broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         # Copy rabbitmq cookie
@@ -1064,8 +1058,6 @@ for json_file in os.listdir(configuration_dir):
 
         print 'Starting services'
         target_client = SSHClient.load(cluster_ip)
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(target_client, 'true')
         logger.info('Starting services')
         for service in SetupController.master_services:
             if SetupController._has_service(target_client, service):
@@ -1149,7 +1141,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config)
+            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id)
 
             print ''
             print Interactive.boxed_message(['Demote complete.'])
@@ -1169,7 +1161,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config):
+    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id):
         """
         Demotes a given node
         """
@@ -1195,18 +1187,6 @@ EOF
                 master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
-
-        # Elastic search setup
-        print 'Unconfiguring elastic search'
-        target_client = SSHClient.load(cluster_ip)
-        if SetupController._has_service(target_client, 'elasticsearch'):
-            SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-            target_client.run('rm -f /etc/elasticsearch/elasticsearch.yml')
-            SetupController._remove_service(target_client, 'elasticsearch')
-
-            SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
-                                                     '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
-        SetupController._change_service_state(target_client, 'logstash', 'restart')
 
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
@@ -1972,7 +1952,7 @@ print blk_devices
         contents = client.file_read(filename)
         with open('/tmp/temp_read.cfg', 'w') as configfile:
             configfile.write(contents)
-        config = ConfigParser.ConfigParser()
+        config = RawConfigParser()
         config.read('/tmp/temp_read.cfg')
         return config
 
@@ -2037,25 +2017,13 @@ print blk_devices
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
-    def _update_es_configuration(es_client, value):
-        # update elasticsearch configuration
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(es_client, 'elasticsearch', 'stop')
-        SetupController._replace_param_in_config(es_client, config_file,
-                                                 '<IS_POTENTIAL_MASTER>', value)
-        SetupController._replace_param_in_config(es_client, config_file,
-                                                 '<IS_DATASTORE>', value)
-        SetupController._change_service_state(es_client, 'elasticsearch', 'start')
-        SetupController._change_service_state(es_client, 'logstash', 'restart')
-
-    @staticmethod
     def _configure_amqp_to_volumedriver(client, vpname=None):
         """
         Reads out the RabbitMQ client config, using that to (re)configure the volumedriver configuration(s)
         """
         remote_script = """
 import os
-import ConfigParser
+from ConfigParser import RawConfigParser
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 protocol = Configuration.get('ovs.core.broker.protocol')
@@ -2063,7 +2031,7 @@ login = Configuration.get('ovs.core.broker.login')
 password = Configuration.get('ovs.core.broker.password')
 vpool_name = {0}
 uris = []
-cfg = ConfigParser.ConfigParser()
+cfg = RawConfigParser()
 cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
 nodes = [n.strip() for n in cfg.get('main', 'nodes').split(',')]
 for node in nodes:
@@ -2123,7 +2091,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2135,7 +2103,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2147,7 +2115,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip)
+            function(cluster_ip=cluster_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2159,7 +2127,7 @@ for json_file in os.listdir(configuration_dir):
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod

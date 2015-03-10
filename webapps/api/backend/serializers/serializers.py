@@ -34,7 +34,7 @@ class FullSerializer(serializers.Serializer):
         super(FullSerializer, self).__init__(*args, **kwargs)
         self.hybrid = hybrid
         for prop in self.hybrid._properties:
-            if not 'password' in prop.name or allow_passwords:
+            if 'password' not in prop.name or allow_passwords:
                 self.fields[prop.name] = FullSerializer._map_type_to_field(prop.property_type)
         for dynamic in self.hybrid._dynamics:
             if contents is None or (('_dynamics' in contents or dynamic.name in contents)

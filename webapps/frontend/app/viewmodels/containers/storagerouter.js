@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
@@ -57,6 +57,7 @@ define([
         self.failoverMode     = ko.observable();
         self.vDisks           = ko.observableArray([]);
         self.availableActions = ko.observableArray([]);
+        self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -103,6 +104,17 @@ define([
                     deferred.reject();
                 }
             }).promise();
+        };
+        self.downloadLogfiles = function() {
+            self.downloadLogState($.t('ovs:support.downloadinglogs'));
+            api.get('storagerouters/' + self.guid() + '/get_logfiles')
+                .then(self.shared.tasks.wait)
+                .done(function(data) {
+                    window.location.href = 'downloads/' + data;
+                })
+                .always(function() {
+                    self.downloadLogState($.t('ovs:support.downloadlogs'));
+                });
         };
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');

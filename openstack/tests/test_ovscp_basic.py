@@ -109,7 +109,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         self.assertTrue(snapshot_name == snap_name, 'Wrong name for snapshot %s' % snapshot_name)
         self.assertTrue(self._ovs_snapshot_id_in_vdisklist_snapshots(snapshot.id), 'Snapshot not modeled in OVS')
 
-        self._remove_snapshot(snap_name, snapshot)
+        self._remove_snapshot(snap_name, snapshot, force = True)
         cinder_snapshots = self._cinder_list_snapshots()
         self.assertFalse(snapshot.id in cinder_snapshots.keys(), 'Snapshot still modeled in Cinder')
 
@@ -170,7 +170,7 @@ class OVSPluginBasicTestCase(OVSPluginTestCase):
         self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name, exists=False), 'Device still modeled in OVS')
 
-        self._remove_snapshot(snap_name, snapshot)
+        self._remove_snapshot(snap_name, snapshot, force = True)
         cinder_snapshots = self._cinder_list_snapshots()
         self.assertFalse(snapshot.id in cinder_snapshots.keys(), 'Snapshot still modeled in Cinder')
 

@@ -17,9 +17,9 @@ SourceCollector module
 """
 
 import os
-import ConfigParser
 import time
 import re
+from ConfigParser import RawConfigParser
 from datetime import datetime
 from subprocess import check_output
 
@@ -61,10 +61,10 @@ class SourceCollector(object):
 
         @param target: Specifies the pacakging target. Can be:
         * 'experimental' to package against a checked out repo/code
-        * 'unstable', 'test', 'stable' for automatic packaging for a certain branch
+        * 'unstable', 'alpha', 'beta' for automatic packaging for a certain branch
         * ('release', '<release branch>') for autoamtic packaging for a release branch
         @param revision: Specifies an exact target revision:
-        * Any existing tag for repackging 'test', 'stable' or 'release' packages
+        * Any existing tag for repackging 'alpha', 'beta' or 'release' packages
         @param suffix: A suffix for release packages (such as 'alpha', 'beta', 'rc1', 'rtm', ...)
         """
 
@@ -82,7 +82,7 @@ class SourceCollector(object):
         SourceCollector._hg_update_to(SourceCollector.repo_path_metadata, 'default')
 
         print '  Updating code'
-        distribution = target
+        distribution = target  # experimental, unstable, alpha, beta, release
         if target == 'experimental':
             suffix = 'exp'
         elif isinstance(target, tuple) and target[0] == 'experimental':
@@ -96,10 +96,11 @@ class SourceCollector(object):
                 SourceCollector._hg_update_to(SourceCollector.repo_path_code, 'default')
             else:
                 SourceCollector._hg_update_to(SourceCollector.repo_path_code, revision)
-        elif target in ['test', 'stable']:
-            suffix = 'alpha' if target == 'test' else 'beta'
+        elif target in ['alpha', 'beta']:
+            branch = 'test' if target == 'alpha' else 'stable'
+            suffix = target
             if revision is None:
-                SourceCollector._hg_update_to(SourceCollector.repo_path_code, target)
+                SourceCollector._hg_update_to(SourceCollector.repo_path_code, branch)
             else:
                 SourceCollector._hg_update_to(SourceCollector.repo_path_code, revision)
         elif isinstance(target, tuple) and target[0] == 'release':
@@ -115,9 +116,9 @@ class SourceCollector(object):
 
         # Get parent brances
         branches = ['default']
-        if distribution == 'test':
+        if distribution == 'alpha':
             branches.append('test')
-        elif distribution == 'stable':
+        elif distribution == 'beta':
             branches += ['test', 'stable']
         elif distribution == 'release':
             branches += ['test', 'stable', target[1] if revision is None else revision]
@@ -136,7 +137,7 @@ class SourceCollector(object):
 
         # Build version
         filename = '{0}/packaging/version.cfg'.format(SourceCollector.repo_path_code)
-        parser = ConfigParser.RawConfigParser()
+        parser = RawConfigParser()
         parser.read(filename)
         version = '{0}.{1}.{2}'.format(parser.get('main', 'major'),
                                        parser.get('main', 'minor'),
@@ -174,37 +175,36 @@ class SourceCollector(object):
             changelog.append('')
             changelog.append('This changelog is generated based on DVCS. Due to the nature of DVCS the')
             changelog.append('order of changes in this document can be slightly different from reality.')
-            if target in ['test', 'stable', 'release']:
-                log = SourceCollector._run(
-                    "hg log -f -b {0} --template '{{date|shortdate}} {{rev}} {{desc|firstline}}\n'".format(
-                        ' -b '.join(branches)
-                    ), SourceCollector.repo_path_code
-                )
-                for log_line in log.strip().split('\n'):
-                    if SourceCollector._ignore_log(log_line):
-                        continue
-                    date, log_revision, description = log_line.split(' ', 2)
-                    active_tag = None
-                    for tag in tag_data:
-                        if tag['rev_number'] == log_revision and tag['suffix'] >= suffix:
-                            active_tag = tag
-                    if active_tag is not None:
-                        if changes_found is False:
-                            increment_build = False
-                        if other_changes is True:
-                            changelog.append('* Internal updates')
-                        changelog.append('\n{0}{1}\n'.format(
-                            active_tag['version'],
-                            '-{0}.{1}'.format(
-                                active_tag['suffix'], active_tag['build']
-                            ) if active_tag['suffix'] is not None else ''
-                        ))
-                        other_changes = False
-                    if re.match('^OVS\-[0-9]{1,5}', description):
-                        changelog.append('* {0} - {1}'.format(date, description))
-                    else:
-                        other_changes = True
-                    changes_found = True
+            log = SourceCollector._run(
+                "hg log -f -b {0} --template '{{date|shortdate}} {{rev}} {{desc|firstline}}\n'".format(
+                    ' -b '.join(branches)
+                ), SourceCollector.repo_path_code
+            )
+            for log_line in log.strip().split('\n'):
+                if SourceCollector._ignore_log(log_line):
+                    continue
+                date, log_revision, description = log_line.split(' ', 2)
+                active_tag = None
+                for tag in tag_data:
+                    if tag['rev_number'] == log_revision and tag['suffix'] >= suffix:
+                        active_tag = tag
+                if active_tag is not None:
+                    if changes_found is False:
+                        increment_build = False
+                    if other_changes is True:
+                        changelog.append('* Internal updates')
+                    changelog.append('\n{0}{1}\n'.format(
+                        active_tag['version'],
+                        '-{0}.{1}'.format(
+                            active_tag['suffix'], active_tag['build']
+                        ) if active_tag['suffix'] is not None else ''
+                    ))
+                    other_changes = False
+                if re.match('^OVS\-[0-9]{1,5}', description):
+                    changelog.append('* {0} - {1}'.format(date, description))
+                else:
+                    other_changes = True
+                changes_found = True
             if other_changes is True:
                 changelog.append('* Other internal updates')
 
@@ -259,7 +259,7 @@ class SourceCollector(object):
         print '  Full version: {0}'.format(version_string)
 
         # Tag revision
-        if distribution in ['test', 'stable', 'release'] and revision is None and increment_build is True:
+        if distribution in ['alpha', 'beta', 'release'] and revision is None and increment_build is True:
             print '  Tagging revision'
             SourceCollector._run(
                 'hg tag -r {0} {1}'.format(current_revision, version_string),

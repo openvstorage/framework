@@ -102,6 +102,7 @@ class MockVDisk():
     cinder_id = None
     snapshots = []
     vmachine_guid = None
+    parentsnapshot = None
 
     def __init__(self, guid = MOCK_vdisk_guid,
                  devicename = None,
@@ -145,6 +146,8 @@ class MockVDiskList():
     def get_vdisks(self):
         return self.vdisks
 
+    def get_by_parentsnapshot(self, snapshotid):
+        return []
 
 class MockPMachineList():
 

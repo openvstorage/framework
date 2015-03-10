@@ -19,7 +19,7 @@ import copy
 import os
 import re
 import uuid
-
+import json
 from ConfigParser import RawConfigParser
 from subprocess import check_output
 from ovs.celery_run import celery
@@ -39,6 +39,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.extensions.support.agent import SupportAgent
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
@@ -189,7 +190,7 @@ if Service.has_service('{0}'):
                     connection_password = parameters['connection_password']
                     client = OVSClient(connection_host, connection_port,
                                        connection_username, connection_password)
-                task_id = client.call('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
+                task_id = client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successfull, metadata = client.wait_for_task(task_id, timeout=300)
                 if successfull is False:
                     raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
@@ -519,7 +520,13 @@ os.chmod('{0}', 0777)
                     config.set(section, key, value)
             config_dir = '{0}/storagedriver/storagedriver'.format(System.read_remote_config(client, 'ovs.core.cfgdir'))
             client.dir_ensure(config_dir, recursive=True)
-            System.write_config(config, '{0}/{1}.alba'.format(config_dir, vpool_name), client)
+            System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
+            client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
+                'log_level': 'debug',
+                'port': alba_proxy.service.ports[0],
+                'ips': ['127.0.0.1'],
+                'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
+            }))
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
         storagedriver_config.load(client)
@@ -604,8 +611,6 @@ for filename in {1}:
                   '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
                   '<UUID>': str(uuid.uuid4())}
-        if vpool.backend_type.code == 'alba':
-            params['<ALBA_PROXY_PORT>'] = str(alba_proxy.service.ports[0])
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
@@ -917,6 +922,75 @@ if Service.has_service('{0}'):
         """
         return {'storagerouter_guid': storagerouter_guid,
                 'versions': Package.get_versions()}
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_support_info')
+    def get_support_info(storagerouter_guid):
+        """
+        Returns support information regarding a given StorageRouter
+        """
+        return {'storagerouter_guid': storagerouter_guid,
+                'nodeid': Configuration.get('ovs.support.nid'),
+                'clusterid': Configuration.get('ovs.support.cid'),
+                'enabled': int(Configuration.get('ovs.support.enabled')) > 0,
+                'enablesupport': int(Configuration.get('ovs.support.enablesupport')) > 0}
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_support_metadata')
+    def get_support_metadata():
+        """
+        Returns support metadata for a given storagerouter. This should be a routed task!
+        """
+        return SupportAgent.get_heartbeat_data()
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_logfiles')
+    def get_logfiles(local_storagerouter_guid):
+        """
+        Collects logs, moves them to a web-accessible location and returns log tgz's filename
+        """
+        storagerouter = StorageRouter(local_storagerouter_guid)
+        webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
+        logfile = check_output('ovs collect logs', shell=True).strip()
+        logfilename = logfile.split('/')[-1]
+        client = SSHClient.load(storagerouter.ip)
+        client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
+        client.run('chmod 666 {0}/{1}'.format(webpath, logfilename))
+        return logfilename
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.configure_support')
+    def configure_support(enable, enable_support):
+        """
+        Configures support on all StorageRouters
+        """
+        for storagerouter in StorageRouterList.get_storagerouters():
+            client = SSHClient.load(storagerouter.ip)
+            System.set_remote_config(client, 'ovs.support.enabled', 1 if enable else 0)
+            System.set_remote_config(client, 'ovs.support.enablesupport', 1 if enable_support else 0)
+            if enable_support is False:
+                System.run('service openvpn stop', client)
+                System.run('rm -f /etc/openvpn/ovs_*', client)
+            if enable is True:
+                script = """
+from ovs.plugin.provider.service import Service
+if not Service.has_service('{0}'):
+    Service.add_service('', '{0}', '', '', {1})
+    Service.enable_service('{0}')
+if not Service.get_service_status('{0}'):
+    Service.start_service('{0}')
+else:
+    Service.restart_service('{0}')"""
+                System.exec_remote_python(client, script.format('support-agent', {}))
+            else:
+                script = """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    if Service.get_service_status('{0}'):
+        Service.stop_service('{0}')
+    Service.remove_service('', '{0}')"""
+                System.exec_remote_python(client, script.format('support-agent'))
+        return True
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.check_s3')

@@ -84,7 +84,9 @@ class OpenStackCinder(object):
         try:
             from cinder import version
             version = version.version_string()
-            if version.startswith('2015.1'):
+            if version.startswith('2015.2'):
+                return 'kilo'  # For the moment use K driver
+            elif version.startswith('2015.1'):
                 return 'kilo'
             elif version.startswith('2014.2'):
                 return 'juno'
@@ -93,23 +95,54 @@ class OpenStackCinder(object):
         except Exception as ex:
             raise ValueError('Cannot determine cinder version: %s' % str(ex))
 
+    def _get_existing_driver_version(self):
+        """
+        Get VERSION string from existing driver
+        """
+        try:
+            from cinder.volume.drivers import openvstorage
+        except ImportError:
+            pass
+        else:
+            if hasattr(openvstorage, 'OVSVolumeDriver'):
+                return getattr(openvstorage.OVSVolumeDriver, 'VERSION', '0.0.0')
+        return '0.0.0'
+
+    def _get_remote_driver_version(self, location):
+        """
+        Get VERSION string from downloaded driver
+        """
+        with open(location, 'r') as f:
+            for line in f.readlines():
+                if 'VERSION = ' in line:
+                    return line.split('VERSION = ')[-1].strip().replace("'", "").replace('"', "")
+        return '0.0.0'
+
     def _get_driver_code(self):
         """
-        WGET driver, temporary, until driver is included in openstack
+        WGET driver, compare versions, allow local code to be updated from OVS repo until driver is patched upstream
         """
         version = self._get_version()
-        driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
-        print('Using driver %s' % driver)
+        remote_driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
+        temp_location = "/tmp/openvstorage.py"
+        self.client.run('wget {0} -P /tmp'.format(remote_driver))
+
+        existing_version = self._get_existing_driver_version()
+        remote_version = self._get_remote_driver_version(temp_location)
         if self.is_devstack:
-            if os.path.exists('/opt/stack/devstack/cinder'):
-                if not os.path.exists('/opt/stack/devstack/cinder/cinder/volume/drivers/openvstorage.py'):
-                    self.client.run('wget %s -P /opt/stack/devstack/cinder/cinder/volume/drivers' % driver)
-            elif os.path.exists('/opt/stack/cinder'):
-                if not os.path.exists('/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'):
-                    self.client.run('wget %s -P /opt/stack/cinder/cinder/volume/drivers' % driver)
+            cinder_base_path = self._get_base_path('cinder')
+            local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
         elif self.is_openstack:
-            if not os.path.exists('/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'):
-                self.client.run('wget %s -P /usr/lib/python2.7/dist-packages/cinder/volume/drivers' % driver)
+            local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
+        if remote_version > existing_version:
+            print('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
+            if self.is_devstack:
+                self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
+            elif self.is_openstack:
+                self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
+        else:
+            print('Using driver {0} version {1}'.format(local_driver, existing_version))
+        self.client.run('rm {0}'.format(temp_location))
 
     def _is_devstack(self):
         try:
@@ -182,11 +215,11 @@ class OpenStackCinder(object):
         if not self.client.file_exists(CINDER_CONF):
             return False
 
-        self.client.run("""python -c '''from ConfigParser import ConfigParser
+        self.client.run("""python -c '''from ConfigParser import RawConfigParser
 changed = False
 vpool_name = "%s"
 CINDER_CONF = "%s"
-cfg = ConfigParser()
+cfg = RawConfigParser()
 cfg.read([CINDER_CONF]);
 if not cfg.has_section(vpool_name):
     changed = True
@@ -213,11 +246,11 @@ if not vpool_name in enabled_backends:
         if not self.client.file_exists(CINDER_CONF):
             return False
 
-        self.client.run("""python -c '''from ConfigParser import ConfigParser
+        self.client.run("""python -c '''from ConfigParser import RawConfigParser
 changed = False
 vpool_name = "%s"
 CINDER_CONF = "%s"
-cfg = ConfigParser()
+cfg = RawConfigParser()
 cfg.read([CINDER_CONF]);
 if cfg.has_section(vpool_name):
     changed = True
@@ -318,18 +351,17 @@ if vpool_name in enabled_backends:
 
     def _apply_patches(self):
         # fix run_as_root issue
+        cinder_base_path = self._get_base_path('cinder')
+        nova_base_path = self._get_base_path('nova')
         if self.is_devstack:
-            if os.path.exists('/opt/stack/devstack/cinder'):
-                self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /opt/stack/devstack/cinder/cinder/image/image_utils.py''')
-            elif os.path.exists('/opt/stack/cinder'):
-                self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /opt/stack/cinder/cinder/image/image_utils.py''')
+            self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' {0}/image/image_utils.py'''.format(cinder_base_path))
         elif self.is_openstack:
             self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /usr/lib/python2.7/dist-packages/cinder/image/image_utils.py''')
 
         # fix "blockdev" issue
         if self.is_devstack:
-            nova_volume_file = '/opt/stack/nova/nova/virt/libvirt/volume.py'
-            nova_driver_file = '/opt/stack/nova/nova/virt/libvirt/driver.py'
+            nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
+            nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
         elif self.is_openstack:
             nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
             nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
@@ -393,3 +425,8 @@ if not patched:
                         self.cinder_client.volume_types.delete(v.id)
                     except Exception:
                         pass
+
+    def _get_base_path(self, component):
+        exec('import %s' % component, locals())
+        module = locals().get(component)
+        return os.path.dirname(module.__file__)

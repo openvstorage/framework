@@ -64,3 +64,10 @@ class InvalidRelationException(Exception):
     Raised when a modeled relation is not confirm the relation's design
     """
     pass
+
+
+class VolatileObjectException(Exception):
+    """
+    Raised when ceratin actions are executed on a volatile object (e.g. save)
+    """
+    pass

@@ -152,6 +152,9 @@ def setup_hook(hook_type):
         """
         if not hasattr(function, 'hooks'):
             function.hooks = []
-        function.hooks.append(hook_type)
+        if isinstance(hook_type, list):
+            function.hooks += hook_type
+        else:
+            function.hooks.append(hook_type)
         return function
     return wrap

@@ -15,8 +15,8 @@
 """
 Generic volatile factory.
 """
-from configobj import ConfigObj
 import os
+from ConfigParser import RawConfigParser
 from ovs.plugin.provider.configuration import Configuration
 
 
@@ -39,12 +39,12 @@ class VolatileFactory(object):
             if client_type == 'memcache':
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 memcache_servers = list()
-                memcache_config = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-                nodes = memcache_config.get('main')['nodes'] if type(memcache_config.get('main')['nodes']) == list else [memcache_config.get('main')['nodes']]
-                nodes = [node.strip() for node in nodes]
+                memcache_config = RawConfigParser()
+                memcache_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+                nodes = [node.strip() for node in memcache_config.get('main', 'nodes').split(',')]
                 nodes.sort()
                 for node in nodes:
-                    location = memcache_config.get(node)['location']
+                    location = memcache_config.get(node, 'location')
                     memcache_servers.append(location)
                 VolatileFactory.store = MemcacheStore(memcache_servers)
             if client_type == 'default':

@@ -18,8 +18,8 @@ Statistics module
 
 import datetime
 import memcache
-from configobj import ConfigObj
 import os
+from ConfigParser import RawConfigParser
 from backend.decorators import required_roles, load, log
 from rest_framework import viewsets
 from rest_framework.response import Response
@@ -41,12 +41,10 @@ class MemcacheViewSet(viewsets.ViewSet):
         """
         Get the memcache nodes
         """
-        memcache_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
-        nodes = memcache_ini['main']['nodes']
-        if not isinstance(nodes, list):
-            nodes = nodes.split(',')
-        nodes = [node.strip() for node in nodes]
-        return [memcache_ini[node]['location'] for node in nodes]
+        memcache_ini = RawConfigParser()
+        memcache_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+        nodes = [node.strip() for node in memcache_ini.get('main', 'nodes').split(',')]
+        return [memcache_ini.get(node, 'location') for node in nodes]
 
     @staticmethod
     def _node_stats(host):

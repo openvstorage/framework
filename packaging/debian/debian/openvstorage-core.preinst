@@ -1,14 +1,15 @@
 #!/bin/bash
 
-pip install celery
+pip install kombu==3.0.7
+pip install celery==3.1.6
 pip install suds-jurko==0.5
-pip install configobj==4.7.2
 pip install pika
 pip install six --upgrade
 pip install protobuf
 pip install choice
 pip install pyudev
 pip install datadiff
+pup install requests --upgrade
 
 id -a ovs &> /dev/null
 if [[ $? -eq 1 ]]

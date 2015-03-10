@@ -81,3 +81,17 @@ class VDiskList(object):
                                      'items': [('vmachine_guid', DataList.operator.EQUALS, None)]}}).data
         # pylint: enable=line-too-long
         return DataObjectList(vdisks, VDisk)
+
+    @staticmethod
+    def get_by_parentsnapshot(snapshotid):
+        """
+        Gets all vDisks whose parentsnapshot is snapshotid
+        """
+        # pylint: disable=line-too-long
+        vdisks = DataList({'object': VDisk,
+                           'data': DataList.select.GUIDS,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items':[('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
+
+        # pylint: enable=line-too-long
+        return DataObjectList(vdisks, VDisk)

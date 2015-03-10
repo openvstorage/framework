@@ -20,7 +20,9 @@ import copy
 import re
 import json
 import inspect
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException, SaveRaceConditionException, InvalidRelationException
+from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
+                                MissingMandatoryFieldsException, SaveRaceConditionException, InvalidRelationException,
+                                VolatileObjectException)
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
@@ -138,7 +140,7 @@ class DataObject(object):
             return super(cls, new_class).__new__(new_class, *args, **kwargs)
         return super(DataObject, cls).__new__(cls)
 
-    def __init__(self, guid=None, data=None, datastore_wins=False):
+    def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False):
         """
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
@@ -163,6 +165,7 @@ class DataObject(object):
 
         # Initialize public fields
         self.dirty = False
+        self.volatile = volatile
 
         # Worker fields/objects
         self._name = self.__class__.__name__.lower()
@@ -438,6 +441,9 @@ class DataObject(object):
         It will also invalidate certain caches if required. For example lists pointing towards this
         object
         """
+        if self.volatile is True:
+            raise VolatileObjectException()
+
         tries = 0
         successful = False
         while successful is False:
@@ -612,6 +618,9 @@ class DataObject(object):
         """
         Delete the given object. It also invalidates certain lists
         """
+        if self.volatile is True:
+            raise VolatileObjectException()
+
         # Check foreign relations
         relations = RelationMapper.load_foreign_relations(self.__class__)
         if relations is not None:
@@ -709,6 +718,15 @@ class DataObject(object):
             if properties is None or dynamic.name in properties:
                 self._volatile.delete('{0}_{1}'.format(self._key, dynamic.name))
 
+    def export(self):
+        """
+        Exports this object's data for import in another object
+        """
+        data = {}
+        for prop in self._properties:
+            data[prop.name] = self._data[prop.name]
+        return data
+
     def serialize(self, depth=0):
         """
         Serializes the internal data, getting rid of certain metadata like descriptors
@@ -765,6 +783,9 @@ class DataObject(object):
         """
         Checks whether this object has been modified on the datastore
         """
+        if self.volatile is True:
+            return False
+
         this_version = self._data['_version']
         try:
             store_version = self._persistent.get(self._key)['_version']
