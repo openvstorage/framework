@@ -422,6 +422,11 @@ os.chmod('{0}', 0777)
             readcache1_size = '{0}KiB'.format((int(read_cache1_fs.f_bavail * readcache1_factor / 4096) * 4096) * 4)
             readcache2_size = '{0}KiB'.format((int(read_cache2_fs.f_bavail * readcache2_factor / 4096) * 4096) * 4)
 
+        if vpool.backend_type.code == 'alba':
+            size = int(float(scocache_size[:-3]) / 2.0) - 1
+            scocache_size = '{0}KiB'.format(size)
+            # @TODO: Implement Alba fragment cache size # fragment_cache_size = size
+
         model_ports_in_use = []
         for port_storagedriver in StorageDriverList.get_storagedrivers():
             if port_storagedriver.storagerouter_guid == storagerouter.guid:
@@ -520,11 +525,14 @@ os.chmod('{0}', 0777)
                     config.set(section, key, value)
             config_dir = '{0}/storagedriver/storagedriver'.format(System.read_remote_config(client, 'ovs.core.cfgdir'))
             client.dir_ensure(config_dir, recursive=True)
+            cache_dir = '{}/fcache_{}'.format(mountpoint_writecache, vpool_name)
+            client.dir_ensure(cache_dir, recursive=True)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
             client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
                 'log_level': 'debug',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
+                'fragment_cache_dir': cache_dir,
                 'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
             }))
 
