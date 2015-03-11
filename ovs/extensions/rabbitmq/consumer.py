@@ -114,7 +114,7 @@ if __name__ == '__main__':
                                 mapping[key] += this_mapping[key]
             logger.debug('Event map:')
             for key in mapping:
-                logger.debug('{0}: {1}'.format(mapping[key][0]['property'], [current_map['task'].__name__ for current_map in mapping[key]]))
+                logger.debug('{0}: {1}'.format(key.name, [current_map['task'].__name__ for current_map in mapping[key]]))
 
             # Starting connection and handling
             rmq_ini = RawConfigParser()
