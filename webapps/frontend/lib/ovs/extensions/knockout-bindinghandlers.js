@@ -171,21 +171,25 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
     };
     ko.bindingHandlers.shortText = {
         init: function(element, valueAccessor, allBindings) {
-            var value = valueAccessor(),
+            var shortValue, value = valueAccessor(),
                 maxLength = allBindings.get('maxLength');
             if (maxLength !== undefined) {
                 if (value.length > maxLength - 3) {
-                    value = value.substr(0, maxLength - 3) + '&hellip;';
+                    shortValue = value.substr(0, maxLength - 3) + '&hellip;';
+                    $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
+                    return;
                 }
             }
-            $(element).text(value);
+            $(element).html(value);
         },
         update: function(element, valueAccessor, allBindings) {
-            var value = valueAccessor(),
+            var shortValue, value = valueAccessor(),
                 maxLength = allBindings.get('maxLength');
             if (maxLength !== undefined) {
                 if (value.length > maxLength - 3) {
-                    value = value.substr(0, maxLength - 3) + '&hellip;';
+                    shortValue = value.substr(0, maxLength - 3) + '&hellip;';
+                    $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
+                    return;
                 }
             }
             $(element).html(value);
