@@ -190,5 +190,14 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
             }
             $(element).html(value);
         }
-    }
+    };
+    ko.bindingHandlers.let = {
+        'init': function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
+            // Make a modified binding context, with extra properties, and apply it to descendant elements
+            var innerContext = bindingContext.extend(valueAccessor());
+            ko.applyBindingsToDescendants(innerContext, element);
+            return { controlsDescendantBindings: true };
+        }
+    };
+    ko.virtualElements.allowedBindings['let'] = true;
 });
