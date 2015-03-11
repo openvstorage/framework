@@ -34,7 +34,9 @@ limitations under the License.
                 <!-- /ko -->
                 &nbsp; <span class="caret"></span>
             </button>
-            <!-- ko template: { name: 'dropdown-left-template' } -->
+            <!-- ko let: { side: 'left' } -->
+                <!-- ko compose: '../widgets/dropdown/contents.html' -->
+                <!-- /ko -->
             <!-- /ko -->
             <span data-bind="visible: items().length === 0" class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin: 10px 0 0 10px;"></span>
         </div>
@@ -50,7 +52,9 @@ limitations under the License.
                                    attr: { id: (target.hasOwnProperty('identifier') ? ('dropdown-button-' + target.identifier) : undefined) } ">
                     <span data-i18n="ovs:generic.customvalue"></span>
                 </button>
-                <!-- ko template: { name: 'dropdown-left-template' } -->
+                <!-- ko let: { side: 'left' } -->
+                    <!-- ko compose: '../widgets/dropdown/contents.html' -->
+                    <!-- /ko -->
                 <!-- /ko -->
             </div>
             <input type="text" data-bind="value: freeValue, valueUpdate: 'afterkeydown'" class="form-control"/>
@@ -63,7 +67,9 @@ limitations under the License.
                                attr: { id: (target.hasOwnProperty('identifier') ? ('dropdown-button-' + target.identifier) : undefined) } ">
                     <span class="caret"></span>
                 </button>
-                <!-- ko template: { name: 'dropdown-right-template' } -->
+                <!-- ko let: { side: 'right' } -->
+                    <!-- ko compose: '../widgets/dropdown/contents.html' -->
+                    <!-- /ko -->
                 <!-- /ko -->
             </div>
         </div>
@@ -71,47 +77,4 @@ limitations under the License.
             <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
         </div>
     <!-- /ko -->
-    <script type="text/html" id="dropdown-left-template">
-        <ul class="dropdown-menu" role="menu" style="max-height: 250px; overflow: auto; z-index: 6000;" data-bind="visible: items().length > 0">
-            <!-- ko template: { name: 'dropdown-contents-template', afterRender: translate } -->
-            <!-- /ko -->
-        </ul>
-    </script>
-    <script type="text/html" id="dropdown-right-template">
-        <ul class="dropdown-menu dropdown-menu-right" role="menu" style="max-height: 250px; overflow: auto; z-index: 6000;" data-bind="visible: items().length > 0">
-            <!-- ko template: { name: 'dropdown-contents-template', afterRender: translate } -->
-            <!-- /ko -->
-        </ul>
-    </script>
-    <script type="text/html" id="dropdown-contents-template">
-        <!-- ko foreach: items -->
-            <li data-bind="css: {
-                               active: $parent.multi() ? false : !$parent.useFree() && (
-                                   $data !== undefined && $parent.target() !== undefined && $parent.key() !== undefined ? (
-                                       $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
-                                                                 $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
-                                   ) : $parent.target() === $data
-                               )
-                           },
-                           click: function() { $parent.useFree(false); $parent.set($data); }" class="hand">
-                <a style="white-space: nowrap;">
-                    <span data-bind="visible: $parent.multi()">
-                        <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>
-                        <span data-bind="visible: !$parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.notchecked"></span>
-                        &nbsp;
-                    </span>
-                    <span data-part="list-item"></span>
-                    <span data-bind="text: $parent.text($data)"></span>
-                </a>
-            </li>
-        <!-- /ko -->
-        <!-- ko if: free() && !multi() -->
-            <li data-bind="css: { active: $.inArray(target(), items()) === -1 && useFree() },
-                           click: function() { useFree(true); set(freeValue()); }" class="hand">
-                <a style="white-space: nowrap;">
-                    <i><span data-i18n="ovs:generic.customvalue"></span>&nbsp;<span data-bind="text: freeValue()"></span></i>
-                </a>
-            </li>
-        <!-- /ko -->
-    </script>
 </section>
