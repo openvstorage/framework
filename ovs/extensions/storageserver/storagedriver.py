@@ -16,7 +16,7 @@
 Wrapper class for the storagedriverclient of the voldrv team
 """
 
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, MDSClient, MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
 import json
@@ -234,9 +234,16 @@ class StorageDriverConfiguration(object):
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
                 self.is_new = False
+            if self.config_type == 'storagedriver':
+                LSRClient(self.path).update_configuration(self.path)
         else:
             client.run('mkdir -p {0}'.format(self.base_path))
             client.file_write(self.path, contents)
+            if self.config_type == 'storagedriver':
+                client.run('python -c """{0}"""'.format("""
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
+LocalStorageRouterClient('{0}').update_configuration('{0}')
+""".format(self.path)))
             self.is_new = False
 
     def clean(self):
@@ -275,11 +282,13 @@ class StorageDriverConfiguration(object):
         backend_connection_manager = 'backend_connection_manager'
         backend_type = 'backend_type'
         if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'REST':
-            self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
-            self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
+            if 'rest_connection_policy_id' in self.params[self.config_type][backend_connection_manager]['mandatory']:
+                self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
+                self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
         if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'LOCAL':
-            self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
-            self.params[self.config_type][backend_connection_manager]['optional'].append('local_connection_path')
+            if 'local_connection_path' in self.params[self.config_type][backend_connection_manager]['mandatory']:
+                self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
+                self.params[self.config_type][backend_connection_manager]['optional'].append('local_connection_path')
         # Validation
         errors = []
         for section, entries in self.params[self.config_type].iteritems():
