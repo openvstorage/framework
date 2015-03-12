@@ -70,7 +70,7 @@ class StorageRouterController(object):
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
                        and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
-                       and p.split(' ')[2] != '/']
+                       and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
         arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
