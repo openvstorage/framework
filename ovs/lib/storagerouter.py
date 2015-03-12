@@ -74,6 +74,9 @@ class StorageRouterController(object):
         arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
+        # include directories chosen during ovs setup
+        dirs = Configuration.get('ovs.vpool_partitions.dirs').split(',')
+        mountpoints.extend(dirs)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:

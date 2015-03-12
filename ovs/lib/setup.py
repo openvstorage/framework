@@ -158,7 +158,7 @@ class SetupController(object):
             local_unique_id = System.get_my_machine_id()
             remote_install = unique_id != local_unique_id
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
-            if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):
+            if not target_client.file_exists(SetupController.ovs_config_filename):
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
             System.set_remote_config(target_client, 'ovs.core.uniqueid', unique_id)
 
@@ -389,6 +389,21 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
 
         target_client = SSHClient.load(cluster_ip)
         disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
+
+        # add directory mountpoints to ovs.cfg
+        config = SetupController._remote_config_read(target_client, SetupController.ovs_config_filename)
+        partition_key = 'vpool_partitions'
+        if config.has_section(partition_key):
+            config.remove_section(partition_key)
+        config.add_section(partition_key)
+
+        additional_mountpoints = list()
+        for mountpoint, details in disk_layout.iteritems():
+            if 'DIR_ONLY' in details['device']:
+                additional_mountpoints.append(mountpoint)
+        config.set(partition_key, 'dirs', ','.join(map(str, additional_mountpoints)))
+        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, config)
+
         mountpoints = disk_layout.keys()
         mountpoints.sort()
 
@@ -832,8 +847,7 @@ EOF
                 raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
             master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
 
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            ovs_config = SetupController._remote_config_read(target_client, SetupController.ovs_config_filename)
             unique_id = ovs_config.get('core', 'uniqueid')
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
@@ -1135,8 +1149,7 @@ EOF
                 raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
             master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
 
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            ovs_config = SetupController._remote_config_read(target_client, SetupController.ovs_config_filename)
             unique_id = ovs_config.get('core', 'uniqueid')
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
@@ -1562,14 +1575,10 @@ print blk_devices
         if nr_of_disks == 1:
             mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
             mountpoints_to_allocate['/var/tmp']['percentage'] = 20
-            mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/mnt/bfs']['percentage'] = 80
 
         elif nr_of_disks >= 2:
             mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
             mountpoints_to_allocate['/var/tmp']['percentage'] = 100
-            mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[1]
-            mountpoints_to_allocate['/mnt/bfs']['percentage'] = 100
 
         if nr_of_ssds == 1:
             mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
