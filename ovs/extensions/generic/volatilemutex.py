@@ -31,7 +31,7 @@ class VolatileMutex(object):
     lock for longer than a few hundred milliseconds to prevent this.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, wait=None):
         """
         Creates a volatile mutex object
         """
@@ -39,6 +39,19 @@ class VolatileMutex(object):
         self.name = name
         self._has_lock = False
         self._start = 0
+        self._wait = wait
+
+    def __call__(self, wait):
+        self._wait = wait
+        return self
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        _ = args, kwargs
+        self.release()
 
     def acquire(self, wait=None):
         """
@@ -47,6 +60,8 @@ class VolatileMutex(object):
         if self._has_lock:
             return True
         self._start = time.time()
+        if wait is None:
+            wait = self._wait
         while not self._volatile.add(self.key(), 1, 60):
             time.sleep(0.005)
             passed = time.time() - self._start
