@@ -551,4 +551,11 @@ class OVSVolumeDriver(driver.VolumeDriver):
         :return True/False
         """
         LOG.debug('[_FIND CHILDREN OF SNAPSHOT] Snapshotid %s' % snapshotid)
-        return len(vdisklist.VDiskList.get_by_parentsnapshot(snapshotid)) > 0
+        if hasattr(vdisklist.VDiskList, 'get_by_parentsnapshot'):
+            return len(vdisklist.VDiskList.get_by_parentsnapshot(snapshotid)) > 0
+        else:  # on 2.0.0
+            for vdisk in VDiskList.get_vdisks():
+                if vdisk.parentsnapshot == snapshotid:
+                    return True
+        return False
+
