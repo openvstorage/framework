@@ -554,7 +554,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         if hasattr(vdisklist.VDiskList, 'get_by_parentsnapshot'):
             return len(vdisklist.VDiskList.get_by_parentsnapshot(snapshotid)) > 0
         else:  # on 2.0.0
-            for vdisk in VDiskList.get_vdisks():
+            for vdisk in vdisklist.VDiskList.get_vdisks():
                 if vdisk.parentsnapshot == snapshotid:
                     return True
         return False
