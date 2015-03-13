@@ -569,7 +569,7 @@ os.chmod('{0}', 0777)
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=queue_volumerouterqueue,
                                                        events_amqp_uris=queue_urls)
-        storagedriver_config.save(client)
+        storagedriver_config.save(client, reload_config=False)
 
         # Updating the model
         storagedriver.storagedriver_id = vrouter_id
@@ -600,7 +600,7 @@ os.chmod('{0}', 0777)
             if storagedriver_config.is_new is False:
                 storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
-                storagedriver_config.save(node_client)
+                storagedriver_config.save(node_client, reload_config=(sr.ip != ip))
         client = SSHClient.load(ip)
 
         dirs2create.append(storagedriver.mountpoint)

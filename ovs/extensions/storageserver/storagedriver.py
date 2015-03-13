@@ -222,7 +222,7 @@ class StorageDriverConfiguration(object):
                 self.is_new = False
         self.configuration = json.loads(contents)
 
-    def save(self, client=None):
+    def save(self, client=None, reload_config=True):
         """
         Saves the configuration to a given file, optionally a remote one
         """
@@ -233,13 +233,13 @@ class StorageDriverConfiguration(object):
                 os.makedirs(self.base_path)
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
-            if self.config_type == 'storagedriver' and self.is_new is False:
+            if self.config_type == 'storagedriver' and reload_config is True:
                 LSRClient(self.path).update_configuration(self.path)
             self.is_new = False
         else:
             client.run('mkdir -p {0}'.format(self.base_path))
             client.file_write(self.path, contents)
-            if self.config_type == 'storagedriver' and self.is_new is False:
+            if self.config_type == 'storagedriver' and reload_config is True:
                 client.run('python -c """{0}"""'.format("""
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
 LocalStorageRouterClient('{0}').update_configuration('{0}')
