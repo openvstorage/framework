@@ -360,6 +360,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function getColor(index) {
+        var colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
+        return colors[index % colors.length];
+    }
 
     return {
         getTimestamp             : getTimestamp,
@@ -393,6 +397,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         numberSort               : numberSort,
         advancedSort             : advancedSort,
         validate                 : validate,
-        overlap                  : overlap
+        overlap                  : overlap,
+        getColor                 : getColor
     };
 });
