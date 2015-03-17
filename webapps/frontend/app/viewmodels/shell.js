@@ -113,8 +113,9 @@ define([
                                     }).promise();
                                     moduleHandler.then(function() {
                                         return $.Deferred(function(moduleDeferred) {
-                                            require(['ovs/routes/' + plugin], function(routes) {
-                                                routing.extraRoutes.push(routes.routes);
+                                            require(['ovs/hooks/' + plugin], function(hook) {
+                                                routing.extraRoutes.push(hook.routes);
+                                                shared.hooks.dashboards.push(hook.dashboards);
                                                 moduleDeferred.resolve();
                                             });
                                         }).promise();
