@@ -36,11 +36,12 @@ class StorageDriver(DataObject):
                     Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
                     Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
-                    Property('mountpoint_bfs', str, doc='Mountpoint for the backend filesystem (used for local and distributed fs)'),
+                    Property('mountpoint_bfs', str, doc='Mountpoint for backend filesystem (local or distributed fs)'),
                     Property('mountpoint_md', str, doc='Mountpoint for metadata'),
-                    Property('mountpoint_readcache1', str, doc='Mountpoint for read cache 1'),
-                    Property('mountpoint_readcache2', str, doc='Mountpoint for read cache 2'),
-                    Property('mountpoint_writecache', str, doc='Mountpoint for write cache'),
+                    Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
+                    Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
+                    Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
+                    Property('mountpoint_writecaches', list, doc='Write cache mountpoints'),
                     Property('mountpoint_foc', str, doc='Mountpoint for failover cache')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
