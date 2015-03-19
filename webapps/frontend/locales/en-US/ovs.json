@@ -184,7 +184,8 @@
         "backendtype": "Type",
         "storageip": "Storage IP",
         "namespace": "Backend location",
-        "usage": "Usage"
+        "usage": "Usage",
+        "custompath": "Custom path"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -496,9 +497,8 @@
                 "tempfs": "Temporary FS:",
                 "bfs": "Backend FS:",
                 "md": "Metadata:",
-                "readcache1": "Read Cache 1:",
-                "readcache2": "Read Cache 2:",
-                "writecache": "Write Cache:",
+                "readcaches": "Read Caches:",
+                "writecaches": "Write Caches:",
                 "foc": "Failover Cache:",
                 "mtptinuse": "The given __what__ location is already in use on this Storage Router",
                 "ipaddress": "Storage IP:",

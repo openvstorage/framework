@@ -95,21 +95,12 @@ define([
                     reasons.push($.t('ovs:wizards.storageroutertovpool.confirm.errorvalidating'));
                 } else {
                     $.each(self.storageDrivers(), function(index, storageDriver) {
-                        if (self.storageDriver().mountpointReadCache1() === storageDriver.mountpointReadCache1() && $.inArray('readcache1', fields) === -1) {
+                        $.each(storageDriver.mountpoint_readcaches(), function(index, readcache_mp) {
+                            if ($.inArray(readcache_mp, self.storageDriver().mountpoint_readcaches()) !== -1 && $.inArray('readcache1', fields) === -1) {
                             valid = false;
-                            fields.push('readcache1');
+                            fields.push('readcaches');
                             reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-                        }
-                        if (self.storageDriver().mountpointReadCache2() === storageDriver.mountpointReadCache2() && $.inArray('readcache2', fields) === -1) {
-                            valid = false;
-                            fields.push('readcache2');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-                        }
-                        if (self.storageDriver().mountpointWriteCache() === storageDriver.mountpointWriteCache() && $.inArray('writecache', fields) === -1) {
-                            valid = false;
-                            fields.push('writecache');
-                            reasons.push($.t('ovs:wizards.addvpool.gathermountpoints.mtptinuse', { what: $.t('ovs:generic.cachefs') }));
-                        }
+                            }});
                         if (self.storageDriver().mountpointFOC() === storageDriver.mountpointFOC() && $.inArray('foc', fields) === -1) {
                             valid = false;
                             fields.push('foc');

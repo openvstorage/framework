@@ -2,14 +2,14 @@
     data-bind="visible: items().length > 0, css: { 'dropdown-menu-right': side == 'right' }">
     <!-- ko foreach: items -->
         <li data-bind="css: {
-                   active: $parent.multi() ? false : !$parent.useFree() && (
-                       $data !== undefined && $parent.target() !== undefined && $parent.key() !== undefined ? (
-                           $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
-                                                     $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
-                       ) : $parent.target() === $data
-                   )
-               },
-               click: function() { $parent.useFree(false); $parent.set($data); }" class="hand">
+                           active: $parent.multi() ? false : !$parent.useFree() && (
+                               $data !== undefined && $parent.target() !== undefined && $parent.key() !== undefined ? (
+                                   $parent.keyIsFunction() ? $parent.target() !== undefined && $parent.target()[$parent.key()]() === $data[$parent.key()]() :
+                                                             $parent.target() !== undefined && $parent.target()[$parent.key()] === $data[$parent.key()]
+                               ) : $parent.target() === $data
+                           )
+                       },
+                       click: function() { $parent.useFree(false); $parent.set($data); }" class="hand">
             <a style="white-space: nowrap;">
                 <span data-bind="visible: $parent.multi()">
                     <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>

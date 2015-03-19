@@ -211,18 +211,19 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout', 'connection_backend',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
+                  'mountpoint_readcaches', 'mountpoint_writecaches', 'mountpoint_foc',
                   'storage_ip', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
+
         parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
             if field not in call_parameters:
-                if field in ['mountpoint_readcache2', 'connection_backend']:
+                if field in ['connection_backend']:
                     parameters[field] = ''
                     continue
                 else:
                     raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = call_parameters[field]
-            if not isinstance(parameters[field], int):
+            if isinstance(parameters[field], basestring):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
