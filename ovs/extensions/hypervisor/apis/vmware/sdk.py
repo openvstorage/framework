@@ -681,6 +681,7 @@ class Sdk(object):
                     if match:
                         filename = match.group(2)
                         backingfile = filename.replace('.vmdk', '-flat.vmdk')
+                        backingfile = '/{0}'.format(backingfile.strip('/'))
                         config['disks'].append({'filename': filename,
                                                 'backingfilename': backingfile,
                                                 'datastore': match.group(1),
