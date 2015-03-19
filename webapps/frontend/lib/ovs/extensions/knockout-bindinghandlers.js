@@ -204,4 +204,68 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
         }
     };
     ko.virtualElements.allowedBindings['let'] = true;
+    ko.bindingHandlers.pie = {
+        init: function(element) {
+            var id = 'id_' + generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10), height = 200;
+            $(element).html('<div></div>');
+            $($(element).children()[0]).attr('id', id);
+            d3.select('#' + id).append('svg')
+                .attr('class', 'svg')
+                .attr('width', height * 2.5)
+                .attr('height', height)
+                .append('g')
+                .attr('class', 'container')
+                .attr('transform', 'translate(' + height / 2 + ',' + height / 2 + ')');
+        },
+        update: function(element, valueAccessor) {
+            var id, g, pie, arc, legend, size = 200, data = valueAccessor(),
+                color = d3.scale.ordinal().range([
+                    '#e6e6e6', '#b2b2b2', '#808080',
+                    '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
+                ]);
+            arc = d3.svg.arc()
+                .outerRadius(size / 2)
+                .innerRadius(0);
+            pie = d3.layout.pie()
+                .sort(null)
+                .value(function(d) { return d.value; });
+            id = $($(element).children()[0]).attr('id');
+            g = d3.select('#' + id).select('.container')
+                .selectAll('.arc')
+                .data(pie(data))
+                .enter()
+                .append('g')
+                .attr('class', 'arc');
+            g.append('path')
+                .attr('d', arc)
+                .style('fill', function(d) {
+                    var text = d.data.name + ' (' + generic.formatBytes(d.data.value);
+                    if (d.data.hasOwnProperty('percentage')) {
+                        text += ' - ' + generic.formatPercentage(d.data.percentage);
+                    }
+                    text += ')';
+                    return color(text);
+                });
+            legend = d3.select('#' + id).select('.svg').selectAll('.legend')
+                .data(color.domain())
+                .enter()
+                .append('g')
+                .attr('class', 'legend')
+                .attr('transform', function(d, i) {
+                    var height = 25,
+                        horz = 220,
+                        vert = i * height;
+                    return 'translate(' + horz + ',' + vert + ')';
+                });
+            legend.append('rect')
+                .attr('width', 15)
+                .attr('height', 15)
+                .style('fill', color)
+                .style('stroke', color);
+            legend.append('text')
+                .attr('x', 20)
+                .attr('y', 14)
+                .text(function(d) { return d; });
+        }
+    };
 });
