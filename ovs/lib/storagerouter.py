@@ -344,17 +344,17 @@ os.chmod('{0}', 0777)
         files2create = list()
         root_statvfs = os.statvfs('/')
         root_free = root_statvfs.f_bavail * root_statvfs.f_bsize
-        dir_only_factor = 0.3 / len(dir_onlys)
+        dir_only_factor = 0.3 if len(dir_onlys) == 0 else 0.3 / len(dir_onlys)
         readcaches = list()
         writecaches = list()
         all_mps = set(all_partition_mps)
         all_mps = all_mps.union(dir_onlys)
-        count = 1
 
         def match_clustersize(size):
             # int type in KiB
             return int(int(size / 1024 / 4096) * 4096)
 
+        count = 1
         for mp in all_mps:
             if mp in mountpoint_readcaches:
                 if mp in dir_onlys:
