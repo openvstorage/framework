@@ -9,7 +9,6 @@ pip install protobuf
 pip install choice
 pip install pyudev
 pip install datadiff
-pip install requests --upgrade
 
 id -a ovs &> /dev/null
 if [[ $? -eq 1 ]]
