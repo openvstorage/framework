@@ -113,12 +113,12 @@ class StorageDriverConfiguration(object):
 
     parameters = {
         # hg branch: 3.6
-        # hg revision: e5f56a826fe5
-        # buildTime: Wed Feb 18 19:55:45 CET 2015
+        # hg revision: f744d6d6e272
+        # buildTime: Thu Mar 19 10:24:18 UTC 2015
         'metadataserver': {
             'metadata_server': {
-                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', ],
-                'mandatory': ['mds_port', 'mds_scratch_dir', 'mds_rocksdb_path', ]
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', 'mds_port', ],
+                'mandatory': ['mds_scratch_dir', 'mds_rocksdb_path', ]
             },
             'backend_connection_manager': {
                 'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', ],
@@ -131,12 +131,12 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
             },
             'content_addressed_cache': {
-                'optional': ['serialize_read_cache', ],
-                'mandatory': ['read_cache_serialization_path', 'clustercache_mount_points', ]
+                'optional': ['serialize_read_cache', 'clustercache_mount_points', ],
+                'mandatory': ['read_cache_serialization_path', ]
             },
             'event_publisher': {
-                'optional': ['events_amqp_exchange', 'events_amqp_routing_key', ],
-                'mandatory': ['events_amqp_uris', ]
+                'optional': ['events_amqp_uris', 'events_amqp_exchange', 'events_amqp_routing_key', ],
+                'mandatory': []
             },
             'failovercache': {
                 'optional': [],
@@ -147,8 +147,8 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', ],
-                'mandatory': ['fs_virtual_disk_format', 'fs_file_event_rules', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', ]
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', ],
+                'mandatory': ['fs_virtual_disk_format', ]
             },
             'scocache': {
                 'optional': [],
