@@ -924,6 +924,7 @@ if Service.has_service('{0}'):
         logfile = check_output('ovs collect logs', shell=True).strip()
         logfilename = logfile.split('/')[-1]
         client = SSHClient.load(storagerouter.ip)
+        client.dir_ensure(webpath, recursive=True)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
         client.run('chmod 666 {0}/{1}'.format(webpath, logfilename))
         return logfilename
