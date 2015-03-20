@@ -1911,7 +1911,7 @@ print blk_devices
         SetupController.host_ips = set(ipaddresses)
         SetupController._change_service_state(client, 'dbus', 'start')
         SetupController._change_service_state(client, 'avahi-daemon', 'start')
-        discover_result = client.run('avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
+        discover_result = client.run('timeout -k 10 5 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         logger.debug('Avahi discovery result:\n{0}'.format(discover_result))
         for entry in discover_result.split('\n'):
             entry_parts = entry.split(';')
