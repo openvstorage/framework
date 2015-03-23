@@ -281,13 +281,13 @@ if Service.has_service('{0}'):
             else:
                 dir_onlys.append(mp)
         if is_partition(mountpoint_foc):
-            all_partition_mps.extend(mountpoint_foc)
+            all_partition_mps.append(mountpoint_foc)
         else:
             dir_onlys.append(mountpoint_foc)
 
         if vpool.backend_type.code == 'alba':
             if is_partition(mountpoint_fragmentcache):
-                all_partition_mps.extend(mountpoint_fragmentcache)
+                all_partition_mps.append(mountpoint_fragmentcache)
             else:
                 dir_onlys.append(mountpoint_fragmentcache)
 
@@ -361,7 +361,7 @@ os.chmod('{0}', 0777)
                     readcaches.append({'path': '{}/read{}_{}'.format(readcache_fs[mp]['path'], count, vpool_name),
                                        'size': '{0}KiB'.format(match_clustersize(root_free * dir_only_factor))})
                 else:
-                    r_size = (readcache_fs[mp]['statvfs'].f_bavail * readcache_fs[mp]['statvfs'].f_bsize)
+                    r_size = (readcache_fs[mp]['statvfs'].f_bavail * readcache_fs[mp]['statvfs'].f_bsize / 1024) / 4096 * 4096
                     readcaches.append({'path': '{}/read{}_{}'.format(readcache_fs[mp]['path'], count, vpool_name),
                                        'size': '{0}KiB'.format(match_clustersize(r_size * .98))})
                 files2create.append('{}/read{}_{}'.format(readcache_fs[mp]['path'], count, vpool_name))
