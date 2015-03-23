@@ -1058,6 +1058,8 @@ if not os.path.exists(configuration_dir):
     os.makedirs(configuration_dir)
 for json_file in os.listdir(configuration_dir):
     if json_file.endswith('.json'):
+        if os.path.exists('{0}/{1}.cfg'.format(configuration_dir, json_file.replace('.json', ''))):
+            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
         storagedriver_config = StorageDriverConfiguration('storagedriver', json_file.replace('.json', ''))
         storagedriver_config.load()
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
@@ -1224,6 +1226,8 @@ if not os.path.exists(configuration_dir):
     os.makedirs(configuration_dir)
 for json_file in os.listdir(configuration_dir):
     if json_file.endswith('.json'):
+        if os.path.exists('{0}/{1}.cfg'.format(configuration_dir, json_file.replace('.json', ''))):
+            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
         storagedriver_config = StorageDriverConfiguration('storagedriver', json_file.replace('.json', ''))
         storagedriver_config.load()
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
@@ -2051,6 +2055,8 @@ if not os.path.exists(configuration_dir):
 for json_file in os.listdir(configuration_dir):
     this_vpool_name = json_file.replace('.json', '')
     if json_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
+        if os.path.exists('{{0}}/{{1}}.cfg'.format(configuration_dir, this_vpool_name)):
+            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
         storagedriver_configuration = StorageDriverConfiguration('storagedriver', this_vpool_name)
         storagedriver_configuration.load()
         storagedriver_configuration.configure_event_publisher(events_amqp_routing_key=Configuration.get('ovs.core.broker.volumerouter.queue'),

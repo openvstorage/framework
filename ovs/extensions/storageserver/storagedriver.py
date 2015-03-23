@@ -16,12 +16,15 @@
 Wrapper class for the storagedriverclient of the voldrv team
 """
 
+import os
+import json
+import copy
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
-import json
-import os
-import copy
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('extensions', name='storagedriver')
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}
@@ -192,6 +195,7 @@ class StorageDriverConfiguration(object):
         self.vpool_name = vpool_name
         self.configuration = {}
         self.is_new = True
+        self.dirty_entries = []
         self.number = number
         self.params = copy.deepcopy(StorageDriverConfiguration.parameters)  # Never use parameters directly
         self.base_path = '{0}/storagedriver/{1}'.format(Configuration.get('ovs.core.cfgdir'), self.config_type)
@@ -213,13 +217,20 @@ class StorageDriverConfiguration(object):
         contents = '{}'
         if client is None:
             if os.path.isfile(self.path):
+                logger.debug('Loading file {0}'.format(self.path))
                 with open(self.path, 'r') as config_file:
                     contents = config_file.read()
                     self.is_new = False
+            else:
+                logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
         else:
             if client.file_exists(self.path):
+                logger.debug('Loading file {0}'.format(self.path))
                 contents = client.file_read(self.path)
                 self.is_new = False
+            else:
+                logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
+        self.dirty_entries = []
         self.configuration = json.loads(contents)
 
     def save(self, client=None, reload_config=True):
@@ -233,18 +244,31 @@ class StorageDriverConfiguration(object):
                 os.makedirs(self.base_path)
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
-            if self.config_type == 'storagedriver' and reload_config is True:
-                LSRClient(self.path).update_configuration(self.path)
-            self.is_new = False
         else:
             client.run('mkdir -p {0}'.format(self.base_path))
             client.file_write(self.path, contents)
-            if self.config_type == 'storagedriver' and reload_config is True:
-                client.run('python -c """{0}"""'.format("""
+        if self.config_type == 'storagedriver' and reload_config is True:
+            if len(self.dirty_entries) > 0:
+                logger.info('Applying storagedriver configuration changes')
+                if client is None:
+                    changes = LSRClient(self.path).update_configuration(self.path)
+                else:
+                    changes = json.loads(client.run('python -c """{0}"""'.format("""
 from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
-LocalStorageRouterClient('{0}').update_configuration('{0}')
-""".format(self.path)))
-            self.is_new = False
+import json
+print json.dumps(LocalStorageRouterClient('{0}').update_configuration('{0}'))""".format(self.path))))
+                for change in changes:
+                    if change['param_name'] not in self.dirty_entries:
+                        raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
+                    logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
+                    self.dirty_entries.remove(change['param_name'])
+                logger.info('Changes applied')
+                if len(self.dirty_entries) > 0:
+                    logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+            else:
+                logger.debug('No need to apply changes, nothing changed')
+        self.is_new = False
+        self.dirty_entries = []
 
     def clean(self):
         """
@@ -319,6 +343,8 @@ LocalStorageRouterClient('{0}').update_configuration('{0}')
         for item, value in kwargs.iteritems():
             if section not in self.configuration:
                 self.configuration[section] = {}
+            if item not in self.configuration[section] or self.configuration[section][item] != value:
+                self.dirty_entries.append(item)
             self.configuration[section][item] = value
 
 
