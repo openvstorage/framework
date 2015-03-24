@@ -195,18 +195,15 @@ class OpenStackCinder(object):
         # Vpool owned by stack / cinder
         # Give access to libvirt-qemu and ovs
         if self.is_devstack:
-            self.client.run('chown stack:stack "{0}"'.format(mountpoint))
-            self.client.run('usermod -a -G stack libvirt-qemu')
-            self.client.run('usermod -a -G stack ovs')
+            self.client.run('usermod -a -G ovs libvirt-qemu')
             self.client.run('usermod -a -G ovs stack')
         elif self.is_openstack:
-            self.client.run('chown cinder:cinder "{0}"'.format(mountpoint))
-            self.client.run('usermod -a -G cinder libvirt-qemu')
-            self.client.run('usermod -a -G cinder ovs')
+            self.client.run('usermod -a -G ovs libvirt-qemu')
             self.client.run('usermod -a -G ovs cinder')
 
     def _unchown_mountpoint(self, mountpoint):
-        self.client.run('chown root "{0}"'.format(mountpoint))
+        #self.client.run('chown root "{0}"'.format(mountpoint))
+        pass
 
     def _configure_cinder_driver(self, vpool_name):
         """
@@ -292,8 +289,13 @@ if vpool_name in enabled_backends:
             self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
+            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "newgrp ovs\012"' ''')
+            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "newgrp stack\012"' ''')
+            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "umask 0002\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
             time.sleep(3)
+            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp ovs\012"' ''')
+            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp stack\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\"\012"' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\"\012"' ''')
@@ -429,4 +431,4 @@ if not patched:
     def _get_base_path(self, component):
         exec('import %s' % component, locals())
         module = locals().get(component)
-        return os.path.dirname(module.__file__)
+        return os.path.dirname(os.path.abspath(module.__file__))

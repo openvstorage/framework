@@ -74,9 +74,6 @@ class StorageRouterController(object):
         arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
-        # include directories chosen during ovs setup
-        dirs = Configuration.get('ovs.vpool_partitions.dirs').split(',')
-        mountpoints.extend(dirs)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
@@ -570,7 +567,10 @@ for filename in {1}:
         params = {'<VPOOL_MOUNTPOINT>': storagedriver.mountpoint,
                   '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
                   '<VPOOL_NAME>': vpool_name,
-                  '<UUID>': str(uuid.uuid4())}
+                  '<UUID>': str(uuid.uuid4()),
+                  '<OVS_UID>': check_output('id -u ovs', shell=True).strip(),
+                  '<OVS_GID>': check_output('id -g ovs', shell=True).strip(),
+                  }
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))

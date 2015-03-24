@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-import os, uuid, time, shutil, subprocess
+import os, uuid, time, shutil, subprocess, sys
 import inspect #for profiling
 
 #OPENSTACK
@@ -88,12 +88,6 @@ class OVSPluginTestCase(test.TestCase):
         restart = False
         if not self._vpool_exists():
             self._create_vpool()
-            restart = True
-        restart |= self._set_cinder_driver_config()
-        restart |= self._set_cinder_volume_type()
-        if restart:
-            self._restart_cinder()
-
         self._debug('setUp complete')
 
     def _cleanup(self):
@@ -105,9 +99,6 @@ class OVSPluginTestCase(test.TestCase):
                     method(**kwargs)
 
         if VPOOL_CLEANUP:
-            self._revert_cinder_config()
-            self._remove_cinder_volume_type()
-            self._restart_cinder()
             if self._vpool_exists():
                 self._remove_vpool()
 
@@ -133,6 +124,8 @@ class OVSPluginTestCase(test.TestCase):
             def _shell_client(command):
                 proc = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
                 out, err = proc.communicate()
+                if SHELL_DEBUG:
+                    sys.stderr.write('[SHELL_DEBUG] Command %s Out %s Err %s \n' % (command, out, err))
                 self._debug('Command %s Out %s Err %s' % (command, out, err))
                 return out, err
             self.shell_client = _shell_client
@@ -188,11 +181,16 @@ class OVSPluginTestCase(test.TestCase):
                       'mountpoint_bfs': VPOOL_BFS,
                       'mountpoint_temp': VPOOL_TEMP,
                       'mountpoint_md': VPOOL_MD,
-                      'mountpoint_readcaches': VPOOL_READCACHE,
-                      'mountpoint_writecaches': VPOOL_WRITECACHE,
+                      'mountpoint_readcaches': [VPOOL_READCACHE],
+                      'mountpoint_writecaches': [VPOOL_WRITECACHE],
                       'mountpoint_foc': VPOOL_FOC,
                       'storage_ip': '127.0.0.1', #KVM
-                      'vrouter_port': VPOOL_PORT
+                      'vrouter_port': VPOOL_PORT,
+                      'cinder_pass': CINDER_PASS,
+                      'cinder_user': CINDER_USER,
+                      'cinder_tenant': TENANT_NAME,
+                      'cinder_controller': CINDER_CONTROLLER,
+                      'config_cinder': True
                       }
         StorageRouterController.add_vpool(parameters)
         attempt = 0
@@ -201,9 +199,6 @@ class OVSPluginTestCase(test.TestCase):
             if vpool is not None:
                 self._debug('vpool %s created' % VPOOL_NAME)
                 try:
-                    self._get_shell_client()
-                    self.shell_client('sudo chown %s %s' % (self.current_user_id, VPOOL_MOUNTPOINT))
-                    self.shell_client('sudo chmod 775 %s' % (VPOOL_MOUNTPOINT))
                     os.listdir(VPOOL_MOUNTPOINT)
                     return vpool
                 except Exception as ex:
