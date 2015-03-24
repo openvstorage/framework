@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/env python2
 #  Copyright 2014 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

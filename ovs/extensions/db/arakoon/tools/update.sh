@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 if [ "$#" -ne 2 ] ; then
   echo "Copies Arakoon client from the Arakoon repo to the Open vStorage repo"

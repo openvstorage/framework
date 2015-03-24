@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Remove existing enabled sites, taking control over nginx
 rm -f /etc/nginx/sites-enabled/default

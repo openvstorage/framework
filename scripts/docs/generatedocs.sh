@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 DIR=${1%/}
 if [ "$(ls -A $DIR/)" ]; then
      echo "Directory $DIR/ must be empty"

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # Copyright 2014 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -188,7 +188,7 @@ os.makedirs('/var/lib/ceph/radosgw/ceph-radosgw.gateway')
 
 fh = open('/var/www/s3gw.fcgi', 'w')
 fcgi_content = """
-#!/bin/sh
+#!/usr/bin/env sh
 exec /usr/bin/radosgw -c /etc/ceph/ceph.conf -n client.radosgw.gateway
 """
 fh.write(fcgi_content)

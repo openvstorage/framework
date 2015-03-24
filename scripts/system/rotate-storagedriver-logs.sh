@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # storage driver / failovercache rotate on daily basis
 # all files ending in a date format: YYYY-MM-DD will be compressed
