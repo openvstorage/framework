@@ -16,12 +16,15 @@
 Wrapper class for the storagedriverclient of the voldrv team
 """
 
-from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, MDSClient, MDSNodeConfig
+import os
+import json
+import copy
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.plugin.provider.configuration import Configuration
-import json
-import os
-import copy
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('extensions', name='storagedriver')
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}
@@ -113,12 +116,12 @@ class StorageDriverConfiguration(object):
 
     parameters = {
         # hg branch: 3.6
-        # hg revision: e5f56a826fe5
-        # buildTime: Wed Feb 18 19:55:45 CET 2015
+        # hg revision: f744d6d6e272
+        # buildTime: Thu Mar 19 10:24:18 UTC 2015
         'metadataserver': {
             'metadata_server': {
-                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', ],
-                'mandatory': ['mds_port', 'mds_scratch_dir', 'mds_rocksdb_path', ]
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', 'mds_port', ],
+                'mandatory': ['mds_scratch_dir', 'mds_rocksdb_path', ]
             },
             'backend_connection_manager': {
                 'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', ],
@@ -131,12 +134,12 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
             },
             'content_addressed_cache': {
-                'optional': ['serialize_read_cache', ],
-                'mandatory': ['read_cache_serialization_path', 'clustercache_mount_points', ]
+                'optional': ['serialize_read_cache', 'clustercache_mount_points', ],
+                'mandatory': ['read_cache_serialization_path', ]
             },
             'event_publisher': {
-                'optional': ['events_amqp_exchange', 'events_amqp_routing_key', ],
-                'mandatory': ['events_amqp_uris', ]
+                'optional': ['events_amqp_uris', 'events_amqp_exchange', 'events_amqp_routing_key', ],
+                'mandatory': []
             },
             'failovercache': {
                 'optional': [],
@@ -147,8 +150,8 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', ],
-                'mandatory': ['fs_virtual_disk_format', 'fs_file_event_rules', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', ]
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', ],
+                'mandatory': ['fs_virtual_disk_format', ]
             },
             'scocache': {
                 'optional': [],
@@ -192,6 +195,7 @@ class StorageDriverConfiguration(object):
         self.vpool_name = vpool_name
         self.configuration = {}
         self.is_new = True
+        self.dirty_entries = []
         self.number = number
         self.params = copy.deepcopy(StorageDriverConfiguration.parameters)  # Never use parameters directly
         self.base_path = '{0}/storagedriver/{1}'.format(Configuration.get('ovs.core.cfgdir'), self.config_type)
@@ -213,16 +217,23 @@ class StorageDriverConfiguration(object):
         contents = '{}'
         if client is None:
             if os.path.isfile(self.path):
+                logger.debug('Loading file {0}'.format(self.path))
                 with open(self.path, 'r') as config_file:
                     contents = config_file.read()
                     self.is_new = False
+            else:
+                logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
         else:
             if client.file_exists(self.path):
+                logger.debug('Loading file {0}'.format(self.path))
                 contents = client.file_read(self.path)
                 self.is_new = False
+            else:
+                logger.debug('Could not find file {0}, a new one will be created'.format(self.path))
+        self.dirty_entries = []
         self.configuration = json.loads(contents)
 
-    def save(self, client=None):
+    def save(self, client=None, reload_config=True):
         """
         Saves the configuration to a given file, optionally a remote one
         """
@@ -233,11 +244,31 @@ class StorageDriverConfiguration(object):
                 os.makedirs(self.base_path)
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
-                self.is_new = False
         else:
             client.run('mkdir -p {0}'.format(self.base_path))
             client.file_write(self.path, contents)
-            self.is_new = False
+        if self.config_type == 'storagedriver' and reload_config is True:
+            if len(self.dirty_entries) > 0:
+                logger.info('Applying storagedriver configuration changes')
+                if client is None:
+                    changes = LSRClient(self.path).update_configuration(self.path)
+                else:
+                    changes = json.loads(client.run('python -c """{0}"""'.format("""
+from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
+import json
+print json.dumps(LocalStorageRouterClient('{0}').update_configuration('{0}'))""".format(self.path))))
+                for change in changes:
+                    if change['param_name'] not in self.dirty_entries:
+                        raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))
+                    logger.info('Changed {0} from "{1}" to "{2}"'.format(change['param_name'], change['old_value'], change['new_value']))
+                    self.dirty_entries.remove(change['param_name'])
+                logger.info('Changes applied')
+                if len(self.dirty_entries) > 0:
+                    logger.warning('Following changes were not applied: {0}'.format(', '.join(self.dirty_entries)))
+            else:
+                logger.debug('No need to apply changes, nothing changed')
+        self.is_new = False
+        self.dirty_entries = []
 
     def clean(self):
         """
@@ -275,11 +306,13 @@ class StorageDriverConfiguration(object):
         backend_connection_manager = 'backend_connection_manager'
         backend_type = 'backend_type'
         if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'REST':
-            self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
-            self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
+            if 'rest_connection_policy_id' in self.params[self.config_type][backend_connection_manager]['mandatory']:
+                self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
+                self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
         if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'LOCAL':
-            self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
-            self.params[self.config_type][backend_connection_manager]['optional'].append('local_connection_path')
+            if 'local_connection_path' in self.params[self.config_type][backend_connection_manager]['mandatory']:
+                self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
+                self.params[self.config_type][backend_connection_manager]['optional'].append('local_connection_path')
         # Validation
         errors = []
         for section, entries in self.params[self.config_type].iteritems():
@@ -310,6 +343,8 @@ class StorageDriverConfiguration(object):
         for item, value in kwargs.iteritems():
             if section not in self.configuration:
                 self.configuration[section] = {}
+            if item not in self.configuration[section] or self.configuration[section][item] != value:
+                self.dirty_entries.append(item)
             self.configuration[section][item] = value
 
 

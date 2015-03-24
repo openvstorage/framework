@@ -63,6 +63,9 @@ limitations under the License.
                     </div>
                  </div>
             </div>
+            <!-- ko foreach: shared.hooks.dashboards -->
+                <div class="panel panel-default" data-bind="compose: 'viewmodels/site/' + $data"></div>
+            <!-- /ko -->
         </div>
         <div class="col-md-4">
             <!-- Center column -->

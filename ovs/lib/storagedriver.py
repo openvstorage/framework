@@ -16,12 +16,15 @@
 StorageDriver module
 """
 
+import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from ovs.celery_run import celery
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.lib.helpers.decorators import log
+from ovs.lib.mdsservice import MDSServiceController
 
 
 class StorageDriverController(object):
@@ -64,3 +67,15 @@ class StorageDriverController(object):
             # No management Center, cannot update status via api
             #TODO: should we try manually (ping, ssh)?
             pass
+
+    @staticmethod
+    @celery.task(name='ovs.storagedriver.volumedriver_error')
+    @log('VOLUMEDRIVER_TASK')
+    def volumedriver_error(code, volumename):
+        """
+        Handles error messages/events from the volumedriver
+        """
+        if code == VolumeDriverEvents.MDSFailover:
+            disk = VDiskList.get_vdisk_by_volume_id(volumename)
+            if disk is not None:
+                MDSServiceController.ensure_safety(disk)

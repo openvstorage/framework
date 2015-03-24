@@ -96,7 +96,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         cinder type-create <TYPENAME> # e.g. Open vStorage
         cinder type-key <TYPENAME> set volume_backend_name=<VPOOLNAME>
     """
-    VERSION = '1.0.4b'
+    VERSION = '1.0.6'
 
     def __init__(self, *args, **kwargs):
         """Init: args, kwargs pass through;
@@ -576,3 +576,13 @@ class OVSVolumeDriver(driver.VolumeDriver):
                          % (snapshotid, disk))
                 return disk
         raise RuntimeError('No disk found for snapshotid %s' % snapshotid)
+
+    def _snapshot_has_children(self, snapshotid):
+        """Find if snapshot has children, in OVS Model
+        :return True/False
+        """
+        LOG.debug('[_FIND CHILDREN OF SNAPSHOT] Snapshotid %s' % snapshotid)
+        for vdisk in VDiskList.get_vdisks():
+            if vdisk.parentsnapshot == snapshotid:
+                return True
+        return False

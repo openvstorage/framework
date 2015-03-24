@@ -95,7 +95,7 @@ limitations under the License.
                 <div class="col-lg-7">
                     <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
                         <i data-i18n="[html]ovs:wizards.addvpool.gathervpool.nobackends"
-                           style="display: inline-block; margin-top: 6px;"></i>
+                           style="display: inline-block; margin-top: 7px;"></i>
                     <!-- /ko -->
                     <!-- ko if: data.albaBackends() !== undefined && data.albaBackends().length > 0 -->
                         <span data-bind="dropdown: {
@@ -109,6 +109,13 @@ limitations under the License.
                                          }">
                         </span>
                     <!-- /ko -->
+                    <button class="btn btn-default"  style="margin-left: 10px;"
+                            data-bind="click: loadAlbaBackends, style: {
+                                           'margin-top': (data.albaBackends() !== undefined && data.albaBackends().length > 0 ? '-26px' : '')
+                                       }, enable: !albaBackendLoading()">
+                        <span class="fa" data-i18n="[html]ovs:icons.load"></span>
+                        <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
+                    </button>
                 </div>
             </div>
         </div>

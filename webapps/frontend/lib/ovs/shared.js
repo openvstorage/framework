@@ -29,6 +29,9 @@ define(['knockout'], function(ko){
                 username: ko.observable(),
                 guid    : ko.observable(),
                 roles   : ko.observableArray([])
+            },
+            hooks          : {
+                dashboards: []
             }
         };
     };

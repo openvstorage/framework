@@ -183,7 +183,10 @@
         "group": "Group",
         "backendtype": "Type",
         "storageip": "Storage IP",
-        "namespace": "Backend location"
+        "namespace": "Backend location",
+        "usage": "Usage",
+        "custompath": "Custom path",
+        "reload": "Reload"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -206,11 +209,7 @@
             },
             "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
-            "logging": "Storage Router logs",
-            "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
-            "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this Storage Router's logs."
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers"
         }
     },
     "vpools" : {
@@ -434,6 +433,28 @@
             "addfailed": "The backend could not be added: __why__"
         }
     },
+    "support": {
+        "information": "Information",
+        "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
+        "identification": "Identification parameters",
+        "title": "Support",
+        "clusterid": "Cluster ID:",
+        "nodeid": "Node ID",
+        "nodes": "StorageRouters:",
+        "callhome": "Call Home settings",
+        "metadata": "Heartbeat data",
+        "enable": "Heartbeat enabled",
+        "enablesupport": "Remote Access enabled",
+        "save": "Save settings",
+        "saving": "Saving",
+        "savingmsg": "Your settings are being applied",
+        "saved": "Saved",
+        "savedmsg": "Settings applied",
+        "failed": "Error",
+        "failedmsg": "Error while applying your settings",
+        "downloadinglogs": "collecting...",
+        "downloadlogs": "download logfiles"
+    },
     "notfound": {
         "title": "Page not found",
         "introduction": "The page you've requested was not found. Please navigate back, and try again or update your bookmarks."
@@ -447,7 +468,7 @@
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
-                "invalidname": "The vPool name is invalid. Only the letters a-z and numbers are allowed. Dashes are not allowed as first or last character. Capital letters, spaces and special characters are not supported for vPool names.",
+                "invalidname": "The vPool name is invalid. Only the letters a-z, numbers and dashes (not as first or last character) are allowed. A minimum of 3 and a maximum of 50 characters has to be maintained.",
                 "backendtype": "BackendType:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
@@ -464,7 +485,7 @@
                 "clientid": "Client ID",
                 "clientsecret": "Client secret",
                 "albabackend": "Backend",
-                "nobackends": "No backends, press &quot;Next &raquo;&quot; to (re)load",
+                "nobackends": "No backends found.",
                 "choosebackend": "Choose one of the available backends",
                 "invalidalbainfo": "The entered connection info and credentials are invalid",
                 "localhost": "Use local ALBA backends"
@@ -477,9 +498,8 @@
                 "tempfs": "Temporary FS:",
                 "bfs": "Backend FS:",
                 "md": "Metadata:",
-                "readcache1": "Read Cache 1:",
-                "readcache2": "Read Cache 2:",
-                "writecache": "Write Cache:",
+                "readcaches": "Read Caches:",
+                "writecaches": "Write Caches:",
                 "foc": "Failover Cache:",
                 "mtptinuse": "The given __what__ location is already in use on this Storage Router",
                 "ipaddress": "Storage IP:",
@@ -709,6 +729,7 @@
         "logs": "&#xf02d;",
         "externallink": "&#xf08e;",
         "password": "&#xf084;",
-        "vpools": "&#xf0c2;"
+        "vpools": "&#xf0c2;",
+        "load": "&#xf021;"
     }
 }

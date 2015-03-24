@@ -46,43 +46,43 @@ define([
             // connection validation using filled out keystone credentials
             var validationResult = { valid: true, reasons: [], fields: [] };
             return $.Deferred(function(deferred) {
-            	$.when.apply($, [
-            	    $.Deferred(function(cinderDeffered) {
-            	    	if (self.data.hasCinder() === true && self.data.configCinder() === true) {
-	            	    	generic.xhrAbort(self.checkCinderCredentialsHandle);
-	                        var postData = {
-	                            	cinder_user: self.data.cinderUser(),
-	                                cinder_password: self.data.cinderPassword(),
-	                                tenant_name: self.data.cinderTenant(),
-	                                controller_ip: self.data.cinderCtrlIP()
-	                        };
-	                    	self.checkCinderCredentialsHandle = api.post('storagerouters/' + self.data.target().guid() + '/valid_cinder_credentials', { data: postData })
-	                			.then(self.shared.tasks.wait)
-	                			.done(function(data) {
-	                				if (!data) {
-	                    				validationResult.valid = false;
-	                    				validationResult.reasons.push($.t('ovs:wizards.addvpool.gathercinder.invalidcinderinfo'));
-	                                    validationResult.fields.push('cinderUser');
-	                                    validationResult.fields.push('cinderPassword');
-	                                    validationResult.fields.push('cinderTenant');
-	                                    validationResult.fields.push('cinderCtrlIP');
-	                    			}
-	                				cinderDeffered.resolve();
-	                			})
-	                			.fail(cinderDeffered.reject);
-            	    	} else {
-            	    		cinderDeffered.resolve();
-            	    	}
-            	    }).promise()
-            	])
-            	.always(function() {
-            		self.preValidateResult(validationResult);
-            		if (validationResult.valid) {
-            			deferred.resolve();
-	                } else {
-	                	deferred.reject();
-	                }
-            	});
+                $.when.apply($, [
+                    $.Deferred(function(cinderDeffered) {
+                        if (self.data.hasCinder() === true && self.data.configCinder() === true) {
+                            generic.xhrAbort(self.checkCinderCredentialsHandle);
+                            var postData = {
+                                    cinder_user: self.data.cinderUser(),
+                                    cinder_password: self.data.cinderPassword(),
+                                    tenant_name: self.data.cinderTenant(),
+                                    controller_ip: self.data.cinderCtrlIP()
+                            };
+                            self.checkCinderCredentialsHandle = api.post('storagerouters/' + self.data.target().guid() + '/valid_cinder_credentials', { data: postData })
+                                .then(self.shared.tasks.wait)
+                                .done(function(data) {
+                                    if (!data) {
+                                        validationResult.valid = false;
+                                        validationResult.reasons.push($.t('ovs:wizards.addvpool.gathercinder.invalidcinderinfo'));
+                                        validationResult.fields.push('cinderUser');
+                                        validationResult.fields.push('cinderPassword');
+                                        validationResult.fields.push('cinderTenant');
+                                        validationResult.fields.push('cinderCtrlIP');
+                                    }
+                                    cinderDeffered.resolve();
+                                })
+                                .fail(cinderDeffered.reject);
+                        } else {
+                            cinderDeffered.resolve();
+                        }
+                    }).promise()
+                ])
+                .always(function() {
+                    self.preValidateResult(validationResult);
+                    if (validationResult.valid) {
+                        deferred.resolve();
+                    } else {
+                        deferred.reject();
+                    }
+                });
             }).promise();
         };
         self.next = function() {

@@ -19,7 +19,7 @@ Generic system module, executing statements on local node
 import os
 import uuid
 import time
-from ConfigParser import ConfigParser
+from ConfigParser import RawConfigParser
 from subprocess import check_output
 from StringIO import StringIO
 
@@ -151,6 +151,17 @@ print Configuration.get('{0}')
         return System.exec_remote_python(client, read)
 
     @staticmethod
+    def set_remote_config(client, key, value):
+        """
+        Sets remote configuration key
+        """
+        write = """
+from ovs.plugin.provider.configuration import Configuration
+Configuration.set('{0}', '{1}')
+""".format(key, value)
+        System.exec_remote_python(client, write)
+
+    @staticmethod
     def ports_in_use(client=None):
         """
         Returns the ports in use
@@ -229,14 +240,14 @@ print Configuration.get('{0}')
     @staticmethod
     def read_config(filename, client=None):
         if client is None:
-            cp = ConfigParser()
+            cp = RawConfigParser()
             with open(filename, 'r') as config_file:
                 cfg = config_file.read()
             cp.readfp(StringIO(cfg))
             return cp
         else:
             contents = client.file_read(filename)
-            cp = ConfigParser()
+            cp = RawConfigParser()
             cp.readfp(StringIO(contents))
             return cp
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 # Copyright 2014 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,15 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env python
-
 """
 Migration module
 """
 import os
 import imp
 import inspect
-import ConfigParser
+from ConfigParser import RawConfigParser
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='migrations')
@@ -50,7 +49,7 @@ class Migration(object):
             return end
 
         cfg_filename = '/opt/OpenvStorage/config/main.cfg'
-        parser = ConfigParser.RawConfigParser()
+        parser = RawConfigParser()
         parser.read(cfg_filename)
 
         # Load mapping
