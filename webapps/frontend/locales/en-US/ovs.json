@@ -185,7 +185,8 @@
         "storageip": "Storage IP",
         "namespace": "Backend location",
         "usage": "Usage",
-        "custompath": "Custom path"
+        "custompath": "Custom path",
+        "reload": "Reload"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -484,7 +485,7 @@
                 "clientid": "Client ID",
                 "clientsecret": "Client secret",
                 "albabackend": "Backend",
-                "nobackends": "No backends, press &quot;Next &raquo;&quot; to (re)load",
+                "nobackends": "No backends found.",
                 "choosebackend": "Choose one of the available backends",
                 "invalidalbainfo": "The entered connection info and credentials are invalid",
                 "localhost": "Use local ALBA backends"
@@ -728,6 +729,7 @@
         "logs": "&#xf02d;",
         "externallink": "&#xf08e;",
         "password": "&#xf084;",
-        "vpools": "&#xf0c2;"
+        "vpools": "&#xf0c2;",
+        "load": "&#xf021;"
     }
 }
