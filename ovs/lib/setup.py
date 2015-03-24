@@ -1805,7 +1805,8 @@ print blk_devices
                 if device == 'DIR_ONLY':
                     continue
                 if details['percentage'] == 'NA':
-                    print '>>> Invalid value {0}% for device: {1}'.format(details['percentage'], device)
+                    print '>>> Invalid percentage value for device: {0}'.format(device)
+                    print
                     time.sleep(1)
                     return False
                 percentage = int(details['percentage'])
@@ -1813,15 +1814,30 @@ print blk_devices
                     total[device] += percentage
                 else:
                     total[device] = percentage
-            print total
             for device, percentage in total.iteritems():
                 if is_percentage(percentage):
                     continue
                 else:
                     print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
+                    print
                     time.sleep(1)
                     return False
             return True
+
+        def _labels_are_unique(layout):
+            partitions = set()
+            nr_of_labels = 0
+            for details in layout.itervalues():
+                if 'DIR_ONLY' not in details['device']:
+                    partitions.add(details['label'])
+                    nr_of_labels += 1
+            if len(partitions) < nr_of_labels:
+                print '! Partition labels should be unique across partitions'
+                print
+                time.sleep(1)
+                return False
+            else:
+                return True
 
         def process_submenu_actions(mp_to_edit):
             subitem = default[mp_to_edit]
@@ -1856,7 +1872,6 @@ print blk_devices
         if auto_config:
             SetupController._partition_disks(client, default)
             return default
-
         else:
             choices = show_layout(default)
             while True:
@@ -1892,7 +1907,9 @@ print blk_devices
 
                 elif chosen == 'Apply':
                     if not _summarize_partition_percentages(default):
-                        'Partition totals are not within percentage range'
+                        choices = show_layout(default)
+                        continue
+                    if not _labels_are_unique(default):
                         choices = show_layout(default)
                         continue
 
