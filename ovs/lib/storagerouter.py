@@ -500,7 +500,8 @@ os.chmod('{0}', 0777)
                                                       metadata_path=metadatapath,
                                                       tlog_path=tlogpath,
                                                       foc_throttle_usecs=4000,
-                                                      read_cache_default_behaviour='CacheOnWrite')
+                                                      read_cache_default_behaviour='CacheOnWrite',
+                                                      non_disposable_scos_factor=12)
         storagedriver_config.configure_volume_router(**vrouter_config)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
