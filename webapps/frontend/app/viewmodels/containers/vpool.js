@@ -138,7 +138,7 @@ define([
                             self.machineHandle = api.get('vmachines', { queryparams: options })
                                 .done(function(data) {
                                     var guids = [], vmdata = {};
-                                    $.each(data, function(index, item) {
+                                    $.each(data.data, function(index, item) {
                                         guids.push(item.guid);
                                         vmdata[item.guid] = item;
                                     });
