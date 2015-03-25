@@ -10,6 +10,10 @@ pip install choice
 pip install pyudev
 pip install datadiff
 
+if [ ! -f /etc/openvstorage_id ]; then
+  echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
+fi
+
 id -a ovs &> /dev/null
 if [[ $? -eq 1 ]]
 then

@@ -34,7 +34,6 @@ class System(object):
 
     OVS_CONFIG = '/opt/OpenvStorage/config/ovs.cfg'
 
-    my_machine_id = ''
     my_storagerouter_guid = ''
     my_storagedriver_id = ''
 
@@ -60,19 +59,11 @@ class System(object):
     @staticmethod
     def get_my_machine_id(client=None):
         """
-        Returns unique machine id based on mac address
+        Returns unique machine id, generated at install time.
         """
-        if not System.my_machine_id or client:
-            cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            output = System.run(cmd, client)
-            for mac in output.split('\n'):
-                if mac.strip() != '000000000000':
-                    if client:
-                        return mac.strip()
-                    else:
-                        System.my_machine_id = mac.strip()
-                        break
-        return System.my_machine_id
+        if client is not None:
+            return client.run('cat /etc/openvstorage_id').strip()
+        return check_output('cat /etc/openvstorage_id', shell=True).strip()
 
     @staticmethod
     def get_my_storagerouter():
