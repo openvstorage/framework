@@ -84,7 +84,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         on POSIX permissions
         """
 
-        return {'driver_volume_type': 'local',
+        return {'driver_volume_type': 'file',
                 'data': {'vpoolname': self._vpool_name,
                          'device_path': volume.provider_location}}
 
