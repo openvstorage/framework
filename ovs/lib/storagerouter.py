@@ -272,11 +272,17 @@ if Service.has_service('{0}'):
         mountpoint_fragmentcache = mountpoint_writecaches[0]
         mountpoint_fcache = mountpoint_writecaches[0]
 
+        all_locations = list()
         directories_to_create.add(mountpoint_temp)
+        all_locations.append(mountpoint_temp)
         directories_to_create.add(mountpoint_md)
+        all_locations.append(mountpoint_md)
         directories_to_create.add(mountpoint_foc)
+        all_locations.append(mountpoint_foc)
         directories_to_create.add(mountpoint_fragmentcache)
+        all_locations.append(mountpoint_fragmentcache)
         directories_to_create.add(mountpoint_fcache)
+        all_locations.append(mountpoint_fcache)
 
         print 'mountpoint_temp: {}'.format(mountpoint_temp)
         print 'mountpoint_md: {}'.format(mountpoint_md)
@@ -292,10 +298,13 @@ if Service.has_service('{0}'):
 
         for mp in mountpoint_readcaches:
             directories_to_create.add(str(mp))
+            all_locations.append(str(mp))
         for mp in mountpoint_writecaches:
             directories_to_create.add(str(mp))
+            all_locations.append(str(mp))
 
         print 'directories_to_create" {}'.format(directories_to_create)
+        print 'all_locations: {}'.format(all_locations)
 
         client = SSHClient.load(ip)
         dir_create_script = """
@@ -314,7 +323,7 @@ os.chmod('{0}', 0777)
             System.exec_remote_python(client, bfs_chmod_script)
 
         location_sizing = dict()
-        for mp in directories_to_create:
+        for mp in all_locations:
             location = os.stat(mp).st_dev
             if location not in location_sizing:
                 location_sizing[location] = {'size': os.statvfs(mp).f_bavail * os.statvfs(mp).f_bsize,
