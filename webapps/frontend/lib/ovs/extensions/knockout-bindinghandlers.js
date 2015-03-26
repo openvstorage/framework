@@ -232,7 +232,7 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 .innerRadius(0);
             pie = d3.layout.pie()
                 .sort(null)
-                .value(function(d) { return d.value; });
+                .value(function(d) { return Math.round(d.percentage * 100) / 100; });
 
             id = $($(element).children()[0]).attr('id');
 
