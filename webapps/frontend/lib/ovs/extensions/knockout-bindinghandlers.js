@@ -282,10 +282,9 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                     return 'translate(0,' + vert + ')';
                 });
             entry.append('rect')
-                .attr('width', 15)
-                .attr('height', 15)
+                .attr('width', 16)
+                .attr('height', 16)
                 .style('fill', function(d) { return color(d.name); })
-                .style('stroke', function(d) { return color(d.name); });
             entry.append('text')
                 .attr('x', 20)
                 .attr('y', 14)
