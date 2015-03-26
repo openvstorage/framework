@@ -268,13 +268,6 @@ if Service.has_service('{0}'):
         mountpoint_md = parameters['mountpoint_md']
         mountpoint_readcaches = parameters['mountpoint_readcaches']
         mountpoint_writecaches = parameters['mountpoint_writecaches']
-
-        print 'mountpoint_temp: {}'.format(mountpoint_temp)
-        print 'mountpoint_md: {}'.format(mountpoint_md)
-
-        print 'mp_rcs: {}'.format(mountpoint_readcaches)
-        print 'mp_wcs: {}'.format(mountpoint_writecaches)
-
         mountpoint_foc = parameters['mountpoint_foc']
         mountpoint_fragmentcache = mountpoint_writecaches[0]
         mountpoint_fcache = mountpoint_writecaches[0]
@@ -282,55 +275,27 @@ if Service.has_service('{0}'):
         directories_to_create.add(mountpoint_temp)
         directories_to_create.add(mountpoint_md)
         directories_to_create.add(mountpoint_foc)
+        directories_to_create.add(mountpoint_fragmentcache)
+        directories_to_create.add(mountpoint_fcache)
 
+        print 'mountpoint_temp: {}'.format(mountpoint_temp)
+        print 'mountpoint_md: {}'.format(mountpoint_md)
         print 'mountpoint_foc: {}'.format(mountpoint_foc)
         print 'mountpoint_fragmentcache: {}'.format(mountpoint_fragmentcache)
-
-        print 'dirs to create: {}'.format(directories_to_create)
-
-        def is_partition(directory):
-            for mountpoint in mountpoints:
-                if directory == mountpoint:
-                    return True
-            return False
+        print 'mountpoint_fcache: {}'.format(mountpoint_fcache)
+        print 'mp_rcs: {}'.format(mountpoint_readcaches)
+        print 'mp_wcs: {}'.format(mountpoint_writecaches)
 
         def match_clustersize(size):
             # int type in KiB
             return int(int(size / 1024 / 4096) * 4096)
 
-        all_locations = list()
-        all_locations.append(mountpoint_temp)
-        all_locations.append(mountpoint_md)
-        all_locations.append(mountpoint_foc)
-        all_locations.append(mountpoint_fragmentcache)
-        all_locations.append(mountpoint_fcache)
         for mp in mountpoint_readcaches:
-            all_locations.append(mp)
+            directories_to_create.add(str(mp))
         for mp in mountpoint_writecaches:
-            all_locations.append(mp)
+            directories_to_create.add(str(mp))
 
-        print all_locations
-
-        location_sizing = dict()
-        for mp in all_locations:
-            location = os.stat(mp).st_dev
-            if location not in location_sizing:
-                location_sizing[location] = {'size': os.statvfs(mp).f_bavail * os.statvfs(mp).f_bsize,
-                                             'count': 1}
-            else:
-                location_sizing[location]['count'] += 1
-
-        print location_sizing
-
-        available_size = dict()
-        for key, values in location_sizing.iteritems():
-            available_size[key] = values['size'] / values['count']
-
-        print available_size
-
-        directories_to_create.union(set(all_locations))
         print 'directories_to_create" {}'.format(directories_to_create)
-
 
         client = SSHClient.load(ip)
         dir_create_script = """
@@ -348,6 +313,20 @@ os.chmod('{0}', 0777)
 """.format(parameters['mountpoint_bfs'])
             System.exec_remote_python(client, bfs_chmod_script)
 
+        location_sizing = dict()
+        for mp in directories_to_create:
+            location = os.stat(mp).st_dev
+            if location not in location_sizing:
+                location_sizing[location] = {'size': os.statvfs(mp).f_bavail * os.statvfs(mp).f_bsize,
+                                             'count': 1}
+            else:
+                location_sizing[location]['count'] += 1
+        print location_sizing
+
+        available_size = dict()
+        for key, values in location_sizing.iteritems():
+            available_size[key] = values['size'] / values['count']
+        print available_size
 
         # @todo: put on all write caches?
         fdcache = '{}/fd_{}'.format(mountpoint_foc, vpool_name)
@@ -366,7 +345,7 @@ os.chmod('{0}', 0777)
         w_count = 1
 
         unique_locations = set()
-        for mp in all_locations:
+        for mp in directories_to_create:
             unique_locations.add(mp)
 
         for mp in unique_locations:
