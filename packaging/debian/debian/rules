@@ -1,0 +1,61 @@
+#!/usr/bin/make -f
+
+openvstorage-core:
+	dh_testdir
+	dh_testroot
+	dh_installdirs  -p$@
+	dh_installchangelogs  -p$@  CHANGELOG.txt
+	dh_install -p$@
+	dh_installman  -p$@
+	dh_link  -p$@
+	dh_strip  -p$@
+	dh_compress  -p$@
+	dh_fixperms  -p$@
+	dh_installdeb -p$@
+	dh_shlibdeps  -p$@
+	dh_gencontrol  -p$@
+	dh_md5sums  -p$@
+	dh_builddeb  -p$@
+
+openvstorage-webapps:
+	dh_testdir
+	dh_testroot
+	dh_installdirs  -p$@
+	dh_installchangelogs  -p$@  CHANGELOG.txt
+	dh_install -p$@
+	dh_installman  -p$@
+	dh_link  -p$@
+	dh_strip  -p$@
+	dh_compress  -p$@
+	dh_fixperms  -p$@
+	dh_installdeb -p$@
+	dh_shlibdeps  -p$@
+	dh_gencontrol  -p$@
+	dh_md5sums  -p$@
+	dh_builddeb  -p$@
+
+openvstorage:
+	dh_testdir
+	dh_testroot
+	dh_installdirs  -p$@
+	dh_installchangelogs  -p$@ CHANGELOG.txt
+	dh_install -p$@
+	dh_installman  -p$@
+	dh_link  -p$@
+	dh_strip  -p$@
+	dh_compress  -p$@
+	dh_fixperms  -p$@
+	dh_installdeb -p$@
+	dh_shlibdeps  -p$@
+	dh_gencontrol  -p$@
+	dh_md5sums  -p$@
+	dh_builddeb  -p$@
+
+clean:
+	if [ -f debian/openvstorage ]; then rm debian/openvstorage; fi
+	if [ -f debian/openvstorage-core ]; then rm debian/openvstorage-core; fi
+	if [ -f debian/openvstorage-webapps ]; then rm debian/openvstorage-webapps; fi
+
+binary: openvstorage-core openvstorage-webapps openvstorage
+
+.PHONY: clean build
