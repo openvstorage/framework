@@ -60,7 +60,7 @@
             "local": "Local FS",
             "rest": "REST backend",
             "distributed": "Distributed FS",
-            "alba": "Alternate Backend"
+            "alba": "Open vStorage Backend"
         },
         "mgmtcentertypes": {
             "VCENTER": "VMware vCenter",
@@ -500,7 +500,7 @@
                 "nobackends": "No backends found.",
                 "choosebackend": "Choose one of the available backends",
                 "invalidalbainfo": "The entered connection info and credentials are invalid",
-                "localhost": "Use local ALBA backends"
+                "localhost": "Use local Open vStorage backends"
             },
             "gathermountpoints": {
                 "basicinfo": "Enter/select the requested information. It will be shared accross all Storage Routers serving this vPool.",
