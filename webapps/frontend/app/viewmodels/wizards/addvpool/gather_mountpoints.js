@@ -192,25 +192,17 @@ define([
             }
         };
 
-        self.addReadCache = function() {
-            var value = self.data.mtptCustomRC();
-            if (value !== undefined && value !== '') {
-                if ($.inArray(value, self.data.mtptCustomRCs()) === -1 && $.inArray(value, self.data.mountpoints()) === -1) {
-                    self.data.mtptCustomRCs.push(value);
-                    self.data.mtptReadCaches.push(value);
+        self.activate = function() {
+            if (self.data.readcaches().length >= 1) {
+                if ($.inArray(self.data.readcaches()[0], self.data.mtptReadCaches()) === -1) {
+                    self.data.mtptReadCaches.push(self.data.readcaches()[0]);
                 }
-                self.data.mtptCustomRC('');
             }
-        };
-        self.addWriteCache = function() {
-            var value = self.data.mtptCustomWC();
-            if (value !== undefined && value !== '') {
-                if ($.inArray(value, self.data.mtptCustomWCs()) === -1 && $.inArray(value, self.data.mountpoints()) === -1) {
-                    self.data.mtptCustomWCs.push(value);
-                    self.data.mtptWriteCaches.push(value);
+            if (self.data.writecaches().length >= 1) {
+                if ($.inArray(self.data.writecaches()[0], self.data.mtptWriteCaches()) === -1) {
+                    self.data.mtptWriteCaches.push(self.data.writecaches()[0]);
                 }
-                self.data.mtptCustomWC('');
             }
-        };
+        }
     };
 });

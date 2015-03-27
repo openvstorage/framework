@@ -51,6 +51,8 @@ define([
             storageRouters:  ko.observableArray([]),
             storageDrivers:  ko.observableArray([]),
             mountpoints:     ko.observableArray([]),
+            readcaches:      ko.observableArray([]),
+            writecaches:     ko.observableArray([]),
             ipAddresses:     ko.observableArray([]),
             albaBackends:    ko.observableArray(),
             hasCinder:       ko.observable(),
@@ -66,7 +68,7 @@ define([
 
         mtptData.allReadMountpoints = ko.computed(function() {
             var returnValue = [];
-            $.each(mtptData.mountpoints(), function(i, e) {
+            $.each(mtptData.readcaches(), function(i, e) {
                 returnValue.push(e);
             });
             $.each(mtptData.mtptCustomRCs(), function(i, e) {
@@ -92,7 +94,7 @@ define([
 
         mtptData.allWriteMountpoints = ko.computed(function() {
             var returnValue = [];
-            $.each(mtptData.mountpoints(), function(i, e) {
+            $.each(mtptData.writecaches(), function(i, e) {
                 returnValue.push(e);
             });
             $.each(mtptData.mtptCustomWCs(), function(i, e) {

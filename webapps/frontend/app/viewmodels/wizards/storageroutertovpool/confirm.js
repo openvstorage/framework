@@ -156,6 +156,8 @@ define([
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.mountpoints(data.mountpoints);
+                                self.readcaches(data.readcaches);
+                                self.writecaches(data.writecaches);
                                 self.ipAddresses(data.ipaddresses);
                                 self.allowVPool(data.allow_vpool);
                             })

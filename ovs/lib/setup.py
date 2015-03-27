@@ -49,7 +49,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage'}
 
     # Arakoon
     arakoon_clusters = ['ovsdb', 'voldrv']
@@ -267,7 +267,7 @@ class SetupController(object):
             else:
                 promote = True  # Correct, but irrelevant, since a first node is always master
 
-            mountpoints, hypervisor_info = SetupController._prepare_node(
+            mountpoints, hypervisor_info, readcaches, writecaches = SetupController._prepare_node(
                 cluster_ip, nodes, known_passwords,
                 {'type': hypervisor_type,
                  'name': hypervisor_name,
@@ -279,13 +279,13 @@ class SetupController(object):
             if first_node:
                 SetupController._setup_first_node(cluster_ip, unique_id, mountpoints,
                                                   cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
-                                                  enable_heartbeats)
+                                                  enable_heartbeats, readcaches, writecaches)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
-                                                  nodes, hypervisor_info)
+                                                  nodes, hypervisor_info, readcaches, writecaches)
                 if promote:
                     SetupController._promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id,
-                                                  mountpoints, arakoon_mountpoint)
+                                                  mountpoints, arakoon_mountpoint, readcaches, writecaches)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -397,11 +397,22 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
             config.remove_section(partition_key)
         config.add_section(partition_key)
 
-        additional_mountpoints = list()
+        readcaches = list()
+        writecaches = list()
+        storage = list()
         for mountpoint, details in disk_layout.iteritems():
-            if 'DIR_ONLY' in details['device']:
-                additional_mountpoints.append(mountpoint)
-        config.set(partition_key, 'dirs', ','.join(map(str, additional_mountpoints)))
+            if 'readcache' in details['type']:
+                readcaches.append(mountpoint)
+                continue
+            elif 'writecache' in details['type']:
+                writecaches.append(mountpoint)
+                continue
+            else:
+                storage.append(mountpoint)
+
+        config.set(partition_key, 'readcaches', ','.join(map(str, readcaches)))
+        config.set(partition_key, 'writecaches', ','.join(map(str, writecaches)))
+        config.set(partition_key, 'storage', ','.join(map(str, storage)))
         SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, config)
 
         mountpoints = disk_layout.keys()
@@ -447,10 +458,14 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
-        return mountpoints, hypervisor_info
+        print 'mps: {}'.format(mountpoints)
+        print 'rcs: {}'.format(readcaches)
+        print 'wcs: {}'.format(writecaches)
+
+        return mountpoints, hypervisor_info, readcaches, writecaches
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, readcaches, writecaches):
         """
         Sets up the first node services. This node is always a master
         """
@@ -464,8 +479,9 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         target_client = SSHClient.load(cluster_ip)
         if arakoon_mountpoint is None:
             arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                        default_value=Interactive.find_in_list(mountpoints, 'db'))
+                                                        default_value=writecaches[0] if writecaches else '')
         System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
+        System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
@@ -680,7 +696,7 @@ EOF
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info, readcaches, writecaches):
         """
         Sets up an additional node
         """
@@ -872,7 +888,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint):
+    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint, readcaches, writecaches):
         """
         Promotes a given node
         """
@@ -923,7 +939,7 @@ EOF
                 mountpoints.sort()
                 mountpoints = [manual] + mountpoints
                 arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                            default_value=Interactive.find_in_list(mountpoints, 'db'),
+                                                            default_value=writecaches[0] if writecaches else '',
                                                             sort_choices=False)
                 if arakoon_mountpoint == manual:
                     arakoon_mountpoint = None
@@ -935,6 +951,7 @@ EOF
                     else:
                         print '  Invalid path, please retry'
         System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
+        System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, ports)
@@ -1543,11 +1560,10 @@ print blk_devices
 
         """
 
-        mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'mdpath'},
-                                   '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'db'},
-                                   '/mnt/cache1': dict(SetupController.PARTITION_DEFAULTS),
-                                   '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'backendfs'},
-                                   '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'tempfs'}}
+        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
+                           '/mnt/cache2': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
+                           '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
+                           '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
 
         selected_devices = dict(blk_devices)
         skipped_devices = set()
@@ -1576,40 +1592,25 @@ print blk_devices
         print '{0} sata drives: {1}'.format(nr_of_disks, str(disk_devices))
         print
 
-        if nr_of_disks == 1:
-            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/var/tmp']['percentage'] = 20
-
-        elif nr_of_disks >= 2:
-            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/var/tmp']['percentage'] = 100
-
         if nr_of_ssds == 1:
-            mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/cache1']['percentage'] = 50
-            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
-            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
+            mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
+            mps_to_allocate['/mnt/cache1']['percentage'] = 50
+            mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
+            mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
+            mps_to_allocate['/mnt/cache2']['percentage'] = 50
+            mps_to_allocate['/mnt/cache2']['label'] = 'cache2'
+            mps_to_allocate['/mnt/cache2']['type'] = 'readcache'
 
-        elif nr_of_ssds >= 2:
+        elif nr_of_ssds > 1:
             for count in xrange(nr_of_ssds):
                 marker = str('/mnt/cache' + str(count + 1))
-                mountpoints_to_allocate[marker] = dict(SetupController.PARTITION_DEFAULTS)
-                mountpoints_to_allocate[marker]['device'] = ssd_devices[count]
-                mountpoints_to_allocate[marker]['label'] = 'cache' + str(count + 1)
-                if count < 2:
-                    cache_size = 75
-                else:
-                    cache_size = 100
-                mountpoints_to_allocate[marker]['percentage'] = cache_size
+                mps_to_allocate[marker] = dict()
+                mps_to_allocate[marker]['device'] = ssd_devices[count]
+                mps_to_allocate[marker]['type'] = 'readcache' if count > 0 else 'writecache'
+                mps_to_allocate[marker]['percentage'] = 100
+                mps_to_allocate[marker]['label'] = str('cache' + str(count + 1))
 
-            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
-            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[1]
-            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
-
-        return mountpoints_to_allocate, skipped_devices
+        return mps_to_allocate, skipped_devices
 
     @staticmethod
     def _partition_disks(client, partition_layout):
@@ -1637,6 +1638,7 @@ print blk_devices
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
                 continue
+            print "Partitioning disk {}".format(disk)
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
         # Pre process partition info (disk as key)
@@ -1718,7 +1720,12 @@ print blk_devices
             device_size_map['/dev/' + key] = values['size']
 
         def show_layout(proposed):
+            print
             print 'Proposed partition layout:'
+            print
+            print '! Mark fastest ssd device as writecache'
+            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
+            print
             keys = proposed.keys()
             keys.sort()
             key_map = list()
@@ -1786,6 +1793,12 @@ print blk_devices
             else:
                 return False
 
+        def is_valid_storage_type(value):
+            if value in ['readcache', 'writecache', 'storage']:
+                return True
+            else:
+                return False
+
         def validate_subitem(subitem, answer):
             if subitem in ['percentage']:
                 return is_percentage(answer)
@@ -1795,7 +1808,8 @@ print blk_devices
                 return is_mountpoint(answer)
             elif subitem in ['label']:
                 return is_label(answer)
-
+            elif subitem in ['type']:
+                return is_valid_storage_type(answer)
             return False
 
         def _summarize_partition_percentages(layout):

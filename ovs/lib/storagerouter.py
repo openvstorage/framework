@@ -74,6 +74,11 @@ class StorageRouterController(object):
         arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
+        # include directories chosen during ovs setup
+        readcaches = Configuration.get('ovs.vpool_partitions.readcaches').split(',')
+        writecaches = Configuration.get('ovs.vpool_partitions.writecaches').split(',')
+        storage = Configuration.get('ovs.vpool_partitions.storage').split(',')
+        mountpoints.extend(storage)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
@@ -84,7 +89,14 @@ class StorageRouterController(object):
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
+
+        print 'mountpoints:{}'.format(mountpoints)
+        print 'readcaches:{}'.format(readcaches)
+        print 'writecaches:{}'.format(writecaches)
+
         return {'mountpoints': mountpoints,
+                'readcaches': readcaches,
+                'writecaches': writecaches,
                 'ipaddresses': ipaddresses,
                 'files': file_existence,
                 'allow_vpool': allow_vpool}
@@ -358,7 +370,6 @@ os.chmod('{0}', 0777)
             unique_locations.add(mp)
 
         for mp in unique_locations:
-            print mp
             if mp in mountpoint_readcaches:
                 r_size = available_size[os.stat(mp).st_dev]
                 readcaches.append({'path': '{}/read{}_{}'.format(mp, r_count, vpool_name),
@@ -779,7 +790,8 @@ if Service.has_service('{0}'):
             client.run('rm {}'.format(readcache))
 
         for writecache in storagedriver.mountpoint_writecaches:
-            client.run('rm -rf {}'.format(writecache))
+            if writecache:
+                client.run('rm -rf {}'.format(writecache))
 
         client.run('rm -rf {}/foc_{}'.format(storagedriver.mountpoint_foc, vpool.name))
         client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_foc, vpool.name))

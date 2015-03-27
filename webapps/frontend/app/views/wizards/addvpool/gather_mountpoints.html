@@ -40,8 +40,8 @@ limitations under the License.
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('md', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></label>
             <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptMD,
-                                             free: true, defaultfree: '/', defaultRegex: /md/ }">
+                <span data-bind="dropdown: { items: data.writecaches, target: data.mtptMD,
+                                             free: true, defaultfree: '/', defaultRegex: /.*/ }">
                 </span>
             </div>
         </div>
@@ -49,7 +49,7 @@ limitations under the License.
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcaches"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.allReadMountpoints, target: data.readCacheDistributor,
-                                             defaultRegex: /cache/ }">
+                                             defaultRegex: /.*/ }">
                 </span>
             </div>
         </div>
@@ -71,7 +71,7 @@ limitations under the License.
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.writecaches"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: { items: data.allWriteMountpoints, target: data.writeCacheDistributor,
-                                             defaultRegex: /cache/ }">
+                                             defaultRegex: /.*/ }">
                 </span>
             </div>
         </div>
@@ -92,8 +92,8 @@ limitations under the License.
         <div class="form-group" data-bind="css: { 'has-error': $.inArray('foc', canContinue().fields) !== -1 }">
             <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.foc"></label>
             <div class="col-lg-7">
-                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptFOC,
-                                             free: true, defaultfree: '/', defaultRegex: /cache/ }">
+                <span data-bind="dropdown: { items: data.writecaches, target: data.mtptFOC,
+                                             free: true, defaultfree: '/', defaultRegex: /.*/ }">
                 </span>
             </div>
         </div>
