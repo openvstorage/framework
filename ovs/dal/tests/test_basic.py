@@ -624,13 +624,13 @@ class Basic(TestCase):
         """
         disk = TestDisk()
         disk.name = 'disk'
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
         disk.save()
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         self.assertEqual(len(keys), 1, 'There should be one primary key ({0})'.format(len(keys)))
         disk.delete()
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
 
     def test_reduceddatalist(self):

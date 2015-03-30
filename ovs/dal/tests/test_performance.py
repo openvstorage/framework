@@ -125,7 +125,7 @@ class LotsOfObjects(TestCase):
         Cleans all disks and machines
         """
         machine = TestMachine()
-        keys = DataList.get_pks(machine._namespace, machine._name)
+        keys = DataList.get_pks(machine._namespace, machine._classname)
         for guid in keys:
             try:
                 machine = TestMachine(guid)
@@ -135,7 +135,7 @@ class LotsOfObjects(TestCase):
             except (ObjectNotFoundException, ValueError):
                 pass
         disk = TestDisk()
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         for guid in keys:
             try:
                 disk = TestDisk(guid)

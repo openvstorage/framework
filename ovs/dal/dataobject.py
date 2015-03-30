@@ -168,9 +168,9 @@ class DataObject(object):
         self.volatile = volatile
 
         # Worker fields/objects
-        self._name = self.__class__.__name__.lower()
+        self._classname = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._name))
+        self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._classname))
         self._mutex_reverseindex = VolatileMutex('reverseindex')
 
         # Rebuild _relation types
@@ -194,10 +194,10 @@ class DataObject(object):
                 raise ValueError('The given guid is invalid: {0}'.format(guid))
 
         # Build base keys
-        self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)
+        self._key = '{0}_{1}_{2}'.format(self._namespace, self._classname, self._guid)
 
         # Version mutex
-        self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._name, self._guid))
+        self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
 
         # Load data from cache or persistent backend where appropriate
         self._volatile = VolatileFactory.get_client()
@@ -455,7 +455,7 @@ class DataObject(object):
                 if relation.mandatory is True and self._data[relation.name]['guid'] is None:
                     invalid_fields.append(relation.name)
             if len(invalid_fields) > 0:
-                raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._name, ', '.join(invalid_fields)))
+                raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._classname, ', '.join(invalid_fields)))
 
             if recursive:
                 # Save objects that point to us (e.g. disk.vmachine - if this is disk)
@@ -511,7 +511,7 @@ class DataObject(object):
                     data[attribute] = self._data[attribute]
             if data_conflicts:
                 raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
-                    self._name, ', '.join(data_conflicts)
+                    self._classname, ', '.join(data_conflicts)
                 ))
 
             # Refresh internal data structure
@@ -555,7 +555,7 @@ class DataObject(object):
                             else:
                                 reverse_index = {relation.foreign_key: [self.guid]}
                                 self._volatile.set(reverse_key, reverse_index)
-                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._name, self.guid)
+                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
                 reverse_index = self._volatile.get(reverse_key)
                 if reverse_index is None:
                     reverse_index = {}
@@ -570,7 +570,7 @@ class DataObject(object):
             # Second, invalidate property lists
             try:
                 self._mutex_listcache.acquire(60)
-                cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
+                cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
                 cache_list = Toolbox.try_get(cache_key, {})
                 change = False
                 for list_key in cache_list.keys():
@@ -675,14 +675,14 @@ class DataObject(object):
                                 entries.remove(self.guid)
                                 reverse_index[relation.foreign_key] = entries
                                 self._volatile.set(reverse_key, reverse_index)
-            self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._name, self.guid))
+            self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid))
         finally:
             self._mutex_reverseindex.release()
 
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
-            cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
+            cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
             cache_list = Toolbox.try_get(cache_key, {})
             change = False
             for list_key in cache_list.keys():
