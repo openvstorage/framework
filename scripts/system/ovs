@@ -55,6 +55,9 @@ elif [ "$1" = "collect" ] ; then
     gzip $LOGFILE > /dev/null
     echo $LOGFILE.gz
   fi
+elif [ "$1" = "unittest" ] ; then
+  shift
+  python $@
 else
   ipython
 fi
