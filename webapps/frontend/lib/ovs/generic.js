@@ -364,7 +364,54 @@ define(['jquery', 'jqp/pnotify'], function($) {
         var colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
         return colors[index % colors.length];
     }
+    function arrayEquals(array1, array2) {
+        var i;
+        if (!array2) {
+            return false;
+        }
+        if (array1.length !== array2.length) {
+            return false;
+        }
 
+        for (i = 0; i < array1.length; i += 1) {
+            if (array1[i] instanceof Array && array2[i] instanceof Array) {
+                if (!arrayEquals(array1[i], array2[i])) {
+                    return false;
+                }
+            } else if (array1[i] !== array2[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    function arrayHasElement(array, element) {
+        var i;
+        for (i = 0; i < array.length; i += 1) {
+            if (element === array[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function arrayIsIn(array1, array2) {
+        var i;
+        for (i = 0; i < array2.length; i += 1) {
+            if (arrayEquals(array1, array2[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Array.prototype.equals = function(array) {
+        return arrayEquals(this, array);
+    };
+    Array.prototype.nestedIn = function(array) {
+        return arrayIsIn(this, array);
+    };
+    Array.prototype.contains = function(element) {
+        return arrayHasElement(this, element);
+    };
     return {
         getTimestamp             : getTimestamp,
         formatBytes              : formatBytes,
