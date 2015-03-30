@@ -458,10 +458,6 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
-        print 'mps: {}'.format(mountpoints)
-        print 'rcs: {}'.format(readcaches)
-        print 'wcs: {}'.format(writecaches)
-
         return mountpoints, hypervisor_info, readcaches, writecaches
 
     @staticmethod

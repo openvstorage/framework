@@ -148,12 +148,8 @@ define([
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
-                                $.each(data.readcaches, function(i, e) {
-                                    self.data.readcaches.push(e);
-                                });
-                                $.each(data.writecaches, function(i, e) {
-                                    self.data.writecaches.push(e);
-                                });
+                                self.data.readcaches(data.readcaches)
+                                self.data.writecaches(data.writecaches)
                                 self.data.ipAddresses(data.ipaddresses);
                                 self.data.files(data.files);
                                 self.data.allowVPool(data.allow_vpool);

@@ -83,6 +83,9 @@ define([
             self.mtptOK         = ko.observable(true);
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
+            self.mountpoints    = ko.observableArray([]);
+            self.readcaches     = ko.observableArray([]);
+            self.writecaches    = ko.observableArray([]);
             self.ipAddresses    = ko.observableArray([]);
 
             // Computed
