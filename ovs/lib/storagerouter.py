@@ -590,7 +590,7 @@ for filename in {1}:
                   '<UUID>': str(uuid.uuid4()),
                   '<OVS_UID>': check_output('id -u ovs', shell=True).strip(),
                   '<OVS_GID>': check_output('id -g ovs', shell=True).strip(),
-                  '<KILL_TIMEOUT>': str(int(readcache_size / 1024 / 1024 / 6 + 30))}
+                  '<KILL_TIMEOUT>': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
