@@ -620,3 +620,27 @@ class VMachineController(object):
         except Exception as ex:
             logger.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
+
+    @staticmethod
+    @celery.task(name='ovs.machine.update_vmachine_name')
+    def update_vmachine_name(old_name, new_name):
+        """
+        Update a vMachine name: find vmachine by old_name, set new name
+        """
+        vmachines = VMachineList.get_vmachine_by_name(old_name)
+        if len(vmachines) != 1:
+            logger.error('Found {0} vmachines by name {1}'.format(len(vmachines), old_name))
+            return
+        vmachine = vmachines[0]
+        try:
+            vpool = vmachine.pmachine.storagerouters[0].storagedrivers[0].vpool
+        except (IndexError, AttributeError) as ex:
+            logger.info('Could not retrieve vpool for vmachine ({0})'.format(ex))
+            vpool = None
+        mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
+        try:
+            mutex.acquire(wait=5)
+            vmachine.name = new_name
+            vmachine.save()
+        finally:
+            mutex.release()

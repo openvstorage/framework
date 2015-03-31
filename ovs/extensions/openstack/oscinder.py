@@ -282,8 +282,12 @@ if vpool_name in enabled_backends:
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X kill' ''')
             self.client.run('''su stack -c 'screen -S stack -X screen -t c-vol' ''')
             time.sleep(3)
-            self.client.run('''su stack -c 'screen -S stack -p n-api -X kill' ''')
-            self.client.run('''su stack -c 'screen -S stack -X screen -t n-api' ''')
+            out = self.client.run('''su stack -c 'screen -S stack -p n-api -Q select 1>/dev/null; echo $?' ''')
+            n_api_screen_exists = out == '0'
+            if n_api_screen_exists:
+                self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff \n' ''')
+                self.client.run('''su stack -c 'screen -S stack -p n-api -X kill' ''')
+                self.client.run('''su stack -c 'screen -S stack -X screen -t n-api' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X kill' ''')
             self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
@@ -297,8 +301,10 @@ if vpool_name in enabled_backends:
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp ovs\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp stack\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\"\012"' ''')
-            time.sleep(3)
-            self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\"\012"' ''')
+            if n_api_screen_exists:
+                time.sleep(3)
+                self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
+                self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\"\012"' ''')
         except SystemExit as se:  # failed command or non-zero exit codes raise SystemExit
             raise RuntimeError(str(se))
         return self._is_cinder_running()
@@ -361,16 +367,22 @@ if vpool_name in enabled_backends:
             self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /usr/lib/python2.7/dist-packages/cinder/image/image_utils.py''')
 
         # fix "blockdev" issue
+        # fix "instance rename" issue
+        # NOTE! vmachine.name and instance.display_name must match from the beginning
         if self.is_devstack:
             nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
+            nova_servers_file = '{0}/api/openstack/compute/servers.py'.format(nova_base_path)
         elif self.is_openstack:
             nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
             nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
+            nova_servers_file = '/usr/lib/python2.7/dist-packages/nova/api/openstack/compute/servers.py'
 
         self.client.run("""python -c "
+import os
 nova_volume_file = '%s'
 nova_driver_file = '%s'
+nova_servers_file = '%s'
 with open(nova_volume_file, 'r') as f:
     file_contents = f.readlines()
 new_class = '''
@@ -385,6 +397,12 @@ class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):
         conf.source_type = 'file'
         conf.source_path = connection_info['data']['device_path']
         return conf
+'''
+updatename = '''        try:
+            from ovs.lib.vmachine import VMachineController
+            VMachineController.update_vmachine_name.apply_async(kwargs={'old_name':instance.display_name, 'new_name':body['server']['name']})
+        except Exception as ex:
+            print('[OVS] Update exception {0}'.format(ex))
 '''
 patched = False
 for line in file_contents:
@@ -413,7 +431,27 @@ if not patched:
             break
     with open(nova_driver_file, 'w') as f:
         f.writelines(fc)
-" """ % (nova_volume_file, nova_driver_file))
+if os.path.exists(nova_servers_file):
+    with open(nova_servers_file, 'r') as f:
+        file_contents = f.readlines()
+    patched = False
+    for line in file_contents:
+        if 'from ovs.lib.vmachine import VMachineController' in line:
+            patched = True
+            break
+    defupdate = False
+    if not patched:
+        for line in file_contents[:]:
+            if 'def update(self,' in line:
+                defupdate = True
+                continue
+            if defupdate:
+                if 'instance = self._get_server(ctxt,' in line:
+                   fc = file_contents[:file_contents.index(line)+1] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)+1:]
+                   break
+        with open(nova_servers_file, 'w') as f:
+            f.writelines(fc)
+" """ % (nova_volume_file, nova_driver_file, nova_servers_file))
 
     def _delete_volume_type(self, volume_type_name):
         """
