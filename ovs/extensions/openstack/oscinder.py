@@ -358,13 +358,7 @@ if vpool_name in enabled_backends:
             volume_type.set_keys(metadata={'volume_backend_name': volume_type_name})
 
     def _apply_patches(self):
-        # fix run_as_root issue
-        cinder_base_path = self._get_base_path('cinder')
         nova_base_path = self._get_base_path('nova')
-        if self.is_devstack:
-            self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' {0}/image/image_utils.py'''.format(cinder_base_path))
-        elif self.is_openstack:
-            self.client.run('''sed -i 's/run_as_root=True/run_as_root=False/g' /usr/lib/python2.7/dist-packages/cinder/image/image_utils.py''')
 
         # fix "blockdev" issue
         # fix "instance rename" issue
