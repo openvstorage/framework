@@ -23,7 +23,7 @@ class DummyVolatileStore(object):
     """
     This is a dummy volatile store that makes use of a local json file
     """
-    _path = '/tmp/dummyvolatile.json'
+    _path = '/run/dummyvolatile.json'
     _storage = {}
     _timeout = {}
 

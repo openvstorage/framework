@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 cd /opt/OpenvStorage
-export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
+export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps:/opt/OpenvStorage/webapps/api"
 export DISPLAY=:0
 if [ "$1" = "setup" ] ; then
   if [ "$#" -ne 2 ] ; then

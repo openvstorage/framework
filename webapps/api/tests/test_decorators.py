@@ -40,6 +40,7 @@ from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from oauth2.toolbox import Toolbox as OAuth2Toolbox
 from tests.mockups import Serializers
+from backend.toolbox import Toolbox  # Required for the tests
 
 
 class Decorators(TestCase):
@@ -470,50 +471,50 @@ class Decorators(TestCase):
             self.assertEqual(output_values['kwargs']['hints']['full'], function.__name__ == 'the_function_2')
             self.assertEqual(len(response.data), len(data_list_users))
             if function.__name__ == 'the_function_2':
-                self.assertListEqual(response.data, [guid_table['aa']['bb'],
-                                                     guid_table['aa']['cc'],
-                                                     guid_table['bb']['aa'],
-                                                     guid_table['bb']['dd']])
+                self.assertListEqual(response.data['data'], [guid_table['aa']['bb'],
+                                                             guid_table['aa']['cc'],
+                                                             guid_table['bb']['aa'],
+                                                             guid_table['bb']['dd']])
             request.QUERY_PARAMS['sort'] = 'username,-password'
             response = function(2, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data), len(data_list_users))
-            self.assertListEqual(response.data, [guid_table['aa']['cc'],
-                                                 guid_table['aa']['bb'],
-                                                 guid_table['bb']['dd'],
-                                                 guid_table['bb']['aa']])
+            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertListEqual(response.data['data'], [guid_table['aa']['cc'],
+                                                        guid_table['aa']['bb'],
+                                                        guid_table['bb']['dd'],
+                                                        guid_table['bb']['aa']])
             request.QUERY_PARAMS['sort'] = '-username,-password'
             response = function(3, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data), len(data_list_users))
-            self.assertListEqual(response.data, [guid_table['bb']['dd'],
-                                                 guid_table['bb']['aa'],
-                                                 guid_table['aa']['cc'],
-                                                 guid_table['aa']['bb']])
+            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertListEqual(response.data['data'], [guid_table['bb']['dd'],
+                                                         guid_table['bb']['aa'],
+                                                         guid_table['aa']['cc'],
+                                                         guid_table['aa']['bb']])
             request.QUERY_PARAMS['sort'] = 'password,username'
             response = function(4, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data), len(data_list_users))
-            self.assertListEqual(response.data, [guid_table['bb']['aa'],
-                                                 guid_table['aa']['bb'],
-                                                 guid_table['aa']['cc'],
-                                                 guid_table['bb']['dd']])
+            self.assertEqual(len(response.data['data']), len(data_list_users))
+            self.assertListEqual(response.data['data'], [guid_table['bb']['aa'],
+                                                         guid_table['aa']['bb'],
+                                                         guid_table['aa']['cc'],
+                                                         guid_table['bb']['dd']])
             request.QUERY_PARAMS['contents'] = ''
             response = function(5, request)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(output_values['kwargs']['hints']['full'], True)
-            self.assertEqual(len(response.data), len(data_list_users))
+            self.assertEqual(len(response.data['data']), len(data_list_users))
             if function.__name__ == 'the_function_1':
-                self.assertIsInstance(response.data['instance'], DataObjectList)
-                self.assertIsInstance(response.data['instance'][0], User)
-                self.assertIn(response.data['instance'][0].username, ['aa', 'bb'])
+                self.assertIsInstance(response.data['data']['instance'], DataObjectList)
+                self.assertIsInstance(response.data['data']['instance'][0], User)
+                self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
             else:
-                self.assertIsInstance(response.data['instance'], list)
-                self.assertIsInstance(response.data['instance'][0], User)
-                self.assertIn(response.data['instance'][0].username, ['aa', 'bb'])
+                self.assertIsInstance(response.data['data']['instance'], list)
+                self.assertIsInstance(response.data['data']['instance'][0], User)
+                self.assertIn(response.data['data']['instance'][0].username, ['aa', 'bb'])
 
 if __name__ == '__main__':
     import unittest
