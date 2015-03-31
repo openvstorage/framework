@@ -481,10 +481,7 @@ class Sdk(object):
         """
         # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
         # on the machine running the code
-        output = self.ssh_run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
-        for mac in output.strip().split('\n'):
-            if mac.strip() != '000000000000':
-                return mac.strip()
+        return self.ssh_run('cat /etc/openvstorage_id').strip()
 
     def ssh_run(self, command):
         """
