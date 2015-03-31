@@ -40,7 +40,6 @@ class StorageDriver(DataObject):
                     Property('mountpoint_md', str, doc='Mountpoint for metadata'),
                     Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
                     Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
-                    Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
                     Property('mountpoint_writecaches', list, doc='Write cache mountpoints'),
                     Property('mountpoint_foc', str, doc='Mountpoint for failover cache')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
