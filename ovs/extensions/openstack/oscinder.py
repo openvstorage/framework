@@ -360,6 +360,7 @@ if vpool_name in enabled_backends:
     def _apply_patches(self):
         nova_base_path = self._get_base_path('nova')
 
+        version = self._get_version()
         # fix "blockdev" issue
         # fix "instance rename" issue
         # NOTE! vmachine.name and instance.display_name must match from the beginning
@@ -374,6 +375,7 @@ if vpool_name in enabled_backends:
 
         self.client.run("""python -c "
 import os
+version = '%s'
 nova_volume_file = '%s'
 nova_driver_file = '%s'
 nova_servers_file = '%s'
@@ -392,7 +394,8 @@ class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):
         conf.source_path = connection_info['data']['device_path']
         return conf
 '''
-updatename = '''        try:
+updatename = '''
+        try:
             from ovs.lib.vmachine import VMachineController
             VMachineController.update_vmachine_name.apply_async(kwargs={'old_name':instance.display_name, 'new_name':body['server']['name']})
         except Exception as ex:
@@ -426,26 +429,50 @@ if not patched:
     with open(nova_driver_file, 'w') as f:
         f.writelines(fc)
 if os.path.exists(nova_servers_file):
-    with open(nova_servers_file, 'r') as f:
-        file_contents = f.readlines()
-    patched = False
-    for line in file_contents:
-        if 'from ovs.lib.vmachine import VMachineController' in line:
-            patched = True
-            break
-    defupdate = False
-    if not patched:
-        for line in file_contents[:]:
-            if 'def update(self,' in line:
-                defupdate = True
-                continue
-            if defupdate:
-                if 'instance = self._get_server(ctxt,' in line:
-                   fc = file_contents[:file_contents.index(line)+1] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)+1:]
-                   break
-        with open(nova_servers_file, 'w') as f:
-            f.writelines(fc)
-" """ % (nova_volume_file, nova_driver_file, nova_servers_file))
+    fc = None
+    if version == 'kilo':
+        with open(nova_servers_file, 'r') as f:
+            file_contents = f.readlines()
+        patched = False
+        for line in file_contents:
+            if 'from ovs.lib.vmachine import VMachineController' in line:
+                patched = True
+                break
+        defupdate = False
+        if not patched:
+            for line in file_contents[:]:
+                if 'def update(self,' in line:
+                    defupdate = True
+                    continue
+                if defupdate:
+                    if 'instance = self._get_server(ctxt,' in line:
+                       fc = file_contents[:file_contents.index(line)+1] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)+1:]
+                       break
+            if fc:
+                with open(nova_servers_file, 'w') as f:
+                   f.writelines(fc)
+    elif version == 'juno':
+        with open(nova_servers_file, 'r') as f:
+            file_contents = f.readlines()
+        patched = False
+        for line in file_contents:
+            if 'from ovs.lib.vmachine import VMachineController' in line:
+                patched = True
+                break
+        defupdate = False
+        if not patched:
+            for line in file_contents[:]:
+                if 'def update(self,' in line:
+                    defupdate = True
+                    continue
+                if defupdate:
+                    if 'instance = self.compute_api.get(ctxt, id,' in line:
+                       fc = file_contents[:file_contents.index(line)-2] + ['\\n'] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)-2:]
+                       break
+            if fc:
+                with open(nova_servers_file, 'w') as f:
+                   f.writelines(fc)
+" """ % (version, nova_volume_file, nova_driver_file, nova_servers_file))
 
     def _delete_volume_type(self, volume_type_name):
         """
