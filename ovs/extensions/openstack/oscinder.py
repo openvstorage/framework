@@ -16,7 +16,7 @@
 This module contains OpenStack Cinder commands
 """
 import os
-import time
+import time, datetime
 from ovs.extensions.generic.sshclient import SSHClient
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
@@ -274,35 +274,69 @@ if vpool_name in enabled_backends:
         else:
             self._restart_openstack_services()
 
+    def _get_devstack_log_name(self, service, logdir='/opt/stack/logs'):
+        """
+        Construct a log name in format /opt/stack/logs/h-api-cw.log.2015-04-01-123300
+        """
+        now_time = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d-%H%M%S')
+        return '{0}/{1}.log.{2}'.format(logdir, service, now_time)
+
     def _restart_devstack_screen(self):
         """
         Restart c-vol on devstack
+        resume logging
+         screen -S stack -p h-api-cw -X logfile LOGFILE
+         screen -S stack -p h-api-cw -X log on
+         ln -sf /opt/stack/logs/h-api-cfn.log.2015-04-01-123300 /opt/stack/logs/screen-logs/screen-h-api-cfn.log
         """
         try:
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X kill' ''')
-            self.client.run('''su stack -c 'screen -S stack -X screen -t c-vol' ''')
             time.sleep(3)
             out = self.client.run('''su stack -c 'screen -S stack -p n-api -Q select 1>/dev/null; echo $?' ''')
             n_api_screen_exists = out == '0'
             if n_api_screen_exists:
                 self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff \n' ''')
                 self.client.run('''su stack -c 'screen -S stack -p n-api -X kill' ''')
-                self.client.run('''su stack -c 'screen -S stack -X screen -t n-api' ''')
             time.sleep(3)
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X kill' ''')
-            self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
+
+            self.client.run('''su stack -c 'mkdir -p /opt/stack/logs' ''')
             time.sleep(3)
+            logfile = self._get_devstack_log_name('c-vol')
+            self.client.run('''su stack -c 'touch %s' ''' % logfile)
+            self.client.run('''su stack -c 'screen -S stack -X screen -t c-vol' ''')
+            self.client.run('''su stack -c 'screen -S stack -p c-vol -X logfile %s' ''' % logfile)
+            self.client.run('''su stack -c 'screen -S stack -p c-vol -X log on' ''')
+            self.client.run('rm /opt/stack/logs/c-vol.log || true')
+            self.client.run('ln -sf %s /opt/stack/logs/c-vol.log' % logfile)
+
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "newgrp ovs\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "newgrp stack\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "umask 0002\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
+
             time.sleep(3)
+            logfile = self._get_devstack_log_name('n-cpu')
+            self.client.run('''su stack -c 'touch %s' ''' % logfile)
+            self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
+            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X logfile %s' ''' % logfile)
+            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X log on' ''')
+            self.client.run('rm /opt/stack/logs/n-cpu.log || true')
+            self.client.run('ln -sf %s /opt/stack/logs/n-cpu.log' % logfile)
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp ovs\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp stack\012"' ''')
             self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\"\012"' ''')
+
             if n_api_screen_exists:
                 time.sleep(3)
+                logfile = self._get_devstack_log_name('n-api')
+                self.client.run('''su stack -c 'touch %s' ''' % logfile)
+                self.client.run('''su stack -c 'screen -S stack -X screen -t n-api' ''')
+                self.client.run('''su stack -c 'screen -S stack -p n-api -X logfile %s' ''' % logfile)
+                self.client.run('''su stack -c 'screen -S stack -p n-api -X log on' ''')
+                self.client.run('rm /opt/stack/logs/n-api.log || true')
+                self.client.run('ln -sf %s /opt/stack/logs/n-api.log' % logfile)
                 self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
                 self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\"\012"' ''')
         except SystemExit as se:  # failed command or non-zero exit codes raise SystemExit
