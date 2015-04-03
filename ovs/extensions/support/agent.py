@@ -16,6 +16,7 @@
 Module for the Support Agent
 """
 
+import os
 import sys
 import json
 import time
@@ -66,6 +67,15 @@ class SupportAgent(object):
             services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
             servicedata = dict((service.split(' ')[0].strip(), service.split(' ', 1)[1].strip()) for service in services)
             data['metadata']['services'] = servicedata
+        except Exception, ex:
+            data['errors'].append(str(ex))
+        try:
+            # Licensing
+            data['metadata']['licenses'] = []
+            if os.path.exists('/opt/OpenvStorage/config/licenses'):
+                for lic in check_output('cat /opt/OpenvStorage/config/licenses', shell=True).split('\n'):
+                    if lic.strip() != '':
+                        data['metadata']['licenses'].append(lic.strip())
         except Exception, ex:
             data['errors'].append(str(ex))
 

@@ -34,10 +34,17 @@ class License(DataObject):
                     Property('valid_until', float, mandatory=False, doc='License is valid until'),
                     Property('signature', str, mandatory=False, doc='License signature')]
     __relations = []
-    __dynamics = [Dynamic('can_remove', bool, 3600)]
+    __dynamics = [Dynamic('can_remove', bool, 3600),
+                  Dynamic('hash', str, 3600)]
 
     def _can_remove(self):
         """
         Can be removed
         """
         return len(Toolbox.fetch_hooks('license', '{0}.remove'.format(self.component))) == 1
+
+    def _hash(self):
+        """
+        Generates a hash for this particular license
+        """
+        return base64.b64encode(zlib.compress(json.dumps(self.export())))

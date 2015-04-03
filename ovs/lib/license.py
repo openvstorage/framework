@@ -19,8 +19,10 @@ import zlib
 import json
 import base64
 from ovs.celery_run import celery
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
+from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.logHandler import LogHandler
 
@@ -104,6 +106,12 @@ class LicenseController(object):
                             license_object.valid_until = valid_until
                             license_object.signature = signature
                             license_object.save()
+            license_contents = []
+            for lic in LicenseList.get_licenses():
+                license_contents.append(lic.hash)
+            for storagerouter in StorageRouterList.get_storagerouters():
+                client = SSHClient.load(storagerouter.ip)
+                client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         except Exception, ex:
             logger.exception('Error applying license: {0}'.format(ex))
             return None
@@ -114,10 +122,18 @@ class LicenseController(object):
         """
         Removes a license
         """
-        license = License(license_guid)
-        if license.can_remove is True:
-            remove_functions = Toolbox.fetch_hooks('license', '{0}.remove'.format(license.name))
-            return remove_functions[0](component=license.component, data=license.data, valid_until=license.valid_until, signature=license.signature)
+        lic = License(license_guid)
+        if lic.can_remove is True:
+            remove_functions = Toolbox.fetch_hooks('license', '{0}.remove'.format(lic.component))
+            result = remove_functions[0](component=lic.component, data=lic.data, valid_until=lic.valid_until, signature=lic.signature)
+            if result is True:
+                lic.delete()
+                license_contents = []
+                for lic in LicenseList.get_licenses():
+                    license_contents.append(lic.hash)
+                for storagerouter in StorageRouterList.get_storagerouters():
+                    client = SSHClient.load(storagerouter.ip)
+                    client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         return None
 
     @staticmethod
