@@ -135,25 +135,33 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
         }
     };
     ko.bindingHandlers.tooltip = {
-        init: function(element, valueAccessor) {
-            var value = valueAccessor(), title;
+        init: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(), title,
+                placement = allBindings.get('placement');
+            if (placement === undefined) {
+                placement = 'auto top';
+            }
             if (value !== undefined && value !== '') {
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto top',
+                    placement: placement,
                     title: title
                 });
             }
         },
-        update: function(element, valueAccessor) {
-            var value = valueAccessor(), title;
+        update: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(), title,
+                placement = allBindings.get('placement');
+            if (placement === undefined) {
+                placement = 'auto top';
+            }
             $(element).tooltip('destroy');
             if (value !== undefined && value !== '') {
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto top',
+                    placement: placement,
                     title: title
                 });
             }

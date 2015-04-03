@@ -186,7 +186,12 @@
         "namespace": "Backend location",
         "usage": "Usage",
         "custompath": "Custom path",
-        "reload": "Reload"
+        "reload": "Reload",
+        "validuntil": "Valid until",
+        "metadata": "Metadata",
+        "component": "Component",
+        "licensing": "Licensing",
+        "licenselimited": "Unavailable due to License"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -434,6 +439,10 @@
             "addfailed": "The backend could not be added: __why__"
         }
     },
+    "licenses": {
+        "title": "Licenses",
+        "add": "Add license"
+    },
     "support": {
         "information": "Information",
         "description": "Open vStorage has the option to send regular heartbeats with metadata to a centralized server. The heartbeat data can be inspected at the bottom of this page. Additionally, you can enable remote access which enables the Open vStorage support team to access your environment upon your request through a secured tunnel.",
@@ -464,6 +473,22 @@
         "vpool": "vPool"
     },
     "wizards" : {
+        "addlicense": {
+            "title": "Add new License",
+            "gather": {
+                "license": "License",
+                "invalidlicense": "The License code entered is invalid"
+            },
+            "confirm": {
+                "component": "Component",
+                "metadata": "Metadata",
+                "success": "License added successfully",
+                "adding": "adding the License",
+                "started": "Adding License",
+                "inprogress": "The License is being added",
+                "basicinfo": "The entered Lincense contains the following components. Press &quot;Finish&quot; to apply the License."
+            }
+        },
         "addbackend": {
             "title": "Add new Backend",
             "gather": {
@@ -742,6 +767,7 @@
         "externallink": "&#xf08e;",
         "password": "&#xf084;",
         "vpools": "&#xf0c2;",
-        "load": "&#xf021;"
+        "load": "&#xf021;",
+        "licensing": "&#xf132;"
     }
 }

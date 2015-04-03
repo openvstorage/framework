@@ -167,11 +167,13 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function alertError(title, message) {
         return alert(title, message, 'error');
     }
-    function keys(object) {
+    function keys(object, filter) {
         var allKeys = [], key;
         for (key in object) {
             if (object.hasOwnProperty(key)) {
-                allKeys.push(key);
+                if (filter === undefined || filter(key)) {
+                    allKeys.push(key);
+                }
             }
         }
         return allKeys;
@@ -402,6 +404,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function getLocalTime(timestamp) {
+        var date = new Date(timestamp * 1000);
+        return date.toLocaleTimeString();
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -445,6 +451,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         advancedSort             : advancedSort,
         validate                 : validate,
         overlap                  : overlap,
-        getColor                 : getColor
+        getColor                 : getColor,
+        getLocalTime             : getLocalTime
     };
 });

@@ -19,12 +19,10 @@ Module for SetupController
 import os
 import re
 import sys
-import imp
 import time
 import uuid
 import urllib2
 import base64
-import inspect
 
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
@@ -32,6 +30,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -2129,7 +2128,7 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute promote hooks
         """
-        functions = SetupController._fetch_hooks('promote')
+        functions = Toolbox.fetch_hooks('setup', 'promote')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
@@ -2141,7 +2140,7 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute demote hooks
         """
-        functions = SetupController._fetch_hooks('demote')
+        functions = Toolbox.fetch_hooks('setup', 'demote')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
@@ -2153,7 +2152,7 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute firstnode hooks
         """
-        functions = SetupController._fetch_hooks('firstnode')
+        functions = Toolbox.fetch_hooks('setup', 'firstnode')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
@@ -2165,32 +2164,9 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute extranode hooks
         """
-        functions = SetupController._fetch_hooks('extranode')
+        functions = Toolbox.fetch_hooks('setup', 'extranode')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
             function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
-
-    @staticmethod
-    def _fetch_hooks(hook_type):
-        """
-        Load hooks
-        """
-        functions = []
-        path = os.path.dirname(__file__)
-        for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
-                name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
-                for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'hooks') \
-                                    and isinstance(submember[1].hooks, list) \
-                                    and hook_type in submember[1].hooks:
-                                functions.append(submember[1])
-
-        return functions

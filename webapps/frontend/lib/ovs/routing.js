@@ -36,7 +36,8 @@ define(['jquery'], function($) {
         { route: 'hmc',                  moduleId: 'pmachines',            title: $.t('ovs:pmachines.title'),             titlecode: 'ovs:pmachines.title',             nav: true,  main: false },
         { route: 'users',                moduleId: 'users',                title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false },
-        { route: 'support',              moduleId: 'support',              title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false }
+        { route: 'support',              moduleId: 'support',              title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },
+        { route: 'licenses',             moduleId: 'licenses',             title: $.t('ovs:licenses.title'),              titlecode: 'ovs:licenses.title',              nav: true,  main: false }
     ];
     extraRoutes = [];
 
