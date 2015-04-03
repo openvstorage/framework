@@ -47,6 +47,9 @@ class OVSClient(object):
                                  data={'grant_type': 'client_credentials'},
                                  headers=headers,
                                  verify=self._verify).json()
+
+        if len(response.keys()) == 1 and 'error' in response:
+            raise RuntimeError(response['error'])
         self._token = response['access_token']
 
     def _prepare(self, **kwargs):

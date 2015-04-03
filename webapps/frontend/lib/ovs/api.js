@@ -26,7 +26,7 @@ define([
         queryparams.timestamp = generic.getTimestamp();
         for (key in queryparams) {
             if (queryparams.hasOwnProperty(key)) {
-                querystring.push(key + '=' + queryparams[key]);
+                querystring.push(key + '=' + encodeURIComponent(queryparams[key]));
             }
         }
 

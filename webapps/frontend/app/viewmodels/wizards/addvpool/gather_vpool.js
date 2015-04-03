@@ -198,9 +198,15 @@ define([
                 self.invalidAlbaInfo(false);
                 self.fetchAlbaVPoolHandle = api.get('backends', { queryparams: getData })
                     .done(function(data) {
-                        self.data.albaBackends(data.data);
-                        if (data.data.length > 0) {
-                            self.data.albaBackend(data.data[0]);
+                        var available_backends = [];
+                        $.each(data.data, function (index, item) {
+                            if (item.available === true) {
+                                available_backends.push(item);
+                            }
+                        });
+                        if (available_backends.length > 0) {
+                            self.data.albaBackends(available_backends)
+                            self.data.albaBackend(available_backends[0]);
                         } else {
                             self.data.albaBackends(undefined);
                             self.data.albaBackend(undefined);

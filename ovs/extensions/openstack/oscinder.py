@@ -445,12 +445,14 @@ for line in file_contents:
         break
 
 if not patched:
+    fc = None
     for line in file_contents[:]:
         if line.startswith('class LibvirtVolumeDriver(LibvirtBaseVolumeDriver):'):
             fc = file_contents[:file_contents.index(line)] + [l+'\\n' for l in new_class.split('\\n')] + file_contents[file_contents.index(line):]
             break
-    with open(nova_volume_file, 'w') as f:
-        f.writelines(fc)
+    if fc is not None:
+        with open(nova_volume_file, 'w') as f:
+            f.writelines(fc)
 with open(nova_driver_file, 'r') as f:
     file_contents = f.readlines()
 patched = False
@@ -459,12 +461,14 @@ for line in file_contents:
         patched = True
         break
 if not patched:
+    fc = None
     for line in file_contents[:]:
         if 'local=nova.virt.libvirt.volume.LibvirtVolumeDriver' in line:
             fc = file_contents[:file_contents.index(line)] + ['''                  'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver',\\n'''] + file_contents[file_contents.index(line):]
             break
-    with open(nova_driver_file, 'w') as f:
-        f.writelines(fc)
+    if fc is not None:
+        with open(nova_driver_file, 'w') as f:
+            f.writelines(fc)
 if os.path.exists(nova_servers_file):
     fc = None
     if version == 'kilo':
@@ -485,7 +489,7 @@ if os.path.exists(nova_servers_file):
                     if 'instance = self._get_server(ctxt,' in line:
                        fc = file_contents[:file_contents.index(line)+1] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)+1:]
                        break
-            if fc:
+            if fc is not None:
                 with open(nova_servers_file, 'w') as f:
                    f.writelines(fc)
     elif version == 'juno':
@@ -506,7 +510,7 @@ if os.path.exists(nova_servers_file):
                     if 'instance = self.compute_api.get(ctxt, id,' in line:
                        fc = file_contents[:file_contents.index(line)-2] + ['\\n'] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)-2:]
                        break
-            if fc:
+            if fc is not None:
                 with open(nova_servers_file, 'w') as f:
                    f.writelines(fc)
 " """ % (version, nova_volume_file, nova_driver_file, nova_servers_file))
