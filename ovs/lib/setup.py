@@ -1555,10 +1555,10 @@ print blk_devices
 
         """
 
-        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
-                           '/mnt/cache2': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
-                           '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
-                           '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
+        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
+                           '/mnt/cache2': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
+                           '/mnt/bfs': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
+                           '/var/tmp': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
 
         selected_devices = dict(blk_devices)
         skipped_devices = set()
@@ -1590,6 +1590,7 @@ print blk_devices
         if nr_of_ssds == 1:
             mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
             mps_to_allocate['/mnt/cache1']['percentage'] = 50
+            mps_to_allocate['/mnt/cache2']['label'] = 'cache1'
             mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
             mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
             mps_to_allocate['/mnt/cache2']['percentage'] = 50
@@ -1605,6 +1606,12 @@ print blk_devices
                 mps_to_allocate[marker]['percentage'] = 100
                 mps_to_allocate[marker]['label'] = str('cache' + str(count + 1))
 
+        for mp, values in mps_to_allocate.iteritems():
+            if values['device'] in ssd_devices:
+                mps_to_allocate[mp]['ssd'] = True
+            else:
+                mps_to_allocate[mp]['ssd'] = False
+
         return mps_to_allocate, skipped_devices
 
     @staticmethod
@@ -1613,18 +1620,24 @@ print blk_devices
         fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
         mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().split('\n')]
 
+        boot_disk = ''
         unique_disks = set()
         for mp, values in partition_layout.iteritems():
             unique_disks.add(values['device'])
-
+            if 'boot_device' in values and values['boot_device']:
+                boot_disk = values['device']
+                print 'Boot disk {} will not be cleared'.format(boot_disk)
             # Umount partitions
             if mp in mounted:
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
 
         mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().split('\n')]
+
         for mounted_device in mounted_devices:
             for chosen_device in unique_disks:
+                if boot_disk in mounted_device:
+                    continue
                 if chosen_device in mounted_device:
                     print 'Unmounting {0}'.format(mounted_device)
                     client.run('umount {0}'.format(mounted_device))
@@ -1633,6 +1646,9 @@ print blk_devices
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
                 continue
+            if disk == boot_disk:
+                continue
+
             print "Partitioning disk {}".format(disk)
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
@@ -1656,6 +1672,18 @@ print blk_devices
             if disk == 'DIR_ONLY':
                 for directory, _, _ in partitions:
                     client.run('mkdir -p {0}'.format(directory))
+                continue
+
+            if disk == boot_disk:
+                for mp, percentage, label in partitions:
+                    print 'Partitioning free space on bootdisk: {}'.format(disk)
+                    command = """parted {} """.format(boot_disk)
+                    command += """unit % print free | grep 'Free Space' | tail -n1 | awk '{print $1}'"""
+                    start = int(float(client.run(command).split('%')[0])) + 1
+                    nr_of_partitions = int(client.run('lsblk {} | grep part | wc -l'.format(boot_disk))) + 1
+                    client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
+                    fstab_entries.append(fstab_entry.format(label, mp))
+                    client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
                 continue
 
             start = '2MB'
@@ -1689,18 +1717,40 @@ print blk_devices
         new_content += fstab_entries
         client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
+        print 'Mounting all partitions ...'
         try:
             client.run('timeout -k 9 5s mountall -q || true')
         except:
             pass  # The above might fail sometimes. We don't mind and will try again
         client.run('swapoff --all')
-        client.run('mountall -q')
+        client.run('timeout -k 9 5s mountall -q || true')
         client.run('chmod 1777 /var/tmp')
 
     @staticmethod
     def apply_flexible_disk_layout(client, auto_config=False, default=dict()):
         import choice
         blk_devices = SetupController._get_disk_configuration(client)
+
+        # check for free space on bootdevice
+        if not auto_config:
+            boot_disk = ''
+            for disk, values in blk_devices.iteritems():
+                if values['boot_device'] and values['type'] in ['ssd']:
+                    boot_disk += disk
+                    break
+
+            if not boot_disk:
+                print 'No SSD boot disk detected ...'
+                print 'Skipping partitioning of free space on boot disk ...'
+            else:
+                command = """parted /dev/{} """.format(boot_disk)
+                command += """unit GB print free | grep 'Free Space' | tail -n1 | awk '{print $3}'"""
+                free_space = float(client.run(command).split('GB')[0])
+
+                if free_space < 1.0:
+                    print 'Skipping auto partitioning of free space on bootdisk as it is < 1 GiB'
+                    print 'If required partition and mount manually for use in add vpool'
+                    boot_disk = ''
 
         skipped = set()
         if not default:
@@ -1709,6 +1759,10 @@ print blk_devices
         print 'Excluded: {0}'.format(skipped)
         print '-> bootdisk or part of software RAID configuration'
         print
+
+        if boot_disk:
+            print 'Adding free space on boot disk - only mountpoint, label and type can be changed!'
+            default['/mnt/os_cache'] = {'device': "/dev/{}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
 
         device_size_map = dict()
         for key, values in blk_devices.iteritems():
@@ -1749,7 +1803,6 @@ print blk_devices
 
                 print "{0:20} : {1}".format(mp, mp_values)
                 key_map.append(mp)
-            print
 
             return key_map
 
@@ -1850,8 +1903,11 @@ print blk_devices
 
         def process_submenu_actions(mp_to_edit):
             subitem = default[mp_to_edit]
+            is_boot_device = 'boot_device' in default[mp_to_edit] and default[mp_to_edit]['boot_device']
             submenu_items = subitem.keys()
             submenu_items.sort()
+            if 'boot_device' in submenu_items:
+                submenu_items.remove('boot_device')
             submenu_items.append('mountpoint')
             submenu_items.append('finish')
 
@@ -1870,6 +1926,10 @@ print blk_devices
                         default.pop(mp_to_edit)
                         default[new_mountpoint] = mp_values
                         mp_to_edit = new_mountpoint
+                elif is_boot_device and subitem_chosen not in ['type', 'label']:
+                    print '\nOnly mountpoint, label and type can be changed for a boot device'
+                    print 'All free space will be allocated to the new partition'
+                    time.sleep(1)
                 else:
                     answer = choice.Input('Enter new value for {}'.format(subitem_chosen)).ask()
                     if validate_subitem(subitem_chosen, answer):
