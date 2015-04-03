@@ -371,11 +371,14 @@ if vpool_name in enabled_backends:
 
     def _restart_openstack_services(self):
         """
-        Restart service on openstack
+        Restart services on openstack
         """
-        self.client.run('service nova-compute restart')
-        self.client.run('service nova-api-os-compute restart')
-        self.client.run('service cinder-volume restart')
+        for service_name in ('nova-compute', 'nova-api-os-compute', 'cinder-volume'):
+            if os.path.exists('/etc/init/{0}.conf'.format(service_name)):
+                try:
+                    self.client.run('service {0} restart'.format(service_name))
+                except SystemExit as sex:
+                    print('Failed to restart service {0}. {1}'.format(service_name, sex))
         time.sleep(3)
         return self._is_cinder_running()
 
