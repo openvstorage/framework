@@ -1731,9 +1731,9 @@ print blk_devices
         import choice
         blk_devices = SetupController._get_disk_configuration(client)
 
+        boot_disk = ''
         # check for free space on bootdevice
         if not auto_config:
-            boot_disk = ''
             for disk, values in blk_devices.iteritems():
                 if values['boot_device'] and values['type'] in ['ssd']:
                     boot_disk += disk
