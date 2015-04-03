@@ -134,6 +134,7 @@ class LicenseController(object):
                 for storagerouter in StorageRouterList.get_storagerouters():
                     client = SSHClient.load(storagerouter.ip)
                     client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
+            return result
         return None
 
     @staticmethod
