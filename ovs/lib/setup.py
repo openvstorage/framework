@@ -1590,7 +1590,7 @@ print blk_devices
         if nr_of_ssds == 1:
             mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
             mps_to_allocate['/mnt/cache1']['percentage'] = 50
-            mps_to_allocate['/mnt/cache2']['label'] = 'cache1'
+            mps_to_allocate['/mnt/cache1']['label'] = 'cache1'
             mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
             mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
             mps_to_allocate['/mnt/cache2']['percentage'] = 50
