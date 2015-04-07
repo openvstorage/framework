@@ -38,7 +38,7 @@ define([
                 reasons.push($.t('ovs:wizards.addbackend.gather.invalidname'));
             }
             $.each(self.data.backends(), function(index, backend) {
-                if (backend.name() === self.data.name() && $.inArray('name', fields) === -1) {
+                if (backend.name() === self.data.name() && !fields.contains('name')) {
                     valid = false;
                     fields.push('name');
                     reasons.push($.t('ovs:wizards.addbackend.gather.duplicatename'));

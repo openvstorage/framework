@@ -189,7 +189,7 @@ if Service.has_service('{0}'):
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         client = SSHClient.load(ip)
-        mountpoint_bfs = ''
+        mountpoint_bfs = None
         directories_to_create = set()
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
@@ -281,6 +281,10 @@ if Service.has_service('{0}'):
         mountpoint_readcaches = parameters['mountpoint_readcaches']
         mountpoint_writecaches = parameters['mountpoint_writecaches']
         mountpoint_foc = parameters['mountpoint_foc']
+
+        if not mountpoint_writecaches:
+            raise RuntimeError('No write cache mountpoints specified')
+
         mountpoint_fragmentcache = mountpoint_writecaches[0]
         mountpoint_fcache = mountpoint_writecaches[0]
 

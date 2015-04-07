@@ -36,7 +36,7 @@ class StorageDriver(DataObject):
                     Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
                     Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
-                    Property('mountpoint_bfs', str, doc='Mountpoint for backend filesystem (local or distributed fs)'),
+                    Property('mountpoint_bfs', str, mandatory=False, doc='Mountpoint for backend filesystem (local or distributed fs)'),
                     Property('mountpoint_md', str, doc='Mountpoint for metadata'),
                     Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
                     Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),

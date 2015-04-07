@@ -404,9 +404,15 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function stringStartsWith(string1, string2) {
+        return string1.indexOf(string2) === 0;
+    }
     function getLocalTime(timestamp) {
         var date = new Date(timestamp * 1000);
         return date.toLocaleTimeString();
+    }
+    function arrayFilterUnique(value, index, array) {
+        return array.indexOf(value) === index;
     }
 
     Array.prototype.equals = function(array) {
@@ -418,40 +424,44 @@ define(['jquery', 'jqp/pnotify'], function($) {
     Array.prototype.contains = function(element) {
         return arrayHasElement(this, element);
     };
+    String.prototype.startsWith = function(searchString) {
+        return stringStartsWith(this, searchString);
+    };
     return {
-        getTimestamp             : getTimestamp,
-        formatBytes              : formatBytes,
-        formatSpeed              : formatSpeed,
-        formatRatio              : formatRatio,
-        formatShort              : formatShort,
-        formatNumber             : formatNumber,
-        formatPercentage         : formatPercentage,
-        padRight                 : padRight,
-        padLeft                  : padLeft,
-        tryGet                   : tryGet,
-        trySet                   : trySet,
-        lower                    : lower,
-        alert                    : alert,
-        alertInfo                : alertInfo,
-        alertSuccess             : alertSuccess,
-        alertError               : alertError,
-        keys                     : keys,
-        xhrAbort                 : xhrAbort,
-        xhrCompleted             : xhrCompleted,
-        removeElement            : removeElement,
-        smooth                   : smooth,
-        round                    : round,
-        ceil                     : ceil,
-        buildString              : buildString,
-        setDecimals              : setDecimals,
-        crossFiller              : crossFiller,
-        syncObservableArray      : syncObservableArray,
-        deg2rad                  : deg2rad,
-        numberSort               : numberSort,
-        advancedSort             : advancedSort,
-        validate                 : validate,
-        overlap                  : overlap,
-        getColor                 : getColor,
-        getLocalTime             : getLocalTime
+        getTimestamp: getTimestamp,
+        formatBytes: formatBytes,
+        formatSpeed: formatSpeed,
+        formatRatio: formatRatio,
+        formatShort: formatShort,
+        formatNumber: formatNumber,
+        formatPercentage: formatPercentage,
+        padRight: padRight,
+        padLeft: padLeft,
+        tryGet: tryGet,
+        trySet: trySet,
+        lower: lower,
+        alert: alert,
+        alertInfo: alertInfo,
+        alertSuccess: alertSuccess,
+        alertError: alertError,
+        keys: keys,
+        xhrAbort: xhrAbort,
+        xhrCompleted: xhrCompleted,
+        removeElement: removeElement,
+        smooth: smooth,
+        round: round,
+        ceil: ceil,
+        buildString: buildString,
+        setDecimals: setDecimals,
+        crossFiller: crossFiller,
+        syncObservableArray: syncObservableArray,
+        deg2rad: deg2rad,
+        numberSort: numberSort,
+        advancedSort: advancedSort,
+        validate: validate,
+        overlap: overlap,
+        getColor: getColor,
+        getLocalTime: getLocalTime,
+        arrayFilterUnique: arrayFilterUnique
     };
 });

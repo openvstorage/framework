@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storagerouter', '../../containers/storagedriver', './data'
-], function($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
+    '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
     "use strict";
     return function() {
         var self = this;
@@ -43,6 +43,15 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidname'));
+            }
+            else {
+                $.each(self.data.vPools(), function(index, vpool) {
+                    if (vpool.name() === self.data.name()) {
+                        valid = false;
+                        fields.push('name');
+                        reasons.push($.t('ovs:wizards.addvpool.gathervpool.duplicatename'));
+                    }
+                });
             }
             if (self.data.backend().match(/^.+_s3$/)) {
                 if (!self.data.host.valid()) {
@@ -252,6 +261,31 @@ define([
                         self.data.target(self.data.storageRouters()[0]);
                     }
                 });
+
+            if (generic.xhrCompleted(self.loadVPoolsHandle)) {
+                var options = {
+                    contents: ''
+                };
+                self.loadVPoolsHandle = api.get('vpools', { queryparams: options })
+                    .done(function (data) {
+                        var guids = [], vpData = {};
+                        $.each(data.data, function (index, item) {
+                            guids.push(item.guid);
+                            vpData[item.guid] = item;
+                        });
+                        generic.crossFiller(
+                            guids, self.data.vPools,
+                            function (guid) {
+                                return new VPool(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.data.vPools(), function (index, vpool) {
+                            if (guids.contains(vpool.guid())) {
+                                vpool.fillData(vpData[vpool.guid()]);
+                            }
+                        });
+                    });
+            };
         };
     };
 });
