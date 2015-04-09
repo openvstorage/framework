@@ -126,7 +126,7 @@ class DataObject(object):
     _relations = []   # Blueprint for relations
 
     #######################
-    ## Constructor
+    # Constructor
     #######################
 
     def __new__(cls, *args, **kwargs):
@@ -605,6 +605,7 @@ class DataObject(object):
             if tries > 5:
                 raise SaveRaceConditionException()
 
+        self.invalidate_dynamics()
         self._original = copy.deepcopy(self._data)
 
         self.dirty = False
