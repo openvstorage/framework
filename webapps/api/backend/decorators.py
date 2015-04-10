@@ -299,6 +299,31 @@ def return_task():
     return wrap
 
 
+def return_plain():
+    """
+    Decorator to return plain data
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(self, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            _ = self
+            result = f(self, *args, **kwargs)
+            return Response(result, status=status.HTTP_200_OK)
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
+    return wrap
+
+
 def limit(amount, per, timeout):
     """
     Rate-limits the decorated call

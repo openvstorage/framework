@@ -18,6 +18,7 @@ Metadata views
 
 import time
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.generic.system import System
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -59,6 +60,15 @@ class MetadataView(View):
                     if backend_type.code not in plugins:
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
+            # - Generic plugins, as added to the configuration file(s)
+            config = System.read_config('/opt/OpenvStorage/config/ovs.cfg')
+            if config.has_section('plugins'):
+                for option in config.options('plugins'):
+                    if option.startswith('generic.'):
+                        _, plugin_name = option.split('.', 1)
+                        if plugin_name not in plugins:
+                            plugins[plugin_name] = []
+                        plugins[plugin_name] += ['gui']
             data['plugins'] = plugins
 
             # Gather authorization metadata

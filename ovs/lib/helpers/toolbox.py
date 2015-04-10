@@ -17,6 +17,8 @@ Module containing certain helper classes providing various logic
 """
 import os
 import imp
+import random
+import string
 import inspect
 
 
@@ -48,3 +50,10 @@ class Toolbox(object):
                                     and hook in submember[1].hooks[hook_type]:
                                 functions.append(submember[1])
         return functions
+
+    @staticmethod
+    def get_hash(length=16):
+        """
+        Generates a random hash
+        """
+        return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))

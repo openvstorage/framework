@@ -597,8 +597,8 @@ EOF
         print 'Updating configuration files'
         logger.info('Updating configuration files')
         System.set_remote_config(target_client, 'ovs.grid.ip', cluster_ip)
-        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
-        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.cid', Toolbox.get_hash())
+        System.set_remote_config(target_client, 'ovs.support.nid', Toolbox.get_hash())
 
         print 'Starting services'
         logger.info('Starting services for join master')
@@ -650,8 +650,8 @@ EOF
         SetupController._run_firstnode_hooks(cluster_ip)
 
         target_client = SSHClient.load(cluster_ip)
-        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
-        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.cid', Toolbox.get_hash())
+        System.set_remote_config(target_client, 'ovs.support.nid', Toolbox.get_hash())
         if enable_heartbeats is None:
             print '\n+++ Heartbeat +++\n'
             logger.info('Heartbeat')

@@ -167,6 +167,29 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
             }
         }
     };
+    ko.bindingHandlers.timeago = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor(), date;
+            if (value !== undefined && value !== '') {
+                date = new Date(value * 1000);
+                $(element).attr('title', date.toISOString());
+                $(element).timeago();
+            }
+        },
+        update: function(element, valueAccessor) {
+            var value = valueAccessor(), date;
+            if (value !== undefined && value !== '') {
+                date = new Date(value * 1000);
+                if ($(element).attr('title') === undefined) {
+                    $(element).attr('title', date.toISOString());
+                    $(element).timeago();
+                } else {
+                    $(element).attr('title', date.toISOString());
+                    $(element).timeago('updateFromDOM');
+                }
+            }
+        }
+    };
     ko.bindingHandlers.translate = {
         init: function(element, valueAccessor) {
             var value = valueAccessor();

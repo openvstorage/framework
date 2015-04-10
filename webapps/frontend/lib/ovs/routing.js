@@ -14,7 +14,7 @@
 /*global define */
 define(['jquery'], function($) {
     "use strict";
-    var mainRoutes, siteRoutes, buildSiteRoutes, loadHash, extraRoutes;
+    var mainRoutes, siteRoutes, buildSiteRoutes, loadHash, extraRoutes, routePatches;
 
     mainRoutes = [
        { route: '',              moduleId: 'viewmodels/redirect', nav: false },
@@ -40,9 +40,10 @@ define(['jquery'], function($) {
         { route: 'licenses',             moduleId: 'licenses',             title: $.t('ovs:licenses.title'),              titlecode: 'ovs:licenses.title',              nav: true,  main: false }
     ];
     extraRoutes = [];
+    routePatches = [];
 
     buildSiteRoutes = function(mode) {
-        var i, j;
+        var i, j, k;
         for (i = 0; i < extraRoutes.length; i += 1) {
             for (j = 0; j < extraRoutes[i].length; j += 1) {
                 siteRoutes.push(extraRoutes[i][j]);
@@ -50,6 +51,16 @@ define(['jquery'], function($) {
         }
         for (i = 0; i < siteRoutes.length; i += 1) {
             siteRoutes[i].hash = '#' + mode + '/' + siteRoutes[i].route;
+        }
+        for (i = 0; i < routePatches.length; i += 1) {
+            for (j = 0; j < routePatches[i].length; j += 1) {
+                for (k = 0; k < siteRoutes.length; k += 1) {
+                    if (siteRoutes[k].moduleId === routePatches[i][j].moduleId) {
+                        siteRoutes[k].nav = routePatches[i][j].nav;
+                        siteRoutes[k].main = routePatches[i][j].main;
+                    }
+                }
+            }
         }
     };
     loadHash = function(module, params) {
@@ -71,10 +82,11 @@ define(['jquery'], function($) {
     };
 
     return {
-        mainRoutes     : mainRoutes,
-        siteRoutes     : siteRoutes,
-        extraRoutes    : extraRoutes,
+        mainRoutes: mainRoutes,
+        siteRoutes: siteRoutes,
+        extraRoutes: extraRoutes,
+        routePatches: routePatches,
         buildSiteRoutes: buildSiteRoutes,
-        loadHash       : loadHash
+        loadHash: loadHash
     };
 });

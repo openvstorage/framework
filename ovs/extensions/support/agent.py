@@ -45,7 +45,7 @@ class SupportAgent(object):
         self._api = Configuration.get('ovs.support.api')
         self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
         self.interval = int(Configuration.get('ovs.support.interval'))
-        self._url = 'https://{0}/{1}'.format(self._endpoint, self._api)
+        self._url = 'https://{0}/{1}/'.format(self._endpoint, self._api)
 
     @staticmethod
     def get_heartbeat_data():
@@ -130,8 +130,12 @@ class SupportAgent(object):
         logger.debug('Processing heartbeat')
 
         try:
-            request = requests.post(self._url, data={'data': json.dumps(SupportAgent.get_heartbeat_data())})
-            return_data = request.json()
+            response = requests.post(self._url,
+                                     data={'data': json.dumps(SupportAgent.get_heartbeat_data())},
+                                     headers={'Accept': 'application/json; version=1'})
+            if response.status_code != 200:
+                raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
+            return_data = response.json()
         except Exception, ex:
             logger.exception('Unexpected error during support call: {0}'.format(ex))
             raise
@@ -139,7 +143,7 @@ class SupportAgent(object):
         if self._enable_support:
             try:
                 for task in return_data['tasks']:
-                    self._process_task(task['task'], task['metadata'])
+                    self._process_task(task['code'], task['metadata'])
             except Exception, ex:
                 logger.exception('Unexpected error processing tasks: {0}'.format(ex))
                 raise
