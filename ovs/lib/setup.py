@@ -863,7 +863,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None)
+            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None, None, None)
 
             print ''
             print Interactive.boxed_message(['Promote complete.'])
