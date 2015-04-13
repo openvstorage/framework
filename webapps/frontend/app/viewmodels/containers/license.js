@@ -28,6 +28,7 @@ define([
         self.data       = ko.observable();
         self.signature  = ko.observable();
         self.canRemove  = ko.observable();
+        self.token      = ko.observable();
         self.loading    = ko.observable(false);
 
         // Functions
@@ -35,6 +36,7 @@ define([
             self.name(data.name);
             self.component(data.component);
             self.data(data.data);
+            self.token(data.token);
             self.validUntil(data.valid_until);
             self.signature(data.signature);
             generic.trySet(self.canRemove, data, 'can_remove');

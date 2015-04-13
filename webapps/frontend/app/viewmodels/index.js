@@ -55,15 +55,16 @@ define([
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";
 
-            // Cache node ips
+            // Fetch main API metadata
             $.ajax('/api/?timestamp=' + (new Date().getTime()), {
                     type: 'GET',
                     contentType: 'application/json',
                     timeout: 5000,
                     headers: { Accept: 'application/json' }
                 })
-                .done(function(nodes) {
-                    shared.nodes = nodes.storagerouter_ips;
+                .done(function(metadata) {
+                    shared.nodes = metadata.storagerouter_ips;
+                    shared.identification(metadata.identification);
                     window.localStorage.setItem('nodes', JSON.stringify(shared.nodes));
                 });
         }

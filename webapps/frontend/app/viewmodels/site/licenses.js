@@ -34,6 +34,49 @@ define([
             { key: 'validUntil', value: $.t('ovs:generic.validuntil'), width: 250       }
         ];
 
+        // Observable
+        self.licenses    = ko.observableArray([]);
+        self.name        = ko.observable('').extend({ regex: /^[a-zA-Z0-9\-' .]{3,}$/ });
+        self.company     = ko.observable('');
+        self.email       = ko.observable().extend({ regex: /^[a-zA-Z0-9\-' .+]{3,}@[a-zA-Z0-9\-' .+]{3,}$/ });
+        self.phone       = ko.observable('');
+        self.agreement   = ko.observable('');
+        self.newsletter  = ko.observable(true);
+        self.registering = ko.observable(false);
+        self.registered  = ko.observable(false);
+
+        // Computed
+        self.canRegister = ko.computed(function() {
+            var valid = true, fields = [];
+            if (!self.name.valid()) {
+                valid = false;
+                fields.push('name');
+            }
+            if (!self.email.valid()) {
+                valid = false;
+                fields.push('email');
+            }
+            if (!self.agreement()) {
+                valid = false;
+                fields.push('agreement');
+            }
+            return { value: valid, fields: fields };
+        });
+        self.hasFreeLicense = ko.computed(function() {
+            if (self.shared.identification() === undefined) {
+                return false;
+            }
+            var hasFree = false,
+                freeToken = 'free_' + self.shared.identification().cluster_id;
+            $.each(self.licenses(), function(index, license) {
+                if (license.token() === freeToken) {
+                    hasFree = true;
+                    return false;
+                }
+            });
+            return hasFree;
+        });
+
         // Functions
         self.addLicense = function() {
             dialog.show(new AddLicenseWizard({
@@ -62,6 +105,31 @@ define([
                     deferred.resolve();
                 }
             }).promise();
+        };
+        self.register = function() {
+            self.registering(true);
+            var postData = {
+                license_string: '',
+                validate_only: '',
+                registration_parameters: {
+                    name: self.name(),
+                    company: self.company(),
+                    email: self.email(),
+                    phone: self.phone(),
+                    newsletter: self.newsletter()
+                }
+            };
+            api.post('licenses', { data: postData })
+                .then(self.shared.tasks.wait)
+                .done(function() {
+                    generic.alertSuccess($.t('ovs:licenses.request.success'), $.t('ovs:licenses.request.successmsg'));
+                    self.registering(false);
+                    self.registered(true);
+                })
+                .fail(function() {
+                    generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:licenses.request.registering') }));
+                    self.registering(false);
+                });
         };
 
         // Durandal

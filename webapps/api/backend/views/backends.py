@@ -49,7 +49,7 @@ class BackendViewSet(viewsets.ViewSet):
             if backend_type is None:
                 return BackendList.get_backends()
             return BackendTypeList.get_backend_type_by_code(backend_type).backends
-        client = OVSClient(ip, port, client_id, client_secret)
+        client = OVSClient(ip, port, credentials=(client_id, client_secret))
         try:
             remote_backends = client.get('/backends/', params={'backend_type': backend_type,
                                                                'contents': '' if contents is None else contents})

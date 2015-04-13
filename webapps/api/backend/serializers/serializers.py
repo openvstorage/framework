@@ -89,6 +89,8 @@ class FullSerializer(serializers.Serializer):
             return serializers.IntegerField(required=False)
         if field_type is bool:
             return serializers.BooleanField(required=False)
+        if field_type is dict:
+            return serializers.WritableField(required=False)
         return serializers.Field()
 
     class Meta:

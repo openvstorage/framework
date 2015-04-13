@@ -344,6 +344,21 @@ class Basic(TestCase):
                             'query': {'type': DataList.where_operator.AND,
                                       'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
         self.assertEqual(list_11, 10, 'list should contain int 10')  # disk 10-19
+        list_12 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, 'test_1')]}}).data  # noqa
+        self.assertEqual(list_12, 1, 'list should contain int 1')  # single disk
+        list_13 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, 'tESt_1', False)]}}).data  # noqa
+        self.assertEqual(list_13, 1, 'list should contain int 1')  # single disk
+        list_14 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, 'tESt_1')]}}).data  # noqa
+        self.assertEqual(list_14, 0, 'list should contain int 0')  # single disk
         # pylint: enable=line-too-long
 
     def test_invalidpropertyassignment(self):

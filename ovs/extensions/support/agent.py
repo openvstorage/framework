@@ -41,11 +41,9 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._endpoint = Configuration.get('ovs.support.endpoint')
-        self._api = Configuration.get('ovs.support.api')
         self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
         self.interval = int(Configuration.get('ovs.support.interval'))
-        self._url = 'https://{0}/{1}/'.format(self._endpoint, self._api)
+        self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
 
     @staticmethod
     def get_heartbeat_data():

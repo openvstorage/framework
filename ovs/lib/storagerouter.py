@@ -216,14 +216,15 @@ if Service.has_service('{0}'):
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
-                    client = OVSClient(connection_host, connection_port, oauth_client.client_id, oauth_client.client_secret)
+                    client = OVSClient(connection_host, connection_port,
+                                       credentials=(oauth_client.client_id, oauth_client.client_secret))
                 else:
                     connection_host = parameters['connection_host']
                     connection_port = parameters['connection_port']
                     connection_username = parameters['connection_username']
                     connection_password = parameters['connection_password']
                     client = OVSClient(connection_host, connection_port,
-                                       connection_username, connection_password)
+                                       credentials=(connection_username, connection_password))
                 task_id = client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successful, metadata = client.wait_for_task(task_id, timeout=300)
                 if successful is False:

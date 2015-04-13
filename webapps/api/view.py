@@ -48,6 +48,7 @@ class MetadataView(View):
                 'username': None,
                 'userguid': None,
                 'roles': [],
+                'identification': {},
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION),
                 'plugins': {}}
@@ -70,6 +71,9 @@ class MetadataView(View):
                             plugins[plugin_name] = []
                         plugins[plugin_name] += ['gui']
             data['plugins'] = plugins
+
+            # Fill identification
+            data['identification'] = {'cluster_id': config.get('support', 'cid')}
 
             # Gather authorization metadata
             if 'HTTP_AUTHORIZATION' not in request.META:

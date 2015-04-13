@@ -16,7 +16,7 @@
 Module for licenses
 """
 
-
+import re
 from backend.decorators import required_roles, load, return_object, return_list, return_task, log
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -59,11 +59,26 @@ class LicenseSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load()
-    def create(self, license_string, validate_only):
+    def create(self, license_string, validate_only, registration_parameters=None):
         """
         Validates/Applies a license
         """
-        if validate_only is True:
-            return LicenseController.validate.delay(license_string)
-        if validate_only is False:
-            return LicenseController.apply.delay(license_string)
+        if registration_parameters is None:
+            if validate_only is True:
+                return LicenseController.validate.delay(license_string)
+            if validate_only is False:
+                return LicenseController.apply.delay(license_string)
+        else:
+            invalid = []
+            validation = {'name': '^[a-zA-Z0-9\-\' .]{3,}$',
+                          'email': '^[a-zA-Z0-9\-\' .+]{3,}@[a-zA-Z0-9\-\' .+]{3,}$',  # Fairly simple regex, but the license is mailed anyway
+                          'company': None,
+                          'phone': None}
+            for key in validation:
+                if key not in registration_parameters or (validation[key] is not None and re.match(validation[key], registration_parameters[key]) is None):
+                    invalid.append(key)
+            if 'newsletter' not in registration_parameters or not isinstance(registration_parameters['newsletter'], bool):
+                invalid.append('newsletter')
+            if len(invalid) != 0:
+                raise RuntimeError('Invalid parameters in registration_parameters: {0}'.format(', '.format(invalid)))
+            return LicenseController.get_free_license.delay(registration_parameters)

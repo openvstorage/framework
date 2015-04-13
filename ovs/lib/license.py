@@ -22,6 +22,9 @@ import json
 import base64
 from ovs.celery_run import celery
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.api.client import OVSClient
+from ovs.extensions.support.agent import SupportAgent
+from ovs.plugin.provider.configuration import Configuration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -144,6 +147,22 @@ class LicenseController(object):
                     client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
             return result
         return None
+
+    @staticmethod
+    @celery.task(name='ovs.license.get_free_license')
+    def get_free_license(registration_parameters):
+        """
+        Obtains a free license
+        """
+        SupportAgent().run()  # Execute a single heartbeat run
+        client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True)
+        client.post('/support/register/',
+                    data={'cluster_id': Configuration.get('ovs.support.cid'),
+                          'name': registration_parameters['name'],
+                          'email': registration_parameters['email'],
+                          'company': registration_parameters['company'],
+                          'phone': registration_parameters['phone'],
+                          'newsletter': registration_parameters['newsletter']})
 
     @staticmethod
     def _encode(data):
