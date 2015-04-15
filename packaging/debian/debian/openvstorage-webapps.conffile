@@ -1,0 +1,3 @@
+opt/OpenvStorage/config/django_gunicorn_ovs.cfg.py
+etc/nginx/sites-enabled/openvstorage.conf
+etc/nginx/sites-enabled/openvstorage_ssl.conf
