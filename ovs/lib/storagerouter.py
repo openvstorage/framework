@@ -74,6 +74,11 @@ class StorageRouterController(object):
         arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
+        # include directories chosen during ovs setup
+        readcaches = Configuration.get('ovs.vpool_partitions.readcaches').split(',')
+        writecaches = Configuration.get('ovs.vpool_partitions.writecaches').split(',')
+        storage = Configuration.get('ovs.vpool_partitions.storage').split(',')
+        mountpoints.extend(storage)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
@@ -84,7 +89,14 @@ class StorageRouterController(object):
         file_existence = {}
         for check_file in files:
             file_existence[check_file] = os.path.exists(check_file) and os.path.isfile(check_file)
+
+        print 'mountpoints:{}'.format(mountpoints)
+        print 'readcaches:{}'.format(readcaches)
+        print 'writecaches:{}'.format(writecaches)
+
         return {'mountpoints': mountpoints,
+                'readcaches': readcaches,
+                'writecaches': writecaches,
                 'ipaddresses': ipaddresses,
                 'files': file_existence,
                 'allow_vpool': allow_vpool}
@@ -117,6 +129,23 @@ class StorageRouterController(object):
             raise RuntimeError('Could not find Storage Router with given ip address')
 
         vpool = VPoolList.get_vpool_by_name(vpool_name)
+        if vpool:
+            if 'mountpoint_readcaches' in parameters:
+                new_r_caches = list()
+                for mp in parameters['mountpoint_readcaches']:
+                    new_r_caches.append(os.path.split(mp)[0])
+                parameters['mountpoint_readcaches'] = new_r_caches
+
+            if 'mountpoint_writecaches' in parameters:
+                new_w_caches = list()
+                for mp in parameters['mountpoint_writecaches']:
+                    new_w_caches.append(os.path.split(mp)[0])
+
+                parameters['mountpoint_writecaches'] = new_w_caches
+
+                print 'new_r_caches: {}'.format(new_r_caches)
+                print 'new_w_caches: {}'.format(new_w_caches)
+
         storagedriver = None
         if vpool is not None:
             if vpool.backend_type.code == 'local':
@@ -160,12 +189,14 @@ if Service.has_service('{0}'):
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         client = SSHClient.load(ip)
-        mountpoint_bfs = ''
+        mountpoint_bfs = None
         directories_to_create = set()
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
         mountpoints = [device.strip() for device in client.run(cmd).strip().split('\n')]
         mountpoints.remove('/')
+
+        print 'mountpoints: {}'.format(mountpoints)
 
         if vpool is None:
             vpool = VPool()
@@ -185,14 +216,15 @@ if Service.has_service('{0}'):
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
-                    client = OVSClient(connection_host, connection_port, oauth_client.client_id, oauth_client.client_secret)
+                    client = OVSClient(connection_host, connection_port,
+                                       credentials=(oauth_client.client_id, oauth_client.client_secret))
                 else:
                     connection_host = parameters['connection_host']
                     connection_port = parameters['connection_port']
                     connection_username = parameters['connection_username']
                     connection_password = parameters['connection_password']
                     client = OVSClient(connection_host, connection_port,
-                                       connection_username, connection_password)
+                                       credentials=(connection_username, connection_password))
                 task_id = client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successful, metadata = client.wait_for_task(task_id, timeout=300)
                 if successful is False:
@@ -249,49 +281,47 @@ if Service.has_service('{0}'):
         mountpoint_md = parameters['mountpoint_md']
         mountpoint_readcaches = parameters['mountpoint_readcaches']
         mountpoint_writecaches = parameters['mountpoint_writecaches']
-
         mountpoint_foc = parameters['mountpoint_foc']
+
+        if not mountpoint_writecaches:
+            raise RuntimeError('No write cache mountpoints specified')
+
         mountpoint_fragmentcache = mountpoint_writecaches[0]
+        mountpoint_fcache = mountpoint_writecaches[0]
 
+        all_locations = list()
         directories_to_create.add(mountpoint_temp)
+        all_locations.append(mountpoint_temp)
         directories_to_create.add(mountpoint_md)
+        all_locations.append(mountpoint_md)
         directories_to_create.add(mountpoint_foc)
+        all_locations.append(mountpoint_foc)
+        directories_to_create.add(mountpoint_fragmentcache)
+        all_locations.append(mountpoint_fragmentcache)
+        directories_to_create.add(mountpoint_fcache)
+        all_locations.append(mountpoint_fcache)
 
-        def is_partition(directory):
-            for mountpoint in mountpoints:
-                if directory == mountpoint:
-                    return True
-            return False
+        print 'mountpoint_temp: {}'.format(mountpoint_temp)
+        print 'mountpoint_md: {}'.format(mountpoint_md)
+        print 'mountpoint_foc: {}'.format(mountpoint_foc)
+        print 'mountpoint_fragmentcache: {}'.format(mountpoint_fragmentcache)
+        print 'mountpoint_fcache: {}'.format(mountpoint_fcache)
+        print 'mp_rcs: {}'.format(mountpoint_readcaches)
+        print 'mp_wcs: {}'.format(mountpoint_writecaches)
 
-        dir_onlys = list()
-        read_partition_mps = list()
-        write_partition_mps = list()
-        all_partition_mps = list()
+        def match_clustersize(size):
+            # int type in KiB
+            return int(int(size / 1024 / 4096) * 4096)
+
         for mp in mountpoint_readcaches:
-            if is_partition(mp):
-                read_partition_mps.append(mp)
-            else:
-                dir_onlys.append(mp)
+            directories_to_create.add(str(mp))
+            all_locations.append(str(mp))
         for mp in mountpoint_writecaches:
-            if is_partition(mp):
-                write_partition_mps.append(mp)
-            else:
-                dir_onlys.append(mp)
-        if is_partition(mountpoint_foc):
-            all_partition_mps.append(mountpoint_foc)
-        else:
-            dir_onlys.append(mountpoint_foc)
+            directories_to_create.add(str(mp))
+            all_locations.append(str(mp))
 
-        if vpool.backend_type.code == 'alba':
-            if is_partition(mountpoint_fragmentcache):
-                all_partition_mps.append(mountpoint_fragmentcache)
-            else:
-                dir_onlys.append(mountpoint_fragmentcache)
-
-        all_partition_mps.extend(read_partition_mps)
-        all_partition_mps.extend(write_partition_mps)
-        directories_to_create = directories_to_create.union(all_partition_mps)
-        directories_to_create = directories_to_create.union(dir_onlys)
+        print 'directories_to_create" {}'.format(directories_to_create)
+        print 'all_locations: {}'.format(all_locations)
 
         client = SSHClient.load(ip)
         dir_create_script = """
@@ -309,70 +339,60 @@ os.chmod('{0}', 0777)
 """.format(parameters['mountpoint_bfs'])
             System.exec_remote_python(client, bfs_chmod_script)
 
-        dirs2create = list()
-        count = 1
-        readcache_fs, writecache_fs = dict(), dict()
-        for readcache in mountpoint_readcaches:
-            readcache_fs[readcache] = {'statvfs': os.statvfs(readcache),
-                                       'path': '{}'.format(readcache, count, vpool_name)}
-            count += 1
-        count = 1
-        for writecache in mountpoint_writecaches:
-            writecache_fs[writecache] = {'statvfs': os.statvfs(writecache),
-                                         'path': '{}/sco{}_{}'.format(writecache, count, vpool_name)}
-            dirs2create.append('{}/sco{}_{}'.format(writecache, count, vpool_name))
-            count += 1
+        location_sizing = dict()
+        for mp in all_locations:
+            location = os.stat(mp).st_dev
+            if location not in location_sizing:
+                location_sizing[location] = {'size': os.statvfs(mp).f_bavail * os.statvfs(mp).f_bsize,
+                                             'count': 1}
+            else:
+                location_sizing[location]['count'] += 1
+        print location_sizing
+
+        available_size = dict()
+        for key, values in location_sizing.iteritems():
+            available_size[key] = values['size'] / values['count']
+        print available_size
 
         # @todo: put on all write caches?
         fdcache = '{}/fd_{}'.format(mountpoint_foc, vpool_name)
-
         failovercache = '{}/foc_{}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{}/metadata_{}'.format(mountpoint_md, vpool_name)
         tlogpath = '{}/tlogs_{}'.format(mountpoint_md, vpool_name)
         rsppath = '/var/rsp/{}'.format(vpool_name)
+
+        dirs2create = list()
         dirs2create.extend([failovercache, metadatapath, tlogpath, rsppath,
                            System.read_remote_config(client, 'ovs.storagedriver.readcache.serialization.path')])
-
-        # Cache sizes
-        # 20% = scocache
-        # 20% = failovercache
-        # 60% = readcache
-
         files2create = list()
-        root_statvfs = os.statvfs('/')
-        root_free = root_statvfs.f_bavail * root_statvfs.f_bsize
-        dir_only_factor = 0.3 if len(dir_onlys) == 0 else 0.3 / len(dir_onlys)
         readcaches = list()
         writecaches = list()
-        all_mps = set(all_partition_mps)
-        all_mps = all_mps.union(dir_onlys)
+        readcache_size = 0
+        r_count = 1
+        w_count = 1
 
-        def match_clustersize(size):
-            # int type in KiB
-            return int(int(size / 1024 / 4096) * 4096)
+        unique_locations = set()
+        for mp in directories_to_create:
+            unique_locations.add(mp)
 
-        count = 1
-        for mp in all_mps:
+        for mp in unique_locations:
             if mp in mountpoint_readcaches:
-                if mp in dir_onlys:
-                    readcaches.append({'path': '{}/read{}_{}'.format(readcache_fs[mp]['path'], count, vpool_name),
-                                       'size': '{0}KiB'.format(match_clustersize(root_free * dir_only_factor))})
-                else:
-                    r_size = (readcache_fs[mp]['statvfs'].f_bavail * readcache_fs[mp]['statvfs'].f_bsize / 1024) / 4096 * 4096
-                    readcaches.append({'path': '{}/read{}_{}'.format(readcache_fs[mp]['path'], count, vpool_name),
-                                       'size': '{0}KiB'.format(match_clustersize(r_size * .98))})
-                files2create.append('{}/read{}_{}'.format(readcache_fs[mp]['path'], count, vpool_name))
-                count += 1
+                r_size = available_size[os.stat(mp).st_dev]
+                readcache_size += match_clustersize(r_size * .98)
+                readcaches.append({'path': '{}/read{}_{}'.format(mp, r_count, vpool_name),
+                                   'size': '{0}KiB'.format(match_clustersize(r_size * .98))})
+                files2create.append('{}/read{}_{}'.format(mp, r_count, vpool_name))
+                r_count += 1
             if mp in mountpoint_writecaches:
-                if mp in dir_onlys:
-                    writecaches.append({'path': writecache_fs[mp]['path'],
-                                        'size': '{0}KiB'.format(match_clustersize(root_free * dir_only_factor))})
-                else:
-                    w_size = (writecache_fs[mp]['statvfs'].f_bavail * writecache_fs[mp]['statvfs'].f_bsize / 1024) / 4096 * 4096
-                    if mp == mountpoint_fragmentcache:
-                        w_size /= 2
-                    writecaches.append({'path': writecache_fs[mp]['path'],
-                                        'size': '{0}KiB'.format(match_clustersize(w_size * .49) if (mp == mountpoint_foc) else match_clustersize(w_size * .98))})
+                dirs2create.append('{}/sco{}_{}'.format(mp, w_count, vpool_name))
+                w_size = available_size[os.stat(mp).st_dev]
+                writecaches.append({'path': '{}/sco{}_{}'.format(mp, w_count, vpool_name),
+                                    'size': '{0}KiB'.format(match_clustersize(w_size * .98))})
+                dirs2create.append('{}/sco{}_{}'.format(mp, w_count, vpool_name))
+                w_count += 1
+
+        print 'readcaches: {}'.format(readcaches)
+        print 'writecaches: {}'.format(writecaches)
 
         model_ports_in_use = []
         for port_storagedriver in StorageDriverList.get_storagedrivers():
@@ -472,11 +492,15 @@ os.chmod('{0}', 0777)
             cache_dir = '{}/fcache_{}'.format(mountpoint_fragmentcache, vpool_name)
             client.dir_ensure(cache_dir, recursive=True)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
+
+            # manifest cache is in memory
             client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
                 'log_level': 'debug',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
+                'manifest_cache_size': 100000,
                 'fragment_cache_dir': cache_dir,
+                'fragment_cache_size' : available_size[os.stat(mountpoint_fragmentcache).st_dev],
                 'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
             }))
 
@@ -571,7 +595,7 @@ for filename in {1}:
                   '<UUID>': str(uuid.uuid4()),
                   '<OVS_UID>': check_output('id -u ovs', shell=True).strip(),
                   '<OVS_GID>': check_output('id -g ovs', shell=True).strip(),
-                  }
+                  '<KILL_TIMEOUT>': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
         if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
             client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
@@ -773,7 +797,8 @@ if Service.has_service('{0}'):
             client.run('rm {}'.format(readcache))
 
         for writecache in storagedriver.mountpoint_writecaches:
-            client.run('rm -rf {}'.format(writecache))
+            if writecache:
+                client.run('rm -rf {}'.format(writecache))
 
         client.run('rm -rf {}/foc_{}'.format(storagedriver.mountpoint_foc, vpool.name))
         client.run('rm -rf {}/fd_{}'.format(storagedriver.mountpoint_foc, vpool.name))
@@ -838,6 +863,7 @@ if Service.has_service('{0}'):
         @param storagerouters: StorageRouters on which to add a new link
         @param parameters: Settings for new links
         """
+        print 'update storagedrivers: {}'.format(str(parameters))
         success = True
         # Add Storage Drivers
         for storagerouter_ip, storageapplaince_machineid in storagerouters:

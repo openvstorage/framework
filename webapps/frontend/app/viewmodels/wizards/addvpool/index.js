@@ -35,10 +35,8 @@ define([
         data.backend('local');
         data.mtptTemp(undefined);
         data.mtptBFS(undefined);
-        data.mtptMD(undefined);
         data.mtptReadCaches([]);
         data.mtptWriteCaches([]);
-        data.mtptFOC(undefined);
         data.storageIP(undefined);
         data.name('');
         data.host('');
@@ -49,6 +47,8 @@ define([
         data.storageRouters([]);
         data.storageDrivers([]);
         data.mountpoints([]);
+        data.readcaches([]);
+        data.writecaches([]);
         data.ipAddresses([]);
         data.albaBackends(undefined);
         data.albaBackend(undefined);

@@ -35,6 +35,10 @@ requirejs.config({
             deps   : ['jquery'],
             exports: 'jQuery'
         },
+        'jqp/timeago': {
+            deps   : ['jquery'],
+            exports: 'jQuery'
+        },
         'd3': {
             exports: 'd3'
         }

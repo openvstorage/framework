@@ -19,12 +19,10 @@ Module for SetupController
 import os
 import re
 import sys
-import imp
 import time
 import uuid
 import urllib2
 import base64
-import inspect
 
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
@@ -32,6 +30,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -49,7 +48,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage'}
 
     # Arakoon
     arakoon_clusters = ['ovsdb', 'voldrv']
@@ -267,7 +266,7 @@ class SetupController(object):
             else:
                 promote = True  # Correct, but irrelevant, since a first node is always master
 
-            mountpoints, hypervisor_info = SetupController._prepare_node(
+            mountpoints, hypervisor_info, readcaches, writecaches = SetupController._prepare_node(
                 cluster_ip, nodes, known_passwords,
                 {'type': hypervisor_type,
                  'name': hypervisor_name,
@@ -279,13 +278,13 @@ class SetupController(object):
             if first_node:
                 SetupController._setup_first_node(cluster_ip, unique_id, mountpoints,
                                                   cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
-                                                  enable_heartbeats)
+                                                  enable_heartbeats, readcaches, writecaches)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
-                                                  nodes, hypervisor_info)
+                                                  nodes, hypervisor_info, readcaches, writecaches)
                 if promote:
                     SetupController._promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id,
-                                                  mountpoints, arakoon_mountpoint)
+                                                  mountpoints, arakoon_mountpoint, readcaches, writecaches)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -397,11 +396,22 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
             config.remove_section(partition_key)
         config.add_section(partition_key)
 
-        additional_mountpoints = list()
+        readcaches = list()
+        writecaches = list()
+        storage = list()
         for mountpoint, details in disk_layout.iteritems():
-            if 'DIR_ONLY' in details['device']:
-                additional_mountpoints.append(mountpoint)
-        config.set(partition_key, 'dirs', ','.join(map(str, additional_mountpoints)))
+            if 'readcache' in details['type']:
+                readcaches.append(mountpoint)
+                continue
+            elif 'writecache' in details['type']:
+                writecaches.append(mountpoint)
+                continue
+            else:
+                storage.append(mountpoint)
+
+        config.set(partition_key, 'readcaches', ','.join(map(str, readcaches)))
+        config.set(partition_key, 'writecaches', ','.join(map(str, writecaches)))
+        config.set(partition_key, 'storage', ','.join(map(str, storage)))
         SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, config)
 
         mountpoints = disk_layout.keys()
@@ -447,10 +457,10 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
-        return mountpoints, hypervisor_info
+        return mountpoints, hypervisor_info, readcaches, writecaches
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, readcaches, writecaches):
         """
         Sets up the first node services. This node is always a master
         """
@@ -464,8 +474,9 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         target_client = SSHClient.load(cluster_ip)
         if arakoon_mountpoint is None:
             arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                        default_value=Interactive.find_in_list(mountpoints, 'db'))
+                                                        default_value=writecaches[0] if writecaches else '')
         System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
+        System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
@@ -586,8 +597,8 @@ EOF
         print 'Updating configuration files'
         logger.info('Updating configuration files')
         System.set_remote_config(target_client, 'ovs.grid.ip', cluster_ip)
-        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
-        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.cid', Toolbox.get_hash())
+        System.set_remote_config(target_client, 'ovs.support.nid', Toolbox.get_hash())
 
         print 'Starting services'
         logger.info('Starting services for join master')
@@ -639,8 +650,8 @@ EOF
         SetupController._run_firstnode_hooks(cluster_ip)
 
         target_client = SSHClient.load(cluster_ip)
-        System.set_remote_config(target_client, 'ovs.support.cid', str(uuid.uuid4()))
-        System.set_remote_config(target_client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(target_client, 'ovs.support.cid', Toolbox.get_hash())
+        System.set_remote_config(target_client, 'ovs.support.nid', Toolbox.get_hash())
         if enable_heartbeats is None:
             print '\n+++ Heartbeat +++\n'
             logger.info('Heartbeat')
@@ -680,7 +691,7 @@ EOF
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info, readcaches, writecaches):
         """
         Sets up an additional node
         """
@@ -852,7 +863,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None)
+            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None, None, None)
 
             print ''
             print Interactive.boxed_message(['Promote complete.'])
@@ -872,7 +883,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint):
+    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint, readcaches, writecaches):
         """
         Promotes a given node
         """
@@ -923,7 +934,7 @@ EOF
                 mountpoints.sort()
                 mountpoints = [manual] + mountpoints
                 arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                            default_value=Interactive.find_in_list(mountpoints, 'db'),
+                                                            default_value=writecaches[0] if writecaches else '',
                                                             sort_choices=False)
                 if arakoon_mountpoint == manual:
                     arakoon_mountpoint = None
@@ -935,6 +946,7 @@ EOF
                     else:
                         print '  Invalid path, please retry'
         System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
+        System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, ports)
@@ -1543,11 +1555,10 @@ print blk_devices
 
         """
 
-        mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'mdpath'},
-                                   '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'db'},
-                                   '/mnt/cache1': dict(SetupController.PARTITION_DEFAULTS),
-                                   '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'backendfs'},
-                                   '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'tempfs'}}
+        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
+                           '/mnt/cache2': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
+                           '/mnt/bfs': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
+                           '/var/tmp': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
 
         selected_devices = dict(blk_devices)
         skipped_devices = set()
@@ -1576,40 +1587,32 @@ print blk_devices
         print '{0} sata drives: {1}'.format(nr_of_disks, str(disk_devices))
         print
 
-        if nr_of_disks == 1:
-            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/var/tmp']['percentage'] = 20
-
-        elif nr_of_disks >= 2:
-            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/var/tmp']['percentage'] = 100
-
         if nr_of_ssds == 1:
-            mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/cache1']['percentage'] = 50
-            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
-            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
+            mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
+            mps_to_allocate['/mnt/cache1']['percentage'] = 50
+            mps_to_allocate['/mnt/cache1']['label'] = 'cache1'
+            mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
+            mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
+            mps_to_allocate['/mnt/cache2']['percentage'] = 50
+            mps_to_allocate['/mnt/cache2']['label'] = 'cache2'
+            mps_to_allocate['/mnt/cache2']['type'] = 'readcache'
 
-        elif nr_of_ssds >= 2:
+        elif nr_of_ssds > 1:
             for count in xrange(nr_of_ssds):
                 marker = str('/mnt/cache' + str(count + 1))
-                mountpoints_to_allocate[marker] = dict(SetupController.PARTITION_DEFAULTS)
-                mountpoints_to_allocate[marker]['device'] = ssd_devices[count]
-                mountpoints_to_allocate[marker]['label'] = 'cache' + str(count + 1)
-                if count < 2:
-                    cache_size = 75
-                else:
-                    cache_size = 100
-                mountpoints_to_allocate[marker]['percentage'] = cache_size
+                mps_to_allocate[marker] = dict()
+                mps_to_allocate[marker]['device'] = ssd_devices[count]
+                mps_to_allocate[marker]['type'] = 'readcache' if count > 0 else 'writecache'
+                mps_to_allocate[marker]['percentage'] = 100
+                mps_to_allocate[marker]['label'] = str('cache' + str(count + 1))
 
-            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
-            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[1]
-            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
+        for mp, values in mps_to_allocate.iteritems():
+            if values['device'] in ssd_devices:
+                mps_to_allocate[mp]['ssd'] = True
+            else:
+                mps_to_allocate[mp]['ssd'] = False
 
-        return mountpoints_to_allocate, skipped_devices
+        return mps_to_allocate, skipped_devices
 
     @staticmethod
     def _partition_disks(client, partition_layout):
@@ -1617,18 +1620,24 @@ print blk_devices
         fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
         mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().split('\n')]
 
+        boot_disk = ''
         unique_disks = set()
         for mp, values in partition_layout.iteritems():
             unique_disks.add(values['device'])
-
+            if 'boot_device' in values and values['boot_device']:
+                boot_disk = values['device']
+                print 'Boot disk {} will not be cleared'.format(boot_disk)
             # Umount partitions
             if mp in mounted:
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
 
         mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().split('\n')]
+
         for mounted_device in mounted_devices:
             for chosen_device in unique_disks:
+                if boot_disk in mounted_device:
+                    continue
                 if chosen_device in mounted_device:
                     print 'Unmounting {0}'.format(mounted_device)
                     client.run('umount {0}'.format(mounted_device))
@@ -1637,6 +1646,10 @@ print blk_devices
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
                 continue
+            if disk == boot_disk:
+                continue
+
+            print "Partitioning disk {}".format(disk)
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
         # Pre process partition info (disk as key)
@@ -1659,6 +1672,18 @@ print blk_devices
             if disk == 'DIR_ONLY':
                 for directory, _, _ in partitions:
                     client.run('mkdir -p {0}'.format(directory))
+                continue
+
+            if disk == boot_disk:
+                for mp, percentage, label in partitions:
+                    print 'Partitioning free space on bootdisk: {}'.format(disk)
+                    command = """parted {} """.format(boot_disk)
+                    command += """unit % print free | grep 'Free Space' | tail -n1 | awk '{print $1}'"""
+                    start = int(float(client.run(command).split('%')[0])) + 1
+                    nr_of_partitions = int(client.run('lsblk {} | grep part | wc -l'.format(boot_disk))) + 1
+                    client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
+                    fstab_entries.append(fstab_entry.format(label, mp))
+                    client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
                 continue
 
             start = '2MB'
@@ -1692,18 +1717,40 @@ print blk_devices
         new_content += fstab_entries
         client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
+        print 'Mounting all partitions ...'
         try:
             client.run('timeout -k 9 5s mountall -q || true')
         except:
             pass  # The above might fail sometimes. We don't mind and will try again
         client.run('swapoff --all')
-        client.run('mountall -q')
+        client.run('timeout -k 9 5s mountall -q || true')
         client.run('chmod 1777 /var/tmp')
 
     @staticmethod
     def apply_flexible_disk_layout(client, auto_config=False, default=dict()):
         import choice
         blk_devices = SetupController._get_disk_configuration(client)
+
+        boot_disk = ''
+        # check for free space on bootdevice
+        if not auto_config:
+            for disk, values in blk_devices.iteritems():
+                if values['boot_device'] and values['type'] in ['ssd']:
+                    boot_disk += disk
+                    break
+
+            if not boot_disk:
+                print 'No SSD boot disk detected ...'
+                print 'Skipping partitioning of free space on boot disk ...'
+            else:
+                command = """parted /dev/{} """.format(boot_disk)
+                command += """unit GB print free | grep 'Free Space' | tail -n1 | awk '{print $3}'"""
+                free_space = float(client.run(command).split('GB')[0])
+
+                if free_space < 1.0:
+                    print 'Skipping auto partitioning of free space on bootdisk as it is < 1 GiB'
+                    print 'If required partition and mount manually for use in add vpool'
+                    boot_disk = ''
 
         skipped = set()
         if not default:
@@ -1713,12 +1760,21 @@ print blk_devices
         print '-> bootdisk or part of software RAID configuration'
         print
 
+        if boot_disk:
+            print 'Adding free space on boot disk - only mountpoint, label and type can be changed!'
+            default['/mnt/os_cache'] = {'device': "/dev/{}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
+
         device_size_map = dict()
         for key, values in blk_devices.iteritems():
             device_size_map['/dev/' + key] = values['size']
 
         def show_layout(proposed):
+            print
             print 'Proposed partition layout:'
+            print
+            print '! Mark fastest ssd device as writecache'
+            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
+            print
             keys = proposed.keys()
             keys.sort()
             key_map = list()
@@ -1747,7 +1803,6 @@ print blk_devices
 
                 print "{0:20} : {1}".format(mp, mp_values)
                 key_map.append(mp)
-            print
 
             return key_map
 
@@ -1786,6 +1841,12 @@ print blk_devices
             else:
                 return False
 
+        def is_valid_storage_type(value):
+            if value in ['readcache', 'writecache', 'storage']:
+                return True
+            else:
+                return False
+
         def validate_subitem(subitem, answer):
             if subitem in ['percentage']:
                 return is_percentage(answer)
@@ -1795,7 +1856,8 @@ print blk_devices
                 return is_mountpoint(answer)
             elif subitem in ['label']:
                 return is_label(answer)
-
+            elif subitem in ['type']:
+                return is_valid_storage_type(answer)
             return False
 
         def _summarize_partition_percentages(layout):
@@ -1841,8 +1903,11 @@ print blk_devices
 
         def process_submenu_actions(mp_to_edit):
             subitem = default[mp_to_edit]
+            is_boot_device = 'boot_device' in default[mp_to_edit] and default[mp_to_edit]['boot_device']
             submenu_items = subitem.keys()
             submenu_items.sort()
+            if 'boot_device' in submenu_items:
+                submenu_items.remove('boot_device')
             submenu_items.append('mountpoint')
             submenu_items.append('finish')
 
@@ -1861,6 +1926,10 @@ print blk_devices
                         default.pop(mp_to_edit)
                         default[new_mountpoint] = mp_values
                         mp_to_edit = new_mountpoint
+                elif is_boot_device and subitem_chosen not in ['type', 'label']:
+                    print '\nOnly mountpoint, label and type can be changed for a boot device'
+                    print 'All free space will be allocated to the new partition'
+                    time.sleep(1)
                 else:
                     answer = choice.Input('Enter new value for {}'.format(subitem_chosen)).ask()
                     if validate_subitem(subitem_chosen, answer):
@@ -2119,7 +2188,7 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute promote hooks
         """
-        functions = SetupController._fetch_hooks('promote')
+        functions = Toolbox.fetch_hooks('setup', 'promote')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
@@ -2131,7 +2200,7 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute demote hooks
         """
-        functions = SetupController._fetch_hooks('demote')
+        functions = Toolbox.fetch_hooks('setup', 'demote')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
@@ -2143,7 +2212,7 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute firstnode hooks
         """
-        functions = SetupController._fetch_hooks('firstnode')
+        functions = Toolbox.fetch_hooks('setup', 'firstnode')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
@@ -2155,32 +2224,9 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute extranode hooks
         """
-        functions = SetupController._fetch_hooks('extranode')
+        functions = Toolbox.fetch_hooks('setup', 'extranode')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
             function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
-
-    @staticmethod
-    def _fetch_hooks(hook_type):
-        """
-        Load hooks
-        """
-        functions = []
-        path = os.path.dirname(__file__)
-        for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
-                name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
-                for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'hooks') \
-                                    and isinstance(submember[1].hooks, list) \
-                                    and hook_type in submember[1].hooks:
-                                functions.append(submember[1])
-
-        return functions

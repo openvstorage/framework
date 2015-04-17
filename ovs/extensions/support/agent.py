@@ -16,6 +16,7 @@
 Module for the Support Agent
 """
 
+import os
 import sys
 import json
 import time
@@ -40,11 +41,9 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._endpoint = Configuration.get('ovs.support.endpoint')
-        self._api = Configuration.get('ovs.support.api')
         self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
         self.interval = int(Configuration.get('ovs.support.interval'))
-        self._url = 'https://{0}/{1}'.format(self._endpoint, self._api)
+        self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
 
     @staticmethod
     def get_heartbeat_data():
@@ -66,6 +65,15 @@ class SupportAgent(object):
             services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
             servicedata = dict((service.split(' ')[0].strip(), service.split(' ', 1)[1].strip()) for service in services)
             data['metadata']['services'] = servicedata
+        except Exception, ex:
+            data['errors'].append(str(ex))
+        try:
+            # Licensing
+            data['metadata']['licenses'] = []
+            if os.path.exists('/opt/OpenvStorage/config/licenses'):
+                for lic in check_output('cat /opt/OpenvStorage/config/licenses', shell=True).split('\n'):
+                    if lic.strip() != '':
+                        data['metadata']['licenses'].append(lic.strip())
         except Exception, ex:
             data['errors'].append(str(ex))
 
@@ -120,8 +128,12 @@ class SupportAgent(object):
         logger.debug('Processing heartbeat')
 
         try:
-            request = requests.post(self._url, data={'data': json.dumps(SupportAgent.get_heartbeat_data())})
-            return_data = request.json()
+            response = requests.post(self._url,
+                                     data={'data': json.dumps(SupportAgent.get_heartbeat_data())},
+                                     headers={'Accept': 'application/json; version=1'})
+            if response.status_code != 200:
+                raise RuntimeError('Received invalid status code: {0} - {1}'.format(response.status_code, response.text))
+            return_data = response.json()
         except Exception, ex:
             logger.exception('Unexpected error during support call: {0}'.format(ex))
             raise
@@ -129,7 +141,7 @@ class SupportAgent(object):
         if self._enable_support:
             try:
                 for task in return_data['tasks']:
-                    self._process_task(task['task'], task['metadata'])
+                    self._process_task(task['code'], task['metadata'])
             except Exception, ex:
                 logger.exception('Unexpected error processing tasks: {0}'.format(ex))
                 raise

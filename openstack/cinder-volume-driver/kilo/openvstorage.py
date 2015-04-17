@@ -84,7 +84,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         on POSIX permissions
         """
 
-        return {'driver_volume_type': 'local',
+        return {'driver_volume_type': 'file',
                 'data': {'vpoolname': self._vpool_name,
                          'device_path': volume.provider_location}}
 
@@ -390,7 +390,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         """Callback for volume attached to instance or host."""
         pass
 
-    def detach_volume(self, context, volume):
+    def detach_volume(self, context, volume, attachment=None):
         """Callback for volume detached."""
         pass
 

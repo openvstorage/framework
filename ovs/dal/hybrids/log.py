@@ -25,12 +25,13 @@ class Log(DataObject):
     """
     The Log class.
     """
-    __properties = {Property('source', ['API', 'VOLUMEDRIVER_EVENT', 'VOLUMEDRIVER_TASK'], doc='Source of the call'),
+    __properties = [Property('source', ['API', 'VOLUMEDRIVER_EVENT', 'VOLUMEDRIVER_TASK'], doc='Source of the call'),
                     Property('module', str, doc='Module containing the method.'),
                     Property('method', str, doc='Method name that has been called.'),
                     Property('method_args', list, mandatory=False, doc='Method args.'),
                     Property('method_kwargs', dict, mandatory=False, doc='Method kwargs.'),
                     Property('time', float, doc='Timestamp of the event'),
-                    Property('metadata', dict, mandatory=False, doc='Extra metadata about the entry')}
+                    Property('metadata', dict, mandatory=False, doc='Extra metadata about the entry')]
     __relations = [Relation('user', User, 'logs', mandatory=False),
                    Relation('storagedriver', StorageDriver, 'logs', mandatory=False)]
+    __dynamics = []

@@ -17,9 +17,9 @@ define([
 ], function(ko, $){
     "use strict";
     var nameRegex, hostRegex, mountpointRegex, ipRegex, singleton;
-    nameRegex = /^[0-9a-z]{1}[\-a-z0-9]{1,48}[a-z0-9]{1}$/
+    nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
     hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
-    mountpointRegex = /^(\/[a-zA-Z0-9\-_ \.]+)+\/?$/;
+    mountpointRegex = /^(\/[a-zA-Z0-9\-_\.]+)+\/?$/;
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
 
     singleton = function() {
@@ -51,14 +51,18 @@ define([
             storageRouters:  ko.observableArray([]),
             storageDrivers:  ko.observableArray([]),
             mountpoints:     ko.observableArray([]),
+            readcaches:      ko.observableArray([]),
+            writecaches:     ko.observableArray([]),
             ipAddresses:     ko.observableArray([]),
+            vPools:          ko.observableArray([]),
             albaBackends:    ko.observableArray(),
             hasCinder:       ko.observable(),
             configCinder:    ko.observable(),
             cinderUser:      ko.observable('admin'),
             cinderPassword:  ko.observable(''),
             cinderTenant:    ko.observable('admin'),
-            cinderCtrlIP:    ko.observable('').extend({ regex: ipRegex })
+            cinderCtrlIP:    ko.observable('').extend({ regex: ipRegex }),
+            mountpointRegex: mountpointRegex
         }, resetAlbaBackends = function() {
             mtptData.albaBackends(undefined);
             mtptData.albaBackend(undefined);
@@ -66,7 +70,7 @@ define([
 
         mtptData.allReadMountpoints = ko.computed(function() {
             var returnValue = [];
-            $.each(mtptData.mountpoints(), function(i, e) {
+            $.each(mtptData.readcaches(), function(i, e) {
                 returnValue.push(e);
             });
             $.each(mtptData.mtptCustomRCs(), function(i, e) {
@@ -92,7 +96,7 @@ define([
 
         mtptData.allWriteMountpoints = ko.computed(function() {
             var returnValue = [];
-            $.each(mtptData.mountpoints(), function(i, e) {
+            $.each(mtptData.writecaches(), function(i, e) {
                 returnValue.push(e);
             });
             $.each(mtptData.mtptCustomWCs(), function(i, e) {

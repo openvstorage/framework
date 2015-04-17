@@ -150,15 +150,25 @@ class DataList(object):
                 return False  # Fail the filter
 
         # Apply operators
+        ignorecase = len(item) == 4 and item[3] is False
         if item[1] == DataList.operator.NOT_EQUALS:
+            if ignorecase is True:
+                return value.lower() != item[2].lower()
             return value != item[2]
         if item[1] == DataList.operator.EQUALS:
+            if ignorecase is True:
+                return value.lower() == item[2].lower()
             return value == item[2]
         if item[1] == DataList.operator.GT:
             return value > item[2]
         if item[1] == DataList.operator.LT:
             return value < item[2]
         if item[1] == DataList.operator.IN:
+            if ignorecase:
+                if isinstance(item[2], list):
+                    return value.lower() in [x.lower() for x in item[2]]
+                else:
+                    return value.lower() in item[2].lower()
             return value in item[2]
         raise NotImplementedError('The given operator {} is not yet implemented.'.format(item[1]))
 

@@ -127,8 +127,6 @@ class Hybrid(TestCase):
             for dynamic in instance._dynamics:
                 if dynamic.name not in properties:
                     missing_props.append(dynamic.name)
-                else:  # ... and should work
-                    _ = getattr(instance, dynamic.name)
             self.assertEqual(len(missing_props), 0,
                              'Missing dynamic properties in {0}: {1}'.format(cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry

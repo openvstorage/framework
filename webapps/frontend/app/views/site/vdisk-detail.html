@@ -40,9 +40,9 @@ limitations under the License.
                 <button type="button" class="btn btn-mini btn-default"
                         id="buttonVDiskRollback"
                         data-bind="click: function() { $root.rollback(); },
-                                   style: { color: '#428bca' },
-                                   tooltip: 'ovs:vdisks.detail.rollback',
-                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
+                                   style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
+                                   tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.rollback',
+                                   enable: $root.shared.user.roles().contains('write')">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>

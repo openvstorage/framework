@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storagerouter', '../../containers/storagedriver', './data'
-], function($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
+    '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
     "use strict";
     return function() {
         var self = this;
@@ -43,6 +43,15 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidname'));
+            }
+            else {
+                $.each(self.data.vPools(), function(index, vpool) {
+                    if (vpool.name() === self.data.name()) {
+                        valid = false;
+                        fields.push('name');
+                        reasons.push($.t('ovs:wizards.addvpool.gathervpool.duplicatename'));
+                    }
+                });
             }
             if (self.data.backend().match(/^.+_s3$/)) {
                 if (!self.data.host.valid()) {
@@ -148,6 +157,8 @@ define([
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
+                                self.data.readcaches(data.readcaches)
+                                self.data.writecaches(data.writecaches)
                                 self.data.ipAddresses(data.ipaddresses);
                                 self.data.files(data.files);
                                 self.data.allowVPool(data.allow_vpool);
@@ -196,9 +207,15 @@ define([
                 self.invalidAlbaInfo(false);
                 self.fetchAlbaVPoolHandle = api.get('backends', { queryparams: getData })
                     .done(function(data) {
-                        self.data.albaBackends(data.data);
-                        if (data.data.length > 0) {
-                            self.data.albaBackend(data.data[0]);
+                        var available_backends = [];
+                        $.each(data.data, function (index, item) {
+                            if (item.available === true) {
+                                available_backends.push(item);
+                            }
+                        });
+                        if (available_backends.length > 0) {
+                            self.data.albaBackends(available_backends)
+                            self.data.albaBackend(available_backends[0]);
                         } else {
                             self.data.albaBackends(undefined);
                             self.data.albaBackend(undefined);
@@ -244,6 +261,31 @@ define([
                         self.data.target(self.data.storageRouters()[0]);
                     }
                 });
+
+            if (generic.xhrCompleted(self.loadVPoolsHandle)) {
+                var options = {
+                    contents: ''
+                };
+                self.loadVPoolsHandle = api.get('vpools', { queryparams: options })
+                    .done(function (data) {
+                        var guids = [], vpData = {};
+                        $.each(data.data, function (index, item) {
+                            guids.push(item.guid);
+                            vpData[item.guid] = item;
+                        });
+                        generic.crossFiller(
+                            guids, self.data.vPools,
+                            function (guid) {
+                                return new VPool(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.data.vPools(), function (index, vpool) {
+                            if (guids.contains(vpool.guid())) {
+                                vpool.fillData(vpData[vpool.guid()]);
+                            }
+                        });
+                    });
+            };
         };
     };
 });

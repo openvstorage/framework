@@ -25,6 +25,7 @@ define(['knockout'], function(ko){
             routing        : undefined,
             footerData     : ko.observable(ko.observable()),
             nodes          : undefined,
+            identification : ko.observable(),
             user           : {
                 username: ko.observable(),
                 guid    : ko.observable(),

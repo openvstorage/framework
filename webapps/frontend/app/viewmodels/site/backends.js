@@ -13,10 +13,10 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'jquery', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
-    '../containers/backend', '../containers/backendtype'
-], function($, ko, shared, generic, Refresher, api, Backend, BackendType) {
+    '../containers/backend', '../containers/backendtype', '../wizards/addbackend/index'
+], function($, dialog, ko, shared, generic, Refresher, api, Backend, BackendType, AddBackendWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -124,30 +124,10 @@ define([
                 }
             }).promise();
         };
-        self.saveBackend = function() {
-            api.post('backends', {
-                data: {
-                    name: self.newBackend().name(),
-                    backend_type_guid: self.newBackend().backendType().guid()
-                }
-            })
-                .done(function() {
-                    generic.alertSuccess(
-                        $.t('ovs:backends.new.complete'),
-                        $.t('ovs:backends.new.addsuccess')
-                    );
-                    self.loadBackends();
-                })
-                .fail(function(error) {
-                    error = $.parseJSON(error.responseText);
-                    generic.alertError(
-                        $.t('ovs:generic.error'),
-                        $.t('ovs:backends.new.addfailed', { why: error.detail })
-                    );
-                })
-                .always(function() {
-                    self.newBackend(new Backend());
-                });
+        self.addBackend = function() {
+            dialog.show(new AddBackendWizard({
+                modal: true
+            }));
         };
 
         // Durandal

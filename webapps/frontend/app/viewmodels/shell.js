@@ -115,7 +115,10 @@ define([
                                         return $.Deferred(function(moduleDeferred) {
                                             require(['ovs/hooks/' + plugin], function(hook) {
                                                 routing.extraRoutes.push(hook.routes);
-                                                shared.hooks.dashboards.push(hook.dashboards);
+                                                routing.routePatches.push(hook.routePatches);
+                                                $.each(hook.dashboards, function(index, dashboard) {
+                                                    shared.hooks.dashboards.push(dashboard);
+                                                });
                                                 moduleDeferred.resolve();
                                             });
                                         }).promise();

@@ -32,7 +32,7 @@ define([
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 150       },
             { key: 'cacheRatio',        value: $.t('ovs:generic.cache'),            width: 100       },
             { key: 'iops',              value: $.t('ovs:generic.iops'),             width: 100       },
-            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 150       },
+            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 180       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100       },
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined }
         ];

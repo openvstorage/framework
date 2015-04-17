@@ -135,27 +135,58 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
         }
     };
     ko.bindingHandlers.tooltip = {
-        init: function(element, valueAccessor) {
-            var value = valueAccessor(), title;
+        init: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(), title,
+                placement = allBindings.get('placement');
+            if (placement === undefined) {
+                placement = 'auto top';
+            }
             if (value !== undefined && value !== '') {
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto top',
+                    placement: placement,
                     title: title
                 });
             }
         },
-        update: function(element, valueAccessor) {
-            var value = valueAccessor(), title;
+        update: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(), title,
+                placement = allBindings.get('placement');
+            if (placement === undefined) {
+                placement = 'auto top';
+            }
             $(element).tooltip('destroy');
             if (value !== undefined && value !== '') {
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto top',
+                    placement: placement,
                     title: title
                 });
+            }
+        }
+    };
+    ko.bindingHandlers.timeago = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor(), date;
+            if (value !== undefined && value !== '') {
+                date = new Date(value * 1000);
+                $(element).attr('title', date.toISOString());
+                $(element).timeago();
+            }
+        },
+        update: function(element, valueAccessor) {
+            var value = valueAccessor(), date;
+            if (value !== undefined && value !== '') {
+                date = new Date(value * 1000);
+                if ($(element).attr('title') === undefined) {
+                    $(element).attr('title', date.toISOString());
+                    $(element).timeago();
+                } else {
+                    $(element).attr('title', date.toISOString());
+                    $(element).timeago('updateFromDOM');
+                }
             }
         }
     };
@@ -232,7 +263,7 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 .innerRadius(0);
             pie = d3.layout.pie()
                 .sort(null)
-                .value(function(d) { return d.value; });
+                .value(function(d) { return Math.round(d.percentage * 100) / 100; });
 
             id = $($(element).children()[0]).attr('id');
 
@@ -282,10 +313,9 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                     return 'translate(0,' + vert + ')';
                 });
             entry.append('rect')
-                .attr('width', 15)
-                .attr('height', 15)
+                .attr('width', 16)
+                .attr('height', 16)
                 .style('fill', function(d) { return color(d.name); })
-                .style('stroke', function(d) { return color(d.name); });
             entry.append('text')
                 .attr('x', 20)
                 .attr('y', 14)

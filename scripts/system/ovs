@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 cd /opt/OpenvStorage
-export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"
+export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps:/opt/OpenvStorage/webapps/api"
 export DISPLAY=:0
 if [ "$1" = "setup" ] ; then
   if [ "$#" -ne 2 ] ; then
@@ -22,16 +22,18 @@ elif [ "$1" = "monitor" ] ; then
   fi
 elif [ "$1" = "stop" ] ; then
   if [ "$2" = "services" ] ; then
-    for SERVICE in ovs-scheduled-tasks ovs-snmp ovs-volumerouter-consumer ovs-workers ovs-webapp-api ovs-nginx ovs-watcher-framework ovs-watcher-volumedriver ovs-support-agent ovs-rabbitmq ovs-memcached ovs-arakoon-voldrv ovs-arakoon-ovsdb
+    for SERVICE in `cd /etc/init; ls ovs-*`
         do
+        SERVICE=${SERVICE%.*}
         echo "Stopping: $SERVICE"
         stop $SERVICE
         done
   fi
 elif [ "$1" = "start" ] ; then
   if [ "$2" = "services" ] ; then
-    for SERVICE in ovs-arakoon-voldrv ovs-arakoon-ovsdb ovs-rabbitmq ovs-memcached ovs-nginx ovs-webapp-api ovs-workers ovs-scheduled-tasks ovs-snmp ovs-volumerouter-consumer ovs-watcher-framework ovs-watcher-volumedriver ovs-support-agent
+    for SERVICE in `cd /etc/init; ls ovs-*`
         do
+        SERVICE=${SERVICE%.*}
         echo "Starting: $SERVICE"
         start $SERVICE
         done
@@ -53,6 +55,9 @@ elif [ "$1" = "collect" ] ; then
     gzip $LOGFILE > /dev/null
     echo $LOGFILE.gz
   fi
+elif [ "$1" = "unittest" ] ; then
+  shift
+  python $@
 else
   ipython
 fi

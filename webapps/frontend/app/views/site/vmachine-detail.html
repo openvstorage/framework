@@ -45,18 +45,16 @@ limitations under the License.
                         id="buttonVmachineSetAsTemplate"
                         data-bind="click: function() { $root.setAsTemplate(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: !isRunning() && loaded(),
-                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate',
-                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
+                                   enable: $root.shared.user.roles().contains('write'),
+                                   tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.setastemplate'">
                     <span class="fa" data-i18n="[html]ovs:icons.setastemplate"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
                         id="buttonVmachineRollback"
                         data-bind="click: function() { $root.rollback(); },
                                    style: { color: isRunning() ? 'lightgrey' : '#428bca' },
-                                   enable: !isRunning() && loaded(),
                                    tooltip: isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vmachines.detail.rollback',
-                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
+                                   enable: $root.shared.user.roles().contains('write')">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>
