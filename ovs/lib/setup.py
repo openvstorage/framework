@@ -730,7 +730,7 @@ EOF
         enabled = System.read_remote_config(client, 'ovs.support.enabled')
         enablesupport = System.read_remote_config(client, 'ovs.support.enablesupport')
         client = SSHClient.load(cluster_ip)
-        System.set_remote_config(client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(client, 'ovs.support.nid', Toolbox.get_hash())
         System.set_remote_config(client, 'ovs.support.cid', cid)
         System.set_remote_config(client, 'ovs.support.enabled', enabled)
         System.set_remote_config(client, 'ovs.support.enablesupport', enablesupport)
