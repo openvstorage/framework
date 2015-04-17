@@ -88,7 +88,7 @@ class OVSPluginProtectionTestCase(OVSPluginTestCase):
         self.assertTrue(self._ovs_devicename_in_vdisklist(file_name, exists=False), 'Device still modeled in OVS')
         self._debug('ended test')
 
-    def test_not_allowed_to_delete_clone_of_snaphsot(self):
+    def test_not_allowed_to_delete_clone_of_snapshot(self):
         """
         Create a volume using the cinder client
          Create a snapshot using the cinder client
@@ -154,7 +154,7 @@ class OVSPluginProtectionTestCase(OVSPluginTestCase):
         self.assertFalse(self._file_exists_on_mountpoint(clone_file_name), 'File %s not deleted from mountpoint %s ' % (clone_file_name, VPOOL_MOUNTPOINT))
         self.assertTrue(self._ovs_devicename_in_vdisklist(clone_file_name, exists=False), 'Device still modeled in OVS')
 
-        self._remove_snapshot(snap_name, snapshot)
+        self._remove_snapshot(snap_name, snapshot, force = True)
         cinder_snapshots = self._cinder_list_snapshots()
         self.assertFalse(snapshot.id in cinder_snapshots.keys(), 'Snapshot still modeled in Cinder')
 

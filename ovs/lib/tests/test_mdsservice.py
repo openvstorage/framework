@@ -170,12 +170,12 @@ class MDSServices(TestCase):
             storagedriver.name = str(sd_id)
             storagedriver.mountpoint_temp = '/'
             storagedriver.mountpoint_foc = '/'
-            storagedriver.mountpoint_readcache2 = '/'
-            storagedriver.mountpoint_writecache = '/'
-            storagedriver.mountpoint_readcache1 = '/'
+            storagedriver.mountpoint_readcaches = ['/']
+            storagedriver.mountpoint_writecaches = ['/']
             storagedriver.mountpoint_temp = '/'
             storagedriver.mountpoint_md = '/'
             storagedriver.mountpoint_bfs = '/'
+            storagedriver.mountpoint_fragmentcache = '/'
             storagedriver.mountpoint = '/'
             storagedriver.cluster_ip = storagerouters[sr_id].ip
             storagedriver.storage_ip = '127.0.0.1'

@@ -142,7 +142,7 @@ def ensure_single(tasknames):
     return wrap
 
 
-def setup_hook(hook_type):
+def add_hooks(hook_type, hooks):
     """
     This decorator marks the decorated function to be interested in a certain hook
     """
@@ -151,7 +151,12 @@ def setup_hook(hook_type):
         Wrapper function
         """
         if not hasattr(function, 'hooks'):
-            function.hooks = []
-        function.hooks.append(hook_type)
+            function.hooks = {}
+        if hook_type not in function.hooks:
+            function.hooks[hook_type] = []
+        if isinstance(hooks, list):
+            function.hooks[hook_type] += hooks
+        else:
+            function.hooks[hook_type].append(hooks)
         return function
     return wrap

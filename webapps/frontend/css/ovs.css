@@ -29,6 +29,13 @@
     margin: 0;
 }
 
+:not(a) {
+    cursor: default;
+}
+button * {
+    cursor: pointer;
+}
+
 html, body {
     font-family: "mondaregular", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
     height: 100%;

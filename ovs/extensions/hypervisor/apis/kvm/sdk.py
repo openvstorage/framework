@@ -39,6 +39,7 @@ def _recurse(treeitem):
         result[child.tag] = _recurse(child)
         for key, item in child.items():
             result[child.tag][key] = item
+        result[child.tag]['<text>'] = child.text
     return result
 
 
@@ -132,6 +133,16 @@ class Sdk(object):
         return [_recurse(item) for item in tree.findall('devices/interface')]
 
     @staticmethod
+    def _get_nova_name(vm_object):
+        tree = ElementTree.fromstring(vm_object.XMLDesc(0))
+        metadata = tree.findall('metadata')[0]
+        nova_instance_namespace_tag = metadata.getchildren()[0].tag
+        nova_instance_namespace = nova_instance_namespace_tag[nova_instance_namespace_tag.find('{') + 1:nova_instance_namespace_tag.find('}')]
+        instance = metadata.findall('{%s}instance' % nova_instance_namespace)[0]
+        name = instance.findall('{%s}name' % nova_instance_namespace)[0]
+        return name.text
+
+    @staticmethod
     def _get_ram(vm_object):
         """
         returns RAM size in MiB
@@ -210,12 +221,7 @@ class Sdk(object):
             # Cleaning up
             mountpoint = '/mnt/{0}'.format(match.group(1))
             filename = backingfilename.replace(mountpoint, '').strip('/')
-            if 'alias' in disk:
-                # A diskname was specified
-                diskname = disk['alias'].get('name', 'unknown')
-            else:
-                # No diskname specified. Using the .raw filename
-                diskname = filename.split('/')[-1].split('.')[0]
+            diskname = filename.split('/')[-1].split('.')[0]
 
             # Collecting data
             config['disks'].append({'filename': filename,
@@ -238,7 +244,11 @@ class Sdk(object):
                     if mountpoint in datastore.strip():
                         vm_datastore = mountpoint
 
-        config['name'] = vm_object.name()
+        try:
+            config['name'] = self._get_nova_name(vm_object)
+        except Exception as ex:
+            logger.error('Cannot retrieve nova:name {0}'.format(ex))
+            config['name'] = vm_object.name()
         config['id'] = str(vm_object.UUIDString())
         config['backing'] = {'filename': '{0}/{1}'.format(vm_location, vm_filename),
                              'datastore': vm_datastore}
@@ -466,10 +476,7 @@ class Sdk(object):
         """
         # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
         # on the machine running the code
-        output = self.ssh_run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
-        for mac in output.strip().split('\n'):
-            if mac.strip() != '000000000000':
-                return mac.strip()
+        return self.ssh_run('cat /etc/openvstorage_id').strip()
 
     def ssh_run(self, command):
         """

@@ -24,7 +24,7 @@ class DummyPersistentStore(object):
     """
     This is a dummy persistent store that makes use of a local json file
     """
-    _path = '/tmp/dummypersistent.json'
+    _path = '/run/dummypersistent.json'
 
     @staticmethod
     def clean():

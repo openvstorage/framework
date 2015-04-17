@@ -167,11 +167,13 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function alertError(title, message) {
         return alert(title, message, 'error');
     }
-    function keys(object) {
+    function keys(object, filter) {
         var allKeys = [], key;
         for (key in object) {
             if (object.hasOwnProperty(key)) {
-                allKeys.push(key);
+                if (filter === undefined || filter(key)) {
+                    allKeys.push(key);
+                }
             }
         }
         return allKeys;
@@ -360,39 +362,106 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return false;
     }
+    function getColor(index) {
+        var colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
+        return colors[index % colors.length];
+    }
+    function arrayEquals(array1, array2) {
+        var i;
+        if (!array2) {
+            return false;
+        }
+        if (array1.length !== array2.length) {
+            return false;
+        }
 
+        for (i = 0; i < array1.length; i += 1) {
+            if (array1[i] instanceof Array && array2[i] instanceof Array) {
+                if (!arrayEquals(array1[i], array2[i])) {
+                    return false;
+                }
+            } else if (array1[i] !== array2[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    function arrayHasElement(array, element) {
+        var i;
+        for (i = 0; i < array.length; i += 1) {
+            if (element === array[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function arrayIsIn(array1, array2) {
+        var i;
+        for (i = 0; i < array2.length; i += 1) {
+            if (arrayEquals(array1, array2[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function stringStartsWith(string1, string2) {
+        return string1.indexOf(string2) === 0;
+    }
+    function getLocalTime(timestamp) {
+        var date = new Date(timestamp * 1000);
+        return date.toLocaleTimeString();
+    }
+    function arrayFilterUnique(value, index, array) {
+        return array.indexOf(value) === index;
+    }
+
+    Array.prototype.equals = function(array) {
+        return arrayEquals(this, array);
+    };
+    Array.prototype.nestedIn = function(array) {
+        return arrayIsIn(this, array);
+    };
+    Array.prototype.contains = function(element) {
+        return arrayHasElement(this, element);
+    };
+    String.prototype.startsWith = function(searchString) {
+        return stringStartsWith(this, searchString);
+    };
     return {
-        getTimestamp             : getTimestamp,
-        formatBytes              : formatBytes,
-        formatSpeed              : formatSpeed,
-        formatRatio              : formatRatio,
-        formatShort              : formatShort,
-        formatNumber             : formatNumber,
-        formatPercentage         : formatPercentage,
-        padRight                 : padRight,
-        padLeft                  : padLeft,
-        tryGet                   : tryGet,
-        trySet                   : trySet,
-        lower                    : lower,
-        alert                    : alert,
-        alertInfo                : alertInfo,
-        alertSuccess             : alertSuccess,
-        alertError               : alertError,
-        keys                     : keys,
-        xhrAbort                 : xhrAbort,
-        xhrCompleted             : xhrCompleted,
-        removeElement            : removeElement,
-        smooth                   : smooth,
-        round                    : round,
-        ceil                     : ceil,
-        buildString              : buildString,
-        setDecimals              : setDecimals,
-        crossFiller              : crossFiller,
-        syncObservableArray      : syncObservableArray,
-        deg2rad                  : deg2rad,
-        numberSort               : numberSort,
-        advancedSort             : advancedSort,
-        validate                 : validate,
-        overlap                  : overlap
+        getTimestamp: getTimestamp,
+        formatBytes: formatBytes,
+        formatSpeed: formatSpeed,
+        formatRatio: formatRatio,
+        formatShort: formatShort,
+        formatNumber: formatNumber,
+        formatPercentage: formatPercentage,
+        padRight: padRight,
+        padLeft: padLeft,
+        tryGet: tryGet,
+        trySet: trySet,
+        lower: lower,
+        alert: alert,
+        alertInfo: alertInfo,
+        alertSuccess: alertSuccess,
+        alertError: alertError,
+        keys: keys,
+        xhrAbort: xhrAbort,
+        xhrCompleted: xhrCompleted,
+        removeElement: removeElement,
+        smooth: smooth,
+        round: round,
+        ceil: ceil,
+        buildString: buildString,
+        setDecimals: setDecimals,
+        crossFiller: crossFiller,
+        syncObservableArray: syncObservableArray,
+        deg2rad: deg2rad,
+        numberSort: numberSort,
+        advancedSort: advancedSort,
+        validate: validate,
+        overlap: overlap,
+        getColor: getColor,
+        getLocalTime: getLocalTime,
+        arrayFilterUnique: arrayFilterUnique
     };
 });

@@ -19,7 +19,7 @@ Generic system module, executing statements on local node
 import os
 import uuid
 import time
-from ConfigParser import ConfigParser
+from ConfigParser import RawConfigParser
 from subprocess import check_output
 from StringIO import StringIO
 
@@ -34,7 +34,6 @@ class System(object):
 
     OVS_CONFIG = '/opt/OpenvStorage/config/ovs.cfg'
 
-    my_machine_id = ''
     my_storagerouter_guid = ''
     my_storagedriver_id = ''
 
@@ -60,19 +59,11 @@ class System(object):
     @staticmethod
     def get_my_machine_id(client=None):
         """
-        Returns unique machine id based on mac address
+        Returns unique machine id, generated at install time.
         """
-        if not System.my_machine_id or client:
-            cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            output = System.run(cmd, client)
-            for mac in output.split('\n'):
-                if mac.strip() != '000000000000':
-                    if client:
-                        return mac.strip()
-                    else:
-                        System.my_machine_id = mac.strip()
-                        break
-        return System.my_machine_id
+        if client is not None:
+            return client.run('cat /etc/openvstorage_id').strip()
+        return check_output('cat /etc/openvstorage_id', shell=True).strip()
 
     @staticmethod
     def get_my_storagerouter():
@@ -149,6 +140,17 @@ from ovs.plugin.provider.configuration import Configuration
 print Configuration.get('{0}')
 """.format(key)
         return System.exec_remote_python(client, read)
+
+    @staticmethod
+    def set_remote_config(client, key, value):
+        """
+        Sets remote configuration key
+        """
+        write = """
+from ovs.plugin.provider.configuration import Configuration
+Configuration.set('{0}', '{1}')
+""".format(key, value)
+        System.exec_remote_python(client, write)
 
     @staticmethod
     def ports_in_use(client=None):
@@ -229,14 +231,14 @@ print Configuration.get('{0}')
     @staticmethod
     def read_config(filename, client=None):
         if client is None:
-            cp = ConfigParser()
+            cp = RawConfigParser()
             with open(filename, 'r') as config_file:
                 cfg = config_file.read()
             cp.readfp(StringIO(cfg))
             return cp
         else:
             contents = client.file_read(filename)
-            cp = ConfigParser()
+            cp = RawConfigParser()
             cp.readfp(StringIO(contents))
             return cp
 

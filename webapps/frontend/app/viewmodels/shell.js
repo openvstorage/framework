@@ -106,17 +106,24 @@ define([
                             var metadataHandlers = [], backendsActive = false;
                             $.each(metadata.plugins, function(plugin, types) {
                                 if ($.inArray('gui', types) !== -1) {
-                                    metadataHandlers.push($.Deferred(function(moduleDeferred) {
-                                        require(['ovs/routes/' + plugin], function(routes) {
-                                            routing.extraRoutes.push(routes.routes);
-                                            moduleDeferred.resolve();
-                                        });
-                                    }).promise());
-                                    metadataHandlers.push($.Deferred(function(translationDeferred) {
+                                    var moduleHandler = $.Deferred(function(translationDeferred) {
                                         i18n.loadNamespace(plugin, function () {
                                             translationDeferred.resolve();
                                         });
-                                    }).promise());
+                                    }).promise();
+                                    moduleHandler.then(function() {
+                                        return $.Deferred(function(moduleDeferred) {
+                                            require(['ovs/hooks/' + plugin], function(hook) {
+                                                routing.extraRoutes.push(hook.routes);
+                                                routing.routePatches.push(hook.routePatches);
+                                                $.each(hook.dashboards, function(index, dashboard) {
+                                                    shared.hooks.dashboards.push(dashboard);
+                                                });
+                                                moduleDeferred.resolve();
+                                            });
+                                        }).promise();
+                                    });
+                                    metadataHandlers.push(moduleHandler);
                                 }
                                 if ($.inArray('backend', types) !== -1 && !backendsActive) {
                                     routing.siteRoutes.push({

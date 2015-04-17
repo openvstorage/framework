@@ -118,6 +118,56 @@ class StorageRouterViewSet(viewsets.ViewSet):
             routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def get_support_info(self, storagerouter):
+        """
+        Gets support information of a given Storage Router
+        """
+        return StorageRouterController.get_support_info.s(storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def get_support_metadata(self, storagerouter):
+        """
+        Gets support metadata of a given Storage Router
+        """
+        return StorageRouterController.get_support_metadata.apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def configure_support(self, enable, enable_support):
+        """
+        Configures support
+        """
+        return StorageRouterController.configure_support.delay(enable, enable_support)
+
+    @link()
+    @log()
+    @required_roles(['read', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_logfiles(self, local_storagerouter, storagerouter):
+        """
+        Collects logs, moves them to a web-accessible location and returns log tgz's filename
+        """
+        return StorageRouterController.get_logfiles.s(local_storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
     @action()
     @log()
     @required_roles(['read'])
@@ -161,18 +211,19 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout', 'connection_backend',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
+                  'mountpoint_readcaches', 'mountpoint_writecaches', 'mountpoint_foc',
                   'storage_ip', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
+
         parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
             if field not in call_parameters:
-                if field in ['mountpoint_readcache2', 'connection_backend']:
+                if field in ['connection_backend']:
                     parameters[field] = ''
                     continue
                 else:
                     raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = call_parameters[field]
-            if not isinstance(parameters[field], int):
+            if isinstance(parameters[field], basestring):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))

@@ -44,7 +44,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             read: target,
             write: function(newValue) {
                 var diff, stepSize, decimals, execute, currentValue = target();
-                if (currentValue === undefined) {
+                if (currentValue === undefined || currentValue === null) {
                     target(newValue);
                 } else {
                     diff = newValue - currentValue;

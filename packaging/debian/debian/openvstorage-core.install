@@ -1,7 +1,6 @@
 ovs                                            opt/OpenvStorage
 config/env/ovs.sh                              etc/profile.d
 config/elk/indexer.conf                        etc/logstash/conf.d
-config/elk/elasticsearch.yml                   opt/OpenvStorage/config
 config/main.cfg                                opt/OpenvStorage/config
 config/ovs.cfg                                 opt/OpenvStorage/config
 config/logrotate/openvstorage-logs             etc/logrotate.d

@@ -19,18 +19,18 @@ Module for SetupController
 import os
 import re
 import sys
-import imp
 import time
-import ConfigParser
+import uuid
 import urllib2
 import base64
-import inspect
 
+from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 
@@ -48,7 +48,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage'}
 
     # Arakoon
     arakoon_clusters = ['ovsdb', 'voldrv']
@@ -101,11 +101,12 @@ class SetupController(object):
         disk_layout = None
         arakoon_mountpoint = None
         join_cluster = False
+        enable_heartbeats = None
 
         # Support non-interactive setup
         preconfig = '/tmp/openvstorage_preconfig.cfg'
         if os.path.exists(preconfig):
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.read(preconfig)
             ip = config.get('setup', 'target_ip')
             target_password = config.get('setup', 'target_password')
@@ -122,6 +123,7 @@ class SetupController(object):
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
+            enable_heartbeats = True
 
         try:
             if force_type is not None:
@@ -155,12 +157,9 @@ class SetupController(object):
             local_unique_id = System.get_my_machine_id()
             remote_install = unique_id != local_unique_id
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
-            if not target_client.file_exists('/opt/OpenvStorage/config/ovs.cfg'):
+            if not target_client.file_exists(SetupController.ovs_config_filename):
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
-            ovs_config.set('core', 'uniqueid', unique_id)
-            SetupController._remote_config_write(target_client, config_filename, ovs_config)
+            System.set_remote_config(target_client, 'ovs.core.uniqueid', unique_id)
 
             # Getting cluster information
             current_cluster_names = []
@@ -210,7 +209,7 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        #@todo: we should be able to choose the ip here too in a multiple nic setup?
+                        # @TODO: we should be able to choose the ip here too in a multiple nic setup?
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
                         known_passwords[master_ip] = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
                         first_node = False
@@ -256,7 +255,6 @@ class SetupController(object):
             # Deciding master/extra
             print 'Analyzing cluster layout'
             logger.info('Analyzing cluster layout')
-            unique_id = ovs_config.get('core', 'uniqueid')
             promote = False
             if first_node is False:
                 for cluster in SetupController.arakoon_clusters:
@@ -268,7 +266,7 @@ class SetupController(object):
             else:
                 promote = True  # Correct, but irrelevant, since a first node is always master
 
-            mountpoints, hypervisor_info = SetupController._prepare_node(
+            mountpoints, hypervisor_info, readcaches, writecaches = SetupController._prepare_node(
                 cluster_ip, nodes, known_passwords,
                 {'type': hypervisor_type,
                  'name': hypervisor_name,
@@ -278,14 +276,15 @@ class SetupController(object):
                 auto_config, disk_layout
             )
             if first_node:
-                SetupController._setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config,
-                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint)
+                SetupController._setup_first_node(cluster_ip, unique_id, mountpoints,
+                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
+                                                  enable_heartbeats, readcaches, writecaches)
             else:
                 SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
-                                                  nodes, ovs_config, hypervisor_info)
+                                                  nodes, hypervisor_info, readcaches, writecaches)
                 if promote:
                     SetupController._promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id,
-                                                  ovs_config, mountpoints, arakoon_mountpoint)
+                                                  mountpoints, arakoon_mountpoint, readcaches, writecaches)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -389,6 +388,32 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
 
         target_client = SSHClient.load(cluster_ip)
         disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
+
+        # add directory mountpoints to ovs.cfg
+        config = SetupController._remote_config_read(target_client, SetupController.ovs_config_filename)
+        partition_key = 'vpool_partitions'
+        if config.has_section(partition_key):
+            config.remove_section(partition_key)
+        config.add_section(partition_key)
+
+        readcaches = list()
+        writecaches = list()
+        storage = list()
+        for mountpoint, details in disk_layout.iteritems():
+            if 'readcache' in details['type']:
+                readcaches.append(mountpoint)
+                continue
+            elif 'writecache' in details['type']:
+                writecaches.append(mountpoint)
+                continue
+            else:
+                storage.append(mountpoint)
+
+        config.set(partition_key, 'readcaches', ','.join(map(str, readcaches)))
+        config.set(partition_key, 'writecaches', ','.join(map(str, writecaches)))
+        config.set(partition_key, 'storage', ','.join(map(str, storage)))
+        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, config)
+
         mountpoints = disk_layout.keys()
         mountpoints.sort()
 
@@ -432,10 +457,10 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
-        return mountpoints, hypervisor_info
+        return mountpoints, hypervisor_info, readcaches, writecaches
 
     @staticmethod
-    def _setup_first_node(cluster_ip, unique_id, mountpoints, ovs_config, cluster_name, node_name, hypervisor_info, arakoon_mountpoint):
+    def _setup_first_node(cluster_ip, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, readcaches, writecaches):
         """
         Sets up the first node services. This node is always a master
         """
@@ -449,30 +474,12 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
         target_client = SSHClient.load(cluster_ip)
         if arakoon_mountpoint is None:
             arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                        default_value=Interactive.find_in_list(mountpoints, 'db'))
-        ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
-        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
+                                                        default_value=writecaches[0] if writecaches else '')
+        System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
+        System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
-
-        print 'Setting up elastic search'
-        logger.info('Setting up elastic search')
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._add_service(target_client, 'elasticsearch')
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-        target_client.run('mkdir -p /opt/data/elasticsearch/work')
-        target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name),
-                                                 add=False)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NODE_NAME>', node_name)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NETWORK_PUBLISH>', cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'start')
 
         print 'Setting up logstash'
         logger.info('Setting up logstash')
@@ -498,9 +505,9 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
               {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
-""".format(ovs_config.get('core', 'broker.port'),
-           ovs_config.get('core', 'broker.login'),
-           ovs_config.get('core', 'broker.password')))
+""".format(System.read_remote_config(target_client, 'ovs.core.broker.port'),
+           System.read_remote_config(target_client, 'ovs.core.broker.login'),
+           System.read_remote_config(target_client, 'ovs.core.broker.password')))
         rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
         if rabbitmq_running and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
@@ -515,15 +522,15 @@ EOF
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:
-            target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
-                                                             ovs_config.get('core', 'broker.password')))
-            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl add_user {0} {1}'.format(System.read_remote_config(target_client, 'ovs.core.broker.login'),
+                                                                    System.read_remote_config(target_client, 'ovs.core.broker.password')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(System.read_remote_config(target_client, 'ovs.core.broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         print 'Build configuration files'
         logger.info('Build configuration files')
         for config_file, port in SetupController.generic_configfiles.iteritems():
-            config = ConfigParser.ConfigParser()
+            config = RawConfigParser()
             config.add_section('main')
             config.set('main', 'nodes', unique_id)
             config.add_section(unique_id)
@@ -536,8 +543,6 @@ EOF
             if SetupController._has_service(target_client, service):
                 SetupController._enable_service(target_client, service)
                 SetupController._change_service_state(target_client, service, 'start')
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(target_client, 'true')  # Also starts the services
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -591,8 +596,9 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        ovs_config.set('grid', 'ip', cluster_ip)
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        System.set_remote_config(target_client, 'ovs.grid.ip', cluster_ip)
+        System.set_remote_config(target_client, 'ovs.support.cid', Toolbox.get_hash())
+        System.set_remote_config(target_client, 'ovs.support.nid', Toolbox.get_hash())
 
         print 'Starting services'
         logger.info('Starting services for join master')
@@ -643,6 +649,24 @@ EOF
 
         SetupController._run_firstnode_hooks(cluster_ip)
 
+        target_client = SSHClient.load(cluster_ip)
+        System.set_remote_config(target_client, 'ovs.support.cid', Toolbox.get_hash())
+        System.set_remote_config(target_client, 'ovs.support.nid', Toolbox.get_hash())
+        if enable_heartbeats is None:
+            print '\n+++ Heartbeat +++\n'
+            logger.info('Heartbeat')
+
+            print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.',
+                                             'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],
+                                            character=None)
+            enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
+        if enable_heartbeats is True:
+            System.set_remote_config(target_client, 'ovs.support.enabled', 1)
+            service = 'support-agent'
+            SetupController._add_service(target_client, service, {})
+            SetupController._enable_service(target_client, service)
+            SetupController._change_service_state(target_client, service, 'start')
+
         print '\n+++ Announcing service +++\n'
         logger.info('Announcing service')
 
@@ -667,7 +691,7 @@ EOF
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, ovs_config, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, nodes, hypervisor_info, readcaches, writecaches):
         """
         Sets up an additional node
         """
@@ -675,7 +699,7 @@ EOF
         print '\n+++ Adding extra node +++\n'
         logger.info('Adding extra node')
 
-        # Elastic search setup
+        # Logstash setup
         print 'Configuring logstash'
         target_client = SSHClient.load(cluster_ip)
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
@@ -700,6 +724,21 @@ EOF
             client_config = SetupController._remote_config_read(master_client, config)
             target_client = SSHClient.load(cluster_ip)
             SetupController._remote_config_write(target_client, config, client_config)
+
+        client = SSHClient.load(master_ip)
+        cid = System.read_remote_config(client, 'ovs.support.cid')
+        enabled = System.read_remote_config(client, 'ovs.support.enabled')
+        enablesupport = System.read_remote_config(client, 'ovs.support.enablesupport')
+        client = SSHClient.load(cluster_ip)
+        System.set_remote_config(client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(client, 'ovs.support.cid', cid)
+        System.set_remote_config(client, 'ovs.support.enabled', enabled)
+        System.set_remote_config(client, 'ovs.support.enablesupport', enablesupport)
+        if int(enabled) > 0:
+            service = 'support-agent'
+            SetupController._add_service(client, service, {})
+            SetupController._enable_service(client, service)
+            SetupController._change_service_state(client, service, 'start')
 
         client = SSHClient.load(cluster_ip)
         node_name = client.run('hostname')
@@ -747,9 +786,7 @@ EOF
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
-        ovs_config.set('grid', 'ip', cluster_ip)
-        target_client = SSHClient.load(cluster_ip)
-        SetupController._remote_config_write(target_client, '/opt/OpenvStorage/config/ovs.cfg', ovs_config)
+        System.set_remote_config(client, 'ovs.grid.ip', cluster_ip)
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
@@ -821,13 +858,12 @@ EOF
                 raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
             master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
 
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            ovs_config = SetupController._remote_config_read(target_client, SetupController.ovs_config_filename)
             unique_id = ovs_config.get('core', 'uniqueid')
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config, None, None)
+            SetupController._promote_node(ip, master_ip, cluster_name, nodes, unique_id, None, None, None, None)
 
             print ''
             print Interactive.boxed_message(['Promote complete.'])
@@ -847,7 +883,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config, mountpoints, arakoon_mountpoint):
+    def _promote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, mountpoints, arakoon_mountpoint, readcaches, writecaches):
         """
         Promotes a given node
         """
@@ -873,24 +909,8 @@ EOF
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        # Elastic search setup
-        print 'Configuring elastic search'
+        # Logstash setup
         target_client = SSHClient.load(cluster_ip)
-        SetupController._add_service(target_client, 'elasticsearch')
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-        target_client.run('cp /opt/OpenvStorage/config/elasticsearch.yml /etc/elasticsearch/')
-        target_client.run('mkdir -p /opt/data/elasticsearch/work')
-        target_client.run('chown -R elasticsearch:elasticsearch /opt/data/elasticsearch*')
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name),
-                                                 add=False)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NODE_NAME>', node_name)
-        SetupController._replace_param_in_config(target_client, config_file,
-                                                 '<NETWORK_PUBLISH>', cluster_ip)
-        SetupController._change_service_state(target_client, 'elasticsearch', 'start')
-
         SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
                                                  '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
         SetupController._change_service_state(target_client, 'logstash', 'restart')
@@ -914,7 +934,7 @@ EOF
                 mountpoints.sort()
                 mountpoints = [manual] + mountpoints
                 arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                            default_value=Interactive.find_in_list(mountpoints, 'db'),
+                                                            default_value=writecaches[0] if writecaches else '',
                                                             sort_choices=False)
                 if arakoon_mountpoint == manual:
                     arakoon_mountpoint = None
@@ -925,8 +945,8 @@ EOF
                         break
                     else:
                         print '  Invalid path, please retry'
-        ovs_config.set('core', 'db.arakoon.location', arakoon_mountpoint)
-        SetupController._remote_config_write(target_client, SetupController.ovs_config_filename, ovs_config)
+        System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
+        System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
         for cluster in SetupController.arakoon_clusters:
             ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
             ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, ports)
@@ -962,9 +982,9 @@ EOF
               {{default_pass, <<"{2}">>}}]}}
 ].
 EOF
-""".format(ovs_config.get('core', 'broker.port'),
-           ovs_config.get('core', 'broker.login'),
-           ovs_config.get('core', 'broker.password')))
+""".format(System.read_remote_config(target_client, 'ovs.core.broker.port'),
+           System.read_remote_config(target_client, 'ovs.core.broker.login'),
+           System.read_remote_config(target_client, 'ovs.core.broker.password')))
         rabbitmq_running, rabbitmq_pid = SetupController._is_rabbitmq_running(target_client)
         if rabbitmq_running and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
@@ -979,9 +999,9 @@ EOF
         users = target_client.run('rabbitmqctl list_users').split('\r\n')[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:
-            target_client.run('rabbitmqctl add_user {0} {1}'.format(ovs_config.get('core', 'broker.login'),
-                                                                    ovs_config.get('core', 'broker.password')))
-            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(ovs_config.get('core', 'broker.login')))
+            target_client.run('rabbitmqctl add_user {0} {1}'.format(System.read_remote_config(target_client, 'ovs.core.broker.login'),
+                                                                    System.read_remote_config(target_client, 'ovs.core.broker.password')))
+            target_client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(System.read_remote_config(target_client, 'ovs.core.broker.login')))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         # Copy rabbitmq cookie
@@ -1050,6 +1070,8 @@ if not os.path.exists(configuration_dir):
     os.makedirs(configuration_dir)
 for json_file in os.listdir(configuration_dir):
     if json_file.endswith('.json'):
+        if os.path.exists('{0}/{1}.cfg'.format(configuration_dir, json_file.replace('.json', ''))):
+            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
         storagedriver_config = StorageDriverConfiguration('storagedriver', json_file.replace('.json', ''))
         storagedriver_config.load()
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
@@ -1064,8 +1086,6 @@ for json_file in os.listdir(configuration_dir):
 
         print 'Starting services'
         target_client = SSHClient.load(cluster_ip)
-        logger.info('Update ES configuration')
-        SetupController._update_es_configuration(target_client, 'true')
         logger.info('Starting services')
         for service in SetupController.master_services:
             if SetupController._has_service(target_client, service):
@@ -1143,13 +1163,12 @@ EOF
                 raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
             master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
 
-            config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-            ovs_config = SetupController._remote_config_read(target_client, config_filename)
+            ovs_config = SetupController._remote_config_read(target_client, SetupController.ovs_config_filename)
             unique_id = ovs_config.get('core', 'uniqueid')
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id, ovs_config)
+            SetupController._demote_node(ip, master_ip, cluster_name, nodes, unique_id)
 
             print ''
             print Interactive.boxed_message(['Demote complete.'])
@@ -1169,7 +1188,7 @@ EOF
             sys.exit(1)
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id, ovs_config):
+    def _demote_node(cluster_ip, master_ip, cluster_name, nodes, unique_id):
         """
         Demotes a given node
         """
@@ -1196,18 +1215,6 @@ EOF
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        # Elastic search setup
-        print 'Unconfiguring elastic search'
-        target_client = SSHClient.load(cluster_ip)
-        if SetupController._has_service(target_client, 'elasticsearch'):
-            SetupController._change_service_state(target_client, 'elasticsearch', 'stop')
-            target_client.run('rm -f /etc/elasticsearch/elasticsearch.yml')
-            SetupController._remove_service(target_client, 'elasticsearch')
-
-            SetupController._replace_param_in_config(target_client, '/etc/logstash/conf.d/indexer.conf',
-                                                     '<CLUSTER_NAME>', 'ovses_{0}'.format(cluster_name))
-        SetupController._change_service_state(target_client, 'logstash', 'restart')
-
         print 'Leaving arakoon cluster'
         logger.info('Leaving arakoon cluster')
         for cluster in SetupController.arakoon_clusters:
@@ -1231,6 +1238,8 @@ if not os.path.exists(configuration_dir):
     os.makedirs(configuration_dir)
 for json_file in os.listdir(configuration_dir):
     if json_file.endswith('.json'):
+        if os.path.exists('{0}/{1}.cfg'.format(configuration_dir, json_file.replace('.json', ''))):
+            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
         storagedriver_config = StorageDriverConfiguration('storagedriver', json_file.replace('.json', ''))
         storagedriver_config.load()
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
@@ -1546,11 +1555,10 @@ print blk_devices
 
         """
 
-        mountpoints_to_allocate = {'/mnt/md': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'mdpath'},
-                                   '/mnt/db': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'db'},
-                                   '/mnt/cache1': dict(SetupController.PARTITION_DEFAULTS),
-                                   '/mnt/bfs': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'backendfs'},
-                                   '/var/tmp': {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'tempfs'}}
+        mps_to_allocate = {'/mnt/cache1': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache1', 'type': 'writecache'},
+                           '/mnt/cache2': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'cache2', 'type': 'readcache'},
+                           '/mnt/bfs': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'backendfs', 'type': 'storage'},
+                           '/var/tmp': {'device': 'DIR_ONLY', 'ssd': False, 'percentage': 100, 'label': 'tempfs', 'type': 'storage'}}
 
         selected_devices = dict(blk_devices)
         skipped_devices = set()
@@ -1579,44 +1587,32 @@ print blk_devices
         print '{0} sata drives: {1}'.format(nr_of_disks, str(disk_devices))
         print
 
-        if nr_of_disks == 1:
-            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/var/tmp']['percentage'] = 20
-            mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/mnt/bfs']['percentage'] = 80
-
-        elif nr_of_disks >= 2:
-            mountpoints_to_allocate['/var/tmp']['device'] = disk_devices[0]
-            mountpoints_to_allocate['/var/tmp']['percentage'] = 100
-            mountpoints_to_allocate['/mnt/bfs']['device'] = disk_devices[1]
-            mountpoints_to_allocate['/mnt/bfs']['percentage'] = 100
-
         if nr_of_ssds == 1:
-            mountpoints_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/cache1']['percentage'] = 50
-            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
-            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
+            mps_to_allocate['/mnt/cache1']['device'] = ssd_devices[0]
+            mps_to_allocate['/mnt/cache1']['percentage'] = 50
+            mps_to_allocate['/mnt/cache1']['label'] = 'cache1'
+            mps_to_allocate['/mnt/cache1']['type'] = 'writecache'
+            mps_to_allocate['/mnt/cache2']['device'] = ssd_devices[0]
+            mps_to_allocate['/mnt/cache2']['percentage'] = 50
+            mps_to_allocate['/mnt/cache2']['label'] = 'cache2'
+            mps_to_allocate['/mnt/cache2']['type'] = 'readcache'
 
-        elif nr_of_ssds >= 2:
+        elif nr_of_ssds > 1:
             for count in xrange(nr_of_ssds):
                 marker = str('/mnt/cache' + str(count + 1))
-                mountpoints_to_allocate[marker] = dict(SetupController.PARTITION_DEFAULTS)
-                mountpoints_to_allocate[marker]['device'] = ssd_devices[count]
-                mountpoints_to_allocate[marker]['label'] = 'cache' + str(count + 1)
-                if count < 2:
-                    cache_size = 75
-                else:
-                    cache_size = 100
-                mountpoints_to_allocate[marker]['percentage'] = cache_size
+                mps_to_allocate[marker] = dict()
+                mps_to_allocate[marker]['device'] = ssd_devices[count]
+                mps_to_allocate[marker]['type'] = 'readcache' if count > 0 else 'writecache'
+                mps_to_allocate[marker]['percentage'] = 100
+                mps_to_allocate[marker]['label'] = str('cache' + str(count + 1))
 
-            mountpoints_to_allocate['/mnt/md']['device'] = ssd_devices[0]
-            mountpoints_to_allocate['/mnt/md']['percentage'] = 25
-            mountpoints_to_allocate['/mnt/db']['device'] = ssd_devices[1]
-            mountpoints_to_allocate['/mnt/db']['percentage'] = 25
+        for mp, values in mps_to_allocate.iteritems():
+            if values['device'] in ssd_devices:
+                mps_to_allocate[mp]['ssd'] = True
+            else:
+                mps_to_allocate[mp]['ssd'] = False
 
-        return mountpoints_to_allocate, skipped_devices
+        return mps_to_allocate, skipped_devices
 
     @staticmethod
     def _partition_disks(client, partition_layout):
@@ -1624,18 +1620,24 @@ print blk_devices
         fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
         mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().split('\n')]
 
+        boot_disk = ''
         unique_disks = set()
         for mp, values in partition_layout.iteritems():
             unique_disks.add(values['device'])
-
+            if 'boot_device' in values and values['boot_device']:
+                boot_disk = values['device']
+                print 'Boot disk {} will not be cleared'.format(boot_disk)
             # Umount partitions
             if mp in mounted:
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
 
         mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().split('\n')]
+
         for mounted_device in mounted_devices:
             for chosen_device in unique_disks:
+                if boot_disk in mounted_device:
+                    continue
                 if chosen_device in mounted_device:
                     print 'Unmounting {0}'.format(mounted_device)
                     client.run('umount {0}'.format(mounted_device))
@@ -1644,6 +1646,10 @@ print blk_devices
         for disk in unique_disks:
             if disk == 'DIR_ONLY':
                 continue
+            if disk == boot_disk:
+                continue
+
+            print "Partitioning disk {}".format(disk)
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
         # Pre process partition info (disk as key)
@@ -1666,6 +1672,18 @@ print blk_devices
             if disk == 'DIR_ONLY':
                 for directory, _, _ in partitions:
                     client.run('mkdir -p {0}'.format(directory))
+                continue
+
+            if disk == boot_disk:
+                for mp, percentage, label in partitions:
+                    print 'Partitioning free space on bootdisk: {}'.format(disk)
+                    command = """parted {} """.format(boot_disk)
+                    command += """unit % print free | grep 'Free Space' | tail -n1 | awk '{print $1}'"""
+                    start = int(float(client.run(command).split('%')[0])) + 1
+                    nr_of_partitions = int(client.run('lsblk {} | grep part | wc -l'.format(boot_disk))) + 1
+                    client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
+                    fstab_entries.append(fstab_entry.format(label, mp))
+                    client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
                 continue
 
             start = '2MB'
@@ -1699,18 +1717,40 @@ print blk_devices
         new_content += fstab_entries
         client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
+        print 'Mounting all partitions ...'
         try:
             client.run('timeout -k 9 5s mountall -q || true')
         except:
             pass  # The above might fail sometimes. We don't mind and will try again
         client.run('swapoff --all')
-        client.run('mountall -q')
+        client.run('timeout -k 9 5s mountall -q || true')
         client.run('chmod 1777 /var/tmp')
 
     @staticmethod
     def apply_flexible_disk_layout(client, auto_config=False, default=dict()):
         import choice
         blk_devices = SetupController._get_disk_configuration(client)
+
+        boot_disk = ''
+        # check for free space on bootdevice
+        if not auto_config:
+            for disk, values in blk_devices.iteritems():
+                if values['boot_device'] and values['type'] in ['ssd']:
+                    boot_disk += disk
+                    break
+
+            if not boot_disk:
+                print 'No SSD boot disk detected ...'
+                print 'Skipping partitioning of free space on boot disk ...'
+            else:
+                command = """parted /dev/{} """.format(boot_disk)
+                command += """unit GB print free | grep 'Free Space' | tail -n1 | awk '{print $3}'"""
+                free_space = float(client.run(command).split('GB')[0])
+
+                if free_space < 1.0:
+                    print 'Skipping auto partitioning of free space on bootdisk as it is < 1 GiB'
+                    print 'If required partition and mount manually for use in add vpool'
+                    boot_disk = ''
 
         skipped = set()
         if not default:
@@ -1720,12 +1760,21 @@ print blk_devices
         print '-> bootdisk or part of software RAID configuration'
         print
 
+        if boot_disk:
+            print 'Adding free space on boot disk - only mountpoint, label and type can be changed!'
+            default['/mnt/os_cache'] = {'device': "/dev/{}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
+
         device_size_map = dict()
         for key, values in blk_devices.iteritems():
             device_size_map['/dev/' + key] = values['size']
 
         def show_layout(proposed):
+            print
             print 'Proposed partition layout:'
+            print
+            print '! Mark fastest ssd device as writecache'
+            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
+            print
             keys = proposed.keys()
             keys.sort()
             key_map = list()
@@ -1754,7 +1803,6 @@ print blk_devices
 
                 print "{0:20} : {1}".format(mp, mp_values)
                 key_map.append(mp)
-            print
 
             return key_map
 
@@ -1793,6 +1841,12 @@ print blk_devices
             else:
                 return False
 
+        def is_valid_storage_type(value):
+            if value in ['readcache', 'writecache', 'storage']:
+                return True
+            else:
+                return False
+
         def validate_subitem(subitem, answer):
             if subitem in ['percentage']:
                 return is_percentage(answer)
@@ -1802,7 +1856,8 @@ print blk_devices
                 return is_mountpoint(answer)
             elif subitem in ['label']:
                 return is_label(answer)
-
+            elif subitem in ['type']:
+                return is_valid_storage_type(answer)
             return False
 
         def _summarize_partition_percentages(layout):
@@ -1812,7 +1867,8 @@ print blk_devices
                 if device == 'DIR_ONLY':
                     continue
                 if details['percentage'] == 'NA':
-                    print '>>> Invalid value {0}% for device: {1}'.format(details['percentage'], device)
+                    print '>>> Invalid percentage value for device: {0}'.format(device)
+                    print
                     time.sleep(1)
                     return False
                 percentage = int(details['percentage'])
@@ -1820,20 +1876,38 @@ print blk_devices
                     total[device] += percentage
                 else:
                     total[device] = percentage
-            print total
             for device, percentage in total.iteritems():
                 if is_percentage(percentage):
                     continue
                 else:
                     print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
+                    print
                     time.sleep(1)
                     return False
             return True
 
+        def _labels_are_unique(layout):
+            partitions = set()
+            nr_of_labels = 0
+            for details in layout.itervalues():
+                if 'DIR_ONLY' not in details['device']:
+                    partitions.add(details['label'])
+                    nr_of_labels += 1
+            if len(partitions) < nr_of_labels:
+                print '! Partition labels should be unique across partitions'
+                print
+                time.sleep(1)
+                return False
+            else:
+                return True
+
         def process_submenu_actions(mp_to_edit):
             subitem = default[mp_to_edit]
+            is_boot_device = 'boot_device' in default[mp_to_edit] and default[mp_to_edit]['boot_device']
             submenu_items = subitem.keys()
             submenu_items.sort()
+            if 'boot_device' in submenu_items:
+                submenu_items.remove('boot_device')
             submenu_items.append('mountpoint')
             submenu_items.append('finish')
 
@@ -1852,6 +1926,10 @@ print blk_devices
                         default.pop(mp_to_edit)
                         default[new_mountpoint] = mp_values
                         mp_to_edit = new_mountpoint
+                elif is_boot_device and subitem_chosen not in ['type', 'label']:
+                    print '\nOnly mountpoint, label and type can be changed for a boot device'
+                    print 'All free space will be allocated to the new partition'
+                    time.sleep(1)
                 else:
                     answer = choice.Input('Enter new value for {}'.format(subitem_chosen)).ask()
                     if validate_subitem(subitem_chosen, answer):
@@ -1863,7 +1941,6 @@ print blk_devices
         if auto_config:
             SetupController._partition_disks(client, default)
             return default
-
         else:
             choices = show_layout(default)
             while True:
@@ -1899,7 +1976,9 @@ print blk_devices
 
                 elif chosen == 'Apply':
                     if not _summarize_partition_percentages(default):
-                        'Partition totals are not within percentage range'
+                        choices = show_layout(default)
+                        continue
+                    if not _labels_are_unique(default):
                         choices = show_layout(default)
                         continue
 
@@ -1922,7 +2001,7 @@ print blk_devices
         SetupController.host_ips = set(ipaddresses)
         SetupController._change_service_state(client, 'dbus', 'start')
         SetupController._change_service_state(client, 'avahi-daemon', 'start')
-        discover_result = client.run('avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
+        discover_result = client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
         logger.debug('Avahi discovery result:\n{0}'.format(discover_result))
         for entry in discover_result.split('\n'):
             entry_parts = entry.split(';')
@@ -1972,7 +2051,7 @@ print blk_devices
         contents = client.file_read(filename)
         with open('/tmp/temp_read.cfg', 'w') as configfile:
             configfile.write(contents)
-        config = ConfigParser.ConfigParser()
+        config = RawConfigParser()
         config.read('/tmp/temp_read.cfg')
         return config
 
@@ -2037,25 +2116,13 @@ print blk_devices
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
-    def _update_es_configuration(es_client, value):
-        # update elasticsearch configuration
-        config_file = '/etc/elasticsearch/elasticsearch.yml'
-        SetupController._change_service_state(es_client, 'elasticsearch', 'stop')
-        SetupController._replace_param_in_config(es_client, config_file,
-                                                 '<IS_POTENTIAL_MASTER>', value)
-        SetupController._replace_param_in_config(es_client, config_file,
-                                                 '<IS_DATASTORE>', value)
-        SetupController._change_service_state(es_client, 'elasticsearch', 'start')
-        SetupController._change_service_state(es_client, 'logstash', 'restart')
-
-    @staticmethod
     def _configure_amqp_to_volumedriver(client, vpname=None):
         """
         Reads out the RabbitMQ client config, using that to (re)configure the volumedriver configuration(s)
         """
         remote_script = """
 import os
-import ConfigParser
+from ConfigParser import RawConfigParser
 from ovs.plugin.provider.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 protocol = Configuration.get('ovs.core.broker.protocol')
@@ -2063,7 +2130,7 @@ login = Configuration.get('ovs.core.broker.login')
 password = Configuration.get('ovs.core.broker.password')
 vpool_name = {0}
 uris = []
-cfg = ConfigParser.ConfigParser()
+cfg = RawConfigParser()
 cfg.read('/opt/OpenvStorage/config/rabbitmqclient.cfg')
 nodes = [n.strip() for n in cfg.get('main', 'nodes').split(',')]
 for node in nodes:
@@ -2074,6 +2141,8 @@ if not os.path.exists(configuration_dir):
 for json_file in os.listdir(configuration_dir):
     this_vpool_name = json_file.replace('.json', '')
     if json_file.endswith('.json') and (vpool_name is None or vpool_name == this_vpool_name):
+        if os.path.exists('{{0}}/{{1}}.cfg'.format(configuration_dir, this_vpool_name)):
+            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
         storagedriver_configuration = StorageDriverConfiguration('storagedriver', this_vpool_name)
         storagedriver_configuration.load()
         storagedriver_configuration.configure_event_publisher(events_amqp_routing_key=Configuration.get('ovs.core.broker.volumerouter.queue'),
@@ -2119,11 +2188,11 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute promote hooks
         """
-        functions = SetupController._fetch_hooks('promote')
+        functions = Toolbox.fetch_hooks('setup', 'promote')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2131,11 +2200,11 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute demote hooks
         """
-        functions = SetupController._fetch_hooks('demote')
+        functions = Toolbox.fetch_hooks('setup', 'demote')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2143,11 +2212,11 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute firstnode hooks
         """
-        functions = SetupController._fetch_hooks('firstnode')
+        functions = Toolbox.fetch_hooks('setup', 'firstnode')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip)
+            function(cluster_ip=cluster_ip)
         return len(functions) > 0
 
     @staticmethod
@@ -2155,32 +2224,9 @@ for json_file in os.listdir(configuration_dir):
         """
         Execute extranode hooks
         """
-        functions = SetupController._fetch_hooks('extranode')
+        functions = Toolbox.fetch_hooks('setup', 'extranode')
         if len(functions) > 0:
             print '\n+++ Running plugin hooks +++\n'
         for function in functions:
-            function(cluster_ip, master_ip)
+            function(cluster_ip=cluster_ip, master_ip=master_ip)
         return len(functions) > 0
-
-    @staticmethod
-    def _fetch_hooks(hook_type):
-        """
-        Load hooks
-        """
-        functions = []
-        path = os.path.dirname(__file__)
-        for filename in os.listdir(path):
-            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py') and filename != '__init__.py':
-                name = filename.replace('.py', '')
-                module = imp.load_source(name, os.path.join(path, filename))
-                for member in inspect.getmembers(module):
-                    if inspect.isclass(member[1]) \
-                            and member[1].__module__ == name \
-                            and 'object' in [base.__name__ for base in member[1].__bases__]:
-                        for submember in inspect.getmembers(member[1]):
-                            if hasattr(submember[1], 'hooks') \
-                                    and isinstance(submember[1].hooks, list) \
-                                    and hook_type in submember[1].hooks:
-                                functions.append(submember[1])
-
-        return functions

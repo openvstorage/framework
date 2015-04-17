@@ -1,15 +1,18 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 pip install kombu==3.0.7
 pip install celery==3.1.6
 pip install suds-jurko==0.5
-pip install configobj==4.7.2
 pip install pika
 pip install six --upgrade
 pip install protobuf
 pip install choice
 pip install pyudev
 pip install datadiff
+
+if [ ! -f /etc/openvstorage_id ]; then
+  echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
+fi
 
 id -a ovs &> /dev/null
 if [[ $? -eq 1 ]]

@@ -49,10 +49,10 @@ class BackendViewSet(viewsets.ViewSet):
             if backend_type is None:
                 return BackendList.get_backends()
             return BackendTypeList.get_backend_type_by_code(backend_type).backends
-        client = OVSClient(ip, port, client_id, client_secret)
+        client = OVSClient(ip, port, credentials=(client_id, client_secret))
         try:
-            remote_backends = client.call('/backends/', get_data={'backend_type': backend_type,
-                                                                  'contents': '' if contents is None else contents})
+            remote_backends = client.get('/backends/', params={'backend_type': backend_type,
+                                                               'contents': '' if contents is None else contents})
         except (HTTPError, URLError):
             raise NotAcceptable('Could not load remote backends')
         backend_list = []
@@ -80,6 +80,8 @@ class BackendViewSet(viewsets.ViewSet):
         """
         serializer = FullSerializer(Backend, instance=Backend(), data=request.DATA)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            duplicate = BackendList.get_by_name(serializer.object.name)
+            if duplicate is None:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

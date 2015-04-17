@@ -16,11 +16,10 @@
 Module for the OVS API client
 """
 
-import urllib2
 import urllib
-import json
 import base64
 import time
+import requests
 
 
 class OVSClient(object):
@@ -28,14 +27,17 @@ class OVSClient(object):
     Represents the OVS client
     """
 
-    def __init__(self, ip, port, client_id, client_secret):
+    def __init__(self, ip, port, credentials=None, verify=False):
         """
         Initializes the object with credentials and connection information
         """
-        self.client_id = client_id
-        self.client_secret = client_secret
+        if credentials is not None and len(credentials) != 2:
+            raise RuntimeError('Credentials should be None (no authentication) or a tuple containing client_id and client_secret (authenticated)')
+        self.client_id = credentials[0] if credentials is not None else None
+        self.client_secret = credentials[1] if credentials is not None else None
         self._url = 'https://{0}:{1}/api'.format(ip, port)
         self._token = None
+        self._verify = verify
 
     def _connect(self):
         """
@@ -43,44 +45,105 @@ class OVSClient(object):
         """
         headers = {'Accept': 'application/json',
                    'Authorization': 'Basic {0}'.format(base64.b64encode('{0}:{1}'.format(self.client_id, self.client_secret)).strip())}
-        request = urllib2.Request('{0}/oauth2/token/'.format(self._url),
-                                  data=urllib.urlencode({'grant_type': 'client_credentials'}),
-                                  headers=headers)
-        response = urllib2.urlopen(request).read()
-        response_data = json.loads(response)
-        self._token = response_data['access_token']
+        response = requests.post(url='{0}/oauth2/token/'.format(self._url),
+                                 data={'grant_type': 'client_credentials'},
+                                 headers=headers,
+                                 verify=self._verify).json()
 
-    def call(self, api, post_data=None, get_data=None):
+        if len(response.keys()) == 1 and 'error' in response:
+            raise RuntimeError(response['error'])
+        self._token = response['access_token']
+
+    def _prepare(self, **kwargs):
         """
-        Executes an API call
+        Prepares the call:
+        * Authentication, if required
+        * Preparing headers, returning them
         """
-        if self._token is None:
+        if self.client_id is not None and self._token is None:
             self._connect()
 
-        headers = {'Accept': 'application/json; version=1',
-                   'Authorization': 'Bearer {0}'.format(self._token)}
-        url_params = ''
-        if get_data is not None:
-            url_params = '?{0}'.format(urllib.urlencode(get_data))
-        request = urllib2.Request('{0}{1}{2}'.format(self._url, api, url_params),
-                                  data=post_data,
-                                  headers=headers)
-        response = urllib2.urlopen(request).read()
-        return json.loads(response)
+        headers = {'Accept': 'application/json; version=*'}
+        if self._token is not None:
+            headers['Authorization'] = 'Bearer {0}'.format(self._token)
+
+        params = ''
+        if 'params' in kwargs and kwargs['params'] is not None:
+            params = '?{0}'.format(urllib.urlencode(kwargs['params']))
+        url = '{0}{{0}}{1}'.format(self._url, params)
+
+        return headers, url
+
+    @staticmethod
+    def _process(response):
+        """
+        Processes a call result
+        """
+        if response.status_code == 403:
+            raise RuntimeError('No access to the requested API')
+        if response.status_code == 404:
+            raise RuntimeError('The requested API could not be located')
+        if response.status_code == 405:
+            raise RuntimeError('Requested method not allowed')
+        if response.status_code == 429:
+            raise RuntimeError('The requested API has rate limiting: {0}'.format(response.text))
+        if response.status_code == 500:
+            raise RuntimeError('Received internal server error: {0}'.format(response.text))
+        try:
+            return_data = response.json()
+            return return_data
+        except:
+            raise RuntimeError('Could not parse returned data: {0}: {1}'.format(response.status_code, response.text))
+
+    def get(self, api, params=None):
+        """
+        Executes a GET call
+        """
+        headers, url = self._prepare(params=params)
+        return OVSClient._process(requests.get(url=url.format(api),
+                                               headers=headers,
+                                               verify=self._verify))
+
+    def post(self, api, data=None, params=None):
+        """
+        Executes a POST call
+        """
+        headers, url = self._prepare(params=params)
+        return OVSClient._process(requests.post(url=url.format(api),
+                                                data=data,
+                                                headers=headers,
+                                                verify=self._verify))
+
+    def put(self, api, data=None, params=None):
+        """
+        Executes a PUT call
+        """
+        headers, url = self._prepare(params=params)
+        return OVSClient._process(requests.put(url=url.format(api),
+                                               data=data,
+                                               headers=headers,
+                                               verify=self._verify))
+
+    def patch(self, api, data=None, params=None):
+        """
+        Executes a PATCH call
+        """
+        headers, url = self._prepare(params=params)
+        return OVSClient._process(requests.patch(url=url.format(api),
+                                                 data=data,
+                                                 headers=headers,
+                                                 verify=self._verify))
 
     def wait_for_task(self, task_id, timeout=None):
         """
         Waits for a task to complete
         """
-        if self._token is None:
-            self._connect()
-
         start = time.time()
         task_metadata = {'ready': False}
         while task_metadata['ready'] is False:
             if timeout is not None and timeout < (time.time() - start):
                 raise RuntimeError('Waiting for task {0} has timed out.'.format(task_id))
-            task_metadata = self.call('/tasks/{0}/'.format(task_id))
+            task_metadata = self.get('/tasks/{0}/'.format(task_id))
             if task_metadata['ready'] is False:
                 time.sleep(1)
         return task_metadata['successful'], task_metadata['result']
