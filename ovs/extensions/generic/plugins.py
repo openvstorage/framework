@@ -63,3 +63,10 @@ for s in ['memcached', 'watcher-framework']:
 """)
             from ovs.dal.helpers import Migration
             Migration.migrate()
+
+            from ovs.extensions.generic.system import System
+            from ovs.lib.helpers.toolbox import Toolbox
+            ip = System.get_my_storagerouter().ip
+            functions = Toolbox.fetch_hooks('plugin', 'postinstall')
+            for function in functions:
+                function(ip=ip)
