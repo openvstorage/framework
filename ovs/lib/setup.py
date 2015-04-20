@@ -546,7 +546,7 @@ EOF
 
         print 'Start model migration'
         logger.debug('Start model migration')
-        from ovs.extensions.migration.migration import Migration
+        from ovs.dal.helpers import Migration
         Migration.migrate()
 
         print '\n+++ Finalizing setup +++\n'

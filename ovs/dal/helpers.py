@@ -24,9 +24,6 @@ import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 
-from ovs.log.logHandler import LogHandler
-logger = LogHandler('api', name='debug')
-
 
 class Descriptor(object):
     """
@@ -256,3 +253,50 @@ class Toolbox(object):
                 volatile.set(key, 1)
         except:
             pass
+
+
+class Migration(object):
+    """
+    Handles all migrations between versions
+    """
+
+    @staticmethod
+    def migrate():
+        """
+        Executes all migrations. It keeps track of an internal "migration version" which is
+        a always increasing by one
+        """
+
+        def execute(function, start, end):
+            """
+            Executes a single migration, syncing versions
+            """
+            version = function(start)
+            if version > end:
+                end = version
+            return end
+
+        key = 'ovs_model_version'
+        persistent = PersistentFactory.get_client()
+        if persistent.exists(key):
+            data = persistent.get(key)
+        else:
+            data = {}
+
+        migrators = []
+        path = os.path.join(os.path.dirname(__file__), 'migration')
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)) and filename.endswith('.py'):
+                name = filename.replace('.py', '')
+                module = imp.load_source(name, os.path.join(path, filename))
+                for member in inspect.getmembers(module):
+                    if inspect.isclass(member[1]) \
+                            and member[1].__module__ == name \
+                            and 'object' in [base.__name__ for base in member[1].__bases__]:
+                        migrators.append((member[1].identifier, member[1].migrate))
+        for identifier, method in migrators:
+            base_version = data[identifier] if identifier in data else 0
+            new_version = execute(method, base_version, 0)
+            data[identifier] = new_version
+
+        persistent.set(key, data)
