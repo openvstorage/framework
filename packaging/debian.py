@@ -94,7 +94,7 @@ class DebianPackager(object):
             'ssh ovs-apt@packages.cloudfounders.com "grep \'openvstorage_{0}-1_amd64\' /data/www/apt/*/Packages" || true'.format(version_string),
             DebianPackager.package_path
         )
-        print 'Uploading {0} package: {1}'.format('new' if new_package else 'existing', 'openvstorage_{1}-1_amd64'.format(version_string))
+        print 'Uploading {0} package: {1}'.format('new' if new_package else 'existing', 'openvstorage_{0}-1_amd64'.format(version_string))
         DebianPackager._run('dput -c {0}/debian/dput.cfg ovs-apt {0}/debian/openvstorage_{1}-1_amd64.changes'.format(DebianPackager.package_path, version_string),
                             DebianPackager.package_path)
         reload_repo = 'ssh ovs-apt@packages.cloudfounders.com "mini-dinstall -b{0}"'.format('' if new_package else ' --no-db')
