@@ -15,11 +15,13 @@
 """
 Module containing certain helper classes providing various logic
 """
-import inspect
+
+import re
 import os
 import imp
 import copy
-import re
+import logging
+import inspect
 import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
@@ -267,6 +269,9 @@ class Migration(object):
         a always increasing by one
         """
 
+        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
+        logging.disable('WARNING')
+
         def execute(function, start, end):
             """
             Executes a single migration, syncing versions
@@ -300,3 +305,5 @@ class Migration(object):
             data[identifier] = new_version
 
         persistent.set(key, data)
+
+        logging.disable(loglevel)  # Restore workaround
