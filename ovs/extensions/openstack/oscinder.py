@@ -23,6 +23,7 @@ CINDER_CONF = '/etc/cinder/cinder.conf'
 CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
 EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
+NOVA_CONF = '/etc/nova/nova.conf'
 
 
 def file_exists(ssh_client, location):
@@ -34,7 +35,7 @@ def file_exists(ssh_client, location):
 
 class OpenStackCinder(object):
     """
-    Represent the Cinder service
+    Configure/manage openstack services
     """
 
     def __init__(self, cinder_password=None, cinder_user='admin', tenant_name='admin', controller_ip='127.0.0.1'):
@@ -44,7 +45,7 @@ class OpenStackCinder(object):
 
         if cinder_password:
             try:
-                from cinderclient.v1 import client as cinder_client
+                from cinderclient.v2 import client as cinder_client
             except ImportError:
                 pass
             else:
@@ -65,7 +66,7 @@ class OpenStackCinder(object):
         Validate credentials
         """
         try:
-            from cinderclient.v1 import client as cinder_client
+            from cinderclient.v2 import client as cinder_client
         except ImportError:
             return False
         else:
@@ -175,23 +176,24 @@ class OpenStackCinder(object):
     def configure_vpool(self, vpool_name, mountpoint):
         if self.is_devstack or self.is_openstack:
             self._get_driver_code()
-            self._chown_mountpoint(mountpoint)
+            self._configure_user_groups()
             self._configure_cinder_driver(vpool_name)
             self._create_volume_type(vpool_name)
             self._patch_etc_init_cindervolume_conf()
             self._apply_patches()
+            self._configure_messaging_driver()
+            self._enable_openstack_events_consumer()
             self._restart_processes()
 
     def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
         if self.is_devstack or self.is_openstack:
-            self._unchown_mountpoint(mountpoint)
             self._unconfigure_cinder_driver(vpool_name)
             if remove_volume_type:
                 self._delete_volume_type(vpool_name)
             self._unpatch_etc_init_cindervolume_conf()
             self._restart_processes()
 
-    def _chown_mountpoint(self, mountpoint):
+    def _configure_user_groups(self):
         # Vpool owned by stack / cinder
         # Give access to libvirt-qemu and ovs
         if self.is_devstack:
@@ -202,8 +204,95 @@ class OpenStackCinder(object):
             self.client.run('usermod -a -G ovs cinder')
 
     def _unchown_mountpoint(self, mountpoint):
-        #self.client.run('chown root "{0}"'.format(mountpoint))
         pass
+
+    def _enable_openstack_events_consumer(self):
+        """
+        Enable service ovs-openstack-events-consumer
+        """
+        from ovs.lib.setup import SetupController
+        service_name = 'ovs-openstack-events-consumer'
+        if not SetupController._has_service(self.client, service_name):
+            SetupController._add_service(self.client, service_name)
+            SetupController._enable_service(self.client, service_name)
+            SetupController._start_service(self.client, service_name)
+
+    def _configure_messaging_driver(self):
+        """
+        Configure nova and cinder messaging driver
+        Restart c-api and n-api
+        """
+        if not self.client.file_exists(CINDER_CONF):
+            return False
+
+        version = self._get_version()
+        if version == 'juno':
+            messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
+        elif version in ['kilo']:
+            messaging_driver = 'messaging'
+        else:
+            return False
+        self.client.run("""python -c '''from ConfigParser import RawConfigParser
+changed = False
+CINDER_CONF = "{0}"
+cfg = RawConfigParser()
+cfg.read([CINDER_CONF]);
+if cfg.has_option("DEFAULT", "notification_driver"):
+    if cfg.get("DEFAULT", "notification_driver") != "{1}":
+        changed = True
+        cfg.set("DEFAULT", "notification_driver", "{1}")
+else:
+    changed = True
+    cfg.set("DEFAULT", "notification_driver", "{1}")
+if cfg.has_option("DEFAULT", "notification_topics"):
+    notification_topics = cfg.get("DEFAULT", "notification_topics").split(",")
+    if "notifications" not in notification_topics:
+        notification_topics.append("notifications")
+        changed = True
+        cfg.set("DEFAULT", "notification_topics", ",".join(notification_topics))
+else:
+    changed = True
+    cfg.set("DEFAULT", "notification_topics", "notifications")
+
+if changed:
+    with open(CINDER_CONF, "w") as fp:
+       cfg.write(fp)
+'''""".format(CINDER_CONF, messaging_driver))
+
+        if not self.client.file_exists(NOVA_CONF):
+            return False
+
+        self.client.run("""python -c '''from ConfigParser import RawConfigParser
+changed = False
+NOVA_CONF = "{0}"
+cfg = RawConfigParser()
+cfg.read([NOVA_CONF]);
+if cfg.has_option("DEFAULT", "notification_driver"):
+    if cfg.get("DEFAULT", "notification_driver") != "{1}":
+        changed = True
+        cfg.set("DEFAULT", "notification_driver", "{1}")
+else:
+    changed = True
+    cfg.set("DEFAULT", "notification_driver", "{1}")
+if cfg.has_option("DEFAULT", "notification_topics"):
+    notification_topics = cfg.get("DEFAULT", "notification_topics").split(",")
+    if "notifications" not in notification_topics:
+        notification_topics.append("notifications")
+        changed = True
+        cfg.set("DEFAULT", "notification_topics", ",".join(notification_topics))
+else:
+    changed = True
+    cfg.set("DEFAULT", "notification_topics", "notifications")
+if not cfg.has_option("DEFAULT", "notify_on_state_change"):
+    changed = True
+    cfg.set("DEFAULT", "notify_on_state_change", "vm_and_task_state")
+if not cfg.has_option("DEFAULT", "notify_on_any_change"):
+    changed = True
+    cfg.set("DEFAULT", "notify_on_any_change", "True")
+if changed:
+    with open(NOVA_CONF, "w") as fp:
+       cfg.write(fp)
+'''""".format(NOVA_CONF, messaging_driver))
 
     def _configure_cinder_driver(self, vpool_name):
         """
@@ -281,64 +370,56 @@ if vpool_name in enabled_backends:
         now_time = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%d-%H%M%S')
         return '{0}/{1}.log.{2}'.format(logdir, service, now_time)
 
+    def _stop_screen_process(self, process_name, screen_name='stack'):
+        out = self.client.run('''su stack -c 'screen -S {0} -p {1} -Q select 1>/dev/null; echo $?' '''.format(screen_name, process_name))
+        process_screen_exists = out == '0'
+        if process_screen_exists:
+            self.client.run('''su stack -c 'screen -S {0} -p {1} -X stuff \n' '''.format(screen_name, process_name))
+            self.client.run('''su stack -c 'screen -S {0} -p {1} -X kill' '''.format(screen_name, process_name))
+        return process_screen_exists
+
+    def _start_screen_process(self, process_name, commands, screen_name='stack', logdir='/opt/stack/logs'):
+        logfile = self._get_devstack_log_name(process_name)
+        self.client.run('''su stack -c 'touch {0}' '''.format(logfile))
+        self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name))
+        self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile))
+        self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name))
+        self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name))
+        self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name))
+        for command in commands:
+            self.client.run('''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command))
+
     def _restart_devstack_screen(self):
         """
-        Restart c-vol on devstack
-        resume logging
-         screen -S stack -p h-api-cw -X logfile LOGFILE
-         screen -S stack -p h-api-cw -X log on
-         ln -sf /opt/stack/logs/h-api-cfn.log.2015-04-01-123300 /opt/stack/logs/screen-logs/screen-h-api-cfn.log
+        Restart screen processes on devstack
         """
         try:
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X kill' ''')
-            time.sleep(3)
-            out = self.client.run('''su stack -c 'screen -S stack -p n-api -Q select 1>/dev/null; echo $?' ''')
-            n_api_screen_exists = out == '0'
-            if n_api_screen_exists:
-                self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff \n' ''')
-                self.client.run('''su stack -c 'screen -S stack -p n-api -X kill' ''')
-            time.sleep(3)
-            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X kill' ''')
+            c_vol_screen_exists = self._stop_screen_process('c-vol')
+            n_cpu_screen_exists = self._stop_screen_process('n-cpu')
+            n_api_screen_exists = self._stop_screen_process('n-api')
+            c_api_screen_exists = self._stop_screen_process('c-api')
 
             self.client.run('''su stack -c 'mkdir -p /opt/stack/logs' ''')
+
+            if c_vol_screen_exists:
+                self._start_screen_process('c-vol', ["export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\" ",
+                                                     "newgrp ovs",
+                                                     "newgrp stack",
+                                                     "umask 0002",
+                                                     "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\" "])
             time.sleep(3)
-            logfile = self._get_devstack_log_name('c-vol')
-            self.client.run('''su stack -c 'touch %s' ''' % logfile)
-            self.client.run('''su stack -c 'screen -S stack -X screen -t c-vol' ''')
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X logfile %s' ''' % logfile)
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X log on' ''')
-            self.client.run('rm /opt/stack/logs/c-vol.log || true')
-            self.client.run('ln -sf %s /opt/stack/logs/c-vol.log' % logfile)
-
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "newgrp ovs\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "newgrp stack\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "umask 0002\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"' ''')
-
+            if n_cpu_screen_exists:
+                self._start_screen_process('n-cpu', ["newgrp ovs",
+                                                     "newgrp stack",
+                                                     "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\" "])
             time.sleep(3)
-            logfile = self._get_devstack_log_name('n-cpu')
-            self.client.run('''su stack -c 'touch %s' ''' % logfile)
-            self.client.run('''su stack -c 'screen -S stack -X screen -t n-cpu' ''')
-            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X logfile %s' ''' % logfile)
-            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X log on' ''')
-            self.client.run('rm /opt/stack/logs/n-cpu.log || true')
-            self.client.run('ln -sf %s /opt/stack/logs/n-cpu.log' % logfile)
-            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp ovs\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "newgrp stack\012"' ''')
-            self.client.run('''su stack -c 'screen -S stack -p n-cpu -X stuff "sg libvirtd /usr/local/bin/nova-compute --config-file /etc/nova/nova.conf & echo $! >/opt/stack/status/stack/n-cpu.pid; fg || echo n-cpu failed to start | tee \"/opt/stack/status/stack/n-cpu.failure\"\012"' ''')
-
             if n_api_screen_exists:
-                time.sleep(3)
-                logfile = self._get_devstack_log_name('n-api')
-                self.client.run('''su stack -c 'touch %s' ''' % logfile)
-                self.client.run('''su stack -c 'screen -S stack -X screen -t n-api' ''')
-                self.client.run('''su stack -c 'screen -S stack -p n-api -X logfile %s' ''' % logfile)
-                self.client.run('''su stack -c 'screen -S stack -p n-api -X log on' ''')
-                self.client.run('rm /opt/stack/logs/n-api.log || true')
-                self.client.run('ln -sf %s /opt/stack/logs/n-api.log' % logfile)
-                self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"' ''')
-                self.client.run('''su stack -c 'screen -S stack -p n-api -X stuff "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\"\012"' ''')
+                self._start_screen_process('n-api', ["export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\" ",
+                                                     "/usr/local/bin/nova-api & echo $! >/opt/stack/status/stack/n-api.pid; fg || echo n-api failed to start | tee \"/opt/stack/status/stack/n-api.failure\" "])
+            time.sleep(3)
+            if c_api_screen_exists:
+                self._start_screen_process('c-api', ["/usr/local/bin/cinder-api --config-file /etc/cinder/cinder.conf & echo $! >/opt/stack/status/stack/c-api.pid; fg || echo c-api failed to start | tee \"/opt/stack/status/stack/c-api.failure\" "])
+            time.sleep(3)
         except SystemExit as se:  # failed command or non-zero exit codes raise SystemExit
             raise RuntimeError(str(se))
         return self._is_cinder_running()
@@ -373,7 +454,7 @@ if vpool_name in enabled_backends:
         """
         Restart services on openstack
         """
-        for service_name in ('nova-compute', 'nova-api-os-compute', 'cinder-volume'):
+        for service_name in ('nova-compute', 'nova-api-os-compute', 'cinder-volume', 'cinder-api'):
             if os.path.exists('/etc/init/{0}.conf'.format(service_name)):
                 try:
                     self.client.run('service {0} restart'.format(service_name))
@@ -399,23 +480,19 @@ if vpool_name in enabled_backends:
 
         version = self._get_version()
         # fix "blockdev" issue
-        # fix "instance rename" issue
-        # NOTE! vmachine.name and instance.display_name must match from the beginning
         if self.is_devstack:
             nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
-            nova_servers_file = '{0}/api/openstack/compute/servers.py'.format(nova_base_path)
         elif self.is_openstack:
             nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
             nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
-            nova_servers_file = '/usr/lib/python2.7/dist-packages/nova/api/openstack/compute/servers.py'
 
         self.client.run("""python -c "
 import os
 version = '%s'
 nova_volume_file = '%s'
 nova_driver_file = '%s'
-nova_servers_file = '%s'
+
 with open(nova_volume_file, 'r') as f:
     file_contents = f.readlines()
 new_class = '''
@@ -431,13 +508,7 @@ class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):
         conf.source_path = connection_info['data']['device_path']
         return conf
 '''
-updatename = '''
-        try:
-            from ovs.lib.vmachine import VMachineController
-            VMachineController.update_vmachine_name.apply_async(kwargs={'old_name':instance.display_name, 'new_name':body['server']['name']})
-        except Exception as ex:
-            print('[OVS] Update exception {0}'.format(ex))
-'''
+
 patched = False
 for line in file_contents:
     if 'class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):' in line:
@@ -469,51 +540,8 @@ if not patched:
     if fc is not None:
         with open(nova_driver_file, 'w') as f:
             f.writelines(fc)
-if os.path.exists(nova_servers_file):
-    fc = None
-    if version == 'kilo':
-        with open(nova_servers_file, 'r') as f:
-            file_contents = f.readlines()
-        patched = False
-        for line in file_contents:
-            if 'from ovs.lib.vmachine import VMachineController' in line:
-                patched = True
-                break
-        defupdate = False
-        if not patched:
-            for line in file_contents[:]:
-                if 'def update(self,' in line:
-                    defupdate = True
-                    continue
-                if defupdate:
-                    if 'instance = self._get_server(ctxt,' in line:
-                       fc = file_contents[:file_contents.index(line)+1] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)+1:]
-                       break
-            if fc is not None:
-                with open(nova_servers_file, 'w') as f:
-                   f.writelines(fc)
-    elif version == 'juno':
-        with open(nova_servers_file, 'r') as f:
-            file_contents = f.readlines()
-        patched = False
-        for line in file_contents:
-            if 'from ovs.lib.vmachine import VMachineController' in line:
-                patched = True
-                break
-        defupdate = False
-        if not patched:
-            for line in file_contents[:]:
-                if 'def update(self,' in line:
-                    defupdate = True
-                    continue
-                if defupdate:
-                    if 'instance = self.compute_api.get(ctxt, id,' in line:
-                       fc = file_contents[:file_contents.index(line)-2] + ['\\n'] + [l+'\\n' for l in updatename.split('\\n')] + file_contents[file_contents.index(line)-2:]
-                       break
-            if fc is not None:
-                with open(nova_servers_file, 'w') as f:
-                   f.writelines(fc)
-" """ % (version, nova_volume_file, nova_driver_file, nova_servers_file))
+
+" """ % (version, nova_volume_file, nova_driver_file))
 
     def _delete_volume_type(self, volume_type_name):
         """

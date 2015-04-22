@@ -414,6 +414,16 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function arrayFilterUnique(value, index, array) {
         return array.indexOf(value) === index;
     }
+    function getHash(length) {
+        if (length === undefined) {
+            length = 16;
+        }
+        var text = '', possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', i;
+        for(i = 0; i < length; i += 1) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -462,6 +472,7 @@ define(['jquery', 'jqp/pnotify'], function($) {
         overlap: overlap,
         getColor: getColor,
         getLocalTime: getLocalTime,
-        arrayFilterUnique: arrayFilterUnique
+        arrayFilterUnique: arrayFilterUnique,
+        getHash: getHash
     };
 });

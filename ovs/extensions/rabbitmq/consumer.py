@@ -68,9 +68,23 @@ def callback(ch, method, properties, body):
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description = 'KVM File Watcher and Rabbitmq Event Processor for OVS',
+                                    formatter_class = argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('rabbitmq_queue', type=str,
+                        help='Rabbitmq queue name')
+    parser.add_argument('--durable', dest='queue_durable', action='store_const', default=False, const=True,
+                        help='Declare queue as durable')
+    parser.add_argument('--watcher', dest='file_watcher', action='store_const', default=False, const=True,
+                        help='Enable file watcher')
+
+
+    args = parser.parse_args()
+    print(args.rabbitmq_queue, args.queue_durable, args.file_watcher)
     notifier = None
     try:
-        if run_kvm_watcher():
+        if args.file_watcher and run_kvm_watcher():
             from ovs.extensions.rabbitmq.kvm_xml_processor import Kxp
 
             wm = pyinotify.WatchManager()
@@ -145,8 +159,9 @@ if __name__ == '__main__':
                 raise RuntimeError('Could not connect to any available RabbitMQ endpoint.')
             logger.debug('Connected to: {0}'.format(server))
 
-            queue = sys.argv[1] if len(sys.argv) == 2 else 'default'
-            channel.queue_declare(queue=queue, durable=True)
+            queue = args.rabbitmq_queue
+            durable = args.queue_durable
+            channel.queue_declare(queue=queue, durable=durable)
             logger.info('Waiting for messages on {0}...'.format(queue), print_msg=True)
             logger.info('To exit press CTRL+C', print_msg=True)
 

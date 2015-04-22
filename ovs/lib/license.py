@@ -29,6 +29,7 @@ from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.helpers.decorators import add_hooks
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('lib', name='license')
@@ -147,6 +148,16 @@ class LicenseController(object):
                     client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
             return result
         return None
+
+    @staticmethod
+    @add_hooks('setup', 'extranode')
+    def add_extra_node(**kwargs):
+        ip = kwargs['cluster_ip']
+        license_contents = []
+        for lic in LicenseList.get_licenses():
+            license_contents.append(lic.hash)
+        client = SSHClient.load(ip)
+        client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod
     @celery.task(name='ovs.license.get_free_license')

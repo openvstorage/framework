@@ -247,6 +247,13 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             client.file_upload(config_file, temp_filename)
             os.remove(temp_filename)
 
+    def clean_config(self, client):
+        """
+        Removes a configuration file
+        """
+        config_dir = '/'.join([ArakoonInstaller.ARAKOON_CONFIG_DIR, self.config.cluster_name])
+        client.run('rm -rf {0}'.format(config_dir))
+
     def generate_upstart_config(self, client=None):
         (temp_handle, temp_filename) = tempfile.mkstemp()
         config_file = '/etc/init/ovs-arakoon-{0}.conf'.format(self.config.cluster_name)
@@ -301,6 +308,19 @@ rm -rf /var/log/arakoon/{1}
                 'messaging_port': free_ports[1]}
 
     @staticmethod
+    def delete_cluster(cluster_name, ip):
+        """
+        Deletes a cluster, based on the configuration on a node's given ip
+        """
+        ai = ArakoonInstaller()
+        ai.load_config_from(cluster_name, ip)
+        for node in ai.config.nodes:
+            ArakoonInstaller.stop(cluster_name, node.ip)
+            ArakoonInstaller.remove(cluster_name, node.ip)
+            client = SSHClient.load(node.ip)
+            ai.delete_dir_structure(client)
+
+    @staticmethod
     def start(cluster_name, ip):
         client = SSHClient.load(ip)
         cmd = """
@@ -315,6 +335,15 @@ print Service.start_service('arakoon-{0}')
         cmd = """
 from ovs.plugin.provider.service import Service
 print Service.stop_service('arakoon-{0}')
+""".format(cluster_name)
+        System.exec_remote_python(client, cmd)
+
+    @staticmethod
+    def remove(cluster_name, ip):
+        client = SSHClient.load(ip)
+        cmd = """
+from ovs.plugin.provider.service import Service
+print Service.remove_service('', 'arakoon-{0}')
 """.format(cluster_name)
         System.exec_remote_python(client, cmd)
 
@@ -367,6 +396,16 @@ cluster.catchup_node()
         ai.load_config_from(cluster_name, from_ip)
         client = SSHClient.load(to_ip)
         ai.generate_config(client)
+
+    @staticmethod
+    def remove_slave(master_ip, slave_ip, cluster_name):
+        """
+        Removes everything related to a given cluster from the slave
+        """
+        ai = ArakoonInstaller()
+        ai.load_config_from(cluster_name, master_ip)
+        client = SSHClient.load(slave_ip)
+        ai.clean_config(client)
 
     @staticmethod
     def wait_for_cluster(cluster_name):

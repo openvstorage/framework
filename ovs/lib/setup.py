@@ -124,7 +124,7 @@ class SetupController(object):
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
-            enable_heartbeats = True
+            enable_heartbeats = False
 
         try:
             if force_type is not None:
@@ -563,7 +563,7 @@ EOF
 
         print 'Start model migration'
         logger.debug('Start model migration')
-        from ovs.extensions.migration.migration import Migration
+        from ovs.dal.helpers import Migration
         Migration.migrate()
 
         print '\n+++ Finalizing setup +++\n'
@@ -747,7 +747,7 @@ EOF
         enabled = System.read_remote_config(client, 'ovs.support.enabled')
         enablesupport = System.read_remote_config(client, 'ovs.support.enablesupport')
         client = SSHClient.load(cluster_ip)
-        System.set_remote_config(client, 'ovs.support.nid', str(uuid.uuid4()))
+        System.set_remote_config(client, 'ovs.support.nid', Toolbox.get_hash())
         System.set_remote_config(client, 'ovs.support.cid', cid)
         System.set_remote_config(client, 'ovs.support.enabled', enabled)
         System.set_remote_config(client, 'ovs.support.enablesupport', enablesupport)

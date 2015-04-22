@@ -75,7 +75,9 @@ define(['jquery'], function($) {
                         hash = hash.replace(':' + item, params[item].call ? params[item]() : params[item]);
                     }
                 }
-                return hash;
+                if (hash.indexOf(':') === -1) {
+                    return hash;
+                }
             }
         }
         return '/';

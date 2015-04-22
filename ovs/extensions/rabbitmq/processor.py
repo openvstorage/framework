@@ -18,6 +18,7 @@ Contains the process method for processing rabbitmq messages
 
 import time
 import inspect
+import json
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -27,16 +28,18 @@ import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
 from ovs.log.logHandler import LogHandler
 from ovs.dal.hybrids.log import Log
+from ovs.lib.vmachine import VMachineController
+from ovs.lib.vdisk import VDiskController
 
 logger = LogHandler('extensions', name='processor')
 
+CINDER_VOLUME_UPDATE_CACHE = {}
 
 def process(queue, body, mapping):
     """
     Processes the actual received body
     """
     if queue == Configuration.get('ovs.core.broker.volumerouter.queue'):
-        import json
         cache = VolatileFactory.get_client()
         all_extensions = None
 
@@ -126,6 +129,35 @@ def process(queue, body, mapping):
                 if message.event.HasExtension(extension):
                     message_type = extension.full_name
             logger.info('A message with type {0} was received. Skipped.'.format(message_type))
+    elif queue == 'notifications.info':
+        logger.info('Received notification from openstack...')
+        try:
+            body = json.loads(body)
+            print(body)
+            event_type = body['event_type']
+            logger.info('Processing notification for event {0}'.format(event_type))
+            if event_type == 'compute.instance.update':
+                old_display_name = body['payload'].get('old_display_name')
+                instance_id = body['payload']['instance_id']
+                display_name = body['payload'].get('display_name')
+                if old_display_name and old_display_name != display_name:
+                    logger.info('Caught instance rename event')
+                    VMachineController.update_vmachine_name.apply_async(kwargs={'old_name':old_display_name, 'new_name':display_name, 'instance_id': instance_id})
+            elif event_type == 'volume.update.start':
+                volume_id = body['payload']['volume_id']
+                display_name = body['payload']['display_name']
+                CINDER_VOLUME_UPDATE_CACHE[volume_id] = display_name
+            elif event_type == 'volume.update.end':
+                volume_id = body['payload']['volume_id']
+                display_name = body['payload']['display_name']
+                old_display_name = CINDER_VOLUME_UPDATE_CACHE.get(volume_id)
+                if old_display_name and old_display_name != display_name:
+                    logger.info('Caught volume rename event')
+                    VDiskController.update_vdisk_name.apply_async(kwargs={'volume_id':volume_id, 'old_name': old_display_name, 'new_name':display_name})
+                    del CINDER_VOLUME_UPDATE_CACHE[volume_id]
+        except Exception as ex:
+            logger.error('Processing notification failed {0}'.format(ex))
+        logger.info('Processed notification from openstack.')
     else:
         raise NotImplementedError('Queue {} is not yet implemented'.format(queue))
 

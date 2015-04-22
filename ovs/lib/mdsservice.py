@@ -17,6 +17,7 @@ MDSService module
 """
 import time
 import random
+
 from ovs.lib.helpers.decorators import ensure_single
 from celery.schedules import crontab
 from ovs.celery_run import celery
@@ -109,9 +110,9 @@ class MDSServiceController(object):
         metadataserver_config.save(client)
 
         # Create system services
+        template_dir = '/opt/OpenvStorage/config/templates/upstart'
         params = {'<VPOOL_NAME>': vpool.name,
                   '<SERVICE_NUMBER>': str(service_number)}
-        template_dir = '/opt/OpenvStorage/config/templates/upstart'
         client.run('cp -f {0}/ovs-metadataserver.conf {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
         service_script = """
 from ovs.plugin.provider.service import Service
@@ -119,17 +120,46 @@ Service.add_service(package=('openvstorage', 'metadataserver'), name='metadatase
 """.format(vpool.name, service_number, params)
         System.exec_remote_python(client, service_script)
 
+        client.run('rm -f {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
+
         if start is True:
             System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 Service.enable_service('{0}')
-""".format(service.name))
-            System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
 Service.start_service('{0}')
 """.format(service.name))
 
         return mds_service
+
+    @staticmethod
+    def remove_mds_service(mds_service, client, storagerouter, vpool):
+        """
+        Removes an MDS service
+        """
+        if len(mds_service.vdisks_guids) > 0:
+            raise RuntimeError('Cannot remove MDSService that is still serving disks')
+
+        System.exec_remote_python(client, """
+from ovs.plugin.provider.service import Service
+if Service.has_service('{0}'):
+    if Service.get_service_status('{0}') is True:
+        Service.stop_service('{0}')
+    Service.remove_service(domain='openvstorage', name='{0}')
+""".format(mds_service.service.name))
+
+        # Clean up configuration files
+        configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
+        client.run('rm -f {0}/storagedriver/metadataserver/{1}_{2}.json'.format(configuration_dir, vpool.name, mds_service.number))
+
+        # Remove directores
+        storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
+        client.run('rm -rf {0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, mds_service.number))
+        client.run('rm -rf {0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, mds_service.number))
+
+        # Clean up model
+        service = mds_service.service
+        mds_service.delete()
+        service.delete()
 
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
@@ -460,8 +490,13 @@ Service.start_service('{0}')
             for storagerouter in mds_dict[vpool]:
                 mds_services = mds_dict[vpool][storagerouter]
                 has_room = False
+                for mds_service in mds_services[:]:
+                    if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
+                        client = SSHClient.load(storagerouter.ip)
+                        MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool)
+                        mds_services.remove(mds_service)
                 for mds_service in mds_services:
-                    load, _ = MDSServiceController.get_mds_load(mds_service)
+                    _, load = MDSServiceController.get_mds_load(mds_service)
                     if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
                         has_room = True
                         break
