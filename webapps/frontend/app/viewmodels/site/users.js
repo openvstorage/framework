@@ -366,11 +366,28 @@ define([
                     password: generic.getTimestamp().toString()
                 }
             })
-                .done(function() {
-                    generic.alertSuccess(
-                        $.t('ovs:users.new.complete'),
-                        $.t('ovs:users.new.addsuccess')
-                    );
+                .done(function(data) {
+                    var user = new User(data.guid);
+                    self.users.push(user);
+                    dialog.show(new ChangePasswordWizard({
+                        modal: true,
+                        user: user
+                    }))
+                        .done(function(result) {
+                            if (result.success) {
+                                generic.alertSuccess(
+                                    $.t('ovs:users.new.complete'),
+                                    $.t('ovs:users.new.addsuccess')
+                                );
+                            } else {
+                                api.del('users/' + user.guid());
+                                self.users.remove(user);
+                            }
+                        })
+                        .fail(function() {
+                            api.del('users/' + user.guid());
+                            self.users.remove(user);
+                        });
                 })
                 .fail(function(error) {
                     error = $.parseJSON(error.responseText);

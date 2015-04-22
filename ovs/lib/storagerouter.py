@@ -59,6 +59,7 @@ class StorageRouterController(object):
     Contains all BLL related to StorageRouter
     """
     SUPPORT_AGENT = 'support-agent'
+    OPENSTACK_CONDER_KEY = 'ovs_openstack_cinder_'
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_physical_metadata')
@@ -573,16 +574,25 @@ class StorageRouterController(object):
                   '<OVS_GID>': check_output('id -g ovs', shell=True).strip(),
                   '<KILL_TIMEOUT>': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
-        if client.file_exists('/opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf'):
-            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver.conf /opt/OpenvStorage/config/templates/upstart/ovs-volumedriver_{0}.conf'.format(vpool_name))
-            client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-failovercache.conf /opt/OpenvStorage/config/templates/upstart/ovs-failovercache_{0}.conf'.format(vpool_name))
-            if vpool.backend_type.code == 'alba':
-                client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-albaproxy.conf /opt/OpenvStorage/config/templates/upstart/ovs-albaproxy_{0}.conf'.format(vpool_name))
+        template_dir = '/opt/OpenvStorage/config/templates/upstart'
+        template_configs = {'ovs-volumedriver.conf': 'ovs-volumedriver_{0}.conf'.format(vpool.name),
+                            'ovs-failovercache.conf': 'ovs-failovercache_{0}.conf'.format(vpool.name)}
+        if vpool.backend_type.code == 'alba':
+            template_configs['ovs-albaproxy.conf'] = 'ovs-albaproxy_{0}.conf'.format(vpool.name)
+        for template_file, vpool_file in template_configs.iteritems():
+            if client.file_exists('{0}/{1}'.format(template_dir, template_file)):
+                client.run('cp -f {0}/{1} {0}/{2}'.format(template_dir, template_file, vpool_file))
 
         PluginService.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
         PluginService.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
         if vpool.backend_type.code == 'alba':
             PluginService.add_service(package=('openvstorage', 'albaproxy'), name='albaproxy_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
+
+        # Remove copied template config files (obsolete after add service)
+        client.run('rm -f {0}/ovs-failovercache_{1}.conf'.format(template_dir, vpool.name))
+        client.run('rm -f {0}/ovs-volumedriver_{1}.conf'.format(template_dir, vpool.name))
+        if vpool.backend_type.code == 'alba':
+            client.run('rm -f {0}/ovs-albaproxy_{1}.conf'.format(template_dir, vpool.name))
 
         if storagerouter.pmachine.hvtype == 'VMWARE':
             client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
@@ -609,7 +619,7 @@ class StorageRouterController(object):
 
         # Configure Cinder
         ovsdb = PersistentFactory.get_client()
-        vpool_config_key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        vpool_config_key = '{0}{1}'.format(StorageRouterController.OPENSTACK_CINDER_KEY, storagedriver.vpool_guid)
         if ovsdb.exists(vpool_config_key):
             # Second node gets values saved by first node
             cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = ovsdb.get(vpool_config_key)
@@ -648,10 +658,10 @@ class StorageRouterController(object):
         pmachine = storagerouter.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         pmachine_guids = [vm.pmachine_guid for vm in vmachines]
-        vpools_guids = [vm.vpool_guid for vm in vmachines if vm.vpool_guid is not None]
+        vpool_guids = [vm.vpool_guid for vm in vmachines if vm.vpool_guid is not None]
 
         vpool = storagedriver.vpool
-        if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
+        if pmachine.guid in pmachine_guids and vpool.guid in vpool_guids:
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             raise RuntimeError('There are still vDisks served from the given Storage Driver')
@@ -686,8 +696,7 @@ class StorageRouterController(object):
 
         # Unconfigure Cinder
         ovsdb = PersistentFactory.get_client()
-        key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
-        client = ip_client_map.get(ip, SSHClient(ip))
+        key = '{0}{1}'.format(StorageRouterController.OPENSTACK_CINDER_KEY, storagedriver.vpool_guid)
         if ovsdb.exists(key):
             cinder_password, cinder_user, tenant_name, controller_ip, _ = ovsdb.get(key)
             osc = OpenStackCinder(cinder_password=cinder_password,
@@ -696,20 +705,30 @@ class StorageRouterController(object):
                                   controller_ip=controller_ip,
                                   sshclient_ip=ip)
             osc.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
-            if not storagedrivers_left:
+            if storagedrivers_left is False:
                 ovsdb.delete(key)
 
         # KVM pool
         if pmachine.hvtype == 'KVM':
-            if vpool.name in client.run('virsh pool-list --all'):
-                client.run('virsh pool-destroy {0}'.format(vpool.name))
-                try:
-                    client.run('virsh pool-undefine {0}'.format(vpool.name))
-                except:
-                    pass  # Ignore undefine errors, since that can happen on re-entrance
+            # 'Name                 State      Autostart '
+            # '-------------------------------------------'
+            # ' vpool1               active     yes'
+            # ' vpool2               active     no'
+            vpool_overview = client.run('virsh pool-list --all').splitlines()
+            vpool_overview.pop(1)  # Pop   ---------------
+            vpool_overview.pop(0)  # Pop   Name   State   Autostart
+            for vpool_info in vpool_overview:
+                vpool_name = vpool_info.split()[0].strip()
+                if vpool.name == vpool_name:
+                    client.run('virsh pool-destroy {0}'.format(vpool.name))
+                    try:
+                        client.run('virsh pool-undefine {0}'.format(vpool.name))
+                    except:
+                        pass  # Ignore undefine errors, since that can happen on re-entrance
+                    break
 
         # Remove services
-        services_to_remove = [voldrv_service, foc_service] + [mdsservice.service.name for mdsservice in removal_mdsservices]
+        services_to_remove = [voldrv_service, foc_service]
         if storagedriver.alba_proxy is not None:
             services_to_remove.append(albaproxy_service)
         for service in services_to_remove:
@@ -727,8 +746,9 @@ class StorageRouterController(object):
                                                           voldrv_arakoon_client_config[arakoon_node][0][0],
                                                           voldrv_arakoon_client_config[arakoon_node][1]))
         vrouter_clusterregistry = ClusterRegistry(str(vpool.guid), voldrv_arakoon_cluster_id, arakoon_node_configs)
+
         # Reconfigure volumedriver
-        if storagedrivers_left:
+        if storagedrivers_left is True:
             node_configs = []
             for current_storagedriver in vpool.storagedrivers:
                 if current_storagedriver.guid != storagedriver_guid:
@@ -746,7 +766,11 @@ class StorageRouterController(object):
             except RuntimeError as ex:
                 print('Could not destroy filesystem or erase node configs due to error: {}'.format(ex))
 
-        # Cleanup directories
+        for mds_service in removal_mdsservices:
+            # All MDSServiceVDisk object should have been deleted above
+            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool)
+
+        # Cleanup directories/files
         for readcache in storagedriver.mountpoint_readcaches:
             client.run('rm {}'.format(readcache))
 
@@ -760,10 +784,10 @@ class StorageRouterController(object):
         client.run('rm -rf {}/metadata_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf {}/tlogs_{}'.format(storagedriver.mountpoint_md, vpool.name))
         client.run('rm -rf /var/rsp/{}'.format(vpool.name))
-
-        # Remove files
-        for config_file in ['{0}.json'] + ['{0}.json'.format(mdsservice.service.name) for mdsservice in removal_mdsservices]:
-            client.run('rm -f {0}/storagedriver/storagedriver/{1}'.format(configuration_dir, config_file.format(vpool.name)))
+        client.run('rm -f {0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+        if vpool.backend_type.code == 'alba':
+            client.run('rm -f {0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
+            client.run('rm -f {0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
 
         # Remove top directories
         dirs2remove = list()
@@ -775,7 +799,7 @@ class StorageRouterController(object):
         dirs2remove.append(storagedriver.mountpoint_md)
         dirs2remove.append(storagedriver.mountpoint)
 
-        for directory in dirs2remove:
+        for directory in set(dirs2remove):
             if directory:
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
@@ -783,11 +807,6 @@ class StorageRouterController(object):
         if storagedriver.alba_proxy is not None:
             storagedriver.alba_proxy.delete()
         storagedriver.delete(abandon=True)  # Detach from the log entries
-        for mds_service in removal_mdsservices:
-            # All MDSServiceVDisk object should have been deleted above
-            service = mds_service.service
-            mds_service.delete()
-            service.delete()
 
         if storagedrivers_left:
             # Restart leftover services

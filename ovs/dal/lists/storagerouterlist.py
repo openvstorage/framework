@@ -89,3 +89,19 @@ class StorageRouterList(object):
         if len(srs) == 1:
             return srs[0]
         raise RuntimeError('There should be only one StorageRouter with ip: {0}'.format(ip))
+
+    @staticmethod
+    def get_by_name(name):
+        """
+        Returns a StorageRouter by its name
+        """
+        storagerouters = DataList({'object': StorageRouter,
+                                   'data': DataList.select.GUIDS,
+                                   'query': {'type': DataList.where_operator.AND,
+                                             'items': [('name', DataList.operator.EQUALS, name)]}}).data
+        srs = DataObjectList(storagerouters, StorageRouter)
+        if len(srs) == 0:
+            return None
+        if len(srs) == 1:
+            return srs[0]
+        raise RuntimeError('There should be only one StorageRouter with name: {0}'.format(name))

@@ -131,7 +131,7 @@ class SetupController(object):
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
-            enable_heartbeats = True
+            enable_heartbeats = False
 
         try:
             if force_type is not None:
@@ -559,7 +559,7 @@ EOF
 
         print 'Start model migration'
         logger.debug('Start model migration')
-        from ovs.extensions.migration.migration import Migration
+        from ovs.dal.helpers import Migration
         Migration.migrate()
 
         print '\n+++ Finalizing setup +++\n'
