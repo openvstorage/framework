@@ -26,6 +26,8 @@ from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
@@ -449,7 +451,14 @@ class VMachineController(object):
         """
         try:
             vmachine = VMachine(vmachineguid)
-            if storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
+            if vmachine.pmachine.mgmtcenter and storagedriver_id is not None and vmachine.devicename is not None:
+                mgmt_center = Factory.get_mgmtcenter(vmachine.pmachine)
+                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+                logger.info('Syncing vMachine (name {}) with Management center {}'.format(vmachine.name, vmachine.pmachine.mgmtcenter.name))
+                vm_object = mgmt_center.get_vm_agnostic_object(devicename=vmachine.devicename,
+                                                               ip=storagedriver.storage_ip,
+                                                               mountpoint=storagedriver.mountpoint)
+            elif storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
                 # Only the vmachine was received, so base the sync on hypervisorid and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
                 logger.info('Syncing vMachine (name {})'.format(vmachine.name))
@@ -623,15 +632,34 @@ class VMachineController(object):
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_name')
-    def update_vmachine_name(old_name, new_name):
+    def update_vmachine_name(instance_id, old_name, new_name):
         """
-        Update a vMachine name: find vmachine by old_name, set new name
+        Update a vMachine name: find vmachine by management center instance id, set new name
         """
-        vmachines = VMachineList.get_vmachine_by_name(old_name)
-        if len(vmachines) != 1:
-            logger.error('Found {0} vmachines by name {1}'.format(len(vmachines), old_name))
+        vmachine = None
+        for mgmt_center in MgmtCenterList.get_mgmtcenters():
+            mgmt = Factory.get_mgmtcenter(mgmt_center = mgmt_center)
+            try:
+                machine_info = mgmt.get_vmachine_device_info(instance_id)
+                file_name = machine_info['file_name']
+                host_name = machine_info['host_name']
+                vpool_name = machine_info['vpool_name']
+                storage_router = StorageRouterList.get_by_name(host_name)
+                machine_id = storage_router.machine_id
+                device_name = '{0}/{1}'.format(machine_id, file_name)
+                vp = VPoolList.get_vpool_by_name(vpool_name)
+                vmachine = VMachineList.get_by_devicename_and_vpool(device_name, vp)
+                if vmachine:
+                    break
+                vmachine = VMachineList.get_by_devicename_and_vpool(device_name, None)
+                if vmachine:
+                    break
+            except Exception as ex:
+                logger.info('Trying to get mgmt center failed for vmachine {0}. {1}'.format(old_name, ex))
+        if not vmachine:
+            logger.error('No vmachine found for name {0}'.format(old_name))
             return
-        vmachine = vmachines[0]
+
         vpool = vmachine.vpool
         mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
         try:

@@ -31,6 +31,7 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.pmachinelist import PMachineList
+from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
@@ -349,16 +350,6 @@ class VDiskController(object):
             new_vdisk.delete()
             raise
 
-        # Allow "regular" users to use this volume
-        # Do not use run for other user than ovs as it blocks asking for root password
-        # Do not use run_local for other user as it doesn't have permission
-        # So this method only works if this is called by root or ovs
-        #storagerouter = StorageRouter(new_vdisk.storagerouter_guid)
-        #mountpoint = storagedriver.mountpoint
-        #location = "{0}{1}".format(mountpoint, disk_path)
-        #client = SSHClient.load(storagerouter.pmachine.ip)
-        #print(client.run('chmod 664 "{0}"'.format(location)))
-        #print(client.run('chown ovs:ovs "{0}"'.format(location)))
         return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
                 'backingdevice': disk_path}
 
@@ -385,7 +376,6 @@ class VDiskController(object):
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
-        #VDiskController.own_volume(location)
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_volume')
@@ -428,26 +418,36 @@ class VDiskController(object):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         client = SSHClient.load('127.0.0.1')
         print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
-        #VDiskController.own_volume(location)
 
     @staticmethod
-    def own_volume(location):
+    @celery.task(name='ovs.vdisk.update_vdisk_name')
+    def update_vdisk_name(volume_id, old_name, new_name):
         """
-        Change permissions and ownership of file
+        Update a vDisk name using Management Center: set new name
         """
-        if not os.path.exists(location):
-            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
+        vdisk = None
+        for mgmt_center in MgmtCenterList.get_mgmtcenters():
+            mgmt = Factory.get_mgmtcenter(mgmt_center = mgmt_center)
+            try:
+                disk_info = mgmt.get_vdisk_device_info(volume_id)
+                device_path = disk_info['device_path']
+                vpool_name = disk_info['vpool_name']
+                vp = VPoolList.get_vpool_by_name(vpool_name)
+                file_name = os.path.basename(device_path)
+                vdisk = VDiskList.get_by_devicename_and_vpool(file_name, vp)
+                if vdisk:
+                    break
+            except Exception as ex:
+                logger.info('Trying to get mgmt center failed for disk {0} with volume_id {1}. {2}'.format(old_name, volume_idex))
+        if not vdisk:
+            logger.error('No vdisk found for name {0}'.format(old_name))
+            return
 
-        return
-        """
-        client = SSHClient.load('127.0.0.1')
-        osc = OpenStackCinder()
-        print(client.run_local('chmod 664 "{0}"'.format(location)))
+        vpool = vdisk.vpool
+        mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
         try:
-            if osc.is_devstack:
-                print(client.run_local('chgrp stack "{0}"'.format(location)))
-            elif osc.is_openstack:
-                print(client.run_local('chgrp cinder "{0}"'.format(location)))
-        except SystemExit as ex:
-            raise RuntimeError(str(ex))
-        """
+            mutex.acquire(wait=5)
+            vdisk.name = new_name
+            vdisk.save()
+        finally:
+            mutex.release()
