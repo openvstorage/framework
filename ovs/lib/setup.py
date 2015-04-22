@@ -2107,12 +2107,6 @@ print blk_devices
         return nodes
 
     @staticmethod
-    def _validate_ip(ip):
-        regex = '^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$'
-        match = re.search(regex, ip)
-        return match is not None
-
-    @staticmethod
     def _discover_hypervisor(client):
         hypervisor = None
         module = client.run('lsmod | grep kvm || true').strip()
