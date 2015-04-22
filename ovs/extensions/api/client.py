@@ -85,6 +85,8 @@ class OVSClient(object):
             raise RuntimeError('The requested API could not be located')
         if response.status_code == 405:
             raise RuntimeError('Requested method not allowed')
+        if response.status_code == 406:
+            raise RuntimeError('The request was unacceptable: {0}'.format(response.text))
         if response.status_code == 429:
             raise RuntimeError('The requested API has rate limiting: {0}'.format(response.text))
         if response.status_code == 500:

@@ -80,9 +80,9 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             """
             Tries to parse a value to a pythonic value
             """
-            if value == 'true':
+            if value == 'true' or value == 'True':
                 return True
-            if value == 'false':
+            if value == 'false' or value == 'False':
                 return False
             return value
 

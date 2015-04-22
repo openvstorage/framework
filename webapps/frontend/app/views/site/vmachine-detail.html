@@ -159,9 +159,10 @@ limitations under the License.
                 <div data-bind="pager: { loadData: $parent.loadVDisks, headers: $parent.vDiskHeaders, refreshInterval: 5000, controls: true }">
                     <table data-dummy="dummy">
                         <tr data-part="vitem" data-bind="attr: { id: 'vdisk_' + guid() }">
-                            <td>
-                                <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
-                                   class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                            <td style="position: relative;">
+                                <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                                   <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                                </span>
                                 <a data-bind="html: loaded() ? (name() ? name() : '<i>name not set</i>') : '',
                                               attr: { href: $root.shared.routing.loadHash('vdisk-detail', { guid: guid }) }"></a>
                             </td>
