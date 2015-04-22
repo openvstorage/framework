@@ -16,6 +16,7 @@
 Native Injector module
 """
 import os
+from ovs.extensions.generic.sshclient import SSHClient
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 
@@ -76,43 +77,58 @@ class Injector(object):
     def inject_service(provider):
         """ Injects the Service module """
 
-        def _service_exists(name, path=None):
+        def _service_exists(name, client, path):
             if path is None:
                 path = '/etc/init/'
-            return os.path.exists('{0}{1}.conf'.format(path, name))
+            file_to_check = '{0}{1}.conf'.format(path, name)
+            if client is None:
+                return os.path.exists(file_to_check)
+            else:
+                client.file_exists(file_to_check)
 
-        def _get_name(name, path=None):
-            if _service_exists(name, path):
+        def _get_name(name, client, path=None):
+            if _service_exists(name, client, path):
                 return name
             name = 'ovs-{0}'.format(name)
-            if _service_exists(name, path):
+            if _service_exists(name, client, path):
                 return name
             raise ValueError('Service {0} could not be found.'.format(name))
 
-        def add_service(package, name, command, stop_command, params=None):
+        def add_service(package, name, command, stop_command, params=None, ip=None):
             _ = package, command, stop_command
             if params is None:
                 params = {}
 
-            name = _get_name(name, '/opt/OpenvStorage/config/templates/upstart/')
+            client = None if ip is None else SSHClient(ip)
+            name = _get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
             template_dir = '/opt/OpenvStorage/config/templates/upstart/{0}'
             upstart_dir = '/etc/init/{0}'
             upstart_conf = '{0}.conf'.format(name)
-            with open(template_dir.format(upstart_conf), 'r') as template_file:
-                template_conf = template_file.read()
+            if client is None:
+                with open(template_dir.format(upstart_conf), 'r') as template_file:
+                    template_conf = template_file.read()
+            else:
+                template_conf = client.file_read(upstart_conf)
 
             for key, value in params.iteritems():
                 print 'replacing {0} by {1}'.format(key, value)
                 template_conf = template_conf.replace(key, value)
 
             print '\n\n\n service {0} configfile \n {1}'.format(name, template_conf)
-            with open(upstart_dir.format(upstart_conf), 'wb') as upstart_file:
-                upstart_file.write(template_conf)
+            if client is None:
+                with open(upstart_dir.format(upstart_conf), 'wb') as upstart_file:
+                    upstart_file.write(template_conf)
+            else:
+                client.file_write(upstart_conf, template_conf)
 
-        def get_service_status(name):
+        def get_service_status(name, ip=None):
             try:
-                name = _get_name(name)
-                output = check_output('status {0}'.format(name), shell=True)
+                client = None if ip is None else SSHClient(ip)
+                name = _get_name(name, client)
+                if client is None:
+                    output = check_output('status {0}'.format(name), shell=True)
+                else:
+                    output = client.run('status {0}'.format(name))
                 if 'start' in output:
                     return True
                 if 'stop' in output:
@@ -121,48 +137,74 @@ class Injector(object):
                 pass
             return None
 
-        def remove_service(domain, name):
+        def remove_service(domain, name, ip=None):
             _ = domain
             # remove upstart.conf file
-            name = _get_name(name)
-            check_output('rm -rf /etc/init/{0}.conf'.format(name), shell=True)
-            check_output('rm -rf /etc/init/{0}.override'.format(name), shell=True)
+            client = None if ip is None else SSHClient(ip)
+            name = _get_name(name, client)
+            if client is None:
+                check_output('rm -rf /etc/init/{0}.conf'.format(name), shell=True)
+                check_output('rm -rf /etc/init/{0}.override'.format(name), shell=True)
+            else:
+                client.run('rm -rf /etc/init/{0}.conf'.format(name))
+                client.run('rm -rf /etc/init/{0}.override'.format(name))
 
-        def disable_service(name):
-            name = _get_name(name)
-            check_output('echo "manual" > /etc/init/{0}.override'.format(name), shell=True)
+        def disable_service(name, ip=None):
+            client = None if ip is None else SSHClient(ip)
+            name = _get_name(name, client)
+            if client is None:
+                check_output('echo "manual" > /etc/init/{0}.override'.format(name), shell=True)
+            else:
+                client.run('echo "manual" > /etc/init/{0}.override'.format(name))
 
-        def enable_service(name):
-            name = _get_name(name)
-            check_output('rm -f /etc/init/{0}.override'.format(name), shell=True)
+        def enable_service(name, ip=None):
+            client = None if ip is None else SSHClient(ip)
+            name = _get_name(name, client)
+            if client is None:
+                check_output('rm -f /etc/init/{0}.override'.format(name), shell=True)
+            else:
+                client.run('rm -f /etc/init/{0}.override'.format(name))
 
-        def start_service(name):
+        def start_service(name, ip=None):
             try:
-                name = _get_name(name)
-                output = check_output('start {0}'.format(name), shell=True)
+                client = None if ip is None else SSHClient(ip)
+                name = _get_name(name, client)
+                if client is None:
+                    output = check_output('start {0}'.format(name), shell=True)
+                else:
+                    output = client.run('start {0}'.format(name))
             except CalledProcessError as cpe:
                 output = cpe.output
             return output
 
-        def stop_service(name):
+        def stop_service(name, ip=None):
             try:
-                name = _get_name(name)
-                output = check_output('stop {0}'.format(name), shell=True)
+                client = None if ip is None else SSHClient(ip)
+                name = _get_name(name, client)
+                if client is None:
+                    output = check_output('stop {0}'.format(name), shell=True)
+                else:
+                    output = client.run('stop {0}'.format(name))
             except CalledProcessError as cpe:
                 output = cpe.output
             return output
 
-        def restart_service(name):
+        def restart_service(name, ip=None):
             try:
-                name = _get_name(name)
-                output = check_output('restart {0}'.format(name), shell=True)
+                client = None if ip is None else SSHClient(ip)
+                name = _get_name(name, client)
+                if client is None:
+                    output = check_output('restart {0}'.format(name), shell=True)
+                else:
+                    output = client.run('restart {0}'.format(name))
             except CalledProcessError as cpe:
                 output = cpe.output
             return output
 
-        def has_service(name):
+        def has_service(name, ip=None):
             try:
-                _get_name(name)
+                client = None if ip is None else SSHClient(ip)
+                _get_name(name, client)
                 return True
             except ValueError:
                 return False

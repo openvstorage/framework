@@ -264,7 +264,7 @@ class ArakoonClusterEx(ArakoonCluster):
         arakoon -catchup-only --node <NODEID> -config <CONFIGFILE>
         """
         name = System.get_my_machine_id()
-        if not name in self.listNodes():
+        if name not in self.listNodes():
             raise ValueError('Node {0} is not part of cluster {1}'.format(name, self._clusterName))
         status = self._getStatusOne(name)
         if status is True:
@@ -275,7 +275,7 @@ class ArakoonClusterEx(ArakoonCluster):
         cmd = self._cmd(name)
         cmd.remove('-start')
         cmd.append('-catchup-only')
-        rc = subprocess.call(cmd)
+        subprocess.call(cmd)
         status = self._getStatusOne(name)
         if status is True:
             self._stopOne(name)
@@ -299,9 +299,9 @@ if __name__ == '__main__':
 
     arakoonManagement = ArakoonManagementEx()
     arakoon_cluster = arakoonManagement.getCluster(options.cluster)
-    if options.start == True:
+    if options.start is True:
         arakoon_cluster.start(False)
-    elif options.start == False:
+    elif options.start is False:
         arakoon_cluster.stop()
     elif options.catchuponly:
         arakoon_cluster.catchup_node()

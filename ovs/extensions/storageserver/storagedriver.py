@@ -245,7 +245,7 @@ class StorageDriverConfiguration(object):
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
         else:
-            client.run('mkdir -p {0}'.format(self.base_path))
+            client.dir_create(self.base_path)
             client.file_write(self.path, contents)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:

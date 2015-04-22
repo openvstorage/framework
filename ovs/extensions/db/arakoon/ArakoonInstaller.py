@@ -14,8 +14,11 @@
 
 import logging
 from ConfigParser import RawConfigParser
+from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
+from ovs.plugin.provider.service import Service
 from StringIO import StringIO
 
 import os
@@ -118,38 +121,28 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
     def __init__(self):
         self.config = None
 
-    def get_config_file(self, suffix=None):
-        config_dir = '/'.join([ArakoonInstaller.ARAKOON_CONFIG_DIR, self.config.cluster_name])
-        filename = '/'.join([config_dir, self.config.cluster_name + suffix])
-        if not os.path.exists(config_dir):
-            os.makedirs(config_dir)
-        return filename
-
-    def create_config(self, cluster_name, ip, client_port, messaging_port, plugins=None):
+    def create_config(self, cluster_name, client, client_port, messaging_port, plugins=None):
         """
         Creates initial config object causing this host to be master
         :param cluster_name: unique name for this arakoon cluster used in paths
-        :param ip: ip on which service should listen
+        :param client: SSH client object
         :param client_port:
         :param messaging_port:
         :param plugins: optional arakoon plugins
         :return:
         """
-
-        client = SSHClient(ip)
         node_name = System.get_my_machine_id(client)
-        base_dir = System.read_remote_config(client, 'ovs.core.db.arakoon.location')
-        self.clear_config()
+        base_dir = client.config_read('ovs.core.db.arakoon.location')
         self.config = ClusterConfig(base_dir, cluster_name, 'info', plugins)
-        self.config.nodes.append(ClusterNode(node_name, ip, client_port, messaging_port))
-        self.config.target_ip = ip
+        self.config.nodes.append(ClusterNode(node_name, client.ip, client_port, messaging_port))
+        self.config.target_ip = client.ip
 
     @staticmethod
     def get_config_from(cluster_name, master_ip, master_password=None):
         """
         Gets a config object representation for the cluster on master
         """
-        client = SSHClient(master_ip, master_password)
+        client = SSHClient(master_ip, password=master_password)
         cfg_file = client.file_read(ArakoonInstaller.ARAKOON_CONFIG_FILE.format(cluster_name))
         cfg = RawConfigParser()
         cfg.readfp(StringIO(cfg_file))
@@ -159,7 +152,6 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Reads actual config from master node
         Assumes this node is up-to-date and is considered valid
-        :param base_dir: base_dir should be identical across multiple nodes
         """
         cfg = ArakoonInstaller.get_config_from(cluster_name, master_ip)
 
@@ -175,7 +167,8 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         for node_id in nodes:
             node_config = dict(cfg.items(node_id))
             if first is True:
-                self.create_config(cluster_name, node_config['ip'],
+                client = SSHClient(node_config['ip'])
+                self.create_config(cluster_name, client,
                                    node_config['client_port'], node_config['messaging_port'],
                                    plugins=global_section['plugins'])
                 first = False
@@ -196,12 +189,6 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             self.generate_config(client)
             self.generate_upstart_config(client)
 
-    def clear_config(self):
-        self.config = None
-
-    def get_config(self):
-        return self.config
-
     def add_node_to_config(self, node_id, ip, client_port, messaging_port):
         node = ClusterNode(node_id, ip, client_port, messaging_port)
         self.config.nodes.append(node)
@@ -214,7 +201,11 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
 
     def generate_config(self, client=None):
         (temp_handle, temp_filename) = tempfile.mkstemp()
-        config_file = self.get_config_file('.cfg')
+        config_dir = '/'.join([ArakoonInstaller.ARAKOON_CONFIG_DIR, self.config.cluster_name])
+        config_file = '/'.join([config_dir, self.config.cluster_name + '.cfg'])
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+
         contents = RawConfigParser()
         contents.add_section('global')
         contents.set('global', 'cluster_id', self.config.cluster_name)
@@ -243,7 +234,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         else:
             with open(temp_filename, 'wb') as f:
                 contents.write(f)
-            client.dir_ensure(os.path.dirname(config_file))
+            client.dir_create(os.path.dirname(config_file))
             client.file_upload(config_file, temp_filename)
             os.remove(temp_filename)
 
@@ -259,29 +250,19 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         else:
             with open(temp_filename, 'wb') as f:
                 f.write(contents)
-            client.dir_ensure(os.path.dirname(config_file))
+            client.dir_create(os.path.dirname(config_file))
             client.file_upload(config_file, temp_filename)
             os.remove(temp_filename)
 
-    def create_dir_structure(self, client=None, cluster_name=None):
-        if cluster_name is None:
-            cluster_name = self.config.cluster_name
-        cmd = """
-mkdir -p {0}/arakoon/{1}
-mkdir -p {0}/tlogs/{1}
-mkdir -p /var/log/arakoon/{1}
-""".format(self.config.base_dir, cluster_name)
-        System.run(cmd, client)
+    def create_dir_structure(self, client):
+        client.dir_create('{0}/arakoon/{1}'.format(self.config.base_dir, self.config.cluster_name))
+        client.dir_create('{0}/tlogs/{1}'.format(self.config.base_dir, self.config.cluster_name))
+        client.dir_create('/var/log/arakoon/{0}'.format(self.config.cluster_name))
 
-    def delete_dir_structure(self, client=None, cluster_name=None):
-        if cluster_name is None:
-            cluster_name = self.config.cluster_name
-        cmd = """
-rm -rf {0}/arakoon/{1}
-rm -rf {0}/tlogs/{1}
-rm -rf /var/log/arakoon/{1}
-""".format(self.config.base_dir, cluster_name)
-        System.run(cmd, client)
+    def delete_dir_structure(self, client):
+        client.run('rm -rf {0}/arakoon/{1}'.format(self.config.base_dir, self.config.cluster_name))
+        client.run('rm -rf {0}/tlogs/{1}'.format(self.config.base_dir, self.config.cluster_name))
+        client.run('rm -rf /var/log/arakoon/{0}'.format(self.config.cluster_name))
 
     def generate_configs(self, client=None):
         self.generate_config(client)
@@ -290,11 +271,11 @@ rm -rf /var/log/arakoon/{1}
     @staticmethod
     def create_cluster(cluster_name, ip, exclude_ports, plugins=None):
         ai = ArakoonInstaller()
-        ai.clear_config()
+        ai.config = None
         client = SSHClient(ip)
-        port_range = System.read_remote_config(client, 'ovs.ports.arakoon')
+        port_range = client.config_read('ovs.ports.arakoon')
         free_ports = System.get_free_ports(port_range, exclude_ports, 2, client)
-        ai.create_config(cluster_name, ip, free_ports[0], free_ports[1], plugins)
+        ai.create_config(cluster_name, client, free_ports[0], free_ports[1], plugins)
         ai.generate_configs(client)
         ai.create_dir_structure(client)
         return {'client_port': free_ports[0],
@@ -302,40 +283,21 @@ rm -rf /var/log/arakoon/{1}
 
     @staticmethod
     def start(cluster_name, ip):
-        client = SSHClient(ip)
-        cmd = """
-from ovs.plugin.provider.service import Service
-print Service.start_service('arakoon-{0}')
-""".format(cluster_name)
-        System.exec_remote_python(client, cmd)
+        Service.start_service('arakoon-{0}'.format(cluster_name), ip=ip)
 
     @staticmethod
     def stop(cluster_name, ip):
-        client = SSHClient(ip)
-        cmd = """
-from ovs.plugin.provider.service import Service
-print Service.stop_service('arakoon-{0}')
-""".format(cluster_name)
-        System.exec_remote_python(client, cmd)
+        Service.stop_service('arakoon-{0}'.format(cluster_name), ip=ip)
 
     @staticmethod
     def status(cluster_name, ip):
-        client = SSHClient(ip)
-        cmd = """
-from ovs.plugin.provider.service import Service
-print Service.get_service_status('arakoon-{0}')
-""".format(cluster_name)
-        System.exec_remote_python(client, cmd)
+        Service.get_service_status('arakoon-{0}'.format(cluster_name), ip=ip)
 
     @staticmethod
     def catchup_cluster_node(cluster_name, ip):
-        client = SSHClient.load(ip)
-        cmd = """
-from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-cluster = ArakoonManagementEx().getCluster('{0}')
-cluster.catchup_node()
-""".format(cluster_name)
-        System.exec_remote_python(client, cmd)
+        with Remote([ip], [ArakoonManagementEx]) as remote:
+            cluster = remote.ArakoonManagementEx().getCluster(cluster_name)
+            cluster.catchup_node()
 
     @staticmethod
     def extend_cluster(src_ip, tgt_ip, cluster_name, exclude_ports):
@@ -343,7 +305,7 @@ cluster.catchup_node()
         ai.load_config_from(cluster_name, src_ip)
         client = SSHClient(tgt_ip)
         tgt_id = System.get_my_machine_id(client)
-        port_range = System.read_remote_config(client, 'ovs.ports.arakoon')
+        port_range = client.config_read('ovs.ports.arakoon')
         free_ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         ai.create_dir_structure(client)
         ai.add_node_to_config(tgt_id, tgt_ip, free_ports[0], free_ports[1])

@@ -33,6 +33,7 @@ class System(object):
     """
 
     OVS_CONFIG = '/opt/OpenvStorage/config/ovs.cfg'
+    OVS_ID_FILE = '/etc/openvstorage_id'
 
     my_storagerouter_guid = ''
     my_storagedriver_id = ''
@@ -44,26 +45,14 @@ class System(object):
         _ = self
 
     @staticmethod
-    def get_my_ips(client=None):
-        """
-        Returns configured ip addresses for this host
-        """
-
-        cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
-        output = System.run(cmd, client)
-        my_ips = output.split('\n')
-        my_ips = [found_ip.strip() for found_ip in my_ips if found_ip.strip() != '127.0.0.1']
-
-        return my_ips
-
-    @staticmethod
     def get_my_machine_id(client=None):
         """
         Returns unique machine id, generated at install time.
         """
         if client is not None:
-            return client.run('cat /etc/openvstorage_id').strip()
-        return check_output('cat /etc/openvstorage_id', shell=True).strip()
+            return client.run('cat {0}'.format(System.OVS_ID_FILE)).strip()
+        with open(System.OVS_ID_FILE, 'r') as the_file:
+            return the_file.read()
 
     @staticmethod
     def get_my_storagerouter():
@@ -81,33 +70,13 @@ class System(object):
         return StorageRouter(System.my_storagerouter_guid)
 
     @staticmethod
-    def get_my_storagedriver_id(vpool_name):
-        """
-        Returns unique machine storagedriver_id based on vpool_name and machineid
-        """
-        return vpool_name + System.get_my_machine_id()
-
-    @staticmethod
-    def get_storagedriver(vpool_name):
-        """
-        Returns storagedriver object based on vpool_name
-        """
-        my_storagedriver_id = System.get_my_storagedriver_id(vpool_name)
-        my_storagerouter = System.get_my_storagerouter()
-        for storagedriver in my_storagerouter.storagedrivers:
-            if storagedriver.name == my_storagedriver_id:
-                return storagedriver
-        raise ValueError('No storagedriver found for vpool_name: {0}'.format(vpool_name))
-
-    @staticmethod
-    def update_hosts_file(hostname, ip):
+    def update_hosts_file(hostname, ip, client):
         """
         Update/add entry for hostname ip in /etc/hosts
         """
         import re
 
-        with open('/etc/hosts', 'r') as hosts_file:
-            contents = hosts_file.read()
+        contents = client.file_read('/etc/hosts')
 
         if isinstance(hostname, list):
             hostnames = ' '.join(hostname)
@@ -120,46 +89,16 @@ class System(object):
         else:
             contents += '{0} {1}\n'.format(ip, hostnames)
 
-        with open('/etc/hosts', 'wb') as hosts_file:
-            hosts_file.write(contents)
+        client.file_write('/etc/hosts', contents, mode='wb')
 
     @staticmethod
-    def exec_remote_python(client, script):
-        """
-        Executes a python script on a client
-        """
-        return client.run('python -c """{0}"""'.format(script))
-
-    @staticmethod
-    def read_remote_config(client, key):
-        """
-        Reads remote configuration key
-        """
-        read = """
-from ovs.plugin.provider.configuration import Configuration
-print Configuration.get('{0}')
-""".format(key)
-        return System.exec_remote_python(client, read)
-
-    @staticmethod
-    def set_remote_config(client, key, value):
-        """
-        Sets remote configuration key
-        """
-        write = """
-from ovs.plugin.provider.configuration import Configuration
-Configuration.set('{0}', '{1}')
-""".format(key, value)
-        System.exec_remote_python(client, write)
-
-    @staticmethod
-    def ports_in_use(client=None):
+    def ports_in_use(client):
         """
         Returns the ports in use
         """
         cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
-        output = System.run(cmd, client)
-        for found_port in output.split('\n'):
+        output = client.run(cmd)
+        for found_port in output.splitlines():
             yield int(found_port.strip())
 
     @staticmethod
@@ -194,7 +133,7 @@ Configuration.set('{0}', '{1}')
             exclude_list.append(port)
 
         cmd = """cat /proc/sys/net/ipv4/ip_local_port_range"""
-        output = System.run(cmd, client)
+        output = client.run(cmd)
         start_end = list(output.split())
         ephemeral_port_range = xrange(int(min(start_end)), int(max(start_end)))
 
@@ -204,29 +143,6 @@ Configuration.set('{0}', '{1}')
             if len(free_ports) == nr:
                 return free_ports
         raise ValueError('Unable to find requested nr of free ports')
-
-    @staticmethod
-    def run(cmd, client=None):
-        if client is None:
-            output = check_output(cmd, shell=True).strip()
-        else:
-            output = client.run(cmd).strip()
-        return output
-
-    @staticmethod
-    def get_arakoon_cluster_names(client=None, arakoon_config_dir=None):
-        """
-        :param client: optional remote client
-        :param arakoon_config_dir: default /opt/OpenvStorage/config/arakoon for ovs
-        :return: list of configured arakoon cluster names on this client
-        """
-
-        if arakoon_config_dir is None:
-            arakoon_config_dir = '/opt/OpenvStorage/config/arakoon'
-
-        cmd = """ls {0} """.format(arakoon_config_dir)
-        output = System.run(cmd, client)
-        return list(output.split())
 
     @staticmethod
     def read_config(filename, client=None):
@@ -254,7 +170,3 @@ Configuration.set('{0}', '{1}')
             time.sleep(1)
             client.file_upload(filename, temp_filename)
             os.remove(temp_filename)
-
-    @staticmethod
-    def read_ovs_config():
-        return System.read_config(System.OVS_CONFIG)

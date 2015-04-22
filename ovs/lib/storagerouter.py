@@ -27,7 +27,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
-from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
@@ -35,6 +35,7 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
@@ -42,6 +43,7 @@ from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.support.agent import SupportAgent
 from ovs.plugin.provider.configuration import Configuration
 from ovs.plugin.provider.package import Package
+from ovs.plugin.provider.service import Service as PluginService
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
@@ -56,6 +58,7 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
+    SUPPORT_AGENT = 'support-agent'
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_physical_metadata')
@@ -66,7 +69,7 @@ class StorageRouterController(object):
         from ovs.lib.vpool import VPoolController
 
         storagerouter = StorageRouter(storagerouter_guid)
-        mountpoints = check_output('mount -v', shell=True).strip().split('\n')
+        mountpoints = check_output('mount -v', shell=True).strip().splitlines()
         mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
                        and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
@@ -82,7 +85,7 @@ class StorageRouterController(object):
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
-            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().split('\n')
+            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
             ipaddresses = [ip.strip() for ip in ipaddresses]
             ipaddresses.remove('127.0.0.1')
         allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
@@ -114,10 +117,10 @@ class StorageRouterController(object):
         if StorageRouterController._validate_ip(ip) is False:
             raise ValueError('The entered ip address is invalid')
 
-        if not re.match('^[0-9a-z]{1}[\-a-z0-9]{1,48}[a-z0-9]{1}$', vpool_name):
+        if not re.match('^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$', vpool_name):
             raise ValueError('Invalid vpool_name given')
 
-        client = SSHClient.load(ip)  # Make sure to ALWAYS reload the client, as Fabric seems to be singleton-ish
+        client = SSHClient(ip)
         unique_id = System.get_my_machine_id(client)
 
         storagerouter = None
@@ -174,33 +177,26 @@ class StorageRouterController(object):
         voldrv_service = 'volumedriver_{0}'.format(vpool_name)
 
         # Stop services
+        ip_client_map = {}
         for sr in all_storagerouters:
-            node_client = SSHClient.load(sr.ip)
-            System.exec_remote_python(node_client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.disable_service('{0}')
-""".format(voldrv_service))
-            System.exec_remote_python(node_client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.stop_service('{0}')
-""".format(voldrv_service))
+            if PluginService.has_service(voldrv_service, ip=sr.ip):
+                PluginService.disable_service(voldrv_service, ip=sr.ip)
+                PluginService.stop_service(voldrv_service, ip=sr.ip)
+            ip_client_map[sr.ip] = SSHClient(sr.ip)
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
-        client = SSHClient.load(ip)
         mountpoint_bfs = None
         directories_to_create = set()
 
         cmd = "cat /etc/mtab | grep ^/dev/ | cut -d ' ' -f 2"
-        mountpoints = [device.strip() for device in client.run(cmd).strip().split('\n')]
+        mountpoints = [device.strip() for device in client.run(cmd).strip().splitlines()]
         mountpoints.remove('/')
 
         print 'mountpoints: {}'.format(mountpoints)
 
         if vpool is None:
             vpool = VPool()
-            supported_backends = System.read_remote_config(client, 'ovs.storagedriver.backends').split(',')
+            supported_backends = client.config_read('ovs.storagedriver.backends').split(',')
             if 'rest' in supported_backends:
                 supported_backends.remove('rest')  # REST is not supported for now
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
@@ -216,17 +212,17 @@ if Service.has_service('{0}'):
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
-                    client = OVSClient(connection_host, connection_port,
-                                       credentials=(oauth_client.client_id, oauth_client.client_secret))
+                    ovs_client = OVSClient(connection_host, connection_port,
+                                           credentials=(oauth_client.client_id, oauth_client.client_secret))
                 else:
                     connection_host = parameters['connection_host']
                     connection_port = parameters['connection_port']
                     connection_username = parameters['connection_username']
                     connection_password = parameters['connection_password']
-                    client = OVSClient(connection_host, connection_port,
-                                       credentials=(connection_username, connection_password))
-                task_id = client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
-                successful, metadata = client.wait_for_task(task_id, timeout=300)
+                    ovs_client = OVSClient(connection_host, connection_port,
+                                           credentials=(connection_username, connection_password))
+                task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
+                successful, metadata = ovs_client.wait_for_task(task_id, timeout=300)
                 if successful is False:
                     raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
                 vpool.metadata = metadata
@@ -323,21 +319,10 @@ if Service.has_service('{0}'):
         print 'directories_to_create" {}'.format(directories_to_create)
         print 'all_locations: {}'.format(all_locations)
 
-        client = SSHClient.load(ip)
-        dir_create_script = """
-import os
-for directory in {0}:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-""".format(directories_to_create)
-        System.exec_remote_python(client, dir_create_script)
+        client.dir_create(directories_to_create)
 
         if vpool.backend_type.code in ['local', 'distributed']:
-            bfs_chmod_script = """
-import os
-os.chmod('{0}', 0777)
-""".format(parameters['mountpoint_bfs'])
-            System.exec_remote_python(client, bfs_chmod_script)
+            client.dir_chmod(parameters['mountpoint_bfs'], '0777')
 
         location_sizing = dict()
         for mp in all_locations:
@@ -363,7 +348,7 @@ os.chmod('{0}', 0777)
 
         dirs2create = list()
         dirs2create.extend([failovercache, metadatapath, tlogpath, rsppath,
-                           System.read_remote_config(client, 'ovs.storagedriver.readcache.serialization.path')])
+                           client.config_read('ovs.storagedriver.readcache.serialization.path')])
         files2create = list()
         readcaches = list()
         writecaches = list()
@@ -408,9 +393,9 @@ os.chmod('{0}', 0777)
         model_ports_in_use += ports
 
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
-        ipaddresses = client.run(cmd).strip().split('\n')
+        ipaddresses = client.run(cmd).strip().splitlines()
         ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
-        grid_ip = System.read_remote_config(client, 'ovs.grid.ip')
+        grid_ip = client.config_read('ovs.grid.ip')
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
@@ -430,7 +415,7 @@ os.chmod('{0}', 0777)
                           'vrouter_file_write_threshold': 1024,
                           'vrouter_min_workers': 4,
                           'vrouter_max_workers': 16}
-        voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'ovs.storagedriver.db.arakoon.clusterid'))
+        voldrv_arakoon_cluster_id = str(client.config_read('ovs.storagedriver.db.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_nodes = []
@@ -458,7 +443,7 @@ os.chmod('{0}', 0777)
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        readcache_serialization_path = System.read_remote_config(client, 'ovs.storagedriver.readcache.serialization.path')
+        readcache_serialization_path = client.config_read('ovs.storagedriver.readcache.serialization.path')
         queue_protocol = Configuration.get('ovs.core.broker.protocol')
         queue_login = Configuration.get('ovs.core.broker.login')
         queue_password = Configuration.get('ovs.core.broker.password')
@@ -472,7 +457,7 @@ os.chmod('{0}', 0777)
 
         alba_proxy = storagedriver.alba_proxy
         if alba_proxy is None and vpool.backend_type.code == 'alba':
-            service = Service()
+            service = DalService()
             service.storagerouter = storagerouter
             service.ports = [StorageRouterController._get_free_ports(client, model_ports_in_use, 1)]
             service.name = 'albaproxy_{0}'.format(vpool_name)
@@ -487,10 +472,10 @@ os.chmod('{0}', 0777)
                 config.add_section(section)
                 for key, value in vpool.metadata[section].iteritems():
                     config.set(section, key, value)
-            config_dir = '{0}/storagedriver/storagedriver'.format(System.read_remote_config(client, 'ovs.core.cfgdir'))
-            client.dir_ensure(config_dir, recursive=True)
+            config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
+            client.dir_create(config_dir)
             cache_dir = '{}/fcache_{}'.format(mountpoint_fragmentcache, vpool_name)
-            client.dir_ensure(cache_dir, recursive=True)
+            client.dir_create(cache_dir)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
 
             # manifest cache is in memory
@@ -500,7 +485,7 @@ os.chmod('{0}', 0777)
                 'ips': ['127.0.0.1'],
                 'manifest_cache_size': 100000,
                 'fragment_cache_dir': cache_dir,
-                'fragment_cache_size' : available_size[os.stat(mountpoint_fragmentcache).st_dev],
+                'fragment_cache_size': available_size[os.stat(mountpoint_fragmentcache).st_dev],
                 'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
             }))
 
@@ -566,28 +551,19 @@ os.chmod('{0}', 0777)
 
         mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
         for sr in all_storagerouters:
-            node_client = SSHClient.load(sr.ip)
+            node_client = ip_client_map[sr.ip]
             storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
             storagedriver_config.load(node_client)
             if storagedriver_config.is_new is False:
                 storagedriver_config.clean()  # Clean out obsolete values
                 storagedriver_config.configure_filesystem(fs_metadata_backend_mds_nodes=mds_config_set[sr.guid])
                 storagedriver_config.save(node_client, reload_config=False)
-        client = SSHClient.load(ip)
 
         dirs2create.append(storagedriver.mountpoint)
         dirs2create.append('{0}/fd_{1}'.format(mountpoint_foc, vpool_name))
 
-        file_create_script = """
-import os
-for directory in {0}:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-for filename in {1}:
-    if not os.path.exists(filename):
-        open(filename, 'a').close()
-""".format(dirs2create, files2create)
-        System.exec_remote_python(client, file_create_script)
+        client.dir_create(dirs2create)
+        client.file_create(files2create)
 
         params = {'<VPOOL_MOUNTPOINT>': storagedriver.mountpoint,
                   '<HYPERVISOR_TYPE>': storagerouter.pmachine.hvtype,
@@ -603,18 +579,10 @@ for filename in {1}:
             if vpool.backend_type.code == 'alba':
                 client.run('cp -f /opt/OpenvStorage/config/templates/upstart/ovs-albaproxy.conf /opt/OpenvStorage/config/templates/upstart/ovs-albaproxy_{0}.conf'.format(vpool_name))
 
-        extra_service = ''
+        PluginService.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
+        PluginService.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
         if vpool.backend_type.code == 'alba':
-            extra_service = "Service.add_service(package=('openvstorage', 'albaproxy'), name='albaproxy_{0}', command=None, stop_command=None, params={1})".format(
-                vpool_name, params
-            )
-        service_script = """
-from ovs.plugin.provider.service import Service
-Service.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}', command=None, stop_command=None, params={1})
-Service.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}', command=None, stop_command=None, params={1})
-{2}
-""".format(vpool_name, params, extra_service)
-        System.exec_remote_python(client, service_script)
+            PluginService.add_service(package=('openvstorage', 'albaproxy'), name='albaproxy_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
 
         if storagerouter.pmachine.hvtype == 'VMWARE':
             client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
@@ -628,15 +596,8 @@ Service.add_service(package=('openvstorage', 'failovercache'), name='failovercac
 
         # Start services
         for sr in all_storagerouters:
-            node_client = SSHClient.load(sr.ip)
-            System.exec_remote_python(node_client, """
-from ovs.plugin.provider.service import Service
-Service.enable_service('{0}')
-""".format(voldrv_service))
-            System.exec_remote_python(node_client, """
-from ovs.plugin.provider.service import Service
-Service.start_service('{0}')
-""".format(voldrv_service))
+            PluginService.enable_service(voldrv_service, ip=sr.ip)
+            PluginService.start_service(voldrv_service, ip=sr.ip)
 
         # Fill vPool size
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
@@ -669,7 +630,7 @@ Service.start_service('{0}')
                                       tenant_name=tenant_name,
                                       controller_ip=controller_ip)
 
-                osc.configure_vpool(vpool_name, storagedriver.mountpoint)
+                osc.configure_vpool(vpool_name)
                 # Save values for first node to use
                 ovsdb.set(vpool_config_key,
                           [cinder_password, cinder_user, tenant_name, controller_ip, config_cinder])
@@ -711,37 +672,34 @@ Service.start_service('{0}')
             MDSServiceController.ensure_safety(vdisk, [storagerouter])
 
         # Stop services
+        ip_client_map = {}
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.guid != storagedriver_guid:
                 storagedrivers_left = True
-            client = SSHClient.load(current_storagedriver.storagerouter.ip)
-            System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.disable_service('{0}')
-""".format(voldrv_service))
-            System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.stop_service('{0}')
-""".format(voldrv_service))
+            client = SSHClient(current_storagedriver.storagerouter.ip)
+            if client.ip not in ip_client_map:
+                ip_client_map[client.ip] = client
+
+            if PluginService.has_service(voldrv_service, ip=client.ip):
+                PluginService.disable_service(voldrv_service, ip=client.ip)
+                PluginService.stop_service(voldrv_service, ip=client.ip)
 
         # Unconfigure Cinder
         ovsdb = PersistentFactory.get_client()
         key = str('ovs_openstack_cinder_%s' % storagedriver.vpool_guid)
+        client = ip_client_map.get(ip, SSHClient(ip))
         if ovsdb.exists(key):
             cinder_password, cinder_user, tenant_name, controller_ip, _ = ovsdb.get(key)
-            client = SSHClient.load(ip)
-            System.exec_remote_python(client, """
-from ovs.extensions.openstack.oscinder import OpenStackCinder
-osc = OpenStackCinder(cinder_password = '{0}', cinder_user = '{1}', tenant_name = '{2}', controller_ip = '{3}')
-osc.unconfigure_vpool('{4}', '{5}', {6})
-""".format(cinder_password, cinder_user, tenant_name, controller_ip, vpool.name, storagedriver.mountpoint, not storagedrivers_left))
+            osc = OpenStackCinder(cinder_password=cinder_password,
+                                  cinder_user=cinder_user,
+                                  tenant_name=tenant_name,
+                                  controller_ip=controller_ip,
+                                  sshclient_ip=ip)
+            osc.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
             if not storagedrivers_left:
                 ovsdb.delete(key)
 
         # KVM pool
-        client = SSHClient.load(ip)
         if pmachine.hvtype == 'KVM':
             if vpool.name in client.run('virsh pool-list --all'):
                 client.run('virsh pool-destroy {0}'.format(vpool.name))
@@ -754,16 +712,13 @@ osc.unconfigure_vpool('{4}', '{5}', {6})
         services_to_remove = [voldrv_service, foc_service] + [mdsservice.service.name for mdsservice in removal_mdsservices]
         if storagedriver.alba_proxy is not None:
             services_to_remove.append(albaproxy_service)
-        client = SSHClient.load(ip)
         for service in services_to_remove:
-            System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.remove_service(domain='openvstorage', name='{0}')
-""".format(service))
-        configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
+            if PluginService.has_service(service, ip=client.ip):
+                PluginService.remove_service(domain='openvstorage', name=service, ip=client.ip)
 
-        voldrv_arakoon_cluster_id = str(System.read_remote_config(client, 'ovs.storagedriver.db.arakoon.clusterid'))
+        configuration_dir = client.config_read('ovs.core.cfgdir')
+
+        voldrv_arakoon_cluster_id = str(client.config_read('ovs.storagedriver.db.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
@@ -792,7 +747,6 @@ if Service.has_service('{0}'):
                 print('Could not destroy filesystem or erase node configs due to error: {}'.format(ex))
 
         # Cleanup directories
-        client = SSHClient.load(ip)
         for readcache in storagedriver.mountpoint_readcaches:
             client.run('rm {}'.format(readcache))
 
@@ -839,17 +793,9 @@ if Service.has_service('{0}'):
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
                 if current_storagedriver.guid != storagedriver_guid:
-                    client = SSHClient.load(current_storagedriver.storagerouter.ip)
-                    System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.enable_service('{0}')
-""".format(voldrv_service))
-                    System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    Service.start_service('{0}')
-""".format(voldrv_service))
+                    if PluginService.has_service(voldrv_service, ip=current_storagedriver.storagerouter.ip):
+                        PluginService.enable_service(voldrv_service, ip=current_storagedriver.storagerouter.ip)
+                        PluginService.start_service(voldrv_service, ip=current_storagedriver.storagerouter.ip)
         else:
             # Final model cleanup
             vpool.delete()
@@ -950,8 +896,8 @@ if Service.has_service('{0}'):
         webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
         logfile = check_output('ovs collect logs', shell=True).strip()
         logfilename = logfile.split('/')[-1]
-        client = SSHClient.load(storagerouter.ip)
-        client.dir_ensure(webpath, recursive=True)
+        client = SSHClient(storagerouter.ip)
+        client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
         client.run('chmod 666 {0}/{1}'.format(webpath, logfilename))
         return logfilename
@@ -963,31 +909,25 @@ if Service.has_service('{0}'):
         Configures support on all StorageRouters
         """
         for storagerouter in StorageRouterList.get_storagerouters():
-            client = SSHClient.load(storagerouter.ip)
-            System.set_remote_config(client, 'ovs.support.enabled', 1 if enable else 0)
-            System.set_remote_config(client, 'ovs.support.enablesupport', 1 if enable_support else 0)
+            client = SSHClient(storagerouter.ip)
+            client.config_set('ovs.support.enabled', 1 if enable else 0)
+            client.config_set('ovs.support.enablesupport', 1 if enable_support else 0)
             if enable_support is False:
-                System.run('service openvpn stop', client)
-                System.run('rm -f /etc/openvpn/ovs_*', client)
+                client.run('service openvpn stop')
+                client.run('rm -f /etc/openvpn/ovs_*')
             if enable is True:
-                script = """
-from ovs.plugin.provider.service import Service
-if not Service.has_service('{0}'):
-    Service.add_service('', '{0}', '', '', {1})
-    Service.enable_service('{0}')
-if not Service.get_service_status('{0}'):
-    Service.start_service('{0}')
-else:
-    Service.restart_service('{0}')"""
-                System.exec_remote_python(client, script.format('support-agent', {}))
+                if not PluginService.has_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
+                    PluginService.add_service(None, StorageRouterController.SUPPORT_AGENT, None, None, ip=client.ip)
+                    PluginService.enable_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
+                if not PluginService.get_service_status(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
+                    PluginService.start_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
+                else:
+                    PluginService.restart_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
             else:
-                script = """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    if Service.get_service_status('{0}'):
-        Service.stop_service('{0}')
-    Service.remove_service('', '{0}')"""
-                System.exec_remote_python(client, script.format('support-agent'))
+                if PluginService.has_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
+                    if PluginService.get_service_status(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
+                        PluginService.stop_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
+                    PluginService.remove_service(None, StorageRouterController.SUPPORT_AGENT, ip=client.ip)
         return True
 
     @staticmethod
@@ -1054,7 +994,7 @@ if Service.has_service('{0}'):
         """
         Gets `number` free ports ports that are not in use and not reserved
         """
-        port_range = System.read_remote_config(client, 'ovs.ports.storagedriver')
+        port_range = client.config_read('ovs.ports.storagedriver')
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]

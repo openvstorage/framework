@@ -21,12 +21,13 @@ from ovs.lib.helpers.decorators import ensure_single
 from celery.schedules import crontab
 from ovs.celery_run import celery
 from ovs.dal.hybrids.j_mdsservicevdisk import MDSServiceVDisk
-from ovs.dal.hybrids.service import Service
+from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.plugin.provider.configuration import Configuration
+from ovs.plugin.provider.service import Service as PluginService
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
@@ -74,7 +75,7 @@ class MDSServiceController(object):
                                      exclude=occupied_ports, nr=1, client=client)[0]
 
         # Add service to the model
-        service = Service()
+        service = DalService()
         service.name = 'metadataserver_{0}_{1}'.format(vpool.name, service_number)
         service.type = mdsservice_type
         service.storagerouter = storagerouter
@@ -89,8 +90,8 @@ class MDSServiceController(object):
         # Prepare some directores
         scratch_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, service_number)
         rocksdb_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, service_number)
-        client.run('mkdir -p {0}'.format(scratch_dir))
-        client.run('mkdir -p {0}'.format(rocksdb_dir))
+        client.dir_create(scratch_dir)
+        client.dir_create(rocksdb_dir)
 
         # Generate the configuration file
         metadataserver_config = StorageDriverConfiguration('metadataserver', vpool.name, number=service_number)
@@ -109,25 +110,18 @@ class MDSServiceController(object):
         metadataserver_config.save(client)
 
         # Create system services
-        params = {'<VPOOL_NAME>': vpool.name,
-                  '<SERVICE_NUMBER>': str(service_number)}
         template_dir = '/opt/OpenvStorage/config/templates/upstart'
         client.run('cp -f {0}/ovs-metadataserver.conf {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
-        service_script = """
-from ovs.plugin.provider.service import Service
-Service.add_service(package=('openvstorage', 'metadataserver'), name='metadataserver_{0}_{1}', command=None, stop_command=None, params={2})
-""".format(vpool.name, service_number, params)
-        System.exec_remote_python(client, service_script)
-
+        PluginService.add_service(package=('openvstorage', 'metadataserver'),
+                                  name='metadataserver_{0}_{1}'.format(vpool.name, service_number),
+                                  command=None,
+                                  stop_command=None,
+                                  params={'<VPOOL_NAME>': vpool.name,
+                                          '<SERVICE_NUMBER>': str(service_number)},
+                                  ip=client.ip)
         if start is True:
-            System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-Service.enable_service('{0}')
-""".format(service.name))
-            System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-Service.start_service('{0}')
-""".format(service.name))
+            PluginService.enable_service(service.name, ip=client.ip)
+            PluginService.start_service(service.name, ip=client.ip)
 
         return mds_service
 
@@ -452,13 +446,15 @@ Service.start_service('{0}')
                 if vpool not in mds_dict:
                     mds_dict[vpool] = {}
                 if storagerouter not in mds_dict[vpool]:
-                    mds_dict[vpool][storagerouter] = []
-                mds_dict[vpool][storagerouter].append(mds_service)
-        for vpool in mds_dict:
+                    mds_dict[vpool][storagerouter] = {'client': SSHClient(storagerouter.ip),
+                                                      'services': []}
+                mds_dict[vpool][storagerouter]['services'].append(mds_service)
+        for vpool, storagerouter_info in mds_dict.iteritems():
             # 1. First, make sure there's at least one MDS on every StorageRouter that's not overloaded
             # If not, create an extra MDS for that StorageRouter
-            for storagerouter in mds_dict[vpool]:
-                mds_services = mds_dict[vpool][storagerouter]
+            for storagerouter in storagerouter_info:
+                client = mds_dict[vpool][storagerouter]['client']
+                mds_services = mds_dict[vpool][storagerouter]['services']
                 has_room = False
                 for mds_service in mds_services:
                     load, _ = MDSServiceController.get_mds_load(mds_service)
@@ -466,15 +462,14 @@ Service.start_service('{0}')
                         has_room = True
                         break
                 if has_room is False:
-                    client = SSHClient(storagerouter.ip)
                     mds_service = MDSServiceController.prepare_mds_service(client, storagerouter, vpool,
                                                                            fresh_only=False, start=True)
                     if mds_service is None:
                         raise RuntimeError('Could not add MDS node')
-                    mds_dict[vpool][storagerouter].append(mds_service)
+                    mds_services.append(mds_service)
             mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
             for storagerouter in mds_dict[vpool]:
-                client = SSHClient(storagerouter.ip)
+                client = mds_dict[vpool][storagerouter]['client']
                 storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
                 storagedriver_config.load(client)
                 if storagedriver_config.is_new is False:

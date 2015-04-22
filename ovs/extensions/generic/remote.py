@@ -15,7 +15,6 @@
 Remote RPyC wrapper module
 """
 
-from types import ModuleType
 from subprocess import check_output
 from rpyc.utils.zerodeploy import DeployedServer
 from plumbum import SshMachine
@@ -24,31 +23,56 @@ from plumbum import SshMachine
 class Remote(object):
     """
     Remote is a context-manager that allows code within its context to be executed through RPyC
+    It is supposed to be used like this:
+    with Remote([<ip1>, <ip2>], [module1, module2, module3]) as (remote1, remote2):
+        remote1.module1.do_something()
+        remote2.module3.do_something_else()
+    Or like this:
+    with Remote([<ip1>], [module1, module2, module3]) as remote1:
+        remote1.module1.do_something()
+    Each module mentioned in the initialization of the remote object will be made available locally (remote1.module1), but will actually be executed remotely on the respective IP (ip1)
     """
 
-    def __init__(self, ip, modules, username=None):
+    def __init__(self, ip_info, modules, username=None):
         """
-        Initializes the context.
+        Initializes the context
         """
+        self.ips = []
+        if isinstance(ip_info, basestring):
+            self.ips = [ip_info]
+        elif isinstance(ip_info, list):
+            self.ips = ip_info
+        else:
+            raise ValueError("IP info needs to be a single IP or a list of IPs")
+
         self.username = username if username is not None else check_output('whoami').strip()
-        self.connection = None
-        self.machine = SshMachine(ip, user=self.username)
-        self.server = DeployedServer(self.machine)
-        for module in modules:
-            if not isinstance(module, ModuleType):
-                raise RuntimeError('A non-module was passed in as module: {0}'.format(module))
+        self.machines = [SshMachine(ip, user=self.username) for ip in self.ips]
+        self.servers = [DeployedServer(machine) for machine in self.machines]
         self.modules = modules
 
     def __iter__(self):
         replacements = []
-        for module in self.modules:
-            replacements.append(self.connection.modules[module.__name__])
+        for connection in self.connections:
+            replacements.append(self._build_remote_module(connection))
         return iter(replacements)
 
     def __enter__(self):
-        self.connection = self.server.classic_connect()
+        self.connections = [server.classic_connect() for server in self.servers]
+        if len(self.connections) == 1:
+            return self._build_remote_module(self.connections[0])
         return self
 
     def __exit__(self, *args):
         _ = args
-        self.server.close()
+        for server in self.servers:
+            server.close()
+
+    def _build_remote_module(self, connection):
+        connection.modules['sys'].path.append('/opt/OpenvStorage')
+        remote_modules = {}
+        for module in self.modules:
+            if hasattr(module, '__module__'):
+                remote_modules[module.__name__] = getattr(connection.modules[module.__module__], module.__name__)
+            else:
+                remote_modules[module.__name__] = connection.modules[module.__name__]
+        return type('Remote', (), remote_modules)

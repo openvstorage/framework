@@ -62,7 +62,7 @@ class MetadataView(View):
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
             # - Generic plugins, as added to the configuration file(s)
-            config = System.read_config('/opt/OpenvStorage/config/ovs.cfg')
+            config = System.read_config(System.OVS_CONFIG)
             if config.has_section('plugins'):
                 for option in config.options('plugins'):
                     if option.startswith('generic.'):

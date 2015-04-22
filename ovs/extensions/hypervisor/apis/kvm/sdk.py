@@ -17,12 +17,14 @@ This module contains all code for using the KVM libvirt api
 """
 
 from xml.etree import ElementTree
-from threading import Lock
 import subprocess
 import os
 import glob
 import re
 import time
+import libvirt
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='kvm sdk')
@@ -68,14 +70,13 @@ class Sdk(object):
 
     def __init__(self, host='localhost', login='root'):
         logger.debug('Init libvirt')
-        import libvirt
-        self.states = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
-                       libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
-                       libvirt.VIR_DOMAIN_BLOCKED:  'BLOCKED',
-                       libvirt.VIR_DOMAIN_PAUSED:   'PAUSED',
+        self.states = {libvirt.VIR_DOMAIN_NOSTATE: 'NO STATE',
+                       libvirt.VIR_DOMAIN_RUNNING: 'RUNNING',
+                       libvirt.VIR_DOMAIN_BLOCKED: 'BLOCKED',
+                       libvirt.VIR_DOMAIN_PAUSED: 'PAUSED',
                        libvirt.VIR_DOMAIN_SHUTDOWN: 'SHUTDOWN',
-                       libvirt.VIR_DOMAIN_SHUTOFF:  'TURNEDOFF',
-                       libvirt.VIR_DOMAIN_CRASHED:  'CRASHED'}
+                       libvirt.VIR_DOMAIN_SHUTOFF: 'TURNEDOFF',
+                       libvirt.VIR_DOMAIN_CRASHED: 'CRASHED'}
 
         self.libvirt = libvirt
         self.host = host
@@ -234,7 +235,7 @@ class Sdk(object):
 
         vm_filename = self.ssh_run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.strip().split('/')[-1]
-        vm_location = self._get_unique_id()
+        vm_location = System.get_my_machine_id(self._ssh_client)
         vm_datastore = None
         possible_datastores = self.ssh_run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
         for datastore in possible_datastores:
@@ -470,33 +471,8 @@ class Sdk(object):
         if start is False:
             self.ssh_run('virsh destroy {}'.format(name))
 
-    def _get_unique_id(self):
-        """
-        Gets the unique identifier from the KVM node connected to
-        """
-        # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
-        # on the machine running the code
-        return self.ssh_run('cat /etc/openvstorage_id').strip()
-
     def ssh_run(self, command):
-        """
-        Executes an SSH command in a locked context. Since the ssh client is shared in between processes,
-        the client should be reconnected before each new call, since another SDK instance running in the same process
-        could have connected the client to another node. By adding the connect and run in a locking context,
-        it is ensure that within a process the connect and run are executed sequentially.
-        """
         if self._ssh_client is None:
             logger.debug('Init SSH client')
-            from ovs.plugin.provider.remote import Remote
-            self._ssh_client = Remote.cuisine.api
-            self._ssh_client.lock = Lock()
-        try:
-            self._ssh_client.lock.acquire()
-            self._ssh_client.connect(self.host)
-            return self._ssh_client.run(command)
-        except SystemExit as sex:
-            # SystemExit kills the worker, WorkerLostError: Worker exited prematurely: exitcode 1.
-            # we need to cleanup but also trigger an exception
-            raise RuntimeError('Command "{}" returned SystemExit({})'.format(command, sex.message))
-        finally:
-            self._ssh_client.lock.release()
+            self._ssh_client = SSHClient(self.host)
+        return self._ssh_client.run(command)

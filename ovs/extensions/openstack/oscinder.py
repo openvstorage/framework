@@ -16,7 +16,9 @@
 This module contains OpenStack Cinder commands
 """
 import os
-import time, datetime
+import time
+import datetime
+import subprocess
 from ovs.extensions.generic.sshclient import SSHClient
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
@@ -25,32 +27,29 @@ EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/weba
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 
 
-def file_exists(ssh_client, location):
-    """
-    Cuisine's file_exists uses "run" which asks for password when run as user stack
-    """
-    return ssh_client.run_local('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
-
-
 class OpenStackCinder(object):
     """
     Represent the Cinder service
     """
 
-    def __init__(self, cinder_password=None, cinder_user='admin', tenant_name='admin', controller_ip='127.0.0.1'):
-        self.client = SSHClient()
-        auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
+    def __init__(self, cinder_password=None, cinder_user='admin', tenant_name='admin', controller_ip='127.0.0.1', sshclient_ip='127.0.0.1'):
+        self.client = SSHClient(sshclient_ip)
+        auth_url = 'http://{0}:35357/v2.0'.format(controller_ip)
         self.cinder_client = None
 
-        if cinder_password:
+        if cinder_password is not None:
             try:
                 from cinderclient.v1 import client as cinder_client
+                self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
             except ImportError:
                 pass
-            else:
-                self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
-        self.is_devstack = self._is_devstack()
-        self.is_openstack = self._is_openstack()
+
+        self.is_openstack = os.path.exists(CINDER_OPENSTACK_SERVICE)
+        self.is_devstack = False
+        try:
+            self.is_devstack = 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep'))
+        except subprocess.CalledProcessError:
+            pass
 
     @property
     def is_cinder_running(self):
@@ -60,7 +59,8 @@ class OpenStackCinder(object):
     def is_cinder_installed(self):
         return self._is_cinder_installed()
 
-    def valid_credentials(self, cinder_password, cinder_user, tenant_name, controller_ip):
+    @staticmethod
+    def valid_credentials(cinder_password, cinder_user, tenant_name, controller_ip):
         """
         Validate credentials
         """
@@ -77,7 +77,8 @@ class OpenStackCinder(object):
             except:
                 return False
 
-    def _get_version(self):
+    @staticmethod
+    def _get_version():
         """
         Get openstack cinder version
         """
@@ -95,27 +96,17 @@ class OpenStackCinder(object):
         except Exception as ex:
             raise ValueError('Cannot determine cinder version: %s' % str(ex))
 
-    def _get_existing_driver_version(self):
+    @staticmethod
+    def _get_existing_driver_version():
         """
         Get VERSION string from existing driver
         """
         try:
             from cinder.volume.drivers import openvstorage
-        except ImportError:
-            pass
-        else:
             if hasattr(openvstorage, 'OVSVolumeDriver'):
                 return getattr(openvstorage.OVSVolumeDriver, 'VERSION', '0.0.0')
-        return '0.0.0'
-
-    def _get_remote_driver_version(self, location):
-        """
-        Get VERSION string from downloaded driver
-        """
-        with open(location, 'r') as f:
-            for line in f.readlines():
-                if 'VERSION = ' in line:
-                    return line.split('VERSION = ')[-1].strip().replace("'", "").replace('"', "")
+        except ImportError:
+            pass
         return '0.0.0'
 
     def _get_driver_code(self):
@@ -126,9 +117,15 @@ class OpenStackCinder(object):
         remote_driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
         temp_location = "/tmp/openvstorage.py"
         self.client.run('wget {0} -P /tmp'.format(remote_driver))
+        file_content = self.client.file_read(temp_location)
+        remote_version = '0.0.0'
+        for line in file_content:
+            if 'VERSION = ' in line:
+                remote_version = line.split('VERSION = ')[-1].strip().replace("'", "").replace('"', "")
+                break
 
         existing_version = self._get_existing_driver_version()
-        remote_version = self._get_remote_driver_version(temp_location)
+        local_driver = None
         if self.is_devstack:
             cinder_base_path = self._get_base_path('cinder')
             local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
@@ -144,38 +141,26 @@ class OpenStackCinder(object):
             print('Using driver {0} version {1}'.format(local_driver, existing_version))
         self.client.run('rm {0}'.format(temp_location))
 
-    def _is_devstack(self):
-        try:
-            return 'stack' in str(self.client.run_local('ps aux | grep SCREEN | grep stack | grep -v grep'))
-        except SystemExit:  # ssh client raises system exit 1
-            return False
-
-    def _is_openstack(self):
-        return os.path.exists(CINDER_OPENSTACK_SERVICE)
-
     def _is_cinder_running(self):
         if self.is_devstack:
             try:
-                return 'cinder-volume' in str(self.client.run_local('ps aux | grep cinder-volume | grep -v grep'))
+                return 'cinder-volume' in str(self.client.run('ps aux | grep cinder-volume | grep -v grep'))
             except SystemExit:
                 return False
         if self.is_openstack:
             try:
-                return 'start/running' in str(self.client.run_local('service cinder-volume status'))
+                return 'start/running' in str(self.client.run('service cinder-volume status'))
             except SystemExit:
                 return False
         return False
 
     def _is_cinder_installed(self):
-        try:
-            return self.client.file_exists(CINDER_CONF)
-        except EOFError:
-            return file_exists(self.client, CINDER_CONF)
+        return self.client.file_exists(CINDER_CONF)
 
-    def configure_vpool(self, vpool_name, mountpoint):
+    def configure_vpool(self, vpool_name):
         if self.is_devstack or self.is_openstack:
             self._get_driver_code()
-            self._chown_mountpoint(mountpoint)
+            self._chown_mountpoint()
             self._configure_cinder_driver(vpool_name)
             self._create_volume_type(vpool_name)
             self._patch_etc_init_cindervolume_conf()
@@ -191,7 +176,7 @@ class OpenStackCinder(object):
             self._unpatch_etc_init_cindervolume_conf()
             self._restart_processes()
 
-    def _chown_mountpoint(self, mountpoint):
+    def _chown_mountpoint(self):
         # Vpool owned by stack / cinder
         # Give access to libvirt-qemu and ovs
         if self.is_devstack:
@@ -202,7 +187,7 @@ class OpenStackCinder(object):
             self.client.run('usermod -a -G ovs cinder')
 
     def _unchown_mountpoint(self, mountpoint):
-        #self.client.run('chown root "{0}"'.format(mountpoint))
+        # self.client.run('chown root "{0}"'.format(mountpoint))
         pass
 
     def _configure_cinder_driver(self, vpool_name):
@@ -274,7 +259,8 @@ if vpool_name in enabled_backends:
         else:
             self._restart_openstack_services()
 
-    def _get_devstack_log_name(self, service, logdir='/opt/stack/logs'):
+    @staticmethod
+    def _get_devstack_log_name(service, logdir='/opt/stack/logs'):
         """
         Construct a log name in format /opt/stack/logs/h-api-cw.log.2015-04-01-123300
         """
@@ -363,7 +349,7 @@ if vpool_name in enabled_backends:
         if self.is_openstack and os.path.exists(CINDER_OPENSTACK_SERVICE):
             with open(CINDER_OPENSTACK_SERVICE, 'r') as cinder_file:
                 contents = cinder_file.read()
-            if not EXPORT in contents:
+            if EXPORT not in contents:
                 return True
             contents = contents.replace(EXPORT_, '')
             print('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
@@ -386,7 +372,7 @@ if vpool_name in enabled_backends:
         """
         Create a cinder volume type, based on vpool name
         """
-        if self.cinder_client:
+        if self.cinder_client is not None:
             volume_types = self.cinder_client.volume_types.list()
             for v in volume_types:
                 if v.name == volume_type_name:
@@ -401,6 +387,9 @@ if vpool_name in enabled_backends:
         # fix "blockdev" issue
         # fix "instance rename" issue
         # NOTE! vmachine.name and instance.display_name must match from the beginning
+        nova_volume_file = None
+        nova_driver_file = None
+        nova_servers_file = None
         if self.is_devstack:
             nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
@@ -528,7 +517,8 @@ if os.path.exists(nova_servers_file):
                     except Exception:
                         pass
 
-    def _get_base_path(self, component):
+    @staticmethod
+    def _get_base_path(component):
         exec('import %s' % component, locals())
         module = locals().get(component)
         return os.path.dirname(os.path.abspath(module.__file__))

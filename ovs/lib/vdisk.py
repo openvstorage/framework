@@ -26,7 +26,6 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -37,9 +36,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.openstack.oscinder import OpenStackCinder
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
 logger = LogHandler('lib', name='vdisk')
@@ -286,8 +283,6 @@ class VDiskController(object):
         """
         Create a disk from a template
 
-        @param parentdiskguid: guid of the disk
-        @param location: location where virtual device should be created (eg: myVM)
         @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
         @param machineguid: guid of the machine to assign disk to
         @return diskguid: guid of new disk
@@ -353,12 +348,12 @@ class VDiskController(object):
         # Do not use run for other user than ovs as it blocks asking for root password
         # Do not use run_local for other user as it doesn't have permission
         # So this method only works if this is called by root or ovs
-        #storagerouter = StorageRouter(new_vdisk.storagerouter_guid)
-        #mountpoint = storagedriver.mountpoint
-        #location = "{0}{1}".format(mountpoint, disk_path)
-        #client = SSHClient.load(storagerouter.pmachine.ip)
-        #print(client.run('chmod 664 "{0}"'.format(location)))
-        #print(client.run('chown ovs:ovs "{0}"'.format(location)))
+        # storagerouter = StorageRouter(new_vdisk.storagerouter_guid)
+        # mountpoint = storagedriver.mountpoint
+        # location = "{0}{1}".format(mountpoint, disk_path)
+        # client = SSHClient(storagerouter.pmachine.ip)
+        # print(client.run('chmod 664 "{0}"'.format(location)))
+        # print(client.run('chown ovs:ovs "{0}"'.format(location)))
         return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
                 'backingdevice': disk_path}
 
@@ -377,15 +372,15 @@ class VDiskController(object):
         """
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
-        client = SSHClient.load('127.0.0.1')
+        client = SSHClient('127.0.0.1')
         try:
-            output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
+            output = client.run('truncate -s {0}G "{1}"'.format(size, location))
         except SystemExit as ex:
             raise RuntimeError(str(ex))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
-        #VDiskController.own_volume(location)
+        # VDiskController.own_volume(location)
 
     @staticmethod
     @celery.task(name='ovs.disk.delete_volume')
@@ -402,8 +397,8 @@ class VDiskController(object):
         if not os.path.exists(location):
             logger.error('File already deleted at %s' % location)
             return
-        client = SSHClient.load('127.0.0.1')
-        output = client.run_local('rm -f "{0}"'.format(location))
+        client = SSHClient('127.0.0.1')
+        output = client.run('rm -f "{0}"'.format(location))
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
@@ -426,28 +421,28 @@ class VDiskController(object):
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        client = SSHClient.load('127.0.0.1')
-        print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
-        #VDiskController.own_volume(location)
+        client = SSHClient('127.0.0.1')
+        print(client.run('truncate -s {0}G "{1}"'.format(size, location)))
+        # VDiskController.own_volume(location)
 
     @staticmethod
     def own_volume(location):
         """
-        Change permissions and ownership of file
+        Check if local filelocation exists, raise if not
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
 
         return
-        """
-        client = SSHClient.load('127.0.0.1')
-        osc = OpenStackCinder()
-        print(client.run_local('chmod 664 "{0}"'.format(location)))
-        try:
-            if osc.is_devstack:
-                print(client.run_local('chgrp stack "{0}"'.format(location)))
-            elif osc.is_openstack:
-                print(client.run_local('chgrp cinder "{0}"'.format(location)))
-        except SystemExit as ex:
-            raise RuntimeError(str(ex))
-        """
+        # """
+        # client = SSHClient('127.0.0.1')
+        # osc = OpenStackCinder()
+        # print(client.run('chmod 664 "{0}"'.format(location)))
+        # try:
+        #     if osc.is_devstack:
+        #         print(client.run('chgrp stack "{0}"'.format(location)))
+        #     elif osc.is_openstack:
+        #         print(client.run('chgrp cinder "{0}"'.format(location)))
+        # except SystemExit as ex:
+        #     raise RuntimeError(str(ex))
+        # """

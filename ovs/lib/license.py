@@ -121,7 +121,7 @@ class LicenseController(object):
             for lic in LicenseList.get_licenses():
                 license_contents.append(lic.hash)
             for storagerouter in StorageRouterList.get_storagerouters():
-                client = SSHClient.load(storagerouter.ip)
+                client = SSHClient(storagerouter.ip)
                 client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         except Exception, ex:
             logger.exception('Error applying license: {0}'.format(ex))
@@ -143,7 +143,7 @@ class LicenseController(object):
                 for lic in LicenseList.get_licenses():
                     license_contents.append(lic.hash)
                 for storagerouter in StorageRouterList.get_storagerouters():
-                    client = SSHClient.load(storagerouter.ip)
+                    client = SSHClient(storagerouter.ip)
                     client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
             return result
         return None
