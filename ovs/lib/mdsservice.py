@@ -136,10 +136,16 @@ Service.start_service('{0}')
         """
         Removes an MDS service
         """
+        if len(mds_service.vdisks_guids) > 0:
+            raise RuntimeError('Cannot remove MDSService that is still serving disks')
+
         System.exec_remote_python(client, """
 from ovs.plugin.provider.service import Service
 if Service.has_service('{0}'):
-    Service.remove_service(domain='openvstorage', name='{0}')""".format(mds_service.service.name))
+    if Service.get_service_status('{0}') is True:
+        Service.stop_service('{0}')
+    Service.remove_service(domain='openvstorage', name='{0}')
+""".format(mds_service.service.name))
 
         # Clean up configuration files
         configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
@@ -484,8 +490,13 @@ if Service.has_service('{0}'):
             for storagerouter in mds_dict[vpool]:
                 mds_services = mds_dict[vpool][storagerouter]
                 has_room = False
+                for mds_service in mds_services[:]:
+                    if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
+                        client = SSHClient.load(storagerouter.ip)
+                        MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool)
+                        mds_services.remove(mds_service)
                 for mds_service in mds_services:
-                    load, _ = MDSServiceController.get_mds_load(mds_service)
+                    _, load = MDSServiceController.get_mds_load(mds_service)
                     if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
                         has_room = True
                         break
