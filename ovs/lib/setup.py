@@ -19,6 +19,7 @@ Module for SetupController
 import os
 import re
 import sys
+import copy
 import time
 import uuid
 import glob
@@ -55,7 +56,7 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
-    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage'}
+    PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage', 'ssd': False}
 
     # Arakoon
     arakoon_clusters = ['ovsdb', 'voldrv']
@@ -289,15 +290,31 @@ class SetupController(object):
                 auto_config, disk_layout
             )
             if first_node:
-                SetupController._setup_first_node(ip_client_map[cluster_ip], unique_id, mountpoints,
-                                                  cluster_name, node_name, hypervisor_info, arakoon_mountpoint,
-                                                  enable_heartbeats, writecaches)
+                SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
+                                                  unique_id=unique_id,
+                                                  mountpoints=mountpoints,
+                                                  cluster_name=cluster_name,
+                                                  node_name=node_name,
+                                                  hypervisor_info=hypervisor_info,
+                                                  arakoon_mountpoint=arakoon_mountpoint,
+                                                  enable_heartbeats=enable_heartbeats,
+                                                  writecaches=writecaches)
             else:
-                SetupController._setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id,
-                                                  ip_client_map, hypervisor_info)
+                SetupController._setup_extra_node(cluster_ip=cluster_ip,
+                                                  master_ip=master_ip,
+                                                  cluster_name=cluster_name,
+                                                  unique_id=unique_id,
+                                                  ip_client_map=ip_client_map,
+                                                  hypervisor_info=hypervisor_info)
                 if promote:
-                    SetupController._promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id,
-                                                  mountpoints, arakoon_mountpoint, writecaches)
+                    SetupController._promote_node(cluster_ip=cluster_ip,
+                                                  master_ip=master_ip,
+                                                  cluster_name=cluster_name,
+                                                  ip_client_map=ip_client_map,
+                                                  unique_id=unique_id,
+                                                  mountpoints=mountpoints,
+                                                  arakoon_mountpoint=arakoon_mountpoint,
+                                                  writecaches=writecaches)
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
@@ -869,8 +886,15 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            ip_client_map = dict((node_ip, SSHClient(node_ip, password=target_password) for node_ip in nodes if node_ip))
-            SetupController._promote_node(ip, master_ip, cluster_name, ip_client_map, unique_id, None, None, None)
+            ip_client_map = dict((node_ip, SSHClient(node_ip, password=target_password)) for node_ip in nodes if node_ip)
+            SetupController._promote_node(cluster_ip=ip,
+                                          master_ip=master_ip,
+                                          cluster_name=cluster_name,
+                                          ip_client_map=ip_client_map,
+                                          unique_id=unique_id,
+                                          mountpoints=None,
+                                          arakoon_mountpoint=None,
+                                          writecaches=None)
 
             print ''
             print Interactive.boxed_message(['Promote complete.'])
@@ -939,14 +963,14 @@ EOF
                 mountpoints.sort()
                 mountpoints = [manual] + mountpoints
                 arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
-                                                            default_value=writecaches[0] if writecaches else '',
+                                                            default_value=writecaches[0] if len(writecaches) > 0 else None,
                                                             sort_choices=False)
                 if arakoon_mountpoint == manual:
                     arakoon_mountpoint = None
             if arakoon_mountpoint is None:
                 while True:
                     arakoon_mountpoint = Interactive.ask_string('Enter arakoon database path').strip().rstrip('/')
-                    if target_client.dir_create(arakoon_mountpoint):
+                    if target_client.dir_exists(arakoon_mountpoint):
                         break
                     else:
                         print '  Invalid path, please retry'
@@ -1157,7 +1181,7 @@ EOF
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            ip_client_map = dict((node_ip, SSHClient(node_ip, password=target_password) for node_ip in nodes if node_ip))
+            ip_client_map = dict((node_ip, SSHClient(node_ip, password=target_password)) for node_ip in nodes if node_ip)
             SetupController._demote_node(ip, master_ip, cluster_name, ip_client_map, unique_id)
 
             print ''
@@ -1436,12 +1460,12 @@ EOF
 
         elif nr_of_ssds > 1:
             for count in xrange(nr_of_ssds):
-                marker = str('/mnt/cache' + str(count + 1))
+                marker = '/mnt/cache' + str(count + 1)
                 mps_to_allocate[marker] = dict()
                 mps_to_allocate[marker]['device'] = ssd_devices[count]
                 mps_to_allocate[marker]['type'] = 'readcache' if count > 0 else 'writecache'
                 mps_to_allocate[marker]['percentage'] = 100
-                mps_to_allocate[marker]['label'] = str('cache' + str(count + 1))
+                mps_to_allocate[marker]['label'] = 'cache' + str(count + 1)
 
         for mp, values in mps_to_allocate.iteritems():
             if values['device'] in ssd_devices:
@@ -1565,12 +1589,58 @@ EOF
 
     @staticmethod
     def apply_flexible_disk_layout(client, auto_config=False, default=None):
-        import choice
-        blk_devices = SetupController._get_disk_configuration(client)
+        def print_and_sleep(message, sleep_count=1):
+            if not message.startswith('\n>>>'):
+                message = '\n>>> {0}'.format(message)
+            if not message.endswith('\n'):
+                message = '{0}\n'.format(message)
+            print message
+            time.sleep(sleep_count)
 
+        def show_layout(proposed):
+            print
+            print 'Proposed partition layout:'
+            print
+            print '! Mark fastest ssd device as writecache'
+            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
+            print
+            key_map = list()
+            longest_mp = max([len(mp) for mp in proposed])
+            for mp in sorted(proposed):
+                key_map.append(mp)
+                if not proposed[mp]['device'] or proposed[mp]['device'] == 'DIR_ONLY':
+                    print "{0:{1}} :  device : DIR_ONLY".format(mp, longest_mp)
+                    continue
+
+                mp_values = ''
+                for dict_key in sorted(proposed[mp]):
+                    value = str(proposed[mp][dict_key])
+                    if dict_key == 'device' and value and value != 'DIR_ONLY':
+                        size = device_size_map[value]
+                        size_in_gb = int(size / 1000.0 / 1000.0 / 1000.0)
+                        value = value + ' ({0} GB)'.format(size_in_gb)
+                    if dict_key == 'device':
+                        mp_values += ' {0} : {1:20}'.format(dict_key, value)
+                    elif dict_key == 'label':
+                        mp_values += ' {0} : {1:10}'.format(dict_key, value)
+                    else:
+                        mp_values += ' {0} : {1:5}'.format(dict_key, value)
+
+                print "{0:{1}} : {2}".format(mp, longest_mp, mp_values)
+
+            return key_map
+
+        def check_percentages(percentage_mapping, device_to_check):
+            total_percentage_assigned = sum([perc for perc in percentage_mapping[device_to_check].itervalues()])
+            if total_percentage_assigned > 100:
+                print_and_sleep('More than 100% specified for device {0}, please update manually'.format(device_to_check))
+            elif total_percentage_assigned < 100:
+                print_and_sleep('Less than 100% specified for device {0}, please update manually if required'.format(device_to_check))
+
+        blk_devices = SetupController._get_disk_configuration(client)
         boot_disk = ''
         # check for free space on bootdevice
-        if not auto_config:
+        if auto_config is False:
             for disk, values in blk_devices.iteritems():
                 if values['boot_device'] and values['type'] in ['ssd']:
                     boot_disk += disk
@@ -1593,242 +1663,250 @@ EOF
         if default is None:
             default, skipped = SetupController._generate_default_partition_layout(blk_devices)
 
+        ssd_devices = set([mountpoint_info['device'] for mountpoint_info in default.itervalues() if mountpoint_info['ssd'] is True])
+
         print 'Excluded: {0}'.format(skipped)
         print '-> bootdisk or part of software RAID configuration'
         print
 
         if boot_disk:
             print 'Adding free space on boot disk - only mountpoint, label and type can be changed!'
-            default['/mnt/os_cache'] = {'device': "/dev/{}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
+            default['/mnt/os_cache'] = {'device': "/dev/{0}".format(boot_disk), 'ssd': True, 'boot_device': True, 'percentage': 100, 'label': 'os_cache', 'type': 'readcache'}
 
         device_size_map = dict()
         for key, values in blk_devices.iteritems():
             device_size_map['/dev/' + key] = values['size']
 
-        def show_layout(proposed):
-            print
-            print 'Proposed partition layout:'
-            print
-            print '! Mark fastest ssd device as writecache'
-            print '! Leave /mnt/bfs as DIR_ONLY when not using a local vpool'
-            print
-            keys = proposed.keys()
-            keys.sort()
-            key_map = list()
-            for mp in keys:
-                sub_keys = proposed[mp].keys()
-                sub_keys.sort()
-                mp_values = ''
-                if not proposed[mp]['device'] or proposed[mp]['device'] in ['DIR_ONLY']:
-                    mp_values = ' {0} : {1:20}'.format('device', 'DIR_ONLY')
-                    print "{0:20} : {1}".format(mp, mp_values)
-                    key_map.append(mp)
-                    continue
-
-                for sub_key in sub_keys:
-                    value = str(proposed[mp][sub_key])
-                    if sub_key == 'device' and value and value != 'DIR_ONLY':
-                        size = device_size_map[value]
-                        size_in_gb = int(size / 1000.0 / 1000.0 / 1000.0)
-                        value = value + ' ({0} GB)'.format(size_in_gb)
-                    if sub_key in ['device']:
-                        mp_values = mp_values + ' {0} : {1:20}'.format(sub_key, value)
-                    elif sub_key in ['label']:
-                        mp_values = mp_values + ' {0} : {1:10}'.format(sub_key, value)
-                    else:
-                        mp_values = mp_values + ' {0} : {1:5}'.format(sub_key, value)
-
-                print "{0:20} : {1}".format(mp, mp_values)
-                key_map.append(mp)
-
-            return key_map
-
-        def show_submenu_layout(subitem, mountpoint):
-            sub_keys = subitem.keys()
-            sub_keys.sort()
-            for sub_key in sub_keys:
-                print "{0:15} : {1}".format(sub_key, subitem[sub_key])
-            print "{0:15} : {1}".format('mountpoint', mountpoint)
-            print
-
-        def is_device_path(value):
-            if re.match('/dev/[a-z][a-z][a-z]+', value):
-                return True
-            else:
-                return False
-
-        def is_mountpoint(value):
-            if re.match('/mnt/[a-z]+[0-9]*', value):
-                return True
-            else:
-                return False
-
-        def is_percentage(value):
-            try:
-                if 0 <= int(value) <= 100:
-                    return True
-                else:
-                    return False
-            except ValueError:
-                return False
-
-        def is_label(value):
-            if re.match('[a-z]+[0-9]*', value):
-                return True
-            else:
-                return False
-
-        def is_valid_storage_type(value):
-            if value in ['readcache', 'writecache', 'storage']:
-                return True
-            else:
-                return False
-
-        def validate_subitem(subitem, answer):
-            if subitem in ['percentage']:
-                return is_percentage(answer)
-            elif subitem in ['device']:
-                return is_device_path(answer)
-            elif subitem in ['mountpoint']:
-                return is_mountpoint(answer)
-            elif subitem in ['label']:
-                return is_label(answer)
-            elif subitem in ['type']:
-                return is_valid_storage_type(answer)
-            return False
-
-        def _summarize_partition_percentages(layout):
-            total = dict()
-            for details in layout.itervalues():
-                device = details['device']
-                if device == 'DIR_ONLY':
-                    continue
-                if details['percentage'] == 'NA':
-                    print '>>> Invalid percentage value for device: {0}'.format(device)
-                    print
-                    time.sleep(1)
-                    return False
-                percentage = int(details['percentage'])
-                if device in total:
-                    total[device] += percentage
-                else:
-                    total[device] = percentage
-            for device, percentage in total.iteritems():
-                if is_percentage(percentage):
-                    continue
-                else:
-                    print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
-                    print
-                    time.sleep(1)
-                    return False
-            return True
-
-        def _labels_are_unique(layout):
-            partitions = set()
-            nr_of_labels = 0
-            for details in layout.itervalues():
-                if 'DIR_ONLY' not in details['device']:
-                    partitions.add(details['label'])
-                    nr_of_labels += 1
-            if len(partitions) < nr_of_labels:
-                print '! Partition labels should be unique across partitions'
-                print
-                time.sleep(1)
-                return False
-            else:
-                return True
-
-        def process_submenu_actions(mp_to_edit):
-            subitem = default[mp_to_edit]
-            is_boot_device = 'boot_device' in default[mp_to_edit] and default[mp_to_edit]['boot_device']
-            submenu_items = subitem.keys()
-            submenu_items.sort()
-            if 'boot_device' in submenu_items:
-                submenu_items.remove('boot_device')
-            submenu_items.append('mountpoint')
-            submenu_items.append('finish')
-
-            print 'Mountpoint: {0}'.format(mp_to_edit)
-            while True:
-                show_submenu_layout(subitem, mp_to_edit)
-                subitem_chosen = choice.Menu(submenu_items).ask()
-                if subitem_chosen == 'finish':
-                    break
-                elif subitem_chosen == 'mountpoint':
-                    new_mountpoint = choice.Input('Enter new mountpoint: ', str).ask()
-                    if new_mountpoint in default:
-                        print 'New mountpoint already exists!'
-                    else:
-                        mp_values = default[mp_to_edit]
-                        default.pop(mp_to_edit)
-                        default[new_mountpoint] = mp_values
-                        mp_to_edit = new_mountpoint
-                elif is_boot_device and subitem_chosen not in ['type', 'label']:
-                    print '\nOnly mountpoint, label and type can be changed for a boot device'
-                    print 'All free space will be allocated to the new partition'
-                    time.sleep(1)
-                else:
-                    answer = choice.Input('Enter new value for {}'.format(subitem_chosen)).ask()
-                    if validate_subitem(subitem_chosen, answer):
-                        subitem[subitem_chosen] = answer
-                    else:
-                        print '\n>>> Invalid entry {0} for {1}\n'.format(answer, subitem_chosen)
-                        time.sleep(1)
-
-        if auto_config:
+        if auto_config is True:
             SetupController._partition_disks(client, default)
             return default
-        else:
-            choices = show_layout(default)
-            while True:
-                menu_actions = ['Add', 'Remove', 'Update', 'Print', 'Apply', 'Quit']
-                menu_devices = list(choices)
-                menu_devices.sort()
-                chosen = choice.Menu(menu_actions).ask()
 
-                if chosen == 'Add':
-                    to_add = choice.Input('Enter mountpoint to add:', str).ask()
-                    if to_add in default:
-                        print 'Mountpoint {0} already exists'.format(to_add)
-                    else:
-                        default[to_add] = dict(SetupController.PARTITION_DEFAULTS)
-                    choices = show_layout(default)
+        choices = show_layout(default)
+        percentage_map = {}
+        for mountpoint, info in default.iteritems():
+            device = info.get('device')
+            if device == 'DIR_ONLY':
+                continue
 
-                elif chosen == 'Remove':
-                    to_remove = choice.Input('Enter mountpoint to remove:', str).ask()
-                    if to_remove in default:
-                        default.pop(to_remove)
-                    else:
-                        print 'Mountpoint {0} not found, no action taken'.format(to_remove)
-                    choices = show_layout(default)
+            if device not in percentage_map:
+                percentage_map[device] = {mountpoint: 0}
+            elif mountpoint not in percentage_map[device]:
+                percentage_map[device][mountpoint] = 0
+            percentage_map[device][mountpoint] += info['percentage']
 
-                elif chosen == 'Update':
-                    print 'Choose mountpoint to update:'
-                    to_update = choice.Menu(menu_devices).ask()
-                    process_submenu_actions(to_update)
-                    choices = show_layout(default)
+        while True:
+            menu_actions = ['Add', 'Remove', 'Update', 'Print', 'Apply', 'Quit']
+            chosen = Interactive.ask_choice(menu_actions, 'Make a choice', sort_choices=False)
 
-                elif chosen == 'Print':
-                    show_layout(default)
+            if chosen == 'Add':
+                to_add = Interactive.ask_string('Enter mountpoint to add')
+                if to_add in default:
+                    print_and_sleep('Mountpoint {0} already exists'.format(to_add))
+                else:
+                    # Calculcate new default labelname
+                    label_counters = []
+                    for mountpoint_info in default.itervalues():
+                        if re.match('^cache[0-9]{1,2}$', mountpoint_info['label'].strip()):
+                            label_counters.append(int(mountpoint_info['label'].strip().split('cache')[1]))
 
-                elif chosen == 'Apply':
-                    if not _summarize_partition_percentages(default):
-                        choices = show_layout(default)
+                    new_label = None
+                    for new_counter in xrange(1, 1000):
+                        if new_counter in label_counters:
+                            continue
+                        new_label = 'cache{0}'.format(new_counter)
+                        break
+                    default[to_add] = dict(SetupController.PARTITION_DEFAULTS)
+                    default[to_add]['label'] = new_label
+
+                choices = show_layout(default)
+
+            elif chosen == 'Remove':
+                to_remove = Interactive.ask_string('Enter mountpoint to remove')
+                if to_remove in default:
+                    copied_map = copy.deepcopy(percentage_map)
+                    for device, mp_info in copied_map.iteritems():
+                        for mountp in copied_map[device]:
+                            if mountp == to_remove:
+                                percentage_map[device].pop(to_remove)
+                    default.pop(to_remove)
+                else:
+                    print_and_sleep('Mountpoint {0} not found, no action taken'.format(to_remove))
+                choices = show_layout(default)
+
+            elif chosen == 'Quit':
+                return 'QUIT'
+
+            elif chosen == 'Print':
+                show_layout(default)
+
+            elif chosen == 'Update':
+                to_update = Interactive.ask_choice(choices)
+                subitem = default[to_update]
+                is_boot_device = 'boot_device' in subitem and subitem['boot_device'] is True
+                submenu_items = subitem.keys()
+                if 'boot_device' in submenu_items:
+                    submenu_items.remove('boot_device')
+                submenu_items.remove('ssd')
+                submenu_items.append('mountpoint')
+                submenu_items.append('finish')
+
+                while True:
+                    for sub_key in sorted(subitem):
+                        print "{0:15} : {1}".format(sub_key, subitem[sub_key])
+                    print "{0:15} : {1}".format('mountpoint', to_update)
+                    print
+
+                    subitem_chosen = Interactive.ask_choice(submenu_items, sort_choices=False)
+                    if subitem_chosen == 'finish':
+                        break
+                    elif is_boot_device and subitem_chosen not in ['type', 'label']:
+                        print '\nOnly mountpoint, label and type can be changed for a boot device'
+                        print 'All free space will be allocated to the new partition'
+                        time.sleep(1)
+                    elif subitem_chosen == 'percentage':
+                        answer = Interactive.ask_integer('Please specify the percentage: ', 1, 100)
+                        subitem['percentage'] = answer
+                        device = subitem['device']
+                        # Recalculate percentages
+                        if device in percentage_map:
+                            percentage_map[device][to_update] = answer
+                            if len(percentage_map[device]) != 2:
+                                check_percentages(percentage_map, device)
+                            else:
+                                total_percentage = sum([percent for percent in percentage_map[device].itervalues()])
+                                if total_percentage > 100:
+                                    for mountp in percentage_map[device].iterkeys():
+                                        if mountp != to_update:
+                                            percentage_map[device][mountp] = 100 - answer
+                                            default[mountp]['percentage'] = 100 - answer
+                                            print_and_sleep('Overallocation detected, updated {0} on device {1} to {2}%'.format(mountp, device, 100 - answer))
+                    elif subitem_chosen == 'type':
+                        answer = Interactive.ask_choice(['readcache', 'writecache', 'storage'], 'Please set the type', 'storage', False)
+                        subitem['type'] = answer
+                    elif subitem_chosen == 'label':
+                        answer = Interactive.ask_string('Please set the label')
+                        if not re.match('^[a-z]+[0-9]*', answer):
+                            print_and_sleep('Invalid entry {0} for label'.format(answer))
+                        else:
+                            subitem['label'] = answer
+                    elif subitem_chosen == 'mountpoint':
+                        answer = Interactive.ask_string('Please set the mountpoint')
+                        if not re.match('^/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_-]+$', answer):
+                            print_and_sleep('Invalid entry {0} for mountpoint'.format(answer))
+                        elif answer in default:
+                            print_and_sleep('New mountpoint already exists!')
+                        else:
+                            default.pop(to_update)
+                            default[answer] = subitem
+                            for dev, mp_info in percentage_map.iteritems():
+                                for mountp in mp_info.iterkeys():
+                                    if mountp == to_update:
+                                        percentage = percentage_map[dev].pop(mountp)
+                                        percentage_map[dev][answer] = percentage
+                            to_update = answer
+                    elif subitem_chosen == 'device':
+                        answer = Interactive.ask_string('Please set the device')
+                        if not re.match('^/dev/[a-z]{3}$', answer):
+                            print_and_sleep('Invalid entry {0} for device'.format(answer))
+                        elif answer not in device_size_map:
+                            print_and_sleep('Device {0} does not exist'.format(answer))
+                        elif answer == subitem['device']:
+                            print_and_sleep('Same device specified, nothing will be updated')
+                        else:
+                            mountpoint = to_update
+                            orig_device = subitem['device']
+                            percentage = subitem['percentage']
+                            subitem['ssd'] = answer in ssd_devices
+                            subitem['device'] = answer
+
+                            if orig_device in percentage_map:
+                                # Update original device
+                                percentage_map[orig_device].pop(mountpoint)
+                                if len(percentage_map[orig_device]) > 1:
+                                    check_percentages(percentage_map, orig_device)
+
+                                # Update new device
+                                if answer in percentage_map:
+                                    percentage_map[answer][mountpoint] = percentage
+                                    if len(percentage_map[answer]) == 2:
+                                        default[mountpoint]['percentage'] = percentage
+                                        total_percentage = sum([percent for percent in percentage_map[answer].itervalues()])
+                                        if total_percentage > 100:
+                                            for mountp in percentage_map[answer].iterkeys():
+                                                if mountp != mountpoint:
+                                                    percentage_map[answer][mountp] = 100 - percentage
+                                                    default[mountp]['percentage'] = 100 - percentage
+                                                    print_and_sleep('Overallocation detected, updated {0} on device {1} to {2}%'.format(mountp, answer, 100 - percentage))
+                                    elif len(percentage_map[answer]) > 2:
+                                        check_percentages(percentage_map, answer)
+
+                            if answer not in percentage_map:
+                                percentage_map[answer] = {mountpoint: percentage if isinstance(percentage, int) else 0}
+                            elif mountpoint not in percentage_map[answer]:
+                                percentage_map[answer][mountpoint] = percentage if isinstance(percentage, int) else 0
+                                check_percentages(percentage_map, answer)
+
+                choices = show_layout(default)
+
+            elif chosen == 'Apply':
+                total = dict()
+                valid_percentages = True
+                for details in default.itervalues():
+                    device = details['device']
+                    if device == 'DIR_ONLY':
                         continue
-                    if not _labels_are_unique(default):
-                        choices = show_layout(default)
-                        continue
-
-                    show_layout(default)
-                    confirmation = choice.Input('Please confirm partition layout (yes/no), ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', str).ask()
-                    if confirmation.lower() == 'yes':
-                        print 'Applying partition layout ...'
-                        SetupController._partition_disks(client, default)
-                        return default
+                    if details['percentage'] == 'NA' or details['percentage'] == 0:
+                        print '>>> Invalid percentage value for device: {0}'.format(device)
+                        print
+                        time.sleep(1)
+                        valid_percentages = False
+                        break
+                    percentage = int(details['percentage'])
+                    if device in total:
+                        total[device] += percentage
                     else:
-                        print 'Please confirm by typing yes'
-                elif chosen == 'Quit':
-                    return 'QUIT'
+                        total[device] = percentage
+
+                if valid_percentages is True:
+                    for device, percentage in total.iteritems():
+                        if 0 < percentage <= 100:
+                            continue
+                        else:
+                            print '>>> Invalid total {0}% for device: {1}'.format(percentage, device)
+                            print
+                            time.sleep(1)
+                            valid_percentages = False
+                            break
+
+                if valid_percentages is False:
+                    choices = show_layout(default)
+                    continue
+
+                valid_labels = True
+                partitions = set()
+                nr_of_labels = 0
+                for details in default.itervalues():
+                    if 'DIR_ONLY' not in details['device']:
+                        partitions.add(details['label'])
+                        nr_of_labels += 1
+                if len(partitions) < nr_of_labels:
+                    print '! Partition labels should be unique across partitions'
+                    print
+                    time.sleep(1)
+                    valid_labels = False
+
+                if valid_labels is False:
+                    choices = show_layout(default)
+                    continue
+
+                show_layout(default)
+                confirmation = Interactive.ask_yesno('Please confirm the partition layout, ALL DATA WILL BE ERASED ON THE DISKS ABOVE!', False)
+                if confirmation is True:
+                    print 'Applying partition layout ...'
+                    SetupController._partition_disks(client, default)
+                    return default
+                else:
+                    print 'Please confirm by typing "y"'
 
     @staticmethod
     def _discover_nodes(client):
@@ -1864,12 +1942,6 @@ EOF
                 nodes[cluster_name][node_name]['type'] = entry_parts[4].split('_')[2]
                 nodes[cluster_name][node_name]['ip_list'].append(ip)
         return nodes
-
-    @staticmethod
-    def _validate_ip(ip):
-        regex = '^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$'
-        match = re.search(regex, ip)
-        return match is not None
 
     @staticmethod
     def _discover_hypervisor(client):

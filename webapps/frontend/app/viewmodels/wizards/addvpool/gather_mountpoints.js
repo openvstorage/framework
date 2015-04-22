@@ -85,7 +85,7 @@ define([
                 }
             }
             else {
-                self.data.mtptBFS('/mnt/bfs'); // BFS isn't used, so set it to a non-conflicting value
+                self.data.mtptBFS('');
             }
 
             // Temp mountpoint checks
