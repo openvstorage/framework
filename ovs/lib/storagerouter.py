@@ -803,6 +803,8 @@ if Service.has_service('{0}'):
             storagedriver.alba_proxy.delete()
         storagedriver.delete(abandon=True)  # Detach from the log entries
 
+        MDSServiceController.mds_checkup()
+
         if storagedrivers_left:
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
