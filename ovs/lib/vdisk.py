@@ -26,7 +26,6 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -38,9 +37,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.openstack.oscinder import OpenStackCinder
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
 logger = LogHandler('lib', name='vdisk')
@@ -436,7 +433,7 @@ class VDiskController(object):
                 if vdisk:
                     break
             except Exception as ex:
-                logger.info('Trying to get mgmt center failed for disk {0} with volume_id {1}. {2}'.format(old_name, volume_idex))
+                logger.info('Trying to get mgmt center failed for disk {0} with volume_id {1}. {2}'.format(old_name, volume_id, ex))
         if not vdisk:
             logger.error('No vdisk found for name {0}'.format(old_name))
             return
