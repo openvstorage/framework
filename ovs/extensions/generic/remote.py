@@ -28,7 +28,7 @@ class Remote(object):
         remote1.module1.do_something()
         remote2.module3.do_something_else()
     Or like this:
-    with Remote([<ip1>], [module1, module2, module3]) as remote1:
+    with Remote(<ip1>, [module1, module2, module3]) as remote1:
         remote1.module1.do_something()
     Each module mentioned in the initialization of the remote object will be made available locally (remote1.module1), but will actually be executed remotely on the respective IP (ip1)
     """
@@ -43,7 +43,10 @@ class Remote(object):
         elif isinstance(ip_info, list):
             self.ips = ip_info
         else:
-            raise ValueError("IP info needs to be a single IP or a list of IPs")
+            raise ValueError('IP info needs to be a single IP or a list of IPs')
+
+        if not isinstance(modules, list) or not isinstance(modules, set) or not isinstance(modules, tuple):
+            raise ValueError('Modules should be a list, set or tuple')
 
         self.username = username if username is not None else check_output('whoami').strip()
         self.machines = [SshMachine(ip, user=self.username) for ip in self.ips]

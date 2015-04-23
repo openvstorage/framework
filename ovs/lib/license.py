@@ -156,7 +156,7 @@ class LicenseController(object):
         license_contents = []
         for lic in LicenseList.get_licenses():
             license_contents.append(lic.hash)
-        client = SSHClient.load(ip)
+        client = SSHClient(ip)
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod

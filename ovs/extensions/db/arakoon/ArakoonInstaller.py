@@ -298,7 +298,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         for node in ai.config.nodes:
             ArakoonInstaller.stop(cluster_name, node.ip)
             ArakoonInstaller.remove(cluster_name, node.ip)
-            client = SSHClient.load(node.ip)
+            client = SSHClient(node.ip)
             ai.delete_dir_structure(client)
 
     @staticmethod
@@ -311,12 +311,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
 
     @staticmethod
     def remove(cluster_name, ip):
-        client = SSHClient.load(ip)
-        cmd = """
-from ovs.plugin.provider.service import Service
-print Service.remove_service('', 'arakoon-{0}')
-""".format(cluster_name)
-        System.exec_remote_python(client, cmd)
+        Service.remove_service(None, 'arakoon-{0}'.format(cluster_name), ip=ip)
 
     @staticmethod
     def status(cluster_name, ip):
@@ -324,7 +319,7 @@ print Service.remove_service('', 'arakoon-{0}')
 
     @staticmethod
     def catchup_cluster_node(cluster_name, ip):
-        with Remote([ip], [ArakoonManagementEx]) as remote:
+        with Remote(ip, [ArakoonManagementEx]) as remote:
             cluster = remote.ArakoonManagementEx().getCluster(cluster_name)
             cluster.catchup_node()
 
@@ -366,7 +361,7 @@ print Service.remove_service('', 'arakoon-{0}')
         """
         ai = ArakoonInstaller()
         ai.load_config_from(cluster_name, master_ip)
-        client = SSHClient.load(slave_ip)
+        client = SSHClient(slave_ip)
         ai.clean_config(client)
 
     @staticmethod
