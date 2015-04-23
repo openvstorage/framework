@@ -139,7 +139,7 @@ class OVSMigrator(object):
                 backend_type.save()
 
             # Add service types
-            for service_type_info in ['MetadataServer', 'AlbaProxy']:
+            for service_type_info in ['MetadataServer', 'AlbaProxy', 'Arakoon']:
                 service_type = ServiceType()
                 service_type.name = service_type_info
                 service_type.save()
