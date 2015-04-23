@@ -21,12 +21,11 @@ import re
 import sys
 import copy
 import time
-import uuid
 import urllib2
 import base64
 
 from ConfigParser import RawConfigParser
-from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
+from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.interactive import Interactive
 from ovs.extensions.generic.system import System
@@ -52,8 +51,8 @@ class SetupController(object):
     PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage', 'ssd': False}
 
     # Arakoon
-    arakoon_clusters = ['ovsdb', 'voldrv']
-    arakoon_exclude_ports = {'ovsdb': 8872, 'voldrv': 8870}
+    arakoon_clusters = {'ovsdb': 'arakoon-ovsdb',
+                        'voldrv': 'arakoon-voldrv'}
 
     # Generic configfiles
     generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
@@ -225,7 +224,7 @@ class SetupController(object):
                         cluster_name = Interactive.ask_string('Please enter the cluster name')
                         if cluster_name in current_cluster_names:
                             print 'The new cluster name should be unique.'
-                        if not re.match('^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$', cluster_name):
+                        elif not re.match('^[0-9a-zA-Z]+(\-[0-9a-zA-Z]+)*$', cluster_name):
                             print "The new cluster name can only contain numbers, letters and dashes."
                         else:
                             break
@@ -259,10 +258,10 @@ class SetupController(object):
             promote = False
             if first_node is False:
                 for cluster in SetupController.arakoon_clusters:
-                    config = ArakoonInstaller.get_config_from(cluster, master_ip, known_passwords[master_ip])
-                    cluster_nodes = [node.strip() for node in config.get('global', 'cluster').split(',')]
-                    logger.debug('{0} nodes for cluster {1} found'.format(len(cluster_nodes), cluster))
-                    if (len(cluster_nodes) < 3 or force_type == 'master') and force_type != 'extra':
+                    config = ArakoonClusterConfig(cluster)
+                    config.load_config(SSHClient.load(master_ip, known_passwords[master_ip]))
+                    logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
+                    if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                         promote = True
             else:
                 promote = True  # Correct, but irrelevant, since a first node is always master
@@ -494,9 +493,12 @@ System.update_hosts_file(hostname='{0}', ip='{1}')
                                                         default_value=writecaches[0] if writecaches else '')
         System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
         System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
+        arakoon_ports = {}
+        exclude_ports = []
         for cluster in SetupController.arakoon_clusters:
-            ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
-            ArakoonInstaller.create_cluster(cluster, cluster_ip, ports)
+            result = ArakoonInstaller.create_cluster(cluster, cluster_ip, exclude_ports)
+            arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
+            exclude_ports += arakoon_ports[cluster]
 
         print 'Setting up logstash'
         logger.info('Setting up logstash')
@@ -581,6 +583,8 @@ EOF
         from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.hybrids.storagerouter import StorageRouter
         from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.dal.lists.servicetypelist import ServiceTypeList
+        from ovs.dal.hybrids.service import Service
 
         print 'Configuring/updating model'
         logger.info('Configuring/updating model')
@@ -610,6 +614,14 @@ EOF
         storagerouter.node_type = 'MASTER'
         storagerouter.pmachine = pmachine
         storagerouter.save()
+        arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
+        for cluster, ports in arakoon_ports.iteritems():
+            service = Service()
+            service.name = SetupController.arakoon_clusters[cluster]
+            service.type = arakoonservice_type
+            service.ports = ports
+            service.storagerouter = storagerouter
+            service.save()
 
         print 'Updating configuration files'
         logger.info('Updating configuration files')
@@ -735,7 +747,7 @@ EOF
         print 'Configuring services'
         logger.info('Copying client configurations')
         for cluster in SetupController.arakoon_clusters:
-            ArakoonInstaller.deploy_config(master_ip, cluster_ip, cluster)
+            ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, cluster)
         for config in SetupController.generic_configfiles.keys():
             master_client = SSHClient.load(master_ip)
             client_config = SetupController._remote_config_read(master_client, config)
@@ -912,6 +924,9 @@ EOF
         Promotes a given node
         """
         from ovs.dal.lists.storagerouterlist import StorageRouterList
+        from ovs.dal.lists.servicetypelist import ServiceTypeList
+        from ovs.dal.lists.servicelist import ServiceList
+        from ovs.dal.hybrids.service import Service
 
         print '\n+++ Promoting node +++\n'
         logger.info('Promoting node')
@@ -926,8 +941,9 @@ EOF
         # Find other (arakoon) master nodes
         master_nodes = []
         for cluster in SetupController.arakoon_clusters:
-            config = ArakoonInstaller.get_config_from(cluster, master_ip)
-            master_nodes = [config.get(node.strip(), 'ip').strip() for node in config.get('global', 'cluster').split(',')]
+            config = ArakoonClusterConfig(cluster)
+            config.load_config(SSHClient.load(master_ip))
+            master_nodes = [node.ip for node in config.nodes]
             if cluster_ip in master_nodes:
                 master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
@@ -971,9 +987,12 @@ EOF
                         print '  Invalid path, please retry'
         System.set_remote_config(target_client, 'ovs.core.db.arakoon.location', arakoon_mountpoint)
         System.set_remote_config(target_client, 'ovs.arakoon.base.dir', arakoon_mountpoint)
+        arakoon_ports = {}
+        exclude_ports = ServiceList.get_ports_for_ip(cluster_ip)
         for cluster in SetupController.arakoon_clusters:
-            ports = [SetupController.arakoon_exclude_ports[cluster], SetupController.arakoon_exclude_ports[cluster] + 1]
-            ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, ports)
+            result = ArakoonInstaller.extend_cluster(master_ip, cluster_ip, cluster, exclude_ports)
+            arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
+            exclude_ports += arakoon_ports[cluster]
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -995,6 +1014,15 @@ EOF
             ArakoonInstaller.restart_cluster_add(cluster, master_nodes, cluster_ip)
         PersistentFactory.store = None
         VolatileFactory.store = None
+
+        arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
+        for cluster, ports in arakoon_ports.iteritems():
+            service = Service()
+            service.name = SetupController.arakoon_clusters[cluster]
+            service.type = arakoonservice_type
+            service.ports = ports
+            service.storagerouter = storagerouter
+            service.save()
 
         print 'Setting up RabbitMQ'
         logger.debug('Setting up RMQ')
@@ -1231,9 +1259,9 @@ EOF
         # Find other (arakoon) master nodes
         master_nodes = []
         for cluster in SetupController.arakoon_clusters:
-            config = ArakoonInstaller.get_config_from(cluster, master_ip)
-            master_nodes = [config.get(node.strip(), 'ip').strip() for node in
-                            config.get('global', 'cluster').split(',')]
+            config = ArakoonClusterConfig(cluster)
+            config.load_config(SSHClient.load(master_ip))
+            master_nodes = [node.ip for node in config.nodes]
             if cluster_ip in master_nodes:
                 master_nodes.remove(cluster_ip)
         if len(master_nodes) == 0:
@@ -1299,6 +1327,13 @@ for json_file in os.listdir(configuration_dir):
             ArakoonInstaller.restart_cluster_remove(cluster, remaining_nodes)
         PersistentFactory.store = None
         VolatileFactory.store = None
+
+        service_names = []
+        for cluster in SetupController.arakoon_clusters:
+            service_names.append(SetupController.arakoon_clusters[cluster])
+        for service in storagerouter.services:
+            if service.name in service_names:
+                service.delete()
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')

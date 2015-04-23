@@ -50,3 +50,17 @@ class ServiceList(object):
         if len(services) == 1:
             return Descriptor(Service, services[0]).get_object(True)
         return None
+
+    @staticmethod
+    def get_ports_for_ip(ip):
+        """
+        Returns a list of ports for all services on a given (StorageRouter) ip
+        """
+        services = DataList({'object': Service,
+                             'data': DataList.select.GUIDS,
+                             'query': {'type': DataList.where_operator.AND,
+                                       'items': [('storagerouter.ip', DataList.operator.EQUALS, ip)]}}).data
+        ports = []
+        for service in DataObjectList(services, Service):
+            ports.extend(service.ports)
+        return list(set(ports))
