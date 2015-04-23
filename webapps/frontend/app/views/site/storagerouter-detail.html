@@ -115,7 +115,7 @@ limitations under the License.
                             <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:storagerouters.detail.storageroutervpoollink"></h4>
                                 <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
-                                <table class="table table-noborder table-hover table-condensed" data-bind="foreach: $root.vPools">
+                                <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
                                             <th style="width: 30px;"></th>
@@ -126,7 +126,7 @@ limitations under the License.
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.storageip"></span></th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody data-bind="foreach: $root.vPools">
                                         <tr>
                                             <td>
                                                 <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
