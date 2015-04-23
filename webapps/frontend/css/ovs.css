@@ -194,3 +194,7 @@ a {
 .nav-tabs > li.active > a, .nav-tabs > li.active > a:hover, .nav-tabs > li.active > a:focus {
     color: #377ca8 !important;
 }
+
+.noline {
+    text-decoration: none !important;
+}

@@ -117,18 +117,18 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
             $(element).popover({
                 html: true,
                 placement: 'auto',
-                trigger: 'click',
+                trigger: 'focus',
                 title: $.t(value.title),
                 content: $.t(value.content)
             });
         },
         update: function(element, valueAccessor) {
             var value = valueAccessor();
-            $(element).tooltip('destroy');
+            $(element).popover('destroy');
             $(element).popover({
                 html: true,
                 placement: 'auto',
-                trigger: 'click',
+                trigger: 'focus',
                 title: $.t(value.title),
                 content: $.t(value.content)
             });
