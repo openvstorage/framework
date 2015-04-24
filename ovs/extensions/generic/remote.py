@@ -45,7 +45,7 @@ class Remote(object):
         else:
             raise ValueError('IP info needs to be a single IP or a list of IPs')
 
-        if not isinstance(modules, list) or not isinstance(modules, set) or not isinstance(modules, tuple):
+        if not isinstance(modules, list) and not isinstance(modules, set) and not isinstance(modules, tuple):
             raise ValueError('Modules should be a list, set or tuple')
 
         self.username = username if username is not None else check_output('whoami').strip()

@@ -84,7 +84,7 @@ class Injector(object):
             if client is None:
                 return os.path.exists(file_to_check)
             else:
-                client.file_exists(file_to_check)
+                return client.file_exists(file_to_check)
 
         def _get_name(name, client, path=None):
             if _service_exists(name, client, path):
@@ -108,18 +108,16 @@ class Injector(object):
                 with open(template_dir.format(upstart_conf), 'r') as template_file:
                     template_conf = template_file.read()
             else:
-                template_conf = client.file_read(upstart_conf)
+                template_conf = client.file_read(template_dir.format(upstart_conf))
 
             for key, value in params.iteritems():
-                print 'replacing {0} by {1}'.format(key, value)
                 template_conf = template_conf.replace(key, value)
 
-            print '\n\n\n service {0} configfile \n {1}'.format(name, template_conf)
             if client is None:
                 with open(upstart_dir.format(upstart_conf), 'wb') as upstart_file:
                     upstart_file.write(template_conf)
             else:
-                client.file_write(upstart_conf, template_conf)
+                client.file_write(upstart_dir.format(upstart_conf), template_conf)
 
         def get_service_status(name, ip=None):
             try:

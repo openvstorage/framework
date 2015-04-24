@@ -16,6 +16,7 @@ import os
 import re
 import tempfile
 import paramiko
+import subprocess
 from subprocess import check_output
 from ConfigParser import RawConfigParser
 
@@ -76,7 +77,9 @@ class SSHClient(object):
         else:
             try:
                 self._connect()
-                _, stdout, _ = self.client.exec_command(command)  # stdin, stdout, stderr
+                _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
+                if stdout.channel.recv_exit_status() != 0:
+                    raise subprocess.CalledProcessError(stderr.readlines())
                 return '\n'.join(line for line in stdout)
             finally:
                 self._disconnect()

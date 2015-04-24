@@ -24,9 +24,10 @@ import time
 import uuid
 import glob
 import base64
-import pyudev
 import urllib2
+import subprocess
 from string import digits
+from pyudev import Context
 
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
@@ -40,7 +41,7 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.plugin.provider.service import Service
+from ovs.plugin.provider.service import Service as PluginService
 from ovs.plugin.provider.configuration import Configuration
 
 logger = LogHandler('lib', name='setup')
@@ -257,6 +258,8 @@ class SetupController(object):
             ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
             if not cluster_ip:
                 cluster_ip = Interactive.ask_choice(ipaddresses, 'Select the public ip address of {0}'.format(node_name))
+                ip_client_map.pop(ip)
+                ip_client_map[cluster_ip] = SSHClient(cluster_ip, password=target_node_password)
             known_passwords[cluster_ip] = target_node_password
             if cluster_ip not in nodes:
                 nodes.append(cluster_ip)
@@ -280,15 +283,17 @@ class SetupController(object):
             else:
                 promote = True  # Correct, but irrelevant, since a first node is always master
 
-            mountpoints, hypervisor_info, writecaches, ip_client_map = SetupController._prepare_node(
-                cluster_ip, nodes, known_passwords, ip_client_map,
-                {'type': hypervisor_type,
-                 'name': hypervisor_name,
-                 'username': hypervisor_username,
-                 'ip': hypervisor_ip,
-                 'password': hypervisor_password},
-                auto_config, disk_layout
-            )
+            mountpoints, hypervisor_info, writecaches, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
+                                                                                                     nodes=nodes,
+                                                                                                     known_passwords=known_passwords,
+                                                                                                     ip_client_map=ip_client_map,
+                                                                                                     hypervisor_info={'type': hypervisor_type,
+                                                                                                                      'name': hypervisor_name,
+                                                                                                                      'username': hypervisor_username,
+                                                                                                                      'ip': hypervisor_ip,
+                                                                                                                      'password': hypervisor_password},
+                                                                                                     auto_config=auto_config,
+                                                                                                     disk_layout=disk_layout)
             if first_node:
                 SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
                                                   unique_id=unique_id,
@@ -485,8 +490,8 @@ class SetupController(object):
         for node, node_client in ip_client_map.iteritems():
             print 'Updating hosts files'
             logger.debug('Updating hosts files')
-            for ip in mapping.keys():
-                System.update_hosts_file(mapping[ip], ip, node_client)
+            for ip, hostname in mapping.iteritems():
+                System.update_hosts_file(hostname, ip, node_client)
 
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
@@ -605,18 +610,7 @@ class SetupController(object):
             exclude_ports += arakoon_ports[cluster]
 
         SetupController._configure_logstash(target_client, cluster_name)
-
-        print 'Adding services'
-        logger.info('Adding services')
-        params = {'<ARAKOON_NODE_ID>': unique_id,
-                  '<MEMCACHE_NODE_IP>': cluster_ip,
-                  '<WORKER_QUEUE>': '{0},ovs_masters'.format(unique_id)}
-        for service in SetupController.master_node_services + ['watcher-framework', 'watcher-volumedriver']:
-            logger.debug('Adding service {0}'.format(service))
-            Service.add_service(None, service, None, None, params, ip=target_client.ip)
-
-        print 'Setting up RabbitMQ'
-        logger.debug('Setting up RabbitMQ')
+        SetupController._add_services(target_client, unique_id, 'master')
         SetupController._configure_rabbitmq(target_client)
 
         print 'Build configuration files'
@@ -632,8 +626,8 @@ class SetupController(object):
         print 'Starting model services'
         logger.debug('Starting model services')
         for service in SetupController.model_services:
-            if Service.has_service(service, ip=target_client.ip):
-                Service.enable_service(service, ip=target_client.ip)
+            if PluginService.has_service(service, ip=target_client.ip):
+                PluginService.enable_service(service, ip=target_client.ip)
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Start model migration'
@@ -643,7 +637,10 @@ class SetupController(object):
 
         print '\n+++ Finalizing setup +++\n'
         logger.info('Finalizing setup')
-        SetupController._finalize_setup(target_client, node_name, 'MASTER', hypervisor_info, unique_id)
+        storagerouter = SetupController._finalize_setup(target_client, node_name, 'MASTER', hypervisor_info, unique_id)
+
+        from ovs.dal.lists.servicetypelist import ServiceTypeList
+        from ovs.dal.hybrids.service import Service
         arakoonservice_type = ServiceTypeList.get_by_name('Arakoon')
         for cluster, ports in arakoon_ports.iteritems():
             service = Service()
@@ -662,18 +659,18 @@ class SetupController(object):
         print 'Starting services'
         logger.info('Starting services for join master')
         for service in SetupController.master_services:
-            if Service.has_service(service, ip=target_client.ip):
-                Service.enable_service(service, ip=target_client.ip)
+            if PluginService.has_service(service, ip=target_client.ip):
+                PluginService.enable_service(service, ip=target_client.ip)
                 SetupController._change_service_state(target_client, service, 'start')
         # Enable HA for the rabbitMQ queues
         SetupController._start_rabbitmq_and_check_process(target_client)
 
         for service in ['watcher-framework', 'watcher-volumedriver']:
-            Service.enable_service(service, ip=target_client.ip)
+            PluginService.enable_service(service, ip=target_client.ip)
             SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
-        Service.enable_service('workers', ip=target_client.ip)
+        PluginService.enable_service('workers', ip=target_client.ip)
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
         SetupController._run_hooks('firstnode', cluster_ip)
@@ -691,8 +688,8 @@ class SetupController(object):
         if enable_heartbeats is True:
             target_client.config_set('ovs.support.enabled', 1)
             service = 'support-agent'
-            Service.add_service(None, service, None, None, ip=target_client.ip)
-            Service.enable_service(service, ip=target_client.ip)
+            PluginService.add_service(None, service, None, None, ip=target_client.ip)
+            PluginService.enable_service(service, ip=target_client.ip)
             SetupController._change_service_state(target_client, service, 'start')
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -711,15 +708,7 @@ class SetupController(object):
 
         target_client = ip_client_map[cluster_ip]
         SetupController._configure_logstash(target_client, cluster_name)
-
-        print 'Adding services'
-        logger.info('Adding services')
-        params = {'<ARAKOON_NODE_ID>': unique_id,
-                  '<MEMCACHE_NODE_IP>': cluster_ip,
-                  '<WORKER_QUEUE>': unique_id}
-        for service in SetupController.extra_node_services + ['watcher-framework', 'watcher-volumedriver']:
-            logger.debug('Adding service {0}'.format(service))
-            Service.add_service(None, service, None, None, params, ip=target_client.ip)
+        SetupController._add_services(target_client, unique_id, 'extra')
 
         print 'Configuring services'
         logger.info('Copying client configurations')
@@ -739,8 +728,8 @@ class SetupController(object):
         target_client.config_set('ovs.support.enablesupport', enablesupport)
         if int(enabled) > 0:
             service = 'support-agent'
-            Service.add_service(None, service, None, None, ip=target_client.ip)
-            Service.enable_service(service, ip=target_client.ip)
+            PluginService.add_service(None, service, None, None, ip=target_client.ip)
+            PluginService.enable_service(service, ip=target_client.ip)
             SetupController._change_service_state(target_client, service, 'start')
 
         node_name = target_client.run('hostname')
@@ -752,12 +741,12 @@ class SetupController(object):
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
-            Service.enable_service(service, ip=target_client.ip)
+            PluginService.enable_service(service, ip=target_client.ip)
             SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
-            Service.enable_service('workers', ip=node_client.ip)
+            PluginService.enable_service('workers', ip=node_client.ip)
             SetupController._change_service_state(node_client, 'workers', 'restart')
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
@@ -798,15 +787,7 @@ class SetupController(object):
             raise RuntimeError('There should be at least one other master node')
 
         SetupController._configure_logstash(target_client, cluster_name)
-
-        print 'Adding services'
-        logger.info('Adding services')
-        params = {'<ARAKOON_NODE_ID>': unique_id,
-                  '<MEMCACHE_NODE_IP>': cluster_ip,
-                  '<WORKER_QUEUE>': '{0},ovs_masters'.format(unique_id)}
-        for service in SetupController.master_node_services + ['watcher-framework', 'watcher-volumedriver']:
-            logger.debug('Adding service {0}'.format(service))
-            Service.add_service(None, service, None, None, params, ip=target_client.ip)
+        SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Joining arakoon cluster'
         logger.info('Joining arakoon cluster')
@@ -877,7 +858,7 @@ class SetupController(object):
         target_client.file_write(rabbitmq_cookie_file, contents)
         target_client.file_attribs(rabbitmq_cookie_file, mode=400)
         target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
-        target_client.run('rabbitmqctl join_cluster rabbit@{}; sleep 5;'.format(master_hostname))
+        target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         # Enable HA for the rabbitMQ queues
@@ -891,8 +872,8 @@ class SetupController(object):
         print 'Starting services'
         logger.info('Starting services')
         for service in SetupController.master_services:
-            if Service.has_service(service, ip=target_client.ip):
-                Service.enable_service(service, ip=target_client.ip)
+            if PluginService.has_service(service, ip=target_client.ip):
+                PluginService.enable_service(service, ip=target_client.ip)
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Retarting services'
@@ -979,27 +960,27 @@ class SetupController(object):
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
-        if Service.has_service('rabbitmq', ip=target_client.ip):
+        if PluginService.has_service('rabbitmq', ip=target_client.ip):
             target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl reset; sleep 5;')
             target_client.run('rabbitmqctl stop; sleep 5;')
             SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
-            Service.remove_service(None, 'rabbitmq', ip=target_client.ip)
+            PluginService.remove_service(None, 'rabbitmq', ip=target_client.ip)
             target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
         logger.info('Removing services')
         for service in [s for s in SetupController.master_node_services if s not in SetupController.extra_node_services]:
-            if Service.has_service(service, ip=target_client.ip):
+            if PluginService.has_service(service, ip=target_client.ip):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._change_service_state(target_client, service, 'stop')
-                Service.remove_service(None, service, ip=target_client.ip)
+                PluginService.remove_service(None, service, ip=target_client.ip)
 
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
                   '<WORKER_QUEUE>': '{0}'.format(unique_id)}
-        if Service.has_service('workers', ip=target_client.ip):
-            Service.add_service(None, 'workers', None, None, params, ip=target_client.ip)
+        if PluginService.has_service('workers', ip=target_client.ip):
+            PluginService.add_service(None, 'workers', None, None, params, ip=target_client.ip)
 
         print 'Restarting services'
         logger.debug('Restarting services')
@@ -1023,6 +1004,8 @@ class SetupController(object):
 
     @staticmethod
     def _configure_rabbitmq(client):
+        print 'Setting up RabbitMQ'
+        logger.debug('Setting up RabbitMQ')
         rabbitmq_port = client.config_read('ovs.core.broker.port')
         rabbitmq_login = client.config_read('ovs.core.broker.login')
         rabbitmq_password = client.config_read('ovs.core.broker.password')
@@ -1150,6 +1133,24 @@ EOF
         SetupController._change_service_state(client, 'avahi-daemon', 'restart')
 
     @staticmethod
+    def _add_services(client, unique_id, node_type):
+        if node_type == 'master':
+            services = SetupController.master_node_services
+            worker_queue = '{0},ovs_masters'.format(unique_id)
+        else:
+            services = SetupController.extra_node_services
+            worker_queue = unique_id
+
+        print 'Adding services'
+        logger.info('Adding services')
+        params = {'<ARAKOON_NODE_ID>': unique_id,
+                  '<MEMCACHE_NODE_IP>': client.ip,
+                  '<WORKER_QUEUE>': worker_queue}
+        for service in services + ['watcher-framework', 'watcher-volumedriver']:
+            logger.debug('Adding service {0}'.format(service))
+            PluginService.add_service(None, service, None, None, params, ip=client.ip)
+
+    @staticmethod
     def _finalize_setup(client, node_name, node_type, hypervisor_info, unique_id):
         cluster_ip = client.ip
         client.dir_create('/opt/OpenvStorage/webapps/frontend/logging')
@@ -1164,8 +1165,6 @@ EOF
         from ovs.dal.lists.pmachinelist import PMachineList
         from ovs.dal.hybrids.storagerouter import StorageRouter
         from ovs.dal.lists.storagerouterlist import StorageRouterList
-        from ovs.dal.lists.servicetypelist import ServiceTypeList
-        from ovs.dal.hybrids.service import Service
 
         print 'Configuring/updating model'
         logger.info('Configuring/updating model')
@@ -1195,62 +1194,61 @@ EOF
         storagerouter.node_type = node_type
         storagerouter.pmachine = pmachine
         storagerouter.save()
+        return storagerouter
 
     @staticmethod
     def _get_disk_configuration(client):
         """
         Connect to target host and retrieve sata/ssd/raid configuration
         """
-        with Remote(client.ip, [pyudev, glob, os], 'root') as remote:
+        with Remote(client.ip, [glob, os, Context]) as remote:
             def get_value(location):
                 file_open = remote.os.open(location, remote.os.O_RDONLY)
-                file_content = remote.os.read(file_open, 12)
+                file_content = remote.os.read(file_open, 10240)
                 remote.os.close(file_open)
                 return str(file_content)
 
-            blk_patterns = ['sd.*', 'fio.*', 'vd.*', 'xvd.*']
-            blk_devices = dict()
-
             content = get_value('/etc/mtab')
             boot_device = None
-            for line in content:
+            for line in content.splitlines():
                 if ' / ' in line:
                     boot_partition = line.split()[0]
                     boot_device = boot_partition.lstrip('/dev/').translate(None, digits)
 
-            for device_path in remote.glob.glob('/sys/block/*'):
-                device = remote.os.path.basename(device_path)
-                for pattern in blk_patterns:
-                    if re.compile(pattern).match(device):
-                        model = ''
-                        sectors = get_value('/sys/block/{0}/size'.format(device))
-                        sector_size = get_value('/sys/block/{0}/queue/hw_sector_size'.format(device))
-                        rotational = get_value('/sys/block/{0}/queue/rotational'.format(device))
-                        context = remote.pyudev.Context()
-                        devices = context.list_devices(subsystem='block')
-                        is_raid_member = False
+            blk_devices = dict()
+            devices = [remote.os.path.basename(device_path) for device_path in remote.glob.glob('/sys/block/*')]
+            matching_devices = [device for device in devices if re.match('^(?:sd|fio|vd|xvd).*', device)]
 
-                        for entry in devices:
-                            if device not in entry['DEVNAME']:
-                                continue
+            for matching_device in matching_devices:
+                model = ''
+                sectors = get_value('/sys/block/{0}/size'.format(matching_device))
+                sector_size = get_value('/sys/block/{0}/queue/hw_sector_size'.format(matching_device))
+                rotational = get_value('/sys/block/{0}/queue/rotational'.format(matching_device))
+                context = remote.Context()
+                devices = context.list_devices(subsystem='block')
+                is_raid_member = False
 
-                            if entry['DEVTYPE'] == 'partition' and 'ID_FS_USAGE' in entry:
-                                if 'raid' in entry['ID_FS_USAGE'].lower():
-                                    is_raid_member = True
+                for entry in devices:
+                    if matching_device not in entry['DEVNAME']:
+                        continue
 
-                            if entry['DEVTYPE'] == 'disk' and 'ID_MODEL' in entry:
-                                model = str(entry['ID_MODEL'])
+                    if entry['DEVTYPE'] == 'partition' and 'ID_FS_USAGE' in entry:
+                        if 'raid' in entry['ID_FS_USAGE'].lower():
+                            is_raid_member = True
 
-                        if 'fio' in device:
-                            model = 'FUSIONIO'
+                    if entry['DEVTYPE'] == 'disk' and 'ID_MODEL' in entry:
+                        model = str(entry['ID_MODEL'])
 
-                        device_details = {'size': float(sectors) * float(sector_size),
-                                          'type': 'disk' if '1' in rotational else 'ssd',
-                                          'software_raid': is_raid_member,
-                                          'model': model,
-                                          'boot_device': device == boot_device}
+                if 'fio' in matching_device:
+                    model = 'FUSIONIO'
 
-                        blk_devices[device] = device_details
+                device_details = {'size': float(sectors) * float(sector_size),
+                                  'type': 'disk' if '1' in rotational else 'ssd',
+                                  'software_raid': is_raid_member,
+                                  'model': model,
+                                  'boot_device': matching_device == boot_device}
+
+                blk_devices[matching_device] = device_details
 
         # cross-check ssd devices - flawed detection on vmware
         for disk in blk_devices.keys():
@@ -1341,7 +1339,7 @@ EOF
             unique_disks.add(values['device'])
             if 'boot_device' in values and values['boot_device']:
                 boot_disk = values['device']
-                print 'Boot disk {} will not be cleared'.format(boot_disk)
+                print 'Boot disk {0} will not be cleared'.format(boot_disk)
             # Umount partitions
             if mp in mounted:
                 print 'Unmounting {0}'.format(mp)
@@ -1364,7 +1362,7 @@ EOF
             if disk == boot_disk:
                 continue
 
-            print "Partitioning disk {}".format(disk)
+            print "Partitioning disk {0}".format(disk)
             client.run('parted {0} -s mklabel gpt'.format(disk))
 
         # Pre process partition info (disk as key)
@@ -1391,11 +1389,11 @@ EOF
 
             if disk == boot_disk:
                 for mp, percentage, label in partitions:
-                    print 'Partitioning free space on bootdisk: {}'.format(disk)
-                    command = """parted {} """.format(boot_disk)
+                    print 'Partitioning free space on bootdisk: {0}'.format(disk)
+                    command = """parted {0} """.format(boot_disk)
                     command += """unit % print free | grep 'Free Space' | tail -n1 | awk '{print $1}'"""
                     start = int(float(client.run(command).split('%')[0])) + 1
-                    nr_of_partitions = int(client.run('lsblk {} | grep part | wc -l'.format(boot_disk))) + 1
+                    nr_of_partitions = int(client.run('lsblk {0} | grep part | wc -l'.format(boot_disk))) + 1
                     client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
                     fstab_entries.append(fstab_entry.format(label, mp))
                     client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
@@ -1504,7 +1502,7 @@ EOF
                 print 'No SSD boot disk detected ...'
                 print 'Skipping partitioning of free space on boot disk ...'
             else:
-                command = """parted /dev/{} """.format(boot_disk)
+                command = """parted /dev/{0} """.format(boot_disk)
                 command += """unit GB print free | grep 'Free Space' | tail -n1 | awk '{print $3}'"""
                 free_space = float(client.run(command).split('GB')[0])
 
@@ -1789,7 +1787,7 @@ EOF
                 if node_name not in nodes[cluster_name]:
                     nodes[cluster_name][node_name] = {'ip': '', 'type': '', 'ip_list': []}
                 try:
-                    ip = '{}.{}.{}.{}'.format(cluster_info[4], cluster_info[5], cluster_info[6], cluster_info[7])
+                    ip = '{0}.{1}.{2}.{3}'.format(cluster_info[4], cluster_info[5], cluster_info[6], cluster_info[7])
                 except IndexError:
                     ip = entry_parts[7]
                 nodes[cluster_name][node_name]['ip'] = ip
@@ -1814,15 +1812,15 @@ EOF
         """
 
         action = None
-        status = Service.get_service_status(name, ip=client.ip)
+        status = PluginService.get_service_status(name, ip=client.ip)
         if status is False and state in ['start', 'restart']:
-            Service.start_service(name, ip=client.ip)
+            PluginService.start_service(name, ip=client.ip)
             action = 'started'
         elif status is True and state == 'stop':
-            Service.stop_service(name, ip=client.ip)
+            PluginService.stop_service(name, ip=client.ip)
             action = 'stopped'
         elif status is True and state == 'restart':
-            Service.restart_service(name, ip=client.ip)
+            PluginService.restart_service(name, ip=client.ip)
             action = 'restarted'
 
         if action is None:
@@ -1831,7 +1829,7 @@ EOF
             timeout = 300
             safetycounter = 0
             while safetycounter < timeout:
-                status = Service.get_service_status(name, ip=client.ip)
+                status = PluginService.get_service_status(name, ip=client.ip)
                 if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
                     break
                 safetycounter += 1
@@ -1842,9 +1840,16 @@ EOF
 
     @staticmethod
     def _is_rabbitmq_running(client):
+        def check_rabbitmq_status(service):
+            try:
+                out = client.run('service {0} status'.format(service))
+            except subprocess.CalledProcessError:
+                out = client.run('service {0} status | true'.format(service))
+            return out
+
         rabbitmq_running, rabbitmq_pid = False, 0
         ovs_rabbitmq_running, pid = False, -1
-        output = client.run('service rabbitmq-server status')
+        output = check_rabbitmq_status('rabbitmq-server')
         if 'unrecognized service' in output:
             output = None
         if output:
@@ -1853,16 +1858,20 @@ EOF
                 if 'pid' in line:
                     rabbitmq_running = True
                     rabbitmq_pid = line.split(',')[1].replace('}', '')
+                    break
         else:
-            output = client.run('ps aux | grep rabbit@ | grep -v grep')
-            if output:  # in case of error it is ''
-                output = output.split(' ')
-                if output[0] == 'rabbitmq':
-                    rabbitmq_pid = output[1]
-                    for item in output[2:]:
-                        if 'erlang' in item or 'rabbitmq' in item or 'beam' in item:
-                            rabbitmq_running = True
-        output = client.run('service ovs-rabbitmq status')
+            try:
+                output = client.run('ps aux | grep rabbit@ | grep -v grep')
+            except subprocess.CalledProcessError:
+                output = client.run('ps aux | grep rabbit@ | grep -v grep | true')
+
+            output = output.split(' ')
+            if output[0] == 'rabbitmq':
+                rabbitmq_pid = output[1]
+                for item in output[2:]:
+                    if 'erlang' in item or 'rabbitmq' in item or 'beam' in item:
+                        rabbitmq_running = True
+        output = check_rabbitmq_status('ovs-rabbitmq')
         if 'stop/waiting' in output:
             pass
         if 'start/running' in output:

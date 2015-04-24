@@ -20,7 +20,6 @@ import os
 import uuid
 import time
 from ConfigParser import RawConfigParser
-from subprocess import check_output
 from StringIO import StringIO
 
 from ovs.log.logHandler import LogHandler
@@ -52,7 +51,7 @@ class System(object):
         if client is not None:
             return client.run('cat {0}'.format(System.OVS_ID_FILE)).strip()
         with open(System.OVS_ID_FILE, 'r') as the_file:
-            return the_file.read()
+            return the_file.read().strip()
 
     @staticmethod
     def get_my_storagerouter():

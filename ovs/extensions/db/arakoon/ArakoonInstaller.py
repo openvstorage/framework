@@ -142,7 +142,7 @@ class ArakoonClusterConfig():
                 contents.set(section, item, data[section][item])
         with open(temp_filename, 'wb') as config_file:
             contents.write(config_file)
-        client.dir_ensure(self._dir, recursive=True)
+        client.dir_create(self._dir)
         client.file_upload(self._filename, temp_filename)
         os.remove(temp_filename)
 
