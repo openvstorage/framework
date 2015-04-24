@@ -260,8 +260,9 @@ class DataObject(object):
 
         # Optionally, initialize some fields
         if data is not None:
-            for field, value in data.iteritems():
-                setattr(self, field, value)
+            for prop in self._properties:
+                if prop.name in data:
+                    setattr(self, prop.name, data[prop.name])
 
     #######################
     # Helper methods for dynamic getting and setting

@@ -126,6 +126,9 @@ class Basic(TestCase):
         disk = TestDisk(data={'name': 'diskx'})
         disk.save()
         self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
+        disk = TestDisk(data={'name': 'disky', 'foo': 'bar'})
+        disk.save()
+        self.assertEqual(disk.name, 'disky', 'Disk name should be preloaded, without raising for invalid preload data')
 
     def test_datapersistent(self):
         """

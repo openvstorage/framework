@@ -198,9 +198,9 @@ class StorageRouterController(object):
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
-                    client = OVSClient(connection_host, connection_port, credentials=(oauth_client.client_id, oauth_client.client_secret))
+                    client = OVSClient(connection_host, connection_port, credentials=(oauth_client.client_id, oauth_client.client_secret), version=1)
                 else:
-                    client = OVSClient(connection_host, connection_port, credentials=(connection_username, connection_password))
+                    client = OVSClient(connection_host, connection_port, credentials=(connection_username, connection_password), version=1)
                 task_id = client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successful, metadata = client.wait_for_task(task_id, timeout=300)
                 if successful is False:
