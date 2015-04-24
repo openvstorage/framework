@@ -477,15 +477,18 @@ if vpool_name in enabled_backends:
 
     def _apply_patches(self):
         nova_base_path = self._get_base_path('nova')
+        cinder_base_path = self._get_base_path('cinder')
 
         version = self._get_version()
         # fix "blockdev" issue
         if self.is_devstack:
             nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
+            cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         elif self.is_openstack:
             nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
             nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
+            cinder_brick_initiator_file = '/usr/lib/python2.7/dist-packages/cinder/brick/initiator/connector.py'
 
         self.client.run("""python -c "
 import os
@@ -542,6 +545,10 @@ if not patched:
             f.writelines(fc)
 
 " """ % (version, nova_volume_file, nova_driver_file))
+
+        # fix brick/upload to glance
+        if os.path.exists(cinder_brick_initiator_file):
+            self.client.run("""sed -i 's/elif protocol == "LOCAL":/elif protocol in ["LOCAL", "FILE"]:/g' %s""" % cinder_brick_initiator_file)
 
     def _delete_volume_type(self, volume_type_name):
         """
