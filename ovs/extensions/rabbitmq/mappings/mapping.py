@@ -72,4 +72,5 @@ class Mapping(object):
                                                                              'dedupe_key': '[TASK_NAME]_[storagedriver_id]'}}],
                VolumeDriverEvents.volumedriver_error: [{'task': StorageDriverController.volumedriver_error,
                                                         'arguments': {'code': 'code',
-                                                                      'volume_name': 'volumename'}}]}
+                                                                      'volume_name': 'volumename',
+                                                                      '[NODE_ID]': 'storagedriver_id'}}]}
