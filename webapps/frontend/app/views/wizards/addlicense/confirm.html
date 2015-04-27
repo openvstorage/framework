@@ -20,9 +20,6 @@ limitations under the License.
             <li>
                 <span data-i18n="ovs:generic.component"></span>: <span data-bind="translate: ($data.component + ':licensing.component')"></span><br />
                 <span data-i18n="ovs:generic.name"></span>: <span data-bind="text: $data.name"></span><br />
-                <!-- ko if: $data.valid_until !== null -->
-                    <span data-i18n="ovs:generic.validuntil"></span>: <span data-bind="text: generic.getLocalTime($data.valid_until)"></span><br />
-                <!-- /ko -->
                 <span data-i18n="ovs:generic.metadata"></span>:
                 <ul data-bind="foreach: $root.generic.keys($data.metadata)">
                     <!-- ko if: $data !== 'token' -->
