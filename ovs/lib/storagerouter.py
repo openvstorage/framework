@@ -801,7 +801,7 @@ if Service.has_service('{0}'):
         # First model cleanup
         if storagedriver.alba_proxy is not None:
             storagedriver.alba_proxy.delete()
-        storagedriver.delete(abandon=True)  # Detach from the log entries
+        storagedriver.delete(abandon=['logs'])  # Detach from the log entries
 
         MDSServiceController.mds_checkup()
 

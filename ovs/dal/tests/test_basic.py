@@ -819,7 +819,7 @@ class Basic(TestCase):
         self.assertIsNotNone(disk_3.machine, 'The machine should still be linked')
         _ = machine.disks  # Make sure we loaded the list
         disk_2.delete()
-        machine.delete(abandon=True)  # Should not raise due to disk_2 being deleted
+        machine.delete(abandon=['disks'])  # Should not raise
         disk_4 = TestDisk(disk_1.guid)
         self.assertIsNone(disk_4.machine, 'The machine should be unlinked')
 
