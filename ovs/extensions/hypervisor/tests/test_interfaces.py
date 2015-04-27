@@ -66,7 +66,6 @@ class Interfaces(TestCase):
                     all_ok = False
         self.assertTrue(all_ok, 'Not all functions in the {0} are equal'.format(module_name))
 
-
     @staticmethod
     def _print_table(overview, headers):
         y_entries = overview.keys()
