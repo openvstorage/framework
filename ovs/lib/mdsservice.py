@@ -113,18 +113,15 @@ class MDSServiceController(object):
         # Create system services
         template_dir = '/opt/OpenvStorage/config/templates/upstart'
         client.run('cp -f {0}/ovs-metadataserver.conf {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
-        PluginService.add_service(package=('openvstorage', 'metadataserver'),
-                                  name='metadataserver_{0}_{1}'.format(vpool.name, service_number),
-                                  command=None,
-                                  stop_command=None,
+        PluginService.add_service(name='metadataserver_{0}_{1}'.format(vpool.name, service_number),
                                   params={'<VPOOL_NAME>': vpool.name,
                                           '<SERVICE_NUMBER>': str(service_number)},
-                                  ip=client.ip)
+                                  client=client)
         client.run('rm -f {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
 
         if start is True:
-            PluginService.enable_service(service.name, ip=client.ip)
-            PluginService.start_service(service.name, ip=client.ip)
+            PluginService.enable_service(service.name, client=client)
+            PluginService.start_service(service.name, client=client)
 
         return mds_service
 
@@ -136,16 +133,13 @@ class MDSServiceController(object):
         if len(mds_service.vdisks_guids) > 0:
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
-        System.exec_remote_python(client, """
-from ovs.plugin.provider.service import Service
-if Service.has_service('{0}'):
-    if Service.get_service_status('{0}') is True:
-        Service.stop_service('{0}')
-    Service.remove_service(domain='openvstorage', name='{0}')
-""".format(mds_service.service.name))
+        if PluginService.has_service(mds_service.service.name, client=client):
+            if PluginService.get_service_status(mds_service.service.name, client=client) is True:
+                PluginService.stop_service(mds_service.service.name, client=client)
+                PluginService.remove_service(name=mds_service.service.name, client=client)
 
         # Clean up configuration files
-        configuration_dir = System.read_remote_config(client, 'ovs.core.cfgdir')
+        configuration_dir = client.config_read('ovs.core.cfgdir')
         client.run('rm -f {0}/storagedriver/metadataserver/{1}_{2}.json'.format(configuration_dir, vpool.name, mds_service.number))
 
         # Remove directores

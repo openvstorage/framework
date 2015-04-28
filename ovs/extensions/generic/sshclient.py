@@ -14,6 +14,8 @@
 
 import os
 import re
+import grp
+import pwd
 import tempfile
 import paramiko
 import subprocess
@@ -38,12 +40,18 @@ class SSHClient(object):
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         self.ip = ip
-        self.username = username if username is not None else check_output("whoami", shell=True).strip()
-        self.password = password
-
         local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
         local_ips = [ip.strip() for ip in local_ips]
         self.is_local = self.ip in local_ips
+
+        current_user = check_output("whoami", shell=True).strip()
+        if username is None:
+            self.username = current_user
+        else:
+            self.username = username
+            if username != current_user:
+                self.is_local = False  # If specified user differs from current executing user, we always use the paramiko SSHClient
+        self.password = password
 
     def _connect(self):
         """
@@ -73,14 +81,15 @@ class SSHClient(object):
         Executes a shell command
         """
         if self.is_local is True:
-            return check_output(command, shell=True)
+            return check_output(command, shell=True).strip()
         else:
             try:
                 self._connect()
                 _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
-                if stdout.channel.recv_exit_status() != 0:
-                    raise subprocess.CalledProcessError(stderr.readlines())
-                return '\n'.join(line for line in stdout)
+                exit_code = stdout.channel.recv_exit_status()
+                if exit_code != 0:  # Raise same error as check_output
+                    raise subprocess.CalledProcessError(exit_code, command, stderr.readlines())
+                return '\n'.join(line.strip() for line in stdout).strip()
             finally:
                 self._disconnect()
 
@@ -98,15 +107,48 @@ class SSHClient(object):
             else:
                 self.run('mkdir -p "{0}"'.format(directory))
 
-    def dir_chmod(self, directories, mode):
+    def dir_chmod(self, directories, mode, recursive=False):
+        if not isinstance(mode, int):
+            raise ValueError('Mode should be an integer')
+
         if isinstance(directories, basestring):
             directories = [directories]
         for directory in directories:
             directory = self._shell_safe(directory)
             if self.is_local is True:
                 os.chmod(directory, mode)
+                if recursive is True:
+                    for root, dirs, _ in os.walk(directory):
+                        for sub_dir in dirs:
+                            os.chmod(os.path.join(root, sub_dir), mode)
             else:
-                self.run('chmod {0} {1}'.format(mode, directory))
+                recursive_str = '-R' if recursive is True else ''
+                self.run('chmod {0} {1} {2}'.format(recursive_str, mode, directory))
+
+    def dir_chown(self, directories, user, group, recursive=False):
+        all_users = [user_info[0] for user_info in pwd.getpwall()]
+        all_groups = [group_info[0] for group_info in grp.getgrall()]
+
+        if user not in all_users:
+            raise ValueError('User "{0}" is unknown on the system'.format(user))
+        if group not in all_groups:
+            raise ValueError('Group "{0}" is unknown on the system'.format(group))
+
+        uid = pwd.getpwnam(user)[2]
+        gid = grp.getgrnam(group)[2]
+        if isinstance(directories, basestring):
+            directories = [directories]
+        for directory in directories:
+            directory = self._shell_safe(directory)
+            if self.is_local is True:
+                os.chown(directory, uid, gid)
+                if recursive is True:
+                    for root, dirs, _ in os.walk(directory):
+                        for sub_dir in dirs:
+                            os.chown(os.path.join(root, sub_dir), uid, gid)
+            else:
+                recursive_str = '-R' if recursive is True else ''
+                self.run('chown {0} {1} {2}:{3}'.format(recursive_str, directory, user, group))
 
     def file_create(self, filenames):
         if isinstance(filenames, basestring):
@@ -197,6 +239,8 @@ class SSHClient(object):
             return Configuration.get(key)
         else:
             read = """
+import sys
+sys.path.append('/opt/OpenvStorage')
 from ovs.plugin.provider.configuration import Configuration
 print Configuration.get('{0}')
 """.format(key)
@@ -208,6 +252,8 @@ print Configuration.get('{0}')
             Configuration.set(key, value)
         else:
             write = """
+import sys
+sys.path.append('/opt/OpenvStorage')
 from ovs.plugin.provider.configuration import Configuration
 Configuration.set('{0}', '{1}')
 """.format(key, value)

@@ -57,11 +57,13 @@ class SetupController(object):
     This class contains all logic for setting up an environment, installed with system-native packages
     """
 
+    ARAKOON_OVSDB = 'arakoon-ovsdb'
+    ARAKOON_VOLDRV = 'arakoon-voldrv'
     PARTITION_DEFAULTS = {'device': 'DIR_ONLY', 'percentage': 'NA', 'label': 'cache1', 'type': 'storage', 'ssd': False}
 
     # Arakoon
-    arakoon_clusters = {'ovsdb': 'arakoon-ovsdb',
-                        'voldrv': 'arakoon-voldrv'}
+    arakoon_clusters = {'ovsdb': ARAKOON_OVSDB,
+                        'voldrv': ARAKOON_VOLDRV}
 
     # Generic configfiles
     generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
@@ -70,8 +72,8 @@ class SetupController(object):
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
     # Services
-    model_services = ['memcached', 'arakoon-ovsdb']
-    master_services = model_services + ['rabbitmq', 'arakoon-voldrv']
+    model_services = ['memcached', ARAKOON_OVSDB]
+    master_services = model_services + ['rabbitmq', ARAKOON_VOLDRV]
     extra_node_services = ['workers', 'volumerouter-consumer']
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
@@ -80,7 +82,7 @@ class SetupController(object):
     host_ips = set()
 
     @staticmethod
-    def setup_node(ip=None, force_type=None, verbose=False):
+    def setup_node(ip=None, force_type=None):
         """
         Sets up a node.
         1. Some magic figuring out here:
@@ -129,7 +131,6 @@ class SetupController(object):
             hypervisor_username = config.get('setup', 'hypervisor_username')
             hypervisor_password = config.get('setup', 'hypervisor_password')
             arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
-            verbose = config.getboolean('setup', 'verbose')
             auto_config = config.get('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
@@ -155,10 +156,6 @@ class SetupController(object):
             target_client = SSHClient(ip, password=target_node_password)
             ip_client_map[ip] = target_client
 
-            if verbose:
-                logger.debug('Verbose mode')
-                from ovs.plugin.provider.remote import Remote
-                Remote.cuisine.fabric.output['running'] = True
             logger.debug('Target client loaded')
 
             print '\n+++ Collecting cluster information +++\n'
@@ -276,7 +273,7 @@ class SetupController(object):
             if first_node is False:
                 for cluster in SetupController.arakoon_clusters:
                     config = ArakoonClusterConfig(cluster)
-                    config.load_config(SSHClient(master_ip, known_passwords[master_ip]))
+                    config.load_config(SSHClient(master_ip, password=known_passwords[master_ip]))
                     logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
                     if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                         promote = True
@@ -462,13 +459,7 @@ class SetupController(object):
                 prev_node_password = this_node_password
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, password=this_node_password)
-        root_ssh_folder = '/root/.ssh'
-        ovs_ssh_folder = '/opt/OpenvStorage/.ssh'
-        public_key_filename = '{0}/id_rsa.pub'
-        authorized_keys_filename = '{0}/authorized_keys'
-        known_hosts_filename = '{0}/known_hosts'
-        authorized_keys = ''
-        mapping = {}
+
         logger.debug('Nodes: {0}'.format(nodes))
         logger.debug('Discovered nodes: \n{0}'.format(SetupController.discovered_nodes))
         all_ips = set()
@@ -479,6 +470,13 @@ class SetupController(object):
             all_hostnames.add(hostname)
         all_ips.update(SetupController.host_ips)
 
+        root_ssh_folder = '/root/.ssh'
+        ovs_ssh_folder = '/opt/OpenvStorage/.ssh'
+        public_key_filename = '{0}/id_rsa.pub'
+        authorized_keys_filename = '{0}/authorized_keys'
+        known_hosts_filename = '{0}/known_hosts'
+        authorized_keys = ''
+        mapping = {}
         for node, node_client in ip_client_map.iteritems():
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
@@ -487,11 +485,11 @@ class SetupController(object):
             all_hostnames.add(node_hostname)
             mapping[node] = node_hostname
 
+        print 'Updating hosts files'
+        logger.debug('Updating hosts files')
         for node, node_client in ip_client_map.iteritems():
-            print 'Updating hosts files'
-            logger.debug('Updating hosts files')
-            for ip, hostname in mapping.iteritems():
-                System.update_hosts_file(hostname, ip, node_client)
+            hostname = mapping[node]
+            System.update_hosts_file(hostname, node, node_client)
 
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
@@ -626,8 +624,8 @@ class SetupController(object):
         print 'Starting model services'
         logger.debug('Starting model services')
         for service in SetupController.model_services:
-            if PluginService.has_service(service, ip=target_client.ip):
-                PluginService.enable_service(service, ip=target_client.ip)
+            if PluginService.has_service(service, client=target_client):
+                PluginService.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Start model migration'
@@ -659,18 +657,18 @@ class SetupController(object):
         print 'Starting services'
         logger.info('Starting services for join master')
         for service in SetupController.master_services:
-            if PluginService.has_service(service, ip=target_client.ip):
-                PluginService.enable_service(service, ip=target_client.ip)
+            if PluginService.has_service(service, client=target_client):
+                PluginService.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
         # Enable HA for the rabbitMQ queues
         SetupController._start_rabbitmq_and_check_process(target_client)
 
         for service in ['watcher-framework', 'watcher-volumedriver']:
-            PluginService.enable_service(service, ip=target_client.ip)
+            PluginService.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
-        PluginService.enable_service('workers', ip=target_client.ip)
+        PluginService.enable_service('workers', client=target_client)
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
         SetupController._run_hooks('firstnode', cluster_ip)
@@ -688,8 +686,8 @@ class SetupController(object):
         if enable_heartbeats is True:
             target_client.config_set('ovs.support.enabled', 1)
             service = 'support-agent'
-            PluginService.add_service(None, service, None, None, ip=target_client.ip)
-            PluginService.enable_service(service, ip=target_client.ip)
+            PluginService.add_service(service, client=target_client)
+            PluginService.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -728,8 +726,8 @@ class SetupController(object):
         target_client.config_set('ovs.support.enablesupport', enablesupport)
         if int(enabled) > 0:
             service = 'support-agent'
-            PluginService.add_service(None, service, None, None, ip=target_client.ip)
-            PluginService.enable_service(service, ip=target_client.ip)
+            PluginService.add_service(service, client=target_client)
+            PluginService.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         node_name = target_client.run('hostname')
@@ -741,12 +739,12 @@ class SetupController(object):
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
-            PluginService.enable_service(service, ip=target_client.ip)
+            PluginService.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
-            PluginService.enable_service('workers', ip=node_client.ip)
+            PluginService.enable_service('workers', client=node_client)
             SetupController._change_service_state(node_client, 'workers', 'restart')
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
@@ -850,7 +848,7 @@ class SetupController(object):
         SetupController._configure_rabbitmq(target_client)
 
         # Copy rabbitmq cookie
-        logger.debug('Copying RMQ cookie')
+        logger.debug('Copying Rabbit MQ cookie')
         rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
         contents = master_client.file_read(rabbitmq_cookie_file)
         master_hostname = master_client.run('hostname')
@@ -864,16 +862,13 @@ class SetupController(object):
         # Enable HA for the rabbitMQ queues
         SetupController._change_service_state(target_client, 'rabbitmq', 'start')
         SetupController._start_rabbitmq_and_check_process(target_client)
-
-        print 'Update existing vPools'
-        logger.info('Update existing vPools')
-        SetupController._configure_amqp_to_volumedriver(ip_client_map.values())
+        SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Starting services'
         logger.info('Starting services')
         for service in SetupController.master_services:
-            if PluginService.has_service(service, ip=target_client.ip):
-                PluginService.enable_service(service, ip=target_client.ip)
+            if PluginService.has_service(service, client=target_client):
+                PluginService.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Retarting services'
@@ -924,9 +919,7 @@ class SetupController(object):
         for cluster in SetupController.arakoon_clusters:
             ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, cluster)
 
-        print 'Update existing vPools'
-        logger.info('Update existing vPools')
-        SetupController._configure_amqp_to_volumedriver(ip_client_map.values())
+        SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -965,22 +958,22 @@ class SetupController(object):
             target_client.run('rabbitmqctl reset; sleep 5;')
             target_client.run('rabbitmqctl stop; sleep 5;')
             SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
-            PluginService.remove_service(None, 'rabbitmq', ip=target_client.ip)
+            PluginService.remove_service('rabbitmq', client=target_client)
             target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
         logger.info('Removing services')
         for service in [s for s in SetupController.master_node_services if s not in SetupController.extra_node_services]:
-            if PluginService.has_service(service, ip=target_client.ip):
+            if PluginService.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._change_service_state(target_client, service, 'stop')
-                PluginService.remove_service(None, service, ip=target_client.ip)
+                PluginService.remove_service(service, client=target_client)
 
         params = {'<ARAKOON_NODE_ID>': unique_id,
                   '<MEMCACHE_NODE_IP>': cluster_ip,
                   '<WORKER_QUEUE>': '{0}'.format(unique_id)}
-        if PluginService.has_service('workers', ip=target_client.ip):
-            PluginService.add_service(None, 'workers', None, None, params, ip=target_client.ip)
+        if PluginService.has_service('workers', client=target_client):
+            PluginService.add_service('workers', params=params, client=target_client)
 
         print 'Restarting services'
         logger.debug('Restarting services')
@@ -1020,12 +1013,15 @@ EOF
         rabbitmq_running, rabbitmq_pid, _, _ = SetupController._is_rabbitmq_running(client)
         if rabbitmq_running is True and rabbitmq_pid:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
-            client.run('service rabbitmq-server stop')
+            try:
+                client.run('service rabbitmq-server stop')
+            except subprocess.CalledProcessError:
+                print('  Failure stopping the rabbitmq-server process')
             time.sleep(5)
             try:
                 client.run('kill {0}'.format(rabbitmq_pid))
                 print('  Process killed')
-            except SystemExit:
+            except subprocess.CalledProcessError:
                 print('  Process already stopped')
         client.run('rabbitmq-server -detached; sleep 5;')
         users = client.run('rabbitmqctl list_users').splitlines()[1:-1]
@@ -1066,6 +1062,8 @@ EOF
 
     @staticmethod
     def _configure_amqp_to_volumedriver(node_ips):
+        print 'Update existing vPools'
+        logger.info('Update existing vPools')
         for node_ip in node_ips:
             with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx]) as remote:
                 login = remote.Configuration.get('ovs.core.broker.login')
@@ -1148,7 +1146,7 @@ EOF
                   '<WORKER_QUEUE>': worker_queue}
         for service in services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
-            PluginService.add_service(None, service, None, None, params, ip=client.ip)
+            PluginService.add_service(service, params=params, client=client)
 
     @staticmethod
     def _finalize_setup(client, node_name, node_type, hypervisor_info, unique_id):
@@ -1810,17 +1808,16 @@ EOF
         """
         Starts/stops/restarts a service
         """
-
         action = None
-        status = PluginService.get_service_status(name, ip=client.ip)
+        status = PluginService.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
-            PluginService.start_service(name, ip=client.ip)
+            PluginService.start_service(name, client=client)
             action = 'started'
         elif status is True and state == 'stop':
-            PluginService.stop_service(name, ip=client.ip)
+            PluginService.stop_service(name, client=client)
             action = 'stopped'
         elif status is True and state == 'restart':
-            PluginService.restart_service(name, ip=client.ip)
+            PluginService.restart_service(name, client=client)
             action = 'restarted'
 
         if action is None:
@@ -1829,7 +1826,7 @@ EOF
             timeout = 300
             safetycounter = 0
             while safetycounter < timeout:
-                status = PluginService.get_service_status(name, ip=client.ip)
+                status = PluginService.get_service_status(name, client=client)
                 if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
                     break
                 safetycounter += 1

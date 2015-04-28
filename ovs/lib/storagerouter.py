@@ -182,10 +182,11 @@ class StorageRouterController(object):
         # Stop services
         ip_client_map = {}
         for sr in all_storagerouters:
-            if PluginService.has_service(voldrv_service, ip=sr.ip):
-                PluginService.disable_service(voldrv_service, ip=sr.ip)
-                PluginService.stop_service(voldrv_service, ip=sr.ip)
-            ip_client_map[sr.ip] = SSHClient(sr.ip)
+            sr_client = SSHClient(sr.ip)
+            if PluginService.has_service(voldrv_service, client=sr_client):
+                PluginService.disable_service(voldrv_service, client=sr_client)
+                PluginService.stop_service(voldrv_service, client=sr_client)
+            ip_client_map[sr.ip] = sr_client
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         if vpool is None:
@@ -539,10 +540,10 @@ class StorageRouterController(object):
             if client.file_exists('{0}/{1}'.format(template_dir, template_file)):
                 client.run('cp -f {0}/{1} {0}/{2}'.format(template_dir, template_file, vpool_file))
 
-        PluginService.add_service(package=('openvstorage', 'volumedriver'), name='volumedriver_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
-        PluginService.add_service(package=('openvstorage', 'failovercache'), name='failovercache_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
+        PluginService.add_service(name='volumedriver_{0}'.format(vpool_name), params=params, client=client)
+        PluginService.add_service(name='failovercache_{0}'.format(vpool_name), params=params, client=client)
         if vpool.backend_type.code == 'alba':
-            PluginService.add_service(package=('openvstorage', 'albaproxy'), name='albaproxy_{0}'.format(vpool_name), command=None, stop_command=None, params=params, ip=client.ip)
+            PluginService.add_service(name='albaproxy_{0}'.format(vpool_name), params=params, client=client)
 
         # Remove copied template config files (obsolete after add service)
         client.run('rm -f {0}/ovs-failovercache_{1}.conf'.format(template_dir, vpool.name))
@@ -562,8 +563,9 @@ class StorageRouterController(object):
 
         # Start services
         for sr in all_storagerouters:
-            PluginService.enable_service(voldrv_service, ip=sr.ip)
-            PluginService.start_service(voldrv_service, ip=sr.ip)
+            sr_client = ip_client_map.get(sr.ip, SSHClient(ip))
+            PluginService.enable_service(voldrv_service, client=sr_client)
+            PluginService.start_service(voldrv_service, client=sr_client)
 
         # Fill vPool size
         vfs_info = os.statvfs('/mnt/{0}'.format(vpool_name))
@@ -648,9 +650,9 @@ class StorageRouterController(object):
             if client.ip not in ip_client_map:
                 ip_client_map[client.ip] = client
 
-            if PluginService.has_service(voldrv_service, ip=client.ip):
-                PluginService.disable_service(voldrv_service, ip=client.ip)
-                PluginService.stop_service(voldrv_service, ip=client.ip)
+            if PluginService.has_service(voldrv_service, client=client):
+                PluginService.disable_service(voldrv_service, client=client)
+                PluginService.stop_service(voldrv_service, client=client)
 
         # Unconfigure Cinder
         ovsdb = PersistentFactory.get_client()
@@ -691,8 +693,8 @@ class StorageRouterController(object):
         if storagedriver.alba_proxy is not None:
             services_to_remove.append(albaproxy_service)
         for service in services_to_remove:
-            if PluginService.has_service(service, ip=client.ip):
-                PluginService.remove_service(domain='openvstorage', name=service, ip=client.ip)
+            if PluginService.has_service(service, client=client):
+                PluginService.remove_service(name=service, client=client)
 
         configuration_dir = client.config_read('ovs.core.cfgdir')
 
@@ -774,10 +776,12 @@ class StorageRouterController(object):
         if storagedrivers_left:
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
+                ip = current_storagedriver.storagerouter.ip
+                sr_client = ip_client_map.get(ip, SSHClient(ip))
                 if current_storagedriver.guid != storagedriver_guid:
-                    if PluginService.has_service(voldrv_service, ip=current_storagedriver.storagerouter.ip):
-                        PluginService.enable_service(voldrv_service, ip=current_storagedriver.storagerouter.ip)
-                        PluginService.start_service(voldrv_service, ip=current_storagedriver.storagerouter.ip)
+                    if PluginService.has_service(voldrv_service, client=sr_client):
+                        PluginService.enable_service(voldrv_service, client=sr_client)
+                        PluginService.start_service(voldrv_service, client=sr_client)
         else:
             # Final model cleanup
             vpool.delete()
@@ -898,18 +902,18 @@ class StorageRouterController(object):
                 client.run('service openvpn stop')
                 client.run('rm -f /etc/openvpn/ovs_*')
             if enable is True:
-                if not PluginService.has_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
-                    PluginService.add_service(None, StorageRouterController.SUPPORT_AGENT, None, None, ip=client.ip)
-                    PluginService.enable_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
-                if not PluginService.get_service_status(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
-                    PluginService.start_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
+                if not PluginService.has_service(StorageRouterController.SUPPORT_AGENT, client=client):
+                    PluginService.add_service(StorageRouterController.SUPPORT_AGENT, client=client)
+                    PluginService.enable_service(StorageRouterController.SUPPORT_AGENT, client=client)
+                if not PluginService.get_service_status(StorageRouterController.SUPPORT_AGENT, client=client):
+                    PluginService.start_service(StorageRouterController.SUPPORT_AGENT, client=client)
                 else:
-                    PluginService.restart_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
+                    PluginService.restart_service(StorageRouterController.SUPPORT_AGENT, client=client)
             else:
-                if PluginService.has_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
-                    if PluginService.get_service_status(StorageRouterController.SUPPORT_AGENT, ip=client.ip):
-                        PluginService.stop_service(StorageRouterController.SUPPORT_AGENT, ip=client.ip)
-                    PluginService.remove_service(None, StorageRouterController.SUPPORT_AGENT, ip=client.ip)
+                if PluginService.has_service(StorageRouterController.SUPPORT_AGENT, client=client):
+                    if PluginService.get_service_status(StorageRouterController.SUPPORT_AGENT, client=client):
+                        PluginService.stop_service(StorageRouterController.SUPPORT_AGENT, client=client)
+                    PluginService.remove_service(None, StorageRouterController.SUPPORT_AGENT, client=client)
         return True
 
     @staticmethod
