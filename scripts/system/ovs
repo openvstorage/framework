@@ -1,0 +1,63 @@
+#!/usr/bin/env sh
+cd /opt/OpenvStorage
+export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps:/opt/OpenvStorage/webapps/api"
+export DISPLAY=:0
+if [ "$1" = "setup" ] ; then
+  if [ "$#" -ne 2 ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
+  elif [ "$2" = "master" ] || [ "$2" = "extra" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.setup_node(force_type='$2')"
+  elif [ "$2" = "promote" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.promote_node()"
+  elif [ "$2" = "demote" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.demote_node()"
+  fi
+elif [ "$1" = "monitor" ] ; then
+  if [ "$2" = "services" ] ; then
+    watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
+  elif [ "$2" = "heartbeat" ] ; then
+    python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
+  elif [ "$2" = "mds" ] ; then
+    python /opt/OpenvStorage/ovs/lib/mdsservice.py
+  fi
+elif [ "$1" = "stop" ] ; then
+  if [ "$2" = "services" ] ; then
+    for SERVICE in `cd /etc/init; ls ovs-*`
+        do
+        SERVICE=${SERVICE%.*}
+        echo "Stopping: $SERVICE"
+        stop $SERVICE
+        done
+  fi
+elif [ "$1" = "start" ] ; then
+  if [ "$2" = "services" ] ; then
+    for SERVICE in `cd /etc/init; ls ovs-*`
+        do
+        SERVICE=${SERVICE%.*}
+        echo "Starting: $SERVICE"
+        start $SERVICE
+        done
+  fi
+elif [ "$1" = "collect" ] ; then
+  if [ "$2" = "logs" ] ; then
+    LOGFILE=/tmp/ovs-`hostname`-`date "+%Y%m%d%H%M%S"`-logs.tar
+    rm -f $LOGFILE
+    rm -f $LOGFILE.gz
+    touch $LOGFILE
+    tar uvf $LOGFILE /var/log/arakoon* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/logstash* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/nginx* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/ovs* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/rabbitmq* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/upstart* > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/*log > /dev/null 2>&1
+    tar uvf $LOGFILE /var/log/dmesg* > /dev/null 2>&1
+    gzip $LOGFILE > /dev/null
+    echo $LOGFILE.gz
+  fi
+elif [ "$1" = "unittest" ] ; then
+  shift
+  python $@
+else
+  ipython
+fi
