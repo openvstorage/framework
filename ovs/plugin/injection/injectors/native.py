@@ -15,8 +15,6 @@
 """
 Native Injector module
 """
-import os
-from ovs.extensions.generic.sshclient import SSHClient
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 
@@ -56,21 +54,6 @@ class Injector(object):
         provider.get = staticmethod(_get)
         provider.getInt = staticmethod(_get_int)
         provider.set = staticmethod(_set)
-        return provider
-
-    @staticmethod
-    def inject_remote(provider):
-        """ Injects the remote module """
-        class Cuisine:
-            import cuisine
-            import fabric
-
-            api = cuisine
-            fabric = fabric.api
-
-        provider.fabric = Cuisine().fabric
-        provider.cuisine = Cuisine()
-
         return provider
 
     @staticmethod

@@ -1062,7 +1062,7 @@ EOF
         print 'Update existing vPools'
         logger.info('Update existing vPools')
         for node_ip in node_ips:
-            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx]) as remote:
+            with Remote(node_ip, [os, RawConfigParser, Configuration, StorageDriverConfiguration, ArakoonManagementEx], 'ovs') as remote:
                 login = remote.Configuration.get('ovs.core.broker.login')
                 password = remote.Configuration.get('ovs.core.broker.password')
                 protocol = remote.Configuration.get('ovs.core.broker.protocol')

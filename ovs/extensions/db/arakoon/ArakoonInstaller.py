@@ -388,7 +388,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
         logging.disable('WARNING')
 
-        with Remote(new_ip, [ArakoonManagementEx]) as remote:
+        with Remote(new_ip, [ArakoonManagementEx], 'ovs') as remote:
             cluster = remote.ArakoonManagementEx().getCluster(cluster_name)
             cluster.catchup_node()
 

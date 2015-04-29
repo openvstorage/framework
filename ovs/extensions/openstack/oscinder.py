@@ -195,12 +195,12 @@ class OpenStackCinder(object):
         """
         Enable service ovs-openstack-events-consumer
         """
-        from ovs.lib.setup import SetupController
+        from ovs.plugin.provider.service import Service
         service_name = 'ovs-openstack-events-consumer'
-        if not SetupController._has_service(self.client, service_name):
-            SetupController._add_service(self.client, service_name)
-            SetupController._enable_service(self.client, service_name)
-            SetupController._start_service(self.client, service_name)
+        if not Service.has_service(service_name, self.client):
+            Service.add_service(service_name, self.client)
+            Service.enable_service(service_name, self.client)
+            Service.start_service(service_name, self.client)
 
     def _configure_messaging_driver(self):
         """
