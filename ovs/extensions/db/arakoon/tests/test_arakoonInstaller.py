@@ -75,8 +75,8 @@ class TestArakoonInstaller(TestCase):
     def setUp(cls):
         for node in TestArakoonInstaller.nodes:
             client = SSHClient(node)
-            client.run('rm -rf /tmp/db')
-            client.run('rm -rf /tmp/cfg')
+            client.dir_delete('/tmp/db')
+            client.dir_delete('/tmp/cfg')
             client.dir_create('/tmp/db')
             client.dir_create('/tmp/cfg')
 

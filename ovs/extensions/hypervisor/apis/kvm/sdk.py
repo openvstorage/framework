@@ -82,7 +82,7 @@ class Sdk(object):
         self.host = host
         self.login = login
         self._conn = None
-        self._ssh_client = None
+        self.ssh_client = None
         logger.debug('Init complete')
 
     def _connect(self, attempt = 0):
@@ -233,11 +233,13 @@ class Sdk(object):
             order += 1
             mountpoints.append(mountpoint)
 
-        vm_filename = self.ssh_run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host)
+        vm_filename = self.ssh_client.run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.strip().split('/')[-1]
-        vm_location = System.get_my_machine_id(self._ssh_client)
+        vm_location = System.get_my_machine_id(self.ssh_client)
         vm_datastore = None
-        possible_datastores = self.ssh_run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
+        possible_datastores = self.ssh_client.run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
         for datastore in possible_datastores:
             # Filter results so only the correct machineid/xml combinations are left over
             if '{0}/{1}'.format(vm_location, vm_filename) in datastore.strip():
@@ -316,6 +318,8 @@ class Sdk(object):
         Delete domain from libvirt
         Try to delete all files from vpool (xml, .raw)
         """
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host)
         vm_object = None
         try:
             vm_object = self.get_vm_object(vmid)
@@ -324,7 +328,7 @@ class Sdk(object):
         found_files = self.find_devicename(devicename)
         if found_files is not None:
             for found_file in found_files:
-                self.ssh_run('rm {0}'.format(found_file))
+                self.ssh_client.file_delete(found_file)
                 logger.info('File on vpool deleted: {0}'.format(found_file))
         if vm_object:
             found_file = ''
@@ -337,7 +341,7 @@ class Sdk(object):
                 elif 'dev' in disk['source']:
                     found_file = disk['source']['dev']
                 if found_file and os.path.exists(found_file) and os.path.isfile(found_file):
-                    self.ssh_run('rm {0}'.format(found_file))
+                    self.ssh_client.file_delete(found_file)
                     logger.info('File on vpool deleted: {0}'.format(found_file))
             vm_object.undefine()
         elif disks_info:
@@ -345,7 +349,7 @@ class Sdk(object):
             for path, devicename in disks_info:
                 found_file = '{}/{}'.format(path, devicename)
                 if os.path.exists(found_file) and os.path.isfile(found_file):
-                    self.ssh_run('rm {0}'.format(found_file))
+                    self.ssh_client.file_delete(found_file)
                     logger.info('File on vpool deleted: {0}'.format(found_file))
         return True
 
@@ -467,12 +471,8 @@ class Sdk(object):
         else:
             for network in networks:
                 options.append('--network {}'.format(','.join(network)))
-        self.ssh_run('{} {}'.format(command, ' '.join(options)))
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host)
+        self.ssh_client.run('{0} {1}'.format(command, ' '.join(options)))
         if start is False:
-            self.ssh_run('virsh destroy {}'.format(name))
-
-    def ssh_run(self, command):
-        if self._ssh_client is None:
-            logger.debug('Init SSH client')
-            self._ssh_client = SSHClient(self.host)
-        return self._ssh_client.run(command)
+            self.ssh_client.run('virsh destroy {0}'.format(name))

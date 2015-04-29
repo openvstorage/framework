@@ -16,6 +16,8 @@ import os
 import re
 import grp
 import pwd
+import glob
+import json
 import tempfile
 import paramiko
 import subprocess
@@ -107,6 +109,37 @@ class SSHClient(object):
             else:
                 self.run('mkdir -p "{0}"'.format(directory))
 
+    def dir_delete(self, directories):
+        """
+        Remove a directory (or multiple directories) from the remote filesystem recursively
+        """
+        if isinstance(directories, basestring):
+            directories = [directories]
+        for directory in directories:
+            directory = self._shell_safe(directory)
+            if self.is_local is True:
+                if os.path.exists(directory):
+                    for dirpath, dirnames, filenames in os.walk(directory, topdown=False):
+                        for filename in filenames:
+                            os.remove(os.path.join(dirpath, filename))
+                        for sub_directory in dirnames:
+                            os.rmdir(os.path.join(dirpath, sub_directory))
+                    os.rmdir(directory)
+            else:
+                if self.dir_exists(directory):
+                    self.run('rm -rf "{0}"'.format(directory))
+
+    def dir_exists(self, directory):
+        """
+        Checks if a directory exists on a remote host
+        """
+        if self.is_local is True:
+            return os.path.isdir(self._shell_safe(directory))
+        else:
+            command = """import os, json
+print json.dumps(os.path.isdir('{0}'))""".format(self._shell_safe(directory))
+            return json.loads(self.run('python -c """{0}"""'.format(command)))
+
     def dir_chmod(self, directories, mode, recursive=False):
         if not isinstance(mode, int):
             raise ValueError('Mode should be an integer')
@@ -123,7 +156,7 @@ class SSHClient(object):
                             os.chmod(os.path.join(root, sub_dir), mode)
             else:
                 recursive_str = '-R' if recursive is True else ''
-                self.run('chmod {0} {1} {2}'.format(recursive_str, mode, directory))
+                self.run('chmod {0} {1} {2}'.format(recursive_str, oct(mode), directory))
 
     def dir_chown(self, directories, user, group, recursive=False):
         all_users = [user_info[0] for user_info in pwd.getpwall()]
@@ -148,7 +181,7 @@ class SSHClient(object):
                             os.chown(os.path.join(root, sub_dir), uid, gid)
             else:
                 recursive_str = '-R' if recursive is True else ''
-                self.run('chown {0} {1} {2}:{3}'.format(recursive_str, directory, user, group))
+                self.run('chown {0} {1}:{2} {3}'.format(recursive_str, user, group, directory))
 
     def file_create(self, filenames):
         if isinstance(filenames, basestring):
@@ -165,6 +198,31 @@ class SSHClient(object):
                 directory = os.path.dirname(filename)
                 self.dir_create(directory)
                 self.run('touch {0}'.format(filename))
+
+    def file_delete(self, filenames):
+        """
+        Remove a file (or multiple files) from the remote filesystem
+        """
+        if isinstance(filenames, basestring):
+            filenames = [filenames]
+        for filename in filenames:
+            filename = self._shell_safe(filename)
+            if self.is_local is True:
+                if '*' in filename:
+                    for fn in glob.glob(filename):
+                        os.remove(fn)
+                else:
+                    if os.path.isfile(filename):
+                        os.remove(filename)
+            else:
+                if '*' in filename:
+                    command = """import glob, json
+print json.dumps(glob.glob('{0}'))""".format(filename)
+                    for fn in json.loads(self.run('python -c """{0}"""'.format(command))):
+                        self.run('rm -f "{0}"'.format(fn))
+                else:
+                    if self.file_exists(filename):
+                        self.run('rm -f "{0}"'.format(filename))
 
     def file_unlink(self, path):
         if self.file_exists(path):
@@ -219,9 +277,11 @@ class SSHClient(object):
         Checks if a file exists on a remote host
         """
         if self.is_local is True:
-            return os.path.isfile(filename)
+            return os.path.isfile(self._shell_safe(filename))
         else:
-            return self.run('[[ -f "{0}" ]] && echo "TRUE" || echo "FALSE"'.format(filename)) == 'TRUE'
+            command = """import os, json
+print json.dumps(os.path.isfile('{0}'))""".format(self._shell_safe(filename))
+            return json.loads(self.run('python -c """{0}"""'.format(command)))
 
     def file_attribs(self, filename, mode):
         """

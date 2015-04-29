@@ -114,15 +114,15 @@ class Injector(object):
                     return True
                 if 'stop' in output:
                     return False
+                return False
             except CalledProcessError:
-                pass
-            return None
+                raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
         def remove_service(name, client):
             # remove upstart.conf file
             name = _get_name(name, client)
-            client.run('rm -rf /etc/init/{0}.conf'.format(name))
-            client.run('rm -rf /etc/init/{0}.override'.format(name))
+            client.file_delete('/etc/init/{0}.conf'.format(name))
+            client.file_delete('/etc/init/{0}.override'.format(name))
 
         def disable_service(name, client):
             name = _get_name(name, client)
@@ -130,7 +130,7 @@ class Injector(object):
 
         def enable_service(name, client):
             name = _get_name(name, client)
-            client.run('rm -f /etc/init/{0}.override'.format(name))
+            client.file_delete('/etc/init/{0}.override'.format(name))
 
         def start_service(name, client):
             try:

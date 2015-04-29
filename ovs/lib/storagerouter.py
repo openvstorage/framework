@@ -276,7 +276,7 @@ class StorageRouterController(object):
             mountpoint_inode_mapping[mountpoint] = inode
 
         if vpool.backend_type.code in ['local', 'distributed']:
-            client.dir_chmod(parameters['mountpoint_bfs'], '0777')
+            client.dir_chmod(parameters['mountpoint_bfs'], 0777)
 
         fdcache = '{0}/fd_{1}'.format(mountpoint_foc, vpool_name)
         failovercache = '{0}/foc_{1}'.format(mountpoint_foc, vpool_name)
@@ -546,10 +546,10 @@ class StorageRouterController(object):
             PluginService.add_service(name='albaproxy_{0}'.format(vpool_name), params=params, client=client)
 
         # Remove copied template config files (obsolete after add service)
-        client.run('rm -f {0}/ovs-failovercache_{1}.conf'.format(template_dir, vpool.name))
-        client.run('rm -f {0}/ovs-volumedriver_{1}.conf'.format(template_dir, vpool.name))
+        client.file_delete('{0}/ovs-failovercache_{1}.conf'.format(template_dir, vpool.name))
+        client.file_delete('{0}/ovs-volumedriver_{1}.conf'.format(template_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
-            client.run('rm -f {0}/ovs-albaproxy_{1}.conf'.format(template_dir, vpool.name))
+            client.file_delete('{0}/ovs-albaproxy_{1}.conf'.format(template_dir, vpool.name))
 
         if storagerouter.pmachine.hvtype == 'VMWARE':
             client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
@@ -734,24 +734,24 @@ class StorageRouterController(object):
         # Cleanup directories/files
         for readcache in storagedriver.mountpoint_readcaches:
             file_name = '{0}/read_{1}'.format(readcache, vpool.name)
-            client.run('rm {0}'.format(file_name))
+            client.file_delete(file_name)
             logger.info('Removed file {0}'.format(file_name))
 
         for writecache in storagedriver.mountpoint_writecaches:
             dir_name = '{0}/sco_{1}'.format(writecache, vpool.name)
-            client.run('rm -rf {0}'.format(dir_name))
+            client.dir_delete(dir_name)
             logger.info('Recursively removed {0}'.format(dir_name))
 
-        client.run('rm -rf {0}/foc_{1}'.format(storagedriver.mountpoint_foc, vpool.name))
-        client.run('rm -rf {0}/fd_{1}'.format(storagedriver.mountpoint_foc, vpool.name))
-        client.run('rm -rf {0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name))
-        client.run('rm -rf {0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name))
-        client.run('rm -rf {0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name))
-        client.run('rm -rf /var/rsp/{0}'.format(vpool.name))
-        client.run('rm -f {0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+        client.dir_delete('{0}/foc_{1}'.format(storagedriver.mountpoint_foc, vpool.name))
+        client.dir_delete('{0}/fd_{1}'.format(storagedriver.mountpoint_foc, vpool.name))
+        client.dir_delete('{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name))
+        client.dir_delete('{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name))
+        client.dir_delete('{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name))
+        client.dir_delete('/var/rsp/{0}'.format(vpool.name))
+        client.file_delete('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
-            client.run('rm -f {0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
-            client.run('rm -f {0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
+            client.file_delete('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
+            client.file_delete('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
 
         # Remove top directories
         dirs2remove = list()
@@ -900,7 +900,7 @@ class StorageRouterController(object):
             client.config_set('ovs.support.enablesupport', 1 if enable_support else 0)
             if enable_support is False:
                 client.run('service openvpn stop')
-                client.run('rm -f /etc/openvpn/ovs_*')
+                client.file_delete('/etc/openvpn/ovs_*')
             if enable is True:
                 if not PluginService.has_service(StorageRouterController.SUPPORT_AGENT, client=client):
                     PluginService.add_service(StorageRouterController.SUPPORT_AGENT, client=client)

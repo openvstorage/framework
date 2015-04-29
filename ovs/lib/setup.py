@@ -266,20 +266,6 @@ class SetupController(object):
                 for node in nodes:
                     known_passwords[node] = target_password
 
-            # Deciding master/extra
-            print 'Analyzing cluster layout'
-            logger.info('Analyzing cluster layout')
-            promote = False
-            if first_node is False:
-                for cluster in SetupController.arakoon_clusters:
-                    config = ArakoonClusterConfig(cluster)
-                    config.load_config(SSHClient(master_ip, password=known_passwords[master_ip]))
-                    logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
-                    if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
-                        promote = True
-            else:
-                promote = True  # Correct, but irrelevant, since a first node is always master
-
             mountpoints, hypervisor_info, writecaches, ip_client_map = SetupController._prepare_node(cluster_ip=cluster_ip,
                                                                                                      nodes=nodes,
                                                                                                      known_passwords=known_passwords,
@@ -291,7 +277,7 @@ class SetupController(object):
                                                                                                                       'password': hypervisor_password},
                                                                                                      auto_config=auto_config,
                                                                                                      disk_layout=disk_layout)
-            if first_node:
+            if first_node is True:
                 SetupController._setup_first_node(target_client=ip_client_map[cluster_ip],
                                                   unique_id=unique_id,
                                                   mountpoints=mountpoints,
@@ -302,6 +288,18 @@ class SetupController(object):
                                                   enable_heartbeats=enable_heartbeats,
                                                   writecaches=writecaches)
             else:
+                # Deciding master/extra
+                print 'Analyzing cluster layout'
+                logger.info('Analyzing cluster layout')
+                promote = False
+                for cluster in SetupController.arakoon_clusters:
+                    config = ArakoonClusterConfig(cluster)
+                    config.load_config(SSHClient(master_ip, password=known_passwords[master_ip]))
+                    logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
+                    if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
+                        promote = True
+                        break
+
                 SetupController._setup_extra_node(cluster_ip=cluster_ip,
                                                   master_ip=master_ip,
                                                   cluster_name=cluster_name,
@@ -963,14 +961,13 @@ class SetupController(object):
 
         print 'Removing services'
         logger.info('Removing services')
-        for service in [s for s in SetupController.master_node_services if s not in SetupController.extra_node_services]:
+        for service in [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]:
             if PluginService.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._change_service_state(target_client, service, 'stop')
                 PluginService.remove_service(service, client=target_client)
 
-        params = {'<ARAKOON_NODE_ID>': unique_id,
-                  '<MEMCACHE_NODE_IP>': cluster_ip,
+        params = {'<MEMCACHE_NODE_IP>': cluster_ip,
                   '<WORKER_QUEUE>': '{0}'.format(unique_id)}
         if PluginService.has_service('workers', client=target_client):
             PluginService.add_service('workers', params=params, client=target_client)
@@ -1134,6 +1131,10 @@ EOF
     def _add_services(client, unique_id, node_type):
         if node_type == 'master':
             services = SetupController.master_node_services
+            if SetupController.ARAKOON_VOLDRV in services:
+                services.remove(SetupController.ARAKOON_VOLDRV)
+            if SetupController.ARAKOON_OVSDB in services:
+                services.remove(SetupController.ARAKOON_OVSDB)
             worker_queue = '{0},ovs_masters'.format(unique_id)
         else:
             services = SetupController.extra_node_services
@@ -1141,8 +1142,7 @@ EOF
 
         print 'Adding services'
         logger.info('Adding services')
-        params = {'<ARAKOON_NODE_ID>': unique_id,
-                  '<MEMCACHE_NODE_IP>': client.ip,
+        params = {'<MEMCACHE_NODE_IP>': client.ip,
                   '<WORKER_QUEUE>': worker_queue}
         for service in services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))

@@ -140,7 +140,7 @@ class OpenStackCinder(object):
                 self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
         else:
             print('Using driver {0} version {1}'.format(local_driver, existing_version))
-        self.client.run('rm {0}'.format(temp_location))
+        self.client.file_delete(temp_location)
 
     def _is_cinder_running(self):
         if self.is_devstack:
@@ -370,7 +370,7 @@ if vpool_name in enabled_backends:
         self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name))
         self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile))
         self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name))
-        self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name))
+        self.client.file_delete('{0}/{1}.log'.format(logdir, process_name))
         self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name))
         for command in commands:
             self.client.run('''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command))

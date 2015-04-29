@@ -117,7 +117,7 @@ class MDSServiceController(object):
                                   params={'<VPOOL_NAME>': vpool.name,
                                           '<SERVICE_NUMBER>': str(service_number)},
                                   client=client)
-        client.run('rm -f {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
+        client.file_delete('{0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
 
         if start is True:
             PluginService.enable_service(service.name, client=client)
@@ -140,12 +140,12 @@ class MDSServiceController(object):
 
         # Clean up configuration files
         configuration_dir = client.config_read('ovs.core.cfgdir')
-        client.run('rm -f {0}/storagedriver/metadataserver/{1}_{2}.json'.format(configuration_dir, vpool.name, mds_service.number))
+        client.file_delete('{0}/storagedriver/metadataserver/{1}_{2}.json'.format(configuration_dir, vpool.name, mds_service.number))
 
         # Remove directores
         storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
-        client.run('rm -rf {0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, mds_service.number))
-        client.run('rm -rf {0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, mds_service.number))
+        client.dir_delete('{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, mds_service.number))
+        client.dir_delete('{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, mds_service.number))
 
         # Clean up model
         service = mds_service.service

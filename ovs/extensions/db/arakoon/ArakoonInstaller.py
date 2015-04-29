@@ -150,7 +150,7 @@ class ArakoonClusterConfig():
         """
         Deletes a configuration file
         """
-        client.run('rm -rf {0}'.format(self._dir))
+        client.dir_delete(self._dir)
 
 
 class ArakoonInstaller():
@@ -201,13 +201,14 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         node_name = System.get_my_machine_id(client)
 
         config = ArakoonClusterConfig(cluster_name, plugins)
-        config.nodes.append(ArakoonNodeConfig(name=node_name,
-                                              ip=ip,
-                                              client_port=ports[0],
-                                              messaging_port=ports[1],
-                                              log_dir=ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name),
-                                              home=ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
-                                              tlog_dir=ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)))
+        if not [node.name for node in config.nodes if node.name == node_name]:
+            config.nodes.append(ArakoonNodeConfig(name=node_name,
+                                                  ip=ip,
+                                                  client_port=ports[0],
+                                                  messaging_port=ports[1],
+                                                  log_dir=ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name),
+                                                  home=ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
+                                                  tlog_dir=ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)))
         ArakoonInstaller._deploy(config)
         return {'client_port': ports[0],
                 'messaging_port': ports[1]}
@@ -239,13 +240,14 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
 
-        config.nodes.append(ArakoonNodeConfig(name=node_name,
-                                              ip=new_ip,
-                                              client_port=ports[0],
-                                              messaging_port=ports[1],
-                                              log_dir=ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name),
-                                              home=ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
-                                              tlog_dir=ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)))
+        if not [node.name for node in config.nodes if node.name == node_name]:
+            config.nodes.append(ArakoonNodeConfig(name=node_name,
+                                                  ip=new_ip,
+                                                  client_port=ports[0],
+                                                  messaging_port=ports[1],
+                                                  log_dir=ArakoonInstaller.ARAKOON_LOG_DIR.format(cluster_name),
+                                                  home=ArakoonInstaller.ARAKOON_HOME_DIR.format(base_dir, cluster_name),
+                                                  tlog_dir=ArakoonInstaller.ARAKOON_TLOG_DIR.format(base_dir, cluster_name)))
         ArakoonInstaller._deploy(config)
         return {'client_port': ports[0],
                 'messaging_port': ports[1]}
@@ -272,16 +274,16 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         Cleans up a single node (remove services, directories and configuration files)
         """
         # Removes services for a cluster on a given node
-        client = SSHClient(node.ip, username='ovs')
-        ArakoonInstaller.stop(config.cluster_id, client=client)
-        ArakoonInstaller.remove(config.cluster_id, client=client)
+        ovs_client = SSHClient(node.ip, username='ovs')
+        root_client = SSHClient(node.ip, username='root')
+        ArakoonInstaller.stop(config.cluster_id, client=root_client)
+        ArakoonInstaller.remove(config.cluster_id, client=root_client)
 
         # Cleans all directories on a given node
-        for directory in [node.log_dir, node.tlog_dir, node.home]:
-            client.run('rm -rf {0}'.format(directory))
+        ovs_client.dir_delete([node.log_dir, node.tlog_dir, node.home])
 
         # Removes a configuration file from a node
-        config.delete_config(client)
+        config.delete_config(ovs_client)
 
     @staticmethod
     def _deploy(config):
@@ -394,12 +396,12 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         for ip in current_ips:
             if ip == new_ip:
                 continue
-            client = SSHClient(ip, username='ovs')
+            client = SSHClient(ip, username='root')
             ArakoonInstaller.stop(cluster_name, client=client)
             ArakoonInstaller.start(cluster_name, client=client)
             if len(current_ips) > threshold:  # A two node cluster needs all nodes running
                 ArakoonInstaller.wait_for_cluster(cluster_name)
-        new_client = SSHClient(new_ip, username='ovs')
+        new_client = SSHClient(new_ip, username='root')
         ArakoonInstaller.start(cluster_name, client=new_client)
         ArakoonInstaller.wait_for_cluster(cluster_name)
         logging.disable(loglevel)  # Restore workaround
@@ -412,7 +414,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
         logging.disable('WARNING')
         for ip in remaining_ips:
-            client = SSHClient(ip, username='ovs')
+            client = SSHClient(ip, username='root')
             ArakoonInstaller.stop(cluster_name, client=client)
             ArakoonInstaller.start(cluster_name, client=client)
             if len(remaining_ips) > 2:  # A two node cluster needs all nodes running

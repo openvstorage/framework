@@ -388,7 +388,7 @@ class VDiskController(object):
             logger.error('File already deleted at %s' % location)
             return
         client = SSHClient('127.0.0.1')
-        output = client.run('rm -f "{0}"'.format(location))
+        output = client.file_delete(location)
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
