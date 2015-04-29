@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 # Post install deps
+pip install paramiko
 pip install pysnmp==4.2.5
 
 # Activate kibana
