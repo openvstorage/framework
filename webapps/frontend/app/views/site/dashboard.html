@@ -97,7 +97,7 @@ limitations under the License.
                         <span data-bind="visible: vMachinesLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <select data-bind="options: topVmachineModes, value: topVmachineMode,
                                            optionsText: function(item) { return $.t('ovs:generic.' + item); }"
-                                style="margin-left: 5px;"></select>
+                                style="margin-left: 5px; margin-top: -3px; border-width: 1px;"></select>
                         <a data-bind="popover: {
                                           title: 'ovs:dashboard.panels.vmachines.helptitle',
                                           content: 'ovs:dashboard.panels.vmachines.helpcontent'
@@ -174,7 +174,7 @@ limitations under the License.
                         <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <select data-bind="options: topVpoolModes, value: topVPoolMode,
                                            optionsText: function(item) { return $.t('ovs:generic.' + item); }"
-                                style="margin-left: 5px;"></select>
+                                style="margin-left: 5px; margin-top: -3px; border-width: 1px;"></select>
                         <a data-bind="popover: {
                                           title: 'ovs:dashboard.panels.vpools.helptitle',
                                           content: 'ovs:dashboard.panels.vpools.helpcontent'
