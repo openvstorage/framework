@@ -514,7 +514,7 @@ os.chmod('{0}', 0777)
         storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
         storagedriver.save()
 
-        MDSServiceController.prepare_mds_service(client, storagerouter, vpool)
+        MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
 
         mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
         for sr in all_storagerouters:
@@ -760,7 +760,7 @@ if Service.has_service('{0}'):
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
-            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool)
+            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
 
         # Cleanup directories/files
         client = SSHClient.load(ip)
