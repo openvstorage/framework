@@ -212,7 +212,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout', 'connection_backend',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
                   'mountpoint_readcaches', 'mountpoint_writecaches', 'mountpoint_foc',
-                  'storage_ip', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
+                  'storage_ip', 'integratemgmt']
 
         parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
@@ -228,25 +228,20 @@ class StorageRouterViewSet(viewsets.ViewSet):
 
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
 
-    @action()
+    @link()
     @log()
     @required_roles(['read'])
-    @return_task()
     @load(StorageRouter)
-    def check_cinder(self, storagerouter):
+    def get_mgmtcenter_info(self, storagerouter):
         """
-        Checks whether cinder process is running on the specified machine
+        Return mgmtcenter info (ip, username, name, type)
         """
-        return StorageRouterController.check_cinder.s().apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        data = {}
+        mgmtcenter = storagerouter.pmachine.mgmtcenter
+        if mgmtcenter:
+            data = {'ip': mgmtcenter.ip,
+                    'username': mgmtcenter.username,
+                    'name': mgmtcenter.name,
+                    'type': mgmtcenter.type}
 
-    @action()
-    @log()
-    @required_roles(['read'])
-    @return_task()
-    @load(StorageRouter)
-    def valid_cinder_credentials(self, storagerouter, cinder_password, cinder_user, tenant_name, controller_ip):
-        """
-        Checks whether cinder process is running on the specified machine
-        """
-        return StorageRouterController.valid_cinder_credentials.s(cinder_password, cinder_user, tenant_name, controller_ip).apply_async(
-            routing_key='sr.{0}'.format(storagerouter.machine_id))
+        return Response(data, status=status.HTTP_200_OK)

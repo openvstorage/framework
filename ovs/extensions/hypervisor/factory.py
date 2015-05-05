@@ -85,6 +85,7 @@ class Factory(object):
                     elif mgmtcenter_type == 'OPENSTACK':
                         from mgmtcenters.openstack import OpenStack
                         mgmtcenter = OpenStack(ip, username, password)
+                        mgmtcenter.set_metadata(mgmt_center.metadata)
                     else:
                         raise NotImplementedError('Management center for {0} is not yet supported'.format(mgmtcenter_type))
                     Factory.mgmtcenters[key] = mgmtcenter

@@ -56,12 +56,12 @@ define([
             ipAddresses:     ko.observableArray([]),
             vPools:          ko.observableArray([]),
             albaBackends:    ko.observableArray(),
-            hasCinder:       ko.observable(),
-            configCinder:    ko.observable(),
-            cinderUser:      ko.observable('admin'),
-            cinderPassword:  ko.observable(''),
-            cinderTenant:    ko.observable('admin'),
-            cinderCtrlIP:    ko.observable('').extend({ regex: ipRegex }),
+            integratemgmt:   ko.observable(),
+            hasMgmtCenter:   ko.observable(),
+            mgmtcenter_user: ko.observable(),
+            mgmtcenter_ip:   ko.observable(),
+            mgmtcenter_type: ko.observable(),
+            mgmtcenter_name: ko.observable(),
             mountpointRegex: mountpointRegex
         }, resetAlbaBackends = function() {
             mtptData.albaBackends(undefined);

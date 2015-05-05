@@ -18,13 +18,16 @@ This module contains OpenStack Cinder commands
 import os
 import time, datetime
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.log.logHandler import LogHandler
+
+
+logger = LogHandler('lib', name='openstack_mgmt')
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
 CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
 EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 NOVA_CONF = '/etc/nova/nova.conf'
-
 
 def file_exists(ssh_client, location):
     """
@@ -33,23 +36,14 @@ def file_exists(ssh_client, location):
     return ssh_client.run_local('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
 
 
-class OpenStackCinder(object):
+class OpenStackManagement(object):
     """
     Configure/manage openstack services
     """
 
-    def __init__(self, cinder_password=None, cinder_user='admin', tenant_name='admin', controller_ip='127.0.0.1'):
+    def __init__(self, cinder_client):
         self.client = SSHClient.load('127.0.0.1')
-        auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
-        self.cinder_client = None
-
-        if cinder_password:
-            try:
-                from cinderclient.v2 import client as cinder_client
-            except ImportError:
-                pass
-            else:
-                self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
+        self.cinder_client = cinder_client
         self.is_devstack = self._is_devstack()
         self.is_openstack = self._is_openstack()
 
@@ -61,22 +55,25 @@ class OpenStackCinder(object):
     def is_cinder_installed(self):
         return self._is_cinder_installed()
 
-    def valid_credentials(self, cinder_password, cinder_user, tenant_name, controller_ip):
-        """
-        Validate credentials
-        """
-        try:
-            from cinderclient.v2 import client as cinder_client
-        except ImportError:
-            return False
-        else:
-            try:
-                auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
-                cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
-                cinder_client.authenticate()
-                return True
-            except:
-                return False
+    def configure_vpool(self, vpool_name, mountpoint):
+        if (self.is_devstack or self.is_openstack) and self._is_cinder_installed():
+            self._get_driver_code()
+            self._configure_user_groups()
+            self._configure_cinder_driver(vpool_name)
+            self._create_volume_type(vpool_name)
+            self._patch_etc_init_cindervolume_conf()
+            self._apply_patches()
+            self._configure_messaging_driver()
+            self._enable_openstack_events_consumer()
+            self._restart_processes()
+
+    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
+        if self.is_devstack or self.is_openstack:
+            self._unconfigure_cinder_driver(vpool_name)
+            if remove_volume_type:
+                self._delete_volume_type(vpool_name)
+            self._unpatch_etc_init_cindervolume_conf()
+            self._restart_processes()
 
     def _get_version(self):
         """
@@ -172,26 +169,6 @@ class OpenStackCinder(object):
             return self.client.file_exists(CINDER_CONF)
         except EOFError:
             return file_exists(self.client, CINDER_CONF)
-
-    def configure_vpool(self, vpool_name, mountpoint):
-        if self.is_devstack or self.is_openstack:
-            self._get_driver_code()
-            self._configure_user_groups()
-            self._configure_cinder_driver(vpool_name)
-            self._create_volume_type(vpool_name)
-            self._patch_etc_init_cindervolume_conf()
-            self._apply_patches()
-            self._configure_messaging_driver()
-            self._enable_openstack_events_consumer()
-            self._restart_processes()
-
-    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
-        if self.is_devstack or self.is_openstack:
-            self._unconfigure_cinder_driver(vpool_name)
-            if remove_volume_type:
-                self._delete_volume_type(vpool_name)
-            self._unpatch_etc_init_cindervolume_conf()
-            self._restart_processes()
 
     def _configure_user_groups(self):
         # Vpool owned by stack / cinder
@@ -380,14 +357,17 @@ if vpool_name in enabled_backends:
 
     def _start_screen_process(self, process_name, commands, screen_name='stack', logdir='/opt/stack/logs'):
         logfile = self._get_devstack_log_name(process_name)
-        self.client.run('''su stack -c 'touch {0}' '''.format(logfile))
-        self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name))
-        self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile))
-        self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name))
-        self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name))
-        self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name))
+        print(self.client.run('''su stack -c 'touch {0}' '''.format(logfile)))
+        print(self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name)))
+        print(self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile)))
+        print(self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name)))
+        time.sleep(1)
+        print(self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name)))
+        print(self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name)))
         for command in commands:
-            self.client.run('''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command))
+            cmd = '''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command)
+            print(cmd)
+            print(self.client.run(cmd))
 
     def _restart_devstack_screen(self):
         """

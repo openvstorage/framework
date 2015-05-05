@@ -13,5 +13,5 @@
 # limitations under the License.
 
 """
-This package contains openstack specific extensions (except management center)
+This package contains the management centers extensions for managing the system
 """

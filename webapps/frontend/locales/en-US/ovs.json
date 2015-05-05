@@ -573,16 +573,14 @@
                 "writecachename": "Write Cache",
                 "writecaches": "Write Caches:"
             },
-            "gathercinder": {
-                "basicinfo": "Configure Cinder credentials (Keystone authentication)",
-                "cinderuser": "User name:",
-                "cinderpassword": "Password:",
-                "cindertenant": "Tenant name:",
-                "cinderctrlip": "Keystone public IP:",
-                "configcinder": "Configure this vpool with Cinder",
-                "nocinder": "No Cinder process detected, press next to continue",
-                "detecting": "Detecting Cinder process, please wait ...",
-                "invalidcinderinfo": "Could not connect to specified Keystone server or wrong credentials"
+            "integratemgmtcenter": {
+                "basicinfo": "Integrate vpool with Management center:",
+                "mgmtcenter_name": "Name:",
+                "mgmtcenter_user": "User name:",
+                "mgmtcenter_ip": "IP Address:",
+                "mgmtcenter_type": "Type:",
+                "integratemgmt": "Integrate/Skip",
+                "nomgmtcenter": "No management center found for this node, cannot integrate vpool"
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
