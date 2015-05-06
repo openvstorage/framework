@@ -30,7 +30,7 @@ class MgmtCenter(DataObject):
                     Property('ip', str, doc='IP address of the Management Center.'),
                     Property('port', int, doc='Port of the Management Center.'),
                     Property('type', ['VCENTER', 'OPENSTACK'], doc='Management Center type.'),
-                    Property('metadata', dict, default={}, doc='Management Center specific metadata')]
+                    Property('metadata', dict, default=dict(), doc='Management Center specific metadata')]
                     # to avoid adding custom properties for every value
     __relations = []
     __dynamics = [Dynamic('hosts', dict, 60)]
