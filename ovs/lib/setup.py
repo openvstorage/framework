@@ -486,14 +486,13 @@ class SetupController(object):
         print 'Updating hosts files'
         logger.debug('Updating hosts files')
         for node, node_client in ip_client_map.iteritems():
-            hostname = mapping[node]
-            System.update_hosts_file(hostname, node, node_client)
-
+            for hostname_node, hostname in mapping.iteritems():
+                System.update_hosts_file(hostname, hostname_node, node_client)
             node_client.file_write(authorized_keys_filename.format(root_ssh_folder), authorized_keys)
             node_client.file_write(authorized_keys_filename.format(ovs_ssh_folder), authorized_keys)
-            cmd = 'cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}'
+            cmd = 'cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null >> {1}.tmp; cat {1}.tmp | sort -u - > {1}'
             node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(root_ssh_folder), ' '.join(all_hostnames)))
-            cmd = 'su - ovs -c "cp {1} {1}.tmp;ssh-keyscan -t rsa {0} {2} >> {1}.tmp;cat {1}.tmp | sort -u - > {1}"'
+            cmd = 'su - ovs -c "cp {1} {1}.tmp; ssh-keyscan -t rsa {0} {2} 2> /dev/null  >> {1}.tmp; cat {1}.tmp | sort -u - > {1}"'
             node_client.run(cmd.format(' '.join(all_ips), known_hosts_filename.format(ovs_ssh_folder), ' '.join(all_hostnames)))
 
         # Creating filesystems
@@ -676,8 +675,7 @@ class SetupController(object):
         if enable_heartbeats is None:
             print '\n+++ Heartbeat +++\n'
             logger.info('Heartbeat')
-
-            print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.',
+            print Interactive.boxed_message(['Open vStorage has the option to send regular heartbeats with metadata to a centralized server.' +
                                              'The metadata contains anonymous data like Open vStorage\'s version and status of the Open vStorage services. These heartbeats are optional and can be turned on/off at any time via the GUI.'],
                                             character=None)
             enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
@@ -853,7 +851,7 @@ class SetupController(object):
         target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
         target_client.file_write(rabbitmq_cookie_file, contents)
         target_client.file_attribs(rabbitmq_cookie_file, mode=400)
-        target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
+        target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
         target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
         target_client.run('rabbitmqctl stop; sleep 5;')
 
@@ -952,7 +950,7 @@ class SetupController(object):
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
         if PluginService.has_service('rabbitmq', ip=target_client.ip):
-            target_client.run('rabbitmq-server -detached; sleep 5; rabbitmqctl stop_app; sleep 5;')
+            target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl reset; sleep 5;')
             target_client.run('rabbitmqctl stop; sleep 5;')
             SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
@@ -1020,7 +1018,7 @@ EOF
                 print('  Process killed')
             except subprocess.CalledProcessError:
                 print('  Process already stopped')
-        client.run('rabbitmq-server -detached; sleep 5;')
+        client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
         users = client.run('rabbitmqctl list_users').splitlines()[1:-1]
         users = [usr.split('\t')[0] for usr in users]
         if 'ovs' not in users:

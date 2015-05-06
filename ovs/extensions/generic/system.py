@@ -75,7 +75,7 @@ class System(object):
         """
         import re
 
-        contents = client.file_read('/etc/hosts')
+        contents = client.file_read('/etc/hosts') + '\n'
 
         if isinstance(hostname, list):
             hostnames = ' '.join(hostname)

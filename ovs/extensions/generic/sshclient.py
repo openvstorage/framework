@@ -46,7 +46,7 @@ class SSHClient(object):
         local_ips = [ip.strip() for ip in local_ips]
         self.is_local = self.ip in local_ips
 
-        current_user = check_output("whoami", shell=True).strip()
+        current_user = check_output('whoami', shell=True).strip()
         if username is None:
             self.username = current_user
         else:
@@ -54,6 +54,13 @@ class SSHClient(object):
             if username != current_user:
                 self.is_local = False  # If specified user differs from current executing user, we always use the paramiko SSHClient
         self.password = password
+
+        if not self.is_local:
+            self._connect()
+
+    def __del__(self):
+        if not self.is_local:
+            self._disconnect()
 
     def _connect(self):
         """
@@ -85,15 +92,13 @@ class SSHClient(object):
         if self.is_local is True:
             return check_output(command, shell=True).strip()
         else:
-            try:
-                self._connect()
-                _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
-                exit_code = stdout.channel.recv_exit_status()
-                if exit_code != 0:  # Raise same error as check_output
-                    raise subprocess.CalledProcessError(exit_code, command, stderr.readlines())
-                return '\n'.join(line.strip() for line in stdout).strip()
-            finally:
-                self._disconnect()
+            _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code != 0:  # Raise same error as check_output
+                print exit_code
+                print stderr.readlines()
+                raise subprocess.CalledProcessError(exit_code, command, stderr.readlines())
+            return '\n'.join(line.strip() for line in stdout).strip()
 
     def dir_create(self, directories):
         """
@@ -251,12 +256,10 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
                 the_file.write(contents)
             os.close(handle)
             try:
-                self._connect()
                 sftp = self.client.open_sftp()
                 sftp.put(temp_filename, filename)
             finally:
-                self._disconnect()
-            os.remove(temp_filename)
+                os.remove(temp_filename)
 
     def file_upload(self, remote_filename, local_filename):
         """
@@ -265,12 +268,8 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         if self.is_local is True:
             check_output('cp -f "{0}" "{1}"'.format(local_filename, remote_filename), shell=True)
         else:
-            try:
-                self._connect()
-                sftp = self.client.open_sftp()
-                sftp.put(local_filename, remote_filename)
-            finally:
-                self._disconnect()
+            sftp = self.client.open_sftp()
+            sftp.put(local_filename, remote_filename)
 
     def file_exists(self, filename):
         """

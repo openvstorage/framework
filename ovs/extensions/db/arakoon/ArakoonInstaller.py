@@ -280,7 +280,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         ArakoonInstaller.remove(config.cluster_id, client=root_client)
 
         # Cleans all directories on a given node
-        ovs_client.dir_delete([node.log_dir, node.tlog_dir, node.home])
+        root_client.dir_delete([node.log_dir, node.tlog_dir, node.home])
 
         # Removes a configuration file from a node
         config.delete_config(ovs_client)
@@ -326,7 +326,8 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Stops an arakoon service
         """
-        if Service.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
+        if Service.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
+                Service.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
             Service.stop_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
@@ -334,7 +335,8 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Removes an arakoon service
         """
-        Service.remove_service('arakoon-{0}'.format(cluster_name), client=client)
+        if Service.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
+            Service.remove_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
     def deploy_to_slave(master_ip, slave_ip, cluster_name):
