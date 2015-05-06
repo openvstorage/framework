@@ -19,7 +19,7 @@ define([
     var nameRegex, hostRegex, mountpointRegex, ipRegex, singleton;
     nameRegex = /^[0-9a-z][\-a-z0-9]{1,48}[a-z0-9]$/;
     hostRegex = /^((((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))|((([a-z0-9]+[\.\-])*[a-z0-9]+\.)+[a-z]{2,4}))$/;
-    mountpointRegex = /^(/[a-zA-Z0-9\-_\.]+)+/?$/;
+    mountpointRegex = /^(\/[a-zA-Z0-9\-_\.]+)+\/?$/;
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
 
     singleton = function() {
@@ -56,12 +56,12 @@ define([
             ipAddresses:     ko.observableArray([]),
             vPools:          ko.observableArray([]),
             albaBackends:    ko.observableArray(),
-            hasCinder:       ko.observable(),
-            configCinder:    ko.observable(),
-            cinderUser:      ko.observable('admin'),
-            cinderPassword:  ko.observable(''),
-            cinderTenant:    ko.observable('admin'),
-            cinderCtrlIP:    ko.observable('').extend({ regex: ipRegex }),
+            integratemgmt:   ko.observable(),
+            hasMgmtCenter:   ko.observable(),
+            mgmtcenter_user: ko.observable(),
+            mgmtcenter_ip:   ko.observable(),
+            mgmtcenter_type: ko.observable(),
+            mgmtcenter_name: ko.observable(),
             mountpointRegex: mountpointRegex
         }, resetAlbaBackends = function() {
             mtptData.albaBackends(undefined);

@@ -49,16 +49,19 @@ class BackendViewSet(viewsets.ViewSet):
             if backend_type is None:
                 return BackendList.get_backends()
             return BackendTypeList.get_backend_type_by_code(backend_type).backends
-        client = OVSClient(ip, port, credentials=(client_id, client_secret))
+        client = OVSClient(ip, port, credentials=(client_id, client_secret), version=1)
         try:
             remote_backends = client.get('/backends/', params={'backend_type': backend_type,
                                                                'contents': '' if contents is None else contents})
         except (HTTPError, URLError):
-            raise NotAcceptable('Could not load remote backends')
+            raise []
         backend_list = []
         for entry in remote_backends['data']:
-            backend = type('Backend', (), entry)()
-            backend_list.append(backend)
+            try:
+                backend = Backend(data=entry, volatile=True)
+                backend_list.append(backend)
+            except:
+                pass  # Ignore backend that cannot be parsed correctly, as they might be incompatible anyway
         return backend_list
 
     @log()

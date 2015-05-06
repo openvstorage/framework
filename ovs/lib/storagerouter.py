@@ -39,7 +39,7 @@ from ovs.extensions.api.client import OVSClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.openstack.oscinder import OpenStackCinder
+from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.support.agent import SupportAgent
@@ -59,8 +59,6 @@ class StorageRouterController(object):
     """
     Contains all BLL related to StorageRouter
     """
-    SUPPORT_AGENT = 'support-agent'
-    OPENSTACK_CINDER_KEY = 'ovs_openstack_cinder_'
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_physical_metadata')
@@ -211,10 +209,12 @@ class StorageRouterController(object):
                     connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
                     ovs_client = OVSClient(connection_host, connection_port,
-                                           credentials=(oauth_client.client_id, oauth_client.client_secret))
+                                           credentials=(oauth_client.client_id, oauth_client.client_secret), 
+                                           version=1)
                 else:
                     ovs_client = OVSClient(connection_host, connection_port,
-                                           credentials=(connection_username, connection_password))
+                                           credentials=(connection_username, connection_password), 
+                                           version=1)
                 task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
                 successful, metadata = ovs_client.wait_for_task(task_id, timeout=300)
                 if successful is False:
@@ -505,7 +505,7 @@ class StorageRouterController(object):
         storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
         storagedriver.save()
 
-        MDSServiceController.prepare_mds_service(client, storagerouter, vpool)
+        MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
 
         mds_config_set = MDSServiceController.get_mds_storagedriver_config_set(vpool)
         for sr in all_storagerouters:
@@ -575,33 +575,18 @@ class StorageRouterController(object):
         for vdisk in vpool.vdisks:
             MDSServiceController.ensure_safety(vdisk)
 
-        # Configure Cinder
-        ovsdb = PersistentFactory.get_client()
-        vpool_config_key = '{0}{1}'.format(StorageRouterController.OPENSTACK_CINDER_KEY, storagedriver.vpool_guid)
-        if ovsdb.exists(vpool_config_key):
-            # Second node gets values saved by first node
-            cinder_password, cinder_user, tenant_name, controller_ip, config_cinder = ovsdb.get(vpool_config_key)
-        else:
-            config_cinder = parameters.get('config_cinder', False)
-            cinder_password = ''
-            cinder_user = ''
-            tenant_name = ''
-            controller_ip = ''
-        if config_cinder:
-            cinder_password = parameters.get('cinder_pass', cinder_password)
-            cinder_user = parameters.get('cinder_user', cinder_user)
-            tenant_name = parameters.get('cinder_tenant', tenant_name)
-            controller_ip = parameters.get('cinder_controller', controller_ip)  # Keystone host
-            if cinder_password:
-                osc = OpenStackCinder(cinder_password=cinder_password,
-                                      cinder_user=cinder_user,
-                                      tenant_name=tenant_name,
-                                      controller_ip=controller_ip)
 
-                osc.configure_vpool(vpool_name)
-                # Save values for first node to use
-                ovsdb.set(vpool_config_key,
-                          [cinder_password, cinder_user, tenant_name, controller_ip, config_cinder])
+        mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
+        if mgmt_center:
+            # Store specific metadata in mgmtcenter object
+            metadata = mgmt_center.get_metadata(storagerouter.pmachine.mgmtcenter.metadata, parameters)
+            storagerouter.pmachine.mgmtcenter.metadata.update(metadata)
+            storagerouter.pmachine.mgmtcenter.save()
+            mgmt_center.set_metadata(metadata)
+            # Configure vpool on management center
+            mgmt_center.configure_vpool(vpool_name, storagedriver.mountpoint)
+        else:
+            logger.info('Storagerouter {0} does not have management center'.format(storagerouter.name))
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.remove_storagedriver')
@@ -654,19 +639,17 @@ class StorageRouterController(object):
                 PluginService.disable_service(voldrv_service, client=client)
                 PluginService.stop_service(voldrv_service, client=client)
 
-        # Unconfigure Cinder
-        ovsdb = PersistentFactory.get_client()
-        key = '{0}{1}'.format(StorageRouterController.OPENSTACK_CINDER_KEY, storagedriver.vpool_guid)
-        if ovsdb.exists(key):
-            cinder_password, cinder_user, tenant_name, controller_ip, _ = ovsdb.get(key)
-            osc = OpenStackCinder(cinder_password=cinder_password,
-                                  cinder_user=cinder_user,
-                                  tenant_name=tenant_name,
-                                  controller_ip=controller_ip,
-                                  sshclient_ip=ip)
-            osc.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
-            if storagedrivers_left is False:
-                ovsdb.delete(key)
+        # Unconfigure vpool on management
+        # @TODO: Fix this code to use new SSHClient and Remote
+        print('unconfigure vpool')
+        client = SSHClient.load(ip)
+        print(System.exec_remote_python(client, """
+from ovs.extensions.generic.system import System
+from ovs.extensions.hypervisor.factory import Factory
+mgmtcenter = Factory.get_mgmtcenter(System.get_my_storagerouter().pmachine)
+if mgmtcenter:
+    mgmtcenter.unconfigure_vpool('{0}', '{1}', {2})
+""".format(vpool.name, storagedriver.mountpoint, not storagedrivers_left)))
 
         # KVM pool
         if pmachine.hvtype == 'KVM':
@@ -729,7 +712,7 @@ class StorageRouterController(object):
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
-            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool)
+            MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
 
         # Cleanup directories/files
         for readcache in storagedriver.mountpoint_readcaches:
@@ -769,7 +752,7 @@ class StorageRouterController(object):
         # First model cleanup
         if storagedriver.alba_proxy is not None:
             storagedriver.alba_proxy.delete()
-        storagedriver.delete(abandon=True)  # Detach from the log entries
+        storagedriver.delete(abandon=['logs'])  # Detach from the log entries
 
         MDSServiceController.mds_checkup()
 
@@ -947,24 +930,6 @@ class StorageRouterController(object):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.check_cinder')
-    def check_cinder():
-        """
-        Checks whether cinder is running
-        """
-        osc = OpenStackCinder()
-        return osc.is_cinder_installed
-
-    @staticmethod
-    @celery.task(name='ovs.storagerouter.valid_cinder_credentials')
-    def valid_cinder_credentials(cinder_password, cinder_user, tenant_name, controller_ip):
-        """
-        Checks whether the cinder credentials are valid
-        """
-        osc = OpenStackCinder()
-        return osc.valid_credentials(cinder_password, cinder_user, tenant_name, controller_ip)
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

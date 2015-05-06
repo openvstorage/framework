@@ -49,11 +49,7 @@ define([
                         mountpoint_writecaches: self.data.mtptWriteCaches(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        config_cinder: self.data.configCinder(),
-                        cinder_user: self.data.cinderUser(),
-                        cinder_pass: self.data.cinderPassword(),
-                        cinder_tenant: self.data.cinderTenant(),
-                        cinder_controller: self.data.cinderCtrlIP()
+                        integratemgmt: self.data.integratemgmt()
                     }
                 };
                 api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })

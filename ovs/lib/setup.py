@@ -131,7 +131,8 @@ class SetupController(object):
             hypervisor_username = config.get('setup', 'hypervisor_username')
             hypervisor_password = config.get('setup', 'hypervisor_password')
             arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
-            auto_config = config.get('setup', 'auto_config')
+            verbose = config.getboolean('setup', 'verbose')
+            auto_config = config.getboolean('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
             enable_heartbeats = False
@@ -1511,7 +1512,7 @@ EOF
         if default is None:
             default, skipped = SetupController._generate_default_partition_layout(blk_devices)
 
-        ssd_devices = set([mountpoint_info['device'] for mountpoint_info in default.itervalues() if mountpoint_info['ssd'] is True])
+        ssd_devices = set([mountpoint_info['device'] for mountpoint_info in default.itervalues() if mountpoint_info.get('ssd', False) is True])
 
         print 'Excluded: {0}'.format(skipped)
         print '-> bootdisk or part of software RAID configuration'

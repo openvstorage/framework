@@ -45,7 +45,7 @@ class MDSServiceController(object):
     """
 
     @staticmethod
-    def prepare_mds_service(client, storagerouter, vpool, fresh_only=True, start=False):
+    def prepare_mds_service(client, storagerouter, vpool, fresh_only=True, reload_config=False):
         """
         Prepares an MDS service:
         * Creates the required configuration
@@ -88,69 +88,66 @@ class MDSServiceController(object):
         mds_service.number = service_number
         mds_service.save()
 
-        # Prepare some directores
-        scratch_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, service_number)
-        rocksdb_dir = '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, service_number)
-        client.dir_create(scratch_dir)
-        client.dir_create(rocksdb_dir)
+        mds_nodes = []
+        for service in mdsservice_type.services:
+            if service.storagerouter_guid == storagerouter.guid:
+                mds_service = service.mds_service
+                if mds_service.vpool_guid == vpool.guid:
+                    mds_nodes.append({'host': service.storagerouter.ip,
+                                      'port': service.ports[0],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
+                                                                               vpool.name,
+                                                                               mds_service.number),
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
+                                                                                    vpool.name,
+                                                                                    mds_service.number)})
 
-        # Generate the configuration file
-        metadataserver_config = StorageDriverConfiguration('metadataserver', vpool.name, number=service_number)
-        metadataserver_config.load(client)
-        metadataserver_config.clean()  # Clean out obsolete values
-        if vpool.backend_type.code == 'alba':
-            metadataserver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
-                                                                       alba_connection_port=storagedriver.alba_proxy.service.ports[0],
-                                                                       backend_type='ALBA')
-        else:
-            metadataserver_config.configure_backend_connection_manager(**vpool.metadata)
-        metadataserver_config.configure_metadata_server(mds_address=storagerouter.ip,
-                                                        mds_port=service.ports[0],
-                                                        mds_scratch_dir=scratch_dir,
-                                                        mds_rocksdb_path=rocksdb_dir)
-        metadataserver_config.save(client)
-
-        # Create system services
-        template_dir = '/opt/OpenvStorage/config/templates/upstart'
-        client.run('cp -f {0}/ovs-metadataserver.conf {0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
-        PluginService.add_service(name='metadataserver_{0}_{1}'.format(vpool.name, service_number),
-                                  params={'<VPOOL_NAME>': vpool.name,
-                                          '<SERVICE_NUMBER>': str(service_number)},
-                                  client=client)
-        client.file_delete('{0}/ovs-metadataserver_{1}_{2}.conf'.format(template_dir, vpool.name, service_number))
-
-        if start is True:
-            PluginService.enable_service(service.name, client=client)
-            PluginService.start_service(service.name, client=client)
+        # Generate the correct section in the Storage Driver's configuration
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+        storagedriver_config.load(client)
+        storagedriver_config.clean()  # Clean out obsolete values
+        storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+        storagedriver_config.save(client, reload_config=reload_config)
 
         return mds_service
 
     @staticmethod
-    def remove_mds_service(mds_service, client, storagerouter, vpool):
+    def remove_mds_service(mds_service, client, storagerouter, vpool, reload_config):
         """
         Removes an MDS service
         """
         if len(mds_service.vdisks_guids) > 0:
             raise RuntimeError('Cannot remove MDSService that is still serving disks')
 
-        if PluginService.has_service(mds_service.service.name, client=client):
-            if PluginService.get_service_status(mds_service.service.name, client=client) is True:
-                PluginService.stop_service(mds_service.service.name, client=client)
-                PluginService.remove_service(name=mds_service.service.name, client=client)
-
-        # Clean up configuration files
-        configuration_dir = client.config_read('ovs.core.cfgdir')
-        client.file_delete('{0}/storagedriver/metadataserver/{1}_{2}.json'.format(configuration_dir, vpool.name, mds_service.number))
-
-        # Remove directores
+        mdsservice_type = ServiceTypeList.get_by_name('MetadataServer')
         storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
-        client.dir_delete('{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md, vpool.name, mds_service.number))
-        client.dir_delete('{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp, vpool.name, mds_service.number))
 
         # Clean up model
         service = mds_service.service
         mds_service.delete()
         service.delete()
+
+        # Generate new mds_nodes section
+        mds_nodes = []
+        for service in mdsservice_type.services:
+            if service.storagerouter_guid == storagerouter.guid:
+                mds_service = service.mds_service
+                if mds_service.vpool_guid == vpool.guid:
+                    mds_nodes.append({'host': service.storagerouter.ip,
+                                      'port': service.ports[0],
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
+                                                                               vpool.name,
+                                                                               mds_service.number),
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
+                                                                                    vpool.name,
+                                                                                    mds_service.number)})
+
+        # Generate the correct section in the Storage Driver's configuration
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+        storagedriver_config.load(client)
+        storagedriver_config.clean()  # Clean out obsolete values
+        storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
+        storagedriver_config.save(client, reload_config=reload_config)
 
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
@@ -486,7 +483,7 @@ class MDSServiceController(object):
                 for mds_service in mds_services[:]:
                     if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
                         client = SSHClient(storagerouter.ip)
-                        MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool)
+                        MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=True)
                         mds_services.remove(mds_service)
                 for mds_service in mds_services:
                     _, load = MDSServiceController.get_mds_load(mds_service)
@@ -495,7 +492,7 @@ class MDSServiceController(object):
                         break
                 if has_room is False:
                     mds_service = MDSServiceController.prepare_mds_service(client, storagerouter, vpool,
-                                                                           fresh_only=False, start=True)
+                                                                           fresh_only=False, reload_config=True)
                     if mds_service is None:
                         raise RuntimeError('Could not add MDS node')
                     mds_services.append(mds_service)

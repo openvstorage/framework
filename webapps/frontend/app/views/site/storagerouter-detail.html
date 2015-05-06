@@ -115,7 +115,7 @@ limitations under the License.
                             <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:storagerouters.detail.storageroutervpoollink"></h4>
                                 <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
-                                <table class="table table-noborder table-hover table-condensed" data-bind="foreach: $root.vPools">
+                                <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
                                             <th style="width: 30px;"></th>
@@ -127,22 +127,31 @@ limitations under the License.
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td>
-                                                <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
-                                                                                  checked: $.inArray(guid(), $root.checkedVPoolGuids()) !== -1,
-                                                                                  disable: true">
-                                            </td>
-                                            <td><span data-bind="text: name()"></span></td>
-                                            <!-- ko foreach: $parents[0].storageDrivers() -->
-                                                <!-- ko if: $.inArray(guid(), $parent.storageDriverGuids()) !== -1 -->
-                                                    <td><span data-bind="text: ports()[0]"></span></td>
-                                                    <td><span data-bind="text: ports()[1]"></span></td>
-                                                    <td><span data-bind="text: ports()[2]"></span></td>
-                                                    <td><span data-bind="text: storageIP()"></span></td>
+                                        <!-- ko foreach: $root.vPools() -->
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" data-bind="attr: { id: 'vpool_' + guid() },
+                                                                                      checked: $.inArray(guid(), $root.checkedVPoolGuids()) !== -1,
+                                                                                      disable: true">
+                                                </td>
+                                                <td><span data-bind="text: name()"></span></td>
+                                                <!-- ko foreach: $parents[0].storageDrivers() -->
+                                                    <!-- ko if: $.inArray(guid(), $parent.storageDriverGuids()) !== -1 -->
+                                                        <td><span data-bind="text: ports()[0]"></span></td>
+                                                        <td><span data-bind="text: ports()[1]"></span></td>
+                                                        <td><span data-bind="text: ports()[2]"></span></td>
+                                                        <td><span data-bind="text: storageIP()"></span></td>
+                                                    <!--/ko-->
                                                 <!--/ko-->
-                                            <!--/ko-->
-                                        </tr>
+                                            </tr>
+                                        <!-- /ko -->
+                                        <!-- ko visible: $root.vPools().length === 0 -->
+                                            <tr>
+                                                <td colspan="6">
+                                                    <i data-i18n="ovs:generic.noentries"></i>
+                                                </td>
+                                            </tr>
+                                        <!-- /ko -->
                                     </tbody>
                                 </table>
                                 <button class="btn btn-default" data-bind="visible: false, click: $root.updateStorageRouterServing"

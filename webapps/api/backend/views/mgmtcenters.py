@@ -66,7 +66,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         Deletes a Management center
         """
-        mgmtcenter.delete(abandon=True)
+        mgmtcenter.delete(abandon=['pmachines'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @log()

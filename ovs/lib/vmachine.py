@@ -295,7 +295,7 @@ class VMachineController(object):
         if vm is not None:
             MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
                                                                   'metadata': {'name': vm.name}})
-            vm.delete(abandon=True)
+            vm.delete(abandon=['vdisks'])
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')

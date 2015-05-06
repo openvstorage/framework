@@ -178,7 +178,7 @@ class Injector(object):
 
         def get_versions():
             versions = {}
-            for package in ['openvstorage', 'openvstorage-backend', 'volumedriver-server', 'volumedriver-base', 'alba', 'alba-asdmanager']:
+            for package in ['openvstorage', 'openvstorage-backend', 'volumedriver-server', 'volumedriver-base', 'alba', 'openvstorage-sdm']:
                 version_info = _get_version(package)
                 if version_info:
                     versions[package] = version_info

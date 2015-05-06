@@ -209,7 +209,7 @@ limitations under the License.
                                             <input type="checkbox" data-bind="attr: { id: 'storagerouter_' + guid() }, checkedValue: guid(),
                                                                               checked: $root.checkedStorageRouterGuids,
                                                                               disable: $parent.backendType() === 'local' && $.inArray(guid(), $parent.storageRouterGuids()) === -1"
-                                                    style="vertical-align: text-bottom;">
+                                                    style="vertical-align: text-bottom; margin: 4px;">
                                             <label data-bind="attr: { for: 'storagerouter_' + guid() }" style="font-weight: normal; margin-left: 7px;">
                                                 <span data-bind="text: name"></span>
                                             </label>

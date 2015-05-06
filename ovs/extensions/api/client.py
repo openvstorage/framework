@@ -27,7 +27,7 @@ class OVSClient(object):
     Represents the OVS client
     """
 
-    def __init__(self, ip, port, credentials=None, verify=False):
+    def __init__(self, ip, port, credentials=None, verify=False, version='*'):
         """
         Initializes the object with credentials and connection information
         """
@@ -38,6 +38,7 @@ class OVSClient(object):
         self._url = 'https://{0}:{1}/api'.format(ip, port)
         self._token = None
         self._verify = verify
+        self._version = version
 
     def _connect(self):
         """
@@ -63,7 +64,7 @@ class OVSClient(object):
         if self.client_id is not None and self._token is None:
             self._connect()
 
-        headers = {'Accept': 'application/json; version=*'}
+        headers = {'Accept': 'application/json; version={0}'.format(self._version)}
         if self._token is not None:
             headers['Authorization'] = 'Bearer {0}'.format(self._token)
 
