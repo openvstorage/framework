@@ -136,6 +136,7 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
+        VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
 
     @staticmethod
@@ -412,7 +413,7 @@ class VDiskController(object):
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
         client = SSHClient.load('127.0.0.1')
-        print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
+        logger.info(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
 
     @staticmethod
     @celery.task(name='ovs.vdisk.update_vdisk_name')
@@ -446,3 +447,36 @@ class VDiskController(object):
             vdisk.save()
         finally:
             mutex.release()
+
+    @staticmethod
+    @celery.task(name='ovs.vdisk.sync_with_mgmtcenter')
+    def sync_with_mgmtcenter(disk, pmachine, storagedriver):
+        """
+        Update disk info using management center (if available)
+        @param disk: vDisk hybrid (vdisk to be updated)
+        @param pmachine: pmachine hybrid (pmachine running the storagedriver)
+        @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)
+        """
+        if pmachine.mgmtcenter is None:
+            disk_name = disk.devicename.split('.')[0]
+            disk.save()
+            logger.info('No management center for pmachine {0}'.format(pmachine.name))
+            return
+        logger.debug('Sync vdisk {0} with management center {1} on storagedriver {2}'.format(disk.name, pmachine.mgmtcenter.name, storagedriver.name))
+        mgmt = Factory.get_mgmtcenter(mgmt_center = pmachine.mgmtcenter)
+        volumepath = disk.devicename
+        mountpoint = storagedriver.mountpoint
+        devicepath = '{0}/{1}'.format(mountpoint, volumepath)
+        try:
+            disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
+        except Exception as ex:
+            logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
+        if disk_mgmt_center_info is None:
+            logger.info('No information retrieved for vdisk {0}'.format(disk.name))
+            return
+        disk_name = disk_mgmt_center_info.get('name')
+        if disk_name:
+            disk.name = disk_name
+            disk.save()
+
+

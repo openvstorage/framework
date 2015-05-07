@@ -133,13 +133,13 @@ class OpenStackManagement(object):
         elif self.is_openstack:
             local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
         if remote_version > existing_version:
-            print('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
+            logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
             if self.is_devstack:
                 self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
             elif self.is_openstack:
                 self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
         else:
-            print('Using driver {0} version {1}'.format(local_driver, existing_version))
+            logger.debug('Using driver {0} version {1}'.format(local_driver, existing_version))
         self.client.run('rm {0}'.format(temp_location))
 
     def _is_devstack(self):
@@ -357,17 +357,17 @@ if vpool_name in enabled_backends:
 
     def _start_screen_process(self, process_name, commands, screen_name='stack', logdir='/opt/stack/logs'):
         logfile = self._get_devstack_log_name(process_name)
-        print(self.client.run('''su stack -c 'touch {0}' '''.format(logfile)))
-        print(self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name)))
-        print(self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile)))
-        print(self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name)))
+        logger.debug(self.client.run('''su stack -c 'touch {0}' '''.format(logfile)))
+        logger.debug(self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name)))
+        logger.debug(self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile)))
+        logger.debug(self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name)))
         time.sleep(1)
-        print(self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name)))
-        print(self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name)))
+        logger.debug(self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name)))
+        logger.debug(self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name)))
         for command in commands:
             cmd = '''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command)
-            print(cmd)
-            print(self.client.run(cmd))
+            logger.debug(cmd)
+            logger.debug(self.client.run(cmd))
 
     def _restart_devstack_screen(self):
         """
@@ -414,7 +414,7 @@ if vpool_name in enabled_backends:
             if EXPORT in contents:
                 return True
             contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
-            print('changing contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
+            logger.debug('changing contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
             self.client.run('cat >%s <<EOF \n%s' % (CINDER_OPENSTACK_SERVICE, contents))
 
     def _unpatch_etc_init_cindervolume_conf(self):
@@ -427,7 +427,7 @@ if vpool_name in enabled_backends:
             if not EXPORT in contents:
                 return True
             contents = contents.replace(EXPORT_, '')
-            print('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
+            logger.debug('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
             self.client.run('cat >%s <<EOF \n%s' % (CINDER_OPENSTACK_SERVICE, contents))
 
     def _restart_openstack_services(self):
@@ -439,7 +439,7 @@ if vpool_name in enabled_backends:
                 try:
                     self.client.run('service {0} restart'.format(service_name))
                 except SystemExit as sex:
-                    print('Failed to restart service {0}. {1}'.format(service_name, sex))
+                    logger.debug('Failed to restart service {0}. {1}'.format(service_name, sex))
         time.sleep(3)
         return self._is_cinder_running()
 

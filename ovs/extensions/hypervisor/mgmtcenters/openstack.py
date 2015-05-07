@@ -213,6 +213,18 @@ class OpenStack(object):
                           'vpool_name': connection_info['data']['vpoolname']})
         return disks
 
+    def get_vdisk_model_by_devicepath(self, devicepath):
+        """
+        Return vdisk model info (name)
+        :param devicepath: full device path
+        :return: dict
+        """
+        for volume in self.cinder_client.volumes.list():
+            info = volume.initialize_connection(None, {})
+            if info['data']['device_path'] == devicepath:
+                return {'name': volume.name,
+                        'id': volume.id}
+
     def get_vdisk_device_info(self, volumeid):
         """
         Returns devicename (full path, including vpool) and vpool name
