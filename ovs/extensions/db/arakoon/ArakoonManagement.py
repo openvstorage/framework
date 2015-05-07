@@ -79,7 +79,7 @@ class ArakoonClusterEx(ArakoonCluster):
     def __validateName(self, name):
         if name is None or name.strip() == '':
             raise Exception('A name should be passed.  An empty name is not an option')
-        if not isinstance(name, str):
+        if not isinstance(name, basestring):
             raise Exception('Name should be of type string')
         for char in [' ', ',', '#']:
             if char in name:

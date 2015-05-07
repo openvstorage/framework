@@ -17,7 +17,7 @@ Remote RPyC wrapper module
 
 from subprocess import check_output
 from rpyc.utils.zerodeploy import DeployedServer
-from plumbum.machines.paramiko_machine import ParamikoMachine
+from plumbum import SshMachine
 
 
 class Remote(object):
@@ -49,7 +49,7 @@ class Remote(object):
             raise ValueError('Modules should be a list, set or tuple')
 
         self.username = username if username is not None else check_output('whoami').strip()
-        self.machines = [ParamikoMachine(ip, user=self.username) for ip in self.ips]
+        self.machines = [SshMachine(ip, user=self.username) for ip in self.ips]
         self.servers = [DeployedServer(machine) for machine in self.machines]
         self.modules = modules
 
