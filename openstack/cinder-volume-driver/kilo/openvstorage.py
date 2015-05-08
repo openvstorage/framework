@@ -149,6 +149,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
             LOG.debug('CP_IMG_TO_VOL Deleting existing empty raw file %s ',
                       destination_path)
             vdisklib.VDiskController.delete_volume(location = destination_path)
+            self._ensure_volume_is_gone(volume.provider_location, str(volume.host))
             LOG.debug('CP_IMG_TO_VOL Downloading image to %s',
                       destination_path)
             image_utils.fetch_to_raw(context,
@@ -559,3 +560,33 @@ class OVSVolumeDriver(driver.VolumeDriver):
                     return True
         return False
 
+    def _ensure_volume_is_gone(self, location, hostname, retry=3,
+                                         timeout=3):
+        """Make sure OVS disk object (based on location and hostname) cannot be found anymore
+        :raise VolumeBackendAPIException
+        """
+        hostname = self._get_real_hostname(hostname)
+        LOG.debug('[_FIND OVS DISK GONE] Location %s, hostname %s',
+                  location, hostname)
+        attempt = 0
+        while attempt <= retry:
+            disk = None
+            for vd in vdisklist.VDiskList.get_vdisks():
+                if vd.vpool:
+                    for vsr in vd.vpool.storagedrivers:
+                        if vsr.storagerouter.name == hostname:
+                            _location = "{0}/{1}".format(vsr.mountpoint,
+                                                         vd.devicename)
+                            if _location == location:
+                                LOG.debug('Location %s Disk found %s',
+                                          location, vd.guid)
+                                if timeout:
+                                    time.sleep(timeout)
+                                    attempt += 1
+            if disk is None:
+                LOG.debug('[_FIND OVS DISK GONE] Disk no longer found')
+                return
+
+        msg = (_('Disk still found for location %s') % location)
+        LOG.exception(msg)
+        raise exception.VolumeBackendAPIException(data=msg)
