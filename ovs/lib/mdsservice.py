@@ -328,7 +328,14 @@ class MDSServiceController(object):
             if candidate_master is not None:
                 # A non-overloaded local slave was found.
                 client = MetadataServerClient.load(candidate_master)
-                amount_of_tlogs = client.catch_up(str(vdisk.volume_id), True)
+                try:
+                    amount_of_tlogs = client.catch_up(str(vdisk.volume_id), True)
+                except RuntimeError as ex:
+                    if 'Namespace does not exist' in ex.message:
+                        client.create_namespace(str(vdisk.volume_id))
+                        amount_of_tlogs = client.catch_up(str(vdisk.volume_id), True)
+                    else:
+                        raise
                 if amount_of_tlogs < tlogs:
                     # Almost there. Catching up right now, and continue as soon as it's up-to-date
                     start = time.time()

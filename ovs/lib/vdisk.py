@@ -363,7 +363,7 @@ class VDiskController(object):
         """
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
-        client = SSHClient('127.0.0.1')
+        client = SSHClient('127.0.0.1', username='root')
         try:
             output = client.run('truncate -s {0}G "{1}"'.format(size, location))
         except SystemExit as ex:
@@ -387,7 +387,7 @@ class VDiskController(object):
         if not os.path.exists(location):
             logger.error('File already deleted at %s' % location)
             return
-        client = SSHClient('127.0.0.1')
+        client = SSHClient('127.0.0.1', username='root')
         output = client.file_delete(location)
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
         if os.path.exists(location):
@@ -411,7 +411,7 @@ class VDiskController(object):
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        client = SSHClient('127.0.0.1')
+        client = SSHClient('127.0.0.1', username='root')
         print(client.run('truncate -s {0}G "{1}"'.format(size, location)))
 
     @staticmethod

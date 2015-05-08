@@ -632,7 +632,7 @@ class StorageRouterController(object):
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.guid != storagedriver_guid:
                 storagedrivers_left = True
-            client = SSHClient(current_storagedriver.storagerouter.ip)
+            client = SSHClient(current_storagedriver.storagerouter.ip, username='root')
             if client.ip not in ip_client_map:
                 ip_client_map[client.ip] = client
 
@@ -874,7 +874,7 @@ class StorageRouterController(object):
         Configures support on all StorageRouters
         """
         for storagerouter in StorageRouterList.get_storagerouters():
-            client = SSHClient(storagerouter.ip)
+            client = SSHClient(storagerouter.ip, username='root')
             client.config_set('ovs.support.enabled', 1 if enable else 0)
             client.config_set('ovs.support.enablesupport', 1 if enable_support else 0)
             if enable_support is False:

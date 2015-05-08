@@ -234,7 +234,7 @@ class Sdk(object):
             mountpoints.append(mountpoint)
 
         if self.ssh_client is None:
-            self.ssh_client = SSHClient(self.host)
+            self.ssh_client = SSHClient(self.host, username='root')
         vm_filename = self.ssh_client.run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.strip().split('/')[-1]
         vm_location = System.get_my_machine_id(self.ssh_client)
@@ -319,7 +319,7 @@ class Sdk(object):
         Try to delete all files from vpool (xml, .raw)
         """
         if self.ssh_client is None:
-            self.ssh_client = SSHClient(self.host)
+            self.ssh_client = SSHClient(self.host, username='root')
         vm_object = None
         try:
             vm_object = self.get_vm_object(vmid)
@@ -472,7 +472,7 @@ class Sdk(object):
             for network in networks:
                 options.append('--network {}'.format(','.join(network)))
         if self.ssh_client is None:
-            self.ssh_client = SSHClient(self.host)
+            self.ssh_client = SSHClient(self.host, username='root')
         self.ssh_client.run('{0} {1}'.format(command, ' '.join(options)))
         if start is False:
             self.ssh_client.run('virsh destroy {0}'.format(name))

@@ -950,7 +950,7 @@ class SetupController(object):
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
-        if PluginService.has_service('rabbitmq', ip=target_client.ip):
+        if PluginService.has_service('rabbitmq', client=target_client):
             target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl reset; sleep 5;')
             target_client.run('rabbitmqctl stop; sleep 5;')
@@ -973,11 +973,6 @@ class SetupController(object):
 
         print 'Restarting services'
         logger.debug('Restarting services')
-        for node in master_nodes:
-            node_client = ip_client_map[node]
-            for service in [s for s in SetupController.master_node_services if s not in SetupController.master_services]:
-                SetupController._change_service_state(node_client, service, 'restart')
-
         SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         for node_client in ip_client_map.itervalues():
             SetupController._change_service_state(node_client, 'watcher-framework', 'restart')

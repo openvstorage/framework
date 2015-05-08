@@ -42,7 +42,7 @@ class OpenStackManagement(object):
     """
 
     def __init__(self, cinder_client):
-        self.client = SSHClient.load('127.0.0.1')
+        self.client = SSHClient('127.0.0.1', username='root')
         self.cinder_client = cinder_client
         self.is_devstack = self._is_devstack()
         self.is_openstack = self._is_openstack()
