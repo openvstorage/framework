@@ -95,8 +95,6 @@ class SSHClient(object):
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                print exit_code
-                print stderr.readlines()
                 raise subprocess.CalledProcessError(exit_code, command, stderr.readlines())
             return '\n'.join(line.strip() for line in stdout).strip()
 
