@@ -194,7 +194,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Creates a cluster
         """
-        client = SSHClient(ip, username='ovs')
+        client = SSHClient(ip)
         base_dir = client.config_read('ovs.core.db.arakoon.location').rstrip('/')
         port_range = client.config_read('ovs.ports.arakoon')
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
@@ -219,7 +219,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         Deletes a complete cluster
         """
         config = ArakoonClusterConfig(cluster_name)
-        config.load_config(SSHClient(ip, username='ovs'))
+        config.load_config(SSHClient(ip))
 
         # Cleans up a complete cluster (remove services, directories and configuration files)
         for node in config.nodes:
@@ -230,11 +230,11 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Extends a cluster to a given new node
         """
-        client = SSHClient(master_ip, username='ovs')
+        client = SSHClient(master_ip)
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
 
-        client = SSHClient(new_ip, username='ovs')
+        client = SSHClient(new_ip)
         base_dir = client.config_read('ovs.core.db.arakoon.location').rstrip('/')
         port_range = client.config_read('ovs.ports.arakoon')
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
@@ -257,7 +257,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Removes a node from a cluster, the old node will become a slave
         """
-        client = SSHClient(remaining_node_ip, username='ovs')
+        client = SSHClient(remaining_node_ip)
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
 
@@ -274,7 +274,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         Cleans up a single node (remove services, directories and configuration files)
         """
         # Removes services for a cluster on a given node
-        ovs_client = SSHClient(node.ip, username='ovs')
+        ovs_client = SSHClient(node.ip)
         root_client = SSHClient(node.ip, username='root')
         ArakoonInstaller.stop(config.cluster_id, client=root_client)
         ArakoonInstaller.remove(config.cluster_id, client=root_client)
@@ -291,7 +291,7 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         Deploys a complete cluster: Distributing the configuration files, creating directories and services
         """
         for node in config.nodes:
-            ovs_client = SSHClient(node.ip, username='ovs')
+            ovs_client = SSHClient(node.ip)
             root_client = SSHClient(node.ip, username='root')
 
             # Distributes a configuration file to all its nodes
@@ -343,10 +343,10 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Deploys the configuration file to a slave
         """
-        client = SSHClient(master_ip, username='ovs')
+        client = SSHClient(master_ip)
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
-        client = SSHClient(slave_ip, username='ovs')
+        client = SSHClient(slave_ip)
         config.write_config(client)
 
     @staticmethod
@@ -354,10 +354,10 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
         """
         Removes everything related to a given cluster from the slave
         """
-        client = SSHClient(master_ip, username='ovs')
+        client = SSHClient(master_ip)
         config = ArakoonClusterConfig(cluster_name)
         config.load_config(client)
-        client = SSHClient(slave_ip, username='ovs')
+        client = SSHClient(slave_ip)
         config.delete_config(client)
 
     @staticmethod

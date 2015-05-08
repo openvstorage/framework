@@ -31,7 +31,7 @@ class PluginManager(object):
             from ovs.dal.lists.storagerouterlist import StorageRouterList
             ips = [storagerouter.ip for storagerouter in StorageRouterList.get_storagerouters()]
             for ip in ips:
-                client = SSHClient(ip)
+                client = SSHClient(ip, username='root')
                 for service_name in ['watcher-framework', 'memcached']:
                     Service.stop_service(service_name, client=client)
                     wait = 30
@@ -44,7 +44,7 @@ class PluginManager(object):
                         raise RuntimeError('Could not stop service: {0}'.format(service_name))
 
             for ip in ips:
-                client = SSHClient(ip)
+                client = SSHClient(ip, username='root')
                 for service_name in ['memcached', 'watcher-framework']:
                     Service.start_service(service_name, client=client)
                     wait = 30

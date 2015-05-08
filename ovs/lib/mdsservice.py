@@ -477,7 +477,7 @@ class MDSServiceController(object):
                 if vpool not in mds_dict:
                     mds_dict[vpool] = {}
                 if storagerouter not in mds_dict[vpool]:
-                    mds_dict[vpool][storagerouter] = {'client': SSHClient(storagerouter.ip),
+                    mds_dict[vpool][storagerouter] = {'client': SSHClient(storagerouter.ip, username='root'),
                                                       'services': []}
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
         for vpool, storagerouter_info in mds_dict.iteritems():

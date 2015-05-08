@@ -30,7 +30,7 @@ class SSHClient(object):
     Remote/local client
     """
 
-    def __init__(self, ip, username=None, password=None):
+    def __init__(self, ip, username='ovs', password=None):
         """
         Initializes an SSHClient
         """

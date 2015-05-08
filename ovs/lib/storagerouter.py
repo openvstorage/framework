@@ -187,7 +187,7 @@ class StorageRouterController(object):
                 PluginService.disable_service(voldrv_service, client=sr_client)
                 PluginService.stop_service(voldrv_service, client=sr_client)
             ip_client_map[sr.ip] = {'root': sr_client,
-                                    'ovs': SSHClient(sr.ip, username='ovs')}
+                                    'ovs': SSHClient(sr.ip)}
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         if vpool is None:
@@ -755,7 +755,7 @@ class StorageRouterController(object):
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
                 ip = current_storagedriver.storagerouter.ip
-                sr_client = ip_client_map.get(ip, SSHClient(ip))
+                sr_client = ip_client_map.get(ip, SSHClient(ip, username='root'))
                 if current_storagedriver.guid != storagedriver_guid:
                     if PluginService.has_service(voldrv_service, client=sr_client):
                         PluginService.enable_service(voldrv_service, client=sr_client)
@@ -862,7 +862,7 @@ class StorageRouterController(object):
         webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
         logfile = check_output('ovs collect logs', shell=True).strip()
         logfilename = logfile.split('/')[-1]
-        client = SSHClient(storagerouter.ip)
+        client = SSHClient(storagerouter.ip, username='root')
         client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
         client.run('chmod 666 {0}/{1}'.format(webpath, logfilename))
@@ -875,9 +875,10 @@ class StorageRouterController(object):
         Configures support on all StorageRouters
         """
         for storagerouter in StorageRouterList.get_storagerouters():
-            client = SSHClient(storagerouter.ip, username='root')
+            client = SSHClient(storagerouter.ip)
             client.config_set('ovs.support.enabled', 1 if enable else 0)
             client.config_set('ovs.support.enablesupport', 1 if enable_support else 0)
+            client = SSHClient(storagerouter.ip, username='root')
             if enable_support is False:
                 client.run('service openvpn stop')
                 client.file_delete('/etc/openvpn/ovs_*')
