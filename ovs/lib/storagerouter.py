@@ -647,13 +647,14 @@ class StorageRouterController(object):
             if mgmtcenter:
                 mgmtcenter.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
 
+        client = SSHClient(ip, username='root')
+
         # KVM pool
         if pmachine.hvtype == 'KVM':
             # 'Name                 State      Autostart '
             # '-------------------------------------------'
             # ' vpool1               active     yes'
             # ' vpool2               active     no'
-            client = SSHClient(ip)
             vpool_overview = client.run('virsh pool-list --all').splitlines()
             vpool_overview.pop(1)  # Pop   ---------------
             vpool_overview.pop(0)  # Pop   Name   State   Autostart
@@ -750,8 +751,6 @@ class StorageRouterController(object):
             storagedriver.alba_proxy.delete()
         storagedriver.delete(abandon=['logs'])  # Detach from the log entries
 
-        MDSServiceController.mds_checkup()
-
         if storagedrivers_left:
             # Restart leftover services
             for current_storagedriver in vpool.storagedrivers:
@@ -764,6 +763,8 @@ class StorageRouterController(object):
         else:
             # Final model cleanup
             vpool.delete()
+
+        MDSServiceController.mds_checkup()
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.update_storagedrivers')
