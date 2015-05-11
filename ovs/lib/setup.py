@@ -154,7 +154,7 @@ class SetupController(object):
                 target_node_password = Interactive.ask_password('Enter the root password for {0}'.format(node_string))
             else:
                 target_node_password = target_password
-            target_client = SSHClient(ip, password=target_node_password)
+            target_client = SSHClient(ip, username='root', password=target_node_password)
             ip_client_map[ip] = target_client
 
             logger.debug('Target client loaded')
@@ -224,7 +224,7 @@ class SetupController(object):
                         master_password = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
                         known_passwords[master_ip] = master_password
                         if master_ip not in ip_client_map:
-                            ip_client_map[master_ip] = SSHClient(master_ip, password=master_password)
+                            ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
                         first_node = False
                     else:
                         cluster_name = None
@@ -257,7 +257,7 @@ class SetupController(object):
             if not cluster_ip:
                 cluster_ip = Interactive.ask_choice(ipaddresses, 'Select the public ip address of {0}'.format(node_name))
                 ip_client_map.pop(ip)
-                ip_client_map[cluster_ip] = SSHClient(cluster_ip, password=target_node_password)
+                ip_client_map[cluster_ip] = SSHClient(cluster_ip, username='root', password=target_node_password)
             known_passwords[cluster_ip] = target_node_password
             if cluster_ip not in nodes:
                 nodes.append(cluster_ip)
@@ -295,7 +295,7 @@ class SetupController(object):
                 promote = False
                 for cluster in SetupController.arakoon_clusters:
                     config = ArakoonClusterConfig(cluster)
-                    config.load_config(SSHClient(master_ip, password=known_passwords[master_ip]))
+                    config.load_config(SSHClient(master_ip, username='root', password=known_passwords[master_ip]))
                     logger.debug('{0} nodes for cluster {1} found'.format(len(config.nodes), cluster))
                     if (len(config.nodes) < 3 or force_type == 'master') and force_type != 'extra':
                         promote = True
@@ -367,7 +367,7 @@ class SetupController(object):
             cluster_name = match_groups['cluster']
 
             target_password = Interactive.ask_password('Enter the root password for this node')
-            target_client = SSHClient('127.0.0.1', password=target_password)
+            target_client = SSHClient('127.0.0.1', username='root', password=target_password)
             discovery_result = SetupController._discover_nodes(target_client)
             master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems() if node_properties.get('type') == 'master']
             nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
@@ -383,7 +383,7 @@ class SetupController(object):
             ip = ovs_config.get('grid', 'ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
-            ip_client_map = dict((node_ip, SSHClient(node_ip, password=target_password)) for node_ip in nodes if node_ip)
+            ip_client_map = dict((node_ip, SSHClient(node_ip, username='root', password=target_password)) for node_ip in nodes if node_ip)
             if node_action == 'promote':
                 SetupController._promote_node(cluster_ip=ip,
                                               master_ip=master_ip,
@@ -440,7 +440,7 @@ class SetupController(object):
             if node in known_passwords:
                 passwords[node] = known_passwords[node]
                 if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, password=known_passwords[node])
+                    ip_client_map[node] = SSHClient(node, username='root', password=known_passwords[node])
                 continue
             if first_request is True:
                 prev_node_password = Interactive.ask_password('Enter root password for {0}'.format(node))
@@ -448,7 +448,7 @@ class SetupController(object):
                 passwords[node] = prev_node_password
                 first_request = False
                 if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, password=prev_node_password)
+                    ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
             else:
                 this_node_password = Interactive.ask_password('Enter root password for {0}, just press enter if identical as above'.format(node))
                 if this_node_password == '':
@@ -457,7 +457,7 @@ class SetupController(object):
                 passwords[node] = this_node_password
                 prev_node_password = this_node_password
                 if node not in ip_client_map:
-                    ip_client_map[node] = SSHClient(node, password=this_node_password)
+                    ip_client_map[node] = SSHClient(node, username='root', password=this_node_password)
 
         logger.debug('Nodes: {0}'.format(nodes))
         logger.debug('Discovered nodes: \n{0}'.format(SetupController.discovered_nodes))
@@ -774,7 +774,7 @@ class SetupController(object):
         master_nodes = []
         for cluster in SetupController.arakoon_clusters:
             config = ArakoonClusterConfig(cluster)
-            config.load_config(SSHClient(master_ip))
+            config.load_config(SSHClient(master_ip, username='root'))
             master_nodes = [node.ip for node in config.nodes]
             if cluster_ip in master_nodes:
                 master_nodes.remove(cluster_ip)
@@ -904,7 +904,7 @@ class SetupController(object):
         master_nodes = []
         for cluster in SetupController.arakoon_clusters:
             config = ArakoonClusterConfig(cluster)
-            config.load_config(SSHClient(master_ip))
+            config.load_config(SSHClient(master_ip, username='root'))
             master_nodes = [node.ip for node in config.nodes]
             if cluster_ip in master_nodes:
                 master_nodes.remove(cluster_ip)
