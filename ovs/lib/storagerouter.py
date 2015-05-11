@@ -402,7 +402,7 @@ class StorageRouterController(object):
                                                       existing_storagedriver.ports[1],
                                                       existing_storagedriver.ports[2]))
         if new_storagedriver:
-            node_configs.append(ClusterNodeConfig(vrouter_id, grid_ip, ports[0], ports[1], ports[2]))
+            node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
         vrouter_clusterregistry.set_node_configs(node_configs)
 
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
