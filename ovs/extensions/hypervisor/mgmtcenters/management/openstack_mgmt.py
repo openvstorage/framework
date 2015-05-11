@@ -33,7 +33,7 @@ def file_exists(ssh_client, location):
     """
     Cuisine's file_exists uses "run" which asks for password when run as user stack
     """
-    return ssh_client.run_local('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
+    return ssh_client.run('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
 
 
 class OpenStackManagement(object):
@@ -144,7 +144,7 @@ class OpenStackManagement(object):
 
     def _is_devstack(self):
         try:
-            return 'stack' in str(self.client.run_local('ps aux | grep SCREEN | grep stack | grep -v grep'))
+            return 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep'))
         except SystemExit:  # ssh client raises system exit 1
             return False
 
@@ -154,12 +154,12 @@ class OpenStackManagement(object):
     def _is_cinder_running(self):
         if self.is_devstack:
             try:
-                return 'cinder-volume' in str(self.client.run_local('ps aux | grep cinder-volume | grep -v grep'))
+                return 'cinder-volume' in str(self.client.run('ps aux | grep cinder-volume | grep -v grep'))
             except SystemExit:
                 return False
         if self.is_openstack:
             try:
-                return 'start/running' in str(self.client.run_local('service cinder-volume status'))
+                return 'start/running' in str(self.client.run('service cinder-volume status'))
             except SystemExit:
                 return False
         return False
@@ -187,12 +187,12 @@ class OpenStackManagement(object):
         """
         Enable service ovs-openstack-events-consumer
         """
-        from ovs.lib.setup import SetupController
+        from ovs.plugin.provider.service import Service
         service_name = 'ovs-openstack-events-consumer'
-        if not SetupController._has_service(self.client, service_name):
-            SetupController._add_service(self.client, service_name)
-            SetupController._enable_service(self.client, service_name)
-            SetupController._start_service(self.client, service_name)
+        if not Service.has_service(service_name, self.client):
+            Service.add_service(service_name, self.client)
+            Service.enable_service(service_name, self.client)
+            Service.start_service(service_name, self.client)
 
     def _configure_messaging_driver(self):
         """
