@@ -296,12 +296,12 @@ print json.dumps(os.path.isfile('{0}'))""".format(self._shell_safe(filename))
             return Configuration.get(key)
         else:
             read = """
-import sys
+import sys, json
 sys.path.append('/opt/OpenvStorage')
 from ovs.plugin.provider.configuration import Configuration
-print Configuration.get('{0}')
+print json.dumps(Configuration.get('{0}'))
 """.format(key)
-            return self.run('python -c """{0}"""'.format(read))
+            return json.loads(self.run('python -c """{0}"""'.format(read)))
 
     def config_set(self, key, value):
         if self.is_local is True:
