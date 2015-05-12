@@ -64,7 +64,7 @@ class OpenStack(object):
     def get_metadata(self, metadata, parameters):
         """
         Get specific config values:
-        - config_cinder (first time comes from GUI True/False)
+        - config_cinder (first time comes from GUI integratemgmt: True/False)
         """
         config_cinder = metadata.get('integratemgmt', None)
         if config_cinder is None:
@@ -79,24 +79,6 @@ class OpenStack(object):
         self.config_cinder = metadata.get('integratemgmt')
         logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
 
-    def valid_credentials(self, cinder_password, cinder_user, tenant_name, controller_ip):
-        """
-        OBSOLETE - Validate credentials
-        Use init and authenticate
-        """
-        try:
-            from cinderclient.v2 import client as cinder_client
-        except ImportError:
-            return False
-        else:
-            try:
-                auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
-                cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
-                cinder_client.authenticate()
-                return True
-            except Exception as ex:
-                logger.error('Authenticate failed %s' % ex)
-                return False
 
     def configure_vpool(self, vpool_name, mountpoint):
         if self.config_cinder:
@@ -115,6 +97,7 @@ class OpenStack(object):
                 logger.error('Management action "unconfigure_vpool" failed %s' % ex)
         else:
             logger.info('Cinder configuration is disabled')
+
     def get_host_status_by_ip(self, host_ip):
         """
         Return host status

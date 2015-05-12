@@ -37,14 +37,14 @@ class KVM(object):
         """
         return self.sdk.get_power_state(vmid)
 
-    def create_vm_from_template(self, name, source_vm, disks, storage_ip, mountpoint, wait=True):
+    def create_vm_from_template(self, name, source_vm, disks, ip, mountpoint, wait=True):
         """
         create vm from template
         TODO:
         storage_ip and mountpoint refer to target Storage Driver
         but on kvm storagedriver.storage_ip is 127.0.0.1
         """
-        _ = storage_ip, wait  # For compatibility purposes only
+        _ = ip, wait  # For compatibility purposes only
         return self.sdk.create_vm_from_template(name, source_vm, disks, mountpoint)
 
     def delete_vm(self, vmid, storagedriver_mountpoint=None, storagedriver_storage_ip=None, devicename=None, disks_info=None, wait=True):

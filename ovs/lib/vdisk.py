@@ -449,7 +449,6 @@ class VDiskController(object):
             mutex.release()
 
     @staticmethod
-    @celery.task(name='ovs.vdisk.sync_with_mgmtcenter')
     def sync_with_mgmtcenter(disk, pmachine, storagedriver):
         """
         Update disk info using management center (if available)
@@ -458,7 +457,7 @@ class VDiskController(object):
         @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)
         """
         if pmachine.mgmtcenter is None:
-            disk_name = disk.devicename.split('.')[0]
+            disk.name = disk.devicename.split('.')[0]
             disk.save()
             logger.info('No management center for pmachine {0}'.format(pmachine.name))
             return
