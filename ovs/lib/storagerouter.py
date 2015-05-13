@@ -123,7 +123,7 @@ class StorageRouterController(object):
         required_params_wihout_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
                                         'connection_host': (str, Toolbox.regex_ip, False),
                                         'connection_port': (int, None),
-                                        'connection_backend': (str, None),
+                                        'connection_backend': (dict, None),
                                         'connection_username': (str, None),
                                         'connection_password': (str, None)}
 
@@ -203,8 +203,8 @@ class StorageRouterController(object):
             connection_username = parameters['connection_username']
             connection_password = parameters['connection_password']
             if vpool.backend_type.code in ['local', 'distributed']:
-                metadata = {'backend_type': 'LOCAL',
-                            'local_connection_path': mountpoint_bfs}
+                vpool.metadata = {'backend_type': 'LOCAL',
+                                  'local_connection_path': mountpoint_bfs}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
                     connection_host = Configuration.get('ovs.grid.ip')
@@ -217,10 +217,17 @@ class StorageRouterController(object):
                     ovs_client = OVSClient(connection_host, connection_port,
                                            credentials=(connection_username, connection_password),
                                            version=1)
-                task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(parameters['connection_backend']))
+                backend_guid = parameters['connection_backend']['backend']
+                preset_name = parameters['connection_backend']['metadata']
+                backend_info = ovs_client.get('/alba/backends/{0}/'.format(backend_guid), params={'contents': '_dynamics'})
+                if preset_name not in [preset['name'] for preset in backend_info['presets']]:
+                    raise RuntimeError('Given preset {0} is not available in backend {1}'.format(preset_name, backend_guid))
+                task_id = ovs_client.get('/alba/backends/{0}/get_config_metadata'.format(backend_guid))
                 successful, metadata = ovs_client.wait_for_task(task_id, timeout=300)
                 if successful is False:
                     raise RuntimeError('Could not load metadata from remote environment {0}'.format(connection_host))
+                vpool.metadata = {'metadata': metadata,
+                                  'preset': preset_name}
             elif vpool.backend_type.code in ['ceph_s3', 'amazon_s3', 'swift_s3']:
                 if vpool.backend_type.code in ['swift_s3']:
                     strict_consistency = 'false'
@@ -229,21 +236,20 @@ class StorageRouterController(object):
                     strict_consistency = 'true'
                     s3_connection_flavour = 'S3'
 
-                metadata = {'s3_connection_host': connection_host,
-                            's3_connection_port': connection_port,
-                            's3_connection_username': connection_username,
-                            's3_connection_password': connection_password,
-                            's3_connection_flavour': s3_connection_flavour,
-                            's3_connection_strict_consistency': strict_consistency,
-                            's3_connection_verbose_logging': 1,
-                            'backend_type': 'S3'}
+                vpool.metadata = {'s3_connection_host': connection_host,
+                                  's3_connection_port': connection_port,
+                                  's3_connection_username': connection_username,
+                                  's3_connection_password': connection_password,
+                                  's3_connection_flavour': s3_connection_flavour,
+                                  's3_connection_strict_consistency': strict_consistency,
+                                  's3_connection_verbose_logging': 1,
+                                  'backend_type': 'S3'}
             else:
                 raise ValueError('Unsupported backend type specified: "{0}"'.format(vpool.backend_type.code))
 
             vpool.name = vpool_name
             vpool.login = connection_username
             vpool.password = connection_password
-            vpool.metadata = metadata
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
             vpool.description = "{0} {1}".format(vpool.backend_type.code, vpool_name)
             vpool.save()
@@ -434,9 +440,9 @@ class StorageRouterController(object):
             alba_proxy.storagedriver = storagedriver
             alba_proxy.save()
             config = RawConfigParser()
-            for section in vpool.metadata:
+            for section in vpool.metadata['metadata']:
                 config.add_section(section)
-                for key, value in vpool.metadata[section].iteritems():
+                for key, value in vpool.metadata['metadata'][section].iteritems():
                     config.set(section, key, value)
             config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
             client.dir_create(config_dir)
@@ -461,6 +467,7 @@ class StorageRouterController(object):
         if vpool.backend_type.code == 'alba':
             storagedriver_config.configure_backend_connection_manager(alba_connection_host='127.0.0.1',
                                                                       alba_connection_port=alba_proxy.service.ports[0],
+                                                                      alba_connection_preset=vpool.metadata['preset'],
                                                                       backend_type='ALBA')
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)

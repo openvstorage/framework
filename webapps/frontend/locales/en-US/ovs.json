@@ -541,6 +541,7 @@
                 "clientid": "Client ID",
                 "clientsecret": "Client secret",
                 "albabackend": "Backend",
+                "albapreset": "Preset",
                 "nobackends": "No backends found.",
                 "choosebackend": "Choose one of the available backends",
                 "invalidalbainfo": "The entered connection info and credentials are invalid",

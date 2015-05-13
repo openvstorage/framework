@@ -27,7 +27,9 @@ from oauth2.toolbox import Toolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler('api', 'oauth2')
 
 
 class OAuth2TokenView(View):
@@ -96,7 +98,8 @@ class OAuth2TokenView(View):
                 return HttpResponse, {'access_token': access_token.access_token,
                                       'token_type': 'bearer',
                                       'expires_in': 3600}
-            except:
+            except Exception as ex:
+                logger.exception('Error matching client: {0}'.format(ex))
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
         else:
             return HttpResponseBadRequest, {'error': 'unsupported_grant_type'}

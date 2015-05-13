@@ -113,10 +113,24 @@ limitations under the License.
                             data-bind="click: loadAlbaBackends, style: {
                                            'margin-top': (data.albaBackends() !== undefined && data.albaBackends().length > 0 ? '-26px' : '')
                                        }, enable: !albaBackendLoading()">
-                        <span class="fa" data-i18n="[html]ovs:icons.load"></span>
+                        <span class="fa fa-" data-bind="css: { 'fa-spin': albaBackendLoading() }" data-i18n="[html]ovs:icons.load"></span>
                         <span style="padding-left: 8px;" data-i18n="ovs:generic.reload"></span>
                     </button>
                 </div>
+            </div>
+        </div>
+        <div class="form-group" data-bind="if: data.albaBackend() !== undefined">
+            <label class="col-lg-3 control-label" for="" data-i18n="ovs:wizards.addvpool.gathervpool.albapreset"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: {
+                                     key: 'name', keyisfunction: false,
+                                     items: data.albaBackend().presetNames, target: data.albaPreset,
+                                     text: function(item) {
+                                         var text = item.name === 'default' ? 'Default' : item.name;
+                                         text += ': ' + item.policies.join(', ');
+                                         return text;
+                                     }
+                                 }"></span>
             </div>
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathervpool.extendedinfo"></p>

@@ -17,13 +17,26 @@ Contains various decorator
 """
 import json
 import time
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseForbidden
+from django.contrib.auth import authenticate, login
+from rest_framework.request import Request
+from rest_framework.exceptions import PermissionDenied
+from django.core.handlers.wsgi import WSGIRequest
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.log.logHandler import LogHandler
 from ovs.dal.hybrids.log import Log
 
 logger = LogHandler('api', 'oauth2')
+
+
+def _find_request(args):
+    """
+    Finds the "request" object in args
+    """
+    for item in args:
+        if isinstance(item, Request) or isinstance(item, WSGIRequest):
+            return item
 
 
 def json_response():
@@ -137,3 +150,30 @@ def log():
 
     return wrap
 
+
+def authenticated():
+    """
+    Forces an authentication run
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(*args, **kwargs):
+            """
+            Wrapped function
+            """
+            request = _find_request(args)
+            user = authenticate(request=request, native_django=True)
+            if user is None:
+                raise PermissionDenied('Authentication credentials were not provided.')
+            login(request, user)
+            return f(*args, **kwargs)
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
+    return wrap
