@@ -126,8 +126,7 @@ limitations under the License.
                                      key: 'name', keyisfunction: false,
                                      items: data.albaBackend().presetNames, target: data.albaPreset,
                                      text: function(item) {
-                                         var text = item.name === 'default' ? 'Default' : item.name;
-                                         text += ': ' + item.policies.join(', ');
+                                         var text = item.name + ': ' + item.policies.join(', ');
                                          return text;
                                      }
                                  }"></span>
