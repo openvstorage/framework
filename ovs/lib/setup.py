@@ -1372,6 +1372,7 @@ EOF
                 partitions_by_disk[disk] = [(mp, percentage, label)]
 
         # Partition and format disks
+        mpts_to_mount = []
         fstab_entries = ['{0} - Do not edit anything in this block'.format(fstab_separator[0])]
         for disk, partitions in partitions_by_disk.iteritems():
             if disk == 'DIR_ONLY':
@@ -1389,6 +1390,7 @@ EOF
                     client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
                     fstab_entries.append(fstab_entry.format(label, mp))
                     client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
+                    mpts_to_mount.append(mp)
                 continue
 
             start = '2MB'
@@ -1402,6 +1404,7 @@ EOF
                     client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
                 client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
                 fstab_entries.append(fstab_entry.format(label, mp))
+                mpts_to_mount.append(mp)
                 count += 1
                 start = size_in_percentage
 
@@ -1423,12 +1426,9 @@ EOF
         client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
         print 'Mounting all partitions ...'
-        try:
-            client.run('timeout -k 9 5s mountall -q || true')
-        except:
-            pass  # The above might fail sometimes. We don't mind and will try again
-        client.run('swapoff --all')
-        client.run('timeout -k 9 5s mountall -q || true')
+        for mp in mpts_to_mount:
+            client.dir_create(mp)
+            client.run('mount {0}'.format(mp))
         client.run('chmod 1777 /var/tmp')
 
     @staticmethod
