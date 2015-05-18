@@ -19,6 +19,7 @@ import pickle
 import uuid
 import os
 import time
+from subprocess import check_output
 
 from ovs.lib.helpers.decorators import log
 from ovs.celery_run import celery
@@ -364,12 +365,10 @@ class VDiskController(object):
         """
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
-        client = SSHClient('127.0.0.1', username='root')
-        try:
-            output = client.run('truncate -s {0}G "{1}"'.format(size, location))
-        except SystemExit as ex:
-            raise RuntimeError(str(ex))
+
+        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
 
@@ -388,9 +387,9 @@ class VDiskController(object):
         if not os.path.exists(location):
             logger.error('File already deleted at %s' % location)
             return
-        client = SSHClient('127.0.0.1', username='root')
-        output = client.file_delete(location)
+        output = check_output('rm "{0}"'.format(location), shell=True).strip()
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        logger.info(output)
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
         if output == '':
@@ -412,8 +411,9 @@ class VDiskController(object):
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        client = SSHClient('127.0.0.1', username='root')
-        logger.info(client.run('truncate -s {0}G "{1}"'.format(size, location)))
+        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
+        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        logger.info(output)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.update_vdisk_name')

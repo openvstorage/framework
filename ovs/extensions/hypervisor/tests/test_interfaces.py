@@ -53,7 +53,7 @@ class Interfaces(TestCase):
                 function = member[1]
                 fname = function.__name__
                 if fname.startswith('_') and fname not in ['__init__']:
-                    # single underscore (private names) are ignored 
+                    # single underscore (private names) are ignored
                     # __init__ method MUST be identical
                     continue
                 if fname not in overview:
