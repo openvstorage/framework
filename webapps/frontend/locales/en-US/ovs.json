@@ -792,6 +792,8 @@
         "password": "&#xf084;",
         "vpools": "&#xf0c2;",
         "load": "&#xf021;",
-        "licensing": "&#xf132;"
+        "licensing": "&#xf132;",
+        "up": "&#xf106;",
+        "down": "&#xf107;"
     }
 }
