@@ -868,12 +868,12 @@ class SetupController(object):
                 PluginService.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
 
-        print 'Retarting services'
+        print 'Restarting services'
         SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
-            print 'Retarting services'
+            print 'Restarting services'
             SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -964,30 +964,33 @@ class SetupController(object):
                 SetupController._change_service_state(target_client, service, 'stop')
                 PluginService.remove_service(service, client=target_client)
 
-        params = {'<MEMCACHE_NODE_IP>': cluster_ip,
-                  '<WORKER_QUEUE>': '{0}'.format(unique_id)}
         if PluginService.has_service('workers', client=target_client):
-            PluginService.add_service('workers', params=params, client=target_client)
+            PluginService.add_service(name='workers',
+                                      client=target_client,
+                                      params={'<MEMCACHE_NODE_IP>': cluster_ip,
+                                              '<WORKER_QUEUE>': '{0}'.format(unique_id)})
 
         print 'Restarting services'
         logger.debug('Restarting services')
         SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
-        SetupController._restart_framework_and_memcache_services(ip_client_map)
+        SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip):
-            print 'Retarting services'
-            SetupController._restart_framework_and_memcache_services(ip_client_map)
+            print 'Restarting services'
+            SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
 
         logger.info('Demote complete')
 
     @staticmethod
-    def _restart_framework_and_memcache_services(ip_client_map):
+    def _restart_framework_and_memcache_services(ip_client_map, memcached_exclude_client=None):
         for service_info in [('watcher-framework', 'stop'),
                              ('memcached', 'restart'),
                              ('watcher-framework', 'start')]:
             for node_client in ip_client_map.itervalues():
+                if memcached_exclude_client is not None and memcached_exclude_client.ip == node_client.ip and service_info[0] == 'memcached':
+                    continue  # Skip memcached for demoted nodes, because they don't run that service
                 SetupController._change_service_state(node_client, service_info[0], service_info[1])
 
     @staticmethod
