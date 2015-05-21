@@ -870,13 +870,11 @@ class SetupController(object):
 
         print 'Retarting services'
         SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
-        for node_client in ip_client_map.itervalues():
-            SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
+        SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
             print 'Retarting services'
-            for node_client in ip_client_map.itervalues():
-                SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
+            SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
@@ -974,17 +972,23 @@ class SetupController(object):
         print 'Restarting services'
         logger.debug('Restarting services')
         SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
-        for node_client in ip_client_map.itervalues():
-            SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
+        SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip):
             print 'Retarting services'
-            for node_client in ip_client_map.itervalues():
-                SetupController._change_service_state(node_client, 'watcher-framework', 'restart')
+            SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
 
         logger.info('Demote complete')
+
+    @staticmethod
+    def _restart_framework_and_memcache_services(ip_client_map):
+        for service_info in [('watcher-framework', 'stop'),
+                             ('memcached', 'restart'),
+                             ('watcher-framework', 'start')]:
+            for node_client in ip_client_map.itervalues():
+                SetupController._change_service_state(node_client, service_info[0], service_info[1])
 
     @staticmethod
     def _configure_rabbitmq(client):
