@@ -50,7 +50,7 @@ class VDiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.list_volumes')
+    @celery.task(name='ovs.vdisk.list_volumes')
     def list_volumes(vpool_guid=None):
         """
         List all known volumes on a specific vpool or on all
@@ -67,7 +67,7 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_from_voldrv')
+    @celery.task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volumename, storagedriver_id):
         """
@@ -107,7 +107,7 @@ class VDiskController(object):
                 mutex.release()
 
     @staticmethod
-    @celery.task(name='ovs.disk.resize_from_voldrv')
+    @celery.task(name='ovs.vdisk.resize_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def resize_from_voldrv(volumename, volumesize, volumepath, storagedriver_id):
         """
@@ -141,7 +141,7 @@ class VDiskController(object):
         MDSServiceController.ensure_safety(disk)
 
     @staticmethod
-    @celery.task(name='ovs.disk.rename_from_voldrv')
+    @celery.task(name='ovs.vdisk.rename_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagedriver_id):
         """
@@ -165,7 +165,7 @@ class VDiskController(object):
             disk.save()
 
     @staticmethod
-    @celery.task(name='ovs.disk.clone')
+    @celery.task(name='ovs.vdisk.clone')
     def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
         """
         Clone a disk
@@ -215,7 +215,7 @@ class VDiskController(object):
                 'backingdevice': location}
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_snapshot')
+    @celery.task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(diskguid, metadata, snapshotid=None):
         """
         Create a disk snapshot
@@ -237,7 +237,7 @@ class VDiskController(object):
         return snapshotid
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_snapshot')
+    @celery.task(name='ovs.vdisk.delete_snapshot')
     def delete_snapshot(diskguid, snapshotid):
         """
         Delete a disk snapshot
@@ -255,7 +255,7 @@ class VDiskController(object):
         disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
-    @celery.task(name='ovs.disk.set_as_template')
+    @celery.task(name='ovs.vdisk.set_as_template')
     def set_as_template(diskguid):
         """
         Set a disk as template
@@ -266,7 +266,7 @@ class VDiskController(object):
         disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
 
     @staticmethod
-    @celery.task(name='ovs.disk.rollback')
+    @celery.task(name='ovs.vdisk.rollback')
     def rollback(diskguid, timestamp):
         """
         Rolls back a disk based on a given disk snapshot timestamp
@@ -281,7 +281,7 @@ class VDiskController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_from_template')
+    @celery.task(name='ovs.vdisk.create_from_template')
     def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagedriver_guid=None):
         """
         Create a disk from a template
@@ -351,7 +351,7 @@ class VDiskController(object):
                 'backingdevice': disk_path}
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_volume')
+    @celery.task(name='ovs.vdisk.create_volume')
     def create_volume(location, size):
         """
         Create a volume using filesystem calls
@@ -373,7 +373,7 @@ class VDiskController(object):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_volume')
+    @celery.task(name='ovs.vdisk.delete_volume')
     def delete_volume(location):
         """
         Create a volume using filesystem calls
@@ -397,7 +397,7 @@ class VDiskController(object):
         raise RuntimeError(output)
 
     @staticmethod
-    @celery.task(name='ovs.disk.extend_volume')
+    @celery.task(name='ovs.vdisk.extend_volume')
     def extend_volume(location, size):
         """
         Extend a volume using filesystem calls

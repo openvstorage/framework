@@ -466,7 +466,7 @@ class DataObject(object):
                         if item is not None:
                             item.save(recursive=True, skip=relation.foreign_key)
 
-                # Save object we point at (e.g. machine.disks - if this is machine)
+                # Save object we point at (e.g. machine.vdisks - if this is machine)
                 relations = RelationMapper.load_foreign_relations(self.__class__)
                 if relations is not None:
                     for key, info in relations.iteritems():

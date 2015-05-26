@@ -44,7 +44,8 @@ define([
                 var storageRouter = self.storageRouter();
                 $.when.apply($, [
                         storageRouter.load('_dynamics,_relations'),
-                        storageRouter.getAvailableActions()
+                        storageRouter.getAvailableActions(),
+                        storageRouter.getDisks()
                     ])
                     .then(self.loadStorageDrivers)
                     .then(self.loadVPools)

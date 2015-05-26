@@ -65,7 +65,7 @@ class StorageDriverController(object):
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
         else:
             # No management Center, cannot update status via api
-            #TODO: should we try manually (ping, ssh)?
+            # @TODO: should we try manually (ping, ssh)?
             pass
 
     @staticmethod

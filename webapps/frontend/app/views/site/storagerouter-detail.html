@@ -101,6 +101,9 @@ limitations under the License.
             <li class="active" data-bind="tooltip: 'ovs:generic.management', visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
+            <li data-bind="tooltip: 'ovs:generic.disks', visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
+                <a href="#disks" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.disks"></a>
+            </li>
         </ul>
         <div class="tab-content">
             <div class="tab-pane active" id="management" style="padding: 15px;" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
@@ -114,11 +117,12 @@ limitations under the License.
                             </td>
                             <td style="padding: 0 0 20px 0;">
                                 <h4 data-i18n="ovs:storagerouters.detail.storageroutervpoollink"></h4>
-                                <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
                                 <table class="table table-noborder table-hover table-condensed">
                                     <thead>
                                         <tr>
-                                            <th style="width: 30px;"></th>
+                                            <th style="width: 30px;">
+                                                <span class="fa fa-spin" data-bind="visible: !$root.vPoolsLoaded()" data-i18n="[html]ovs:icons.loading"></span>
+                                            </th>
                                             <th><span data-i18n="ovs:generic.vpool"></span></th>
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.mgmtport"></span></th>
                                             <th style="width: 125px;"><span data-i18n="ovs:generic.xmlrpcport"></span></th>
@@ -145,7 +149,7 @@ limitations under the License.
                                                 <!--/ko-->
                                             </tr>
                                         <!-- /ko -->
-                                        <!-- ko visible: $root.vPools().length === 0 -->
+                                        <!-- ko if: $root.vPools().length === 0 -->
                                             <tr>
                                                 <td colspan="6">
                                                     <i data-i18n="ovs:generic.noentries"></i>
@@ -160,6 +164,28 @@ limitations under the License.
                                 </button>
                             </td>
                         </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="tab-pane" id="disks" style="padding: 15px;" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
+                <table class="table table-noborder" style="width: 100%;">
+                    <tbody>
+                        <tr style="padding-bottom: 10px;">
+                            <td style="width: 90px;">&nbsp;</td>
+                            <td style="padding: 0;">
+                                <h4 data-i18n="ovs:storagerouters.detail.disks.title"></h4>
+                            </td>
+                        </tr>
+                        <!-- ko foreach: disks -->
+                            <tr>
+                                <td style="vertical-align: top; padding: 20px 0 0 0;">
+                                    /dev/<span data-bind="text: name"></span>
+                                </td>
+                                <td style="padding: 0 0 10px 0;">
+                                    <div data-bind="disk: { disk: $data, width: 1000 }"></div>
+                                </td>
+                            </tr>
+                        <!-- /ko -->
                     </tbody>
                 </table>
             </div>

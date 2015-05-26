@@ -191,7 +191,12 @@
         "metadata": "Metadata",
         "component": "Component",
         "licensing": "Licensing",
-        "licenselimited": "Unavailable due to License"
+        "licenselimited": "Unavailable due to License",
+        "mountpoint": "Mountpoint",
+        "filesystem": "Filesystem",
+        "rawdisk": "Raw disk",
+        "rawpartition": "Raw partition",
+        "spaceleft": "__amount__ left"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -214,7 +219,10 @@
             },
             "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers"
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
+            "disks": {
+                "title": "Physical disks"
+            }
         }
     },
     "vpools" : {
@@ -780,6 +788,7 @@
         "moveaway": "&#xf074;",
         "information": "&#xf05a;",
         "vdisks": "&#xf0a0;",
+        "disks": "&#xf0a0;",
         "add": "&#xf067;",
         "vmachines": "&#xf0e8;",
         "storageroutervpoollink": "&#xf07c;",
