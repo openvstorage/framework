@@ -26,8 +26,8 @@ class Disk(DataObject):
     a virtual disk, but from the OS (and framework) point of view, they're considered physical)
     """
     __properties = [Property('path', str, doc='The device path'),
-                    Property('vendor', str, doc='The disks vendor'),
-                    Property('model', str, doc='The disks model'),
+                    Property('vendor', str, mandatory=False, doc='The disks vendor'),
+                    Property('model', str, mandatory=False, doc='The disks model'),
                     Property('state', ['OK', 'ERROR', 'MISSING'], doc='The state of the disk'),
                     Property('name', str, doc='Name of the disk (e.g. sda)'),
                     Property('size', int, doc='Size of the disk, in bytes'),

@@ -15,7 +15,7 @@ limitations under the License.
 -->
 <section style="display: inline-block; position: relative;" data-bind="attr: { id: unique }">
     <span style="position: absolute; top: 20px; left: 10px;"
-          data-bind="visible: disk === undefined || disk.partitionsLoaded() === false">
+          data-bind="visible: disk() === undefined || disk().partitionsLoaded() === false">
         <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
     </span>
 </section>

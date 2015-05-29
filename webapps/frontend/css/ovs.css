@@ -67,6 +67,12 @@ div[data-view]:not(.modal-dialog) {
 .pointer {
     cursor: default;
 }
+.zoom-in {
+    cursor: zoom-in;
+}
+.zoom-out {
+    cursor: zoom-out;
+}
 
 .quote {
     padding: 10px 20px;

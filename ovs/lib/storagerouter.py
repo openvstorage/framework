@@ -41,10 +41,10 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.hypervisor.factory import Factory
-from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.support.agent import SupportAgent
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.disk import DiskController
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.log.logHandler import LogHandler
 from ovs.plugin.provider.configuration import Configuration
@@ -273,6 +273,8 @@ class StorageRouterController(object):
 
         root_client.dir_create(all_locations)
 
+        directory_usage = {}
+
         root_inode = os.stat('/').st_dev
         inode_count = {}
         mountpoint_inode_mapping = {}
@@ -325,12 +327,24 @@ class StorageRouterController(object):
                 readcaches.append({'path': '{0}/read_{1}'.format(mountpoint, vpool_name),
                                    'size': '{0}KiB'.format(r_size)})
                 files2create.append('{0}/read_{1}'.format(mountpoint, vpool_name))
+                inode = os.stat(mountpoint).st_dev
+                if inode not in directory_usage:
+                    directory_usage[inode] = []
+                directory_usage[inode].append({'type': 'cache',
+                                               'metadata': {'type': 'read'},
+                                               'size': r_size * 1024})
             elif mountpoint in mountpoint_writecaches:
                 w_size = int(available_size * .98 / 1024 / 4096) * 4096
                 dir2create = '{0}/sco_{1}'.format(mountpoint, vpool_name)
                 writecaches.append({'path': dir2create,
                                     'size': '{0}KiB'.format(w_size)})
                 dirs2create.append(dir2create)
+                inode = os.stat(mountpoint).st_dev
+                if inode not in directory_usage:
+                    directory_usage[inode] = []
+                directory_usage[inode].append({'type': 'cache',
+                                               'metadata': {'type': 'write'},
+                                               'size': w_size * 1024})
 
         if vpool.backend_type.code == 'alba' and frag_size is None:
             raise ValueError('Something went wrong trying to calculate the fragment cache size')
@@ -449,6 +463,13 @@ class StorageRouterController(object):
             cache_dir = '{}/fcache_{}'.format(mountpoint_fragmentcache, vpool_name)
             root_client.dir_create(cache_dir)
             System.write_config(config, '{0}/{1}_alba.cfg'.format(config_dir, vpool_name), client)
+            inode = os.stat(cache_dir).st_dev
+            if inode not in directory_usage:
+                directory_usage[inode] = []
+            directory_usage[inode].append({'type': 'cache',
+                                           'metadata': {'type': 'fragment'},
+                                           'size': frag_size,
+                                           'relation': ('storagedriver', storagedriver.guid)})
 
             # manifest cache is in memory
             client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
@@ -513,6 +534,31 @@ class StorageRouterController(object):
         storagedriver.mountpoint_writecaches = mountpoint_writecaches
         storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
         storagedriver.save()
+
+        DiskController.sync_with_reality(storagerouter.guid)
+        for mountpoint, usage in {mountpoint_md: {'type': 'metadata',
+                                                  'metadata': {}},
+                                  mountpoint_foc: {'type': 'cache',
+                                                   'metadata': {'type': 'foc'}},
+                                  mountpoint_bfs: {'type': 'backend',
+                                                   'metadata': {'type': 'local'}},
+                                  mountpoint_temp: {'type': 'temp',
+                                                    'metadata': {}}}.iteritems():
+            if not mountpoint:
+                continue
+            inode = os.stat(mountpoint).st_dev
+            if inode not in directory_usage:
+                directory_usage[inode] = []
+            usage['size'] = None
+            directory_usage[inode].append(usage)
+        for inode in directory_usage:
+            for usage in directory_usage[inode]:
+                usage['relation'] = ('storagedriver', storagedriver.guid)
+        for disk in storagerouter.disks:
+            for partition in disk.partitions:
+                if partition.inode is not None and partition.inode in directory_usage:
+                    partition.usage += directory_usage[partition.inode]
+                    partition.save()
 
         MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
 
@@ -752,6 +798,15 @@ class StorageRouterController(object):
         for directory in set(dirs2remove):
             if directory:
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
+
+        DiskController.sync_with_reality(storagerouter.guid)
+        for disk in storagerouter.disks:
+            for partition in disk.partitions:
+                partition.usage = [usage for usage in partition.usage
+                                   if 'relation' not in usage
+                                   or usage['relation'][0] != 'storagedriver'
+                                   or usage['relation'][1] != storagedriver.guid]
+                partition.save()
 
         # First model cleanup
         if storagedriver.alba_proxy is not None:

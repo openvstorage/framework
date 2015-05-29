@@ -38,6 +38,11 @@
                 "stopped": "Stopped",
                 "failure": "Failure",
                 "unknown": "Unknown"
+            },
+            "disk": {
+                "ok": "OK",
+                "missing": "Missing",
+                "failure": "Failure"
             }
         },
         "messages": {
@@ -69,6 +74,12 @@
         "granttypes": {
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"
+        },
+        "caches": {
+            "read": "Read cache",
+            "write": "Write cache",
+            "foc": "Failover cache",
+            "fragment": "Fragment cache"
         },
         "username": "Username",
         "password": "Password",
@@ -196,7 +207,11 @@
         "filesystem": "Filesystem",
         "rawdisk": "Raw disk",
         "rawpartition": "Raw partition",
-        "spaceleft": "__amount__ left"
+        "spaceleft": "__amount__ left",
+        "sizeamount": "Size: __amount__",
+        "partitionusage": "Detailed partition usage:",
+        "sizeunspecified": "Size up to __amount__",
+        "tempspace": "Temporary files"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -803,6 +818,8 @@
         "load": "&#xf021;",
         "licensing": "&#xf132;",
         "up": "&#xf106;",
-        "down": "&#xf107;"
+        "down": "&#xf107;",
+        "expand": "&#xf196;",
+        "collapse": "&#xf147;"
     }
 }

@@ -17,7 +17,6 @@ DiskController module
 """
 import re
 import os
-import json
 import time
 from pyudev import Context
 from celery.schedules import crontab
@@ -25,6 +24,7 @@ from ovs.celery_run import celery
 from ovs.log.logHandler import LogHandler
 from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.disk import Disk
+from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.lib.helpers.decorators import ensure_single
@@ -40,11 +40,16 @@ class DiskController(object):
     @staticmethod
     @celery.task(name='ovs.disk.sync_with_reality', bind=True, schedule=crontab(minute='*/5'))
     @ensure_single(['ovs.disk.sync_with_reality'])
-    def sync_with_reality():
+    def sync_with_reality(storagerouter_guid=None):
         """
         Syncs the Disks from all StorageRouters with the reality.
         """
-        for storagerouter in StorageRouterList.get_storagerouters():
+        storagerouters = []
+        if storagerouter_guid is not None:
+            storagerouters.append(StorageRouter(storagerouter_guid))
+        else:
+            storagerouters = StorageRouterList.get_storagerouters()
+        for storagerouter in storagerouters:
             client = SSHClient(storagerouter.ip, username='root')
             configuration = {}
             # Gather mount data
@@ -106,8 +111,8 @@ class DiskController(object):
                 else:
                     configuration[device_name].update({'name': device_name,
                                                        'path': path,
-                                                       'vendor': device['ID_VENDOR'],
-                                                       'model': device['ID_MODEL'],
+                                                       'vendor': device['ID_VENDOR'] if 'ID_VENDOR' in device else None,
+                                                       'model': device['ID_MODEL'] if 'ID_MODEL' in device else None,
                                                        'size': sector_size * sectors,
                                                        'is_ssd': rotational == 0,
                                                        'state': 'OK'})
@@ -170,8 +175,8 @@ class DiskController(object):
         Updates a partition
         """
         for prop in ['filesystem', 'offset', 'state', 'path', 'mountpoint', 'inode', 'size']:
-            if prop in container:
-                setattr(partition, prop, container[prop])
+            value = container[prop] if prop in container else None
+            setattr(partition, prop, value)
         partition.save()
 
     @staticmethod
@@ -180,6 +185,6 @@ class DiskController(object):
         Updates a disk
         """
         for prop in ['vendor', 'state', 'path', 'is_ssd', 'model', 'size']:
-            if prop in container:
-                setattr(disk, prop, container[prop])
+            value = container[prop] if prop in container else None
+            setattr(disk, prop, value)
         disk.save()

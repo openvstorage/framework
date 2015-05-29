@@ -630,7 +630,7 @@ class DataObject(object):
                 items = getattr(self, key)
                 if info['list'] is True:
                     if len(items) > 0:
-                        if abandon is not None and key in abandon:
+                        if abandon is not None and (key in abandon or '_all' in abandon):
                             for item in items.itersafe():
                                 setattr(item, info['key'], None)
                                 try:
@@ -642,7 +642,7 @@ class DataObject(object):
                 elif items is not None:
                     # No list (so a 1-to-1 relation), so there should be an object, or None
                     item = items  # More clear naming
-                    if abandon is not None and key in abandon:
+                    if abandon is not None and (key in abandon or '_all' in abandon):
                         setattr(item, info['key'], None)
                         try:
                             item.save()

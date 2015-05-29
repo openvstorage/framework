@@ -36,17 +36,19 @@ define([
         self.size              = ko.observable();
         self.mountpoint        = ko.observable();
         self.path              = ko.observable();
+        self.usage             = ko.observable();
 
         // Functions
         self.fillData = function(data) {
-            generic.trySet(self.id, data, 'id');
-            generic.trySet(self.filesystem, data, 'filesystem');
-            generic.trySet(self.state, data, 'state');
-            generic.trySet(self.inode, data, 'inode');
-            generic.trySet(self.offset, data, 'offset');
-            generic.trySet(self.size, data, 'size');
-            generic.trySet(self.mountpoint, data, 'mountpoint');
-            generic.trySet(self.path, data, 'path');
+            self.id(data.id);
+            self.filesystem(data.filesystem);
+            self.state(data.state);
+            self.inode(data.inode);
+            self.offset(data.offset);
+            self.size(data.size);
+            self.mountpoint(data.mountpoint);
+            self.path(data.path);
+            self.usage(data.usage);
 
             self.loaded(true);
             self.loading(false);
