@@ -23,7 +23,7 @@ import os
 import traceback
 from time import mktime
 from datetime import datetime
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
@@ -32,7 +32,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.loglist import LogList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from volumedriver.scrubber.scrubber import Scrubber
+from volumedriver.storagerouter.storagerouterclient import Scrubber
 from ovs.log.logHandler import LogHandler
 
 _storagedriver_scrubber = Scrubber()

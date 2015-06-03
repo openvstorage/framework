@@ -58,9 +58,10 @@ limitations under the License.
             <div class="col-lg-7">
                 <div class="input-group">
                     <span class="input-group-addon" data-i18n="ovs:generic.custompath"></span>
-                    <input type="text" data-bind="value: data.mtptCustomRC" class="form-control" />
+                    <input type="text" id="inputCustomRC" data-bind="value: data.mtptCustomRC" class="form-control" />
                     <div class="input-group-btn">
-                        <button type="button" class="btn btn-small btn-default" data-bind="click: addReadCache">
+                        <button type="button" class="btn btn-small btn-default" data-bind="click: addReadCache"
+                                id="buttonAddCustomRC">
                             <span class="fa" data-i18n="[html]ovs:icons.add"></span>
                         </button>
                     </div>
@@ -80,9 +81,10 @@ limitations under the License.
             <div class="col-lg-7">
                 <div class="input-group">
                     <span class="input-group-addon" data-i18n="ovs:generic.custompath"></span>
-                    <input type="text" data-bind="value: data.mtptCustomWC" class="form-control" />
+                    <input type="text" id="inputCustomWC" data-bind="value: data.mtptCustomWC" class="form-control" />
                     <div class="input-group-btn">
-                        <button type="button" class="btn btn-small btn-default" data-bind="click: addWriteCache">
+                        <button type="button" class="btn btn-small btn-default" data-bind="click: addWriteCache"
+                                id="buttonAddCustomWC">
                             <span class="fa" data-i18n="[html]ovs:icons.add"></span>
                         </button>
                     </div>

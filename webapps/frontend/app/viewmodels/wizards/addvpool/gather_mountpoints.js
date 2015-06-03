@@ -168,8 +168,10 @@ define([
         self.addReadCache = function() {
             var value = self.data.mtptCustomRC();
             if (value !== undefined && value !== '') {
-                if (!self.data.mtptCustomRCs().contains(value) && !self.data.mountpoints().contains(value)) {
+                if (!self.data.mtptCustomRCs().contains(value)) {
                     self.data.mtptCustomRCs.push(value);
+                }
+                if (!self.data.mtptReadCaches().contains(value)) {
                     self.data.mtptReadCaches.push(value);
                 }
                 self.data.mtptCustomRC('');
@@ -179,8 +181,10 @@ define([
         self.addWriteCache = function() {
             var value = self.data.mtptCustomWC();
             if (value !== undefined && value !== '') {
-                if (!self.data.mtptCustomWCs().contains(value) && !self.data.mountpoints().contains(value)) {
+                if (!self.data.mtptCustomWCs().contains(value)) {
                     self.data.mtptCustomWCs.push(value);
+                }
+                if (!self.data.mtptWriteCaches().contains(value)) {
                     self.data.mtptWriteCaches.push(value);
                 }
                 self.data.mtptCustomWC('');

@@ -16,7 +16,7 @@ import time
 from subprocess import check_output
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 
 ARP_TIMEOUT = 30
 current_time = int(time.time())

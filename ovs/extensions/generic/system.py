@@ -23,7 +23,7 @@ from ConfigParser import RawConfigParser
 from StringIO import StringIO
 
 from ovs.log.logHandler import LogHandler
-logger = LogHandler('lib', name='system')
+logger = LogHandler('extensions', name='system')
 
 
 class System(object):

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from ovs.plugin.provider.service import Service
+from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 
@@ -25,7 +25,7 @@ class PluginManager(object):
         """
         (Re)load plugins
         """
-        if Service.has_service('ovs-watcher-framework', SSHClient('127.0.0.1', username='root')):
+        if ServiceManager.has_service('ovs-watcher-framework', SSHClient('127.0.0.1', username='root')):
             # If the watcher is running, 'ovs setup' was executed and we need to restart everything to load
             # the plugin. In the other case, the plugin will be loaded once 'ovs setup' is executed
             from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -33,10 +33,10 @@ class PluginManager(object):
             for ip in ips:
                 client = SSHClient(ip, username='root')
                 for service_name in ['watcher-framework', 'memcached']:
-                    Service.stop_service(service_name, client=client)
+                    ServiceManager.stop_service(service_name, client=client)
                     wait = 30
                     while wait > 0:
-                        if Service.get_service_status(service_name, client=client) is False:
+                        if ServiceManager.get_service_status(service_name, client=client) is False:
                             break
                         time.sleep(1)
                         wait -= 1
@@ -46,10 +46,10 @@ class PluginManager(object):
             for ip in ips:
                 client = SSHClient(ip, username='root')
                 for service_name in ['memcached', 'watcher-framework']:
-                    Service.start_service(service_name, client=client)
+                    ServiceManager.start_service(service_name, client=client)
                     wait = 30
                     while wait > 0:
-                        if Service.get_service_status(service_name, client=client) is True:
+                        if ServiceManager.get_service_status(service_name, client=client) is True:
                             break
                         time.sleep(1)
                         wait -= 1

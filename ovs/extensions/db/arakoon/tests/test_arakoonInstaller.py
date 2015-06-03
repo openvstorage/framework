@@ -15,7 +15,7 @@
 import sys
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
 from unittest import TestCase
@@ -65,7 +65,7 @@ class TestArakoonInstaller(TestCase):
             c.set(key, value)
 
         Configuration.get = staticmethod(_get)
-        Configuration.getInt = staticmethod(_get_int)
+        Configuration.get_int = staticmethod(_get_int)
         Configuration.set = staticmethod(_set)
 
         Configuration.set('ovs.ports.arakoon', 22000)
@@ -84,7 +84,7 @@ class TestArakoonInstaller(TestCase):
         return '/tmp/cfg/{0}/{0}.cfg'.format(cluster)
 
     def test_single_node(self):
-        base_port = Configuration.getInt('ovs.ports.arakoon')
+        base_port = Configuration.get_int('ovs.ports.arakoon')
         cluster = 'one'
         node = sorted(TestArakoonInstaller.nodes.keys())[0]
         ArakoonInstaller.create_cluster(cluster, node, [])
@@ -94,7 +94,7 @@ class TestArakoonInstaller(TestCase):
         self.assertEqual(contents.strip(), expected.strip())
 
     def test_multi_node(self):
-        base_port = Configuration.getInt('ovs.ports.arakoon')
+        base_port = Configuration.get_int('ovs.ports.arakoon')
         cluster = 'one'
         nodes = sorted(TestArakoonInstaller.nodes.keys())
         nodes = dict((node, SSHClient(node)) for node in nodes)

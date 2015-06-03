@@ -95,6 +95,7 @@ define([
             }
         };
         wizardData.readCacheDistributor.isObservableArray = true;
+        wizardData.readCacheDistributor.identifier = 'mtpt-readcaches'
 
         wizardData.allWriteMountpoints = ko.computed(function() {
             var returnValue = [];
@@ -121,6 +122,7 @@ define([
             }
         };
         wizardData.writeCacheDistributor.isObservableArray = true;
+        wizardData.writeCacheDistributor.identifier = 'mtpt-writecaches'
 
         wizardData.accesskey.subscribe(resetAlbaBackends);
         wizardData.secretkey.subscribe(resetAlbaBackends);

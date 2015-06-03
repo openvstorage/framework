@@ -24,8 +24,8 @@ import base64
 import requests
 from subprocess import check_output
 from ConfigParser import RawConfigParser
-from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.package import Package
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.packages.package import PackageManager
 from ovs.log.logHandler import LogHandler
 
 
@@ -57,7 +57,7 @@ class SupportAgent(object):
 
         try:
             # Versions
-            data['metadata']['versions'] = Package.get_versions()
+            data['metadata']['versions'] = PackageManager.get_versions()
         except Exception, ex:
             data['errors'].append(str(ex))
         try:

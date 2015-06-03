@@ -41,8 +41,8 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
-from ovs.plugin.provider.service import Service as PluginService
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.generic.configuration import Configuration
 
 logger = LogHandler('lib', name='setup')
 logger.logger.propagate = False
@@ -622,8 +622,8 @@ class SetupController(object):
         print 'Starting model services'
         logger.debug('Starting model services')
         for service in SetupController.model_services:
-            if PluginService.has_service(service, client=target_client):
-                PluginService.enable_service(service, client=target_client)
+            if ServiceManager.has_service(service, client=target_client):
+                ServiceManager.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Start model migration'
@@ -655,18 +655,18 @@ class SetupController(object):
         print 'Starting services'
         logger.info('Starting services for join master')
         for service in SetupController.master_services:
-            if PluginService.has_service(service, client=target_client):
-                PluginService.enable_service(service, client=target_client)
+            if ServiceManager.has_service(service, client=target_client):
+                ServiceManager.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
         # Enable HA for the rabbitMQ queues
         SetupController._start_rabbitmq_and_check_process(target_client)
 
         for service in ['watcher-framework', 'watcher-volumedriver']:
-            PluginService.enable_service(service, client=target_client)
+            ServiceManager.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
-        PluginService.enable_service('workers', client=target_client)
+        ServiceManager.enable_service('workers', client=target_client)
         SetupController._change_service_state(target_client, 'workers', 'restart')
 
         SetupController._run_hooks('firstnode', cluster_ip)
@@ -683,8 +683,8 @@ class SetupController(object):
         if enable_heartbeats is True:
             target_client.config_set('ovs.support.enabled', 1)
             service = 'support-agent'
-            PluginService.add_service(service, client=target_client)
-            PluginService.enable_service(service, client=target_client)
+            ServiceManager.add_service(service, client=target_client)
+            ServiceManager.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
@@ -723,8 +723,8 @@ class SetupController(object):
         target_client.config_set('ovs.support.enablesupport', enablesupport)
         if int(enabled) > 0:
             service = 'support-agent'
-            PluginService.add_service(service, client=target_client)
-            PluginService.enable_service(service, client=target_client)
+            ServiceManager.add_service(service, client=target_client)
+            ServiceManager.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         node_name = target_client.run('hostname')
@@ -736,12 +736,12 @@ class SetupController(object):
 
         print 'Starting services'
         for service in ['watcher-framework', 'watcher-volumedriver']:
-            PluginService.enable_service(service, client=target_client)
+            ServiceManager.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
         logger.debug('Restarting workers')
         for node_client in ip_client_map.itervalues():
-            PluginService.enable_service('workers', client=node_client)
+            ServiceManager.enable_service('workers', client=node_client)
             SetupController._change_service_state(node_client, 'workers', 'restart')
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
@@ -864,8 +864,8 @@ class SetupController(object):
         print 'Starting services'
         logger.info('Starting services')
         for service in SetupController.master_services:
-            if PluginService.has_service(service, client=target_client):
-                PluginService.enable_service(service, client=target_client)
+            if ServiceManager.has_service(service, client=target_client):
+                ServiceManager.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
@@ -948,27 +948,27 @@ class SetupController(object):
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
-        if PluginService.has_service('rabbitmq', client=target_client):
+        if ServiceManager.has_service('rabbitmq', client=target_client):
             target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl reset; sleep 5;')
             target_client.run('rabbitmqctl stop; sleep 5;')
             SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
-            PluginService.remove_service('rabbitmq', client=target_client)
+            ServiceManager.remove_service('rabbitmq', client=target_client)
             target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
         logger.info('Removing services')
         for service in [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]:
-            if PluginService.has_service(service, client=target_client):
+            if ServiceManager.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._change_service_state(target_client, service, 'stop')
-                PluginService.remove_service(service, client=target_client)
+                ServiceManager.remove_service(service, client=target_client)
 
-        if PluginService.has_service('workers', client=target_client):
-            PluginService.add_service(name='workers',
-                                      client=target_client,
-                                      params={'<MEMCACHE_NODE_IP>': cluster_ip,
-                                              '<WORKER_QUEUE>': '{0}'.format(unique_id)})
+        if ServiceManager.has_service('workers', client=target_client):
+            ServiceManager.add_service(name='workers',
+                                       client=target_client,
+                                       params={'MEMCACHE_NODE_IP': cluster_ip,
+                                               'WORKER_QUEUE': '{0}'.format(unique_id)})
 
         print 'Restarting services'
         logger.debug('Restarting services')
@@ -1143,11 +1143,11 @@ EOF
 
         print 'Adding services'
         logger.info('Adding services')
-        params = {'<MEMCACHE_NODE_IP>': client.ip,
-                  '<WORKER_QUEUE>': worker_queue}
+        params = {'MEMCACHE_NODE_IP': client.ip,
+                  'WORKER_QUEUE': worker_queue}
         for service in services + ['watcher-framework', 'watcher-volumedriver']:
             logger.debug('Adding service {0}'.format(service))
-            PluginService.add_service(service, params=params, client=client)
+            ServiceManager.add_service(service, params=params, client=client)
 
     @staticmethod
     def _finalize_setup(client, node_name, node_type, hypervisor_info, unique_id):
@@ -1810,15 +1810,15 @@ EOF
         Starts/stops/restarts a service
         """
         action = None
-        status = PluginService.get_service_status(name, client=client)
+        status = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
-            PluginService.start_service(name, client=client)
+            ServiceManager.start_service(name, client=client)
             action = 'started'
         elif status is True and state == 'stop':
-            PluginService.stop_service(name, client=client)
+            ServiceManager.stop_service(name, client=client)
             action = 'stopped'
         elif status is True and state == 'restart':
-            PluginService.restart_service(name, client=client)
+            ServiceManager.restart_service(name, client=client)
             action = 'restarted'
 
         if action is None:
@@ -1827,7 +1827,7 @@ EOF
             timeout = 300
             safetycounter = 0
             while safetycounter < timeout:
-                status = PluginService.get_service_status(name, client=client)
+                status = ServiceManager.get_service_status(name, client=client)
                 if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
                     break
                 safetycounter += 1

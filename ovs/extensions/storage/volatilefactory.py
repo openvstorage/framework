@@ -17,7 +17,7 @@ Generic volatile factory.
 """
 import os
 from ConfigParser import RawConfigParser
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 
 
 class VolatileFactory(object):

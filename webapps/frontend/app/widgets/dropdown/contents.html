@@ -9,7 +9,8 @@
                                ) : $parent.target() === $data
                            )
                        },
-                       click: function() { $parent.useFree(false); $parent.set($data); }" class="hand">
+                       click: function() { $parent.useFree(false); $parent.set($data); },
+                       attr: { id: ($parent.target.hasOwnProperty('identifier') ? ('dropdown-button-' + $parent.target.identifier + '-' + $data.replace(/\//g, '')) : undefined) }" class="hand">
             <a style="white-space: nowrap;">
                 <span data-bind="visible: $parent.multi()">
                     <span data-bind="visible: $parent.contains($data)" class="fa" data-i18n="[html]ovs:icons.checked"></span>

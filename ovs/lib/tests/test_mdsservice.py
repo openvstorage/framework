@@ -20,7 +20,7 @@ import sys
 import json
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -98,7 +98,7 @@ class MDSServices(TestCase):
             return int(Configuration.get(key))
 
         Configuration.get = staticmethod(_get)
-        Configuration.getInt = staticmethod(_get_int)
+        Configuration.get_int = staticmethod(_get_int)
 
         # Cleaning storage
         VolatileFactory.store.clean()

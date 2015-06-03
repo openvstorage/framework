@@ -27,8 +27,7 @@ from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.service import Service as PluginService
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
@@ -207,9 +206,9 @@ class MDSServiceController(object):
         vdisk.reload_client()
         if excluded_storagerouters is None:
             excluded_storagerouters = []
-        maxload = Configuration.getInt('ovs.storagedriver.mds.maxload')
-        safety = Configuration.getInt('ovs.storagedriver.mds.safety')
-        tlogs = Configuration.getInt('ovs.storagedriver.mds.tlogs')
+        maxload = Configuration.get_int('ovs.storagedriver.mds.maxload')
+        safety = Configuration.get_int('ovs.storagedriver.mds.safety')
+        tlogs = Configuration.get_int('ovs.storagedriver.mds.tlogs')
         services = [mds_service.service for mds_service in vdisk.vpool.mds_services
                     if mds_service.service.storagerouter not in excluded_storagerouters]
         nodes = set(service.storagerouter.ip for service in services)
@@ -447,7 +446,7 @@ class MDSServiceController(object):
                 mds_per_load[load] = []
             mds_per_load[load].append(storagerouter.guid)
 
-        safety = Configuration.getInt('ovs.storagedriver.mds.safety')
+        safety = Configuration.get_int('ovs.storagedriver.mds.safety')
         config_set = {}
         for storagerouter_guid in mds_per_storagerouter:
             config_set[storagerouter_guid] = [mds_per_storagerouter[storagerouter_guid]]
@@ -494,7 +493,7 @@ class MDSServiceController(object):
                         mds_services.remove(mds_service)
                 for mds_service in mds_services:
                     _, load = MDSServiceController.get_mds_load(mds_service)
-                    if load < Configuration.getInt('ovs.storagedriver.mds.maxload'):
+                    if load < Configuration.get_int('ovs.storagedriver.mds.maxload'):
                         has_room = True
                         break
                 if has_room is False:
