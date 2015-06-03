@@ -25,7 +25,7 @@ class PluginManager(object):
         """
         (Re)load plugins
         """
-        if Service.has_service('ovs-watcher-framework', SSHClient('127.0.0.1', username='root')):
+        if ServiceManager.has_service('ovs-watcher-framework', SSHClient('127.0.0.1', username='root')):
             # If the watcher is running, 'ovs setup' was executed and we need to restart everything to load
             # the plugin. In the other case, the plugin will be loaded once 'ovs setup' is executed
             from ovs.dal.lists.storagerouterlist import StorageRouterList
