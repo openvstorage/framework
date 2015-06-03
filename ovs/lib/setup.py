@@ -477,9 +477,22 @@ class SetupController(object):
         authorized_keys = ''
         mapping = {}
         for node, node_client in ip_client_map.iteritems():
+            if node_client.file_exists(authorized_keys_filename.format(root_ssh_folder)):
+                existing_keys = node_client.file_read(authorized_keys_filename.format(root_ssh_folder)).split('\n')
+                for existing_key in existing_keys:
+                    if not existing_key in authorized_keys:
+                        authorized_keys += "{0}\n".format(existing_key)
+            if node_client.file_exists(authorized_keys_filename.format(ovs_ssh_folder)):
+                existing_keys = node_client.file_read(authorized_keys_filename.format(ovs_ssh_folder))
+                for existing_key in existing_keys:
+                    if not existing_key in authorized_keys:
+                        authorized_keys += "{0}\n".format(existing_key)
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
-            authorized_keys += '{0}\n{1}\n'.format(root_pub_key, ovs_pub_key)
+            if not root_pub_key in authorized_keys:
+                authorized_keys += '{0}\n'.format(root_pub_key)
+            if not ovs_pub_key in authorized_keys:
+                authorized_keys += '{0}\n'.format(ovs_pub_key)
             node_hostname = node_client.run('hostname')
             all_hostnames.add(node_hostname)
             mapping[node] = node_hostname
