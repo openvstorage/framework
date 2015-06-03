@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from ovs.plugin.provider.service import Service
+from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 
@@ -33,10 +33,10 @@ class PluginManager(object):
             for ip in ips:
                 client = SSHClient(ip, username='root')
                 for service_name in ['watcher-framework', 'memcached']:
-                    Service.stop_service(service_name, client=client)
+                    ServiceManager.stop_service(service_name, client=client)
                     wait = 30
                     while wait > 0:
-                        if Service.get_service_status(service_name, client=client) is False:
+                        if ServiceManager.get_service_status(service_name, client=client) is False:
                             break
                         time.sleep(1)
                         wait -= 1
@@ -46,10 +46,10 @@ class PluginManager(object):
             for ip in ips:
                 client = SSHClient(ip, username='root')
                 for service_name in ['memcached', 'watcher-framework']:
-                    Service.start_service(service_name, client=client)
+                    ServiceManager.start_service(service_name, client=client)
                     wait = 30
                     while wait > 0:
-                        if Service.get_service_status(service_name, client=client) is True:
+                        if ServiceManager.get_service_status(service_name, client=client) is True:
                             break
                         time.sleep(1)
                         wait -= 1

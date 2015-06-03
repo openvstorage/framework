@@ -23,7 +23,7 @@ import os
 import traceback
 from time import mktime
 from datetime import datetime
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController

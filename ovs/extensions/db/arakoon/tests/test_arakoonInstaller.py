@@ -15,7 +15,7 @@
 import sys
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
 from ovs.extensions.storage.persistentfactory import PersistentFactory
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
 from unittest import TestCase

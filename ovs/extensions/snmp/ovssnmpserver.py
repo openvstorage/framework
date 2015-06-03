@@ -18,7 +18,7 @@ OVS SNMP bootstrap module
 from ovs.extensions.snmp.server import SNMPServer
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.dataobjectlist import DataObjectList
 
 import signal, time

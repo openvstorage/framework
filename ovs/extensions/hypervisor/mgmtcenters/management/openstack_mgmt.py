@@ -187,12 +187,12 @@ class OpenStackManagement(object):
         """
         Enable service ovs-openstack-events-consumer
         """
-        from ovs.plugin.provider.service import Service
+        from ovs.extensions.services.service import ServiceManager
         service_name = 'ovs-openstack-events-consumer'
-        if not Service.has_service(service_name, self.client):
-            Service.add_service(service_name, self.client)
-            Service.enable_service(service_name, self.client)
-            Service.start_service(service_name, self.client)
+        if not ServiceManager.has_service(service_name, self.client):
+            ServiceManager.add_service(service_name, self.client)
+            ServiceManager.enable_service(service_name, self.client)
+            ServiceManager.start_service(service_name, self.client)
 
     def _configure_messaging_driver(self):
         """

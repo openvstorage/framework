@@ -27,8 +27,7 @@ from ovs.dal.hybrids.j_mdsservice import MDSService
 from ovs.dal.lists.servicelist import ServiceList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.dal.lists.vpoollist import VPoolList
-from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.service import Service as PluginService
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient

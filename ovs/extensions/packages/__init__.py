@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2015 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,5 @@
 # limitations under the License.
 
 """
-This module contains all injected logic
+This package contains package extensions
 """
-

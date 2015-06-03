@@ -20,7 +20,7 @@ import sys
 import json
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory

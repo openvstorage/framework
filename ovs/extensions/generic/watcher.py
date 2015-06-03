@@ -116,7 +116,7 @@ def services_running(target):
             _log(target, 'Test rabbitMQ...', 0)
             import pika
             from ConfigParser import RawConfigParser
-            from ovs.plugin.provider.configuration import Configuration
+            from ovs.extensions.generic.configuration import Configuration
             rmq_ini = RawConfigParser()
             rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
             rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]

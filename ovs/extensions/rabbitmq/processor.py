@@ -22,7 +22,7 @@ import json
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
