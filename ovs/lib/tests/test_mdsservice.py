@@ -98,7 +98,7 @@ class MDSServices(TestCase):
             return int(Configuration.get(key))
 
         Configuration.get = staticmethod(_get)
-        Configuration.getInt = staticmethod(_get_int)
+        Configuration.get_int = staticmethod(_get_int)
 
         # Cleaning storage
         VolatileFactory.store.clean()
