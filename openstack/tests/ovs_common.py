@@ -22,6 +22,7 @@ from cinderclient.v1 import client as cinder_client
 from glanceclient.v1 import client as glance_client
 from keystoneclient.v2_0 import client as keystone_client
 from cinderclient import exceptions as cinder_client_exceptions
+from oslo_config import cfg
 
 #OVS
 from ovs.dal.lists.vpoollist import VPoolList
@@ -39,6 +40,19 @@ class OVSPluginTestException(Exception): pass
 class WaitTimedOut(OVSPluginTestException): pass
 class VolumeInErrorState(OVSPluginTestException): pass
 class TooManyAttempts(OVSPluginTestException): pass
+
+
+test_opts = [
+    cfg.BoolOpt('backup_enable_progress_timer',
+                default=False,
+                help=''),
+    cfg.BoolOpt('backup_swift_enable_progress_timer',
+                default=False,
+                help='')
+]
+
+CONF = cfg.CONF
+CONF.register_opts(test_opts)
 
 class OVSPluginTestCase(test.TestCase):
     """
