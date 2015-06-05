@@ -42,6 +42,7 @@ define([
         self.viewportItems   = ko.observableArray([]);
         self.pageLoading     = ko.observable(false);
         self.sortable        = ko.observable(false);
+        self.preloading      = ko.observable(false);
         self.sorting         = ko.observable({sequence: [], directions: {}});
 
         // Handles
@@ -316,6 +317,7 @@ define([
             self.key = generic.tryGet(settings, 'key', 'guid');
             self.settings(settings);
             self.headers(settings.headers);
+            self.preloading(generic.tryGet(settings, 'preloading', false));
             self.controls(generic.tryGet(settings, 'controls', true));
             self.sortable(generic.tryGet(settings, 'sortable', false));
             if (self.sortable() === true) {
@@ -344,15 +346,17 @@ define([
                 if (self.hasLoad(true, false)) {
                     return;
                 }
-                self.preloadPage += 1;
-                if (self.preloadPage === self.current()) {
+                if (self.preloading()) {
                     self.preloadPage += 1;
-                }
-                if (self.preloadPage > self.lastPage()) {
-                    self.preloadPage = 1;
-                }
-                if (self.preloadPage !== self.current()) {
-                    self.load(self.preloadPage, true);
+                    if (self.preloadPage === self.current()) {
+                        self.preloadPage += 1;
+                    }
+                    if (self.preloadPage > self.lastPage()) {
+                        self.preloadPage = 1;
+                    }
+                    if (self.preloadPage !== self.current()) {
+                        self.load(self.preloadPage, true);
+                    }
                 }
             }, self.refresh);
             self.refresher.run();

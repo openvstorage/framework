@@ -24,6 +24,8 @@ class DataObjectList(object):
     descriptor metadata to provide a list-alike experience
     """
 
+    global_object_cache = {}
+
     def __init__(self, query_result, cls, reduced=False):
         """
         Initializes a DataObjectList object, using a query result and a class type
@@ -33,9 +35,12 @@ class DataObjectList(object):
         """
         self._guids = query_result
         self.type = cls
+        self._type_name = cls.__name__
         self._objects = {}
         self._reduced = reduced
         self._query_result = query_result
+        if self._type_name not in DataObjectList.global_object_cache:
+            DataObjectList.global_object_cache[self._type_name] = {}
 
     @property
     def reduced(self):
@@ -76,15 +81,20 @@ class DataObjectList(object):
             Loads and caches the object
             """
             if self._reduced:
-                self._objects[guid] = type(self.type.__name__, (), {})()
+                self._objects[guid] = type(self._type_name, (), {})()
                 setattr(self._objects[guid], 'guid', guid)
             else:
                 self._objects[guid] = self.type(guid)
+                DataObjectList.global_object_cache[self._type_name][guid] = self._objects[guid]
 
-        if requested_guid not in self._objects:
+        if requested_guid in self._objects:
+            requested_object = self._objects[requested_guid]
+        elif requested_guid in DataObjectList.global_object_cache[self._type_name]:
+            requested_object = DataObjectList.global_object_cache[self._type_name][requested_guid]
+            self._objects[requested_guid] = requested_object
+        else:
             load_and_cache(requested_guid)
             return self._objects[requested_guid]
-        requested_object = self._objects[requested_guid]
         if requested_object.updated_on_datastore():
             load_and_cache(requested_guid)
             return self._objects[requested_guid]

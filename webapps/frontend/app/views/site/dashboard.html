@@ -65,7 +65,7 @@ limitations under the License.
                  </div>
             </div>
             <!-- ko foreach: shared.hooks.dashboards -->
-                <div class="panel panel-default" data-bind="compose: 'viewmodels/site/' + $data"></div>
+                <div class="panel panel-default" data-bind="compose: $data.activator"></div>
             <!-- /ko -->
         </div>
         <div class="col-md-4">
@@ -90,7 +90,7 @@ limitations under the License.
                 <!-- vMachines -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vmachines.title"></b>
-                    <a data-bind="text: vMachineGuids().length,
+                    <a data-bind="text: amountOfVMachines(),
                                   attr: { href: $root.shared.routing.loadHash('vmachines', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
