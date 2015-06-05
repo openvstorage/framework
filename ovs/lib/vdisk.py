@@ -471,9 +471,11 @@ class VDiskController(object):
         except Exception as ex:
             logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
         if disk_mgmt_center_info is None:
-            logger.info('No information retrieved for vdisk {0}'.format(disk.name))
-            return
-        disk_name = disk_mgmt_center_info.get('name')
+            logger.info('No information retrieved for vdisk {0} using management center'.format(disk.name))
+            disk_name = disk.devicename.split('.')[0]
+        else:
+            disk_name = disk_mgmt_center_info.get('name')
+
         if disk_name:
             disk.name = disk_name
             disk.save()
