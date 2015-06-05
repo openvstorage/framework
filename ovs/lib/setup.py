@@ -1037,9 +1037,17 @@ EOF
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
         users = client.run('rabbitmqctl list_users').splitlines()[1:-1]
         users = [usr.split('\t')[0] for usr in users]
+        retry = 0
         if 'ovs' not in users:
-            client.run('rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password))
-            client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login))
+            while retry < 5:
+                try:
+                    client.run('rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password))
+                    client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login))
+                    break
+                except subprocess.CalledProcessError as cpe:
+                    logger.error(cpe)
+                    time.sleep(5)
+                    retry += 1
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
