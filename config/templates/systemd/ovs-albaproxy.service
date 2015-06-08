@@ -1,0 +1,17 @@
+[Unit]
+Description=alba proxy
+Wants=ovs-volumedriver_<VPOOL_NAME>.service
+Before=ovs-volumedriver_<VPOOL_NAME>.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+Environment=LD_LIBRARY_PATH=/usr/lib/alba
+ExecStart=/usr/bin/alba proxy-start --config /opt/OpenvStorage/config/storagedriver/storagedriver/<VPOOL_NAME>_alba.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,18 @@
+[Unit]
+Description=nginx HTTP Server
+Requires=ovs-watcher-framework.service
+After=syslog.target network.target remote-fs.target nss-lookup.target ovs-watcher-framework.service
+
+[Service]
+Type=forking
+PIDFile=/var/run/nginx.pid
+Restart=on-failure
+RestartSec=5
+ExecStartPre=/usr/sbin/nginx -t
+ExecStart=/usr/sbin/nginx
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s QUIT $MAINPID
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

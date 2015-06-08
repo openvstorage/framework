@@ -1,0 +1,13 @@
+[Unit]
+Description=memcache
+After=local-fs.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/memcached -m 1000 -p 11211 -u memcached -l <MEMCACHE_NODE_IP>
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

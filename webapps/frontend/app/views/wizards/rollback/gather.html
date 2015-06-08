@@ -1,0 +1,59 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <div data-bind="if: canContinue().value">
+        <form role="form form-horizontal" class="form-horizontal">
+            <p data-i18n="ovs:wizards.rollback.gather.selectsnapshots"></p>
+            <div class="form-group">
+                <label class="col-lg-3 control-label" for="snapshot" data-i18n="ovs:wizards.rollback.gather.snapshot"></label>
+                <div class="col-lg-8">
+                    <span data-bind="dropdown: {
+                                         key: 'timestamp', keyisfunction: false,
+                                         items: data.velement().snapshots, target: data.snapshot,
+                                         text: function(item) {
+                                             var text = '', date = new Date(item.timestamp * 1000);
+                                             if (item.label !== undefined && item.label !== '') {
+                                                 text += item.label
+                                             }
+                                             text += ' (' + date.toLocaleDateString() + ' ' + date.toLocaleTimeString() + ')';
+                                             return text;
+                                         }
+                                     }">
+                        <span data-bind="translate: (target().is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')"
+                              data-part="selected-item" class="fa"></span>
+                        <span data-part="list-item">
+                            <span data-bind="translate: (is_consistent ? 'ovs:icons.consistent' : 'ovs:icons.inconsistent')" class="fa"></span> &nbsp;
+                        </span>
+                    </span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-3"></label>
+                <div class="col-lg-8">
+                    <span data-i18n="[html]ovs:icons.consistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.consistentss"></span><br />
+                    <span data-i18n="[html]ovs:icons.inconsistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.inconsistentss"></span>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>

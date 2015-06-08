@@ -1,0 +1,20 @@
+[Unit]
+Description=rabbitMQ server
+After=local-fs.target network.target
+
+[Service]
+Type=simple
+User=rabbitmq
+Group=rabbitmq
+WorkingDirectory=/var/lib/rabbitmq
+Environment=RABBITMQ_PID_FILE=/var/run/rabbitmq/pid
+ExecStartPre=-/bin/sh -c "/usr/lib/rabbitmq/bin/rabbitmqctl status > /dev/null 2>&1"
+ExecStart=/usr/lib/rabbitmq/bin/rabbitmq-server
+ExecStartPost=/usr/lib/rabbitmq/bin/rabbitmqctl wait /var/run/rabbitmq/pid
+ExecStop=/usr/sbin/rabbitmqctl stop
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
