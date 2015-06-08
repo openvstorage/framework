@@ -765,26 +765,39 @@ class StorageRouterController(object):
             MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=False)
 
         # Cleanup directories/files
+        files_to_remove = list()
+        dirs_to_remove = list()
         for readcache in storagedriver.mountpoint_readcaches:
             file_name = '{0}/read_{1}'.format(readcache, vpool.name)
-            client.file_delete(file_name)
-            logger.info('Removed file {0}'.format(file_name))
+            files_to_remove.append(file_name)
 
         for writecache in storagedriver.mountpoint_writecaches:
             dir_name = '{0}/sco_{1}'.format(writecache, vpool.name)
-            client.dir_delete(dir_name)
-            logger.info('Recursively removed {0}'.format(dir_name))
+            dirs_to_remove.append(dir_name)
 
-        client.dir_delete('{0}/foc_{1}'.format(storagedriver.mountpoint_foc, vpool.name))
-        client.dir_delete('{0}/fd_{1}'.format(storagedriver.mountpoint_foc, vpool.name))
-        client.dir_delete('{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name))
-        client.dir_delete('{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name))
-        client.dir_delete('{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name))
-        client.dir_delete('/var/rsp/{0}'.format(vpool.name))
-        client.file_delete('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+        dirs_to_remove.extend(['{0}/foc_{1}'.format(storagedriver.mountpoint_foc, vpool.name),
+                               '{0}/fd_{1}'.format(storagedriver.mountpoint_foc, vpool.name),
+                               '{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name),
+                               '{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name),
+                               '{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name),
+                               '/var/rsp/{0}'.format(vpool.name)])
+
+        files_to_remove.append('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
-            client.file_delete('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir, vpool.name))
-            client.file_delete('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir, vpool.name))
+            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.cfg'.format(configuration_dir,
+                                                                                         vpool.name))
+            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir,
+                                                                                          vpool.name))
+
+        for file_name in files_to_remove:
+            if file_name and client.file_exists(file_name):
+                client.file_delete(file_name)
+                logger.info('Removed file {0}'.format(file_name))
+
+        for dir_name in dirs_to_remove:
+            if dir_name and client.dir_exists(dir_name):
+                client.dir_delete(dir_name)
+                logger.info('Recursively removed {0}'.format(dir_name))
 
         # Remove top directories
         dirs2remove = list()
