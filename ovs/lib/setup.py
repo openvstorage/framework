@@ -1036,25 +1036,31 @@ EOF
                 print('  Process already stopped')
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
-        retry = 0
-        while retry < 5:
-            try:
-                users = client.run('rabbitmqctl list_users').splitlines()[1:-1]
-                users = [usr.split('\t')[0] for usr in users]
 
-                if 'ovs' not in users:
-                    client.run('rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password))
-                    client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login))
-                break
-            except subprocess.CalledProcessError as cpe:
-                logger.error(cpe)
-                time.sleep(5)
-                retry += 1
+        # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
+        #  and the next command fails so the best solution is to retry several times
+        users = Toolbox.retry_client_run(client,
+                                         'rabbitmqctl list_users',
+                                         logger=logger).splitlines()[1:-1]
+        users = [usr.split('\t')[0] for usr in users]
+
+        if 'ovs' not in users:
+            Toolbox.retry_client_run(client,
+                                     'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
+                                     logger=logger)
+            Toolbox.retry_client_run(client,
+                                     'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
+                                     logger=logger)
+
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
     def _start_rabbitmq_and_check_process(client):
-        output = client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'').splitlines()
+        output = Toolbox.retry_client_run(client,
+                                          'sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'',
+                                          time_sleep=1,
+                                          logger=logger).splitlines()
+
         for line in output:
             if 'Error: unable to connect to node ' in line:
                 rabbitmq_running, rabbitmq_pid, _, _ = SetupController._is_rabbitmq_running(client)

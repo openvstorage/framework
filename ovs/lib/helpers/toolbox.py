@@ -21,6 +21,8 @@ import imp
 import random
 import string
 import inspect
+import subprocess
+import time
 from ovs.dal.helpers import Toolbox as HelperToolbox
 
 
@@ -97,3 +99,22 @@ class Toolbox(object):
         Generates a random hash
         """
         return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
+
+    @staticmethod
+    def retry_client_run(client, command, max_count=5, time_sleep=5, logger=None):
+        """
+        Retry a client run command, catch CalledProcessError
+        """
+        cpe = None
+        retry = 0
+        while retry < max_count:
+            try:
+                return client.run(command)
+            except subprocess.CalledProcessError as cpe:
+                if logger:
+                    logger.error(cpe)
+                time.sleep(time_sleep)
+                retry += 1
+        if cpe:
+            raise cpe
+
