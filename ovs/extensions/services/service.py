@@ -42,10 +42,14 @@ class ServiceManager(object):
             _ = cls
             if ServiceManager.ImplementationClass is None:
                 try:
-                    init_info = check_output('init --version', shell=True)
+                    init_info = check_output('cat /proc/1/comm', shell=True)
                     # All service classes used in below code should share the exact same interface!
-                    if 'upstart' in init_info:
-                        ServiceManager.ImplementationClass = Upstart
+                    if 'init' in init_info:
+                        version_info = check_output('init --version', shell=True)
+                        if 'upstart' in version_info:
+                            ServiceManager.ImplementationClass = Upstart
+                        else:
+                            raise RuntimeError('The ServiceManager is unrecognizable')
                     # elif 'systemd' in init_info:
                     #     ServiceManager.ImplementationClass = SystemD
                     else:
