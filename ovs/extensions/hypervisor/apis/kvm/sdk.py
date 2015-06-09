@@ -68,7 +68,7 @@ class Sdk(object):
     This class contains all SDK related methods
     """
 
-    def __init__(self, host='localhost', login='root'):
+    def __init__(self, host='127.0.0.1', login='root'):
         logger.debug('Init libvirt')
         self.states = {libvirt.VIR_DOMAIN_NOSTATE: 'NO STATE',
                        libvirt.VIR_DOMAIN_RUNNING: 'RUNNING',
@@ -85,12 +85,13 @@ class Sdk(object):
         self.ssh_client = None
         logger.debug('Init complete')
 
-    def _connect(self, attempt = 0):
+    def _connect(self, attempt=0):
         if self._conn:
             self._disconnect()  # Clean up existing conn
         logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
         try:
-            if self.host == 'localhost':  # Or host in (localips...):
+            if self.host.lower() in ['localhost']:  # Or host in (localips...):
+                self.host = '127.0.0.1'
                 self._conn = self.libvirt.open('qemu:///system')  # Only local connection
             else:
                 self._conn = self.libvirt.open('qemu+ssh://{0}@{1}/system'.format(self.login, self.host))
