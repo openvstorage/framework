@@ -17,25 +17,64 @@ import os
 import re
 from subprocess import check_output
 
-SECRET_KEY_LENGTH = 50
-
 
 def file_read(fn):
     with open(fn, 'r') as the_file:
-        return the_file.read()
+        return the_file.read().strip()
 
 
 def file_write(fn, cts):
     with open(fn, 'w') as the_file:
         the_file.write(cts)
 
+# Activate kibana
+kibana_source = '/root/kibana/*'
+kibana_target = '/opt/OpenvStorage/webapps/frontend/logging'
+check_output('mkdir -p {0}'.format(kibana_target), shell=True)
+check_output('mv {0} {1}'.format(kibana_source, kibana_target), shell=True)
+check_output('chown -R ovs:ovs {0}'.format(kibana_target), shell=True)
+check_output('cp {0}/app/dashboards/guided.json {0}/app/dashboards/default.json'.format(kibana_target), shell=True)
 
+# Disable/stop default services. Will be replaced by upstart scripts
+check_output('service rabbitmq-server stop', shell=True)
+check_output('update-rc.d rabbitmq-server disable', shell=True)
+check_output('service nginx stop', shell=True)
+check_output('update-rc.d nginx disable', shell=True)
+check_output('service memcached stop', shell=True)
+check_output('update-rc.d memcached disable', shell=True)
+
+# Cleanup *.pyc files
+check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
+check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
+
+# Few logstash cleanups
+check_output('usermod -a -G adm logstash', shell=True)
+check_output('echo manual > /etc/init/logstash-web.override', shell=True)
+
+# Configure logging
+check_output('chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh', shell=True)
+check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
+check_output('restart rsyslog', shell=True)
+
+# Add crontabs
+cron_contents = check_output('crontab -l', shell=True).splitlines()
+for cron_entry, cron_rule in {'ntpdate': '0 * * * * /usr/sbin/ntpdate pool.ntp.org',
+                              'ovs monitor heartbeat': '* * * * * ovs monitor heartbeat',
+                              'rotate-storagedriver-logs': '59 23 * * * /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh'}.iteritems():
+    found = False
+    for cron_line in cron_contents:
+        if cron_entry in cron_line:
+            found = True
+            break
+    if found is False:
+        check_output('crontab -l | { cat; echo "{0}"; } | crontab -', shell=True)
+
+# Configure SSH
 config_file = '/etc/ssh/sshd_config'
 if os.path.isfile(config_file):
     use_dns = False
     new_contents = []
-    contents = file_read(config_file).strip().split('\n')
-    for line in contents:
+    for line in file_read(config_file).splitlines():
         if 'AcceptEnv' in line:
             new_contents.append('#{0}'.format(line.strip().strip('#').strip()))
         elif 'UseDNS' in line:
@@ -53,15 +92,17 @@ if os.path.isfile(config_file):
     file_write(config_file, '{0}\n'.format('\n'.join(new_contents)))
 check_output('service ssh restart', shell=True)
 
+# Configure coredumps
 limits_file = '/etc/security/limits.conf'
 if os.path.isfile(limits_file):
-    contents = file_read(limits_file).strip()
+    contents = file_read(limits_file)
     if not re.search('\s?root\s+soft\s+core\s+unlimited\s?', contents):
         contents += '\nroot soft core unlimited'
     if not re.search('\s?ovs\s+soft\s+core\s+unlimited\s?', contents):
         contents += '\novs soft core unlimited'
     file_write(limits_file, '{0}\n'.format(contents))
 
+# Generate SSH keys
 root_ssh_folder = '{0}/.ssh'.format(check_output('echo ~root', shell=True).strip())
 ovs_ssh_folder = '{0}/.ssh'.format(check_output('echo ~ovs', shell=True).strip())
 private_key_filename = '{0}/id_rsa'

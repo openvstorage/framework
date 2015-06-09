@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
 
-pip install djangorestframework==2.3.9
-pip install markdown
+if [[ -f /etc/openvstorage_id && ! -f /etc/somerandomupgradefile ]]
+then
+    echo 'Please start upgrade through GUI because all nodes in the cluster need to be upgraded simultaneously'
+    exit 1
+fi

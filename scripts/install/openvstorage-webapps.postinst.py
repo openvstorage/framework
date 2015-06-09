@@ -21,8 +21,15 @@ import sys
 from ConfigParser import RawConfigParser
 from subprocess import check_output, CalledProcessError
 
+# Remove existing enabled sites, taking control over nginx
+check_output('rm -f /etc/nginx/sites-enabled/default', shell=True)
+
+# Cleanup *.pyc files
+check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
+check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
+
 SECRET_KEY_LENGTH = 50
-SECRET_SELECTION = "{}{}{}".format(string.ascii_letters, string.digits, string.punctuation)
+SECRET_SELECTION = "{0}{1}{2}".format(string.ascii_letters, string.digits, string.punctuation)
 secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in range(SECRET_KEY_LENGTH)])
 
 config_filename = '/opt/OpenvStorage/config/ovs.cfg'

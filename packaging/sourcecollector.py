@@ -17,11 +17,11 @@ SourceCollector module
 """
 
 import os
-import time
 import re
-from ConfigParser import RawConfigParser
+import time
 from datetime import datetime
 from subprocess import check_output
+from ConfigParser import RawConfigParser
 
 
 class SourceCollector(object):
@@ -35,10 +35,9 @@ class SourceCollector(object):
     It will also update the repo with all required versioning tags, if appropriate
     """
 
-    repo = 'openvstorage/openvstorage'
-    repo_path_metadata = '/tmp/repo_openvstorage_metadata'
-    repo_path_code = '/tmp/repo_openvstorage_code'
     package_path = '/tmp/packages/openvstorage'
+    repo_path_code = '/tmp/repo_openvstorage_code'
+    repo_path_metadata = '/tmp/repo_openvstorage_metadata'
 
     def __init__(self):
         """
@@ -67,72 +66,74 @@ class SourceCollector(object):
         * Any existing tag for repackging 'alpha', 'beta' or 'release' packages
         @param suffix: A suffix for release packages (such as 'alpha', 'beta', 'rc1', 'rtm', ...)
         """
+        suffix_map = {'beta': 'beta',
+                      'alpha': 'alpha',
+                      'release': suffix,
+                      'unstable': 'rev',
+                      'experimental': 'exp'}
+        branch_map = {'beta': 'stable',
+                      'alpha': 'test',
+                      'unstable': 'default'}
 
-        print 'Collecting sources'
+        print 'Validating input parameters'
 
-        if not os.path.exists(SourceCollector.repo_path_code):
-            os.makedirs(SourceCollector.repo_path_code)
-        if not os.path.exists(SourceCollector.repo_path_metadata):
-            os.makedirs(SourceCollector.repo_path_metadata)
-        if not os.path.exists(SourceCollector.package_path):
-            os.makedirs(SourceCollector.package_path)
-
-        # Update the metadata repo
-        print '  Updating metadata'
-        SourceCollector._hg_update_to(SourceCollector.repo_path_metadata, 'default')
-
-        print '  Updating code'
         distribution = target  # experimental, unstable, alpha, beta, release
-        if target == 'experimental':
-            suffix = 'exp'
-        elif isinstance(target, tuple) and target[0] == 'experimental':
-            print '    Using feature branch {0}'.format(target[1])
-            suffix = 'exp'
-            distribution = target[0]
-            SourceCollector._hg_update_to(SourceCollector.repo_path_code, target[1])
-        elif target == 'unstable':
-            suffix = 'rev'
-            if revision is None:
-                SourceCollector._hg_update_to(SourceCollector.repo_path_code, 'default')
-            else:
-                SourceCollector._hg_update_to(SourceCollector.repo_path_code, revision)
-        elif target in ['alpha', 'beta']:
-            branch = 'test' if target == 'alpha' else 'stable'
-            suffix = target
-            if revision is None:
-                SourceCollector._hg_update_to(SourceCollector.repo_path_code, branch)
-            else:
-                SourceCollector._hg_update_to(SourceCollector.repo_path_code, revision)
-        elif isinstance(target, tuple) and target[0] == 'release':
-            if len(target) != 2 and revision is None:
+        if isinstance(target, basestring):
+            if target not in ['experimental', 'unstable', 'alpha', 'beta']:
+                raise ValueError('Invalid target specified')
+            suffix = suffix_map[target]
+
+        elif isinstance(target, tuple):
+            if len(target) != 2 or target[0] not in ['experimental', 'release']:
+                raise ValueError('Invalid target specified')
+            if target[0] == 'release' and revision is None:
                 raise ValueError('In case a release build is requested, the exact release branch should be passed.')
+            if target[0] == 'release':
+                raise NotImplementedError('Release packaging is not yet fully tested. Please fork the repo and test first')
+            suffix = suffix_map[target[0]]
             distribution = target[0]
-            SourceCollector._hg_update_to(SourceCollector.repo_path_code, target[1] if revision is None else revision)
+            branch_map[distribution] = target[1]
+
         else:
             raise ValueError('Invalid target specified')
 
-        if distribution == 'release':
-            raise NotImplementedError('Release packaging is not yet fully tested. Please fork the repo and test first')
+        print 'Collecting sources'
+        for directory in [SourceCollector.repo_path_code, SourceCollector.repo_path_metadata, SourceCollector.package_path]:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
 
-        # Get parent brances
+        # Update the metadata repo
+        print '  Updating metadata'
+        SourceCollector._hg_update_to(path=SourceCollector.repo_path_metadata,
+                                      revision='default')
+        known_branches = [branch.split()[0].strip() for branch in SourceCollector.run(command='hg branches',
+                                                                                      working_directory=SourceCollector.repo_path_metadata).splitlines()]
+
+        if target != 'experimental':
+            print '  Updating code'
+            if branch_map[distribution] not in known_branches:
+                raise ValueError('Unknown branch "{0}" specified'.format(branch_map[distribution]))
+            SourceCollector._hg_update_to(path=SourceCollector.repo_path_code,
+                                          revision=branch_map[distribution] if revision is None else revision)
+
+        # Get parent branches
         branches = ['default']
         if distribution == 'alpha':
             branches.append('test')
         elif distribution == 'beta':
-            branches += ['test', 'stable']
+            branches.extend(['test', 'stable'])
         elif distribution == 'release':
-            branches += ['test', 'stable', target[1] if revision is None else revision]
+            branches.extend(['test', 'stable', target[1] if revision is None else revision])
 
         # Get current revision
         print '  Fetch current revision'
-        current_revision = int(SourceCollector._run(
-            'hg summary', SourceCollector.repo_path_code
-        ).split('\n')[0].split(':')[1].strip())
+        current_revision = int(SourceCollector.run(command='hg summary',
+                                                   working_directory=SourceCollector.repo_path_code).splitlines()[0].split(':')[1].strip())
         print '    Revision: {0}'.format(current_revision)
 
         # Get revision timestamp
-        timestamp = eval(SourceCollector._run("hg log -r {0} --template '{{date}}'".format(current_revision),
-                                              SourceCollector.repo_path_code))
+        timestamp = eval(SourceCollector.run(command="hg log -r {0} --template '{{date}}'".format(current_revision),
+                                             working_directory=SourceCollector.repo_path_code))
         revision_date = datetime.fromtimestamp(timestamp)
 
         # Build version
@@ -147,7 +148,8 @@ class SourceCollector(object):
         # Load tag information
         tag_data = []
         print '  Loading tags'
-        for raw_tag in SourceCollector._run('hg tags', SourceCollector.repo_path_metadata).split('\n'):
+        for raw_tag in SourceCollector.run(command='hg tags',
+                                           working_directory=SourceCollector.repo_path_metadata).splitlines():
             parts = raw_tag.split(' ')
             tag = parts[0]
             match = re.search('^(?P<version>[0-9]+?\.[0-9]+?\.[0-9]+?)(-(?P<suffix>.+)\.(?P<build>[0-9]+))?$', tag)
@@ -175,14 +177,12 @@ class SourceCollector(object):
             changelog.append('')
             changelog.append('This changelog is generated based on DVCS. Due to the nature of DVCS the')
             changelog.append('order of changes in this document can be slightly different from reality.')
-            log = SourceCollector._run(
-                "hg log -f -b {0} --template '{{date|shortdate}} {{rev}} {{desc|firstline}}\n'".format(
-                    ' -b '.join(branches)
-                ), SourceCollector.repo_path_code
-            )
-            for log_line in log.strip().split('\n'):
-                if SourceCollector._ignore_log(log_line):
+            log = SourceCollector.run(command="hg log -f -b {0} --template '{{date|shortdate}} {{rev}} {{desc|firstline}}\n'".format(' -b '.join(branches)),
+                                      working_directory=SourceCollector.repo_path_code)
+            for log_line in log.strip().splitlines():
+                if 'Added tag ' in log_line and ' for changeset ' in log_line:
                     continue
+
                 date, log_revision, description = log_line.split(' ', 2)
                 active_tag = None
                 for tag in tag_data:
@@ -193,12 +193,8 @@ class SourceCollector(object):
                         increment_build = False
                     if other_changes is True:
                         changelog.append('* Internal updates')
-                    changelog.append('\n{0}{1}\n'.format(
-                        active_tag['version'],
-                        '-{0}.{1}'.format(
-                            active_tag['suffix'], active_tag['build']
-                        ) if active_tag['suffix'] is not None else ''
-                    ))
+                    changelog.append('\n{0}{1}\n'.format(active_tag['version'],
+                                                         '-{0}.{1}'.format(active_tag['suffix'], active_tag['build']) if active_tag['suffix'] is not None else ''))
                     other_changes = False
                 if re.match('^OVS\-[0-9]{1,5}', description):
                     changelog.append('* {0} - {1}'.format(date, description))
@@ -229,10 +225,8 @@ class SourceCollector(object):
         # Save changelog
         if len(changelog) > 0:
             if increment_build is True:
-                changelog.insert(5, '\n{0}{1}\n'.format(
-                    version,
-                    '-{0}.{1}'.format(suffix, build) if suffix is not None else ''
-                ))
+                changelog.insert(5, '\n{0}{1}\n'.format(version,
+                                                        '-{0}.{1}'.format(suffix, build) if suffix is not None else ''))
         with open('{0}/CHANGELOG.txt'.format(SourceCollector.repo_path_code), 'w') as changelog_file:
             changelog_file.write('\n'.join(changelog))
 
@@ -252,43 +246,30 @@ class SourceCollector(object):
         #     1.2.1              - hotfix for 1.2.0
         #     1.2.2              - hotfix for 1.2.1
 
-        version_string = '{0}{1}'.format(
-            version,
-            '-{0}.{1}'.format(suffix, build) if suffix is not None else ''
-        )
+        version_string = '{0}{1}'.format(version,
+                                         '-{0}.{1}'.format(suffix, build) if suffix is not None else '')
         print '  Full version: {0}'.format(version_string)
 
         # Tag revision
         if distribution in ['alpha', 'beta', 'release'] and revision is None and increment_build is True:
             print '  Tagging revision'
-            SourceCollector._run(
-                'hg tag -r {0} {1}'.format(current_revision, version_string),
-                SourceCollector.repo_path_metadata
-            )
-            SourceCollector._run('hg push', SourceCollector.repo_path_metadata)
+            SourceCollector.run(command='hg tag -r {0} {1}'.format(current_revision, version_string),
+                                working_directory=SourceCollector.repo_path_metadata)
+            SourceCollector.run(command='hg push',
+                                working_directory=SourceCollector.repo_path_metadata)
 
         # Building archive
         print '  Building archive'
-        SourceCollector._run(
-            "tar -czf {0}/openvstorage_{1}.tar.gz --transform 's,^,openvstorage-{1}/,' scripts/install scripts/system config ovs webapps *.txt".format(
-                SourceCollector.package_path, version_string
-            ), SourceCollector.repo_path_code
-        )
-        SourceCollector._run('rm -f CHANGELOG.txt', SourceCollector.repo_path_code)
+        SourceCollector.run(command="tar -czf {0}/openvstorage_{1}.tar.gz --transform 's,^,openvstorage-{1}/,' scripts/install scripts/system config ovs webapps *.txt".format(SourceCollector.package_path,
+                                                                                                                                                                               version_string),
+                            working_directory=SourceCollector.repo_path_code)
+        SourceCollector.run(command='rm -f CHANGELOG.txt',
+                            working_directory=SourceCollector.repo_path_code)
         print '    Archive: {0}/openvstorage_{1}.tar.gz'.format(SourceCollector.package_path, version_string)
 
         print 'Done'
 
-        return distribution, version, suffix, build, version_string, revision_date
-
-    @staticmethod
-    def _ignore_log(log_line):
-        """
-        Returns whether a mercurial log line should be ignored
-        """
-        if 'Added tag ' in log_line and ' for changeset ' in log_line:
-            return True
-        return False
+        return distribution, version_string, revision_date
 
     @staticmethod
     def _hg_update_to(path, revision):
@@ -296,12 +277,12 @@ class SourceCollector(object):
         Updates a given repo to a certain revision, cloning if it does not exist yet
         """
         if not os.path.exists('{0}/.hg'.format(path)):
-            SourceCollector._run('hg clone https://bitbucket.org/{0} {1}'.format(SourceCollector.repo, path), path)
-        SourceCollector._run('hg pull -u', path)
-        SourceCollector._run('hg update -r {0}'.format(revision), path)
+            SourceCollector.run('hg clone https://bitbucket.org/openvstorage/openvstorage {0}'.format(path), path)
+        SourceCollector.run('hg pull -u', path)
+        SourceCollector.run('hg update -r {0}'.format(revision), path)
 
     @staticmethod
-    def _run(command, working_directory):
+    def run(command, working_directory):
         """
         Runs a comment, returning the output
         """
