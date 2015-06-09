@@ -27,14 +27,6 @@ def file_write(fn, cts):
     with open(fn, 'w') as the_file:
         the_file.write(cts)
 
-# Activate kibana
-# kibana_source = '/root/kibana/*'
-# kibana_target = '/opt/OpenvStorage/webapps/frontend/logging'
-# check_output('mkdir -p {0}'.format(kibana_target), shell=True)
-# check_output('mv {0} {1}'.format(kibana_source, kibana_target), shell=True)
-# check_output('chown -R ovs:ovs {0}'.format(kibana_target), shell=True)
-# check_output('cp {0}/app/dashboards/guided.json {0}/app/dashboards/default.json'.format(kibana_target), shell=True)
-
 # Disable/stop default services. Will be replaced by upstart scripts
 check_output('service rabbitmq-server stop', shell=True)
 check_output('update-rc.d rabbitmq-server disable', shell=True)
