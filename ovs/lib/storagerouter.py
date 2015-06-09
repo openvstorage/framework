@@ -678,7 +678,8 @@ class StorageRouterController(object):
             for junction in mds.vdisks:
                 vdisks.append(junction.vdisk)
         for vdisk in vdisks:
-            MDSServiceController.ensure_safety(vdisk, [storagerouter])
+            if vdisk.storagedriver_id:
+                MDSServiceController.ensure_safety(vdisk, [storagerouter])
 
         # Stop services
         ip_client_map = {}
@@ -837,6 +838,11 @@ class StorageRouterController(object):
                         ServiceManager.start_service(voldrv_service, client=sr_client)
         else:
             # Final model cleanup
+            for vdisk in vpool.vdisks:
+                for junction in vdisk.mds_services:
+                    if junction:
+                        junction.delete()
+                vdisk.delete()
             vpool.delete()
 
         MDSServiceController.mds_checkup()
