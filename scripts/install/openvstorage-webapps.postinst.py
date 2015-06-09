@@ -42,6 +42,9 @@ with open(config_filename, 'wb') as config_file:
 os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage; python manage.py syncdb --noinput', shell=True)
 
+check_output('service nginx stop', shell=True)
+check_output('update-rc.d nginx disable', shell=True)
+
 # Create web certificates
 if not os.path.exists('/opt/OpenvStorage/config/ssl/server.crt'):
     check_output('mkdir -p /opt/OpenvStorage/config/ssl', shell=True)

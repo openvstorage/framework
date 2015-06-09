@@ -28,18 +28,16 @@ def file_write(fn, cts):
         the_file.write(cts)
 
 # Activate kibana
-kibana_source = '/root/kibana/*'
-kibana_target = '/opt/OpenvStorage/webapps/frontend/logging'
-check_output('mkdir -p {0}'.format(kibana_target), shell=True)
-check_output('mv {0} {1}'.format(kibana_source, kibana_target), shell=True)
-check_output('chown -R ovs:ovs {0}'.format(kibana_target), shell=True)
-check_output('cp {0}/app/dashboards/guided.json {0}/app/dashboards/default.json'.format(kibana_target), shell=True)
+# kibana_source = '/root/kibana/*'
+# kibana_target = '/opt/OpenvStorage/webapps/frontend/logging'
+# check_output('mkdir -p {0}'.format(kibana_target), shell=True)
+# check_output('mv {0} {1}'.format(kibana_source, kibana_target), shell=True)
+# check_output('chown -R ovs:ovs {0}'.format(kibana_target), shell=True)
+# check_output('cp {0}/app/dashboards/guided.json {0}/app/dashboards/default.json'.format(kibana_target), shell=True)
 
 # Disable/stop default services. Will be replaced by upstart scripts
 check_output('service rabbitmq-server stop', shell=True)
 check_output('update-rc.d rabbitmq-server disable', shell=True)
-check_output('service nginx stop', shell=True)
-check_output('update-rc.d nginx disable', shell=True)
 check_output('service memcached stop', shell=True)
 check_output('update-rc.d memcached disable', shell=True)
 
@@ -57,17 +55,12 @@ check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.co
 check_output('restart rsyslog', shell=True)
 
 # Add crontabs
-cron_contents = check_output('crontab -l', shell=True).splitlines()
-for cron_entry, cron_rule in {'ntpdate': '0 * * * * /usr/sbin/ntpdate pool.ntp.org',
-                              'ovs monitor heartbeat': '* * * * * ovs monitor heartbeat',
-                              'rotate-storagedriver-logs': '59 23 * * * /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh'}.iteritems():
-    found = False
-    for cron_line in cron_contents:
-        if cron_entry in cron_line:
-            found = True
-            break
-    if found is False:
-        check_output('crontab -l | { cat; echo "{0}"; } | crontab -', shell=True)
+cron_contents = check_output('crontab -l 2>/dev/null || true', shell=True).splitlines()
+for cron_rule in ['0 * * * * /usr/sbin/ntpdate pool.ntp.org',
+                  '* * * * * ovs monitor heartbeat',
+                  '59 23 * * * /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh']:
+    if cron_rule not in cron_contents:
+        check_output('(crontab -l 2>/dev/null; echo "{0}") | crontab -'.format(cron_rule), shell=True)
 
 # Configure SSH
 config_file = '/etc/ssh/sshd_config'
