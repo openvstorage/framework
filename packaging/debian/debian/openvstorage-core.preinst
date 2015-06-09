@@ -23,8 +23,8 @@ else
         echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
     fi
 
-    id -a ovs &> /dev/null
-    if [[ $? -eq 1 ]]
+    user_exists=$(id -a ovs > /dev/null 2>&1; echo $?)
+    if [[ $user_exists -eq 1 ]]
     then
         echo 'Creating OVS user'
         useradd ovs -d /opt/OpenvStorage
