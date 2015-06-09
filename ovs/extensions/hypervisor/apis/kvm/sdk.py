@@ -90,7 +90,7 @@ class Sdk(object):
             self._disconnect()  # Clean up existing conn
         logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
         try:
-            if self.host.lower() in ['localhost']:  # Or host in (localips...):
+            if self.host.lower() in ['localhost', '127.0.0.1']:  # Or host in (localips...):
                 self.host = '127.0.0.1'
                 self._conn = self.libvirt.open('qemu:///system')  # Only local connection
             else:
