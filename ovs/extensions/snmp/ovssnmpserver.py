@@ -25,14 +25,13 @@ import signal, time
 
 STORAGE_PREFIX = "ovs_snmp"
 NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
-SNMP_PORTS = [161, 9161, 10161]
 
 class OVSSNMPServer():
     """
     Bootstrap the SNMP Server, hook into ovs
     """
 
-    def __init__(self):
+    def __init__(self, port):
         """
         Init
         """
@@ -41,7 +40,7 @@ class OVSSNMPServer():
         from ovs.extensions.generic.system import System
         my_storagerouter = System.get_my_storagerouter()
         self.host = my_storagerouter.ip
-        self.ports = SNMP_PORTS
+        self.port = port
 
         self.persistent = PersistentFactory.get_client()
         self.users = self.get_users()
@@ -414,7 +413,7 @@ class OVSSNMPServer():
         Start
         """
         self.server = SNMPServer(host = self.host,
-                                 ports = self.ports,
+                                 port = self.port,
                                  users = self.users,
                                  naming_scheme = NAMING_SCHEME)
         self._polling_functions()
@@ -428,6 +427,15 @@ class OVSSNMPServer():
         self.server.stop()
 
 if __name__ == '__main__':
-    server = OVSSNMPServer()
+    import argparse
+    parser = argparse.ArgumentParser(description = 'SNMP server for OVS',
+                                    formatter_class = argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('--port', dest='port', type=int,
+                        help='Declare queue as durable')
+
+    args = parser.parse_args()
+
+    server = OVSSNMPServer(args.port)
 
     server.start()
