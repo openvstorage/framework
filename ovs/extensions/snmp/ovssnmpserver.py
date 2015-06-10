@@ -432,7 +432,7 @@ if __name__ == '__main__':
                                     formatter_class = argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument('--port', dest='port', type=int,
-                        help='Declare queue as durable')
+                        help='SNMP Port')
 
     args = parser.parse_args()
 
