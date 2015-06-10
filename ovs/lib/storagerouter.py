@@ -120,12 +120,13 @@ class StorageRouterController(object):
                            'mountpoint_temp': (str, Toolbox.regex_mountpoint),
                            'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
-        required_params_wihout_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
+        required_params_without_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
                                         'connection_host': (str, Toolbox.regex_ip, False),
                                         'connection_port': (int, None),
                                         'connection_backend': (dict, None),
                                         'connection_username': (str, None),
                                         'connection_password': (str, None)}
+        required_params_local = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
 
         if not isinstance(parameters, dict):
             raise ValueError('Parameters should be of type "dict"')
@@ -191,17 +192,20 @@ class StorageRouterController(object):
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         if vpool is None:
-            Toolbox.verify_required_params(required_params_wihout_vpool, parameters)
+            if parameters['type'] == 'local':
+                Toolbox.verify_required_params(required_params_local, parameters)
+            else:
+                Toolbox.verify_required_params(required_params_without_vpool, parameters)
             vpool = VPool()
             supported_backends = client.config_read('ovs.storagedriver.backends').split(',')
             if 'rest' in supported_backends:
                 supported_backends.remove('rest')  # REST is not supported for now
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
             vpool.backend_type = backend_type
-            connection_host = parameters['connection_host']
-            connection_port = parameters['connection_port']
-            connection_username = parameters['connection_username']
-            connection_password = parameters['connection_password']
+            connection_host = parameters.get('connection_host', '')
+            connection_port = parameters.get('connection_port', '')
+            connection_username = parameters.get('connection_username', '')
+            connection_password = parameters.get('connection_password', '')
             if vpool.backend_type.code in ['local', 'distributed']:
                 vpool.metadata = {'backend_type': 'LOCAL',
                                   'local_connection_path': mountpoint_bfs}
