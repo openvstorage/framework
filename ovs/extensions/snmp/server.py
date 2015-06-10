@@ -18,10 +18,10 @@ SNMP Server module
 
 from pysnmp.entity import engine, config
 from pysnmp.entity.rfc3413 import cmdrsp, context
+from pysnmp.carrier import error
 from pysnmp.carrier.asynsock.dgram import udp
 from pysnmp.proto.api import v2c
 from pysnmp.smi.error import SmiError
-
 
 
 class SNMPServer():
@@ -31,7 +31,7 @@ class SNMPServer():
     standard oids implemented by pysnmp
     custom oids implemented either in custom class or by browsing dal/model
     """
-    def __init__(self, host, port, users, naming_scheme):
+    def __init__(self, host, ports, users, naming_scheme):
         """
         host = public ip to listen on
         port = port to listen on (usually 161)
@@ -52,9 +52,21 @@ class SNMPServer():
 
         # Transport setup
         # UDP over IPv4
-        config.addSocketTransport(self.snmpEngine,
-                                  udp.domainName,
-                                  udp.UdpTransport().openServerMode((host, port)))
+        port_bind = None
+        for port in ports:
+            try:
+                config.addSocketTransport(self.snmpEngine,
+                                          udp.domainName,
+                                          udp.UdpTransport().openServerMode((host, port)))
+                port_bind = port
+                print('Serving on port %s' % port)
+                break
+            except error.CarrierError as carrier_error :
+                if "[Errno 98]" in carrier_error.message:
+                    print('Port %s is in use' % port)
+
+        if port_bind is None:
+            raise RuntimeError('Cannot bind to any of the ports %s' % ports)
 
         # SNMPv3/USM setup
         # user: usr-md5-des, auth: MD5, priv DES

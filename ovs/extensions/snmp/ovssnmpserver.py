@@ -25,7 +25,7 @@ import signal, time
 
 STORAGE_PREFIX = "ovs_snmp"
 NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
-
+SNMP_PORTS = [161, 9161, 10161]
 
 class OVSSNMPServer():
     """
@@ -41,7 +41,7 @@ class OVSSNMPServer():
         from ovs.extensions.generic.system import System
         my_storagerouter = System.get_my_storagerouter()
         self.host = my_storagerouter.ip
-        self.port = 161
+        self.ports = SNMP_PORTS
 
         self.persistent = PersistentFactory.get_client()
         self.users = self.get_users()
@@ -414,7 +414,7 @@ class OVSSNMPServer():
         Start
         """
         self.server = SNMPServer(host = self.host,
-                                 port = self.port,
+                                 ports = self.ports,
                                  users = self.users,
                                  naming_scheme = NAMING_SCHEME)
         self._polling_functions()
