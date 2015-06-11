@@ -26,7 +26,7 @@ amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'
                                     Configuration.get('ovs.core.broker.password'),
                                     Configuration.get('ovs.grid.ip'))
 
-worker_states = check_output("/usr/local/bin/celery inspect ping -b {0} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(amqp), shell=True)
+worker_states = check_output("/usr/bin/celery inspect ping -b {0} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(amqp), shell=True)
 routers = StorageRouterList.get_storagerouters()
 for node in routers:
     if node.heartbeats is None:
