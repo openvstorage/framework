@@ -63,8 +63,7 @@ class DebianPackager(object):
 
         # Build changelog entry
         with open('{0}/openvstorage-{1}/debian/changelog'.format(debian_folder, version_string), 'w') as changelog_file:
-            changelog_file.write("""
-openvstorage ({0}-1) {1}; urgency=low
+            changelog_file.write("""openvstorage ({0}-1) {1}; urgency=low
 
   * For changes, see individual changelogs
 
