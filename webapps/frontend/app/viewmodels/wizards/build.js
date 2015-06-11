@@ -43,19 +43,25 @@ define([
             return parent.step() > 0;
         });
         parent.hasNext = ko.computed(function() {
+            return parent.step() < parent.stepsLength() - 1 && parent.stepsLength() > 1;
+        });
+        parent.canNext = ko.computed(function() {
             if (parent.running()) {
                 return false;
             }
-            if (parent.step() < parent.stepsLength() - 1 && parent.stepsLength() > 1) {
+            if (parent.hasNext()) {
                 return parent.canContinue().value === true;
             }
             return false;
         });
         parent.hasFinish = ko.computed(function() {
+            return parent.step() === parent.stepsLength() - 1;
+        });
+        parent.canFinish = ko.computed(function() {
             if (parent.running()) {
                 return false;
             }
-            if (parent.step() === parent.stepsLength() - 1) {
+            if (parent.hasFinish()) {
                 return parent.canContinue().value === true;
             }
             return false;
