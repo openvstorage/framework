@@ -23,27 +23,14 @@ define([
 
         // Variables
         self.shared = shared;
-        self.data = data;
-
-        // Observables
-        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
+        self.data   = data;
 
         // Computed
         self.canContinue = ko.computed(function () {
-            var valid = true, showErrors = false, reasons = [], fields = [], preValidation = self.preValidateResult();
-            if (preValidation.valid === false) {
-                showErrors = true;
-                reasons = reasons.concat(preValidation.reasons);
-                fields = fields.concat(preValidation.fields);
-            }
-            return { value: valid, showErrors: showErrors, reasons: reasons, fields: fields };
+            return { value: self.data.mgmtcenterLoaded(), showErrors: false, reasons: [], fields: [] };
         });
 
         // Functions
-        self.preValidate = function() {
-            // connection validation using filled out keystone credentials
-            return true;
-        };
         self.next = function() {
             return true;
         };
@@ -55,14 +42,21 @@ define([
                     if (data.username) {
                         self.data.hasMgmtCenter(true);
                         self.data.integratemgmt(true);
-                        self.data.mgmtcenter_user(data.username);
-                        self.data.mgmtcenter_name(data.name);
-                        self.data.mgmtcenter_ip(data.ip);
-                        self.data.mgmtcenter_type(data.type);
+                        self.data.mgmtcenterUser(data.username);
+                        self.data.mgmtcenterName(data.name);
+                        self.data.mgmtcenterIp(data.ip);
+                        self.data.mgmtcenterType(data.type);
                      } else {
                         self.data.hasMgmtCenter(false);
                         self.data.integratemgmt(false);
                      }
+                })
+                .fail(function() {
+                    self.data.hasMgmtCenter(false);
+                    self.data.integratemgmt(false);
+                })
+                .always(function() {
+                    self.data.mgmtcenterLoaded(true);
                 });
         };
     };

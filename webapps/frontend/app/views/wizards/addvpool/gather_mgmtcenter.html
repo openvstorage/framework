@@ -15,37 +15,41 @@ limitations under the License.
 -->
 <div>
     <form id="form.gather.mgmtcenter" role="form form-horizontal" class="form-horizontal">
-        <div data-bind="visible: data.hasMgmtCenter() === undefined" class="alert alert-info" style="margin-top: 5px;">
-            <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
-            <span data-i18n="ovs:wizards.addvpool.integratemgmtcenter.detecting"></span>
-        </div>
-        <div data-bind="visible: data.hasMgmtCenter() === false" class="alert alert-success" style="margin-top: 5px;">
-            <p data-i18n="ovs:wizards.addvpool.integratemgmtcenter.nomgmtcenter"></p>
-        </div>
-        <div data-bind="visible: data.hasMgmtCenter() === true" style="margin-top: 5px;">
-            <p data-i18n="ovs:wizards.addvpool.integratemgmtcenter.basicinfo"></p>
-            <div class="form-group">
-                <label class="col-lg-4 control-label">&nbsp;</label>
-                <div class="col-lg-6">
-                    <input type="checkbox" id="integratemgmt" data-bind="checked: data.integratemgmt">
-                    <label for="integratemgmt" data-i18n="ovs:wizards.addvpool.integratemgmtcenter.integratemgmt"></label>
+        <div data-bind="visible: data.mgmtcenterLoaded()">
+            <div data-bind="visible: data.hasMgmtCenter() === undefined" class="alert alert-info" style="margin-top: 5px;">
+                <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+                <span data-i18n="ovs:wizards.addvpool.integratemgmtcenter.detecting"></span>
+            </div>
+            <div data-bind="visible: data.hasMgmtCenter() === false" class="alert alert-success" style="margin-top: 5px;">
+                <p data-i18n="ovs:wizards.addvpool.integratemgmtcenter.nomgmtcenter"></p>
+            </div>
+            <div data-bind="visible: data.hasMgmtCenter() === true" style="margin-top: 5px;">
+                <p data-i18n="ovs:wizards.addvpool.integratemgmtcenter.basicinfo"></p>
+                <div class="form-group">
+                    <label class="col-lg-4 control-label">&nbsp;</label>
+                    <div class="col-lg-6">
+                        <input type="checkbox" id="integratemgmt" data-bind="checked: data.integratemgmt">
+                        <label for="integratemgmt" data-i18n="ovs:wizards.addvpool.integratemgmtcenter.integratemgmt"></label>
+                    </div>
+                </div>
+                <div data-bind="visible: data.integratemgmt() === true">
+                    Management center info:
+                    <ul>
+                        <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcentertype"> </b> <span data-bind="text: data.mgmtcenterType"></span></li>
+                        <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcentername"> </b> <span data-bind="text: data.mgmtcenterName"></span></li>
+                        <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcenterip"> </b> <span data-bind="text: data.mgmtcenterIp"></span></li>
+                        <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcenteruser"> </b> <span data-bind="text: data.mgmtcenterUser"></span></li>
+                    </ul>
                 </div>
             </div>
-            <div data-bind="visible: data.integratemgmt() === true">
-                Management center info:
-                <ul>
-                    <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcenter_type"> </b> <span data-bind="text: data.mgmtcenter_type"></span></li>
-                    <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcenter_name"> </b> <span data-bind="text: data.mgmtcenter_name"></span></li>
-                    <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcenter_ip"> </b> <span data-bind="text: data.mgmtcenter_ip"></span></li>
-                    <li><b data-i18n="ovs:wizards.addvpool.integratemgmtcenter.mgmtcenter_user"> </b> <span data-bind="text: data.mgmtcenter_user"></span></li>
-                </ul>
-            </div>
+        </div>
+        <div data-bind="visible: !data.mgmtcenterLoaded()" class="alert alert-info" style="margin-top: 20px;">
+            <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+            <span data-i18n="ovs:wizards.addvpool.integratemgmtcenter.loading"></span>
         </div>
     </form>
-    <div class="alert alert-danger" data-bind="visible: !canContinue().value || canContinue().showErrors"
-         style="margin-bottom: -10px;">
+    <div class="alert alert-danger" data-bind="visible: !canContinue().value && canContinue().showErrors" style="margin-bottom: -10px;">
         <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
-
         <p data-bind="visible: canContinue().reasons.length > 0"><span
                 data-i18n="ovs:generic.followingerrorsfound"></span></p>
         <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
