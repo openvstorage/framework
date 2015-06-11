@@ -1,16 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "$@"
-echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-
-if [[ ! -z "$2" && ! -f /etc/somerandomupgradefile ]]
+if [[ ! -z "$2" && ! -f /etc/ready_for_upgrade ]]
 then
-    echo 'Please start upgrade through GUI because all nodes in the cluster need to be upgraded simultaneously'
+    echo -e '\n\nPlease start upgrade through GUI because all nodes in the cluster need to be upgraded simultaneously!!!!!\n\n'
     exit 1
 else
     pip install suds-jurko==0.5
