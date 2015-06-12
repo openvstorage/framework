@@ -429,6 +429,12 @@ class StorageRouterController(object):
             node_configs.append(ClusterNodeConfig(vrouter_id, str(grid_ip), ports[0], ports[1], ports[2]))
         vrouter_clusterregistry.set_node_configs(node_configs)
 
+        # Possible modes: ['classic', 'ganesha']
+        if storagerouter.pmachine.hvtype == 'VMWARE':
+            volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode')
+        else:
+            volumedriver_mode = 'classic'
+
         filesystem_config = StorageDriverConfiguration.build_filesystem_by_hypervisor(storagerouter.pmachine.hvtype)
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
@@ -485,6 +491,18 @@ class StorageRouterController(object):
                 'fragment_cache_size': frag_size,
                 'albamgr_cfg_file': '{0}/{1}_alba.cfg'.format(config_dir, vpool_name)
             }))
+
+        if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'ganesha':
+            ganesha_config = '/opt/OpenvStorage/config/storagedriver/storagedriver/{0}_ganesha.conf'.format(vpool_name)
+            contents = ''
+            for template in ['ganesha-core', 'ganesha-export']:
+                contents += client.file_read('/opt/OpenvStorage/config/templates/{0}.conf'.format(template))
+            params = {'VPOOL_NAME': vpool_name,
+                      'VPOOL_MOUNTPOINT': '/mnt/{0}'.format(vpool_name),
+                      'NFS_FILESYSTEM_ID': storagerouter.ip.split('.', 2)[-1]}
+            for key, value in params.iteritems():
+                contents = contents.replace('<{0}>'.format(key), value)
+            client.file_write(ganesha_config, contents)
 
         storagedriver_config = StorageDriverConfiguration('storagedriver', vpool_name)
         storagedriver_config.load(client)
@@ -591,13 +609,15 @@ class StorageRouterController(object):
                   'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
         template_dir = '/opt/OpenvStorage/config/templates/upstart'
-        template_configs = {'ovs-volumedriver.conf': 'ovs-volumedriver_{0}.conf'.format(vpool.name),
-                            'ovs-failovercache.conf': 'ovs-failovercache_{0}.conf'.format(vpool.name)}
+        template_configs = {'ovs-failovercache': 'ovs-failovercache_{0}'.format(vpool.name)}
+        if volumedriver_mode == 'ganesha':
+            template_configs['ovs-ganesha'] = 'ovs-volumedriver_{0}'.format(vpool.name)
+        else:  # classic
+            template_configs['ovs-volumedriver'] = 'ovs-volumedriver_{0}'.format(vpool.name)
         if vpool.backend_type.code == 'alba':
-            template_configs['ovs-albaproxy.conf'] = 'ovs-albaproxy_{0}.conf'.format(vpool.name)
+            template_configs['ovs-albaproxy'] = 'ovs-albaproxy_{0}'.format(vpool.name)
         for template_file, vpool_file in template_configs.iteritems():
-            if client.file_exists('{0}/{1}'.format(template_dir, template_file)):
-                client.run('cp -f {0}/{1} {0}/{2}'.format(template_dir, template_file, vpool_file))
+            ServiceManager.prepare_template(template_file, vpool_file, client=client)
 
         ServiceManager.add_service(name='volumedriver_{0}'.format(vpool_name), params=params, client=root_client)
         ServiceManager.add_service(name='failovercache_{0}'.format(vpool_name), params=params, client=root_client)
@@ -605,12 +625,10 @@ class StorageRouterController(object):
             ServiceManager.add_service(name='albaproxy_{0}'.format(vpool_name), params=params, client=root_client)
 
         # Remove copied template config files (obsolete after add service)
-        client.file_delete('{0}/ovs-failovercache_{1}.conf'.format(template_dir, vpool.name))
-        client.file_delete('{0}/ovs-volumedriver_{1}.conf'.format(template_dir, vpool.name))
-        if vpool.backend_type.code == 'alba':
-            client.file_delete('{0}/ovs-albaproxy_{1}.conf'.format(template_dir, vpool.name))
+        for vpool_file in template_configs.itervalues():
+            client.file_delete('{0}/{1}.conf'.format(template_dir, vpool_file))
 
-        if storagerouter.pmachine.hvtype == 'VMWARE':
+        if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':
             root_client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
             root_client.run('service nfs-kernel-server start')
 
@@ -735,6 +753,11 @@ class StorageRouterController(object):
                 ServiceManager.remove_service(name=service, client=client)
 
         configuration_dir = client.config_read('ovs.core.cfgdir')
+        # Possible modes: ['classic', 'ganesha']
+        if storagerouter.pmachine.hvtype == 'VMWARE':
+            volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode')
+        else:
+            volumedriver_mode = 'classic'
 
         voldrv_arakoon_cluster_id = str(client.config_read('ovs.storagedriver.db.arakoon.clusterid'))
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
@@ -793,6 +816,9 @@ class StorageRouterController(object):
                                                                                          vpool.name))
             files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir,
                                                                                           vpool.name))
+        if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'ganesha':
+            files_to_remove.append('{0}/storagedriver/storagedriver/{0}_ganesha.conf'.format(configuration_dir,
+                                                                                             vpool.name))
 
         for file_name in files_to_remove:
             if file_name and client.file_exists(file_name):
@@ -844,8 +870,7 @@ class StorageRouterController(object):
             # Final model cleanup
             for vdisk in vpool.vdisks:
                 for junction in vdisk.mds_services:
-                    if junction:
-                        junction.delete()
+                    junction.delete()
                 vdisk.delete()
             vpool.delete()
 
