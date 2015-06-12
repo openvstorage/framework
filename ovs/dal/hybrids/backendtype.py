@@ -35,6 +35,6 @@ class BackendType(DataObject):
         Checks whether this BackendType has a plugin installed
         """
         try:
-            return self.code in Configuration().plugins.backends
+            return self.code in Configuration.plugins.backends
         except:
             return False

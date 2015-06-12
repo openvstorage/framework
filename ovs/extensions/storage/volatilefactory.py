@@ -33,14 +33,14 @@ class VolatileFactory(object):
 
         if not hasattr(VolatileFactory, 'store') or VolatileFactory.store is None:
             if client_type is None:
-                client_type = Configuration.get('ovs.core.storage.volatile')
+                client_type = Configuration.general.volatile
 
             VolatileFactory.store = None
             if client_type == 'memcache':
                 from ovs.extensions.storage.volatile.memcachestore import MemcacheStore
                 memcache_servers = list()
                 memcache_config = RawConfigParser()
-                memcache_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
+                memcache_config.read(os.path.join(Configuration.general.configdir, 'memcacheclient.cfg'))
                 nodes = [node.strip() for node in memcache_config.get('main', 'nodes').split(',')]
                 nodes.sort()
                 for node in nodes:

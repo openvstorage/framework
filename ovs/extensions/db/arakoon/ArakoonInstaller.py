@@ -19,6 +19,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
 from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.generic.configuration import Configuration
 from StringIO import StringIO
 
 import os
@@ -175,8 +176,9 @@ class ArakoonInstaller(object):
         Creates a cluster
         """
         client = SSHClient(ip)
-        base_dir = client.config_read('ovs.core.db.arakoon.location').rstrip('/')
-        port_range = client.config_read('ovs.ports.arakoon')
+        configuration = Configuration(client)
+        base_dir = configuration.arakoon.location.rstrip('/')
+        port_range = configuration.ports.arakoon
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
 
@@ -215,8 +217,9 @@ class ArakoonInstaller(object):
         config.load_config(client)
 
         client = SSHClient(new_ip)
-        base_dir = client.config_read('ovs.core.db.arakoon.location').rstrip('/')
-        port_range = client.config_read('ovs.ports.arakoon')
+        configuration = Configuration(client)
+        base_dir = configuration.arakoon.location.rstrip('/')
+        port_range = configuration.ports.arakoon
         ports = System.get_free_ports(port_range, exclude_ports, 2, client)
         node_name = System.get_my_machine_id(client)
 

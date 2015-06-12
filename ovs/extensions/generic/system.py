@@ -19,6 +19,7 @@ Generic system module, executing statements on local node
 import os
 import uuid
 import time
+from subprocess import check_output
 from ConfigParser import RawConfigParser
 from StringIO import StringIO
 
@@ -31,7 +32,6 @@ class System(object):
     Generic helper class
     """
 
-    OVS_CONFIG = '/opt/OpenvStorage/config/ovs.cfg'
     OVS_ID_FILE = '/etc/openvstorage_id'
 
     my_storagerouter_guid = ''
@@ -91,12 +91,15 @@ class System(object):
         client.file_write('/etc/hosts', contents, mode='wb')
 
     @staticmethod
-    def ports_in_use(client):
+    def ports_in_use(client=None):
         """
         Returns the ports in use
         """
-        cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
-        output = client.run(cmd)
+        cmd = "netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"
+        if client is None:
+            output = check_output(cmd, shell=True)
+        else:
+            output = client.run(cmd)
         for found_port in output.splitlines():
             yield int(found_port.strip())
 
@@ -110,31 +113,31 @@ class System(object):
         :return: sorted incrementing list of nr of free ports
         """
 
-        requested_range = list()
-        selected_range = str(selected_range)
-        for port_range in str(selected_range).split(','):
-            port_range = port_range.strip()
-            if '-' in port_range:
-                current_range = (int(port_range.split('-')[0]), int(port_range.split('-')[1]))
+        requested_range = []
+        for port_range in selected_range:
+            if isinstance(port_range, list):
+                current_range = [port_range[0], port_range[1]]
             else:
-                current_range = (int(port_range), 65535)
+                current_range = [port_range, 65535]
             if 0 <= current_range[0] <= 1024:
-                current_range = (1025, current_range[1])
-            requested_range.extend(xrange(current_range[0], current_range[1] + 1))
-        free_ports = list()
+                current_range = [1025, current_range[1]]
+            requested_range += range(current_range[0], current_range[1] + 1)
 
+        free_ports = []
         if exclude is None:
-            exclude = list()
+            exclude = []
         exclude_list = list(exclude)
 
         ports_in_use = System.ports_in_use(client)
-        for port in ports_in_use:
-            exclude_list.append(port)
+        exclude_list += ports_in_use
 
-        cmd = """cat /proc/sys/net/ipv4/ip_local_port_range"""
-        output = client.run(cmd)
-        start_end = list(output.split())
-        ephemeral_port_range = xrange(int(min(start_end)), int(max(start_end)))
+        cmd = 'cat /proc/sys/net/ipv4/ip_local_port_range'
+        if client is None:
+            output = check_output(cmd, shell=True)
+        else:
+            output = client.run(cmd)
+        start_end = map(int, output.split())
+        ephemeral_port_range = xrange(min(start_end), max(start_end))
 
         for possible_free_port in requested_range:
             if possible_free_port not in ephemeral_port_range and possible_free_port not in exclude_list:

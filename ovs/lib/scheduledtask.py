@@ -213,7 +213,7 @@ class ScheduledTaskController(object):
     @ensure_single(['ovs.scheduled.collapse_arakoon'])
     def collapse_arakoon():
         logger.info('Starting arakoon collapse')
-        arakoon_dir = os.path.join(Configuration.get('ovs.core.cfgdir'), 'arakoon')
+        arakoon_dir = os.path.join(Configuration.general.configdir, 'arakoon')
         arakoon_clusters = map(lambda directory: os.path.basename(directory.rstrip(os.path.sep)),
                                os.walk(arakoon_dir).next()[1])
         for cluster in arakoon_clusters:
@@ -238,7 +238,7 @@ class ScheduledTaskController(object):
         """
         Cleans audit trail logs
         """
-        days = int(Configuration.get('ovs.core.audittrails.keep'))
+        days = int(Configuration.general.audittrails)
         mark = time.time() - days * 24 * 60 * 60
         for log in LogList.get_logs():
             if log.time < mark:

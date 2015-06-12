@@ -51,7 +51,7 @@ def run_event_consumer():
     Check whether to run the event consumer
     """
     rmq_config = RawConfigParser()
-    rmq_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+    rmq_config.read(os.path.join(Configuration.general.configdir, 'rabbitmqclient.cfg'))
     machine_id = System.get_my_machine_id()
     return rmq_config.has_section(machine_id)
 
@@ -132,9 +132,9 @@ if __name__ == '__main__':
 
             # Starting connection and handling
             rmq_ini = RawConfigParser()
-            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+            rmq_ini.read(os.path.join(Configuration.general.configdir, 'rabbitmqclient.cfg'))
             rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
-            this_server = '{0}:{1}'.format(Configuration.get('ovs.grid.ip'), Configuration.get('ovs.core.broker.port'))
+            this_server = '{0}:{1}'.format(Configuration.general.ip, Configuration.broker.port)
             rmq_servers = [this_server] + [server for server in map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes) if server != this_server]
             channel = None
             server = ''
@@ -146,8 +146,8 @@ if __name__ == '__main__':
                         pika.ConnectionParameters(host=server.split(':')[0],
                                                   port=int(server.split(':')[1]),
                                                   credentials=pika.PlainCredentials(
-                                                      Configuration.get('ovs.core.broker.login'),
-                                                      Configuration.get('ovs.core.broker.password')
+                                                      Configuration.broker.login,
+                                                      Configuration.broker.password
                                                   ))
                     )
                     channel = connection.channel()

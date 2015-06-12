@@ -168,7 +168,7 @@ class LicenseController(object):
         SupportAgent().run()  # Execute a single heartbeat run
         client = OVSClient('monitoring.openvstorage.com', 443, credentials=None, verify=True)
         client.post('/support/register/',
-                    data={'cluster_id': Configuration.get('ovs.support.cid'),
+                    data={'cluster_id': Configuration.support.cid,
                           'name': registration_parameters['name'],
                           'email': registration_parameters['email'],
                           'company': registration_parameters['company'],

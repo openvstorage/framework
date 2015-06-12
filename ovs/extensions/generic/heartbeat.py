@@ -18,15 +18,13 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
 
-configuration = Configuration()
-
 ARP_TIMEOUT = 30
 current_time = int(time.time())
 machine_id = System.get_my_machine_id()
-amqp = '{0}://{1}:{2}@{3}//'.format(configuration.broker.protocol,
-                                    configuration.broker.login,
-                                    configuration.broker.password,
-                                    configuration.general.ip)
+amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.broker.protocol,
+                                    Configuration.broker.login,
+                                    Configuration.broker.password,
+                                    Configuration.general.ip)
 
 worker_states = check_output("/usr/local/bin/celery inspect ping -b {0} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(amqp), shell=True)
 routers = StorageRouterList.get_storagerouters()

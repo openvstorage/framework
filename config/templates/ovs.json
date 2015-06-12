@@ -20,17 +20,19 @@
             "safety": 3,
             "maxload": 75,
             "tlogs": 100
-        }
+        },
+        "vmware": "ganesha",
+        "serializationpath": "/var/rsp"
     },
     "webapps": {
         "django": {
             "uiname": "api",
             "appname": "api",
-            "dir": "webapp",
+            "dir": "webapps",
             "name": "CloudFounders Engineering Dept.",
             "email": "engineering@cloudfounders.com",
             "dbname": "api.sqlite3",
-            "secret": "pl4c3h0ld3r"
+            "secret": ""
         }
     },
     "support": {
@@ -47,12 +49,20 @@
     },
     "logging": {
         "level": "DEBUG",
-        "path": "/var/log/ovs",
+        "filepath": "/var/log/ovs",
         "defaultfile": "generic",
         "defaultname": "logger"
     },
     "plugins": {
         "generic": [],
         "backends": []
+    },
+    "partitions": {
+        "readcaches": [],
+        "writecaches": [],
+        "storage": []
+    },
+    "arakoon": {
+        "location": ""
     }
 }

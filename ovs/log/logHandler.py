@@ -21,7 +21,7 @@ import logging.handlers
 import pwd
 import grp
 import os
-from ConfigParser import RawConfigParser
+from ovs.extensions.generic.configuration import Configuration
 
 
 def _ignore_formatting_errors():
@@ -66,24 +66,19 @@ class LogHandler(object):
         Initializes the logger
         """
 
-        filename = '/opt/OpenvStorage/config/main.cfg'
-        parser = RawConfigParser()
-        parser.read(filename)
+        configuration = Configuration()
 
         if name is None:
-            name = parser.get('logging', 'default_name')
+            name = configuration.logging.defaultname
 
         log_filename = '{0}/{1}.log'.format(
-            parser.get('logging', 'path'),
-            LogHandler.targets[source] if source in LogHandler.targets else parser.get('logging', 'default_file')
+            configuration.logging.filepath,
+            LogHandler.targets[source] if source in LogHandler.targets else configuration.logging.defaultfile
         )
 
-        uid = pwd.getpwnam('ovs').pw_uid
-        gid = grp.getgrnam('ovs').gr_gid
         if not os.path.exists(log_filename):
             open(log_filename, 'a').close()
             os.chmod(log_filename, 0o666)
-
 
         formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
         handler = logging.FileHandler(log_filename)
@@ -91,7 +86,7 @@ class LogHandler(object):
 
         self.logger = logging.getLogger(name)
         self.logger.propagate = True
-        self.logger.setLevel(getattr(logging, parser.get('logging', 'level')))
+        self.logger.setLevel(getattr(logging, configuration.logging.level))
         self.logger.addHandler(handler)
 
     @_ignore_formatting_errors()

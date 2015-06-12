@@ -30,4 +30,9 @@ if crontab -l | grep -q 'ntpdate'; then true; else crontab -l | { cat; echo '0 *
 if crontab -l | grep -q 'ovs monitor heartbeat'; then true; else crontab -l | { cat; echo '* * * * * ovs monitor heartbeat'; } | crontab -; fi
 if crontab -l | grep -q 'rotate-storagedriver-logs'; then true; else crontab -l | { cat; echo '59 23 * * * /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh'; } | crontab -; fi
 
+# Creating configuration file
+if [ ! -f /opt/OpenvStorage/config/ovs.json ]; then
+  cp /opt/OpenvStorage/config/templates/ovs.json /opt/OpenvStorage/config/ovs.json
+fi
+
 python /opt/OpenvStorage/scripts/install/openvstorage-core.postinst.py "__NEW_VERSION__" "$@"

@@ -75,13 +75,13 @@ class StorageRouterController(object):
                        and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
                        and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
                        and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
-        arakoon_mountpoint = Configuration.get('ovs.core.db.arakoon.location')
+        arakoon_mountpoint = Configuration.arakoon.location
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
         # include directories chosen during ovs setup
-        readcaches = [entry for entry in Configuration.get('ovs.vpool_partitions.readcaches').split(',') if entry]
-        writecaches = [entry for entry in Configuration.get('ovs.vpool_partitions.writecaches').split(',') if entry]
-        storage = [entry for entry in Configuration.get('ovs.vpool_partitions.storage').split(',') if entry]
+        readcaches = [entry for entry in Configuration.partitions.readcaches if entry]
+        writecaches = [entry for entry in Configuration.partitions.writecaches if entry]
+        storage = [entry for entry in Configuration.partitions.storage if entry]
         mountpoints.extend(storage)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
@@ -145,6 +145,7 @@ class StorageRouterController(object):
         client = SSHClient(ip)
         root_client = SSHClient(ip, username='root')
         unique_id = System.get_my_machine_id(client)
+        configuration = Configuration(client)
 
         storagerouter = None
         for current_storagerouter in StorageRouterList.get_storagerouters():
@@ -197,9 +198,6 @@ class StorageRouterController(object):
             else:
                 Toolbox.verify_required_params(required_params_without_vpool, parameters)
             vpool = VPool()
-            supported_backends = client.config_read('ovs.storagedriver.backends').split(',')
-            if 'rest' in supported_backends:
-                supported_backends.remove('rest')  # REST is not supported for now
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
             vpool.backend_type = backend_type
             connection_host = parameters.get('connection_host', '')
@@ -211,7 +209,7 @@ class StorageRouterController(object):
                                   'local_connection_path': mountpoint_bfs}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
-                    connection_host = Configuration.get('ovs.grid.ip')
+                    connection_host = configuration.general.ip
                     connection_port = 443
                     oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
                     ovs_client = OVSClient(connection_host, connection_port,
@@ -299,7 +297,7 @@ class StorageRouterController(object):
         rsppath = '/var/rsp/{0}'.format(vpool_name)
 
         dirs2create = [failovercache, metadatapath, tlogpath, rsppath,
-                       client.config_read('ovs.storagedriver.readcache.serialization.path')]
+                       configuration.storagedriver.serializationpath]
         files2create = list()
         readcaches = list()
         writecaches = list()
@@ -385,7 +383,7 @@ class StorageRouterController(object):
         cmd = "ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1"
         ipaddresses = client.run(cmd).strip().splitlines()
         ipaddresses = [ipaddr.strip() for ipaddr in ipaddresses]
-        grid_ip = client.config_read('ovs.grid.ip')
+        grid_ip = configuration.general.ip
         if grid_ip in ipaddresses:
             ipaddresses.remove(grid_ip)
         if not ipaddresses:
@@ -405,7 +403,7 @@ class StorageRouterController(object):
                           'vrouter_file_write_threshold': 1024,
                           'vrouter_min_workers': 4,
                           'vrouter_max_workers': 16}
-        voldrv_arakoon_cluster_id = str(client.config_read('ovs.storagedriver.db.arakoon.clusterid'))
+        voldrv_arakoon_cluster_id = 'voldrv'
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_nodes = []
@@ -431,7 +429,7 @@ class StorageRouterController(object):
 
         # Possible modes: ['classic', 'ganesha']
         if storagerouter.pmachine.hvtype == 'VMWARE':
-            volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode')
+            volumedriver_mode = configuration.storagedriver.vmware
         else:
             volumedriver_mode = 'classic'
 
@@ -439,11 +437,11 @@ class StorageRouterController(object):
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        readcache_serialization_path = client.config_read('ovs.storagedriver.readcache.serialization.path')
-        queue_protocol = Configuration.get('ovs.core.broker.protocol')
-        queue_login = Configuration.get('ovs.core.broker.login')
-        queue_password = Configuration.get('ovs.core.broker.password')
-        queue_volumerouterqueue = Configuration.get('ovs.core.broker.volumerouter.queue')
+        readcache_serialization_path = configuration.storagedriver.serializationpath
+        queue_protocol = configuration.broker.protocol
+        queue_login = configuration.broker.login
+        queue_password = configuration.broker.password
+        queue_volumerouterqueue = configuration.broker.queues.storagedriver
         queue_urls = []
         for current_storagerouter in StorageRouterList.get_masters():
             queue_urls.append({'amqp_uri': '{0}://{1}:{2}@{3}'.format(queue_protocol,
@@ -468,7 +466,7 @@ class StorageRouterController(object):
                 config.add_section(section)
                 for key, value in vpool.metadata['metadata'][section].iteritems():
                     config.set(section, key, value)
-            config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
+            config_dir = '{0}/storagedriver/storagedriver'.format(configuration.general.configdir)
             client.dir_create(config_dir)
             cache_dir = '{}/fcache_{}'.format(mountpoint_fragmentcache, vpool_name)
             root_client.dir_create(cache_dir)
@@ -724,6 +722,7 @@ class StorageRouterController(object):
                 mgmtcenter.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
 
         client = SSHClient(ip, username='root')
+        configuration = Configuration(client)
 
         # KVM pool
         if pmachine.hvtype == 'KVM':
@@ -752,14 +751,14 @@ class StorageRouterController(object):
             if ServiceManager.has_service(service, client=client):
                 ServiceManager.remove_service(name=service, client=client)
 
-        configuration_dir = client.config_read('ovs.core.cfgdir')
+        configuration_dir = configuration.general.configdir
         # Possible modes: ['classic', 'ganesha']
         if storagerouter.pmachine.hvtype == 'VMWARE':
-            volumedriver_mode = Configuration.get('ovs.storagedriver.vmware_mode')
+            volumedriver_mode = configuration.storagedriver.vmware
         else:
             volumedriver_mode = 'classic'
 
-        voldrv_arakoon_cluster_id = str(client.config_read('ovs.storagedriver.db.arakoon.clusterid'))
+        voldrv_arakoon_cluster_id = 'voldrv'
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
         arakoon_node_configs = []
@@ -949,10 +948,10 @@ class StorageRouterController(object):
         Returns support information regarding a given StorageRouter
         """
         return {'storagerouter_guid': storagerouter_guid,
-                'nodeid': Configuration.get('ovs.support.nid'),
-                'clusterid': Configuration.get('ovs.support.cid'),
-                'enabled': int(Configuration.get('ovs.support.enabled')) > 0,
-                'enablesupport': int(Configuration.get('ovs.support.enablesupport')) > 0}
+                'nodeid': Configuration.support.nid,
+                'clusterid': Configuration.support.cid,
+                'enabled': Configuration.support.enabled,
+                'enablesupport': Configuration.support.enablesupport}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.get_support_metadata')
@@ -986,8 +985,10 @@ class StorageRouterController(object):
         """
         for storagerouter in StorageRouterList.get_storagerouters():
             client = SSHClient(storagerouter.ip)
-            client.config_set('ovs.support.enabled', 1 if enable else 0)
-            client.config_set('ovs.support.enablesupport', 1 if enable_support else 0)
+            configuration = Configuration(client)
+            configuration.support.enabled = enable
+            configuration.support.enablesupport = enable_support
+            configuration.save()
             client = SSHClient(storagerouter.ip, username='root')
             if enable_support is False:
                 client.run('service openvpn stop')
@@ -1044,7 +1045,8 @@ class StorageRouterController(object):
         """
         Gets `number` free ports ports that are not in use and not reserved
         """
-        port_range = client.config_read('ovs.ports.storagedriver')
+        configuration = Configuration(client)
+        port_range = configuration.ports.storagedriver
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]

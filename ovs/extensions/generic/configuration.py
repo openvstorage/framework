@@ -19,15 +19,22 @@ Configuration module
 import os
 import json
 import tempfile
-from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', 'file mutex')
+class MetaConfiguration(type):
+    """
+    Configuration metaclass for static functionality
+    """
+    def __getattr__(self, item):
+        configuration = Configuration()
+        return getattr(Configuration.ENTRY_CLASS(configuration.config, []), item)
 
 
 class Configuration(object):
     """
     Manages the configuration, based on a json file
     """
+
+    __metaclass__ = MetaConfiguration
     PATH = '/opt/OpenvStorage/config/ovs.json'
 
     class Entry(object):
@@ -69,7 +76,7 @@ class Configuration(object):
             with open(Configuration.PATH, 'r') as config_file:
                 self.config = json.loads(config_file.read())
         else:
-            self.config = json.loads(client.file_read(self._filename))
+            self.config = json.loads(client.file_read(Configuration.PATH))
 
     def save(self):
         """
@@ -83,8 +90,8 @@ class Configuration(object):
             (temp_handle, temp_filename) = tempfile.mkstemp()
             with open(temp_filename, 'w') as config_file:
                 config_file.write(contents)
-            self.client.dir_ensure(self._dir, recursive=True)
-            self.client.file_upload(self._filename, temp_filename)
+            self.client.dir_create(os.path.dirname(Configuration.PATH))
+            self.client.file_upload(Configuration.PATH, temp_filename)
             os.remove(temp_filename)
 
     def __getattr__(self, item):
