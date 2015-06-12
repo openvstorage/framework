@@ -446,6 +446,20 @@
             "deletefailed": "Could not delete the user: __why__"
         }
     },
+    "updates": {
+        "buttons": {"framework": "Update Framework",
+                    "volumedriver": "Update Storage Driver"},
+        "complete": "Update finished",
+        "failed": "Update failed: __why__",
+        "framework": "Framework",
+        "name": "Name",
+        "noupdates": "No koffiekoeks for you",
+        "start_update_question": "Das zeker dadde mee uwen __what__ update",
+        "start_update": "En we zijme weg",
+        "success": "Successful",
+        "title": "Updates",
+        "volumedriver": "Storage Driver"
+    },
     "login": {
         "title": "Login",
         "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",

@@ -251,7 +251,7 @@ class StorageRouterController(object):
             vpool.login = connection_username
             vpool.password = connection_password
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
-            vpool.description = "{0} {1}".format(vpool.backend_type.code, vpool_name)
+            vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.save()
 
         if len(mountpoint_readcaches) == 0:
@@ -990,6 +990,55 @@ class StorageRouterController(object):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_update_status')
+    def get_update_status(storagerouter_ip):
+        """
+        Checks for new updates
+        """
+        # Update apt (only our ovsaptrepo.list)
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        root_client.run('apt-get update -o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
+
+        # Compare installed and candidate versions
+        package_map = {'framework': ['openvstorage-core', 'openvstorage-webapps'],
+                       'volumedriver': ['volumedriver-base', 'volumedriver-server']}
+
+        return_value = {}
+        for update_name, packages in package_map.iteritems():
+            package_info = {}
+            for package_name in packages:
+                installed = None
+                candidate = None
+                for line in check_output('apt-cache policy {0}'.format(package_name), shell=True).splitlines():
+                    line = line.strip()
+                    if line.startswith('Installed:'):
+                        installed = line.lstrip('Installed:').strip()
+                    elif line.startswith('Candidate:'):
+                        candidate = line.lstrip('Candidate:').strip()
+
+                    if installed is not None and candidate is not None:
+                        break
+
+                package_info[candidate] = installed
+
+            to_version = max(package_info)  # We're only interested to show the highest version available for any of the sub-packages
+            from_version = package_info[to_version]
+            return_value[update_name] = None if from_version == to_version else {'from': from_version,
+                                                                                 'to': to_version}
+        return return_value
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.update_framework')
+    def update_framework(storagerouter_ip):
+        """
+        Launch the update-framework method in setup.py
+        """
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        root_client.run('ovs setup update_framework')
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

@@ -61,6 +61,7 @@ define([
         self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
         self.disks            = ko.observableArray([]);
         self.disksLoaded      = ko.observable(false);
+        self.updates          = ko.observable();
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -94,6 +95,15 @@ define([
         });
 
         // Functions
+        self.getUpdates = function() {
+            return $.Deferred(function(deferred) {
+                api.get('storagerouters/' + self.guid() + '/get_update_status')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        self.updates(data);
+                    })
+            }).promise();
+        }
         self.getDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDisks)) {

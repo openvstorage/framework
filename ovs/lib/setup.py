@@ -418,6 +418,38 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
+    def update_framework():
+        def log_message(message, ssh_client=None, severity='info'):
+            if ssh_client is not None:
+                message = '{0:<15}: {1}'.format(ssh_client.ip, message)
+            if severity == 'info':
+                logger.info(message)
+            elif severity == 'warning':
+                logger.warning(message)
+            elif severity == 'error':
+                logger.error(message)
+
+        log_message('+++ Starting framework update+++')
+
+        # Store storagerouter information in file to be able to recover
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+        storage_routers = StorageRouterList.get_storagerouters()
+        sr_ip_sshclient_map = dict((storage_router.ip, SSHClient(storage_router.ip, 'root')) for storage_router in storage_routers)
+
+        for sr_ip, client in sr_ip_sshclient_map:
+            client.file_write('/opt/OpenvStorage/update', '\n'.join(sr_ip_sshclient_map.keys()))
+
+            # # Stop all services
+            log_message('Stopping services', client)
+            for service_name in ['arakoon-ovsdb', 'memcached']:
+                if PluginService.has_service(service_name, client=client):
+                    log_message('Stopped service {0}'.format(service_name), client)
+                    PluginService.disable_service(service_name, client=client)
+                    PluginService.stop_service(service_name, client=client)
+
+        log_message('+++ Finished update+++')
+
+    @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info, auto_config, disk_layout):
         """
         Prepares a node:
