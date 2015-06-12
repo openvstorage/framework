@@ -30,7 +30,7 @@ with open(config_filename, 'r') as config_file:
     contents = json.loads(config_file.read())
 contents['webapps']['django']['secret'] = secret_key
 with open(config_filename, 'w') as config_file:
-    config_file.write(contents)
+    config_file.write(json.dumps(contents, indent=4))
 
 os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage; python manage.py syncdb --noinput', shell=True)
