@@ -789,11 +789,15 @@ class DataObject(object):
             return False
 
         this_version = self._data['_version']
-        try:
-            store_version = self._persistent.get(self._key)['_version']
-        except KeyNotFoundException:
-            store_version = -1
-        return this_version != store_version
+        cached_object = self._volatile.get(self._key)
+        if cached_object is None:
+            try:
+                backend_version = self._persistent.get(self._key)['_version']
+            except KeyNotFoundException:
+                backend_version = -1
+        else:
+            backend_version = cached_object['_version']
+        return this_version != backend_version
 
     #######################
     # Properties

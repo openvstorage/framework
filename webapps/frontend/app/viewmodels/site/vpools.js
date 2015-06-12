@@ -64,7 +64,7 @@ define([
                                     return self.vPoolCache[guid];
                                 },
                                 dependencyLoader: function(item) {
-                                    item.loadBackendType();
+                                    item.loadBackendType(false);
                                 }
                             });
                         })
@@ -107,7 +107,7 @@ define([
                             });
                         });
                 }
-            }, 5000);
+            }, 60000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

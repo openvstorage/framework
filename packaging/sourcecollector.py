@@ -160,7 +160,7 @@ class SourceCollector(object):
                 tag_suffix = match_dict['suffix']
                 rev_number, rev_hash = parts[-1].split(':')
                 tag_data.append({'version': tag_version,
-                                 'build': tag_build,
+                                 'build': int(tag_build),
                                  'suffix': tag_suffix,
                                  'rev_number': rev_number,
                                  'rev_hash': rev_hash})
@@ -213,7 +213,7 @@ class SourceCollector(object):
         else:
             builds = sorted(tag['build'] for tag in tag_data if tag['version'] == version and tag['suffix'] == suffix)
             if len(builds) > 0:
-                build = int(builds[-1])
+                build = builds[-1]
                 if revision is None and increment_build is True:
                     build += 1
                 else:

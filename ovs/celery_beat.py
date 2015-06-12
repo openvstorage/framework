@@ -27,7 +27,7 @@ from celery.schedules import crontab
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('celery', name='celery beat')

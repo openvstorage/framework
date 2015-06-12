@@ -18,7 +18,7 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
-from ovs.plugin.provider.service import Service
+from ovs.extensions.services.service import ServiceManager
 from StringIO import StringIO
 
 import os
@@ -153,7 +153,7 @@ class ArakoonClusterConfig():
         client.dir_delete(self._dir)
 
 
-class ArakoonInstaller():
+class ArakoonInstaller(object):
     """
     class to dynamically install/(re)configure arakoon cluster
     """
@@ -162,26 +162,6 @@ class ArakoonInstaller():
     ARAKOON_TLOG_DIR = '{0}/tlogs/{1}'
     ARAKOON_CONFIG_DIR = '/opt/OpenvStorage/config/arakoon'
     ARAKOON_CONFIG_FILE = '/opt/OpenvStorage/config/arakoon/{0}/{0}.cfg'
-
-    ARAKOON_UPSTART_FILE = '/etc/init/ovs-arakoon-{0}.conf'
-    ARAKOON_UPSTART = """
-description "Arakoon upstart"
-
-start on (local-filesystems and started networking)
-stop on runlevel [016]
-
-kill timeout 60
-respawn
-respawn limit 10 5
-console log
-setuid ovs
-setgid ovs
-
-env PYTHONPATH=/opt/OpenvStorage
-chdir /opt/OpenvStorage
-
-exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagement.py --start --cluster {0}
-"""
 
     def __init__(self):
         """
@@ -304,39 +284,35 @@ exec /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagem
             root_client.dir_chown(abs_paths, 'ovs', 'ovs', recursive=True)
 
             # Creates services for/on all nodes in the config
-            (temp_handle, temp_filename) = tempfile.mkstemp()
-            config_file = ArakoonInstaller.ARAKOON_UPSTART_FILE.format(config.cluster_id)
-            contents = ArakoonInstaller.ARAKOON_UPSTART.format(config.cluster_id)
-            with open(temp_filename, 'wb') as f:
-                f.write(contents)
-            ovs_client.dir_create(os.path.dirname(config_file))
-            root_client.file_upload(config_file, temp_filename)
-            os.remove(temp_filename)
+            base_name = 'ovs-arakoon'
+            target_name = 'ovs-arakoon-{0}'.format(config.cluster_id)
+            ServiceManager.prepare_template(base_name, target_name, ovs_client)
+            ServiceManager.add_service(target_name, root_client, params={'CLUSTER': config.cluster_id})
 
     @staticmethod
     def start(cluster_name, client):
         """
         Starts an arakoon cluster
         """
-        if Service.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
-            Service.start_service('arakoon-{0}'.format(cluster_name), client=client)
+        if ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is False:
+            ServiceManager.start_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
     def stop(cluster_name, client):
         """
         Stops an arakoon service
         """
-        if Service.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
-                Service.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
-            Service.stop_service('arakoon-{0}'.format(cluster_name), client=client)
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True and \
+                ServiceManager.get_service_status('arakoon-{0}'.format(cluster_name), client=client) is True:
+            ServiceManager.stop_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
     def remove(cluster_name, client):
         """
         Removes an arakoon service
         """
-        if Service.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
-            Service.remove_service('arakoon-{0}'.format(cluster_name), client=client)
+        if ServiceManager.has_service('arakoon-{0}'.format(cluster_name), client=client) is True:
+            ServiceManager.remove_service('arakoon-{0}'.format(cluster_name), client=client)
 
     @staticmethod
     def deploy_to_slave(master_ip, slave_ip, cluster_name):

@@ -13,10 +13,10 @@
 // limitations under the License.
 /*global define, window, require */
 define([
-    'jquery', 'plugins/router', 'bootstrap', 'i18next',
+    'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
     'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
-], function($, router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
+], function($, router, system, activator, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
     "use strict";
     router.map(routing.mainRoutes)
           .buildNavigationModel()
@@ -117,7 +117,14 @@ define([
                                                 routing.extraRoutes.push(hook.routes);
                                                 routing.routePatches.push(hook.routePatches);
                                                 $.each(hook.dashboards, function(index, dashboard) {
-                                                    shared.hooks.dashboards.push(dashboard);
+                                                    system.acquire('viewmodels/site/' + dashboard)
+                                                        .then(function(module) {
+                                                            var moduleInstance = new module();
+                                                            shared.hooks.dashboards.push({
+                                                                module: moduleInstance,
+                                                                activator: activator.create()
+                                                            });
+                                                        });
                                                 });
                                                 moduleDeferred.resolve();
                                             });

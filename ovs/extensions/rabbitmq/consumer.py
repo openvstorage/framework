@@ -28,7 +28,7 @@ import pyinotify
 from ConfigParser import RawConfigParser
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='consumer')

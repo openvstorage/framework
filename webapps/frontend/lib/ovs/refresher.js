@@ -32,7 +32,18 @@ define(function(){
         self.stop = function() {
             if (self.refreshTimeout !== undefined) {
                 window.clearInterval(self.refreshTimeout);
+                self.refreshTimeout = undefined;
             }
+        };
+        self.setInterval = function(interval) {
+            self.interval = interval;
+            if (self.refreshTimeout !== undefined) {
+                self.stop();
+                self.start();
+            }
+        };
+        self.setLoad = function(load) {
+            self.load = load;
         };
         self.run = function() {
             self.load();

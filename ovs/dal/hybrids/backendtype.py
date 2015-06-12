@@ -17,7 +17,7 @@ BackendType module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Dynamic
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 
 
 class BackendType(DataObject):

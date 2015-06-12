@@ -22,7 +22,6 @@ from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
 from ovs.extensions.generic.system import System
 from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler
-from ovs.plugin.provider.process import Process
 
 manager = ArakoonManagementEx()
 ensurearakoonworks = EnsureArakoonWorks()
@@ -117,7 +116,8 @@ class CheckArakoonTlogMark():
         CheckArakoonTlogMark._speak(
             'Arakoon getStatusOne for Localnode {1}: {0}'.format(extensionstatus, localnode))
         if extensionstatus is True:
-            processstatus = Process.checkProcess('arakoon')
+            output = subprocess.check_output('ps aux | grep -v grep | grep arakoon || true', shell=True)
+            processstatus = 1 if 'arakoon' not in output else 0
             if processstatus:
                 CheckArakoonTlogMark._speak('Arakoon Process is not Running')
                 return False

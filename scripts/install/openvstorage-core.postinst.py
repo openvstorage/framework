@@ -98,6 +98,7 @@ if not os.path.exists(private_key_filename.format(root_ssh_folder)):
     check_output("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename.format(root_ssh_folder)), shell=True)
 # Generate keys for ovs
 check_output('su - ovs -c "mkdir -p {0}"'.format(ovs_ssh_folder), shell=True)
+check_output('su - ovs -c "chmod 755 {0}"'.format(ovs_ssh_folder), shell=True)
 check_output('su - ovs -c "ssh-keygen -t rsa -b 4096 -f {0} -N \'\'"'.format(private_key_filename.format(ovs_ssh_folder)), shell=True)
 root_authorized_keys = authorized_keys_filename.format(root_ssh_folder)
 ovs_authorized_keys = authorized_keys_filename.format(ovs_ssh_folder)
