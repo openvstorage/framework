@@ -79,9 +79,9 @@ class StorageRouterController(object):
         if arakoon_mountpoint in mountpoints:
             mountpoints.remove(arakoon_mountpoint)
         # include directories chosen during ovs setup
-        readcaches = Configuration.get('ovs.vpool_partitions.readcaches').split(',')
-        writecaches = Configuration.get('ovs.vpool_partitions.writecaches').split(',')
-        storage = Configuration.get('ovs.vpool_partitions.storage').split(',')
+        readcaches = [entry for entry in Configuration.get('ovs.vpool_partitions.readcaches').split(',') if entry]
+        writecaches = [entry for entry in Configuration.get('ovs.vpool_partitions.writecaches').split(',') if entry]
+        storage = [entry for entry in Configuration.get('ovs.vpool_partitions.storage').split(',') if entry]
         mountpoints.extend(storage)
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']

@@ -54,5 +54,10 @@ define([
         data.albaBackend(undefined);
         data.integratemgmt(false);
         data.hasMgmtCenter(false);
+        data.mgmtcenterUser(undefined);
+        data.mgmtcenterIp(undefined);
+        data.mgmtcenterType(undefined);
+        data.mgmtcenterName(undefined);
+        data.mgmtcenterLoaded(undefined);
     };
 });

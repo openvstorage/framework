@@ -58,7 +58,7 @@ define([
             vPools:           ko.observableArray([]),
             albaBackends:     ko.observableArray(),
             integratemgmt:    ko.observable(),
-            hasMgmtCenter:    ko.observable(),
+            hasMgmtCenter:    ko.observable(false),
             mgmtcenterUser:   ko.observable(),
             mgmtcenterIp:     ko.observable(),
             mgmtcenterType:   ko.observable(),
