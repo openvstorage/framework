@@ -51,11 +51,16 @@ class Interfaces(TestCase):
             hypervisors.append(current_class.__name__)
             for member in inspect.getmembers(current_class, inspect.ismethod):
                 function = member[1]
-                if function.__name__ not in overview:
-                    overview[function.__name__] = [False for _ in range(len(hypervisors) + 2)]
+                fname = function.__name__
+                if fname.startswith('_') and fname not in ['__init__']:
+                    # single underscore (private names) are ignored
+                    # __init__ method MUST be identical
+                    continue
+                if fname not in overview:
+                    overview[fname] = [False for _ in range(len(hypervisors) + 2)]
                 function_info = inspect.getargspec(function)
                 function_parameters = function_info.args[1:]
-                overview[function.__name__][hypervisors.index(current_class.__name__)] = function_parameters
+                overview[fname][hypervisors.index(current_class.__name__)] = function_parameters
         for function in overview:
             overview[function][2] = overview[function][0] == overview[function][1]
         Interfaces._print_table(overview, hypervisors + ['Equal parameters'])

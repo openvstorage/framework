@@ -51,6 +51,6 @@ class TestSystem(TestCase):
 
     def test_local_remote_check(self):
         local_result = System.get_free_ports(self.single_port_range)
-        client = SSHClient.load(self.ip)
+        client = SSHClient(self.ip)
         remote_result = System.get_free_ports(self.single_port_range, client=client)
         self.assertEqual(local_result, remote_result)

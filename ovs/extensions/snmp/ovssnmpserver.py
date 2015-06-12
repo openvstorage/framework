@@ -18,7 +18,7 @@ OVS SNMP bootstrap module
 from ovs.extensions.snmp.server import SNMPServer
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.dataobjectlist import DataObjectList
 
 import signal, time
@@ -26,13 +26,12 @@ import signal, time
 STORAGE_PREFIX = "ovs_snmp"
 NAMING_SCHEME = "1.3.6.1.4.1.29961.%s.%s.%s"
 
-
 class OVSSNMPServer():
     """
     Bootstrap the SNMP Server, hook into ovs
     """
 
-    def __init__(self):
+    def __init__(self, port):
         """
         Init
         """
@@ -41,7 +40,7 @@ class OVSSNMPServer():
         from ovs.extensions.generic.system import System
         my_storagerouter = System.get_my_storagerouter()
         self.host = my_storagerouter.ip
-        self.port = 161
+        self.port = port
 
         self.persistent = PersistentFactory.get_client()
         self.users = self.get_users()
@@ -428,6 +427,15 @@ class OVSSNMPServer():
         self.server.stop()
 
 if __name__ == '__main__':
-    server = OVSSNMPServer()
+    import argparse
+    parser = argparse.ArgumentParser(description = 'SNMP server for OVS',
+                                    formatter_class = argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('--port', dest='port', type=int,
+                        help='SNMP Port')
+
+    args = parser.parse_args()
+
+    server = OVSSNMPServer(args.port)
 
     server.start()

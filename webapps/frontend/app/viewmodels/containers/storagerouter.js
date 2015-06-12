@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk'
-], function($, ko, generic, api, shared, VDisk) {
+    'viewmodels/containers/vdisk', 'viewmodels/containers/disk'
+], function($, ko, generic, api, shared, VDisk, Disk) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -30,6 +30,7 @@ define([
         // Handles
         self.loadHandle  = undefined;
         self.loadActions = undefined;
+        self.loadDisks   = undefined;
 
         // External dependencies
         self.pMachine  = ko.observable();
@@ -58,6 +59,8 @@ define([
         self.vDisks           = ko.observableArray([]);
         self.availableActions = ko.observableArray([]);
         self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
+        self.disks            = ko.observableArray([]);
+        self.disksLoaded      = ko.observable(false);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -91,6 +94,46 @@ define([
         });
 
         // Functions
+        self.getDisks = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadDisks)) {
+                    self.loadDisks = api.get('disks', { queryparams: {
+                        storagerouterguid: self.guid(),
+                        contents: '_relations',
+                        sort: 'name'
+                    }})
+                        .done(function(data) {
+                            var guids = [], ddata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                ddata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.disks,
+                                function(guid) {
+                                    var d = new Disk(guid);
+                                    d.loading(true);
+                                    return d;
+                                }, 'guid'
+                            );
+                            $.each(self.disks(), function(index, disk) {
+                                if (ddata.hasOwnProperty(disk.guid())) {
+                                    disk.fillData(ddata[disk.guid()]);
+                                    disk.getPartitions();
+                                }
+                            });
+                            self.disks.sort(function(a, b) {
+                                return a.name() > b.name();
+                            });
+                            self.disksLoaded(true);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
         self.getAvailableActions = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadActions)) {
@@ -140,6 +183,16 @@ define([
                         var vd = new VDisk(guid);
                         vd.loading(true);
                         return vd;
+                    }, 'guid'
+                );
+            }
+            if (data.hasOwnProperty('disks_guids')) {
+                generic.crossFiller(
+                    data.disks_guids, self.disks,
+                    function(guid) {
+                        var d = new Disk(guid);
+                        d.loading(true);
+                        return d;
                     }, 'guid'
                 );
             }

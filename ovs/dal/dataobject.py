@@ -466,7 +466,7 @@ class DataObject(object):
                         if item is not None:
                             item.save(recursive=True, skip=relation.foreign_key)
 
-                # Save object we point at (e.g. machine.disks - if this is machine)
+                # Save object we point at (e.g. machine.vdisks - if this is machine)
                 relations = RelationMapper.load_foreign_relations(self.__class__)
                 if relations is not None:
                     for key, info in relations.iteritems():
@@ -630,7 +630,7 @@ class DataObject(object):
                 items = getattr(self, key)
                 if info['list'] is True:
                     if len(items) > 0:
-                        if abandon is not None and key in abandon:
+                        if abandon is not None and (key in abandon or '_all' in abandon):
                             for item in items.itersafe():
                                 setattr(item, info['key'], None)
                                 try:
@@ -642,7 +642,7 @@ class DataObject(object):
                 elif items is not None:
                     # No list (so a 1-to-1 relation), so there should be an object, or None
                     item = items  # More clear naming
-                    if abandon is not None and key in abandon:
+                    if abandon is not None and (key in abandon or '_all' in abandon):
                         setattr(item, info['key'], None)
                         try:
                             item.save()
@@ -789,11 +789,15 @@ class DataObject(object):
             return False
 
         this_version = self._data['_version']
-        try:
-            store_version = self._persistent.get(self._key)['_version']
-        except KeyNotFoundException:
-            store_version = -1
-        return this_version != store_version
+        cached_object = self._volatile.get(self._key)
+        if cached_object is None:
+            try:
+                backend_version = self._persistent.get(self._key)['_version']
+            except KeyNotFoundException:
+                backend_version = -1
+        else:
+            backend_version = cached_object['_version']
+        return this_version != backend_version
 
     #######################
     # Properties

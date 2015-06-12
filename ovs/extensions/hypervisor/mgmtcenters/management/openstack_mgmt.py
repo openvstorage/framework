@@ -18,6 +18,10 @@ This module contains OpenStack Cinder commands
 import os
 import time, datetime
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.log.logHandler import LogHandler
+
+
+logger = LogHandler('lib', name='openstack_mgmt')
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
 CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
@@ -25,31 +29,21 @@ EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/weba
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 NOVA_CONF = '/etc/nova/nova.conf'
 
-
 def file_exists(ssh_client, location):
     """
     Cuisine's file_exists uses "run" which asks for password when run as user stack
     """
-    return ssh_client.run_local('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
+    return ssh_client.run('test -e "{0}" && echo OK ; true'.format(location)).endswith('OK')
 
 
-class OpenStackCinder(object):
+class OpenStackManagement(object):
     """
     Configure/manage openstack services
     """
 
-    def __init__(self, cinder_password=None, cinder_user='admin', tenant_name='admin', controller_ip='127.0.0.1'):
-        self.client = SSHClient.load('127.0.0.1')
-        auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
-        self.cinder_client = None
-
-        if cinder_password:
-            try:
-                from cinderclient.v2 import client as cinder_client
-            except ImportError:
-                pass
-            else:
-                self.cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
+    def __init__(self, cinder_client):
+        self.client = SSHClient('127.0.0.1', username='root')
+        self.cinder_client = cinder_client
         self.is_devstack = self._is_devstack()
         self.is_openstack = self._is_openstack()
 
@@ -61,22 +55,25 @@ class OpenStackCinder(object):
     def is_cinder_installed(self):
         return self._is_cinder_installed()
 
-    def valid_credentials(self, cinder_password, cinder_user, tenant_name, controller_ip):
-        """
-        Validate credentials
-        """
-        try:
-            from cinderclient.v2 import client as cinder_client
-        except ImportError:
-            return False
-        else:
-            try:
-                auth_url = 'http://{}:35357/v2.0'.format(controller_ip)
-                cinder_client = cinder_client.Client(cinder_user, cinder_password, tenant_name, auth_url)
-                cinder_client.authenticate()
-                return True
-            except:
-                return False
+    def configure_vpool(self, vpool_name, mountpoint):
+        if (self.is_devstack or self.is_openstack) and self._is_cinder_installed():
+            self._get_driver_code()
+            self._configure_user_groups()
+            self._configure_cinder_driver(vpool_name)
+            self._create_volume_type(vpool_name)
+            self._patch_etc_init_cindervolume_conf()
+            self._apply_patches()
+            self._configure_messaging_driver()
+            self._enable_openstack_events_consumer()
+            self._restart_processes()
+
+    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
+        if self.is_devstack or self.is_openstack:
+            self._unconfigure_cinder_driver(vpool_name)
+            if remove_volume_type:
+                self._delete_volume_type(vpool_name)
+            self._unpatch_etc_init_cindervolume_conf()
+            self._restart_processes()
 
     def _get_version(self):
         """
@@ -136,18 +133,18 @@ class OpenStackCinder(object):
         elif self.is_openstack:
             local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
         if remote_version > existing_version:
-            print('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
+            logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
             if self.is_devstack:
                 self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
             elif self.is_openstack:
                 self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
         else:
-            print('Using driver {0} version {1}'.format(local_driver, existing_version))
+            logger.debug('Using driver {0} version {1}'.format(local_driver, existing_version))
         self.client.run('rm {0}'.format(temp_location))
 
     def _is_devstack(self):
         try:
-            return 'stack' in str(self.client.run_local('ps aux | grep SCREEN | grep stack | grep -v grep'))
+            return 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep'))
         except SystemExit:  # ssh client raises system exit 1
             return False
 
@@ -157,12 +154,12 @@ class OpenStackCinder(object):
     def _is_cinder_running(self):
         if self.is_devstack:
             try:
-                return 'cinder-volume' in str(self.client.run_local('ps aux | grep cinder-volume | grep -v grep'))
+                return 'cinder-volume' in str(self.client.run('ps aux | grep cinder-volume | grep -v grep'))
             except SystemExit:
                 return False
         if self.is_openstack:
             try:
-                return 'start/running' in str(self.client.run_local('service cinder-volume status'))
+                return 'start/running' in str(self.client.run('service cinder-volume status'))
             except SystemExit:
                 return False
         return False
@@ -172,26 +169,6 @@ class OpenStackCinder(object):
             return self.client.file_exists(CINDER_CONF)
         except EOFError:
             return file_exists(self.client, CINDER_CONF)
-
-    def configure_vpool(self, vpool_name, mountpoint):
-        if self.is_devstack or self.is_openstack:
-            self._get_driver_code()
-            self._configure_user_groups()
-            self._configure_cinder_driver(vpool_name)
-            self._create_volume_type(vpool_name)
-            self._patch_etc_init_cindervolume_conf()
-            self._apply_patches()
-            self._configure_messaging_driver()
-            self._enable_openstack_events_consumer()
-            self._restart_processes()
-
-    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
-        if self.is_devstack or self.is_openstack:
-            self._unconfigure_cinder_driver(vpool_name)
-            if remove_volume_type:
-                self._delete_volume_type(vpool_name)
-            self._unpatch_etc_init_cindervolume_conf()
-            self._restart_processes()
 
     def _configure_user_groups(self):
         # Vpool owned by stack / cinder
@@ -210,12 +187,12 @@ class OpenStackCinder(object):
         """
         Enable service ovs-openstack-events-consumer
         """
-        from ovs.lib.setup import SetupController
+        from ovs.extensions.services.service import ServiceManager
         service_name = 'ovs-openstack-events-consumer'
-        if not SetupController._has_service(self.client, service_name):
-            SetupController._add_service(self.client, service_name)
-            SetupController._enable_service(self.client, service_name)
-            SetupController._start_service(self.client, service_name)
+        if not ServiceManager.has_service(service_name, self.client):
+            ServiceManager.add_service(service_name, self.client)
+            ServiceManager.enable_service(service_name, self.client)
+            ServiceManager.start_service(service_name, self.client)
 
     def _configure_messaging_driver(self):
         """
@@ -380,14 +357,17 @@ if vpool_name in enabled_backends:
 
     def _start_screen_process(self, process_name, commands, screen_name='stack', logdir='/opt/stack/logs'):
         logfile = self._get_devstack_log_name(process_name)
-        self.client.run('''su stack -c 'touch {0}' '''.format(logfile))
-        self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name))
-        self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile))
-        self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name))
-        self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name))
-        self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name))
+        logger.debug(self.client.run('''su stack -c 'touch {0}' '''.format(logfile)))
+        logger.debug(self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name)))
+        logger.debug(self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile)))
+        logger.debug(self.client.run('''su stack -c 'screen -S {0} -p {1} -X log on' '''.format(screen_name, process_name)))
+        time.sleep(1)
+        logger.debug(self.client.run('rm {0}/{1}.log || true'.format(logdir, process_name)))
+        logger.debug(self.client.run('ln -sf {0} {1}/{2}.log'.format(logfile, logdir, process_name)))
         for command in commands:
-            self.client.run('''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command))
+            cmd = '''su stack -c 'screen -S {0} -p {1} -X stuff "{2}\012"' '''.format(screen_name, process_name, command)
+            logger.debug(cmd)
+            logger.debug(self.client.run(cmd))
 
     def _restart_devstack_screen(self):
         """
@@ -434,7 +414,7 @@ if vpool_name in enabled_backends:
             if EXPORT in contents:
                 return True
             contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
-            print('changing contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
+            logger.debug('changing contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
             self.client.run('cat >%s <<EOF \n%s' % (CINDER_OPENSTACK_SERVICE, contents))
 
     def _unpatch_etc_init_cindervolume_conf(self):
@@ -447,7 +427,7 @@ if vpool_name in enabled_backends:
             if not EXPORT in contents:
                 return True
             contents = contents.replace(EXPORT_, '')
-            print('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
+            logger.debug('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
             self.client.run('cat >%s <<EOF \n%s' % (CINDER_OPENSTACK_SERVICE, contents))
 
     def _restart_openstack_services(self):
@@ -459,7 +439,7 @@ if vpool_name in enabled_backends:
                 try:
                     self.client.run('service {0} restart'.format(service_name))
                 except SystemExit as sex:
-                    print('Failed to restart service {0}. {1}'.format(service_name, sex))
+                    logger.debug('Failed to restart service {0}. {1}'.format(service_name, sex))
         time.sleep(3)
         return self._is_cinder_running()
 

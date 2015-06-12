@@ -15,7 +15,7 @@
 """
 Generic persistent factory.
 """
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='persistent factory')

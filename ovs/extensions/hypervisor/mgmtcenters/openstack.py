@@ -16,6 +16,10 @@
 Module for the OpenStack Controller API
 """
 import os
+from ovs.log.logHandler import LogHandler
+from ovs.extensions.hypervisor.mgmtcenters.management.openstack_mgmt import OpenStackManagement
+
+logger = LogHandler('lib', name='openstack_mgmt')
 
 class OpenStack(object):
     """
@@ -50,7 +54,47 @@ class OpenStack(object):
                                                   project_id = 'admin',
                                                   auth_url = 'http://{}:35357/v2.0'.format(ip),
                                                   service_type="volumev2")
+        self.management = OpenStackManagement(cinder_client = self.cinder_client)
+        self.metadata = {}
+        self.config_cinder = False
         self.STATE_MAPPING = {'up' : 'RUNNING'}
+
+        logger.debug('Init complete')
+
+    def get_metadata(self, metadata, parameters):
+        """
+        Get specific config values:
+        - config_cinder (first time comes from GUI integratemgmt: True/False)
+        """
+        config_cinder = parameters.get('integratemgmt', False)
+        return {'integratemgmt': config_cinder}
+
+    def set_metadata(self, metadata):
+        """
+        Update local metadata
+        """
+        self.metadata = metadata
+        self.config_cinder = metadata.get('integratemgmt')
+        logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
+
+
+    def configure_vpool(self, vpool_name, mountpoint):
+        if self.config_cinder:
+            try:
+                return self.management.configure_vpool(vpool_name, mountpoint)
+            except (SystemExit, Exception) as ex:
+                logger.error('Management action "configure_vpool" failed %s' % ex)
+        else:
+            logger.info('Cinder configuration is disabled')
+
+    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
+        if self.config_cinder:
+            try:
+                return self.management.unconfigure_vpool(vpool_name, mountpoint, remove_volume_type)
+            except (SystemExit, Exception) as ex:
+                logger.error('Management action "unconfigure_vpool" failed %s' % ex)
+        else:
+            logger.info('Cinder configuration is disabled')
 
     def get_host_status_by_ip(self, host_ip):
         """
@@ -149,6 +193,18 @@ class OpenStack(object):
                           'dir_name': dir_name,
                           'vpool_name': connection_info['data']['vpoolname']})
         return disks
+
+    def get_vdisk_model_by_devicepath(self, devicepath):
+        """
+        Return vdisk model info (name)
+        :param devicepath: full device path
+        :return: dict
+        """
+        for volume in self.cinder_client.volumes.list():
+            info = volume.initialize_connection(None, {})
+            if info['data']['device_path'] == devicepath:
+                return {'name': volume.name,
+                        'id': volume.id}
 
     def get_vdisk_device_info(self, volumeid):
         """

@@ -19,6 +19,7 @@ import pickle
 import uuid
 import os
 import time
+from subprocess import check_output
 
 from ovs.lib.helpers.decorators import log
 from ovs.celery_run import celery
@@ -49,7 +50,7 @@ class VDiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.list_volumes')
+    @celery.task(name='ovs.vdisk.list_volumes')
     def list_volumes(vpool_guid=None):
         """
         List all known volumes on a specific vpool or on all
@@ -66,7 +67,7 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_from_voldrv')
+    @celery.task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volumename, storagedriver_id):
         """
@@ -106,7 +107,7 @@ class VDiskController(object):
                 mutex.release()
 
     @staticmethod
-    @celery.task(name='ovs.disk.resize_from_voldrv')
+    @celery.task(name='ovs.vdisk.resize_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def resize_from_voldrv(volumename, volumesize, volumepath, storagedriver_id):
         """
@@ -136,10 +137,11 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
+        VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
 
     @staticmethod
-    @celery.task(name='ovs.disk.rename_from_voldrv')
+    @celery.task(name='ovs.vdisk.rename_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagedriver_id):
         """
@@ -163,7 +165,7 @@ class VDiskController(object):
             disk.save()
 
     @staticmethod
-    @celery.task(name='ovs.disk.clone')
+    @celery.task(name='ovs.vdisk.clone')
     def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
         """
         Clone a disk
@@ -213,7 +215,7 @@ class VDiskController(object):
                 'backingdevice': location}
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_snapshot')
+    @celery.task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(diskguid, metadata, snapshotid=None):
         """
         Create a disk snapshot
@@ -235,7 +237,7 @@ class VDiskController(object):
         return snapshotid
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_snapshot')
+    @celery.task(name='ovs.vdisk.delete_snapshot')
     def delete_snapshot(diskguid, snapshotid):
         """
         Delete a disk snapshot
@@ -253,7 +255,7 @@ class VDiskController(object):
         disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
-    @celery.task(name='ovs.disk.set_as_template')
+    @celery.task(name='ovs.vdisk.set_as_template')
     def set_as_template(diskguid):
         """
         Set a disk as template
@@ -264,7 +266,7 @@ class VDiskController(object):
         disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
 
     @staticmethod
-    @celery.task(name='ovs.disk.rollback')
+    @celery.task(name='ovs.vdisk.rollback')
     def rollback(diskguid, timestamp):
         """
         Rolls back a disk based on a given disk snapshot timestamp
@@ -279,7 +281,7 @@ class VDiskController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_from_template')
+    @celery.task(name='ovs.vdisk.create_from_template')
     def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagedriver_guid=None):
         """
         Create a disk from a template
@@ -349,7 +351,7 @@ class VDiskController(object):
                 'backingdevice': disk_path}
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_volume')
+    @celery.task(name='ovs.vdisk.create_volume')
     def create_volume(location, size):
         """
         Create a volume using filesystem calls
@@ -363,17 +365,15 @@ class VDiskController(object):
         """
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
-        client = SSHClient.load('127.0.0.1')
-        try:
-            output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
-        except SystemExit as ex:
-            raise RuntimeError(str(ex))
+
+        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_volume')
+    @celery.task(name='ovs.vdisk.delete_volume')
     def delete_volume(location):
         """
         Create a volume using filesystem calls
@@ -387,9 +387,9 @@ class VDiskController(object):
         if not os.path.exists(location):
             logger.error('File already deleted at %s' % location)
             return
-        client = SSHClient.load('127.0.0.1')
-        output = client.run_local('rm -f "{0}"'.format(location))
+        output = check_output('rm "{0}"'.format(location), shell=True).strip()
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        logger.info(output)
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
         if output == '':
@@ -397,7 +397,7 @@ class VDiskController(object):
         raise RuntimeError(output)
 
     @staticmethod
-    @celery.task(name='ovs.disk.extend_volume')
+    @celery.task(name='ovs.vdisk.extend_volume')
     def extend_volume(location, size):
         """
         Extend a volume using filesystem calls
@@ -411,8 +411,9 @@ class VDiskController(object):
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        client = SSHClient.load('127.0.0.1')
-        print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
+        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
+        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        logger.info(output)
 
     @staticmethod
     @celery.task(name='ovs.vdisk.update_vdisk_name')
@@ -446,3 +447,37 @@ class VDiskController(object):
             vdisk.save()
         finally:
             mutex.release()
+
+    @staticmethod
+    def sync_with_mgmtcenter(disk, pmachine, storagedriver):
+        """
+        Update disk info using management center (if available)
+        @param disk: vDisk hybrid (vdisk to be updated)
+        @param pmachine: pmachine hybrid (pmachine running the storagedriver)
+        @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)
+        """
+        if pmachine.mgmtcenter is None:
+            disk.name = disk.devicename.split('.')[0]
+            disk.save()
+            logger.info('No management center for pmachine {0}'.format(pmachine.name))
+            return
+        logger.debug('Sync vdisk {0} with management center {1} on storagedriver {2}'.format(disk.name, pmachine.mgmtcenter.name, storagedriver.name))
+        mgmt = Factory.get_mgmtcenter(mgmt_center = pmachine.mgmtcenter)
+        volumepath = disk.devicename
+        mountpoint = storagedriver.mountpoint
+        devicepath = '{0}/{1}'.format(mountpoint, volumepath)
+        try:
+            disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
+        except Exception as ex:
+            logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
+        if disk_mgmt_center_info is None:
+            logger.info('No information retrieved for vdisk {0} using management center'.format(disk.name))
+            disk_name = disk.devicename.split('.')[0]
+        else:
+            disk_name = disk_mgmt_center_info.get('name')
+
+        if disk_name:
+            disk.name = disk_name
+            disk.save()
+
+

@@ -24,7 +24,7 @@ from ovs.celery_run import celery
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.support.agent import SupportAgent
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -122,7 +122,7 @@ class LicenseController(object):
             for lic in LicenseList.get_licenses():
                 license_contents.append(lic.hash)
             for storagerouter in StorageRouterList.get_storagerouters():
-                client = SSHClient.load(storagerouter.ip)
+                client = SSHClient(storagerouter.ip)
                 client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         except Exception, ex:
             logger.exception('Error applying license: {0}'.format(ex))
@@ -144,7 +144,7 @@ class LicenseController(object):
                 for lic in LicenseList.get_licenses():
                     license_contents.append(lic.hash)
                 for storagerouter in StorageRouterList.get_storagerouters():
-                    client = SSHClient.load(storagerouter.ip)
+                    client = SSHClient(storagerouter.ip)
                     client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
             return result
         return None
@@ -156,7 +156,7 @@ class LicenseController(object):
         license_contents = []
         for lic in LicenseList.get_licenses():
             license_contents.append(lic.hash)
-        client = SSHClient.load(ip)
+        client = SSHClient(ip)
         client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod

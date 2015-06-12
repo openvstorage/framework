@@ -131,7 +131,7 @@ class Sdk(object):
             ).obj_identifier
             # pylint: enable=line-too-long
         else:
-            self._esxHost = None
+            self._esxHost = self._get_vcenter_hosts()[0].obj_identifier # TODO?
 
     @authenticated(force=True)
     def _get_vcenter_hosts(self):
@@ -157,6 +157,9 @@ class Sdk(object):
                                                                  'path': 'host'}}}},
             properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
         )
+        ## HACK : if there's a single host, datacenter_info is ObjectContent instead of list(ObjectContent)
+        if hasattr(datacenter_info, 'name'):
+            return [datacenter_info]
         return datacenter_info
 
     def get_host_status_by_ip(self, host_ip):
@@ -292,7 +295,7 @@ class Sdk(object):
         """
         Checks whether a vm with a given name or key exists on a given esxi host
         """
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
         if name is not None or key is not None:
             try:
                 if name is not None:
@@ -326,6 +329,84 @@ class Sdk(object):
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
         vm = self._get_object(vmid)
         return vm
+
+    @authenticated()
+    def get_vm_device_info(self, key):
+        """
+        Return a vm config, based on its key
+        """
+        vm = self.get_vm(key)
+        filename = vm.config.files.vmPathName
+        regex = '\[([^\]]+)\]\s(.+)'
+        match = re.search(regex, filename)
+        disks = self._get_vmachine_vdisks(vm)
+        return {'file_name': match.group(2),
+                'host_name': vm.name,
+                'vpool_name': match.group(1),
+                'disks': disks}
+
+    @authenticated()
+    def get_all_vms(self):
+        """
+        Get all vMachines on all esxhosts registered to this vCenter
+        :return: list
+        """
+        if not self._is_vcenter:
+            raise RuntimeError('Must be connected to a vCenter Server API.')
+        hosts =  self._get_vcenter_hosts()
+        guests = []
+        for host in hosts:
+            esxhost = self._validate_host(host.obj_identifier)
+            vms = self._get_object(esxhost,
+                               prop_type='VirtualMachine',
+                               traversal={'name': 'HostSystemTraversalSpec',
+                                          'type': 'HostSystem',
+                                          'path': 'vm'},
+                               properties=['name', 'config'])
+            for vm in vms:
+                guests.append({'id': vm.obj_identifier.value,
+                                'name': vm.name,
+                                'instance_name': vm.name})
+        return guests
+
+
+    def _get_vmachine_vdisks(self, vm_object):
+        disks = []
+        regex = '\[([^\]]+)\]\s(.+)'
+        disk_type = type(self._client.factory.create('ns0:VirtualDisk'))
+        for device in vm_object.config.hardware.device:
+            if isinstance(device, disk_type):
+                backingfile = device.backing.fileName
+                match = re.search(regex, backingfile)
+                if match:
+                    disks.append({'filename': match.group(2),
+                                  'datastore': match.group(1),
+                                  'name': device.deviceInfo.label})
+        return disks
+
+    @authenticated()
+    def get_all_vdisks(self):
+        """
+        Get all vDisks on all esxhosts registered to this vCenter
+        # similar to cinder.volumes.list()
+        :return: list
+        """
+        if not self._is_vcenter:
+            raise RuntimeError('Must be connected to a vCenter Server API.')
+        hosts =  self._get_vcenter_hosts()
+
+        disks = []
+        for host in hosts:
+            esxhost = self._validate_host(host.obj_identifier)
+            vms = self._get_object(esxhost,
+                               prop_type='VirtualMachine',
+                               traversal={'name': 'HostSystemTraversalSpec',
+                                          'type': 'HostSystem',
+                                          'path': 'vm'},
+                               properties=['name', 'config'])
+            for vm in vms:
+                disks.extend(self._get_vmachine_vdisks(vm))
+        return disks
 
     @authenticated()
     def get_vms(self, ip, mountpoint):
@@ -617,14 +698,6 @@ class Sdk(object):
         return task
 
     @authenticated()
-    def get_vm(self, key):
-        vmid = self.exists(key=key)
-        if vmid is None:
-            raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
-        vm = self._get_object(vmid)
-        return vm
-
-    @authenticated()
     def get_datastore(self, ip, mountpoint):
         """
         @param ip : hypervisor ip to query for datastore presence
@@ -634,7 +707,7 @@ class Sdk(object):
         """
 
         datastore = None
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
         host_system = self._get_object(esxhost, properties=['datastore'])
         for store in host_system.datastore[0]:
             store = self._get_object(store)
@@ -663,7 +736,7 @@ class Sdk(object):
     def make_agnostic_config(self, vm_object):
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
 
         config = {'name': vm_object.config.name,
                   'id': vm_object.obj_identifier.value,
@@ -800,7 +873,7 @@ class Sdk(object):
         filename = filename.replace('-flat.vmdk', '.vmdk')  # Support both -flat.vmdk and .vmdk
         if not filename.endswith('.vmdk') and not filename.endswith('.vmx'):
             raise ValueError('Unexpected filetype')
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
 
         datastore = self.get_datastore(ip, mountpoint)
         if not datastore:

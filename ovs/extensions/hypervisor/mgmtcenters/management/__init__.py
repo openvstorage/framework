@@ -13,6 +13,5 @@
 # limitations under the License.
 
 """
-This module contains all injected logic
+This package contains the management centers extensions for managing the system
 """
-

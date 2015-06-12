@@ -18,7 +18,7 @@ requirejs.config({
         'durandal'   : '../lib/durandal/js',
         'plugins'    : '../lib/durandal/js/plugins',
         'transitions': '../lib/durandal/js/transitions',
-        'knockout'   : '../lib/knockout/knockout-3.0.0',
+        'knockout'   : '../lib/knockout/knockout-3.3.0',
         'bootstrap'  : '../lib/bootstrap/js/bootstrap',
         'jquery'     : '../lib/jquery/jquery-1.9.1',
         'jqp'        : '../lib/jquery-plugins/js',
@@ -80,7 +80,7 @@ define([
         });
         app.configurePlugins({
             widget: {
-                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown']
+                kinds: ['pager', 'lazyloader', 'lazylist', 'footer', 'dropdown', 'disk']
             }
         });
         app.start().then(function() {

@@ -41,7 +41,8 @@ define([
                         connection_timeout: self.data.timeout(),
                         connection_username: self.data.accesskey(),
                         connection_password: self.data.secretkey(),
-                        connection_backend: (self.data.albaBackend() !== undefined ? self.data.albaBackend().linked_guid : undefined),
+                        connection_backend: {'backend': (self.data.backend() === 'alba' ? self.data.albaBackend().guid : undefined),
+                                             'metadata': (self.data.backend() === 'alba' ? self.data.albaPreset().name : undefined)},
                         mountpoint_temp: self.data.mtptTemp(),
                         mountpoint_bfs: self.data.mtptBFS(),
                         mountpoint_md: self.data.mtptMD(),
@@ -49,11 +50,7 @@ define([
                         mountpoint_writecaches: self.data.mtptWriteCaches(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        config_cinder: self.data.configCinder(),
-                        cinder_user: self.data.cinderUser(),
-                        cinder_pass: self.data.cinderPassword(),
-                        cinder_tenant: self.data.cinderTenant(),
-                        cinder_controller: self.data.cinderCtrlIP()
+                        integratemgmt: self.data.integratemgmt()
                     }
                 };
                 api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })

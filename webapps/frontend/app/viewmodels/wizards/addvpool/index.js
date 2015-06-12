@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_cinder', './confirm'
-], function($, generic, build, data, GatherVPool, GatherMountPoints, GatherCinder, Confirm) {
+    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_mgmtcenter', './confirm'
+], function($, generic, build, data, GatherVPool, GatherMountPoints, IntegrateMgmt, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -24,7 +24,7 @@ define([
         // Setup
         self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new GatherVPool(), new GatherMountPoints(), new GatherCinder(), new Confirm()]);
+        self.steps([new GatherVPool(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
         self.step(0);
         self.activateStep();
 
@@ -52,11 +52,12 @@ define([
         data.ipAddresses([]);
         data.albaBackends(undefined);
         data.albaBackend(undefined);
-        data.cinderUser('admin');
-        data.cinderPassword('');
-        data.cinderTenant('admin');
-        data.cinderCtrlIP('127.0.0.1');
-        data.configCinder(false);
-        data.hasCinder(false);
+        data.integratemgmt(false);
+        data.hasMgmtCenter(false);
+        data.mgmtcenterUser(undefined);
+        data.mgmtcenterIp(undefined);
+        data.mgmtcenterType(undefined);
+        data.mgmtcenterName(undefined);
+        data.mgmtcenterLoaded(undefined);
     };
 });

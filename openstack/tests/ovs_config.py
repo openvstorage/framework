@@ -22,10 +22,6 @@ with open('/etc/hostname') as hostname_file:
     hostname = hostname_file.read().strip()
 IP = [storagerouter for storagerouter in StorageRouterList.get_storagerouters() if storagerouter.name == hostname][0].ip
 
-#fix issue with add_vpool becoming interactive
-import fabric.auth
-fabric.auth.set_password('root', IP, 22, 'rooter') #needs root password in plaintext
-
 PROCESS='screen'  # on openstack it is service
 SHELL_DEBUG = True # enable shell client debug
 

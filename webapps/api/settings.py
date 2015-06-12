@@ -16,7 +16,7 @@
 Django settings module
 """
 import os
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 
 DEBUG = False
 TEMPLATE_DEBUG = DEBUG

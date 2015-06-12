@@ -41,6 +41,9 @@ define([
         self.viewportKeys    = ko.observableArray([]);
         self.viewportItems   = ko.observableArray([]);
         self.pageLoading     = ko.observable(false);
+        self.sortable        = ko.observable(false);
+        self.preloading      = ko.observable(false);
+        self.sorting         = ko.observable({sequence: [], directions: {}});
 
         // Handles
         self.preloadHandle = undefined;
@@ -154,6 +157,16 @@ define([
         self.loading = ko.computed(function() {
             return self.viewportItems().length === 0 && self.pageLoading();
         });
+        self.sortingKey = ko.computed(function() {
+            if (self.sortable() === false || self.sorting().sequence.length === 0) {
+                return undefined;
+            }
+            var sorting = self.sorting(), result = [];
+            $.each(sorting.sequence, function(index, item) {
+                result.push((sorting.directions[item] ? '' : '-') + item);
+            });
+            return result.join(',');
+        });
 
         // Functions
         self.step = function(next) {
@@ -189,7 +202,7 @@ define([
         };
         self.load = function(page, preload) {
             if (self.external()) {
-                self.loadData(page);
+                self.loadData(page, self.sortingKey());
             } else {
                 if (self.hasLoad(preload, !preload)) {
                     // If there's a preload, it shouldn't abort. If it's not a preload, it should abort.
@@ -206,7 +219,7 @@ define([
                     self._pageFirst(self.viewportCache[page].pageFirst);
                     self._pageLast(self.viewportCache[page].pageLast);
                 }
-                var promise = self.loadData(page)
+                var promise = self.loadData(page, self.sortingKey())
                     .then(function (dataset) {
                         if (dataset !== undefined && (preload || page === self.current())) {
                             var keys = [], idata = {};
@@ -251,6 +264,39 @@ define([
                 }
             }
         };
+        self.sort = function(data, event) {
+            if (self.sortable() === false) {
+                return;
+            }
+            var key = data.key, value, sorting = self.sorting();
+            if (event.ctrlKey) {
+                if (sorting.directions.hasOwnProperty(key)) {
+                    value = sorting.directions[key];
+                    if (value === true) {
+                        sorting.directions[key] = false;
+                    } else {
+                        delete sorting.directions[key];
+                        generic.removeElement(sorting.sequence, key);
+                    }
+                } else {
+                    sorting.sequence.push(key);
+                    sorting.directions[key] = true;
+                }
+            } else {
+                if (sorting.directions.hasOwnProperty(key)) {
+                    value = sorting.directions[key];
+                    sorting = {sequence: [key],
+                               directions: {}};
+                    sorting.directions[key] = !value;
+                } else {
+                    sorting = {sequence: [key],
+                               directions: {}};
+                    sorting.directions[key] = true;
+                }
+            }
+            self.sorting(sorting);
+            self.load(self.current(), false);
+        };
 
         // Durandal
         self.activate = function(settings) {
@@ -271,7 +317,25 @@ define([
             self.key = generic.tryGet(settings, 'key', 'guid');
             self.settings(settings);
             self.headers(settings.headers);
+            self.preloading(generic.tryGet(settings, 'preloading', false));
             self.controls(generic.tryGet(settings, 'controls', true));
+            self.sortable(generic.tryGet(settings, 'sortable', false));
+            if (self.sortable() === true) {
+                var sorting = {sequence: [],
+                               directions: {}}, key;
+                if (settings.hasOwnProperty('sorting')) {
+                    $.each(settings.sorting.split(','), function(index, item) {
+                        key = item[0] === '-' ? item.substring(1) : item;
+                        sorting.sequence.push(key);
+                        sorting.directions[key] = item[0] !== '-';
+                    });
+                } else {
+                    key = self.headers()[0].key;
+                    sorting.sequence = [key];
+                    sorting.directions[key] = true;
+                }
+                self.sorting(sorting);
+            }
 
             if (settings.hasOwnProperty('trigger')) {
                 settings.trigger.subscribe(function() { self.load(self.current(), false); });
@@ -282,15 +346,17 @@ define([
                 if (self.hasLoad(true, false)) {
                     return;
                 }
-                self.preloadPage += 1;
-                if (self.preloadPage === self.current()) {
+                if (self.preloading()) {
                     self.preloadPage += 1;
-                }
-                if (self.preloadPage > self.lastPage()) {
-                    self.preloadPage = 1;
-                }
-                if (self.preloadPage !== self.current()) {
-                    self.load(self.preloadPage, true);
+                    if (self.preloadPage === self.current()) {
+                        self.preloadPage += 1;
+                    }
+                    if (self.preloadPage > self.lastPage()) {
+                        self.preloadPage = 1;
+                    }
+                    if (self.preloadPage !== self.current()) {
+                        self.load(self.preloadPage, true);
+                    }
                 }
             }, self.refresh);
             self.refresher.run();

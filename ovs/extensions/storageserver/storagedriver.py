@@ -21,7 +21,7 @@ import json
 import copy
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='storagedriver')
@@ -100,7 +100,8 @@ class MetadataServerClient(object):
             try:
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
-            except RuntimeError:
+            except RuntimeError as ex:
+                logger.error('Error loading MDSClient: {0}'.format(ex))
                 return None
         return mdsclient_service_cache[key]
 
@@ -115,22 +116,26 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: 3.6
-        # hg revision: e7b3ffed419a
-        # buildTime: Wed Apr  1 17:14:31 UTC 2015
+        # hg branch: 3.6-dev
+        # hg revision: custom
+        # buildTime: custom
         'metadataserver': {
             'metadata_server': {
-                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', 'mds_port', ],
-                'mandatory': ['mds_scratch_dir', 'mds_rocksdb_path', ]
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
+                'mandatory': []
             },
             'backend_connection_manager': {
-                'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', ],
+                'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
                 'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
             },
         },
         'storagedriver': {
+            'metadata_server': {
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
+                'mandatory': []
+            },
             'backend_connection_manager': {
-                'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', ],
+                'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
                 'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
             },
             'content_addressed_cache': {
@@ -245,7 +250,7 @@ class StorageDriverConfiguration(object):
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
         else:
-            client.run('mkdir -p {0}'.format(self.base_path))
+            client.dir_create(self.base_path)
             client.file_write(self.path, contents)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:

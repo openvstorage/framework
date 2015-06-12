@@ -447,23 +447,37 @@ class VMachineController(object):
     @log('VOLUMEDRIVER_TASK')
     def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
         """
-        Updates a given vmachine with data retreived from a given pmachine
+        Updates a given vmachine with data retrieved from a given pmachine
         """
         try:
             vmachine = VMachine(vmachineguid)
-            if vmachine.pmachine.mgmtcenter and storagedriver_id is not None and vmachine.devicename is not None:
+        except Exception as ex:
+            logger.info('Cannot get VMachine object: {0}'.format(str(ex)))
+            raise
+
+        vm_object = None
+        if vmachine.pmachine.mgmtcenter and storagedriver_id is not None and vmachine.devicename is not None:
+            try:
                 mgmt_center = Factory.get_mgmtcenter(vmachine.pmachine)
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 logger.info('Syncing vMachine (name {}) with Management center {}'.format(vmachine.name, vmachine.pmachine.mgmtcenter.name))
                 vm_object = mgmt_center.get_vm_agnostic_object(devicename=vmachine.devicename,
                                                                ip=storagedriver.storage_ip,
                                                                mountpoint=storagedriver.mountpoint)
-            elif storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
+            except Exception as ex:
+                logger.info('Error while fetching vMachine info from management center: {0}'.format(str(ex)))
+
+        if vm_object is None and storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
+            try:
                 # Only the vmachine was received, so base the sync on hypervisorid and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
                 logger.info('Syncing vMachine (name {})'.format(vmachine.name))
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisor_id)
-            elif storagedriver_id is not None and vmachine.devicename is not None:
+            except Exception as ex:
+                logger.info('Error while fetching vMachine info from hypervisor: {0}'.format(str(ex)))
+
+        if vm_object is None and storagedriver_id is not None and vmachine.devicename is not None:
+            try:
                 # Storage Driver id was given, using the devicename instead (to allow hypervisorid updates
                 # which can be caused by re-adding a vm to the inventory)
                 pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
@@ -480,20 +494,16 @@ class VMachineController(object):
                 vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
                                                                    ip=storagedriver.storage_ip,
                                                                    mountpoint=storagedriver.mountpoint)
-            else:
-                message = 'Not enough information to sync vmachine'
-                logger.info('Error: {0}'.format(message))
-                raise RuntimeError(message)
-        except Exception as ex:
-            logger.info('Error while fetching vMachine info: {0}'.format(str(ex)))
-            raise
+            except Exception as ex:
+                logger.info('Error while fetching vMachine info from hypervisor using devicename: {0}'.format(str(ex)))
 
         if vm_object is None:
-            message = 'Could not retreive hypervisor vmachine object'
+            message = 'Not enough information to sync vmachine'
             logger.info('Error: {0}'.format(message))
             raise RuntimeError(message)
-        else:
-            VMachineController.update_vmachine_config(vmachine, vm_object)
+
+
+        VMachineController.update_vmachine_config(vmachine, vm_object)
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')

@@ -32,7 +32,7 @@ define([
                 // The observed data is not set, or an empyt list
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
-        }).extend({ throttle: 50 });
+        }).extend({ rateLimit: 50 });
         self.cacheHits = ko.computed(function() {
             var total = 0;
             if (self.hasData()) {

@@ -22,12 +22,15 @@ from cinderclient.v1 import client as cinder_client
 from glanceclient.v1 import client as glance_client
 from keystoneclient.v2_0 import client as keystone_client
 from cinderclient import exceptions as cinder_client_exceptions
+from oslo_config import cfg
 
 #OVS
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.lib.storagerouter import StorageRouterController
+from ovs.extensions.generic.system import System
+from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 
 #CONFIG
 from ovs_config import *
@@ -37,6 +40,19 @@ class OVSPluginTestException(Exception): pass
 class WaitTimedOut(OVSPluginTestException): pass
 class VolumeInErrorState(OVSPluginTestException): pass
 class TooManyAttempts(OVSPluginTestException): pass
+
+
+test_opts = [
+    cfg.BoolOpt('backup_enable_progress_timer',
+                default=False,
+                help=''),
+    cfg.BoolOpt('backup_swift_enable_progress_timer',
+                default=False,
+                help='')
+]
+
+CONF = cfg.CONF
+CONF.register_opts(test_opts)
 
 class OVSPluginTestCase(test.TestCase):
     """
@@ -171,6 +187,18 @@ class OVSPluginTestCase(test.TestCase):
         This is not actually a test of "Add Vpool to OVS",
         so any failure here will be reported as a setUp error and no tests will run
         """
+        pmachine = System.get_my_storagerouter().pmachine
+        mgmt_center = MgmtCenter(data={'name':'Openstack',
+                                       'description':'test',
+                                       'username':CINDER_USER,
+                                       'password':CINDER_PASS,
+                                       'ip':CINDER_CONTROLLER,
+                                       'port':80,
+                                       'type':'OPENSTACK',
+                                       'metadata':{'integratemgmt':True}})
+        mgmt_center.save()
+        pmachine.mgmtcenter = mgmt_center
+        pmachine.save()
         self._debug('Creating vpool')
         backend_type = 'local'
         fields = ['storage_ip', 'vrouter_port']
@@ -186,11 +214,12 @@ class OVSPluginTestCase(test.TestCase):
                       'mountpoint_foc': VPOOL_FOC,
                       'storage_ip': '127.0.0.1', #KVM
                       'vrouter_port': VPOOL_PORT,
-                      'cinder_pass': CINDER_PASS,
-                      'cinder_user': CINDER_USER,
-                      'cinder_tenant': TENANT_NAME,
-                      'cinder_controller': CINDER_CONTROLLER,
-                      'config_cinder': True
+                      'integrate_vpool': True,
+                      'connection_host': IP,
+                      'connection_port': VPOOL_PORT,
+                      'connection_username': '',
+                      'connection_password': '',
+                      'connection_backend': {},
                       }
         StorageRouterController.add_vpool(parameters)
         attempt = 0

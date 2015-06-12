@@ -38,6 +38,11 @@
                 "stopped": "Stopped",
                 "failure": "Failure",
                 "unknown": "Unknown"
+            },
+            "disk": {
+                "ok": "OK",
+                "missing": "Missing",
+                "failure": "Failure"
             }
         },
         "messages": {
@@ -69,6 +74,12 @@
         "granttypes": {
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"
+        },
+        "caches": {
+            "read": "Read cache",
+            "write": "Write cache",
+            "foc": "Failover cache",
+            "fragment": "Fragment cache"
         },
         "username": "Username",
         "password": "Password",
@@ -191,7 +202,16 @@
         "metadata": "Metadata",
         "component": "Component",
         "licensing": "Licensing",
-        "licenselimited": "Unavailable due to License"
+        "licenselimited": "Unavailable due to License",
+        "mountpoint": "Mountpoint",
+        "filesystem": "Filesystem",
+        "rawdisk": "Raw disk",
+        "rawpartition": "Raw partition",
+        "spaceleft": "__amount__ left",
+        "sizeamount": "Size: __amount__",
+        "partitionusage": "Detailed partition usage:",
+        "sizeunspecified": "Size up to __amount__",
+        "tempspace": "Temporary files"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -214,7 +234,10 @@
             },
             "storageroutervpoollink": "vPools served by this Storage Router",
             "updateserving": "Save changes",
-            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers"
+            "localvpool": "This is a local vPool which can not be shared across multiple Storage Routers",
+            "disks": {
+                "title": "Physical disks"
+            }
         }
     },
     "vpools" : {
@@ -541,6 +564,7 @@
                 "clientid": "Client ID",
                 "clientsecret": "Client secret",
                 "albabackend": "Backend",
+                "albapreset": "Preset",
                 "nobackends": "No backends found.",
                 "choosebackend": "Choose one of the available backends",
                 "invalidalbainfo": "The entered connection info and credentials are invalid",
@@ -573,16 +597,11 @@
                 "writecachename": "Write Cache",
                 "writecaches": "Write Caches:"
             },
-            "gathercinder": {
-                "basicinfo": "Configure Cinder credentials (Keystone authentication)",
-                "cinderuser": "User name:",
-                "cinderpassword": "Password:",
-                "cindertenant": "Tenant name:",
-                "cinderctrlip": "Keystone public IP:",
-                "configcinder": "Configure this vpool with Cinder",
-                "nocinder": "No Cinder process detected, press next to continue",
-                "detecting": "Detecting Cinder process, please wait ...",
-                "invalidcinderinfo": "Could not connect to specified Keystone server or wrong credentials"
+            "integratemgmtcenter": {
+                "integratemgmt": "Automatically configure the vPool on the Hypervisor.",
+                "mgmtcenter": "is managed by Hypervisor Management Center:",
+                "nomgmtcenter": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions.",
+                "loading": "Loading information about available Management Centers."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
@@ -781,6 +800,7 @@
         "moveaway": "&#xf074;",
         "information": "&#xf05a;",
         "vdisks": "&#xf0a0;",
+        "disks": "&#xf0a0;",
         "add": "&#xf067;",
         "vmachines": "&#xf0e8;",
         "storageroutervpoollink": "&#xf07c;",
@@ -793,6 +813,10 @@
         "password": "&#xf084;",
         "vpools": "&#xf0c2;",
         "load": "&#xf021;",
-        "licensing": "&#xf132;"
+        "licensing": "&#xf132;",
+        "up": "&#xf106;",
+        "down": "&#xf107;",
+        "expand": "&#xf196;",
+        "collapse": "&#xf147;"
     }
 }

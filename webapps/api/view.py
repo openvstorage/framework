@@ -16,14 +16,17 @@
 Metadata views
 """
 
+import json
 import time
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.system import System
+from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.conf import settings
-from oauth2.decorators import json_response, limit
+from oauth2.decorators import json_response, limit, authenticated
+from backend.decorators import required_roles, load
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
@@ -62,7 +65,7 @@ class MetadataView(View):
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
             # - Generic plugins, as added to the configuration file(s)
-            config = System.read_config('/opt/OpenvStorage/config/ovs.cfg')
+            config = System.read_config(System.OVS_CONFIG)
             if config.has_section('plugins'):
                 for option in config.options('plugins'):
                     if option.startswith('generic.'):
@@ -113,3 +116,49 @@ class MetadataView(View):
         Pass through method to add the CSRF exempt
         """
         return super(MetadataView, self).dispatch(request, *args, **kwargs)
+
+
+def relay(*args, **kwargs):
+    """
+    Relays any call to another node.
+    Assume this example:
+    * A user wants to execute a HTTP GET on /api/storagerouters/
+    ** /api/<call>
+    * He'll have to execute a HTTP GET on /api/relay/<call>
+    ** This will translate to /apt/relay/storagerouters/
+    Parameters:
+    * Mandatory: ip, port, client_id, client_secret
+    * All other parameters will be passed through to the speicified node
+    """
+
+    @authenticated()
+    @required_roles(['read'])
+    @load()
+    def _relay(_, ip, port, client_id, client_secret, version, request):
+        path = '/{0}'.format(request.path.replace('/api/relay/', ''))
+        method = request.META['REQUEST_METHOD'].lower()
+        client = OVSClient(ip, port, credentials=(client_id, client_secret), version=version, raw_response=True)
+        if not hasattr(client, method):
+            return HttpResponseBadRequest, 'Method not available in relay'
+        client_kwargs = {'params': request.GET}
+        if method != 'get':
+            client_kwargs['data'] = request.POST
+        call_response = getattr(client, method)(path, **client_kwargs)
+        response = HttpResponse(call_response.text,
+                                content_type='application/json',
+                                status=call_response.status_code)
+        for header, value in call_response.headers.iteritems():
+            response[header] = value
+        return response
+
+    try:
+        return _relay(*args, **kwargs)
+    except Exception as ex:
+        message = str(ex)
+        status_code = 400
+        if hasattr(ex, 'detail'):
+            message = ex.detail
+        if hasattr(ex, 'status_code'):
+            status_code = ex.status_code
+        logger.exception('Error relaying call: {0}'.format(message))
+        return HttpResponse(json.dumps({'error': message}), content_type='application/json', status=status_code)

@@ -36,7 +36,7 @@ class VPool(DataObject):
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
     __dynamics = [Dynamic('status',      str, 10),
-                  Dynamic('statistics',  dict, 0),
+                  Dynamic('statistics',  dict, 4, locked=True),
                   Dynamic('stored_data', int, 60)]
 
     def _status(self):
@@ -46,20 +46,21 @@ class VPool(DataObject):
         _ = self
         return None
 
-    def _statistics(self):
+    def _statistics(self, dynamic):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        vdiskstatsdict = {}
+        from ovs.dal.hybrids.vdisk import VDisk
+        statistics = {}
         for key in StorageDriverClient.stat_keys:
-            vdiskstatsdict[key] = 0
-            vdiskstatsdict['{0}_ps'.format(key)] = 0
+            statistics[key] = 0
+            statistics['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
-            for key, value in vdisk.statistics.iteritems():
-                if key != 'timestamp':
-                    vdiskstatsdict[key] += value
-        vdiskstatsdict['timestamp'] = time.time()
-        return vdiskstatsdict
+            for key, value in vdisk.fetch_statistics().iteritems():
+                statistics[key] += value
+        statistics['timestamp'] = time.time()
+        VDisk.calculate_delta(self._key, dynamic, statistics)
+        return statistics
 
     def _stored_data(self):
         """
