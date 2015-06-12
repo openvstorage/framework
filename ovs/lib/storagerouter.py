@@ -817,7 +817,7 @@ class StorageRouterController(object):
             files_to_remove.append('{0}/storagedriver/storagedriver/{1}_alba.json'.format(configuration_dir,
                                                                                           vpool.name))
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'ganesha':
-            files_to_remove.append('{0}/storagedriver/storagedriver/{0}_ganesha.conf'.format(configuration_dir,
+            files_to_remove.append('{0}/storagedriver/storagedriver/{1}_ganesha.conf'.format(configuration_dir,
                                                                                              vpool.name))
 
         for file_name in files_to_remove:
