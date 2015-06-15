@@ -37,6 +37,7 @@ def _ignore_formatting_errors():
             Wrapped function
             """
             try:
+                msg = str(msg)
                 _ = msg % args
                 return f(self, msg, *args, **kwargs)
             except TypeError as exception:
