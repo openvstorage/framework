@@ -48,7 +48,7 @@ check_output('echo manual > /etc/init/logstash-web.override', shell=True)
 
 # Configure logging
 check_output('chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh', shell=True)
-if '$KLogPermitNonKernelFacility on' not in file_read('/etc/rsyslog.d/90-ovs.conf'):
+if not os.path.exists('/etc/rsyslog.d/90-ovs.conf') or '$KLogPermitNonKernelFacility on' not in file_read('/etc/rsyslog.d/90-ovs.conf'):
     check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
     check_output('restart rsyslog', shell=True)
 
@@ -62,8 +62,9 @@ for cron_rule in ['0 * * * * /usr/sbin/ntpdate pool.ntp.org',
 
 # Configure SSH
 config_file = '/etc/ssh/sshd_config'
-ssh_content_before = file_read(config_file)
+ssh_content_before = None
 if os.path.isfile(config_file):
+    ssh_content_before = file_read(config_file)
     use_dns = False
     new_contents = []
     for line in file_read(config_file).splitlines():
