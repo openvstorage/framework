@@ -131,7 +131,6 @@ class SetupController(object):
             hypervisor_username = config.get('setup', 'hypervisor_username')
             hypervisor_password = config.get('setup', 'hypervisor_password')
             arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
-            verbose = config.getboolean('setup', 'verbose')
             auto_config = config.getboolean('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
@@ -429,23 +428,95 @@ class SetupController(object):
             elif severity == 'error':
                 logger.error(message)
 
+        def change_services_state(services, ssh_clients, action):
+            """
+            Stop/start services on SSH clients
+            If action is start, we ignore errors and try to start other services on other nodes
+            """
+            for service_name in services:
+                for ssh_client in ssh_clients:
+                    log_message('{0} service {1}'.format('Stopping' if action == 'stop' else 'Starting', service_name), ssh_client)
+                    try:
+                        SetupController._change_service_state(client=ssh_client,
+                                                              name=service_name,
+                                                              state=action)
+                        log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client)
+                    except Exception as exc:
+                        log_message('Something went wrong {0} service {1}: {2}'.format('stopping' if action == 'stop' else 'starting', service_name, exc), ssh_client, severity='warning')
+                        if action == 'stop':
+                            return False
+            return True
+
         log_message('+++ Starting framework update+++')
 
         # Store storagerouter information in file to be able to recover
+        from ovs.dal.helpers import Migration
         from ovs.dal.lists.storagerouterlist import StorageRouterList
+
+        upgrade_file = '/etc/ready_for_upgrade'
         storage_routers = StorageRouterList.get_storagerouters()
-        sr_ip_sshclient_map = dict((storage_router.ip, SSHClient(storage_router.ip, 'root')) for storage_router in storage_routers)
+        sshclients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
+        this_client = [client.ip for client in sshclients if client.is_local is True][0]
 
-        for sr_ip, client in sr_ip_sshclient_map:
-            client.file_write('/opt/OpenvStorage/update', '\n'.join(sr_ip_sshclient_map.keys()))
+        # Stop services
+        for client in sshclients:
+            client.run('touch {0}'.format(upgrade_file))
 
-            # # Stop all services
-            log_message('Stopping services', client)
-            for service_name in ['arakoon-ovsdb', 'memcached']:
-                if PluginService.has_service(service_name, client=client):
-                    log_message('Stopped service {0}'.format(service_name), client)
-                    PluginService.disable_service(service_name, client=client)
-                    PluginService.stop_service(service_name, client=client)
+        if change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
+                                 ssh_clients=sshclients,
+                                 action='stop') is False:
+            log_message('Stopping all services on every node failed, cannot continue', severity='warning')
+            for client in sshclients:
+                if client.file_exists(upgrade_file):
+                    client.file_delete(upgrade_file)
+
+            log_message('Attempting to start the services again')
+            change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
+                                  ssh_clients=sshclients,
+                                  action='start')
+
+            raise RuntimeError('Failed to stop all required services, aborting update\nPlease check /var/log/ovs/lib.log on {0} for more information'.format(this_client.ip))
+
+        # Start update
+        failed_clients = []
+        for client in sshclients:
+            try:
+                log_message('Installing latest packages', client)
+                client.run('apt-get install -y --force-yes openvstorage-core')
+                log_message('Successfully installed openvstorage-core', client)
+                client.run('apt-get install -y --force-yes openvstorage-webapps')
+                log_message('Successfully installed openvstorage-webapps', client)
+                client.file_delete(upgrade_file)
+            except Exception as ex:
+                log_message('Upgrade failed with error: {0}'.format(ex), client, 'error')
+                failed_clients.append(client)
+                break
+
+        if failed_clients:
+            for client in sshclients:
+                if client.file_exists(upgrade_file):
+                    client.file_delete(upgrade_file)
+            log_message('Attempting to start the services again')
+            change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
+                                  ssh_clients=sshclients,
+                                  action='start')
+            raise RuntimeError('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip))
+
+        # Start all services
+        log_message('Starting services')
+        change_services_state(services=['arakoon-ovsdb', 'memcached', 'support-agent'],
+                              ssh_clients=sshclients,
+                              action='start')
+
+        # Migrate
+        log_message('Starting migration')
+        Migration.migrate()
+
+        # Start all services
+        log_message('Starting watcher-framework service')
+        change_services_state(services=['watcher-framework'],
+                              ssh_clients=sshclients,
+                              action='start')
 
         log_message('+++ Finished update+++')
 
@@ -512,18 +583,18 @@ class SetupController(object):
             if node_client.file_exists(authorized_keys_filename.format(root_ssh_folder)):
                 existing_keys = node_client.file_read(authorized_keys_filename.format(root_ssh_folder)).split('\n')
                 for existing_key in existing_keys:
-                    if not existing_key in authorized_keys:
+                    if existing_key not in authorized_keys:
                         authorized_keys += "{0}\n".format(existing_key)
             if node_client.file_exists(authorized_keys_filename.format(ovs_ssh_folder)):
                 existing_keys = node_client.file_read(authorized_keys_filename.format(ovs_ssh_folder))
                 for existing_key in existing_keys:
-                    if not existing_key in authorized_keys:
+                    if existing_key not in authorized_keys:
                         authorized_keys += "{0}\n".format(existing_key)
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
-            if not root_pub_key in authorized_keys:
+            if root_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(root_pub_key)
-            if not ovs_pub_key in authorized_keys:
+            if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
             node_hostname = node_client.run('hostname')
             all_hostnames.add(node_hostname)
@@ -1067,7 +1138,6 @@ EOF
             except subprocess.CalledProcessError:
                 print('  Process already stopped')
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
-
 
         # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
         #  and the next command fails so the best solution is to retry several times

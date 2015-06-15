@@ -28,10 +28,15 @@ def file_write(fn, cts):
         the_file.write(cts)
 
 # Disable/stop default services. Will be replaced by upstart scripts
-check_output('service rabbitmq-server stop', shell=True)
-check_output('update-rc.d rabbitmq-server disable', shell=True)
-check_output('service memcached stop', shell=True)
-check_output('update-rc.d memcached disable', shell=True)
+run_level_regex = '^[KS][0-9]{2}(.*)'
+for service_name in ('rabbitmq-server', 'memcached'):
+    service_configured = True
+    for run_level in range(7):
+        if service_name not in [re.match(run_level_regex, run_entry).groups()[0] for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)) if re.match(run_level_regex, run_entry)]:
+            service_configured &= False
+    if service_configured is False:
+        check_output('service {0} stop'.format(service_name), shell=True)
+        check_output('update-rc.d {0} disable'.format(service_name), shell=True)
 
 # Cleanup *.pyc files
 check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
@@ -43,8 +48,9 @@ check_output('echo manual > /etc/init/logstash-web.override', shell=True)
 
 # Configure logging
 check_output('chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh', shell=True)
-check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
-check_output('restart rsyslog', shell=True)
+if '$KLogPermitNonKernelFacility on' not in file_read('/etc/rsyslog.d/90-ovs.conf'):
+    check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
+    check_output('restart rsyslog', shell=True)
 
 # Add crontabs
 cron_contents = check_output('crontab -l 2>/dev/null || true', shell=True).splitlines()
@@ -56,6 +62,7 @@ for cron_rule in ['0 * * * * /usr/sbin/ntpdate pool.ntp.org',
 
 # Configure SSH
 config_file = '/etc/ssh/sshd_config'
+ssh_content_before = file_read(config_file)
 if os.path.isfile(config_file):
     use_dns = False
     new_contents = []
@@ -75,7 +82,9 @@ if os.path.isfile(config_file):
     if use_dns is False:
         new_contents.append('UseDNS no')
     file_write(config_file, '{0}\n'.format('\n'.join(new_contents)))
-check_output('service ssh restart', shell=True)
+ssh_content_after = file_read(config_file)
+if ssh_content_after != ssh_content_before:
+    check_output('service ssh restart', shell=True)
 
 # Configure coredumps
 limits_file = '/etc/security/limits.conf'
@@ -93,13 +102,17 @@ ovs_ssh_folder = '{0}/.ssh'.format(check_output('echo ~ovs', shell=True).strip()
 private_key_filename = '{0}/id_rsa'
 authorized_keys_filename = '{0}/authorized_keys'
 known_hosts_filename = '{0}/known_hosts'
+
+check_output('su - ovs -c "mkdir -p {0}"'.format(ovs_ssh_folder), shell=True)
+check_output('su - ovs -c "chmod 755 {0}"'.format(ovs_ssh_folder), shell=True)
+
 # Generate keys for root
 if not os.path.exists(private_key_filename.format(root_ssh_folder)):
     check_output("ssh-keygen -t rsa -b 4096 -f {0} -N ''".format(private_key_filename.format(root_ssh_folder)), shell=True)
 # Generate keys for ovs
-check_output('su - ovs -c "mkdir -p {0}"'.format(ovs_ssh_folder), shell=True)
-check_output('su - ovs -c "chmod 755 {0}"'.format(ovs_ssh_folder), shell=True)
-check_output('su - ovs -c "ssh-keygen -t rsa -b 4096 -f {0} -N \'\'"'.format(private_key_filename.format(ovs_ssh_folder)), shell=True)
+if not os.path.exists(private_key_filename.format(ovs_ssh_folder)):
+    check_output('su - ovs -c "ssh-keygen -t rsa -b 4096 -f {0} -N \'\'"'.format(private_key_filename.format(ovs_ssh_folder)), shell=True)
+
 root_authorized_keys = authorized_keys_filename.format(root_ssh_folder)
 ovs_authorized_keys = authorized_keys_filename.format(ovs_ssh_folder)
 root_known_hosts = known_hosts_filename.format(root_ssh_folder)

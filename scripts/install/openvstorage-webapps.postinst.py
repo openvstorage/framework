@@ -35,15 +35,22 @@ secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in ra
 config_filename = '/opt/OpenvStorage/config/ovs.cfg'
 config = RawConfigParser()
 config.read(config_filename)
-config.set('webapps', 'main.secret', secret_key)
-with open(config_filename, 'wb') as config_file:
-    config.write(config_file)
+if config.get('webapps', 'main.secret') != 'pl4c3h0ld3r':
+    config.set('webapps', 'main.secret', secret_key)
+    with open(config_filename, 'wb') as config_file:
+        config.write(config_file)
 
 os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage; python manage.py syncdb --noinput', shell=True)
 
-check_output('service nginx stop', shell=True)
-check_output('update-rc.d nginx disable', shell=True)
+run_level_regex = '^[KS][0-9]{2}(.*)'
+service_configured = True
+for run_level in range(7):
+    if 'nginx' not in [re.match(run_level_regex, run_entry).groups()[0] for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)) if re.match(run_level_regex, run_entry)]:
+        service_configured &= False
+if service_configured is False:
+    check_output('service nginx stop', shell=True)
+    check_output('update-rc.d nginx disable', shell=True)
 
 # Create web certificates
 if not os.path.exists('/opt/OpenvStorage/config/ssl/server.crt'):
