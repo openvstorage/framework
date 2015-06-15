@@ -42,6 +42,8 @@ def _ignore_formatting_errors():
             except TypeError as exception:
                 if 'not all arguments converted during string formatting' in str(exception):
                     return f(self, 'String format error, original message: {0}'.format(msg))
+                elif 'not enough arguments for format string' in str(exception):
+                    return f(self, 'String format error, original message: {0}'.format(msg))
                 else:
                     raise
         return new_function
