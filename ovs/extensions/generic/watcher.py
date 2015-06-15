@@ -118,15 +118,15 @@ def services_running(target):
             from ConfigParser import RawConfigParser
             from ovs.extensions.generic.configuration import Configuration
             rmq_ini = RawConfigParser()
-            rmq_ini.read(os.path.join(Configuration.general.configdir, 'rabbitmqclient.cfg'))
+            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
             rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
             rmq_servers = map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes)
             good_node = False
             for server in rmq_servers:
                 try:
-                    connection_string = '{0}://{1}:{2}@{3}/%2F'.format(Configuration.broker.protocol,
-                                                                       Configuration.broker.login,
-                                                                       Configuration.broker.password,
+                    connection_string = '{0}://{1}:{2}@{3}/%2F'.format(Configuration.get('ovs.core.broker.protocol'),
+                                                                       Configuration.get('ovs.core.broker.login'),
+                                                                       Configuration.get('ovs.core.broker.password'),
                                                                        server)
                     connection = pika.BlockingConnection(pika.URLParameters(connection_string))
                     channel = connection.channel()

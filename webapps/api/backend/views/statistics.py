@@ -42,7 +42,7 @@ class MemcacheViewSet(viewsets.ViewSet):
         Get the memcache nodes
         """
         memcache_ini = RawConfigParser()
-        memcache_ini.read(os.path.join(Configuration.general.configdir, 'memcacheclient.cfg'))
+        memcache_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
         nodes = [node.strip() for node in memcache_ini.get('main', 'nodes').split(',')]
         return [memcache_ini.get(node, 'location') for node in nodes]
 

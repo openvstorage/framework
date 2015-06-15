@@ -34,7 +34,7 @@ class PersistentFactory(object):
 
         if not hasattr(PersistentFactory, 'store') or PersistentFactory.store is None:
             if client_type is None:
-                client_type = Configuration.general.persistent
+                client_type = Configuration.get('ovs.core.storage.persistent')
 
             PersistentFactory.store = None
             if client_type == 'arakoon':

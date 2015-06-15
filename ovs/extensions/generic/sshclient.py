@@ -290,6 +290,32 @@ print json.dumps(os.path.isfile('{0}'))""".format(self._shell_safe(filename))
         else:
             self.run(command)
 
+    def config_read(self, key):
+        if self.is_local is True:
+            from ovs.extensions.generic.configuration import Configuration
+            return Configuration.get(key)
+        else:
+            read = """
+import sys, json
+sys.path.append('/opt/OpenvStorage')
+from ovs.extensions.generic.configuration import Configuration
+print json.dumps(Configuration.get('{0}'))
+""".format(key)
+            return json.loads(self.run('python -c """{0}"""'.format(read)))
+
+    def config_set(self, key, value):
+        if self.is_local is True:
+            from ovs.extensions.generic.configuration import Configuration
+            Configuration.set(key, value)
+        else:
+            write = """
+import sys, json
+sys.path.append('/opt/OpenvStorage')
+from ovs.extensions.generic.configuration import Configuration
+Configuration.set('{0}', json.loads('{1}'))
+""".format(key, json.dumps(value))
+            self.run('python -c """{0}"""'.format(write))
+
     def rawconfig_read(self, filename):
         contents = self.file_read(filename)
         handle, temp_filename = tempfile.mkstemp()

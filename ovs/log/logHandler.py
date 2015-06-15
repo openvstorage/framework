@@ -18,8 +18,6 @@ Contains the loghandler module
 
 import logging
 import logging.handlers
-import pwd
-import grp
 import os
 from ovs.extensions.generic.configuration import Configuration
 
@@ -65,15 +63,12 @@ class LogHandler(object):
         """
         Initializes the logger
         """
-
-        configuration = Configuration()
-
         if name is None:
-            name = configuration.logging.defaultname
+            name = Configuration.get('ovs.logging.default_name')
 
         log_filename = '{0}/{1}.log'.format(
-            configuration.logging.filepath,
-            LogHandler.targets[source] if source in LogHandler.targets else configuration.logging.defaultfile
+            Configuration.get('ovs.logging.path'),
+            LogHandler.targets[source] if source in LogHandler.targets else Configuration.get('ovs.logging.default_file')
         )
 
         if not os.path.exists(log_filename):
@@ -86,7 +81,7 @@ class LogHandler(object):
 
         self.logger = logging.getLogger(name)
         self.logger.propagate = True
-        self.logger.setLevel(getattr(logging, configuration.logging.level))
+        self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
 
     @_ignore_formatting_errors()

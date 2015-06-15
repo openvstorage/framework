@@ -13,86 +13,50 @@
 # limitations under the License.
 
 """
-Configuration module
+Generic module for managing the OVS configuration files
 """
 
-import os
 import json
-import tempfile
-
-class MetaConfiguration(type):
-    """
-    Configuration metaclass for static functionality
-    """
-    def __getattr__(self, item):
-        configuration = Configuration()
-        return getattr(Configuration.ENTRY_CLASS(configuration.config, []), item)
 
 
 class Configuration(object):
     """
-    Manages the configuration, based on a json file
+    Configuration class
     """
 
-    __metaclass__ = MetaConfiguration
-    PATH = '/opt/OpenvStorage/config/ovs.json'
+    FILE = '/opt/OpenvStorage/config/{0}.json'
 
-    class Entry(object):
+    def __init__(self):
         """
-        Represents a single level in the configuration file
+        Dummy init method
         """
-        def __init__(self, config, path):
-            self.config = config
-            self.path = path
+        _ = self
 
-        def __getattr__(self, item):
-            if item in ['config', 'path']:
-                return object.__getattribute__(self, item)
-            base = self.config
-            for path_key in self.path:
-                base = base[path_key]
-            value = base[item]
-            if isinstance(value, dict):
-                return Configuration.ENTRY_CLASS(self.config, self.path + [item])
-            else:
-                return value
+    @staticmethod
+    def get(key):
+        filename, path = key.split('.', 1)
+        with open(Configuration.FILE.format(filename), 'r') as config_file:
+            config = json.loads(config_file.read())
+            temp_config = config
+            for entry in path.split('.'):
+                temp_config = temp_config[entry]
+            return temp_config
 
-        def __setattr__(self, key, value):
-            if key in ['config', 'path']:
-                return object.__setattr__(self, key, value)
-            base = self.config
-            for path_key in self.path:
-                base = base[path_key]
-            base[key] = value
-
-    ENTRY_CLASS = Entry
-
-    def __init__(self, client=None):
-        """
-        Initializes a configuration object over a client or local
-        """
-        self.client = client
-        if self.client is None:
-            with open(Configuration.PATH, 'r') as config_file:
-                self.config = json.loads(config_file.read())
-        else:
-            self.config = json.loads(client.file_read(Configuration.PATH))
-
-    def save(self):
-        """
-        Saves the configuration file
-        """
-        contents = json.dumps(self.config, indent=4)
-        if self.client is None:
-            with open(Configuration.PATH, 'w') as config_file:
-                config_file.write(contents)
-        else:
-            (temp_handle, temp_filename) = tempfile.mkstemp()
-            with open(temp_filename, 'w') as config_file:
-                config_file.write(contents)
-            self.client.dir_create(os.path.dirname(Configuration.PATH))
-            self.client.file_upload(Configuration.PATH, temp_filename)
-            os.remove(temp_filename)
-
-    def __getattr__(self, item):
-        return getattr(Configuration.ENTRY_CLASS(self.config, []), item)
+    @staticmethod
+    def set(key, value):
+        filename, path = key.split('.', 1)
+        with open(Configuration.FILE.format(filename), 'r') as config_file:
+            config = json.loads(config_file.read())
+            temp_config = config
+            entries = path.split('.')
+            if len(entries) > 1:
+                for entry in entries[:-1]:
+                    if entry in temp_config:
+                        temp_config = temp_config[entry]
+                    else:
+                        temp_config[entry] = {}
+                        temp_config = temp_config[entry]
+                temp_config[entries[-1]] = value
+        contents = json.dumps(config, indent=4)
+        with open(Configuration.FILE.format(filename), 'w') as config_file:
+            config_file.write(contents)

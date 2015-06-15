@@ -203,7 +203,7 @@ class StorageDriverConfiguration(object):
         self.dirty_entries = []
         self.number = number
         self.params = copy.deepcopy(StorageDriverConfiguration.parameters)  # Never use parameters directly
-        self.base_path = '{0}/storagedriver/{1}'.format(Configuration.general.configdir, self.config_type)
+        self.base_path = '{0}/storagedriver/{1}'.format(Configuration.get('ovs.core.cfgdir'), self.config_type)
         if self.number is None:
             self.path = '{0}/{1}.json'.format(self.base_path, self.vpool_name)
         else:
@@ -356,8 +356,8 @@ print json.dumps(LocalStorageRouterClient('{0}').update_configuration('{0}'))"""
 class GaneshaConfiguration:
 
     def __init__(self):
-        self._config_corefile = os.path.join(Configuration.general.configdir, 'templates', 'ganesha-core.conf')
-        self._config_exportfile = os.path.join(Configuration.general.configdir, 'templates', 'ganesha-export.conf')
+        self._config_corefile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'ganesha-core.conf')
+        self._config_exportfile = os.path.join(Configuration.get('ovs.core.cfgdir'), 'templates', 'ganesha-export.conf')
 
     def generate_config(self, target_file, params):
         with open(self._config_corefile, 'r') as core_config_file:

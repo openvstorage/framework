@@ -14,6 +14,7 @@
 
 import sys
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller
+from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient
@@ -40,6 +41,29 @@ class TestArakoonInstaller(TestCase):
 
         System.get_my_machine_id = staticmethod(_get_my_machine_id)
 
+        # Configuration
+        def _get(key):
+            if key == 'ovs.core.storage.persistent':
+                return 'arakoon'
+            c = PersistentFactory.get_client()
+            if c.exists(key):
+                return c.get(key)
+            return None
+
+        def _get_int(key):
+            return int(Configuration.get(key))
+
+        def _set(key, value):
+            c = PersistentFactory.get_client()
+            c.set(key, value)
+
+        Configuration.get = staticmethod(_get)
+        Configuration.get_int = staticmethod(_get_int)
+        Configuration.set = staticmethod(_set)
+
+        Configuration.set('ovs.ports.arakoon', [22000])
+        Configuration.set('ovs.arakoon.location', '/tmp/db')
+
     @classmethod
     def setUp(cls):
         for node in TestArakoonInstaller.nodes:
@@ -53,7 +77,7 @@ class TestArakoonInstaller(TestCase):
         return '/tmp/cfg/{0}/{0}.cfg'.format(cluster)
 
     def test_single_node(self):
-        base_port = Configuration.ports.arakoon
+        base_port = Configuration.get('ovs.ports.arakoon')[0]
         cluster = 'one'
         node = sorted(TestArakoonInstaller.nodes.keys())[0]
         ArakoonInstaller.create_cluster(cluster, node, [])
@@ -63,7 +87,7 @@ class TestArakoonInstaller(TestCase):
         self.assertEqual(contents.strip(), expected.strip())
 
     def test_multi_node(self):
-        base_port = Configuration.ports.arakoon
+        base_port = Configuration.get('ovs.ports.arakoon')[0]
         cluster = 'one'
         nodes = sorted(TestArakoonInstaller.nodes.keys())
         nodes = dict((node, SSHClient(node)) for node in nodes)

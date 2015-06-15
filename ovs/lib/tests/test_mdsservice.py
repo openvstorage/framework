@@ -20,6 +20,7 @@ import sys
 import json
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -85,6 +86,15 @@ class MDSServices(TestCase):
         _ = VDisk(), VPool(), Service(), MDSService(), MDSServiceVDisk(), ServiceType(), \
             StorageRouter(), StorageDriver(), BackendType(), PMachine(), \
             VolatileMutex('dummy'), MDSServiceController
+
+        # Configuration
+        def _get(key):
+            c = PersistentFactory.get_client()
+            if c.exists(key):
+                return c.get(key)
+            return None
+
+        Configuration.get = staticmethod(_get)
 
         # Cleaning storage
         VolatileFactory.store.clean()
@@ -262,6 +272,7 @@ class MDSServices(TestCase):
         """
         Validates whether storagedriver configuration is generated as expected
         """
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
         vpools, storagerouters, storagedrivers, services, mds_services, _ = self._build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3, 4, 5, 6],
@@ -418,6 +429,9 @@ class MDSServices(TestCase):
             if test is True:
                 self.assertListEqual(reality_loads, _loads)
 
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', 75)
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', 100)
         vpools, storagerouters, storagedrivers, _, mds_services, service_type = self._build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3, 4],

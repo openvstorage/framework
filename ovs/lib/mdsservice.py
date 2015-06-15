@@ -71,7 +71,7 @@ class MDSServiceController(object):
         for service in mdsservice_type.services:
             if service.storagerouter_guid == storagerouter.guid:
                 occupied_ports.append(service.ports[0])
-        port = System.get_free_ports(Configuration.ports.mds,
+        port = System.get_free_ports(Configuration.get('ovs.ports.mds'),
                                      exclude=occupied_ports, nr=1, client=client)[0]
 
         # Add service to the model
@@ -206,9 +206,9 @@ class MDSServiceController(object):
         vdisk.reload_client()
         if excluded_storagerouters is None:
             excluded_storagerouters = []
-        maxload = Configuration.storagedriver.mds.maxload
-        safety = Configuration.storagedriver.mds.safety
-        tlogs = Configuration.storagedriver.mds.tlogs
+        maxload = Configuration.get('ovs.storagedriver.mds.maxload')
+        safety = Configuration.get('ovs.storagedriver.mds.safety')
+        tlogs = Configuration.get('ovs.storagedriver.mds.tlogs')
         services = [mds_service.service for mds_service in vdisk.vpool.mds_services
                     if mds_service.service.storagerouter not in excluded_storagerouters]
         nodes = set(service.storagerouter.ip for service in services)
@@ -446,7 +446,7 @@ class MDSServiceController(object):
                 mds_per_load[load] = []
             mds_per_load[load].append(storagerouter.guid)
 
-        safety = Configuration.storagedriver.mds.safety
+        safety = Configuration.get('ovs.storagedriver.mds.safety')
         config_set = {}
         for storagerouter_guid in mds_per_storagerouter:
             config_set[storagerouter_guid] = [mds_per_storagerouter[storagerouter_guid]]
@@ -493,7 +493,7 @@ class MDSServiceController(object):
                         mds_services.remove(mds_service)
                 for mds_service in mds_services:
                     _, load = MDSServiceController.get_mds_load(mds_service)
-                    if load < Configuration.storagedriver.mds.maxload:
+                    if load < Configuration.get('ovs.storagedriver.mds.maxload'):
                         has_room = True
                         break
                 if has_room is False:

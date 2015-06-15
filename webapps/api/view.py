@@ -66,14 +66,15 @@ class MetadataView(View):
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
             # - Generic plugins, as added to the configuration file(s)
-            for plugin_name in Configuration.plugins.generic:
+            generic_plugins = Configuration.get('ovs.plugins.generic')
+            for plugin_name in generic_plugins:
                 if plugin_name not in plugins:
                     plugins[plugin_name] = []
                 plugins[plugin_name] += ['gui']
             data['plugins'] = plugins
 
             # Fill identification
-            data['identification'] = {'cluster_id': Configuration.support.cid}
+            data['identification'] = {'cluster_id': Configuration.get('ovs.support.cid')}
 
             # Gather authorization metadata
             if 'HTTP_AUTHORIZATION' not in request.META:

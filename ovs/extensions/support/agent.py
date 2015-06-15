@@ -41,8 +41,8 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._enable_support = Configuration.support.enablesupport
-        self.interval = Configuration.support.interval
+        self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
+        self.interval = int(Configuration.get('ovs.support.interval'))
         self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
 
     @staticmethod
@@ -50,8 +50,8 @@ class SupportAgent(object):
         """
         Returns heartbeat data
         """
-        data = {'cid': Configuration.support.cid,
-                'nid': Configuration.support.nid,
+        data = {'cid': Configuration.get('ovs.support.cid'),
+                'nid': Configuration.get('ovs.support.nid'),
                 'metadata': {},
                 'errors': []}
 
@@ -84,9 +84,12 @@ class SupportAgent(object):
         """
         Updates the support configuration
         """
-        configuration = Configuration()
-        setattr(configuration.support, key, value)
-        configuration.save()
+        filename = '/opt/OpenvStorage/config/ovs.cfg'
+        config = RawConfigParser()
+        config.read(filename)
+        config.set('support', key, value)
+        with open(filename, 'w') as config_file:
+            config.write(config_file)
 
     @staticmethod
     def _process_task(task, metadata):
@@ -152,7 +155,7 @@ class SupportAgent(object):
 
 if __name__ == '__main__':
     try:
-        if Configuration.support.enabled is False:
+        if int(Configuration.get('ovs.support.enabled')) == 0:
             print 'Support not enabled'
             sys.exit(0)
         logger.info('Starting up')

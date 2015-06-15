@@ -23,11 +23,11 @@ DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 UNIQUE_ID = System.get_my_machine_id()
-UI_NAME = Configuration.webapps.django.uiname
-APP_NAME = Configuration.webapps.django.appname
+UI_NAME = Configuration.get('ovs.webapps.main.uiname')
+APP_NAME = Configuration.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)
 
-BASE_FOLDER = '/opt/OpenvStorage/{0}/{1}'.format(Configuration.webapps.django.dir, APP_NAME)
+BASE_FOLDER = os.path.join(Configuration.get('ovs.core.basedir'), Configuration.get('ovs.webapps.dir'), APP_NAME)
 VERSION = (1,)  # This tuple should contain all supported versions. E.g.: (1,) or (1, 2) or (1, 2, 3) or (2, 3, 4) or ...
 
 BASE_LOG_DIR = '/var/log/ovs'
@@ -39,7 +39,7 @@ STATIC_URL = '/' + UI_NAME + '/static/'  # STATIC_URL must end with a slash
 FORCE_SCRIPT_NAME = FRONTEND_ROOT
 
 ADMINS = (
-    (Configuration.webapps.django.name, Configuration.webapps.django.email),
+    (Configuration.get('ovs.webapps.admin.name'), Configuration.get('ovs.webapps.admin.email')),
 )
 
 MANAGERS = ADMINS
@@ -47,11 +47,11 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_FOLDER + '/' + Configuration.webapps.django.dbname
+        'NAME': BASE_FOLDER + '/' + Configuration.get('ovs.webapps.main.dbname')
     }
 }
 
-ALLOWED_HOSTS = [Configuration.general.ip]
+ALLOWED_HOSTS = [Configuration.get('ovs.grid.ip')]
 TIME_ZONE = 'Europe/Brussels'
 LANGUAGE_CODE = 'en-us'
 LOGIN_URL = APP_NAME + '.frontend.login_view'
@@ -74,7 +74,7 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 )
 
-SECRET_KEY = Configuration.webapps.django.secret
+SECRET_KEY = Configuration.get('ovs.webapps.main.secret')
 
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
