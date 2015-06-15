@@ -447,7 +447,7 @@ class SetupController(object):
                             return False
             return True
 
-        log_message('+++ Starting framework update+++')
+        log_message('+++ Starting framework update +++')
 
         # Store storagerouter information in file to be able to recover
         from ovs.dal.helpers import Migration
@@ -518,7 +518,7 @@ class SetupController(object):
                               ssh_clients=sshclients,
                               action='start')
 
-        log_message('+++ Finished updating+++')
+        log_message('+++ Finished updating +++')
 
     @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info, auto_config, disk_layout):

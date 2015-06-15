@@ -11,8 +11,10 @@ if [ "$1" = "setup" ] ; then
     python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('promote')"
   elif [ "$2" = "demote" ] ; then
     python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('demote')"
-  elif [ "$2" = "update_framework" ] ; then
-    python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()"
+  fi
+elif [ "$1" = "update" ] ; then
+  if [ "$2" = "framework" ] ; then
+    python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()" &
   fi
 elif [ "$1" = "monitor" ] ; then
   if [ "$2" = "services" ] ; then

@@ -1051,7 +1051,7 @@ class StorageRouterController(object):
         """
         root_client = SSHClient(ip=storagerouter_ip,
                                 username='root')
-        root_client.run('ovs setup update_framework')
+        root_client.run('ovs update framework')
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):
