@@ -594,7 +594,6 @@ class StorageRouterController(object):
                 storagedriver_config.save(node_client, reload_config=False)
 
         dirs2create.append(storagedriver.mountpoint)
-        dirs2create.append(storagedriver.mountpoint + '/instances')
         dirs2create.append(fdcache)
 
         root_client.dir_create(dirs2create)
@@ -837,13 +836,11 @@ class StorageRouterController(object):
         dirs2remove.append(storagedriver.mountpoint_fragmentcache)
         dirs2remove.append(storagedriver.mountpoint_foc)
         dirs2remove.append(storagedriver.mountpoint_md)
-        dirs2remove.append(storagedriver.mountpoint + '/instances')
         dirs2remove.append(storagedriver.mountpoint)
 
-        for directory in dirs2remove:
+        for directory in set(dirs2remove):
             if directory:
-                client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; else echo "Directory {0} no longer present"; fi'.format(directory))
-                logger.info('Directory: {0} removed '.format(directory))
+                client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         DiskController.sync_with_reality(storagerouter.guid)
         for disk in storagerouter.disks:
@@ -931,8 +928,7 @@ class StorageRouterController(object):
                         routing_key='sr.{0}'.format(storagerouter_machineid)
                     )
                     result.wait()
-            except Exception as ex:
-                logger.error(str(ex))
+            except:
                 success = False
         return success
 
