@@ -27,7 +27,7 @@ from celery.schedules import crontab
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('celery', name='celery beat')
@@ -122,7 +122,7 @@ class DistributedScheduler(Scheduler):
             self._mutex.acquire(wait=10)
             node_now = current_app._get_current_object().now()
             node_timestamp = time.mktime(node_now.timetuple())
-            node_name = Configuration.get('ovs.core.uniqueid')
+            node_name = System.get_my_machine_id()
             try:
                 lock = self._persistent.get('{0}_lock'.format(self._namespace))
             except KeyNotFoundException:

@@ -18,7 +18,7 @@ import random
 import re
 import string
 import sys
-from ConfigParser import RawConfigParser
+import json
 from subprocess import check_output, CalledProcessError
 
 # Remove existing enabled sites, taking control over nginx
@@ -32,13 +32,12 @@ SECRET_KEY_LENGTH = 50
 SECRET_SELECTION = "{0}{1}{2}".format(string.ascii_letters, string.digits, string.punctuation)
 secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in range(SECRET_KEY_LENGTH)])
 
-config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-config = RawConfigParser()
-config.read(config_filename)
-if config.get('webapps', 'main.secret') != 'pl4c3h0ld3r':
-    config.set('webapps', 'main.secret', secret_key)
-    with open(config_filename, 'wb') as config_file:
-        config.write(config_file)
+config_filename = '/opt/OpenvStorage/config/ovs.json'
+with open(config_filename, 'r') as config_file:
+    contents = json.loads(config_file.read())
+contents['webapps']['main']['secret'] = secret_key
+with open(config_filename, 'w') as config_file:
+    config_file.write(json.dumps(contents, indent=4))
 
 os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage; python manage.py syncdb --noinput', shell=True)

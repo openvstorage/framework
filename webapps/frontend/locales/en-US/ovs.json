@@ -612,13 +612,10 @@
                 "writecaches": "Write Caches:"
             },
             "integratemgmtcenter": {
-                "basicinfo": "Integrate vpool with Management center:",
-                "mgmtcenter_name": "Name:",
-                "mgmtcenter_user": "User name:",
-                "mgmtcenter_ip": "IP Address:",
-                "mgmtcenter_type": "Type:",
-                "integratemgmt": "Integrate/Skip",
-                "nomgmtcenter": "No management center found for this node, cannot integrate vpool"
+                "integratemgmt": "Automatically configure the vPool on the Hypervisor.",
+                "mgmtcenter": "is managed by Hypervisor Management Center:",
+                "nomgmtcenter": "is not managed by a Hypervisor Management Center. Automatic configuration of the vPool on the Hypervisor will not be possible. Please refer to the documentation for manual instructions.",
+                "loading": "Loading information about available Management Centers."
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",

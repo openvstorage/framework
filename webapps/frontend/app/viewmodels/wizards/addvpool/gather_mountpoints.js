@@ -31,7 +31,7 @@ define([
                 if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineId())) {
                     return true;
                 }
-                if (storageDriver.mountpointBFS() !== undefined) {
+                if (storageDriver.mountpointBFS() !== undefined && storageDriver.mountpointBFS() !== "") {
                     bfs_mountpoints.push(storageDriver.mountpointBFS());
                     storagedriver_mountpoints.push(storageDriver.mountpointBFS());
                 }

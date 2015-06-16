@@ -94,11 +94,7 @@ class MDSServices(TestCase):
                 return c.get(key)
             return None
 
-        def _get_int(key):
-            return int(Configuration.get(key))
-
         Configuration.get = staticmethod(_get)
-        Configuration.get_int = staticmethod(_get_int)
 
         # Cleaning storage
         VolatileFactory.store.clean()
@@ -276,7 +272,7 @@ class MDSServices(TestCase):
         """
         Validates whether storagedriver configuration is generated as expected
         """
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
         vpools, storagerouters, storagedrivers, services, mds_services, _ = self._build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3, 4, 5, 6],
@@ -433,9 +429,9 @@ class MDSServices(TestCase):
             if test is True:
                 self.assertListEqual(reality_loads, _loads)
 
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', '75')
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', '100')
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', 75)
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', 100)
         vpools, storagerouters, storagedrivers, _, mds_services, service_type = self._build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3, 4],

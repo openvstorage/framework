@@ -18,10 +18,10 @@ SNMP Server module
 
 from pysnmp.entity import engine, config
 from pysnmp.entity.rfc3413 import cmdrsp, context
+from pysnmp.carrier import error
 from pysnmp.carrier.asynsock.dgram import udp
 from pysnmp.proto.api import v2c
 from pysnmp.smi.error import SmiError
-
 
 
 class SNMPServer():
@@ -52,9 +52,14 @@ class SNMPServer():
 
         # Transport setup
         # UDP over IPv4
-        config.addSocketTransport(self.snmpEngine,
-                                  udp.domainName,
-                                  udp.UdpTransport().openServerMode((host, port)))
+        try:
+            config.addSocketTransport(self.snmpEngine,
+                                      udp.domainName,
+                                      udp.UdpTransport().openServerMode((host, port)))
+            print('Serving on port %s' % port)
+        except error.CarrierError as carrier_error :
+            if "[Errno 98]" in carrier_error.message:
+                raise RuntimeError('Port %s is in use' % port)
 
         # SNMPv3/USM setup
         # user: usr-md5-des, auth: MD5, priv DES

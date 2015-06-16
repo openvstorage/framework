@@ -39,8 +39,7 @@ class PersistentFactory(object):
             PersistentFactory.store = None
             if client_type == 'arakoon':
                 from ovs.extensions.storage.persistent.arakoonstore import ArakoonStore
-                cluster = Configuration.get('ovs.core.db.arakoon.clusterid')
-                PersistentFactory.store = ArakoonStore(cluster)
+                PersistentFactory.store = ArakoonStore('ovsdb')
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()

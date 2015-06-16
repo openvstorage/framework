@@ -39,7 +39,7 @@ def process(queue, body, mapping):
     """
     Processes the actual received body
     """
-    if queue == Configuration.get('ovs.core.broker.volumerouter.queue'):
+    if queue == Configuration.get('ovs.core.broker.queues.storagedriver'):
         cache = VolatileFactory.get_client()
         all_extensions = None
 

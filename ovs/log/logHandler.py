@@ -18,10 +18,8 @@ Contains the loghandler module
 
 import logging
 import logging.handlers
-import pwd
-import grp
 import os
-from ConfigParser import RawConfigParser
+from ovs.extensions.generic.configuration import Configuration
 
 
 def _ignore_formatting_errors():
@@ -37,10 +35,13 @@ def _ignore_formatting_errors():
             Wrapped function
             """
             try:
+                msg = str(msg)
                 _ = msg % args
                 return f(self, msg, *args, **kwargs)
             except TypeError as exception:
                 if 'not all arguments converted during string formatting' in str(exception):
+                    return f(self, 'String format error, original message: {0}'.format(msg))
+                elif 'not enough arguments for format string' in str(exception):
                     return f(self, 'String format error, original message: {0}'.format(msg))
                 else:
                     raise
@@ -65,25 +66,17 @@ class LogHandler(object):
         """
         Initializes the logger
         """
-
-        filename = '/opt/OpenvStorage/config/main.cfg'
-        parser = RawConfigParser()
-        parser.read(filename)
-
         if name is None:
-            name = parser.get('logging', 'default_name')
+            name = Configuration.get('ovs.logging.default_name')
 
         log_filename = '{0}/{1}.log'.format(
-            parser.get('logging', 'path'),
-            LogHandler.targets[source] if source in LogHandler.targets else parser.get('logging', 'default_file')
+            Configuration.get('ovs.logging.path'),
+            LogHandler.targets[source] if source in LogHandler.targets else Configuration.get('ovs.logging.default_file')
         )
 
-        uid = pwd.getpwnam('ovs').pw_uid
-        gid = grp.getgrnam('ovs').gr_gid
         if not os.path.exists(log_filename):
             open(log_filename, 'a').close()
             os.chmod(log_filename, 0o666)
-
 
         formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
         handler = logging.FileHandler(log_filename)
@@ -91,7 +84,7 @@ class LogHandler(object):
 
         self.logger = logging.getLogger(name)
         self.logger.propagate = True
-        self.logger.setLevel(getattr(logging, parser.get('logging', 'level')))
+        self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
 
     @_ignore_formatting_errors()

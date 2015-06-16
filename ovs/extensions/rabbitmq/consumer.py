@@ -79,7 +79,6 @@ if __name__ == '__main__':
     parser.add_argument('--watcher', dest='file_watcher', action='store_const', default=False, const=True,
                         help='Enable file watcher')
 
-
     args = parser.parse_args()
     print(args.rabbitmq_queue, args.queue_durable, args.file_watcher)
     notifier = None
