@@ -1,0 +1,2 @@
+/etc/profile.d/OpenvStorage.sh
+etc/logstash/conf.d/indexer.conf

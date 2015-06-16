@@ -1,0 +1,111 @@
+<!--
+Copyright 2015 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section>
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:licenses.title"></h2>
+        <button class="btn btn-default pull-right" id="buttonAddLicense"
+                data-bind="click: addLicense, enable: $.inArray('manage', $root.shared.user.roles()) !== -1"
+                style="margin-top: 20px; margin-bottom: 10px;">
+            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+            <span data-i18n="ovs:licenses.add"></span>
+        </button>
+    </div>
+    <div data-bind="pager: { container: licenses, loadData: loadLicenses, headers: licenseHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
+        <table data-dummy="dummy">
+            <tr data-part="vitem">
+                <td>
+                    <span data-bind="translate: (component() + ':licensing.component')"></span>
+                </td>
+                <td>
+                    <span data-bind="text: name()"></span>
+                </td>
+                <td>
+                    <!-- ko foreach: $root.generic.keys(data(), function(k) { return k !== 'token'; }) -->
+                        <span data-bind="if: $index() > 0">-</span>
+                        <span data-bind="translate: ($parent.component() + ':licensing.metadata.' + $data)"></span>: <span data-bind="html: $parent.data()[$data] !== null ? $parent.data()[$data] : '<i>Unltd.</i>'"></span>
+                    <!-- /ko -->
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div data-bind="visible: !hasFreeLicense()">
+        <h2 data-i18n="ovs:licenses.request.title"></h2>
+        <form role="form form-horizontal" class="form-horizontal">
+            <p data-i18n="ovs:licenses.request.basicinfo" style="padding-top: 10px; padding-bottom: 10px;"></p>
+            <div class="form-group" data-bind="css: { 'has-error': $.inArray('name', canRegister().fields) !== -1 }">
+                <label class="col-lg-1 control-label" for="name" data-i18n="ovs:licenses.request.name"></label>
+                <div class="col-lg-4">
+                    <input type="text" id="name" class="autofocus form-control" data-bind="value: name, valueUpdate: 'afterkeydown'">
+                </div>
+                <div class="col-lg-6">
+                    <span class="help-block" data-i18n="ovs:licenses.request.namehelp"></span>
+                </div>
+            </div>
+            <div class="form-group" data-bind="css: { 'has-error': $.inArray('company', canRegister().fields) !== -1 }">
+                <label class="col-lg-1 control-label" for="company" data-i18n="ovs:licenses.request.company"></label>
+                <div class="col-lg-4">
+                    <input type="text" id="company" class="autofocus form-control" data-bind="value: company, valueUpdate: 'afterkeydown'">
+                </div>
+                <div class="col-lg-6">
+                    <span class="help-block" data-i18n="ovs:licenses.request.companyhelp"></span>
+                </div>
+            </div>
+            <div class="form-group" data-bind="css: { 'has-error': $.inArray('email', canRegister().fields) !== -1 }">
+                <label class="col-lg-1 control-label" for="email" data-i18n="ovs:licenses.request.email"></label>
+                <div class="col-lg-4">
+                    <input type="text" id="email" class="autofocus form-control" data-bind="value: email, valueUpdate: 'afterkeydown'">
+                </div>
+                <div class="col-lg-6">
+                    <span class="help-block" data-i18n="ovs:licenses.request.emailhelp"></span>
+                </div>
+            </div>
+            <div class="form-group" data-bind="css: { 'has-error': $.inArray('phone', canRegister().fields) !== -1 }">
+                <label class="col-lg-1 control-label" for="email" data-i18n="ovs:licenses.request.phone"></label>
+                <div class="col-lg-4">
+                    <input type="text" id="phone" class="autofocus form-control" data-bind="value: phone, valueUpdate: 'afterkeydown'">
+                </div>
+                <div class="col-lg-6">
+                    <span class="help-block" data-i18n="ovs:licenses.request.phonehelp"></span>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-1 control-label" for="newsletter" data-i18n="ovs:licenses.request.newsletter"></label>
+                <div class="col-lg-8">
+                    <input type="checkbox" id="newsletter" style="margin-top: 15px;" data-bind="checked: newsletter">
+                    <label for="newsletter" class="help-block" data-i18n="[html]ovs:licenses.request.newsletterhelp"
+                           style="padding-left: 10px; display: inline-block; font-weight: normal;"></label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-1 control-label" for="agreement" data-i18n="ovs:licenses.request.agreement"></label>
+                <div class="col-lg-8">
+                    <input type="checkbox" id="agreement" style="margin-top: 15px;" data-bind="checked: agreement">
+                    <label for="agreement" class="help-block" data-i18n="[html]ovs:licenses.request.agreementhelp" style="padding-left: 10px; display: inline-block;"></label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-lg-1"></label>
+                <div class="col-lg-4">
+                    <button type="button" class="pull-left btn btn-default"
+                            data-bind="click: register, enable: (canRegister().value && !registered() && !registering())" data-i18n="[html]ovs:licenses.request.register"></button>
+                    <div class="pull-left" style="margin: 7px 0 0 5px;" data-bind="visible: registering">
+                        <span class="fa fa-1p5x fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
