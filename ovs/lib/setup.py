@@ -426,6 +426,12 @@ class SetupController(object):
             elif severity == 'error':
                 logger.error(message)
 
+        def remove_lock_files(files, ssh_clients):
+            for ssh_client in ssh_clients:
+                for file_name in files:
+                    if ssh_client.file_exists(file_name):
+                        ssh_client.file_delete(file_name)
+
         def change_services_state(services, ssh_clients, action):
             """
             Stop/start services on SSH clients
@@ -435,10 +441,11 @@ class SetupController(object):
                 for ssh_client in ssh_clients:
                     log_message('{0} service {1}'.format('Stopping' if action == 'stop' else 'Starting', service_name), ssh_client)
                     try:
-                        SetupController._change_service_state(client=ssh_client,
-                                                              name=service_name,
-                                                              state=action)
-                        log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client)
+                        if ServiceManager.has_service(service_name, client=ssh_client):
+                            SetupController._change_service_state(client=ssh_client,
+                                                                  name=service_name,
+                                                                  state=action)
+                            log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client)
                     except Exception as exc:
                         log_message('Something went wrong {0} service {1}: {2}'.format('stopping' if action == 'stop' else 'starting', service_name, exc), ssh_client, severity='warning')
                         if action == 'stop':
@@ -450,28 +457,28 @@ class SetupController(object):
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         upgrade_file = '/etc/ready_for_upgrade'
+        upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
         storage_routers = StorageRouterList.get_storagerouters()
         sshclients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
-        this_client = [client.ip for client in sshclients if client.is_local is True][0]
+        this_client = [client for client in sshclients if client.is_local is True][0]
 
         # Stop services
         for client in sshclients:
             client.run('touch {0}'.format(upgrade_file))
+            client.run('touch {0}'.format(upgrade_ongoing_check_file))
 
         if change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
                                  ssh_clients=sshclients,
                                  action='stop') is False:
             log_message('Stopping all services on every node failed, cannot continue', severity='warning')
-            for client in sshclients:
-                if client.file_exists(upgrade_file):
-                    client.file_delete(upgrade_file)
+            remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
 
             log_message('Attempting to start the services again')
             change_services_state(services=['arakoon-ovsdb', 'memcached', 'watcher-framework', 'support-agent'],
                                   ssh_clients=sshclients,
                                   action='start')
 
-            log_message(Interactive.boxed_message(['Failed to stop all required services, aborting update\nPlease check /var/log/ovs/lib.log on {0} for more information'.format(this_client.ip)]))
+            log_message('Failed to stop all required services, aborting update', severity='warning')
             return
 
         # Start update
@@ -485,19 +492,17 @@ class SetupController(object):
                 log_message('Successfully installed openvstorage-webapps', client)
                 client.file_delete(upgrade_file)
             except Exception as ex:
-                log_message(Interactive.boxed_message(['Upgrade failed with error: {0}'.format(ex)]), client, 'error')
+                log_message('Upgrade failed with error: {0}'.format(ex), client, 'error')
                 failed_clients.append(client)
                 break
 
         if failed_clients:
-            for client in sshclients:
-                if client.file_exists(upgrade_file):
-                    client.file_delete(upgrade_file)
-            log_message('Error occurred. Attempting to start the services again')
+            remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
+            log_message('Error occurred. Attempting to start the services again', severity='error')
             change_services_state(services=['arakoon-ovsdb', 'memcached', 'watcher-framework', 'support-agent'],
                                   ssh_clients=sshclients,
                                   action='start')
-            log_message(Interactive.boxed_message(['Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]))]), this_client.ip)
+            log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
             return
 
         # Start all services
@@ -509,27 +514,39 @@ class SetupController(object):
         # Migrate
         log_message('Started model migration')
         try:
-            this_client.run('python -c "from ovs.dal.helpers import Migration;Migration.migrate()"')
+            command = """
+import sys
+sys.path.append('/opt/OpenvStorage')
+from ovs.dal.helpers import Migration
+Migration.migrate()"""
+            this_client.run('python -c "{0}"'.format(command))
             log_message('Finished model migration')
         except subprocess.CalledProcessError as cpe:
-            log_message(Interactive.boxed_message(['An unexpected error occurred:', str(cpe)]), severity='error')
+            remove_lock_files([upgrade_ongoing_check_file], sshclients)
+            log_message('An unexpected error occurred: {0}'.format(cpe.output), severity='error')
             return
 
+        command = """
+import sys
+sys.path.append('/opt/OpenvStorage')
+from ovs.extensions.migration.migrator import Migrator
+Migrator.migrate()"""
         for client in sshclients:
             try:
                 log_message('Started plugin migration', client)
-                client.run('python -c "from ovs.extensions.migration.migrator import Migrator;Migrator.migrate()"')
+                client.run('python -c "{0}"'.format(command))
                 log_message('Finished plugin migration', client)
-            except Exception as ex:
-                log_message(Interactive.boxed_message(['Plugin migration failed with error: {0}'.format(ex)]), client, 'error')
+            except subprocess.CalledProcessError as cpe:
+                remove_lock_files([upgrade_ongoing_check_file], sshclients)
+                log_message('Plugin migration failed with error: {0}'.format(cpe.output), client, 'error')
                 return
 
         # Start all services
-        log_message('Starting watcher-framework service')
         change_services_state(services=['watcher-framework'],
                               ssh_clients=sshclients,
                               action='start')
 
+        remove_lock_files([upgrade_ongoing_check_file], sshclients)
         log_message('+++ Finished updating +++')
 
     @staticmethod

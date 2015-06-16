@@ -39,7 +39,9 @@ limitations under the License.
     </div>
     <div>
         <button class="btn btn-default"
-                data-bind="click: updateFramework, enable: $root.shared.user.roles().contains('manage') && updates().framework === true"
+                data-bind="click: updateFramework,
+                           enable: $root.shared.user.roles().contains('manage') && updates().framework === true && !updating(),
+                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
                 id="buttonUpdateFramework"
                 style="margin-top: 20px;">
             <span data-i18n="ovs:updates.buttons.framework"></span>
@@ -47,10 +49,16 @@ limitations under the License.
     </div>
     <div>
         <button class="btn btn-default"
-                data-bind="click: updateVolumedriver, enable: $root.shared.user.roles().contains('manage') && updates().volumedriver === true"
+                data-bind="click: updateVolumedriver,
+                           enable: $root.shared.user.roles().contains('manage') && updates().volumedriver === true && !updating(),
+                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
                 id="buttonUpdateVolumedriver"
                 style="margin-top: 10px;">
             <span data-i18n="ovs:updates.buttons.volumedriver"></span>
         </button>
+    </div>
+    <div data-bind="visible: upgradeOngoing() !== undefined && upgradeOngoing() === true" class="alert alert-info" style="margin-top: 20px;">
+        <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+        <span data-i18n="ovs:updates.ongoing"></span>
     </div>
 </section>

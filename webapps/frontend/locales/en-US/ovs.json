@@ -454,6 +454,7 @@
         "framework": "Framework",
         "name": "Name",
         "noupdates": "No koffiekoeks for you",
+        "ongoing": "An upgrade is in progress",
         "start_update_question": "Das zeker dadde mee uwen __what__ update",
         "start_update": "En we zijme weg",
         "success": "Successful",

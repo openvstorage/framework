@@ -36,21 +36,29 @@ define([
         self.storageRoutersHandle = {};
 
         // Observables
+        self.upgradeOngoing = ko.observable(false);
         self.storageRouters = ko.observableArray([]);
 
         // Computed
         self.updates = ko.computed(function() {
+            var any_upgrade_ongoing = false;
             var updates_data = {'framework': false,
                                 'volumedriver': false};
             $.each(self.storageRouters(), function(index, storageRouter) {
                 var item = storageRouter.updates();
-                if (item !== undefined && item.framework !== null) {
-                    updates_data.framework = true;
-                }
-                else if (item !== undefined && item.volumedriver !== null) {
-                    updates_data.volumedriver = true;
+                if (item !== undefined) {
+                    if (item.framework !== null) {
+                        updates_data.framework = true;
+                    }
+                    else if (item.volumedriver !== null) {
+                        updates_data.volumedriver = true;
+                    }
+                    else if (item.upgrade_ongoing !== null) {
+                        any_upgrade_ongoing = item.upgrade_ongoing;
+                    }
                 }
             });
+            self.upgradeOngoing(any_upgrade_ongoing);
             return updates_data;
         });
 
@@ -82,10 +90,14 @@ define([
             }).promise();
         };
         self.updateFramework = function() {
-            if (self.updating() === true) {
+            if (self.updating() === true) {  // Cleared by refreshing page, kept in memory only
+                return;
+            }
+            else if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
                 return;
             }
             self.updating(true);
+            self.upgradeOngoing(true); // Resetted by self.updates computed function
 
             return $.Deferred(function(deferred) {
                 app.showMessage(
@@ -96,24 +108,29 @@ define([
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
                             generic.alertSuccess($.t('ovs:updates.start_update'), '');
-                            api.post('storagerouters/' + self.storageRouters()[0].guid() + '/update_framework')
-                                .then(self.shared.tasks.wait)
-                                .done(function() {
-                                    generic.alertSuccess(
-                                        $.t('ovs:updates.complete'),
-                                        $.t('ovs:updates.success')
-                                    );
-                                    deferred.resolve();
-                                    self.updating(false);
-                                })
-                                .fail(function(error) {
-                                    generic.alertError(
-                                        $.t('ovs:generic.error'),
-                                        $.t('ovs:updates.failed', { why: error })
-                                    );
-                                    deferred.reject();
-                                    self.updating(false);
-                                });
+                            $.each(self.storageRouters(), function(index, storageRouter) {
+                                if (storageRouter.nodeType() == 'MASTER') {
+                                    api.post('storagerouters/' + self.storageRouters()[0].guid() + '/update_framework')
+                                        .then(self.shared.tasks.wait)
+                                        .done(function() {
+                                            generic.alertSuccess(
+                                                $.t('ovs:updates.complete'),
+                                                $.t('ovs:updates.success')
+                                            );
+                                            deferred.resolve();
+                                            self.updating(false);
+                                        })
+                                        .fail(function(error) {
+                                            generic.alertError(
+                                                $.t('ovs:generic.error'),
+                                                $.t('ovs:updates.failed', { why: error })
+                                            );
+                                            deferred.reject();
+                                            self.updating(false);
+                                        });
+                                    return false;  // break out of $.each loop
+                                }
+                            });
                         } else {
                             deferred.reject();
                             self.updating(false);

@@ -1053,7 +1053,7 @@ class StorageRouterController(object):
         package_map = {'framework': ['openvstorage-core', 'openvstorage-webapps'],
                        'volumedriver': ['volumedriver-base', 'volumedriver-server']}
 
-        return_value = {}
+        return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
         for update_name, packages in package_map.iteritems():
             package_info = {}
             for package_name in packages:
