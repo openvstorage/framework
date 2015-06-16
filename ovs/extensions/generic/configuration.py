@@ -60,3 +60,15 @@ class Configuration(object):
         contents = json.dumps(config, indent=4)
         with open(Configuration.FILE.format(filename), 'w') as config_file:
             config_file.write(contents)
+
+    @staticmethod
+    def exists(key):
+        filename, path = key.split('.', 1)
+        with open(Configuration.FILE.format(filename), 'r') as config_file:
+            config = json.loads(config_file.read())
+        for sub_key in path.split('.'):
+            try:
+                config = config[sub_key]
+            except KeyError:
+                return False
+        return True

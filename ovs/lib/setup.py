@@ -447,7 +447,6 @@ class SetupController(object):
 
         log_message('+++ Starting framework update +++')
 
-        # Store storagerouter information in file to be able to recover
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         upgrade_file = '/etc/ready_for_upgrade'
@@ -468,11 +467,12 @@ class SetupController(object):
                     client.file_delete(upgrade_file)
 
             log_message('Attempting to start the services again')
-            change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
+            change_services_state(services=['arakoon-ovsdb', 'memcached', 'watcher-framework', 'support-agent'],
                                   ssh_clients=sshclients,
                                   action='start')
 
-            raise RuntimeError('Failed to stop all required services, aborting update\nPlease check /var/log/ovs/lib.log on {0} for more information'.format(this_client.ip))
+            log_message(Interactive.boxed_message(['Failed to stop all required services, aborting update\nPlease check /var/log/ovs/lib.log on {0} for more information'.format(this_client.ip)]))
+            return
 
         # Start update
         failed_clients = []
@@ -485,7 +485,7 @@ class SetupController(object):
                 log_message('Successfully installed openvstorage-webapps', client)
                 client.file_delete(upgrade_file)
             except Exception as ex:
-                log_message('Upgrade failed with error: {0}'.format(ex), client, 'error')
+                log_message(Interactive.boxed_message(['Upgrade failed with error: {0}'.format(ex)]), client, 'error')
                 failed_clients.append(client)
                 break
 
@@ -493,11 +493,12 @@ class SetupController(object):
             for client in sshclients:
                 if client.file_exists(upgrade_file):
                     client.file_delete(upgrade_file)
-            log_message('Attempting to start the services again')
-            change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
+            log_message('Error occurred. Attempting to start the services again')
+            change_services_state(services=['arakoon-ovsdb', 'memcached', 'watcher-framework', 'support-agent'],
                                   ssh_clients=sshclients,
                                   action='start')
-            raise RuntimeError('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]), this_client.ip))
+            log_message(Interactive.boxed_message(['Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients]))]), this_client.ip)
+            return
 
         # Start all services
         log_message('Starting services')
@@ -506,23 +507,22 @@ class SetupController(object):
                               action='start')
 
         # Migrate
-        log_message('Starting model migration')
-        for client in sshclients:
-            try:
-                log_message('Started model migration', client)
-                client.run('python -c "from ovs.dal.helpers import Migration;Migration.migrate()"')
-                log_message('Finished model migration', client)
-            except Exception as ex:
-                log_message('Model migration failed with error: {0}'.format(ex), client, 'error')
+        log_message('Started model migration')
+        try:
+            this_client.run('python -c "from ovs.dal.helpers import Migration;Migration.migrate()"')
+            log_message('Finished model migration')
+        except subprocess.CalledProcessError as cpe:
+            log_message(Interactive.boxed_message(['An unexpected error occurred:', str(cpe)]), severity='error')
+            return
 
-        log_message('Starting plugin migration')
         for client in sshclients:
             try:
                 log_message('Started plugin migration', client)
                 client.run('python -c "from ovs.extensions.migration.migrator import Migrator;Migrator.migrate()"')
                 log_message('Finished plugin migration', client)
             except Exception as ex:
-                log_message('Plugin migration failed with error: {0}'.format(ex), client, 'error')
+                log_message(Interactive.boxed_message(['Plugin migration failed with error: {0}'.format(ex)]), client, 'error')
+                return
 
         # Start all services
         log_message('Starting watcher-framework service')
