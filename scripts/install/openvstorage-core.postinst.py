@@ -60,6 +60,10 @@ for cron_rule in ['0 * * * * /usr/sbin/ntpdate pool.ntp.org',
     if cron_rule not in cron_contents:
         check_output('(crontab -l 2>/dev/null; echo "{0}") | crontab -'.format(cron_rule), shell=True)
 
+# Creating configuration file
+if not os.path.isfile('/opt/OpenvStorage/config/ovs.json'):
+    check_output('cp /opt/OpenvStorage/config/templates/ovs.json /opt/OpenvStorage/config/ovs.json', shell=True)
+
 # Configure SSH
 config_file = '/etc/ssh/sshd_config'
 ssh_content_before = None
