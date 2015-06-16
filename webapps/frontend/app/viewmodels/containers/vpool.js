@@ -185,7 +185,8 @@ define([
                 }
             }).promise();
         };
-        self.loadBackendType = function() {
+        self.loadBackendType = function(refresh) {
+            refresh = !!refresh;
             return $.Deferred(function(deferred) {
                 if (self.backendTypeGuid() !== undefined) {
                     if (self.backendType() === undefined || self.backendTypeGuid() !== self.backendType().guid()) {
@@ -194,7 +195,7 @@ define([
                             .then(deferred.resolve)
                             .fail(deferred.reject);
                         self.backendType(backendType);
-                    } else {
+                    } else if (refresh) {
                         self.backendType().load()
                             .then(deferred.resolve)
                             .fail(deferred.reject);

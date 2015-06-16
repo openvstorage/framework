@@ -1171,6 +1171,52 @@ class Basic(TestCase):
         with self.assertRaises(InvalidRelationException):
             _ = machine.one
 
+    def test_object_cleanup(self):
+        """
+        Validates whether using an object property to delete these entries does not cause issues when deleting the
+        object itself afterwards
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
+
+    def test_relation_set_build(self):
+        """
+        Validates whether relationsets are (re)build correctly
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        VolatileFactory.store.clean()
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertFalse(datalist.from_cache, 'The relation set should be generated')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

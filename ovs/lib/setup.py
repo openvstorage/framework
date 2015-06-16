@@ -21,7 +21,6 @@ import re
 import sys
 import copy
 import time
-import uuid
 import glob
 import base64
 import urllib2
@@ -68,7 +67,6 @@ class SetupController(object):
     # Generic configfiles
     generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
                            '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
-    ovs_config_filename = '/opt/OpenvStorage/config/ovs.cfg'
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
     # Services
@@ -167,9 +165,10 @@ class SetupController(object):
             local_unique_id = System.get_my_machine_id()
             remote_install = unique_id != local_unique_id
             logger.debug('{0} installation'.format('Remote' if remote_install else 'Local'))
-            if not target_client.file_exists(SetupController.ovs_config_filename):
+            try:
+                _ = Configuration.get('ovs.grid.ip')
+            except:
                 raise RuntimeError("The 'openvstorage' package is not installed on {0}".format(ip))
-            target_client.config_set('ovs.core.uniqueid', unique_id)
 
             # Getting cluster information
             current_cluster_names = []
@@ -378,9 +377,8 @@ class SetupController(object):
                     raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
             master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
 
-            ovs_config = target_client.rawconfig_read(SetupController.ovs_config_filename)
-            unique_id = ovs_config.get('core', 'uniqueid')
-            ip = ovs_config.get('grid', 'ip')
+            unique_id = System.get_my_machine_id(target_client)
+            ip = target_client.config_read('ovs.grid.ip')
             nodes.append(ip)  # The client node is never included in the discovery results
 
             ip_client_map = dict((node_ip, SSHClient(node_ip, username='root', password=target_password)) for node_ip in nodes if node_ip)
@@ -516,13 +514,6 @@ class SetupController(object):
         target_client = ip_client_map[cluster_ip]
         disk_layout = SetupController.apply_flexible_disk_layout(target_client, auto_config, disk_layout)
 
-        # add directory mountpoints to ovs.cfg
-        config = target_client.rawconfig_read(SetupController.ovs_config_filename)
-        partition_key = 'vpool_partitions'
-        if config.has_section(partition_key):
-            config.remove_section(partition_key)
-        config.add_section(partition_key)
-
         readcaches = list()
         writecaches = list()
         storage = list()
@@ -536,10 +527,9 @@ class SetupController(object):
             else:
                 storage.append(mountpoint)
 
-        config.set(partition_key, 'readcaches', ','.join(map(str, readcaches)))
-        config.set(partition_key, 'writecaches', ','.join(map(str, writecaches)))
-        config.set(partition_key, 'storage', ','.join(map(str, storage)))
-        target_client.rawconfig_write(SetupController.ovs_config_filename, config)
+        target_client.config_set('ovs.partitions.readcaches', map(str, readcaches))
+        target_client.config_set('ovs.partitions.writecaches', map(str, writecaches))
+        target_client.config_set('ovs.partitions.storage', map(str, storage))
 
         mountpoints = disk_layout.keys()
         mountpoints.sort()
@@ -609,8 +599,7 @@ class SetupController(object):
         if arakoon_mountpoint is None:
             arakoon_mountpoint = Interactive.ask_choice(mountpoints, question='Select arakoon database mountpoint',
                                                         default_value=writecaches[0] if writecaches else '')
-        target_client.config_set('ovs.core.db.arakoon.location', arakoon_mountpoint)
-        target_client.config_set('ovs.arakoon.base.dir', arakoon_mountpoint)
+        target_client.config_set('ovs.arakoon.location', arakoon_mountpoint)
         arakoon_ports = {}
         exclude_ports = []
         for cluster in SetupController.arakoon_clusters:
@@ -694,7 +683,7 @@ class SetupController(object):
                                             character=None)
             enable_heartbeats = Interactive.ask_yesno('Do you want to enable Heartbeats?', default_value=True)
         if enable_heartbeats is True:
-            target_client.config_set('ovs.support.enabled', 1)
+            target_client.config_set('ovs.support.enabled', True)
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
@@ -730,11 +719,11 @@ class SetupController(object):
         cid = master_client.config_read('ovs.support.cid')
         enabled = master_client.config_read('ovs.support.enabled')
         enablesupport = master_client.config_read('ovs.support.enablesupport')
-        target_client.config_set('ovs.support.nid', str(uuid.uuid4()))
+        target_client.config_set('ovs.support.nid', Toolbox.get_hash())
         target_client.config_set('ovs.support.cid', cid)
         target_client.config_set('ovs.support.enabled', enabled)
         target_client.config_set('ovs.support.enablesupport', enablesupport)
-        if int(enabled) > 0:
+        if enabled is True:
             service = 'support-agent'
             ServiceManager.add_service(service, client=target_client)
             ServiceManager.enable_service(service, client=target_client)
@@ -817,8 +806,7 @@ class SetupController(object):
                         break
                     else:
                         print '  Invalid path, please retry'
-        target_client.config_set('ovs.core.db.arakoon.location', arakoon_mountpoint)
-        target_client.config_set('ovs.arakoon.base.dir', arakoon_mountpoint)
+        target_client.config_set('ovs.arakoon.location', arakoon_mountpoint)
         arakoon_ports = {}
         exclude_ports = ServiceList.get_ports_for_ip(cluster_ip)
         for cluster in SetupController.arakoon_clusters:
@@ -1035,16 +1023,31 @@ EOF
             except subprocess.CalledProcessError:
                 print('  Process already stopped')
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
-        users = client.run('rabbitmqctl list_users').splitlines()[1:-1]
+
+        # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
+        #  and the next command fails so the best solution is to retry several times
+        users = Toolbox.retry_client_run(client,
+                                         'rabbitmqctl list_users',
+                                         logger=logger).splitlines()[1:-1]
         users = [usr.split('\t')[0] for usr in users]
+
         if 'ovs' not in users:
-            client.run('rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password))
-            client.run('rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login))
+            Toolbox.retry_client_run(client,
+                                     'rabbitmqctl add_user {0} {1}'.format(rabbitmq_login, rabbitmq_password),
+                                     logger=logger)
+            Toolbox.retry_client_run(client,
+                                     'rabbitmqctl set_permissions {0} ".*" ".*" ".*"'.format(rabbitmq_login),
+                                     logger=logger)
+
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
     def _start_rabbitmq_and_check_process(client):
-        output = client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'').splitlines()
+        output = Toolbox.retry_client_run(client,
+                                          'sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'',
+                                          time_sleep=1,
+                                          logger=logger).splitlines()
+
         for line in output:
             if 'Error: unable to connect to node ' in line:
                 rabbitmq_running, rabbitmq_pid, _, _ = SetupController._is_rabbitmq_running(client)
@@ -1106,7 +1109,7 @@ EOF
                         storagedriver_config.load()
                         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id='voldrv',
                                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)
-                        storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.Configuration.get('ovs.core.broker.volumerouter.queue'),
+                        storagedriver_config.configure_event_publisher(events_amqp_routing_key=remote.Configuration.get('ovs.core.broker.queues.storagedriver'),
                                                                        events_amqp_uris=uris)
                         storagedriver_config.save()
 

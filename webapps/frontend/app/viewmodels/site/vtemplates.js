@@ -144,7 +144,7 @@ define([
                             });
                         });
                 }
-            }, 5000);
+            }, 60000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

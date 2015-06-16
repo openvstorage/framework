@@ -16,9 +16,7 @@
 Generic module for managing the OVS configuration files
 """
 
-from ConfigParser import RawConfigParser
-from ovs.log.logHandler import LogHandler
-logger = LogHandler('extensions', name='configuration')
+import json
 
 
 class Configuration(object):
@@ -26,7 +24,7 @@ class Configuration(object):
     Configuration class
     """
 
-    FILE = '/opt/OpenvStorage/config/{0}.cfg'
+    FILE = '/opt/OpenvStorage/config/{0}.json'
 
     def __init__(self):
         """
@@ -36,20 +34,29 @@ class Configuration(object):
 
     @staticmethod
     def get(key):
-        filename, section, item = key.split('.', 2)
-        config = RawConfigParser()
-        config.read(Configuration.FILE.format(filename))
-        return config.get(section, item)
+        filename, path = key.split('.', 1)
+        with open(Configuration.FILE.format(filename), 'r') as config_file:
+            config = json.loads(config_file.read())
+            temp_config = config
+            for entry in path.split('.'):
+                temp_config = temp_config[entry]
+            return temp_config
 
     @staticmethod
     def set(key, value):
-        filename, section, item = key.split('.', 2)
-        config = RawConfigParser()
-        config.read(Configuration.FILE.format(filename))
-        config.set(section, item, value)
+        filename, path = key.split('.', 1)
+        with open(Configuration.FILE.format(filename), 'r') as config_file:
+            config = json.loads(config_file.read())
+            temp_config = config
+            entries = path.split('.')
+            if len(entries) > 1:
+                for entry in entries[:-1]:
+                    if entry in temp_config:
+                        temp_config = temp_config[entry]
+                    else:
+                        temp_config[entry] = {}
+                        temp_config = temp_config[entry]
+                temp_config[entries[-1]] = value
+        contents = json.dumps(config, indent=4)
         with open(Configuration.FILE.format(filename), 'w') as config_file:
-            config.write(config_file)
-
-    @staticmethod
-    def get_int(key):
-        return int(Configuration.get(key))
+            config_file.write(contents)

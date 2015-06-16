@@ -35,6 +35,6 @@ class BackendType(DataObject):
         Checks whether this BackendType has a plugin installed
         """
         try:
-            return True if Configuration.get('ovs.plugins.backend.' + self.code) else False
+            return self.code in Configuration.get('ovs.plugins.backends')
         except:
             return False

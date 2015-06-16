@@ -27,6 +27,7 @@ from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 
 logger = LogHandler('lib', name='disk')
@@ -61,72 +62,73 @@ class DiskController(object):
                 if match is not None:
                     mount_mapping[match.groups()[0]] = match.groups()[1]
             # Gather disk information
-            context = Context()
-            devices = [device for device in context.list_devices(subsystem='block')
-                       if 'ID_TYPE' in device and device['ID_TYPE'] == 'disk']
-            for device in devices:
-                is_partition = device['DEVTYPE'] == 'partition'
-                device_path = device['DEVNAME']
-                device_name = device_path.split('/')[-1]
-                partition_id = None
-                partition_name = None
-                if is_partition is True:
-                    partition_id = device['ID_PART_ENTRY_NUMBER']
-                    partition_name = device_name
-                    device_name = device_name[:0 - int(len(partition_id))]
-                if device_name not in configuration:
-                    configuration[device_name] = {'partitions': {}}
-                path = None
-                for path_type in ['by-id', 'by-uuid']:
-                    if path is not None:
-                        break
-                    for item in device['DEVLINKS'].split(' '):
-                        if path_type in item:
-                            path = item
-                if path is None:
-                    path = device_path
-                sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
-                sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
-                rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
-                if is_partition is True:
-                    if device['ID_PART_ENTRY_TYPE'] == '0x5':
-                        continue  # This is an extended partition, let's skip that one
-                    configuration[device_name]['partitions'][partition_id] = {'offset': int(device['ID_PART_ENTRY_OFFSET']) * sector_size,
-                                                                              'size': int(device['ID_PART_ENTRY_SIZE']) * sector_size,
-                                                                              'path': path,
-                                                                              'state': 'OK'}
-                    partition_data = configuration[device_name]['partitions'][partition_id]
-                    if partition_name in mount_mapping:
-                        mountpoint = mount_mapping[partition_name]
-                        partition_data['mountpoint'] = mountpoint
-                        partition_data['inode'] = os.stat(mountpoint).st_dev
-                        del mount_mapping[partition_name]
-                        try:
-                            client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
-                        except:
-                            partition_data['state'] = 'ERROR'
-                            pass
-                    if 'ID_FS_TYPE' in device:
-                        partition_data['filesystem'] = device['ID_FS_TYPE']
-                else:
-                    configuration[device_name].update({'name': device_name,
-                                                       'path': path,
-                                                       'vendor': device['ID_VENDOR'] if 'ID_VENDOR' in device else None,
-                                                       'model': device['ID_MODEL'] if 'ID_MODEL' in device else None,
-                                                       'size': sector_size * sectors,
-                                                       'is_ssd': rotational == 0,
-                                                       'state': 'OK'})
-                for partition_name in mount_mapping:
-                    device_name = partition_name.split('/')[-1]
-                    match = re.search('^(.+?)(\d+)$', device_name)
-                    if match is not None:
-                        device_name = match.groups()[0]
-                        partition_id = match.groups()[1]
+            with Remote(storagerouter.ip, [Context]) as remote:
+                context = remote.Context()
+                devices = [device for device in context.list_devices(subsystem='block')
+                           if 'ID_TYPE' in device and device['ID_TYPE'] == 'disk']
+                for device in devices:
+                    is_partition = device['DEVTYPE'] == 'partition'
+                    device_path = device['DEVNAME']
+                    device_name = device_path.split('/')[-1]
+                    partition_id = None
+                    partition_name = None
+                    if is_partition is True:
+                        partition_id = device['ID_PART_ENTRY_NUMBER']
+                        partition_name = device_name
+                        device_name = device_name[:0 - int(len(partition_id))]
                     if device_name not in configuration:
-                        configuration[device_name] = {'partitions': {},
-                                                      'state': 'MISSING'}
-                    configuration[device_name]['partitions'][partition_id] = {'mountpoint': mount_mapping[partition_name],
-                                                                              'state': 'MISSING'}
+                        configuration[device_name] = {'partitions': {}}
+                    path = None
+                    for path_type in ['by-id', 'by-uuid']:
+                        if path is not None:
+                            break
+                        for item in device['DEVLINKS'].split(' '):
+                            if path_type in item:
+                                path = item
+                    if path is None:
+                        path = device_path
+                    sectors = int(client.run('cat /sys/block/{0}/size'.format(device_name)))
+                    sector_size = int(client.run('cat /sys/block/{0}/queue/hw_sector_size'.format(device_name)))
+                    rotational = int(client.run('cat /sys/block/{0}/queue/rotational'.format(device_name)))
+                    if is_partition is True:
+                        if device['ID_PART_ENTRY_TYPE'] == '0x5':
+                            continue  # This is an extended partition, let's skip that one
+                        configuration[device_name]['partitions'][partition_id] = {'offset': int(device['ID_PART_ENTRY_OFFSET']) * sector_size,
+                                                                                  'size': int(device['ID_PART_ENTRY_SIZE']) * sector_size,
+                                                                                  'path': path,
+                                                                                  'state': 'OK'}
+                        partition_data = configuration[device_name]['partitions'][partition_id]
+                        if partition_name in mount_mapping:
+                            mountpoint = mount_mapping[partition_name]
+                            partition_data['mountpoint'] = mountpoint
+                            partition_data['inode'] = os.stat(mountpoint).st_dev
+                            del mount_mapping[partition_name]
+                            try:
+                                client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
+                            except:
+                                partition_data['state'] = 'ERROR'
+                                pass
+                        if 'ID_FS_TYPE' in device:
+                            partition_data['filesystem'] = device['ID_FS_TYPE']
+                    else:
+                        configuration[device_name].update({'name': device_name,
+                                                           'path': path,
+                                                           'vendor': device['ID_VENDOR'] if 'ID_VENDOR' in device else None,
+                                                           'model': device['ID_MODEL'] if 'ID_MODEL' in device else None,
+                                                           'size': sector_size * sectors,
+                                                           'is_ssd': rotational == 0,
+                                                           'state': 'OK'})
+                    for partition_name in mount_mapping:
+                        device_name = partition_name.split('/')[-1]
+                        match = re.search('^(.+?)(\d+)$', device_name)
+                        if match is not None:
+                            device_name = match.groups()[0]
+                            partition_id = match.groups()[1]
+                        if device_name not in configuration:
+                            configuration[device_name] = {'partitions': {},
+                                                          'state': 'MISSING'}
+                        configuration[device_name]['partitions'][partition_id] = {'mountpoint': mount_mapping[partition_name],
+                                                                                  'state': 'MISSING'}
             # Sync the model
             disk_names = []
             for disk in storagerouter.disks:

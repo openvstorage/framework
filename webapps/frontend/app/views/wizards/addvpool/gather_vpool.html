@@ -118,18 +118,18 @@ limitations under the License.
                     </button>
                 </div>
             </div>
-        </div>
-        <div class="form-group" data-bind="if: data.albaBackend() !== undefined">
-            <label class="col-lg-3 control-label" for="" data-i18n="ovs:wizards.addvpool.gathervpool.albapreset"></label>
-            <div class="col-lg-7">
-                <span data-bind="dropdown: {
-                                     key: 'name', keyisfunction: false,
-                                     items: data.albaBackend().presetNames, target: data.albaPreset,
-                                     text: function(item) {
-                                         var text = item.name + ': ' + item.policies.join(', ');
-                                         return text;
-                                     }
-                                 }"></span>
+            <div class="form-group" data-bind="if: data.albaBackend() !== undefined">
+                <label class="col-lg-3 control-label" for="" data-i18n="ovs:wizards.addvpool.gathervpool.albapreset"></label>
+                <div class="col-lg-7">
+                    <span data-bind="dropdown: {
+                                         key: 'name', keyisfunction: false,
+                                         items: data.albaBackend().presetNames, target: data.albaPreset,
+                                         text: function(item) {
+                                             var text = item.name + ': ' + item.policies.join(', ');
+                                             return text;
+                                         }
+                                     }"></span>
+                </div>
             </div>
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathervpool.extendedinfo"></p>

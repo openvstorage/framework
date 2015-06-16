@@ -309,11 +309,11 @@ print json.dumps(Configuration.get('{0}'))
             Configuration.set(key, value)
         else:
             write = """
-import sys
+import sys, json
 sys.path.append('/opt/OpenvStorage')
 from ovs.extensions.generic.configuration import Configuration
-Configuration.set('{0}', '{1}')
-""".format(key, value)
+Configuration.set('{0}', json.loads('{1}'))
+""".format(key, json.dumps(value))
             self.run('python -c """{0}"""'.format(write))
 
     def rawconfig_read(self, filename):
