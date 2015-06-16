@@ -14,7 +14,8 @@ if [ "$1" = "setup" ] ; then
   fi
 elif [ "$1" = "update" ] ; then
   if [ "$2" = "framework" ] ; then
-    python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()" &
+    echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()"' > /tmp/update
+    at -f /tmp/update now
   fi
 elif [ "$1" = "monitor" ] ; then
   if [ "$2" = "services" ] ; then

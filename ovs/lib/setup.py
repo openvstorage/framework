@@ -450,7 +450,6 @@ class SetupController(object):
         log_message('+++ Starting framework update +++')
 
         # Store storagerouter information in file to be able to recover
-        from ovs.dal.helpers import Migration
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
         upgrade_file = '/etc/ready_for_upgrade'
@@ -509,8 +508,23 @@ class SetupController(object):
                               action='start')
 
         # Migrate
-        log_message('Starting migration')
-        Migration.migrate()
+        log_message('Starting model migration')
+        for client in sshclients:
+            try:
+                log_message('Started model migration', client)
+                client.run('python -c "from ovs.dal.helpers import Migration;Migration.migrate()"')
+                log_message('Finished model migration', client)
+            except Exception as ex:
+                log_message('Model migration failed with error: {0}'.format(ex), client, 'error')
+
+        log_message('Starting plugin migration')
+        for client in sshclients:
+            try:
+                log_message('Started plugin migration', client)
+                client.run('python -c "from ovs.extensions.migration.migrator import Migrator;Migrator.migrate()"')
+                log_message('Finished plugin migration', client)
+            except Exception as ex:
+                log_message('Plugin migration failed with error: {0}'.format(ex), client, 'error')
 
         # Start all services
         log_message('Starting watcher-framework service')
