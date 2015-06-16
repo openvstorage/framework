@@ -110,7 +110,7 @@ class SSHClient(object):
                 if not os.path.exists(directory):
                     os.makedirs(directory)
             else:
-                self.run('mkdir -p "{0}"'.format(directory))
+                self.run('mkdir -p "{0}"; echo true'.format(directory))
 
     def dir_delete(self, directories):
         """
