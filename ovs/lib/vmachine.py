@@ -269,6 +269,8 @@ class VMachineController(object):
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
+            for junction in disk.mds_services:
+                junction.delete()
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
