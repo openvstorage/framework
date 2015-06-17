@@ -36,6 +36,7 @@ from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -416,9 +417,9 @@ class SetupController(object):
 
     @staticmethod
     def update_framework():
-        def log_message(message, ssh_client=None, severity='info'):
-            if ssh_client is not None:
-                message = '{0:<15}: {1}'.format(ssh_client.ip, message)
+        def log_message(message, client_ip=None, severity='info'):
+            if client_ip is not None:
+                message = '{0:<15}: {1}'.format(client_ip, message)
             if severity == 'info':
                 logger.info(message)
             elif severity == 'warning':
@@ -437,17 +438,19 @@ class SetupController(object):
             Stop/start services on SSH clients
             If action is start, we ignore errors and try to start other services on other nodes
             """
+            if action == 'start':
+                services.reverse()  # Start services again in reverse order of stopping
             for service_name in services:
                 for ssh_client in ssh_clients:
-                    log_message('{0} service {1}'.format('Stopping' if action == 'stop' else 'Starting', service_name), ssh_client)
+                    log_message('{0} service {1}'.format('Stopping' if action == 'stop' else 'Starting', service_name), ssh_client.ip)
                     try:
                         if ServiceManager.has_service(service_name, client=ssh_client):
                             SetupController._change_service_state(client=ssh_client,
                                                                   name=service_name,
                                                                   state=action)
-                            log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client)
+                            log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client.ip)
                     except Exception as exc:
-                        log_message('Something went wrong {0} service {1}: {2}'.format('stopping' if action == 'stop' else 'starting', service_name, exc), ssh_client, severity='warning')
+                        log_message('Something went wrong {0} service {1}: {2}'.format('stopping' if action == 'stop' else 'starting', service_name, exc), ssh_client.ip, severity='warning')
                         if action == 'stop':
                             return False
             return True
@@ -462,87 +465,112 @@ class SetupController(object):
         sshclients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
         this_client = [client for client in sshclients if client.is_local is True][0]
 
-        # Stop services
+        plugin_services = []
+        plugin_packages = []
+        framework_packages = ['openvstorage-core', 'openvstorage-webapps']
+        framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent']
+
+        # Check plugin requirements
+        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
+        for function in plugin_functions:
+            output = function()
+            if not isinstance(output, dict):
+                log_message('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
+                return
+            if 'services' not in output or 'packages' not in output:
+                log_message('Update cannot continue. Failed to retrieve required service and package information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
+                return
+            if not isinstance(output['services'], list) or not isinstance(output['packages'], list):
+                log_message('Update cannot continue. Services and packages should be of type "list" ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
+                return
+
+            plugin_services += output['services']
+            plugin_packages += output['packages']
+
+        # Commence update !!!!!!!
+        # 1. Create locks
         for client in sshclients:
             client.run('touch {0}'.format(upgrade_file))
             client.run('touch {0}'.format(upgrade_ongoing_check_file))
 
-        if change_services_state(services=['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent'],
-                                 ssh_clients=sshclients,
-                                 action='stop') is False:
-            log_message('Stopping all services on every node failed, cannot continue', severity='warning')
-            remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
+        # 2. Stop services
+        failed_services = False
+        for service_names, service_type in [(plugin_services, 'plugin'),
+                                            (framework_services, 'framework')]:
+            if change_services_state(services=service_names,
+                                     ssh_clients=sshclients,
+                                     action='stop') is False:
+                log_message('Stopping all {0} services on every node failed, cannot continue'.format(service_type), client_ip=this_client.ip, severity='warning')
+                remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
+                failed_services = True
+                break
 
-            log_message('Attempting to start the services again')
-            change_services_state(services=['arakoon-ovsdb', 'memcached', 'watcher-framework', 'support-agent'],
-                                  ssh_clients=sshclients,
-                                  action='start')
+        if failed_services is True:
+            for service_names, service_type in [(plugin_services, 'plugin'),
+                                                (framework_services, 'framework')]:
+                log_message('Attempting to start the {0} services again'.format(service_type), client_ip=this_client.ip)
+                change_services_state(services=service_names,
+                                      ssh_clients=sshclients,
+                                      action='start')
 
-            log_message('Failed to stop all required services, aborting update', severity='warning')
+            log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
             return
 
-        # Start update
+        # 3. Update packages
         failed_clients = []
         for client in sshclients:
             try:
-                log_message('Installing latest packages', client)
-                client.run('apt-get install -y --force-yes openvstorage-core')
-                log_message('Successfully installed openvstorage-core', client)
-                client.run('apt-get install -y --force-yes openvstorage-webapps')
-                log_message('Successfully installed openvstorage-webapps', client)
+                for packages, package_type in [(plugin_packages, 'plugin'),
+                                               (framework_packages, 'framework')]:
+                    log_message('Installing latest {0} packages'.format(package_type), client.ip)
+                    for package_name in packages:
+                        client.run('apt-get install -y --force-yes {0}'.format(package_name))
+                        log_message('Successfully installed {0}'.format(package_name), client.ip)
                 client.file_delete(upgrade_file)
             except Exception as ex:
-                log_message('Upgrade failed with error: {0}'.format(ex), client, 'error')
+                log_message('Upgrade failed with error: {0}'.format(ex), client.ip, 'error')
                 failed_clients.append(client)
                 break
 
         if failed_clients:
             remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
-            log_message('Error occurred. Attempting to start the services again', severity='error')
-            change_services_state(services=['arakoon-ovsdb', 'memcached', 'watcher-framework', 'support-agent'],
+            log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
+            change_services_state(services=framework_services + plugin_services,
                                   ssh_clients=sshclients,
                                   action='start')
             log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
             return
 
-        # Start all services
-        log_message('Starting services')
+        # 4. Start services
+        log_message('Starting services', client_ip=this_client.ip)
         change_services_state(services=['arakoon-ovsdb', 'memcached', 'support-agent'],
                               ssh_clients=sshclients,
                               action='start')
 
-        # Migrate
-        log_message('Started model migration')
+        # 5. Migrate
+        log_message('Started model migration', client_ip=this_client.ip)
         try:
-            command = """
-import sys
-sys.path.append('/opt/OpenvStorage')
-from ovs.dal.helpers import Migration
-Migration.migrate()"""
-            this_client.run('python -c "{0}"'.format(command))
-            log_message('Finished model migration')
-        except subprocess.CalledProcessError as cpe:
+            from ovs.dal.helpers import Migration
+            Migration.migrate()
+            log_message('Finished model migration', client_ip=this_client.ip)
+        except Exception as ex:
             remove_lock_files([upgrade_ongoing_check_file], sshclients)
-            log_message('An unexpected error occurred: {0}'.format(cpe.output), severity='error')
+            log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip, severity='error')
             return
 
-        command = """
-import sys
-sys.path.append('/opt/OpenvStorage')
-from ovs.extensions.migration.migrator import Migrator
-Migrator.migrate()"""
         for client in sshclients:
             try:
-                log_message('Started plugin migration', client)
-                client.run('python -c "{0}"'.format(command))
-                log_message('Finished plugin migration', client)
-            except subprocess.CalledProcessError as cpe:
+                log_message('Started code migration', client.ip)
+                with Remote(client.ip, [Migrator]) as remote:
+                    remote.Migrator.migrate()
+                log_message('Finished code migration', client.ip)
+            except Exception as ex:
                 remove_lock_files([upgrade_ongoing_check_file], sshclients)
-                log_message('Plugin migration failed with error: {0}'.format(cpe.output), client, 'error')
+                log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
                 return
 
-        # Start all services
-        change_services_state(services=['watcher-framework'],
+        # 6. Start watcher
+        change_services_state(services=['watcher-framework'] + plugin_services,
                               ssh_clients=sshclients,
                               action='start')
 
