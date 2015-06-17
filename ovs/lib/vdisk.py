@@ -467,6 +467,7 @@ class VDiskController(object):
         volumepath = disk.devicename
         mountpoint = storagedriver.mountpoint
         devicepath = '{0}/{1}'.format(mountpoint, volumepath)
+        disk_mgmt_center_info = None
         try:
             disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
         except Exception as ex:
