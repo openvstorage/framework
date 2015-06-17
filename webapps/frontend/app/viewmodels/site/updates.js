@@ -121,10 +121,6 @@ define([
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
                                         .then(self.shared.tasks.wait)
                                         .done(function() {
-                                            generic.alertSuccess(
-                                                $.t('ovs:updates.complete'),
-                                                $.t('ovs:updates.success')
-                                            );
                                             deferred.resolve();
                                             self.updating(false);
                                         })
@@ -148,8 +144,7 @@ define([
             }).promise();
         };
         self.updateVolumedriver = function() {
-            if (self.updating() === true) return;
-            self.updating(true);
+            return;
         }
     };
 });

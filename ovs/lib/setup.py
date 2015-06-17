@@ -490,8 +490,8 @@ class SetupController(object):
         # Commence update !!!!!!!
         # 1. Create locks
         for client in sshclients:
-            client.run('touch {0}'.format(upgrade_file))
-            client.run('touch {0}'.format(upgrade_ongoing_check_file))
+            client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually perform apt-get install or apt-get upgrade individual packages
+            client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
 
         # 2. Stop services
         failed_services = False

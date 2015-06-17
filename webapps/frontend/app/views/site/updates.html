@@ -24,7 +24,7 @@ limitations under the License.
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
                     </span>
-                    <span data-bind="text: name"></span>
+                    <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
                         <span data-part="lazy-entry" data-bind="text: item() === undefined || item().framework === null ? $.t('ovs:updates.noupdates') : item().framework.to"></span>
