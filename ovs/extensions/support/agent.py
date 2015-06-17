@@ -155,7 +155,7 @@ class SupportAgent(object):
 
 if __name__ == '__main__':
     try:
-        if int(Configuration.get('ovs.support.enabled')) == 0:
+        if Configuration.get('ovs.support.enabled') is False:
             print 'Support not enabled'
             sys.exit(0)
         logger.info('Starting up')
