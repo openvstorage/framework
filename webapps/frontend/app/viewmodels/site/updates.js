@@ -36,21 +36,27 @@ define([
         self.storageRoutersHandle = {};
 
         // Observables
-        self.upgradeOngoing = ko.observable(false);
-        self.storageRouters = ko.observableArray([]);
+        self.storageRouters     = ko.observableArray([]);
+        self.upgradeOngoing     = ko.observable(false);
+        self.frameworkUpdate    = ko.observable(false);
+        self.volumedriverUpdate = ko.observable(false);
 
         // Computed
         self.updates = ko.computed(function() {
             var any_upgrade_ongoing = false;
+            var any_framework_update = false;
+            var any_volumedriver_update = false;
             var updates_data = {'framework': false,
                                 'volumedriver': false};
             $.each(self.storageRouters(), function(index, storageRouter) {
                 var item = storageRouter.updates();
                 if (item !== undefined) {
                     if (item.framework !== null) {
+                        any_framework_update = true;
                         updates_data.framework = true;
                     }
                     else if (item.volumedriver !== null) {
+                        any_volumedriver_update = true;
                         updates_data.volumedriver = true;
                     }
                     else if (item.upgrade_ongoing !== null) {
@@ -58,6 +64,8 @@ define([
                     }
                 }
             });
+            self.frameworkUpdate(any_framework_update);
+            self.volumedriverUpdate(any_volumedriver_update);
             self.upgradeOngoing(any_upgrade_ongoing);
             return updates_data;
         });
@@ -110,7 +118,7 @@ define([
                             generic.alertSuccess($.t('ovs:updates.start_update'), '');
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (storageRouter.nodeType() == 'MASTER') {
-                                    api.post('storagerouters/' + self.storageRouters()[0].guid() + '/update_framework')
+                                    api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
                                         .then(self.shared.tasks.wait)
                                         .done(function() {
                                             generic.alertSuccess(
@@ -134,6 +142,7 @@ define([
                         } else {
                             deferred.reject();
                             self.updating(false);
+                            self.upgradeOngoing(false);
                         }
                     })
             }).promise();

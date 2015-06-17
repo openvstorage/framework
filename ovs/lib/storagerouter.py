@@ -123,11 +123,11 @@ class StorageRouterController(object):
                            'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
         required_params_without_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                        'connection_host': (str, Toolbox.regex_ip, False),
-                                        'connection_port': (int, None),
-                                        'connection_backend': (dict, None),
-                                        'connection_username': (str, None),
-                                        'connection_password': (str, None)}
+                                         'connection_host': (str, Toolbox.regex_ip, False),
+                                         'connection_port': (int, None),
+                                         'connection_backend': (dict, None),
+                                         'connection_username': (str, None),
+                                         'connection_password': (str, None)}
         required_params_local = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
 
         if not isinstance(parameters, dict):
@@ -1059,7 +1059,7 @@ class StorageRouterController(object):
             for package_name in packages:
                 installed = None
                 candidate = None
-                for line in check_output('apt-cache policy {0}'.format(package_name), shell=True).splitlines():
+                for line in root_client.run('apt-cache policy {0}'.format(package_name)).splitlines():
                     line = line.strip()
                     if line.startswith('Installed:'):
                         installed = line.lstrip('Installed:').strip()

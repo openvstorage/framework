@@ -40,7 +40,7 @@ limitations under the License.
     <div>
         <button class="btn btn-default"
                 data-bind="click: updateFramework,
-                           enable: $root.shared.user.roles().contains('manage') && updates().framework === true && !updating(),
+                           enable: $root.shared.user.roles().contains('manage') && frameworkUpdate() === true && !updating(),
                            visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
                 id="buttonUpdateFramework"
                 style="margin-top: 20px;">
@@ -50,7 +50,7 @@ limitations under the License.
     <div>
         <button class="btn btn-default"
                 data-bind="click: updateVolumedriver,
-                           enable: $root.shared.user.roles().contains('manage') && updates().volumedriver === true && !updating(),
+                           enable: $root.shared.user.roles().contains('manage') && volumedriverUpdate() === true && !updating(),
                            visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
                 id="buttonUpdateVolumedriver"
                 style="margin-top: 10px;">
