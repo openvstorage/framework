@@ -835,7 +835,7 @@ class StorageRouterController(object):
                 logger.info('Recursively removed {0}'.format(dir_name))
 
         # Remove top directories
-        dirs2remove = list()
+        dirs2remove = []
         dirs2remove.extend(storagedriver.mountpoint_readcaches)
         dirs2remove.extend(storagedriver.mountpoint_writecaches)
         dirs2remove.append(storagedriver.mountpoint_fragmentcache)
@@ -843,8 +843,14 @@ class StorageRouterController(object):
         dirs2remove.append(storagedriver.mountpoint_md)
         dirs2remove.append(storagedriver.mountpoint)
 
+        mountpoints = client.run('mount -v').strip().splitlines()
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
+                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
+                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
+                       and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
+
         for directory in set(dirs2remove):
-            if directory:
+            if directory and directory not in mountpoints:
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         DiskController.sync_with_reality(storagerouter.guid)
