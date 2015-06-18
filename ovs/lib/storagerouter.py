@@ -978,10 +978,12 @@ class StorageRouterController(object):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
         """
+        this_client = SSHClient('127.0.0.1', username='root')
+        logfile = this_client.run('ovs collect logs').strip()
+        logfilename = logfile.split('/')[-1]
+
         storagerouter = StorageRouter(local_storagerouter_guid)
         webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
-        logfile = check_output('ovs collect logs', shell=True).strip()
-        logfilename = logfile.split('/')[-1]
         client = SSHClient(storagerouter.ip, username='root')
         client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
