@@ -424,6 +424,34 @@ define(['jquery', 'jqp/pnotify'], function($) {
         }
         return text;
     }
+    function setCookie(name, value, days) {
+        var expires, date;
+        if (days !== undefined) {
+            date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = '; expires=' + date.toGMTString();
+        } else {
+            expires = '';
+        }
+        document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value) + expires + '; path=/';
+    }
+    function getCookie(name) {
+        var cookies = document.cookie.split(';'), cookie, i;
+        name = encodeURIComponent(name);
+        for (i = 0; i < cookies.length; i += 1) {
+            cookie = cookies[i];
+            while (cookie.charAt(0) === ' ') {
+                cookie = cookie.substring(1, cookie.length);
+            }
+            if (cookie.indexOf(name) === 0) {
+                return decodeURIComponent(cookie.substring(name.length + 1, cookie.length));
+            }
+        }
+        return null;
+    }
+    function removeCookie(name) {
+        setCookie(name, '', -1);
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -473,6 +501,9 @@ define(['jquery', 'jqp/pnotify'], function($) {
         getColor: getColor,
         getLocalTime: getLocalTime,
         arrayFilterUnique: arrayFilterUnique,
-        getHash: getHash
+        getHash: getHash,
+        setCookie: setCookie,
+        getCookie: getCookie,
+        removeCookie: removeCookie
     };
 });

@@ -66,7 +66,7 @@ class OpenStack(object):
         Get specific config values:
         - config_cinder (first time comes from GUI integratemgmt: True/False)
         """
-        config_cinder = parameters.get('integratemgmt', False)
+        config_cinder = parameters.get('integratemgmt', metadata.get('integratemgmt', False))
         return {'integratemgmt': config_cinder}
 
     def set_metadata(self, metadata):

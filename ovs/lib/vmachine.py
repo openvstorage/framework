@@ -269,6 +269,8 @@ class VMachineController(object):
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
+            for junction in disk.mds_services:
+                junction.delete()
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
@@ -483,7 +485,7 @@ class VMachineController(object):
                 pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 hypervisor = Factory.get(pmachine)
-                if not hypervisor.file_exists(vmachine.vpool, hypervisor.clean_vmachine_filename(vmachine.devicename)):
+                if not hypervisor.file_exists(storagedriver, hypervisor.clean_vmachine_filename(vmachine.devicename)):
                     return
                 vmachine.pmachine = pmachine
                 vmachine.save()
@@ -534,13 +536,13 @@ class VMachineController(object):
             try:
                 mutex.acquire(wait=5)
                 limit = 5
-                exists = hypervisor.file_exists(vpool, name)
+                exists = hypervisor.file_exists(storagedriver, name)
                 while limit > 0 and exists is False:
                     time.sleep(1)
-                    exists = hypervisor.file_exists(vpool, name)
+                    exists = hypervisor.file_exists(storagedriver, name)
                     limit -= 1
                 if exists is False:
-                    logger.info('Could not locate vmachine with name {0} on vpool {1}'.format(name, vpool))
+                    logger.info('Could not locate vmachine with name {0} on vpool {1}'.format(name, vpool.name))
                     vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
                     if vmachine is not None:
                         VMachineController.delete_from_voldrv(name, storagedriver_id=storagedriver_id)

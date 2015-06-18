@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from subprocess import check_output, STDOUT, CalledProcessError
+from ConfigParser import RawConfigParser
+from ovs.log.logHandler import LogHandler
+
 import os
 import re
 import grp
@@ -20,9 +24,8 @@ import glob
 import json
 import tempfile
 import paramiko
-import subprocess
-from subprocess import check_output
-from ConfigParser import RawConfigParser
+
+logger = LogHandler('extensions', name='sshclient')
 
 
 class SSHClient(object):
@@ -90,12 +93,17 @@ class SSHClient(object):
         Executes a shell command
         """
         if self.is_local is True:
-            return check_output(command, shell=True).strip()
+            try:
+                return check_output(command, stderr=STDOUT, shell=True).strip()
+            except CalledProcessError as cpe:
+                logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, cpe.output))
+                raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                raise subprocess.CalledProcessError(exit_code, command, stderr.readlines())
+                logger.error('Command:\n{0}\nfailed :\n{1}\nand error:\n{2}\n'.format(command, stdout, stderr))
+                raise CalledProcessError(exit_code, command, stderr.readlines())
             return '\n'.join(line.strip() for line in stdout).strip()
 
     def dir_create(self, directories):
@@ -110,7 +118,7 @@ class SSHClient(object):
                 if not os.path.exists(directory):
                     os.makedirs(directory)
             else:
-                self.run('mkdir -p "{0}"'.format(directory))
+                self.run('mkdir -p "{0}"; echo true'.format(directory))
 
     def dir_delete(self, directories):
         """

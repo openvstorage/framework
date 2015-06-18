@@ -63,12 +63,8 @@ class Configuration(object):
 
     @staticmethod
     def exists(key):
-        filename, path = key.split('.', 1)
-        with open(Configuration.FILE.format(filename), 'r') as config_file:
-            config = json.loads(config_file.read())
-        for sub_key in path.split('.'):
-            try:
-                config = config[sub_key]
-            except KeyError:
-                return False
-        return True
+        try:
+            _ = Configuration.get(key)
+            return True
+        except KeyError:
+            return False

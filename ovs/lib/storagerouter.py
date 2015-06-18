@@ -212,7 +212,14 @@ class StorageRouterController(object):
                 if connection_host == '':
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
-                    oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
+                    clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
+                    oauth_client = None
+                    for current_client in clients:
+                        if current_client.user.group.name == 'administrators':
+                            oauth_client = current_client
+                            break
+                    if oauth_client is None:
+                        raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
                     ovs_client = OVSClient(connection_host, connection_port,
                                            credentials=(oauth_client.client_id, oauth_client.client_secret),
                                            version=1)
@@ -295,10 +302,9 @@ class StorageRouterController(object):
         failovercache = '{0}/foc_{1}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{0}/metadata_{1}'.format(mountpoint_md, vpool_name)
         tlogpath = '{0}/tlogs_{1}'.format(mountpoint_md, vpool_name)
-        rsppath = '/var/rsp/{0}'.format(vpool_name)
+        rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
 
-        dirs2create = [failovercache, metadatapath, tlogpath, rsppath,
-                       client.config_read('ovs.storagedriver.rsp')]
+        dirs2create = [failovercache, metadatapath, tlogpath, rsppath]
         files2create = list()
         readcaches = list()
         writecaches = list()
@@ -438,7 +444,6 @@ class StorageRouterController(object):
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        readcache_serialization_path = client.config_read('ovs.storagedriver.rsp')
         queue_protocol = Configuration.get('ovs.core.broker.protocol')
         queue_login = Configuration.get('ovs.core.broker.login')
         queue_password = Configuration.get('ovs.core.broker.password')
@@ -514,7 +519,7 @@ class StorageRouterController(object):
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
-                                                               read_cache_serialization_path=readcache_serialization_path)
+                                                               read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
@@ -785,7 +790,7 @@ class StorageRouterController(object):
                 storagedriver_client.destroy_filesystem()
                 vrouter_clusterregistry.erase_node_configs()
             except RuntimeError as ex:
-                print('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
+                logger.error('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
@@ -807,7 +812,7 @@ class StorageRouterController(object):
                                '{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name),
                                '{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name),
                                '{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name),
-                               '/var/rsp/{0}'.format(vpool.name)])
+                               '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)])
 
         files_to_remove.append('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
@@ -830,7 +835,7 @@ class StorageRouterController(object):
                 logger.info('Recursively removed {0}'.format(dir_name))
 
         # Remove top directories
-        dirs2remove = list()
+        dirs2remove = []
         dirs2remove.extend(storagedriver.mountpoint_readcaches)
         dirs2remove.extend(storagedriver.mountpoint_writecaches)
         dirs2remove.append(storagedriver.mountpoint_fragmentcache)
@@ -838,8 +843,14 @@ class StorageRouterController(object):
         dirs2remove.append(storagedriver.mountpoint_md)
         dirs2remove.append(storagedriver.mountpoint)
 
+        mountpoints = client.run('mount -v').strip().splitlines()
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
+                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
+                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
+                       and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
+
         for directory in set(dirs2remove):
-            if directory:
+            if directory and directory not in mountpoints:
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         DiskController.sync_with_reality(storagerouter.guid)
@@ -967,10 +978,12 @@ class StorageRouterController(object):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
         """
+        this_client = SSHClient('127.0.0.1', username='root')
+        logfile = this_client.run('ovs collect logs').strip()
+        logfilename = logfile.split('/')[-1]
+
         storagerouter = StorageRouter(local_storagerouter_guid)
         webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
-        logfile = check_output('ovs collect logs', shell=True).strip()
-        logfilename = logfile.split('/')[-1]
         client = SSHClient(storagerouter.ip, username='root')
         client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)

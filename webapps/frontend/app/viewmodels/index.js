@@ -14,9 +14,9 @@
 /*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared',
+    'ovs/shared', 'ovs/generic',
     'jqp/timeago'
-], function(router, dialog, $, shared, _) {
+], function(router, dialog, $, shared, generic, _) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
@@ -30,15 +30,30 @@ define([
                         .map(shared.routing.siteRoutes)
                         .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {
+        var state, metadata;
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
             if (instance.guard.authenticated === true) {
                 if (instance.shared.authentication.validate()) {
+                    window.localStorage.removeItem('state');
                     return true;
                 }
                 window.localStorage.setItem('referrer', instruction.fragment);
+                state = window.localStorage.getItem('state');
+                if (state === null && instance.shared.authentication.metadata.mode === 'remote') {
+                    metadata = instance.shared.authentication.metadata;
+                    state = generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
+                    window.localStorage.setItem('state', state);
+                    return metadata.authorize_uri +
+                        '?response_type=code' +
+                        '&client_id=' + encodeURIComponent(metadata.client_id) +
+                        '&redirect_uri=' + encodeURIComponent('https://' + metadata.ip + '/api/oauth2/redirect/') +
+                        '&state=' + encodeURIComponent(state) +
+                        '&scope=' + encodeURIComponent(metadata.scope);
+                }
                 return instruction.params[0] + '/login';
             }
         }
+        window.localStorage.removeItem('state');
         return true;
     };
     childRouter.mapUnknownRoutes('../404');

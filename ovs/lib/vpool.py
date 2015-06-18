@@ -22,6 +22,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.helpers.decorators import log
 
@@ -42,10 +43,12 @@ class VPoolController(object):
         if storagedriver is None:
             raise RuntimeError('A Storage Driver with id {0} could not be found.'.format(storagedriver_id))
         if storagedriver.storagerouter.pmachine.hvtype == 'VMWARE':
-            nfs = Nfsexports()
-            nfs.unexport(mountpoint)
-            nfs.export(mountpoint)
-            nfs.trigger_rpc_mountd()
+            client = SSHClient(storagedriver.storagerouter.ip)
+            if client.config_read('ovs.storagedriver.vmware_mode') == 'classic':
+                nfs = Nfsexports()
+                nfs.unexport(mountpoint)
+                nfs.export(mountpoint)
+                nfs.trigger_rpc_mountd()
 
     @staticmethod
     @celery.task(name='ovs.vpool.sync_with_hypervisor')

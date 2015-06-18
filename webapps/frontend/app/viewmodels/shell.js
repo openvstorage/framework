@@ -64,6 +64,7 @@ define([
                     api.get('')
                         .then(function(metadata) {
                             return $.Deferred(function(mdDeferred) {
+                                self.shared.authentication.metadata = metadata.authentication_metadata;
                                 self.shared.user.username(undefined);
                                 self.shared.user.guid(undefined);
                                 self.shared.user.roles([]);
@@ -95,7 +96,21 @@ define([
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
-            var token = window.localStorage.getItem('accesstoken');
+            var token = window.localStorage.getItem('accesstoken'), state, expectedState;
+            if (token === null) {
+                token = generic.getCookie('accesstoken');
+                if (token !== null) {
+                    state = generic.getCookie('state');
+                    expectedState = window.localStorage.getItem('state');
+                    if (state === null || state !== expectedState) {
+                        token = null;
+                    } else {
+                        window.localStorage.setItem('accesstoken', token);
+                    }
+                    generic.removeCookie('accesstoken');
+                    generic.removeCookie('state');
+                }
+            }
             if (token !== null) {
                 self.shared.authentication.accessToken(token);
             }
@@ -144,6 +159,7 @@ define([
                                     backendsActive = true;
                                 }
                             });
+                            self.shared.authentication.metadata = metadata.authentication_metadata;
                             if (metadata.authenticated) {
                                 metadataHandlers.push(self.shared.authentication.dispatch(true));
                             }

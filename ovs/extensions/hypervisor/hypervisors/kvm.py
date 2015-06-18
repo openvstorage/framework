@@ -182,10 +182,10 @@ class KVM(object):
             return any(machine_id for machine_id in machine_ids if devicename.strip('/').startswith(machine_id))
         return True
 
-    def file_exists(self, vpool, devicename):
+    def file_exists(self, storagedriver, devicename):
         """
         Check if devicename exists
         """
-        _ = vpool
+        _ = storagedriver
         matches = self.sdk.find_devicename(devicename)
         return matches is not None

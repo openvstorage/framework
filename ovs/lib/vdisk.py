@@ -90,11 +90,12 @@ class VDiskController(object):
                     # else: pmachine can't be loaded, because the volumedriver doesn't know about it anymore
                 if pmachine is not None:
                     limit = 5
+                    storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                     hypervisor = Factory.get(pmachine)
-                    exists = hypervisor.file_exists(disk.vpool, disk.devicename)
+                    exists = hypervisor.file_exists(storagedriver, disk.devicename)
                     while limit > 0 and exists is True:
                         time.sleep(1)
-                        exists = hypervisor.file_exists(disk.vpool, disk.devicename)
+                        exists = hypervisor.file_exists(storagedriver, disk.devicename)
                         limit -= 1
                     if exists is True:
                         logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
@@ -452,32 +453,42 @@ class VDiskController(object):
     def sync_with_mgmtcenter(disk, pmachine, storagedriver):
         """
         Update disk info using management center (if available)
+         If no management center, try with hypervisor
+         If no info retrieved, use devicename
         @param disk: vDisk hybrid (vdisk to be updated)
         @param pmachine: pmachine hybrid (pmachine running the storagedriver)
         @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)
         """
-        if pmachine.mgmtcenter is None:
-            disk.name = disk.devicename.split('.')[0]
-            disk.save()
-            logger.info('No management center for pmachine {0}'.format(pmachine.name))
-            return
-        logger.debug('Sync vdisk {0} with management center {1} on storagedriver {2}'.format(disk.name, pmachine.mgmtcenter.name, storagedriver.name))
-        mgmt = Factory.get_mgmtcenter(mgmt_center = pmachine.mgmtcenter)
-        volumepath = disk.devicename
-        mountpoint = storagedriver.mountpoint
-        devicepath = '{0}/{1}'.format(mountpoint, volumepath)
-        try:
-            disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
-        except Exception as ex:
-            logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
-        if disk_mgmt_center_info is None:
-            logger.info('No information retrieved for vdisk {0} using management center'.format(disk.name))
-            disk_name = disk.devicename.split('.')[0]
-        else:
-            disk_name = disk_mgmt_center_info.get('name')
+        disk_name = None
+        if pmachine.mgmtcenter is not None:
+            logger.debug('Sync vdisk {0} with management center {1} on storagedriver {2}'.format(disk.name, pmachine.mgmtcenter.name, storagedriver.name))
+            mgmt = Factory.get_mgmtcenter(mgmt_center = pmachine.mgmtcenter)
+            volumepath = disk.devicename
+            mountpoint = storagedriver.mountpoint
+            devicepath = '{0}/{1}'.format(mountpoint, volumepath)
+            try:
+                disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
+                if disk_mgmt_center_info is not None:
+                    disk_name = disk_mgmt_center_info.get('name')
+            except Exception as ex:
+                logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
 
-        if disk_name:
+        if disk_name is None:
+            logger.info('Sync vdisk with hypervisor on {0}'.format(pmachine.name))
+            try:
+                hv = Factory.get(pmachine)
+                info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
+                for disk in info['disks']:
+                    if disk['filename'] == disk.devicename:
+                        disk_name = disk['name']
+                        break
+            except Exception as ex:
+                logger.error('Failed to get vdisk info from hypervisor. %s' % ex)
+
+        if disk_name is None:
+            logger.info('No info retrieved from hypervisor, using devicename')
+            disk_name = disk.devicename.split('/')[-1].split('.')[0]
+
+        if disk_name is not None:
             disk.name = disk_name
             disk.save()
-
-

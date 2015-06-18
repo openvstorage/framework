@@ -20,6 +20,7 @@ import imp
 import inspect
 from django.conf.urls import patterns, include, url
 from oauth2.tokenview import OAuth2TokenView
+from oauth2.redirectview import OAuth2RedirectView
 from view import MetadataView, relay
 from rest_framework.routers import SimpleRouter
 
@@ -47,8 +48,9 @@ def build_router_urls():
     return router.urls
 
 urlpatterns = patterns('',
-    url(r'^oauth2/token/', OAuth2TokenView.as_view()),
-    url(r'^relay/',        relay),
-    url(r'^$',             MetadataView.as_view()),
-    url(r'',               include(build_router_urls()))
+    url(r'^oauth2/token/',    OAuth2TokenView.as_view()),
+    url(r'^oauth2/redirect/', OAuth2RedirectView.as_view()),
+    url(r'^relay/',           relay),
+    url(r'^$',                MetadataView.as_view()),
+    url(r'',                  include(build_router_urls()))
 )

@@ -191,10 +191,10 @@ class VMware(object):
         _ = self, devicename, machine_ids
         return True
 
-    def file_exists(self, vpool, devicename):
+    def file_exists(self, storagedriver, devicename):
         """
         Check if devicename exists on the given vpool
         """
-        _ = self
-        filename = '/mnt/{0}/{1}'.format(vpool.name, devicename)
-        return os.path.exists(filename) and os.path.isfile(filename)
+        return self.sdk.file_exists(storagedriver.storage_ip,
+                                    storagedriver.mountpoint,
+                                    self.clean_vmachine_filename(devicename))
