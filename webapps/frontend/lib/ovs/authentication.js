@@ -24,6 +24,7 @@ define([
         self.onLoggedIn  = [];
         self.onLoggedOut = [];
         self.required    = false;
+        self.metadata    = {};
 
         // Observables
         self.accessToken = ko.observable();
@@ -73,6 +74,7 @@ define([
         };
         self.logout = function() {
             self.accessToken(undefined);
+            self.metadata = {};
             window.localStorage.removeItem('accesstoken');
             self.dispatch(false)
                 .always(function() {

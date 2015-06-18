@@ -60,3 +60,11 @@ class Configuration(object):
         contents = json.dumps(config, indent=4)
         with open(Configuration.FILE.format(filename), 'w') as config_file:
             config_file.write(contents)
+
+    @staticmethod
+    def exists(key):
+        try:
+            _ = Configuration.get(key)
+            return True
+        except KeyError:
+            return False

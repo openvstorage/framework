@@ -26,7 +26,7 @@ from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.conf import settings
-from oauth2.decorators import json_response, limit, authenticated
+from oauth2.decorators import auto_response, limit, authenticated
 from backend.decorators import required_roles, load
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -40,7 +40,7 @@ class MetadataView(View):
     Implements retrieval of generic metadata about the services
     """
 
-    @json_response()
+    @auto_response()
     @limit(amount=60, per=60, timeout=60)
     def get(self, request, *args, **kwargs):
         """
@@ -49,6 +49,7 @@ class MetadataView(View):
         _ = args, kwargs
         data = {'authenticated': False,
                 'authentication_state': None,
+                'authentication_metadata': {},
                 'username': None,
                 'userguid': None,
                 'roles': [],
@@ -75,6 +76,13 @@ class MetadataView(View):
 
             # Fill identification
             data['identification'] = {'cluster_id': Configuration.get('ovs.support.cid')}
+
+            # Get authentication metadata
+            authentication_metadata = {'ip': System.get_my_storagerouter().ip}
+            for key in ['mode', 'authorize_uri', 'client_id', 'scope']:
+                if Configuration.exists('ovs.webapps.oauth2.{0}'.format(key)):
+                    authentication_metadata[key] = Configuration.get('ovs.webapps.oauth2.{0}'.format(key))
+            data['authentication_metadata'] = authentication_metadata
 
             # Gather authorization metadata
             if 'HTTP_AUTHORIZATION' not in request.META:

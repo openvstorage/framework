@@ -212,7 +212,14 @@ class StorageRouterController(object):
                 if connection_host == '':
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
-                    oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
+                    clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
+                    oauth_client = None
+                    for current_client in clients:
+                        if current_client.user.group.name == 'administrators':
+                            oauth_client = current_client
+                            break
+                    if oauth_client is None:
+                        raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
                     ovs_client = OVSClient(connection_host, connection_port,
                                            credentials=(oauth_client.client_id, oauth_client.client_secret),
                                            version=1)

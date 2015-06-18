@@ -22,7 +22,7 @@ import time
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest
-from oauth2.decorators import json_response, limit, log
+from oauth2.decorators import auto_response, limit, log
 from oauth2.toolbox import Toolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
@@ -39,7 +39,7 @@ class OAuth2TokenView(View):
 
     @log()
     @limit(amount=5, per=60, timeout=60)
-    @json_response()
+    @auto_response()
     def post(self, request, *args, **kwargs):
         """
         Handles token post
