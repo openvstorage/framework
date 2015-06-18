@@ -790,7 +790,7 @@ class StorageRouterController(object):
                 storagedriver_client.destroy_filesystem()
                 vrouter_clusterregistry.erase_node_configs()
             except RuntimeError as ex:
-                print('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
+                logger.error('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
