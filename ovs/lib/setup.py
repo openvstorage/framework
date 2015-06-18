@@ -1356,7 +1356,7 @@ EOF
                 boot_disk = values['device']
                 print 'Boot disk {0} will not be cleared'.format(boot_disk)
             # Umount partitions
-            if mp in mounted:
+            if mp in mounted and values['device'] != 'DIR_ONLY':
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount {0}'.format(mp))
 
