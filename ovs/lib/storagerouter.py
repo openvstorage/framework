@@ -302,10 +302,9 @@ class StorageRouterController(object):
         failovercache = '{0}/foc_{1}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{0}/metadata_{1}'.format(mountpoint_md, vpool_name)
         tlogpath = '{0}/tlogs_{1}'.format(mountpoint_md, vpool_name)
-        rsppath = '/var/rsp/{0}'.format(vpool_name)
+        rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
 
-        dirs2create = [failovercache, metadatapath, tlogpath, rsppath,
-                       client.config_read('ovs.storagedriver.rsp')]
+        dirs2create = [failovercache, metadatapath, tlogpath, rsppath]
         files2create = list()
         readcaches = list()
         writecaches = list()
@@ -445,7 +444,6 @@ class StorageRouterController(object):
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        readcache_serialization_path = client.config_read('ovs.storagedriver.rsp')
         queue_protocol = Configuration.get('ovs.core.broker.protocol')
         queue_login = Configuration.get('ovs.core.broker.login')
         queue_password = Configuration.get('ovs.core.broker.password')
@@ -521,7 +519,7 @@ class StorageRouterController(object):
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
-                                                               read_cache_serialization_path=readcache_serialization_path)
+                                                               read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
@@ -814,7 +812,7 @@ class StorageRouterController(object):
                                '{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name),
                                '{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name),
                                '{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name),
-                               '/var/rsp/{0}'.format(vpool.name)])
+                               '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)])
 
         files_to_remove.append('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
