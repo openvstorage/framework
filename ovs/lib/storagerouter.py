@@ -864,7 +864,9 @@ class StorageRouterController(object):
 
         # First model cleanup
         if storagedriver.alba_proxy is not None:
+            service = storagedriver.alba_proxy.service
             storagedriver.alba_proxy.delete()
+            service.delete()
         storagedriver.delete(abandon=['logs'])  # Detach from the log entries
 
         if storagedrivers_left:
