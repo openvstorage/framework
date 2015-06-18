@@ -51,7 +51,8 @@ limitations under the License.
         <button class="btn btn-default"
                 data-bind="click: updateVolumedriver,
                            enable: $root.shared.user.roles().contains('manage') && volumedriverUpdate() === true && !updating(),
-                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
+                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false,
+                           visible: false"
                 id="buttonUpdateVolumedriver"
                 style="margin-top: 10px;">
             <span data-i18n="ovs:updates.buttons.volumedriver"></span>

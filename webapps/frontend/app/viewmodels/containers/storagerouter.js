@@ -102,7 +102,9 @@ define([
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
                         self.updates(data);
+                        deferred.resolve();
                     })
+                    .fail(deferred.reject);
             }).promise();
         }
         self.getDisks = function() {

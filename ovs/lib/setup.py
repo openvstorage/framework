@@ -474,18 +474,22 @@ class SetupController(object):
         plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
         for function in plugin_functions:
             output = function()
-            if not isinstance(output, dict):
-                log_message('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
-                return
-            if 'services' not in output or 'packages' not in output:
-                log_message('Update cannot continue. Failed to retrieve required service and package information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
-                return
-            if not isinstance(output['services'], list) or not isinstance(output['packages'], list):
-                log_message('Update cannot continue. Services and packages should be of type "list" ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
-                return
+            if not isinstance(output, list):
+                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
 
-            plugin_services += output['services']
-            plugin_packages += output['packages']
+            for out in output:
+                if not isinstance(out, dict):
+                    log_message('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
+                    return
+                if 'services' not in out or 'packages' not in out:
+                    log_message('Update cannot continue. Failed to retrieve required service and package information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
+                    return
+                if not isinstance(out['services'], list) or not isinstance(out['packages'], list):
+                    log_message('Update cannot continue. Services and packages should be of type "list" ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
+                    return
+
+                plugin_services += out['services']
+                plugin_packages += out['packages']
 
         # Commence update !!!!!!!
         # 1. Create locks

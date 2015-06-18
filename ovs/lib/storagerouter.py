@@ -1049,32 +1049,59 @@ class StorageRouterController(object):
                                 username='root')
         root_client.run('apt-get update -o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
 
+        package_map = {'framework': {'core': ['openvstorage-core', 'openvstorage-webapps']},
+                       'volumedriver': {'volumedriver': ['volumedriver-base', 'volumedriver-server']}}
+
+        # Check plugin requirements
+        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
+        for function in plugin_functions:
+            output = function()
+            if not isinstance(output, list):
+                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
+
+            for out in output:
+                if not isinstance(out, dict):
+                    raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
+
+                if 'services' not in out or 'packages' not in out or 'name' not in out:
+                    raise ValueError('Update cannot continue. Failed to retrieve required plugin information ({0})'.format(function.func_name))
+
+                if not isinstance(out['services'], list) or not isinstance(out['packages'], list):
+                    raise ValueError('Update cannot continue. Services and packages should be of type "list" ({0})'.format(function.func_name))
+
+                package_map['framework'][out['name']] = out['packages']
+
         # Compare installed and candidate versions
-        package_map = {'framework': ['openvstorage-core', 'openvstorage-webapps'],
-                       'volumedriver': ['volumedriver-base', 'volumedriver-server']}
-
         return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
-        for update_name, packages in package_map.iteritems():
-            package_info = {}
-            for package_name in packages:
-                installed = None
-                candidate = None
-                for line in root_client.run('apt-cache policy {0}'.format(package_name)).splitlines():
-                    line = line.strip()
-                    if line.startswith('Installed:'):
-                        installed = line.lstrip('Installed:').strip()
-                    elif line.startswith('Candidate:'):
-                        candidate = line.lstrip('Candidate:').strip()
+        for gui_name, package_info in package_map.iteritems():
+            return_value[gui_name] = None
+            for update_name, packages in package_info.iteritems():
+                update_name = update_name if update_name == update_name.upper() else update_name.capitalize()
+                package_versions = {}
+                for package_name in packages:
+                    installed = None
+                    candidate = None
+                    for line in root_client.run('apt-cache policy {0}'.format(package_name)).splitlines():
+                        line = line.strip()
+                        if line.startswith('Installed:'):
+                            installed = line.lstrip('Installed:').strip()
+                        elif line.startswith('Candidate:'):
+                            candidate = line.lstrip('Candidate:').strip()
 
-                    if installed is not None and candidate is not None:
-                        break
+                        if installed is not None and candidate is not None:
+                            break
 
-                package_info[candidate] = installed
+                    package_versions[candidate] = installed
 
-            to_version = max(package_info)  # We're only interested to show the highest version available for any of the sub-packages
-            from_version = package_info[to_version]
-            return_value[update_name] = None if from_version == to_version else {'from': from_version,
-                                                                                 'to': to_version}
+                to_version = max(package_versions)  # We're only interested to show the highest version available for any of the sub-packages
+                from_version = package_versions[to_version]
+                if from_version != to_version:
+                    if return_value[gui_name] is None:
+                        return_value[gui_name] = {'to': '{0} ({1})'.format(update_name, to_version),
+                                                  'from': '{0} ({1}'.format(update_name, from_version)}
+                    else:
+                        return_value[gui_name]['to'] += ', {0} ({1})'.format(update_name, to_version)
+                        return_value[gui_name]['from'] += ', {0} ({1})'.format(update_name, from_version)
         return return_value
 
     @staticmethod

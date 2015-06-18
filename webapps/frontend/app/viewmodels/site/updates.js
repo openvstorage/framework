@@ -91,7 +91,7 @@ define([
                                 }
                             });
                         })
-                        .fail(function() { deferred.reject(); });
+                        .fail(deferred.reject);
                 } else {
                     deferred.resolve();
                 }
@@ -145,6 +145,13 @@ define([
         };
         self.updateVolumedriver = function() {
             return;
-        }
+        };
+
+        // Durandal
+        self.deactivate = function() {
+            $.each(self.widgets, function(index, item) {
+                item.deactivate();
+            });
+        };
     };
 });

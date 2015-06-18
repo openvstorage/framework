@@ -449,15 +449,13 @@
     "updates": {
         "buttons": {"framework": "Update Framework",
                     "volumedriver": "Update Storage Driver"},
-        "complete": "Update finished",
         "failed": "Update failed: __why__",
         "framework": "Framework",
         "name": "Name",
-        "noupdates": "No koffiekoeks for you",
+        "noupdates": "No updates available",
         "ongoing": "An upgrade is in progress",
-        "start_update_question": "Das zeker dadde mee uwen __what__ update",
-        "start_update": "En we zijme weg",
-        "success": "Successful",
+        "start_update_question": "Start the __what__ update? The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)",
+        "start_update": "Update launched",
         "title": "Updates",
         "volumedriver": "Storage Driver"
     },
