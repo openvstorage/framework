@@ -524,11 +524,12 @@ class SetupController(object):
                                                (framework_packages, 'framework')]:
                     log_message('Installing latest {0} packages'.format(package_type), client.ip)
                     for package_name in packages:
+                        log_message('Installing {0}'.format(package_name), client.ip)
                         client.run('apt-get install -y --force-yes {0}'.format(package_name))
                         log_message('Successfully installed {0}'.format(package_name), client.ip)
                 client.file_delete(upgrade_file)
-            except Exception as ex:
-                log_message('Upgrade failed with error: {0}'.format(ex), client.ip, 'error')
+            except subprocess.CalledProcessError as cpe:
+                log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
                 failed_clients.append(client)
                 break
 
