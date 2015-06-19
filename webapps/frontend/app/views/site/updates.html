@@ -26,8 +26,18 @@ limitations under the License.
                     </span>
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('storagerouter-detail', { guid: guid }) }"></a>
                 </td>
-                <td><span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
-                        <span data-part="lazy-entry" data-bind="text: item() === undefined || item().framework === null ? $.t('ovs:updates.noupdates') : item().framework.to"></span>
+                <td>
+                    <span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
+                        <span data-part="lazy-entry">
+                            <span data-bind="visible: item() === undefined || item().framework === null,
+                                             translate: 'ovs:updates.noupdates'"></span>
+                            <span data-bind="if: item() !== undefined && item().framework !== null">
+                                <span data-bind="foreach: item().framework">
+                                    <span data-bind="visible: $index() > 0">,</span>
+                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)
+                                </span>
+                            </span>
+                        </span>
                     </span>
                 </td>
                 <td><span data-bind="lazyloader: { item: updates, undefinedLoading: true }">

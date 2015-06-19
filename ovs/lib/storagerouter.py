@@ -1062,10 +1062,18 @@ class StorageRouterController(object):
                                 username='root')
         root_client.run('apt-get update -o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
 
-        package_map = {'framework': {'core': ['openvstorage-core', 'openvstorage-webapps']},
-                       'volumedriver': {'volumedriver': ['volumedriver-base', 'volumedriver-server']}}
+        package_map = {'framework': [{'name': 'ovs',
+                                      'packages': ['openvstorage-core', 'openvstorage-webapps'],
+                                      'namespace': 'ovs'}],
+                       'volumedriver': [{'name': 'volumedriver',
+                                         'packages': ['volumedriver-base', 'volumedriver-server'],
+                                         'namespace': 'ovs'}]}
 
         # Check plugin requirements
+        required_plugin_params = {'name': (str, None),       # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
+                                  'namespace': (str, None),  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
+                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
+                                  'packages': (list, str)}   # Packages which contain the plugin code and should be updated
         plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
         for function in plugin_functions:
             output = function()
@@ -1073,25 +1081,16 @@ class StorageRouterController(object):
                 raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
 
             for out in output:
-                if not isinstance(out, dict):
-                    raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
-
-                if 'services' not in out or 'packages' not in out or 'name' not in out:
-                    raise ValueError('Update cannot continue. Failed to retrieve required plugin information ({0})'.format(function.func_name))
-
-                if not isinstance(out['services'], list) or not isinstance(out['packages'], list):
-                    raise ValueError('Update cannot continue. Services and packages should be of type "list" ({0})'.format(function.func_name))
-
-                package_map['framework'][out['name']] = out['packages']
+                Toolbox.verify_required_params(required_plugin_params, out)
+                package_map['framework'].append(out)
 
         # Compare installed and candidate versions
         return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
-        for gui_name, package_info in package_map.iteritems():
+        for gui_name, package_information in package_map.iteritems():
             return_value[gui_name] = None
-            for update_name, packages in package_info.iteritems():
-                update_name = update_name if update_name == update_name.upper() else update_name.capitalize()
+            for package_info in package_information:
                 package_versions = {}
-                for package_name in packages:
+                for package_name in package_info['packages']:
                     installed = None
                     candidate = None
                     for line in root_client.run('apt-cache policy {0}'.format(package_name)).splitlines():
@@ -1106,15 +1105,15 @@ class StorageRouterController(object):
 
                     package_versions[candidate] = installed
 
-                to_version = max(package_versions)  # We're only interested to show the highest version available for any of the sub-packages
-                from_version = package_versions[to_version]
+                to_version = max(package_versions) if package_versions else None  # We're only interested to show the highest version available for any of the sub-packages
+                from_version = package_versions[to_version] if to_version else None
                 if from_version != to_version:
                     if return_value[gui_name] is None:
-                        return_value[gui_name] = {'to': '{0} ({1})'.format(update_name, to_version),
-                                                  'from': '{0} ({1}'.format(update_name, from_version)}
-                    else:
-                        return_value[gui_name]['to'] += ', {0} ({1})'.format(update_name, to_version)
-                        return_value[gui_name]['from'] += ', {0} ({1})'.format(update_name, from_version)
+                        return_value[gui_name] = []
+                    return_value[gui_name].append({'to': to_version,
+                                                   'from': from_version,
+                                                   'name': package_info['name'],
+                                                   'namespace': package_info['namespace']})
         return return_value
 
     @staticmethod

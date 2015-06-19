@@ -442,7 +442,8 @@ class SetupController(object):
                 services.reverse()  # Start services again in reverse order of stopping
             for service_name in services:
                 for ssh_client in ssh_clients:
-                    log_message('{0} service {1}'.format('Stopping' if action == 'stop' else 'Starting', service_name), ssh_client.ip)
+                    description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
+                    log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
                     try:
                         if ServiceManager.has_service(service_name, client=ssh_client):
                             SetupController._change_service_state(client=ssh_client,
@@ -450,7 +451,7 @@ class SetupController(object):
                                                                   state=action)
                             log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client.ip)
                     except Exception as exc:
-                        log_message('Something went wrong {0} service {1}: {2}'.format('stopping' if action == 'stop' else 'starting', service_name, exc), ssh_client.ip, severity='warning')
+                        log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
                         if action == 'stop':
                             return False
             return True
@@ -468,9 +469,13 @@ class SetupController(object):
         plugin_services = []
         plugin_packages = []
         framework_packages = ['openvstorage-core', 'openvstorage-webapps']
-        framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached', 'support-agent']
+        framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached']
 
         # Check plugin requirements
+        required_plugin_params = {'name': (str, None),       # Name to describe a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
+                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
+                                  'packages': (list, str),   # Packages which contain the plugin code and should be updated
+                                  'namespace': (str, None)}  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
         plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
         for function in plugin_functions:
             output = function()
@@ -478,16 +483,7 @@ class SetupController(object):
                 raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
 
             for out in output:
-                if not isinstance(out, dict):
-                    log_message('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
-                    return
-                if 'services' not in out or 'packages' not in out:
-                    log_message('Update cannot continue. Failed to retrieve required service and package information ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
-                    return
-                if not isinstance(out['services'], list) or not isinstance(out['packages'], list):
-                    log_message('Update cannot continue. Services and packages should be of type "list" ({0})'.format(function.func_name), client_ip=this_client.ip, severity='error')
-                    return
-
+                Toolbox.verify_required_params(required_plugin_params, out)
                 plugin_services += out['services']
                 plugin_packages += out['packages']
 
@@ -573,10 +569,13 @@ class SetupController(object):
                 log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
                 return
 
-        # 6. Start watcher
+        # 6. Start watcher and restart support-agent
         change_services_state(services=['watcher-framework'] + plugin_services,
                               ssh_clients=sshclients,
                               action='start')
+        change_services_state(services=['support-agent'],
+                              ssh_clients=sshclients,
+                              action='restart')
 
         remove_lock_files([upgrade_ongoing_check_file], sshclients)
         log_message('+++ Finished updating +++')

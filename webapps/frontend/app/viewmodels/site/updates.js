@@ -27,8 +27,8 @@ define([
         self.updating             = ko.observable(false);
         self.widgets              = [];
         self.storageRouterHeaders = [
-            { key: 'name',         value: $.t('ovs:updates.name'),         width: undefined },
-            { key: 'framework',    value: $.t('ovs:updates.framework'),    width: 250 },
+            { key: 'name',         value: $.t('ovs:updates.name'),         width: 400 },
+            { key: 'framework',    value: $.t('ovs:updates.framework'),    width: undefined },
             { key: 'volumedriver', value: $.t('ovs:updates.volumedriver'), width: 250 },
         ];
 
@@ -105,7 +105,6 @@ define([
                 return;
             }
             self.updating(true);
-            self.upgradeOngoing(true); // Resetted by self.updates computed function
 
             return $.Deferred(function(deferred) {
                 app.showMessage(
@@ -115,9 +114,10 @@ define([
                 )
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
-                            generic.alertSuccess($.t('ovs:updates.start_update'), '');
+                            generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (storageRouter.nodeType() == 'MASTER') {
+                                    self.upgradeOngoing(true); // Resetted by self.updates computed function
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
                                         .then(self.shared.tasks.wait)
                                         .done(function() {

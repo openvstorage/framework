@@ -456,7 +456,12 @@
         "ongoing": "An upgrade is in progress",
         "start_update_question": "Start the __what__ update? The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)",
         "start_update": "Update launched",
+        "start_update_extra": "Update will start shortly, please sit back and relax",
         "title": "Updates",
+        "volumedriver": "Storage Driver"
+    },
+    "packages": {
+        "ovs": "Core",
         "volumedriver": "Storage Driver"
     },
     "login": {
