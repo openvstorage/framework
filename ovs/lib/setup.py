@@ -157,6 +157,9 @@ class SetupController(object):
 
             logger.debug('Target client loaded')
 
+            if target_client.file_exists(SetupController.avahi_filename):
+                raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
+
             print '\n+++ Collecting cluster information +++\n'
             logger.info('Collecting cluster information')
 
