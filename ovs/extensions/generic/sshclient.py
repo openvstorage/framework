@@ -101,11 +101,11 @@ class SSHClient(object):
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
                 if debug:
-                    logger.debug("stdout: {0}".format(out))
-                    logger.debug("stderr: {0}".format(err))
-                    return out, err
+                    logger.debug('stdout: {0}'.format(out))
+                    logger.debug('stderr: {0}'.format(err))
+                    return out.strip(), err
                 else:
-                    return out
+                    return out.strip()
 
             except CalledProcessError as cpe:
                 logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, cpe.output))
