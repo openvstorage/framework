@@ -449,7 +449,7 @@ class SetupController(object):
                             SetupController._change_service_state(client=ssh_client,
                                                                   name=service_name,
                                                                   state=action)
-                            log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started', service_name), ssh_client.ip)
+                            log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
                     except Exception as exc:
                         log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
                         if action == 'stop':
@@ -522,11 +522,12 @@ class SetupController(object):
             try:
                 for packages, package_type in [(plugin_packages, 'plugin'),
                                                (framework_packages, 'framework')]:
-                    log_message('Installing latest {0} packages'.format(package_type), client.ip)
+                    if packages:
+                        log_message('Installing latest {0} packages'.format(package_type), client.ip)
                     for package_name in packages:
                         log_message('Installing {0}'.format(package_name), client.ip)
                         client.run('apt-get install -y --force-yes {0}'.format(package_name))
-                        log_message('Successfully installed {0}'.format(package_name), client.ip)
+                        log_message('Installed {0}'.format(package_name), client.ip)
                 client.file_delete(upgrade_file)
             except subprocess.CalledProcessError as cpe:
                 log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
@@ -544,7 +545,7 @@ class SetupController(object):
 
         # 4. Start services
         log_message('Starting services', client_ip=this_client.ip)
-        change_services_state(services=['arakoon-ovsdb', 'memcached', 'support-agent'],
+        change_services_state(services=['arakoon-ovsdb', 'memcached'],
                               ssh_clients=sshclients,
                               action='start')
 

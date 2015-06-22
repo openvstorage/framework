@@ -43,7 +43,6 @@ define([
 
         // Computed
         self.updates = ko.computed(function() {
-            var any_upgrade_ongoing = false;
             var any_framework_update = false;
             var any_volumedriver_update = false;
             var updates_data = {'framework': false,
@@ -55,18 +54,14 @@ define([
                         any_framework_update = true;
                         updates_data.framework = true;
                     }
-                    else if (item.volumedriver !== null) {
+                    if (item.volumedriver !== null) {
                         any_volumedriver_update = true;
                         updates_data.volumedriver = true;
-                    }
-                    else if (item.upgrade_ongoing !== null) {
-                        any_upgrade_ongoing = item.upgrade_ongoing;
                     }
                 }
             });
             self.frameworkUpdate(any_framework_update);
             self.volumedriverUpdate(any_volumedriver_update);
-            self.upgradeOngoing(any_upgrade_ongoing);
             return updates_data;
         });
 
@@ -117,9 +112,12 @@ define([
                             generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (storageRouter.nodeType() == 'MASTER') {
-                                    self.upgradeOngoing(true); // Resetted by self.updates computed function
+                                    self.upgradeOngoing(true);
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
-                                        .then(self.shared.tasks.wait)
+                                        .then(function(taskID) {
+                                            self.updating(false);  // Update itself will stop all services, so celery should not reach done status
+                                            return self.shared.tasks.wait(taskID);
+                                        })
                                         .done(function() {
                                             deferred.resolve();
                                             self.updating(false);
