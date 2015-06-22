@@ -44,8 +44,14 @@ class OpenStackManagement(object):
     def __init__(self, cinder_client):
         self.client = SSHClient('127.0.0.1', username='root')
         self.cinder_client = cinder_client
-        self.is_devstack = self._is_devstack()
-        self.is_openstack = self._is_openstack()
+
+    @property
+    def is_devstack(self):
+        return self._is_devstack()
+
+    @property
+    def is_openstack(self):
+        return self._is_openstack()
 
     @property
     def is_cinder_running(self):
@@ -83,6 +89,8 @@ class OpenStackManagement(object):
             from cinder import version
             version = version.version_string()
             if version.startswith('2015.2'):
+                return 'kilo'  # For the moment use K driver
+            elif version.startswith('7.0'):
                 return 'kilo'  # For the moment use K driver
             elif version.startswith('2015.1'):
                 return 'kilo'
