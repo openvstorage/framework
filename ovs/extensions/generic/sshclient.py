@@ -117,9 +117,9 @@ class SSHClient(object):
                 logger.error('Command:\n{0}\nfailed :\n{1}\nand error:\n{2}\n'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stderr.readlines())
             if debug:
-                return stdout, stderr
+                return '\n'.join(line.strip() for line in stdout).strip(), stderr
             else:
-                return stdout
+                return '\n'.join(line.strip() for line in stdout).strip()
 
     def dir_create(self, directories):
         """
