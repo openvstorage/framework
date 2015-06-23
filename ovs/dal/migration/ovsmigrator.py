@@ -167,10 +167,6 @@ class OVSMigrator(object):
         if working_version < 2:
             # Execute some code that upgrades to version 2
             # working_version = 2
-            from ovs.dal.lists.storagerouterlist import StorageRouterList
-            sr = StorageRouterList.get_storagerouters()[0]
-            sr.name = sr.name.rstrip('-update')
-            sr.save()
-            working_version = 2
+            pass
 
         return working_version
