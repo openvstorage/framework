@@ -123,11 +123,11 @@ class StorageRouterController(object):
                            'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
         required_params_without_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                        'connection_host': (str, Toolbox.regex_ip, False),
-                                        'connection_port': (int, None),
-                                        'connection_backend': (dict, None),
-                                        'connection_username': (str, None),
-                                        'connection_password': (str, None)}
+                                         'connection_host': (str, Toolbox.regex_ip, False),
+                                         'connection_port': (int, None),
+                                         'connection_backend': (dict, None),
+                                         'connection_username': (str, None),
+                                         'connection_password': (str, None)}
         required_params_local = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
 
         if not isinstance(parameters, dict):
@@ -261,7 +261,7 @@ class StorageRouterController(object):
             vpool.login = connection_username
             vpool.password = connection_password
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
-            vpool.description = "{0} {1}".format(vpool.backend_type.code, vpool_name)
+            vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.save()
 
         if len(mountpoint_readcaches) == 0:
@@ -1052,6 +1052,71 @@ class StorageRouterController(object):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_update_status')
+    def get_update_status(storagerouter_ip):
+        """
+        Checks for new updates
+        """
+        # Update apt (only our ovsaptrepo.list)
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        PackageManager.update(client=root_client,
+                              configuration_string='-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
+
+        package_map = {'framework': [{'name': 'ovs',
+                                      'packages': ['openvstorage-core', 'openvstorage-webapps'],
+                                      'namespace': 'ovs'}],
+                       'volumedriver': [{'name': 'volumedriver',
+                                         'packages': ['volumedriver-base', 'volumedriver-server'],
+                                         'namespace': 'ovs'}]}
+
+        # Check plugin requirements
+        required_plugin_params = {'name': (str, None),       # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
+                                  'namespace': (str, None),  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
+                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
+                                  'packages': (list, str)}   # Packages which contain the plugin code and should be updated
+        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
+        for function in plugin_functions:
+            output = function()
+            if not isinstance(output, list):
+                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
+
+            for out in output:
+                Toolbox.verify_required_params(required_plugin_params, out)
+                package_map['framework'].append(out)
+
+        # Compare installed and candidate versions
+        return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
+        for gui_name, package_information in package_map.iteritems():
+            return_value[gui_name] = None
+            for package_info in package_information:
+                package_versions = {}
+                for package_name in package_info['packages']:
+                    version_info = PackageManager.get_installed_and_candidate_version(package_name)
+                    package_versions[version_info[1]] = version_info[0]
+
+                to_version = max(package_versions) if package_versions else None  # We're only interested to show the highest version available for any of the sub-packages
+                from_version = package_versions[to_version] if to_version else None
+                if from_version != to_version:
+                    if return_value[gui_name] is None:
+                        return_value[gui_name] = []
+                    return_value[gui_name].append({'to': to_version,
+                                                   'from': from_version,
+                                                   'name': package_info['name'],
+                                                   'namespace': package_info['namespace']})
+        return return_value
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.update_framework')
+    def update_framework(storagerouter_ip):
+        """
+        Launch the update-framework method in setup.py
+        """
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        root_client.run('ovs update framework')
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

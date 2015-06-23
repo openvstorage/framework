@@ -28,7 +28,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
-from backend.decorators import required_roles, return_list, return_object, return_task, load, log
+from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -80,6 +80,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @link()
     @log()
     @required_roles(['read'])
+    @return_plain()
     @load(StorageRouter)
     def get_available_actions(self):
         """
@@ -89,7 +90,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         storagerouters = StorageRouterList.get_storagerouters()
         if len(storagerouters) > 1:
             actions.append('MOVE_AWAY')
-        return Response(actions, status=status.HTTP_200_OK)
+        return actions
 
     @action()
     @log()
@@ -231,6 +232,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @link()
     @log()
     @required_roles(['read'])
+    @return_plain()
     @load(StorageRouter)
     def get_mgmtcenter_info(self, storagerouter):
         """
@@ -243,5 +245,26 @@ class StorageRouterViewSet(viewsets.ViewSet):
                     'username': mgmtcenter.username,
                     'name': mgmtcenter.name,
                     'type': mgmtcenter.type}
+        return data
 
-        return Response(data, status=status.HTTP_200_OK)
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_update_status(self, storagerouter):
+        """
+        Return available updates for framework, volumedriver, ...
+        """
+        return StorageRouterController.get_update_status.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def update_framework(self, storagerouter):
+        """
+        Initiate a task on 1 storagerouter to update the framework on ALL storagerouters
+        """
+        return StorageRouterController.update_framework.delay(storagerouter.ip)

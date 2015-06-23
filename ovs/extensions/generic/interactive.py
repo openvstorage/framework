@@ -150,7 +150,7 @@ class Interactive(object):
             else:
                 corrected_lines.append(line)
         maxlen = len(max(corrected_lines, key=len))
-        newlines  = []
+        newlines = []
         if character is not None:
             newlines.append(character * (maxlen + 10))
         for line in corrected_lines:

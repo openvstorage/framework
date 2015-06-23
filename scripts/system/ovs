@@ -38,6 +38,11 @@ elif [ "$1" = "setup" ] ; then
     else
         show_help
     fi
+elif [ "$1" = "update" ] ; then
+    if [ "$2" = "framework" ] ; then
+        echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()"' > /tmp/update
+        at -f /tmp/update now
+    fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
         watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'

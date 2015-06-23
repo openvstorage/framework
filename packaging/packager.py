@@ -16,7 +16,7 @@
 Packager module
 
 There are 5 distributions:
-1. experimental: Used for developers to package agains local checked out repo.
+1. experimental: Used for developers to package against local checked out repo.
    e.g.: openvstorage-core_1.1.0.1397221667_1_all.deb
 2. unstable: General packages against unstable branch. No changelog, revision-based buildnumbers
    e.g.: openvstorage-core_1.1.0.345_1_all.deb
@@ -45,7 +45,7 @@ if __name__ == '__main__':
             raise RuntimeError("In case a release target is specified, it should be of the format: 'release,<release branch>'")
         else:
             target = tuple(target.split(','))
-    if target.startswith('experimental,'):
+    elif target.startswith('experimental,'):
         target = tuple(target.split(','))
 
     # 1. Collect sources
