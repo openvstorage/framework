@@ -129,6 +129,7 @@ define([
                                             );
                                             deferred.reject();
                                             self.updating(false);
+                                            self.upgradeOngoing(false);
                                         });
                                     return false;  // break out of $.each loop
                                 }

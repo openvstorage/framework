@@ -38,6 +38,7 @@ from ovs.log.logHandler import LogHandler
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
@@ -490,7 +491,7 @@ class SetupController(object):
         # Commence update !!!!!!!
         # 1. Create locks
         for client in sshclients:
-            client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually perform apt-get install or apt-get upgrade individual packages
+            client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
             client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
 
         # 2. Stop services
@@ -526,7 +527,9 @@ class SetupController(object):
                         log_message('Installing latest {0} packages'.format(package_type), client.ip)
                     for package_name in packages:
                         log_message('Installing {0}'.format(package_name), client.ip)
-                        client.run('apt-get install -y --force-yes {0}'.format(package_name))
+                        PackageManager.install(package_name=package_name,
+                                               client=client,
+                                               force=True)
                         log_message('Installed {0}'.format(package_name), client.ip)
                 client.file_delete(upgrade_file)
             except subprocess.CalledProcessError as cpe:

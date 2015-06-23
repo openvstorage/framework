@@ -1060,7 +1060,8 @@ class StorageRouterController(object):
         # Update apt (only our ovsaptrepo.list)
         root_client = SSHClient(ip=storagerouter_ip,
                                 username='root')
-        root_client.run('apt-get update -o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
+        PackageManager.update(client=root_client,
+                              configuration_string='-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
 
         package_map = {'framework': [{'name': 'ovs',
                                       'packages': ['openvstorage-core', 'openvstorage-webapps'],
@@ -1091,19 +1092,8 @@ class StorageRouterController(object):
             for package_info in package_information:
                 package_versions = {}
                 for package_name in package_info['packages']:
-                    installed = None
-                    candidate = None
-                    for line in root_client.run('apt-cache policy {0}'.format(package_name)).splitlines():
-                        line = line.strip()
-                        if line.startswith('Installed:'):
-                            installed = line.lstrip('Installed:').strip()
-                        elif line.startswith('Candidate:'):
-                            candidate = line.lstrip('Candidate:').strip()
-
-                        if installed is not None and candidate is not None:
-                            break
-
-                    package_versions[candidate] = installed
+                    version_info = PackageManager.get_installed_and_candidate_version(package_name)
+                    package_versions[version_info[1]] = version_info[0]
 
                 to_version = max(package_versions) if package_versions else None  # We're only interested to show the highest version available for any of the sub-packages
                 from_version = package_versions[to_version] if to_version else None
