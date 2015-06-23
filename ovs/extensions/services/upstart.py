@@ -53,20 +53,27 @@ class Upstart(object):
             ))
 
     @staticmethod
-    def add_service(name, client, params=None):
+    def add_service(name, client, params=None, target_name=None, additional_dependencies=None):
         if params is None:
             params = {}
 
         name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
-        template_dir = '/opt/OpenvStorage/config/templates/upstart/{0}'
-        upstart_dir = '/etc/init/{0}'
-        upstart_conf = '{0}.conf'.format(name)
-        template_conf = client.file_read(template_dir.format(upstart_conf))
+        template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
+        template_file = client.file_read(template_conf.format(name))
 
         for key, value in params.iteritems():
-            template_conf = template_conf.replace('<{0}>'.format(key), value)
+            template_file = template_file.replace('<{0}>'.format(key), value)
 
-        client.file_write(upstart_dir.format(upstart_conf), template_conf)
+        if additional_dependencies:
+            dependencies = ''
+            for service in additional_dependencies:
+                dependencies += '{0} '.format(service)
+            template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
+
+        if target_name is None:
+            client.file_write('/etc/init/{0}.conf'.format(name), template_file)
+        else:
+            client.file_write('/etc/init/{0}.conf'.format(target_name), template_file)
 
     @staticmethod
     def get_service_status(name, client):
@@ -132,3 +139,25 @@ class Upstart(object):
             return True
         except ValueError:
             return False
+
+    @staticmethod
+    def is_enabled(name, client):
+        name = Upstart._get_name(name, client)
+        if client.file_exists('/etc/init/{0}.override'.format(name)):
+            return False
+        return True
+
+    @staticmethod
+    def get_service_pid(name, client):
+        pid = 0
+        name = Upstart._get_name(name, client)
+        output = client.run('status {0}'.format(name))
+        if output:
+            output = output.splitlines()
+            for line in output:
+                if 'start/running' in line:
+                    pid = line.split(' ')[3]
+                    if not pid.isdigit():
+                        pid = 0
+                    break
+        return pid

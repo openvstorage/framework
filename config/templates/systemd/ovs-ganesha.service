@@ -1,17 +1,20 @@
 [Unit]
-Description=ovs ganesha
+Description=ovs volumedriver
 Requires=ovs-watcher-volumedriver.service
 After=ovs-watcher-volumedriver.service
 
 [Service]
 Type=simple
-Environment=VFS_FSAL_LOGFILE=/var/log/ovs/volumedriver/vpool.log
-ExecStartPre=/bin/bash -c 'if [ -f <CEPH_CONF> ] ;then ceph-fuse <DFS_MOUNTPOINT> --conf=<CEPH_CONF>; echo "Mounted ceph, starting volumedriver..."; fi'
+Environment=VFS_FSAL_LOGFILE=/var/log/ovs/volumedriver/<VPOOL_NAME>.log
+Environment=GANESHA_LOG_FILE=/var/log/ovs/volumedriver/<VPOOL_NAME>_ganesha.log
+Environment=GANESHA_CONFIG_FILE=/opt/OpenvStorage/config/storagedriver/storagedriver/<VPOOL_NAME>_ganesha.conf
+Environment=GANESHA_PID_FILE=/var/run/ganesha-<VPOOL_NAME>-cf.pid
 ExecStart=/usr/bin/ganesha-cf
-ExecStopPost=/bin/bash -c 'if [ -f <CEPH_CONF> ] ;then echo "Stopped volumedriver, cleaning up mountpoints..."; umount <DFS_MOUNTPOINT>; echo "... done"; fi'
+ExecStopPost=/bin/bash -c 'if mount | grep <VPOOL_MOUNTPOINT> ; then fusermount -u <VPOOL_MOUNTPOINT>; fi'
 Restart=on-failure
-RestartSec=5
-TimeoutStopSec=60
+RestartSec=360
+TimeoutStopSec=<KILL_TIMEOUT>
 
 [Install]
 WantedBy=multi-user.target
+

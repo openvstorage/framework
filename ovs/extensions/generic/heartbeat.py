@@ -17,6 +17,7 @@ from subprocess import check_output
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.os.os import OSManager
 
 ARP_TIMEOUT = 30
 current_time = int(time.time())
@@ -26,7 +27,8 @@ amqp = '{0}://{1}:{2}@{3}//'.format(Configuration.get('ovs.core.broker.protocol'
                                     Configuration.get('ovs.core.broker.password'),
                                     Configuration.get('ovs.grid.ip'))
 
-worker_states = check_output("/usr/local/bin/celery inspect ping -b {0} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(amqp), shell=True)
+celery_path = OSManager.get_path('celery')
+worker_states = check_output("{0} inspect ping -b {1} 2> /dev/null | grep OK | perl -pe 's/\x1b\[[0-9;]*m//g' || true".format(celery_path, amqp), shell=True)
 routers = StorageRouterList.get_storagerouters()
 for node in routers:
     if node.heartbeats is None:

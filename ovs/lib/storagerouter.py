@@ -607,26 +607,22 @@ class StorageRouterController(object):
                   'OVS_GID': check_output('id -g ovs', shell=True).strip(),
                   'KILL_TIMEOUT': str(int(readcache_size / 1024.0 / 1024.0 / 6.0 + 30))}
 
-        template_dir = '/opt/OpenvStorage/config/templates/upstart'
-        template_configs = {'ovs-failovercache': 'ovs-failovercache_{0}'.format(vpool.name)}
+        logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
+        logger.info('backend_type: {0}'.format(vpool.backend_type.code))
+        ServiceManager.add_service(name='ovs-failovercache', params=params, client=root_client, target_name='ovs-failovercache_{0}'.format(vpool.name))
+        ServiceManager.start_service('ovs-failovercache_{0}'.format(vpool.name), client=root_client)
+        if vpool.backend_type.code == 'alba':
+            ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name='ovs-albaproxy_{0}'.format(vpool.name))
+            ServiceManager.start_service('ovs-albaproxy_{0}'.format(vpool.name), client=root_client)
         if volumedriver_mode == 'ganesha':
-            template_configs['ovs-ganesha'] = 'ovs-volumedriver_{0}'.format(vpool.name)
+            ServiceManager.add_service(name='ovs-ganesha', params=params, client=root_client, target_name='ovs-volumedriver_{0}'.format(vpool.name))
+        elif vpool.backend_type.code == 'alba':
+            dependencies = ['ovs-albaproxy_{0}'.format(vpool.name)]
+            ServiceManager.add_service(name='ovs-volumedriver', params=params, client=root_client, target_name='ovs-volumedriver_{0}'.format(vpool.name), additional_dependencies=dependencies)
         else:  # classic
-            template_configs['ovs-volumedriver'] = 'ovs-volumedriver_{0}'.format(vpool.name)
-        if vpool.backend_type.code == 'alba':
-            template_configs['ovs-albaproxy'] = 'ovs-albaproxy_{0}'.format(vpool.name)
-        for template_file, vpool_file in template_configs.iteritems():
-            ServiceManager.prepare_template(template_file, vpool_file, client=client)
-
-        ServiceManager.add_service(name='volumedriver_{0}'.format(vpool_name), params=params, client=root_client)
-        ServiceManager.add_service(name='failovercache_{0}'.format(vpool_name), params=params, client=root_client)
-        if vpool.backend_type.code == 'alba':
-            ServiceManager.add_service(name='albaproxy_{0}'.format(vpool_name), params=params, client=root_client)
-
-        # Remove copied template config files (obsolete after add service)
-        for vpool_file in template_configs.itervalues():
-            client.file_delete('{0}/{1}.conf'.format(template_dir, vpool_file))
-
+            ServiceManager.add_service(name='ovs-volumedriver', params=params, client=root_client, target_name='ovs-volumedriver_{0}'.format(vpool.name))
+        ServiceManager.start_service('ovs-volumedriver_{0}'.format(vpool.name), client=root_client)
+        
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':
             root_client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
             root_client.run('service nfs-kernel-server start')

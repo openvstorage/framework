@@ -20,6 +20,7 @@ import string
 import sys
 import json
 from subprocess import check_output, CalledProcessError
+from ovs.extensions.os.os import OSManager
 
 SECRET_KEY_LENGTH = 50
 SECRET_SELECTION = "{}{}{}".format(string.ascii_letters, string.digits, string.punctuation)
@@ -33,7 +34,7 @@ with open(config_filename, 'w') as config_file:
     config_file.write(json.dumps(contents, indent=4))
 
 os.chdir('/opt/OpenvStorage/webapps/api')
-check_output('export PYTHONPATH=/opt/OpenvStorage; python manage.py syncdb --noinput', shell=True)
+check_output('export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput', shell=True)
 
 # Create web certificates
 if not os.path.exists('/opt/OpenvStorage/config/ssl/server.crt'):
@@ -60,9 +61,12 @@ for filename in filenames:
 
 # Check conflicts with apache2 running on port 80 (most likely devstack/openstack gui)
 try:
-    running = check_output('ps aux | grep apache2 | grep -v grep', shell=True)
+    web_service = OSManager.get_openstack_web_service_name()
+    running = check_output('ps aux | grep {0} | grep -v grep'.format(web_service), shell=True)
 except CalledProcessError:
     running = False
 if running:
     if os.path.exists('/etc/nginx/sites-enabled/openvstorage.conf'):
         os.remove('/etc/nginx/sites-enabled/openvstorage.conf')
+    if os.path.exists('/etc/nginx/conf.d/openvstorage.conf'):
+        os.remove('/etc/nginx/conf.d/openvstorage.conf')

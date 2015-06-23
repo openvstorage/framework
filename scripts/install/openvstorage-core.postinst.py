@@ -16,6 +16,7 @@
 import os
 import re
 from subprocess import check_output
+from ovs.extensions.os.os import OSManager
 
 SECRET_KEY_LENGTH = 50
 
@@ -51,7 +52,8 @@ if os.path.isfile(config_file):
     if use_dns is False:
         new_contents.append('UseDNS no')
     file_write(config_file, '{0}\n'.format('\n'.join(new_contents)))
-check_output('service ssh restart', shell=True)
+ssh_service = OSManager.get_ssh_service_name()
+check_output('service {0} restart'.format(ssh_service), shell=True)
 
 limits_file = '/etc/security/limits.conf'
 if os.path.isfile(limits_file):

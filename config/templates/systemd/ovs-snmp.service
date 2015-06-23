@@ -7,7 +7,7 @@ After=ovs-watcher-framework.service
 Type=simple
 Environment=PYTHONPATH=/opt/OpenvStorage
 WorkingDirectory=/opt/OpenvStorage
-ExecStart= /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/snmp/ovssnmpserver.py
+ExecStart= /usr/bin/python2 /opt/OpenvStorage/ovs/extensions/snmp/ovssnmpserver.py --port 161
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=60

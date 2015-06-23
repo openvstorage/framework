@@ -18,7 +18,7 @@ Service Factory module
 
 from subprocess import check_output
 from ovs.extensions.services.upstart import Upstart
-# from ovs.extensions.services.systemd import SystemD
+from ovs.extensions.services.systemd import Systemd
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='servicemanager')
@@ -50,8 +50,8 @@ class ServiceManager(object):
                             ServiceManager.ImplementationClass = Upstart
                         else:
                             raise RuntimeError('The ServiceManager is unrecognizable')
-                    # elif 'systemd' in init_info:
-                    #     ServiceManager.ImplementationClass = SystemD
+                    elif 'systemd' in init_info:
+                        ServiceManager.ImplementationClass = Systemd
                     else:
                         raise RuntimeError('There was no known ServiceManager detected')
                 except Exception as ex:
