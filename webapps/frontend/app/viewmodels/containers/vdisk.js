@@ -64,7 +64,15 @@ define([
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.order, data, 'order');
-            generic.trySet(self.snapshots, data, 'snapshots');
+            if (data.hasOwnProperty('snapshots')) {
+                var snapshots = [];
+                $.each(data.snapshots, function(index, snapshot) {
+                    if (snapshot.in_backend) {
+                        snapshots.push(snapshot);
+                    }
+                });
+                self.snapshots(snapshots);
+            }
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.vpoolGuid, data, 'vpool_guid');
             generic.trySet(self.vMachineGuid, data, 'vmachine_guid');

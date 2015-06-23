@@ -158,6 +158,9 @@ class SetupController(object):
 
             logger.debug('Target client loaded')
 
+            if target_client.file_exists(SetupController.avahi_filename):
+                raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
+
             print '\n+++ Collecting cluster information +++\n'
             logger.info('Collecting cluster information')
 
@@ -1040,7 +1043,6 @@ class SetupController(object):
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
-        SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
@@ -1084,8 +1086,6 @@ class SetupController(object):
         logger.info('Leaving arakoon cluster')
         for cluster in SetupController.arakoon_clusters:
             ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, cluster)
-
-        SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -1141,9 +1141,10 @@ class SetupController(object):
                                        params={'MEMCACHE_NODE_IP': cluster_ip,
                                                'WORKER_QUEUE': '{0}'.format(unique_id)})
 
+        SetupController._configure_amqp_to_volumedriver(ip_client_map)
+
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip):
