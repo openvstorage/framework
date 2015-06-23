@@ -121,6 +121,9 @@ class MockVDisk():
     def save(self):
         pass
 
+    def invalidate_dynamics(self, *args, **kwargs):
+        pass
+
 
 class MockPMachine():
     guid = MOCK_pmachine_guid
@@ -238,6 +241,9 @@ class OVSPluginBaseTestCase(test.TestCase):
     """
 
     def setUp(self):
+        def _wait_for_snapshot(disk, snapshot_id=None, tries=30):
+            return
+
         vdisk1 = MockVDisk(MOCK_vdisk_guid, MOCK_vdisk_devicename)
         vdisk2 = MockVDisk(MOCK_vdisk_guid2, MOCK_vdisk_devicename2)
         vdisk3 = MockVDisk(MOCK_vdisk_guid3, MOCK_vdisk_devicename3)
@@ -249,6 +255,7 @@ class OVSPluginBaseTestCase(test.TestCase):
         ovsvd.pmachinelist = pmachinelist()
         ovsvd.LOG = MOCK_log()
         ovsvd.image_utils = MOCK_ImageUtils()
+        ovsvd.OVSVolumeDriver._wait_for_snapshot = _wait_for_snapshot
         self.driver = ovsvd.OVSVolumeDriver(configuration = mock.Mock())
 
     def tearDown(self):
