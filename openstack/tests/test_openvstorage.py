@@ -255,7 +255,7 @@ class OVSPluginBaseTestCase(test.TestCase):
         ovsvd.pmachinelist = pmachinelist()
         ovsvd.LOG = MOCK_log()
         ovsvd.image_utils = MOCK_ImageUtils()
-        ovsvd.OVSVolumeDriver._wait_for_snapshot = _wait_for_snapshot
+        ovsvd.OVSVolumeDriver._wait_for_snapshot = staticmethod(_wait_for_snapshot)
         self.driver = ovsvd.OVSVolumeDriver(configuration = mock.Mock())
 
     def tearDown(self):
