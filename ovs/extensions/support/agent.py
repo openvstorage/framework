@@ -29,7 +29,7 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.log.logHandler import LogHandler
 
 
-logger = LogHandler('support', name='agent')
+logger = LogHandler.get('support', name='agent')
 
 
 class SupportAgent(object):

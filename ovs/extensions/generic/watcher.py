@@ -21,7 +21,7 @@ import logging
 from ovs.log.logHandler import LogHandler
 
 logging.basicConfig()
-logger = LogHandler('extensions', name='watcher')
+logger = LogHandler.get('extensions', name='watcher')
 
 
 def _log(log_target, entry, level):

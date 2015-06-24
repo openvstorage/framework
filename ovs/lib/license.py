@@ -32,7 +32,7 @@ from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='license')
+logger = LogHandler.get('lib', name='license')
 
 
 class LicenseController(object):

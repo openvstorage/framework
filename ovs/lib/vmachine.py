@@ -35,7 +35,7 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-logger = LogHandler('lib', name='vmachine')
+logger = LogHandler.get('lib', name='vmachine')
 
 
 class VMachineController(object):
@@ -503,7 +503,6 @@ class VMachineController(object):
             message = 'Not enough information to sync vmachine'
             logger.info('Error: {0}'.format(message))
             raise RuntimeError(message)
-
 
         VMachineController.update_vmachine_config(vmachine, vm_object)
 

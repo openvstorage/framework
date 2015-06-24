@@ -31,9 +31,10 @@ from ovs.dal.hybrids.log import Log
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 
-logger = LogHandler('extensions', name='processor')
+logger = LogHandler.get('extensions', name='processor')
 
 CINDER_VOLUME_UPDATE_CACHE = {}
+
 
 def process(queue, body, mapping):
     """
@@ -142,7 +143,7 @@ def process(queue, body, mapping):
                 display_name = body['payload'].get('display_name')
                 if old_display_name and old_display_name != display_name:
                     logger.info('Caught instance rename event')
-                    VMachineController.update_vmachine_name.apply_async(kwargs={'old_name':old_display_name, 'new_name':display_name, 'instance_id': instance_id})
+                    VMachineController.update_vmachine_name.apply_async(kwargs={'old_name': old_display_name, 'new_name': display_name, 'instance_id': instance_id})
             elif event_type == 'volume.update.start':
                 volume_id = body['payload']['volume_id']
                 display_name = body['payload']['display_name']
@@ -153,7 +154,7 @@ def process(queue, body, mapping):
                 old_display_name = CINDER_VOLUME_UPDATE_CACHE.get(volume_id)
                 if old_display_name and old_display_name != display_name:
                     logger.info('Caught volume rename event')
-                    VDiskController.update_vdisk_name.apply_async(kwargs={'volume_id':volume_id, 'old_name': old_display_name, 'new_name':display_name})
+                    VDiskController.update_vdisk_name.apply_async(kwargs={'volume_id': volume_id, 'old_name': old_display_name, 'new_name': display_name})
                     del CINDER_VOLUME_UPDATE_CACHE[volume_id]
         except Exception as ex:
             logger.error('Processing notification failed {0}'.format(ex))

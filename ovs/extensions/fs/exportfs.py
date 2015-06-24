@@ -16,7 +16,7 @@ import re
 import subprocess
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='exportfs')
+logger = LogHandler.get('extensions', name='exportfs')
 
 
 class Nfsexports(object):
@@ -24,7 +24,7 @@ class Nfsexports(object):
     Basic management for /etc/exports
     """
     def __init__(self):
-        self._exportsFile = '/etc/exports'
+        self._exports_file = '/etc/exports'
         self._cmd = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs']
         self._restart = ['/usr/bin/sudo', '-u', 'root', '/usr/sbin/exportfs', '-ra']
         self._rpcmountd_stop = ['/usr/bin/sudo', '-u', 'root', 'pkill', 'rpc.mountd']
@@ -34,7 +34,7 @@ class Nfsexports(object):
         """
         Read from /etc/exports
         """
-        f = open(self._exportsFile, 'r')
+        f = open(self._exports_file, 'r')
         dlist = []
         for line in f:
             if not re.match('^\s*$', line):
@@ -60,7 +60,7 @@ class Nfsexports(object):
             if i['dir'] == directory:
                 logger.info('Directory already exported, to export with different params please first remove')
                 return
-        f = open(self._exportsFile, 'a')
+        f = open(self._exports_file, 'a')
         f.write('%s %s(%s)\n' % (directory, network, params))
         f.close()
 
@@ -68,15 +68,10 @@ class Nfsexports(object):
         """
         Remove entry from /etc/exports
         """
-        l = self._slurp()
-        for i in l:
-            if i['dir'] == directory:
-                l.remove(i)
-                f = open(self._exportsFile, 'w')
-                for i in l:
-                    f.write("%s %s(%s) \n" % (i['dir'], i['network'], i['params']))
-                f.close()
-                return
+        entries = [entry for entry in self._slurp() if entry['dir'] != directory]
+        with open(self._exports_file, 'w') as the_file_pointer:
+            for entry in entries:
+                the_file_pointer.write("{0} {1}({2}) \n".format(entry['dir'], entry['network'], entry['params']))
 
     def list_exported(self):
         """
@@ -94,7 +89,7 @@ class Nfsexports(object):
         """
         cmd = list(self._cmd)
         exports = self.list_exported()
-        if not directory in exports.keys():
+        if directory not in exports.keys():
             logger.info('Directory %s currently not exported' % directory)
             return
         logger.info('Unexporting {}:{}'.format(exports[directory] if exports[directory] != '<world>' else '*', directory))
@@ -118,4 +113,3 @@ class Nfsexports(object):
     def trigger_rpc_mountd(self):
         subprocess.call(self._rpcmountd_stop)
         subprocess.call(self._rpcmountd_start)
-

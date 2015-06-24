@@ -38,7 +38,7 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.dal.hybrids.log import Log
 
 
-logger = LogHandler('api')
+logger = LogHandler.get('api')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
 

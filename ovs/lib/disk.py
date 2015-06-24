@@ -18,6 +18,7 @@ DiskController module
 import re
 import os
 import time
+from subprocess import CalledProcessError
 from pyudev import Context
 from celery.schedules import crontab
 from ovs.celery_run import celery
@@ -30,7 +31,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 
-logger = LogHandler('lib', name='disk')
+logger = LogHandler.get('lib', name='disk')
 
 
 class DiskController(object):
@@ -105,7 +106,7 @@ class DiskController(object):
                             del mount_mapping[partition_name]
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
-                            except:
+                            except CalledProcessError:
                                 partition_data['state'] = 'ERROR'
                                 pass
                         if 'ID_FS_TYPE' in device:

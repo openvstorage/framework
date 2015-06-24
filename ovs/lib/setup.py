@@ -45,7 +45,7 @@ from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguratio
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.configuration import Configuration
 
-logger = LogHandler('lib', name='setup')
+logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
 
 # @TODO: Make the setup_node re-entrant
@@ -470,16 +470,22 @@ class SetupController(object):
         sshclients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
         this_client = [client for client in sshclients if client.is_local is True][0]
 
+        # Commence update !!!!!!!
+        # 0. Create locks
+        for client in sshclients:
+            client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
+            client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+
+        # 1. Check plugin requirements
         plugin_services = []
         plugin_packages = []
         framework_packages = ['openvstorage-core', 'openvstorage-webapps']
         framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached']
-
-        # Check plugin requirements
         required_plugin_params = {'name': (str, None),       # Name to describe a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
                                   'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
                                   'packages': (list, str),   # Packages which contain the plugin code and should be updated
                                   'namespace': (str, None)}  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
+        log_message('Retrieving plugin requirements', client_ip=this_client.ip)
         plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
         for function in plugin_functions:
             output = function()
@@ -491,11 +497,10 @@ class SetupController(object):
                 plugin_services += out['services']
                 plugin_packages += out['packages']
 
-        # Commence update !!!!!!!
-        # 1. Create locks
-        for client in sshclients:
-            client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
-            client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+        log_message('Plugin   : Services which will be restarted --> {0}'.format(', '.join(plugin_services)))
+        log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(framework_services)))
+        log_message('Plugin   : Packages which will be installed --> {0}'.format(', '.join(plugin_packages)))
+        log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(framework_packages)))
 
         # 2. Stop services
         failed_services = False

@@ -18,7 +18,7 @@ Generic persistent factory.
 from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='persistent factory')
+logger = LogHandler.get('extensions', name='persistent factory')
 
 
 class PersistentFactory(object):

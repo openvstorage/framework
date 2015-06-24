@@ -35,7 +35,7 @@ from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 
 
-logger = LogHandler('lib', name='mds')
+logger = LogHandler.get('lib', name='mds')
 
 
 class MDSServiceController(object):

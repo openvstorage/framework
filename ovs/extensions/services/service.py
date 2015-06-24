@@ -21,7 +21,7 @@ from ovs.extensions.services.upstart import Upstart
 # from ovs.extensions.services.systemd import SystemD
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='servicemanager')
+logger = LogHandler.get('extensions', name='servicemanager')
 
 
 class ServiceManager(object):

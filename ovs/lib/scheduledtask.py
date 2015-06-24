@@ -36,7 +36,7 @@ from volumedriver.storagerouter.storagerouterclient import Scrubber
 from ovs.log.logHandler import LogHandler
 
 _storagedriver_scrubber = Scrubber()
-logger = LogHandler('lib', name='scheduled tasks')
+logger = LogHandler.get('lib', name='scheduled tasks')
 
 
 class ScheduledTaskController(object):

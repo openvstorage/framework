@@ -24,7 +24,7 @@ from ConfigParser import RawConfigParser
 from StringIO import StringIO
 
 from ovs.log.logHandler import LogHandler
-logger = LogHandler('extensions', name='system')
+logger = LogHandler.get('extensions', name='system')
 
 
 class System(object):

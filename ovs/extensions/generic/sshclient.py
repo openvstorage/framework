@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from subprocess import check_output, STDOUT, CalledProcessError, PIPE, Popen
+from subprocess import check_output, CalledProcessError, PIPE, Popen
 from ConfigParser import RawConfigParser
 from ovs.log.logHandler import LogHandler
 
@@ -25,7 +25,7 @@ import json
 import tempfile
 import paramiko
 
-logger = LogHandler('extensions', name='sshclient')
+logger = LogHandler.get('extensions', name='sshclient')
 
 
 class SSHClient(object):

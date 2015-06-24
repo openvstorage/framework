@@ -53,7 +53,7 @@ from ovs.extensions.services.service import ServiceManager
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 
 
-logger = LogHandler('lib', name='storagerouter')
+logger = LogHandler.get('lib', name='storagerouter')
 
 
 class StorageRouterController(object):

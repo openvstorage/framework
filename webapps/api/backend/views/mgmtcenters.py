@@ -30,7 +30,7 @@ from ovs.lib.mgmtcenter import MgmtCenterController
 
 from celery.exceptions import TimeoutError
 
-logger = LogHandler('api', 'mgmtcenters')
+logger = LogHandler.get('api', 'mgmtcenters')
 
 
 class MgmtCenterViewSet(viewsets.ViewSet):

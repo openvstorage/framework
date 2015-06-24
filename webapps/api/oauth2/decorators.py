@@ -27,7 +27,7 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.log.logHandler import LogHandler
 from ovs.dal.hybrids.log import Log
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 def _find_request(args):

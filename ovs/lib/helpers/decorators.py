@@ -23,7 +23,7 @@ from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='scheduled tasks')
+logger = LogHandler.get('lib', name='scheduled tasks')
 
 
 def log(event_type):
@@ -93,6 +93,7 @@ def ensure_single(tasknames):
             task_id = self.request.id
 
             reason = ''
+
             def can_run():
                 global reason
                 """

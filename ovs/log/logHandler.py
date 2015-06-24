@@ -16,8 +16,8 @@
 Contains the loghandler module
 """
 
+import inspect
 import logging
-import logging.handlers
 import os
 from ovs.extensions.generic.configuration import Configuration
 
@@ -54,6 +54,7 @@ class LogHandler(object):
     Log handler
     """
 
+    cache = {}
     targets = {'lib': 'lib',
                'api': 'api',
                'extensions': 'extensions',
@@ -66,6 +67,10 @@ class LogHandler(object):
         """
         Initializes the logger
         """
+        parent_invoker = inspect.stack()[1]
+        if __file__ != parent_invoker[1] or parent_invoker[3] != 'get':
+            raise RuntimeError('Cannot invoke instance from outside this class. Please use LogHandler.get(source, name=None) instead')
+
         if name is None:
             name = Configuration.get('ovs.logging.default_name')
 
@@ -86,6 +91,14 @@ class LogHandler(object):
         self.logger.propagate = True
         self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
+
+    @staticmethod
+    def get(source, name=None):
+        key = '{0}_{1}'.format(source, name)
+        if key not in LogHandler.cache:
+            logger = LogHandler(source, name)
+            LogHandler.cache[key] = logger
+        return LogHandler.cache[key]
 
     @_ignore_formatting_errors()
     def info(self, msg, *args, **kwargs):

@@ -24,7 +24,7 @@ from volumedriver.storagerouter.storagerouterclient import ClusterContact, Stati
 from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='storagedriver')
+logger = LogHandler.get('extensions', name='storagedriver')
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}

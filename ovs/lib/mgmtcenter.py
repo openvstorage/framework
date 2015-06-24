@@ -21,7 +21,7 @@ from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='mgmtcenter')
+logger = LogHandler.get('lib', name='mgmtcenter')
 
 
 class MgmtCenterController(object):
