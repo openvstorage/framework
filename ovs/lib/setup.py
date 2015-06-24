@@ -453,7 +453,7 @@ class SetupController(object):
                             SetupController._change_service_state(client=ssh_client,
                                                                   name=service_name,
                                                                   state=action)
-                            log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
+                            log_message('{0} service {1}'.format('Stopped' if action == 'stop' else 'Started' if action == 'start' else 'Restarted', service_name), ssh_client.ip)
                     except Exception as exc:
                         log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
                         if action == 'stop':
@@ -472,6 +472,7 @@ class SetupController(object):
 
         # Commence update !!!!!!!
         # 0. Create locks
+        log_message('Creating lock files', client_ip=this_client.ip)
         for client in sshclients:
             client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
             client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
@@ -497,10 +498,10 @@ class SetupController(object):
                 plugin_services += out['services']
                 plugin_packages += out['packages']
 
-        log_message('Plugin   : Services which will be restarted --> {0}'.format(', '.join(plugin_services)))
-        log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(framework_services)))
-        log_message('Plugin   : Packages which will be installed --> {0}'.format(', '.join(plugin_packages)))
-        log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(framework_packages)))
+        log_message('Plugin   : Services which will be restarted --> {0}'.format(', '.join(plugin_services)), client_ip=this_client.ip)
+        log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(framework_services)), client_ip=this_client.ip)
+        log_message('Plugin   : Packages which will be installed --> {0}'.format(', '.join(plugin_packages)), client_ip=this_client.ip)
+        log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(framework_packages)), client_ip=this_client.ip)
 
         # 2. Stop services
         failed_services = False
