@@ -24,12 +24,16 @@
             "uiname": "api",
             "appname": "api",
             "dbname": "api.sqlite3",
-            "secret": "pl4c3h0ld3r"
+            "secret": ""
         },
+        "html_endpoint": "/",
         "dir": "webapps",
         "admin": {
             "name": "CloudFounders Engineering Dept.",
             "email": "engineering@cloudfounders.com"
+        },
+        "oauth2": {
+            "mode": "local"
         }
     },
     "ports": {
@@ -44,7 +48,7 @@
             "maxload": 75,
             "tlogs": 100
         },
-        "vmware_mode": "classic"
+        "vmware_mode": "ganesha"
     },
     "grid": {
         "ip": ""

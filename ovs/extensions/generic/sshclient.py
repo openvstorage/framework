@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from subprocess import check_output, STDOUT, CalledProcessError, PIPE, Popen
+from ConfigParser import RawConfigParser
+from ovs.log.logHandler import LogHandler
+
 import os
 import re
 import grp
@@ -20,9 +24,8 @@ import glob
 import json
 import tempfile
 import paramiko
-import subprocess
-from subprocess import check_output
-from ConfigParser import RawConfigParser
+
+logger = LogHandler('extensions', name='sshclient')
 
 
 class SSHClient(object):
@@ -85,18 +88,38 @@ class SSHClient(object):
         """Makes sure that the given path/string is escaped and safe for shell"""
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
-    def run(self, command):
+    def run(self, command, debug=False):
         """
         Executes a shell command
         """
         if self.is_local is True:
-            return check_output(command, shell=True).strip()
+            try:
+                try:
+                    process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
+                except OSError as ose:
+                    logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, str(ose)))
+                    raise CalledProcessError(1, command, str(ose))
+                out, err = process.communicate()
+                if debug:
+                    logger.debug('stdout: {0}'.format(out))
+                    logger.debug('stderr: {0}'.format(err))
+                    return out.strip(), err
+                else:
+                    return out.strip()
+
+            except CalledProcessError as cpe:
+                logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, cpe.output))
+                raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                raise subprocess.CalledProcessError(exit_code, command, stderr.readlines())
-            return '\n'.join(line.strip() for line in stdout).strip()
+                logger.error('Command:\n{0}\nfailed :\n{1}\nand error:\n{2}\n'.format(command, stdout, stderr))
+                raise CalledProcessError(exit_code, command, stderr.readlines())
+            if debug:
+                return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
+            else:
+                return '\n'.join(line.rstrip() for line in stdout).strip()
 
     def dir_create(self, directories):
         """
@@ -110,7 +133,7 @@ class SSHClient(object):
                 if not os.path.exists(directory):
                     os.makedirs(directory)
             else:
-                self.run('mkdir -p "{0}"'.format(directory))
+                self.run('mkdir -p "{0}"; echo true'.format(directory))
 
     def dir_delete(self, directories):
         """

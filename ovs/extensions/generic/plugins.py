@@ -21,7 +21,7 @@ from ovs.extensions.generic.system import System
 class PluginManager(object):
 
     @staticmethod
-    def load_plugins():
+    def install_plugins():
         """
         (Re)load plugins
         """

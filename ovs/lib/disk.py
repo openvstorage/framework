@@ -62,7 +62,7 @@ class DiskController(object):
                 if match is not None:
                     mount_mapping[match.groups()[0]] = match.groups()[1]
             # Gather disk information
-            with Remote(storagerouter.ip, [Context]) as remote:
+            with Remote(storagerouter.ip, [Context, os]) as remote:
                 context = remote.Context()
                 devices = [device for device in context.list_devices(subsystem='block')
                            if 'ID_TYPE' in device and device['ID_TYPE'] == 'disk']
@@ -101,7 +101,7 @@ class DiskController(object):
                         if partition_name in mount_mapping:
                             mountpoint = mount_mapping[partition_name]
                             partition_data['mountpoint'] = mountpoint
-                            partition_data['inode'] = os.stat(mountpoint).st_dev
+                            partition_data['inode'] = remote.os.stat(mountpoint).st_dev
                             del mount_mapping[partition_name]
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))

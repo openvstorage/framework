@@ -233,7 +233,9 @@ class OVSVolumeDriver(driver.VolumeDriver):
             # - requires "emancipate" functionality
             # So for now we'll take a snapshot
             # (or the latest snapshot existing) and clone from that snapshot
-            if not len(source_ovs_disk.snapshots):
+            available_snapshots = [snapshot for snapshot in source_ovs_disk.snapshots
+                                   if 'in_backend' not in snapshot or snapshot['in_backend'] is True]
+            if len(available_snapshots) == 0:
                 metadata = {'label': "Cinder clone snapshot {0}".format(name),
                             'is_consistent': False,
                             'timestamp': time.time(),
@@ -247,8 +249,9 @@ class OVSVolumeDriver(driver.VolumeDriver):
                     snapshotid = None)
                 LOG.debug('CREATE_SNAP OK')
 
+                OVSVolumeDriver._wait_for_snapshot(source_ovs_disk, snapshotid)
             else:
-                snapshotid = source_ovs_disk.snapshots[-1]['guid']
+                snapshotid = available_snapshots[-1]['guid']
             LOG.debug('[CREATE CLONE FROM SNAP] %s ', snapshotid)
 
             disk_meta = vdisklib.VDiskController.clone(
@@ -354,6 +357,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
 
         mountpoint = self._get_hostname_mountpoint(str(volume.host))
         ovs_snap_disk = self._find_ovs_model_disk_by_snapshot_id(snapshot.id)
+        OVSVolumeDriver._wait_for_snapshot(ovs_snap_disk, snapshot.id)
         devicename = volume.display_name
         if not devicename:
             devicename = volume.name
@@ -590,3 +594,28 @@ class OVSVolumeDriver(driver.VolumeDriver):
         msg = (_('Disk still found for location %s') % location)
         LOG.exception(msg)
         raise exception.VolumeBackendAPIException(data=msg)
+
+    @staticmethod
+    def _wait_for_snapshot(disk, snapshot_id=None, tries=60):
+        """
+        Waits for a given snapshot (or any) to be available in the backend (so it can be used for clones)
+        """
+        def load():
+            disk.invalidate_dynamics(['snapshots'])
+            return [snapshot for snapshot in disk.snapshots
+                    if ('in_backend' not in snapshot or snapshot['in_backend'] is True)
+                    and (snapshot_id is None or snapshot['guid'] == str(snapshot_id))]
+
+        snapshots = load()
+        while len(snapshots) == 0 and tries > 0:
+            if snapshot_id is None:
+                LOG.debug('Waiting for a snapshot to be come available')
+            else:
+                LOG.debug('Waiting for snapshot {0} to become available'.format(snapshot_id))
+            tries -= 1
+            time.sleep(60 - tries)
+            snapshots = load()
+        if tries == 0 and len(snapshots) == 0:
+            if snapshot_id is None:
+                raise RuntimeError('No snapshot showed up')
+            raise RuntimeError('Snapshot {0} did not show up'.format(snapshot_id))

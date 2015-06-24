@@ -36,7 +36,9 @@ from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.extensions.migration.migrator import Migrator
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
+from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
@@ -130,7 +132,6 @@ class SetupController(object):
             hypervisor_username = config.get('setup', 'hypervisor_username')
             hypervisor_password = config.get('setup', 'hypervisor_password')
             arakoon_mountpoint = config.get('setup', 'arakoon_mountpoint')
-            verbose = config.getboolean('setup', 'verbose')
             auto_config = config.getboolean('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
@@ -157,6 +158,9 @@ class SetupController(object):
             ip_client_map[ip] = target_client
 
             logger.debug('Target client loaded')
+
+            if target_client.file_exists(SetupController.avahi_filename):
+                raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
 
             print '\n+++ Collecting cluster information +++\n'
             logger.info('Collecting cluster information')
@@ -417,6 +421,175 @@ class SetupController(object):
             sys.exit(1)
 
     @staticmethod
+    def update_framework():
+        def log_message(message, client_ip=None, severity='info'):
+            if client_ip is not None:
+                message = '{0:<15}: {1}'.format(client_ip, message)
+            if severity == 'info':
+                logger.info(message)
+            elif severity == 'warning':
+                logger.warning(message)
+            elif severity == 'error':
+                logger.error(message)
+
+        def remove_lock_files(files, ssh_clients):
+            for ssh_client in ssh_clients:
+                for file_name in files:
+                    if ssh_client.file_exists(file_name):
+                        ssh_client.file_delete(file_name)
+
+        def change_services_state(services, ssh_clients, action):
+            """
+            Stop/start services on SSH clients
+            If action is start, we ignore errors and try to start other services on other nodes
+            """
+            if action == 'start':
+                services.reverse()  # Start services again in reverse order of stopping
+            for service_name in services:
+                for ssh_client in ssh_clients:
+                    description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
+                    log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
+                    try:
+                        if ServiceManager.has_service(service_name, client=ssh_client):
+                            SetupController._change_service_state(client=ssh_client,
+                                                                  name=service_name,
+                                                                  state=action)
+                            log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
+                    except Exception as exc:
+                        log_message('Something went wrong {0} service {1}: {2}'.format(description, service_name, exc), ssh_client.ip, severity='warning')
+                        if action == 'stop':
+                            return False
+            return True
+
+        log_message('+++ Starting framework update +++')
+
+        from ovs.dal.lists.storagerouterlist import StorageRouterList
+
+        upgrade_file = '/etc/ready_for_upgrade'
+        upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
+        storage_routers = StorageRouterList.get_storagerouters()
+        sshclients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
+        this_client = [client for client in sshclients if client.is_local is True][0]
+
+        plugin_services = []
+        plugin_packages = []
+        framework_packages = ['openvstorage-core', 'openvstorage-webapps']
+        framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached']
+
+        # Check plugin requirements
+        required_plugin_params = {'name': (str, None),       # Name to describe a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
+                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
+                                  'packages': (list, str),   # Packages which contain the plugin code and should be updated
+                                  'namespace': (str, None)}  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
+        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
+        for function in plugin_functions:
+            output = function()
+            if not isinstance(output, list):
+                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
+
+            for out in output:
+                Toolbox.verify_required_params(required_plugin_params, out)
+                plugin_services += out['services']
+                plugin_packages += out['packages']
+
+        # Commence update !!!!!!!
+        # 1. Create locks
+        for client in sshclients:
+            client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
+            client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
+
+        # 2. Stop services
+        failed_services = False
+        for service_names, service_type in [(plugin_services, 'plugin'),
+                                            (framework_services, 'framework')]:
+            if change_services_state(services=service_names,
+                                     ssh_clients=sshclients,
+                                     action='stop') is False:
+                log_message('Stopping all {0} services on every node failed, cannot continue'.format(service_type), client_ip=this_client.ip, severity='warning')
+                remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
+                failed_services = True
+                break
+
+        if failed_services is True:
+            for service_names, service_type in [(plugin_services, 'plugin'),
+                                                (framework_services, 'framework')]:
+                log_message('Attempting to start the {0} services again'.format(service_type), client_ip=this_client.ip)
+                change_services_state(services=service_names,
+                                      ssh_clients=sshclients,
+                                      action='start')
+
+            log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
+            return
+
+        # 3. Update packages
+        failed_clients = []
+        for client in sshclients:
+            try:
+                for packages, package_type in [(plugin_packages, 'plugin'),
+                                               (framework_packages, 'framework')]:
+                    if packages:
+                        log_message('Installing latest {0} packages'.format(package_type), client.ip)
+                    for package_name in packages:
+                        log_message('Installing {0}'.format(package_name), client.ip)
+                        PackageManager.install(package_name=package_name,
+                                               client=client,
+                                               force=True)
+                        log_message('Installed {0}'.format(package_name), client.ip)
+                client.file_delete(upgrade_file)
+            except subprocess.CalledProcessError as cpe:
+                log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
+                failed_clients.append(client)
+                break
+
+        if failed_clients:
+            remove_lock_files([upgrade_file, upgrade_ongoing_check_file], sshclients)
+            log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
+            change_services_state(services=framework_services + plugin_services,
+                                  ssh_clients=sshclients,
+                                  action='start')
+            log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
+            return
+
+        # 4. Start services
+        log_message('Starting services', client_ip=this_client.ip)
+        change_services_state(services=['arakoon-ovsdb', 'memcached'],
+                              ssh_clients=sshclients,
+                              action='start')
+
+        # 5. Migrate
+        log_message('Started model migration', client_ip=this_client.ip)
+        try:
+            from ovs.dal.helpers import Migration
+            Migration.migrate()
+            log_message('Finished model migration', client_ip=this_client.ip)
+        except Exception as ex:
+            remove_lock_files([upgrade_ongoing_check_file], sshclients)
+            log_message('An unexpected error occurred: {0}'.format(ex), client_ip=this_client.ip, severity='error')
+            return
+
+        for client in sshclients:
+            try:
+                log_message('Started code migration', client.ip)
+                with Remote(client.ip, [Migrator]) as remote:
+                    remote.Migrator.migrate()
+                log_message('Finished code migration', client.ip)
+            except Exception as ex:
+                remove_lock_files([upgrade_ongoing_check_file], sshclients)
+                log_message('Code migration failed with error: {0}'.format(ex), client.ip, 'error')
+                return
+
+        # 6. Start watcher and restart support-agent
+        change_services_state(services=['watcher-framework'] + plugin_services,
+                              ssh_clients=sshclients,
+                              action='start')
+        change_services_state(services=['support-agent'],
+                              ssh_clients=sshclients,
+                              action='restart')
+
+        remove_lock_files([upgrade_ongoing_check_file], sshclients)
+        log_message('+++ Finished updating +++')
+
+    @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info, auto_config, disk_layout):
         """
         Prepares a node:
@@ -479,18 +652,18 @@ class SetupController(object):
             if node_client.file_exists(authorized_keys_filename.format(root_ssh_folder)):
                 existing_keys = node_client.file_read(authorized_keys_filename.format(root_ssh_folder)).split('\n')
                 for existing_key in existing_keys:
-                    if not existing_key in authorized_keys:
+                    if existing_key not in authorized_keys:
                         authorized_keys += "{0}\n".format(existing_key)
             if node_client.file_exists(authorized_keys_filename.format(ovs_ssh_folder)):
                 existing_keys = node_client.file_read(authorized_keys_filename.format(ovs_ssh_folder))
                 for existing_key in existing_keys:
-                    if not existing_key in authorized_keys:
+                    if existing_key not in authorized_keys:
                         authorized_keys += "{0}\n".format(existing_key)
             root_pub_key = node_client.file_read(public_key_filename.format(root_ssh_folder))
             ovs_pub_key = node_client.file_read(public_key_filename.format(ovs_ssh_folder))
-            if not root_pub_key in authorized_keys:
+            if root_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(root_pub_key)
-            if not ovs_pub_key in authorized_keys:
+            if ovs_pub_key not in authorized_keys:
                 authorized_keys += '{0}\n'.format(ovs_pub_key)
             node_hostname = node_client.run('hostname')
             all_hostnames.add(node_hostname)
@@ -871,7 +1044,6 @@ class SetupController(object):
                 SetupController._change_service_state(target_client, service, 'start')
 
         print 'Restarting services'
-        SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         SetupController._restart_framework_and_memcache_services(ip_client_map)
 
         if SetupController._run_hooks('promote', cluster_ip, master_ip):
@@ -915,8 +1087,6 @@ class SetupController(object):
         logger.info('Leaving arakoon cluster')
         for cluster in SetupController.arakoon_clusters:
             ArakoonInstaller.shrink_cluster(master_ip, cluster_ip, cluster)
-
-        SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
@@ -972,9 +1142,10 @@ class SetupController(object):
                                        params={'MEMCACHE_NODE_IP': cluster_ip,
                                                'WORKER_QUEUE': '{0}'.format(unique_id)})
 
+        SetupController._configure_amqp_to_volumedriver(ip_client_map)
+
         print 'Restarting services'
         logger.debug('Restarting services')
-        SetupController._change_service_state(target_client, 'watcher-volumedriver', 'restart')
         SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
 
         if SetupController._run_hooks('demote', cluster_ip, master_ip):
@@ -1345,7 +1516,7 @@ EOF
                 boot_disk = values['device']
                 print 'Boot disk {0} will not be cleared'.format(boot_disk)
             # Umount partitions
-            if mp in mounted:
+            if mp in mounted and values['device'] != 'DIR_ONLY':
                 print 'Unmounting {0}'.format(mp)
                 client.run('umount -l {0}'.format(mp))
 

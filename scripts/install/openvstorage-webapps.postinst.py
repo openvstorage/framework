@@ -22,8 +22,15 @@ import json
 from subprocess import check_output, CalledProcessError
 from ovs.extensions.os.os import OSManager
 
+# Remove existing enabled sites, taking control over nginx
+check_output('rm -f /etc/nginx/sites-enabled/default', shell=True)
+
+# Cleanup *.pyc files
+check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
+check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
+
 SECRET_KEY_LENGTH = 50
-SECRET_SELECTION = "{}{}{}".format(string.ascii_letters, string.digits, string.punctuation)
+SECRET_SELECTION = "{0}{1}{2}".format(string.ascii_letters, string.digits, string.punctuation)
 secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in range(SECRET_KEY_LENGTH)])
 
 config_filename = '/opt/OpenvStorage/config/ovs.json'
@@ -35,6 +42,15 @@ with open(config_filename, 'w') as config_file:
 
 os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput', shell=True)
+
+run_level_regex = '^[KS][0-9]{2}(.*)'
+service_configured = True
+for run_level in range(7):
+    if 'nginx' not in [re.match(run_level_regex, run_entry).groups()[0] for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)) if re.match(run_level_regex, run_entry)]:
+        service_configured &= False
+if service_configured is False:
+    check_output('service nginx stop', shell=True)
+    check_output('update-rc.d nginx disable', shell=True)
 
 # Create web certificates
 if not os.path.exists('/opt/OpenvStorage/config/ssl/server.crt'):

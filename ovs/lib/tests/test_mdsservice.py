@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """
-Delete snapshots test module
+MDSService test module
 """
 import unittest
 import sys
@@ -29,7 +29,7 @@ from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 
 class MDSServices(TestCase):
     """
-    This test class will validate the various scenarios of the delete snapshots logic
+    This test class will validate the various scenarios of the MDSService logic
     """
 
     VDisk = None

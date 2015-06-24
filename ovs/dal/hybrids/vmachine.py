@@ -60,9 +60,11 @@ class VMachine(DataObject):
                                                       'is_consistent': snapshot['is_consistent'],
                                                       'is_automatic': snapshot.get('is_automatic', True),
                                                       'stored': 0,
+                                                      'in_backend': snapshot['in_backend'],
                                                       'snapshots': {}}
                 snapshots_structure[timestamp]['snapshots'][disk.guid] = snapshot['guid']
                 snapshots_structure[timestamp]['stored'] = snapshots_structure[timestamp]['stored'] + snapshot['stored']
+                snapshots_structure[timestamp]['in_backend'] &= snapshot['in_backend']
 
         snapshots = []
         for timestamp in sorted(snapshots_structure.keys()):
@@ -72,6 +74,7 @@ class VMachine(DataObject):
                               'is_consistent': item['is_consistent'],
                               'is_automatic': item.get('is_automatic', True),
                               'stored': item['stored'],
+                              'in_backend': item['in_backend'],
                               'snapshots': item['snapshots']})
         return snapshots
 

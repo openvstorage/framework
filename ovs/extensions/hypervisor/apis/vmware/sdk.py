@@ -131,7 +131,7 @@ class Sdk(object):
             ).obj_identifier
             # pylint: enable=line-too-long
         else:
-            self._esxHost = self._get_vcenter_hosts()[0].obj_identifier # TODO?
+            self._esxHost = self._get_vcenter_hosts()[0].obj_identifier  # TODO?
 
     @authenticated(force=True)
     def _get_vcenter_hosts(self):
@@ -157,7 +157,7 @@ class Sdk(object):
                                                                  'path': 'host'}}}},
             properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
         )
-        ## HACK : if there's a single host, datacenter_info is ObjectContent instead of list(ObjectContent)
+        # If there's a single host, datacenter_info is ObjectContent instead of list(ObjectContent)
         if hasattr(datacenter_info, 'name'):
             return [datacenter_info]
         return datacenter_info
@@ -353,7 +353,7 @@ class Sdk(object):
         """
         if not self._is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
-        hosts =  self._get_vcenter_hosts()
+        hosts = self._get_vcenter_hosts()
         guests = []
         for host in hosts:
             esxhost = self._validate_host(host.obj_identifier)
@@ -365,10 +365,9 @@ class Sdk(object):
                                properties=['name', 'config'])
             for vm in vms:
                 guests.append({'id': vm.obj_identifier.value,
-                                'name': vm.name,
-                                'instance_name': vm.name})
+                               'name': vm.name,
+                               'instance_name': vm.name})
         return guests
-
 
     def _get_vmachine_vdisks(self, vm_object):
         disks = []
@@ -393,7 +392,7 @@ class Sdk(object):
         """
         if not self._is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
-        hosts =  self._get_vcenter_hosts()
+        hosts = self._get_vcenter_hosts()
 
         disks = []
         for host in hosts:
@@ -534,7 +533,8 @@ class Sdk(object):
         controllerSpec.device = controller
         return controllerSpec
 
-    def _create_option_value(self, factory, key, value):
+    @staticmethod
+    def _create_option_value(factory, key, value):
         """
         Create option values
         """
@@ -604,11 +604,11 @@ class Sdk(object):
         # Copy additional properties
         extraconfigstoskip = ['nvram']
         for item in source_vm.config.extraConfig:
-            if not item.key in extraconfigstoskip:
+            if item.key not in extraconfigstoskip:
                 config.extraConfig.append(
-                    self._create_option_value(self._client.factory,
-                                              item.key,
-                                              item.value))
+                    Sdk._create_option_value(self._client.factory,
+                                             item.key,
+                                             item.value))
 
         task = self._client.service.CreateVM_Task(host_data['folder'],
                                                   config=config,
@@ -683,11 +683,11 @@ class Sdk(object):
         # Copy additional properties
         extraconfigstoskip = ['nvram']
         for item in source_vm.config.extraConfig:
-            if not item.key in extraconfigstoskip:
+            if item.key not in extraconfigstoskip:
                 config.extraConfig.append(
-                    self._create_option_value(self._client.factory,
-                                              item.key,
-                                              item.value))
+                    Sdk._create_option_value(self._client.factory,
+                                             item.key,
+                                             item.value))
 
         task = self._client.service.CreateVM_Task(host_data['folder'],
                                                   config=config,
@@ -776,6 +776,7 @@ class Sdk(object):
         Delete a given vm
         """
         machine = None
+        task = None
         if vmid:
             try:
                 machine = self._build_property('VirtualMachine', vmid)
@@ -893,6 +894,14 @@ class Sdk(object):
                 if filename in mapping[datastore.name]:
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
+
+    def file_exists(self, ip, mountpoint, filename):
+        try:
+            self.get_nfs_datastore_object(ip, mountpoint, filename)
+            return True
+        except Exception, ex:
+            logger.debug('File does not exist: {0}'.format(ex))
+            return False
 
     def _get_vm_datastore_mapping(self, vm):
         """
@@ -1046,7 +1055,7 @@ class Sdk(object):
                         for part in path:
                             part_counter += 1
                             if part_counter < len(path):
-                                if not part in working_item.__dict__:
+                                if part not in working_item.__dict__:
                                     setattr(working_item, part, type(part, (), {})())
                                 working_item = working_item.__dict__[part]
                             else:

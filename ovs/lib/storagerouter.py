@@ -123,11 +123,11 @@ class StorageRouterController(object):
                            'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
         required_params_without_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
-                                        'connection_host': (str, Toolbox.regex_ip, False),
-                                        'connection_port': (int, None),
-                                        'connection_backend': (dict, None),
-                                        'connection_username': (str, None),
-                                        'connection_password': (str, None)}
+                                         'connection_host': (str, Toolbox.regex_ip, False),
+                                         'connection_port': (int, None),
+                                         'connection_backend': (dict, None),
+                                         'connection_username': (str, None),
+                                         'connection_password': (str, None)}
         required_params_local = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
 
         if not isinstance(parameters, dict):
@@ -212,7 +212,14 @@ class StorageRouterController(object):
                 if connection_host == '':
                     connection_host = Configuration.get('ovs.grid.ip')
                     connection_port = 443
-                    oauth_client = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')[0]
+                    clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
+                    oauth_client = None
+                    for current_client in clients:
+                        if current_client.user.group.name == 'administrators':
+                            oauth_client = current_client
+                            break
+                    if oauth_client is None:
+                        raise RuntimeError('Could not find INTERNAL CLIENT_CREDENTIALS client in administrator group.')
                     ovs_client = OVSClient(connection_host, connection_port,
                                            credentials=(oauth_client.client_id, oauth_client.client_secret),
                                            version=1)
@@ -254,7 +261,7 @@ class StorageRouterController(object):
             vpool.login = connection_username
             vpool.password = connection_password
             vpool.connection = '{0}:{1}'.format(connection_host, connection_port) if connection_host else None
-            vpool.description = "{0} {1}".format(vpool.backend_type.code, vpool_name)
+            vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.save()
 
         if len(mountpoint_readcaches) == 0:
@@ -295,10 +302,9 @@ class StorageRouterController(object):
         failovercache = '{0}/foc_{1}'.format(mountpoint_foc, vpool_name)
         metadatapath = '{0}/metadata_{1}'.format(mountpoint_md, vpool_name)
         tlogpath = '{0}/tlogs_{1}'.format(mountpoint_md, vpool_name)
-        rsppath = '/var/rsp/{0}'.format(vpool_name)
+        rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
 
-        dirs2create = [failovercache, metadatapath, tlogpath, rsppath,
-                       client.config_read('ovs.storagedriver.rsp')]
+        dirs2create = [failovercache, metadatapath, tlogpath, rsppath]
         files2create = list()
         readcaches = list()
         writecaches = list()
@@ -438,7 +444,6 @@ class StorageRouterController(object):
         filesystem_config.update({'fs_metadata_backend_arakoon_cluster_nodes': [],
                                   'fs_metadata_backend_mds_nodes': [],
                                   'fs_metadata_backend_type': 'MDS'})
-        readcache_serialization_path = client.config_read('ovs.storagedriver.rsp')
         queue_protocol = Configuration.get('ovs.core.broker.protocol')
         queue_login = Configuration.get('ovs.core.broker.login')
         queue_password = Configuration.get('ovs.core.broker.password')
@@ -514,7 +519,7 @@ class StorageRouterController(object):
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
-                                                               read_cache_serialization_path=readcache_serialization_path)
+                                                               read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
                                                 trigger_gap='1GB',
                                                 backoff_gap='2GB')
@@ -781,7 +786,7 @@ class StorageRouterController(object):
                 storagedriver_client.destroy_filesystem()
                 vrouter_clusterregistry.erase_node_configs()
             except RuntimeError as ex:
-                print('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
+                logger.error('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
 
         for mds_service in removal_mdsservices:
             # All MDSServiceVDisk object should have been deleted above
@@ -803,7 +808,7 @@ class StorageRouterController(object):
                                '{0}/fcache_{1}'.format(storagedriver.mountpoint_fragmentcache, vpool.name),
                                '{0}/metadata_{1}'.format(storagedriver.mountpoint_md, vpool.name),
                                '{0}/tlogs_{1}'.format(storagedriver.mountpoint_md, vpool.name),
-                               '/var/rsp/{0}'.format(vpool.name)])
+                               '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool.name)])
 
         files_to_remove.append('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
         if vpool.backend_type.code == 'alba':
@@ -826,7 +831,7 @@ class StorageRouterController(object):
                 logger.info('Recursively removed {0}'.format(dir_name))
 
         # Remove top directories
-        dirs2remove = list()
+        dirs2remove = []
         dirs2remove.extend(storagedriver.mountpoint_readcaches)
         dirs2remove.extend(storagedriver.mountpoint_writecaches)
         dirs2remove.append(storagedriver.mountpoint_fragmentcache)
@@ -834,8 +839,14 @@ class StorageRouterController(object):
         dirs2remove.append(storagedriver.mountpoint_md)
         dirs2remove.append(storagedriver.mountpoint)
 
+        mountpoints = client.run('mount -v').strip().splitlines()
+        mountpoints = [p.split(' ')[2] for p in mountpoints if len(p.split(' ')) > 2
+                       and not p.split(' ')[2].startswith('/dev') and not p.split(' ')[2].startswith('/proc')
+                       and not p.split(' ')[2].startswith('/sys') and not p.split(' ')[2].startswith('/run')
+                       and p.split(' ')[2] != '/' and not p.split(' ')[2].startswith('/mnt/alba-asd')]
+
         for directory in set(dirs2remove):
-            if directory:
+            if directory and directory not in mountpoints:
                 client.run('if [ -d {0} ] && [ ! "$(ls -A {0})" ]; then rmdir {0}; fi'.format(directory))
 
         DiskController.sync_with_reality(storagerouter.guid)
@@ -849,7 +860,9 @@ class StorageRouterController(object):
 
         # First model cleanup
         if storagedriver.alba_proxy is not None:
+            service = storagedriver.alba_proxy.service
             storagedriver.alba_proxy.delete()
+            service.delete()
         storagedriver.delete(abandon=['logs'])  # Detach from the log entries
 
         if storagedrivers_left:
@@ -963,10 +976,12 @@ class StorageRouterController(object):
         """
         Collects logs, moves them to a web-accessible location and returns log tgz's filename
         """
+        this_client = SSHClient('127.0.0.1', username='root')
+        logfile = this_client.run('ovs collect logs').strip()
+        logfilename = logfile.split('/')[-1]
+
         storagerouter = StorageRouter(local_storagerouter_guid)
         webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
-        logfile = check_output('ovs collect logs', shell=True).strip()
-        logfilename = logfile.split('/')[-1]
         client = SSHClient(storagerouter.ip, username='root')
         client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
@@ -1033,6 +1048,71 @@ class StorageRouterController(object):
         if not os.path.exists(mountpoint):
             return True
         return check_output('sudo -s ls -al {0} | wc -l'.format(mountpoint), shell=True).strip() == '3'
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.get_update_status')
+    def get_update_status(storagerouter_ip):
+        """
+        Checks for new updates
+        """
+        # Update apt (only our ovsaptrepo.list)
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        PackageManager.update(client=root_client,
+                              configuration_string='-o Dir::Etc::sourcelist="sources.list.d/ovsaptrepo.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"')
+
+        package_map = {'framework': [{'name': 'ovs',
+                                      'packages': ['openvstorage-core', 'openvstorage-webapps'],
+                                      'namespace': 'ovs'}],
+                       'volumedriver': [{'name': 'volumedriver',
+                                         'packages': ['volumedriver-base', 'volumedriver-server'],
+                                         'namespace': 'ovs'}]}
+
+        # Check plugin requirements
+        required_plugin_params = {'name': (str, None),       # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
+                                  'namespace': (str, None),  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
+                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
+                                  'packages': (list, str)}   # Packages which contain the plugin code and should be updated
+        plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
+        for function in plugin_functions:
+            output = function()
+            if not isinstance(output, list):
+                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
+
+            for out in output:
+                Toolbox.verify_required_params(required_plugin_params, out)
+                package_map['framework'].append(out)
+
+        # Compare installed and candidate versions
+        return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
+        for gui_name, package_information in package_map.iteritems():
+            return_value[gui_name] = None
+            for package_info in package_information:
+                package_versions = {}
+                for package_name in package_info['packages']:
+                    version_info = PackageManager.get_installed_and_candidate_version(package_name)
+                    package_versions[version_info[1]] = version_info[0]
+
+                to_version = max(package_versions) if package_versions else None  # We're only interested to show the highest version available for any of the sub-packages
+                from_version = package_versions[to_version] if to_version else None
+                if from_version != to_version:
+                    if return_value[gui_name] is None:
+                        return_value[gui_name] = []
+                    return_value[gui_name].append({'to': to_version,
+                                                   'from': from_version,
+                                                   'name': package_info['name'],
+                                                   'namespace': package_info['namespace']})
+        return return_value
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.update_framework')
+    def update_framework(storagerouter_ip):
+        """
+        Launch the update-framework method in setup.py
+        """
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        root_client.run('ovs update framework')
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

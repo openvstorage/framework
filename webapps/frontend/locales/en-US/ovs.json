@@ -446,6 +446,24 @@
             "deletefailed": "Could not delete the user: __why__"
         }
     },
+    "updates": {
+        "buttons": {"framework": "Update Framework",
+                    "volumedriver": "Update Storage Driver"},
+        "failed": "Update failed: __why__",
+        "framework": "Framework",
+        "name": "Name",
+        "noupdates": "No updates available",
+        "ongoing": "An upgrade is in progress",
+        "start_update_question": "Start the __what__ update? The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)",
+        "start_update": "Update launched",
+        "start_update_extra": "Update will start shortly",
+        "title": "Updates",
+        "volumedriver": "Storage Driver"
+    },
+    "packages": {
+        "ovs": "Core",
+        "volumedriver": "Storage Driver"
+    },
     "login": {
         "title": "Login",
         "introduction": "Please provide the required credentials to log in into your Open vStorage management center.",

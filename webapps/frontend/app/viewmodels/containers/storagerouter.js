@@ -46,6 +46,7 @@ define([
         self.machineId        = ko.observable();
         self.ipAddress        = ko.observable();
         self.status           = ko.observable();
+        self.nodeType         = ko.observable();
         self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.storedData       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
@@ -61,6 +62,7 @@ define([
         self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
         self.disks            = ko.observableArray([]);
         self.disksLoaded      = ko.observable(false);
+        self.updates          = ko.observable();
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -94,6 +96,17 @@ define([
         });
 
         // Functions
+        self.getUpdates = function() {
+            return $.Deferred(function(deferred) {
+                api.get('storagerouters/' + self.guid() + '/get_update_status')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        self.updates(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise();
+        }
         self.getDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDisks)) {
@@ -167,6 +180,7 @@ define([
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
+            generic.trySet(self.nodeType, data, 'node_type');
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }

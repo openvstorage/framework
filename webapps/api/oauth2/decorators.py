@@ -17,7 +17,7 @@ Contains various decorator
 """
 import json
 import time
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseServerError
 from django.contrib.auth import authenticate, login
 from rest_framework.request import Request
 from rest_framework.exceptions import PermissionDenied
@@ -39,7 +39,7 @@ def _find_request(args):
             return item
 
 
-def json_response():
+def auto_response():
     """
     Json response wrapper
     """
@@ -52,12 +52,22 @@ def json_response():
             Wrapped function
             """
             results = f(*args, **kw)
-            return_type, data = results[0], results[1]
-            if len(results) == 2:
-                return return_type(json.dumps(data), content_type='application/json')
+            if isinstance(results, tuple) or isinstance(results, list):
+                return_type, data = results[0], results[1]
+                if len(results) == 2:
+                    if isinstance(data, dict):
+                        return return_type(json.dumps(data), content_type='application/json')
+                    return return_type(data)
+                else:
+                    status_code = results[2]
+                    if isinstance(data, dict):
+                        return return_type(json.dumps(data), content_type='application/json', status=status_code)
+                    return return_type(data, status=status_code)
+            elif isinstance(results, HttpResponse):
+                return results
             else:
-                status_code = results[2]
-                return return_type(json.dumps(data), content_type='application/json', status=status_code)
+                logger.error('Got invalid function return data in auto_reponse')
+                return HttpResponseServerError()
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
