@@ -68,7 +68,7 @@ class LogHandler(object):
         Initializes the logger
         """
         parent_invoker = inspect.stack()[1]
-        if __file__ != parent_invoker[1] or parent_invoker[3] != 'get':
+        if not __file__.startswith(parent_invoker[1]) or parent_invoker[3] != 'get':
             raise RuntimeError('Cannot invoke instance from outside this class. Please use LogHandler.get(source, name=None) instead')
 
         if name is None:
