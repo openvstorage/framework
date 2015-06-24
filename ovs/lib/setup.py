@@ -464,6 +464,7 @@ class SetupController(object):
 
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
+        log_message('Generating SSH client connections for each storage router')
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
         storage_routers = StorageRouterList.get_storagerouters()
