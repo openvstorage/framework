@@ -65,11 +65,10 @@ class ValueExtender(MessagePlugin):
     Plugin for SUDS for compatibility with VMware SDK
     """
 
-    def add_attribute_for_value(self, node):
+    def addAttributeForValue(self, node):
         """
         Adds an attribute to a given node
         """
-        _ = self
         if node.name == 'value':
             node.set('xsi:type', 'xsd:string')
 
@@ -77,7 +76,7 @@ class ValueExtender(MessagePlugin):
         """
         Hook up the plugin
         """
-        context.envelope.walk(self.add_attribute_for_value)
+        context.envelope.walk(self.addAttributeForValue)
 
 
 class Sdk(object):

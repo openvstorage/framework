@@ -33,7 +33,7 @@ class EnsureArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class EnsureArakoonWorks:
+class EnsureArakoonWorks(object):
     """
     Wait for the following operation to be possible:
     1) Set a value

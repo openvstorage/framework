@@ -37,7 +37,7 @@ class CheckArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class CheckArakoonTlogMark:
+class CheckArakoonTlogMark(object):
     """
     check if tlogs need marking
     mark tlogs that are unmarked
