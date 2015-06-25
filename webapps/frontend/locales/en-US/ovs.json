@@ -211,7 +211,8 @@
         "sizeamount": "Size: __amount__",
         "partitionusage": "Detailed partition usage:",
         "sizeunspecified": "Size up to __amount__",
-        "tempspace": "Temporary files"
+        "tempspace": "Temporary files",
+        "accept": "Accept"
     },
     "storagerouters": {
         "title": "Storage Routers",

@@ -36,6 +36,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
         }).extend({ notify: 'always' });
         computed(target());
+        computed.min = generic.tryGet(settings, 'min', undefined);
+        computed.max = generic.tryGet(settings, 'max', undefined);
         return computed;
     };
     ko.extenders.smooth = function(target, settings) {

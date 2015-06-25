@@ -115,6 +115,8 @@ INCLUDED AND/OR USED SOFTWARE
     timeago                     MIT             Custom modifications
         Copyright (c) 2008-2013, Ryan McGeary (ryan -[at]- mcgeary [*dot*] org)
 
+    d3 slider                   BSD
+        Copyright (c) 2013, Bjorn Sandvik - http://blog.thematicmapping.org
 
 LICENSES
 
