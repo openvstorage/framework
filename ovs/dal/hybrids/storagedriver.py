@@ -41,7 +41,8 @@ class StorageDriver(DataObject):
                     Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
                     Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
                     Property('mountpoint_writecaches', list, doc='Write cache mountpoints'),
-                    Property('mountpoint_foc', str, doc='Mountpoint for failover cache')]
+                    Property('mountpoint_foc', str, doc='Mountpoint for failover cache'),
+                    Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),

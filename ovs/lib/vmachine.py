@@ -533,7 +533,7 @@ class VMachineController(object):
             pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
             mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
-                mutex.acquire(wait=5)
+                mutex.acquire(wait=120)
                 limit = 5
                 exists = hypervisor.file_exists(storagedriver, name)
                 while limit > 0 and exists is False:

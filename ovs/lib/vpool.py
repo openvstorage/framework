@@ -33,15 +33,17 @@ class VPoolController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.vpool.mountpoint_available_from_voldrv')
+    @celery.task(name='ovs.vpool.up_and_running')
     @log('VOLUMEDRIVER_TASK')
-    def mountpoint_available_from_voldrv(mountpoint, storagedriver_id):
+    def up_and_running(mountpoint, storagedriver_id):
         """
-        Hook for (re)exporting the NFS mountpoint
+        Volumedriver informs us that the service is completely started. Post-start events can be executed
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
             raise RuntimeError('A Storage Driver with id {0} could not be found.'.format(storagedriver_id))
+        storagedriver.startup_counter += 1
+        storagedriver.save()
         if storagedriver.storagerouter.pmachine.hvtype == 'VMWARE':
             client = SSHClient(storagedriver.storagerouter.ip)
             if client.config_read('ovs.storagedriver.vmware_mode') == 'classic':
