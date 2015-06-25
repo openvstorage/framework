@@ -713,7 +713,7 @@ class Sdk(object):
         for store in host_system.datastore[0]:
             store = self._get_object(store)
             if not store.summary.accessible:
-                raise RuntimeError('Datastore {0} is not accessible at mountpoint {1}'.format(store.name, mountpoint))
+                logger.warning('Datastore {0} is not accessible, skipping'.format(store.name))
             if hasattr(store.info, 'nas'):
                 if store.info.nas.remoteHost == ip and store.info.nas.remotePath == mountpoint:
                     datastore = store
