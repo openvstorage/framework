@@ -21,7 +21,7 @@ import uuid
 import json
 import time
 from ConfigParser import RawConfigParser
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 
 from ovs.celery_run import celery
 from ovs.dal.hybrids.storagedriver import StorageDriver
@@ -748,12 +748,28 @@ class StorageRouterController(object):
             try:
                 if ServiceManager.has_service(albaproxy_service, client=client):
                     ServiceManager.start_service(albaproxy_service, client=client)
+                    tries = 10
+                    running = False
+                    port = storagedriver.alba_proxy.service.ports[0]
+                    while running is False and tries > 0:
+                        logger.debug('Waiting for the Alba proxy to start up again...')
+                        tries -= 1
+                        time.sleep(10 - tries)
+                        try:
+                            client.run('alba proxy-statistics --host 127.0.0.1 --port {0}'.format(port))
+                            running = True
+                        except CalledProcessError:
+                            pass
+                    if running is False:
+                        raise RuntimeError('Alba proxy failed to start')
+                    logger.debug('Alba proxy running')
 
+                logger.debug('Destroying filesystem and erasing node configs')
                 storagedriver_client = LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
                 storagedriver_client.destroy_filesystem()
                 vrouter_clusterregistry.erase_node_configs()
             except RuntimeError as ex:
-                logger.error('Could not destroy filesystem or erase node configs due to error: {0}'.format(ex))
+                logger.error('Could not destroy filesystem or erase node configs: {0}'.format(ex))
             if ServiceManager.has_service(albaproxy_service, client=client):
                 ServiceManager.stop_service(albaproxy_service, client=client)
 
