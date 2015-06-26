@@ -380,8 +380,7 @@ class ArakoonInstaller(object):
         """
         Execute a restart sequence (Executed after arakoon and/or alba package upgrade)
         """
-        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
-        logging.disable('WARNING')
+        logger.debug('Restart sequence for {0} via {1}'.format(cluster_name, master_ip))
 
         client = SSHClient(master_ip)
         config = ArakoonClusterConfig(cluster_name)
@@ -389,17 +388,19 @@ class ArakoonInstaller(object):
 
         all_clients = [SSHClient(node.ip) for node in config.nodes if node.ip != master_ip] + [client]
         if len(config.nodes) <= 2:
+            logger.debug('  Insufficient nodes in cluster {0}. Full restart'.format(cluster_name))
             for function in [ArakoonInstaller.stop, ArakoonInstaller.start]:
                 for client in all_clients:
                     function(cluster_name, client)
             ArakoonInstaller.wait_for_cluster(cluster_name)
         else:
+            logger.debug('  Sufficient nodes in cluster {0}. Sequential restart'.format(cluster_name))
             for client in all_clients:
                 ArakoonInstaller.stop(cluster_name, client)
                 ArakoonInstaller.start(cluster_name, client)
+                logger.debug('  Restarted node {0} on cluster {1}'.format(client.ip, cluster_name))
                 ArakoonInstaller.wait_for_cluster(cluster_name)
-
-        logging.disable(loglevel)  # Restore workaround
+        logger.debug('Restart sequence for {0} via {1} completed'.format(cluster_name, master_ip))
 
     @staticmethod
     def restart_cluster_add(cluster_name, current_ips, new_ip):
