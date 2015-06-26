@@ -50,11 +50,11 @@ define([
             $.each(self.storageRouters(), function(index, storageRouter) {
                 var item = storageRouter.updates();
                 if (item !== undefined) {
-                    if (item.framework !== null) {
+                    if (item.framework.length > 0) {
                         any_framework_update = true;
                         updates_data.framework = true;
                     }
-                    if (item.volumedriver !== null) {
+                    if (item.volumedriver.length > 0) {
                         any_volumedriver_update = true;
                         updates_data.volumedriver = true;
                     }
