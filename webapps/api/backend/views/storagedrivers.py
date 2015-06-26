@@ -64,13 +64,14 @@ class StorageDriverViewSet(viewsets.ViewSet):
         """
         result = True
         storagerouter = storagedriver.storagerouter
+        storagedrivers_left = len([sd for sd in storagerouter.storagedrivers if sd.guid != storagedriver.guid])
         pmachine = storagerouter.pmachine
         vmachines = VMachineList.get_customer_vmachines()
         vpools_guids = [vmachine.vpool_guid for vmachine in vmachines if vmachine.vpool_guid is not None]
         pmachine_guids = [vmachine.pmachine_guid for vmachine in vmachines]
         vpool = storagedriver.vpool
 
-        if pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
+        if storagedrivers_left is False and pmachine.guid in pmachine_guids and vpool.guid in vpools_guids:
             result = False
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
             result = False

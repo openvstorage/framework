@@ -62,7 +62,7 @@ class Mapping(object):
                                                            'dedupe': True,
                                                            'dedupe_key': '[TASK_NAME]_[new_name]_[storagedriver_id]',
                                                            'execonstoragerouter': True}}],
-               FileSystemEvents.up_and_running: [{'task': VPoolController.mountpoint_available_from_voldrv,
+               FileSystemEvents.up_and_running: [{'task': VPoolController.up_and_running,
                                                   'arguments': {'mountpoint': 'mountpoint',
                                                                 '[NODE_ID]': 'storagedriver_id'},
                                                   'options': {'execonstoragerouter': True}}],
