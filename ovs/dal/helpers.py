@@ -269,9 +269,6 @@ class Migration(object):
         a always increasing by one
         """
 
-        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
-        logging.disable('WARNING')
-
         def execute(function, start, end):
             """
             Executes a single migration, syncing versions
@@ -305,5 +302,3 @@ class Migration(object):
             data[identifier] = new_version
 
         persistent.set(key, data)
-
-        logging.disable(loglevel)  # Restore workaround

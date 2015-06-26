@@ -22,10 +22,13 @@ import subprocess
 from ConfigParser import RawConfigParser
 
 from arakoon.Arakoon import ArakoonClientConfig, ArakoonClient
-from arakoon.ArakoonManagement import ArakoonManagement, ArakoonCluster, logging
+from arakoon.ArakoonManagement import ArakoonManagement, ArakoonCluster
 from ovs.extensions.generic.system import System
+from ovs.log.logHandler import LogHandler
 
 config_dir = '/opt/OpenvStorage/config'
+
+logging = LogHandler.get('arakoon', name='arakoon_management')
 
 
 class ArakoonManagementEx(ArakoonManagement):
