@@ -12,9 +12,6 @@ class Migrator(object):
     def migrate():
         """ Executes all migrations. It keeps track of an internal "migration version" which is always increasing by one """
 
-        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
-        logging.disable('WARNING')
-
         data = Configuration.get('ovs.core.versions') if Configuration.exists('ovs.core.versions') else {}
         migrators = []
         path = os.path.join(os.path.dirname(__file__), 'migration')
@@ -35,5 +32,3 @@ class Migrator(object):
             data[identifier] = end_version
 
         Configuration.set('ovs.core.versions', data)
-
-        logging.disable(loglevel)  # Restore workaround
