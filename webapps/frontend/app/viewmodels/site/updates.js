@@ -27,9 +27,9 @@ define([
         self.updating             = ko.observable(false);
         self.widgets              = [];
         self.storageRouterHeaders = [
-            { key: 'name',         value: $.t('ovs:updates.name'),         width: 400 },
+            { key: 'name',         value: $.t('ovs:updates.name'),         width: 300 },
             { key: 'framework',    value: $.t('ovs:updates.framework'),    width: undefined },
-            { key: 'volumedriver', value: $.t('ovs:updates.volumedriver'), width: 250 },
+            { key: 'volumedriver', value: $.t('ovs:updates.volumedriver'), width: 400 },
         ];
 
         // Handles
@@ -45,18 +45,37 @@ define([
         self.updates = ko.computed(function() {
             var any_framework_update = false;
             var any_volumedriver_update = false;
-            var updates_data = {'framework': false,
-                                'volumedriver': false};
+            var updates_data = {'framework': {'update': false,
+                                              'downtime': []},
+                                'volumedriver': {'update': false,
+                                                 'downtime': []}};
             $.each(self.storageRouters(), function(index, storageRouter) {
                 var item = storageRouter.updates();
                 if (item !== undefined) {
                     if (item.framework.length > 0) {
                         any_framework_update = true;
-                        updates_data.framework = true;
+                        updates_data.framework.update = true;
+                        $.each(item.framework, function(a_index, framework_info) {
+                            $.each(framework_info.downtime, function(b_index, downtime) {
+                                if (!downtime.nestedIn(updates_data.framework.downtime)) {
+                                    updates_data.framework.downtime.push(downtime);
+                                }
+                            });
+                        });
                     }
                     if (item.volumedriver.length > 0) {
                         any_volumedriver_update = true;
-                        updates_data.volumedriver = true;
+                        updates_data.volumedriver.update = true;
+                        $.each(item.volumedriver, function(a_index, volumedriver_info) {
+                            $.each(volumedriver_info.downtime, function(b_index, downtime) {
+                                if (!downtime.nestedIn(updates_data.volumedriver.downtime)) {
+                                    updates_data.volumedriver.downtime.push(downtime);
+                                }
+                            });
+                        });
+                    }
+                    if (item.upgrade_ongoing === true) {
+                        self.upgradeOngoing(true);
                     }
                 }
             });
@@ -102,8 +121,25 @@ define([
             self.updating(true);
 
             return $.Deferred(function(deferred) {
+                var downtimes = [];
+                $.each(self.updates().framework.downtime, function(index, downtime) {
+                    if (downtime[2] === null) {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
+                    } else {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
+                    }
+                });
+                $.each(self.updates().volumedriver.downtime, function(index, downtime) {
+                    if (downtime[2] === null) {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
+                    } else {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
+                    }
+                });
+
+                var downtimeMessage = '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 app.showMessage(
-                    $.t('ovs:updates.start_update_question', { what: $.t('ovs:updates.framework') }).trim(),
+                    $.t('ovs:updates.start_update_question', { what: $.t('ovs:updates.framework'), downtime: downtimeMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
                     [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                 )

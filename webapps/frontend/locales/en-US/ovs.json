@@ -455,7 +455,7 @@
         "name": "Name",
         "noupdates": "No updates available",
         "ongoing": "An upgrade is in progress",
-        "start_update_question": "Start the __what__ update? The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)",
+        "start_update_question": "Are you sure you want to start the __what__ update?<br /><br />The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)__downtime__",
         "start_update": "Update launched",
         "start_update_extra": "Update will start shortly",
         "title": "Updates",
@@ -464,6 +464,9 @@
     "packages": {
         "ovs": "Core",
         "volumedriver": "Storage Driver"
+    },
+    "downtime": {
+        "general": "Following service__multiple__ will experience downtime:"
     },
     "login": {
         "title": "Login",
