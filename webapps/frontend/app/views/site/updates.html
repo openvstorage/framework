@@ -32,10 +32,8 @@ limitations under the License.
                             <span data-bind="visible: item() === undefined || item().framework.length === 0,
                                              translate: 'ovs:updates.noupdates'"></span>
                             <span data-bind="if: item() !== undefined && item().framework.length > 0">
-                                <span data-bind="foreach: item().framework">
-                                    <span data-bind="visible: $index() > 0">,</span>
-                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)
-                                </span>
+                                <span data-bind="foreach: item().framework"><span data-bind="visible: $index() > 0">,</span>
+                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)</span>
                             </span>
                         </span>
                     </span>

@@ -1099,7 +1099,8 @@ class StorageRouterController(object):
         required_plugin_params = {'name': (str, None),       # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
                                   'namespace': (str, None),  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
                                   'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
-                                  'packages': (list, str)}   # Packages which contain the plugin code and should be updated
+                                  'packages': (list, str),
+                                  'downtime': (list, dict)}   # Packages which contain the plugin code and should be updated
         plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
         for function in plugin_functions:
             output = function()
@@ -1134,6 +1135,7 @@ class StorageRouterController(object):
                     return_value[gui_name].append({'to': to_version,
                                                    'from': from_version,
                                                    'name': package_info['name'],
+                                                   'downtime': package_info.get('downtime', []),
                                                    'namespace': package_info['namespace']})
         return return_value
 
