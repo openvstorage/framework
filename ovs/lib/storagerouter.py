@@ -1118,7 +1118,8 @@ class StorageRouterController(object):
             for package_info in package_information:
                 package_versions = {}
                 for package_name in package_info['packages']:
-                    version_info = PackageManager.get_installed_and_candidate_version(package_name)
+                    version_info = PackageManager.get_installed_and_candidate_version(package_name = package_name,
+                                                                                      client = root_client)
                     to_version = version_info[1]
                     from_version = version_info[0]
 

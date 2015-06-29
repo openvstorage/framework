@@ -41,10 +41,10 @@ class DebianPackage(object):
         return versions
 
     @staticmethod
-    def get_installed_and_candidate_version(package_name):
+    def get_installed_and_candidate_version(package_name, client):
         installed = None
         candidate = None
-        for line in check_output('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING), shell=True).splitlines():
+        for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
             line = line.strip()
             if line.startswith('Installed:'):
                 installed = line.lstrip('Installed:').strip()

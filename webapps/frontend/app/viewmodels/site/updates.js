@@ -137,7 +137,7 @@ define([
                     }
                 });
 
-                var downtimeMessage = '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
+                var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 app.showMessage(
                     $.t('ovs:updates.start_update_question', { what: $.t('ovs:updates.framework'), downtime: downtimeMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
