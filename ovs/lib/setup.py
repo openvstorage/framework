@@ -447,9 +447,9 @@ class SetupController(object):
             for service_name in services:
                 for ssh_client in ssh_clients:
                     description = 'stopping' if action == 'stop' else 'starting' if action == 'start' else 'restarting'
-                    log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
                     try:
                         if ServiceManager.has_service(service_name, client=ssh_client):
+                            log_message('{0} service {1}'.format(description.capitalize(), service_name), ssh_client.ip)
                             SetupController._change_service_state(client=ssh_client,
                                                                   name=service_name,
                                                                   state=action)
@@ -479,8 +479,8 @@ class SetupController(object):
             client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
 
         # 1. Check plugin requirements
-        plugin_services = []
-        plugin_packages = []
+        plugin_services = set()
+        plugin_packages = set()
         framework_packages = ['openvstorage-core', 'openvstorage-webapps']
         framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached']
         required_plugin_params = {'name': (str, None),       # Name to describe a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
@@ -495,16 +495,18 @@ class SetupController(object):
 
             for out in output:
                 Toolbox.verify_required_params(required_plugin_params, out)
-                plugin_services += out['services']
-                plugin_packages += out['packages']
+                plugin_services.update(out['services'])
+                plugin_packages.update(out['packages'])
 
-        log_message('Plugin   : Services which will be restarted --> {0}'.format(', '.join(plugin_services)), client_ip=this_client.ip)
-        log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(framework_services)), client_ip=this_client.ip)
-        log_message('Plugin   : Packages which will be installed --> {0}'.format(', '.join(plugin_packages)), client_ip=this_client.ip)
-        log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(framework_packages)), client_ip=this_client.ip)
+        log_message('Plugin   : Services which will be restarted --> {0}'.format(', '.join(plugin_services)))
+        log_message('Plugin   : Packages which will be installed --> {0}'.format(', '.join(plugin_packages)))
+        log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(framework_services)))
+        log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(framework_packages)))
 
         # 2. Stop services
         failed_services = False
+        plugin_services = list(plugin_services)
+        plugin_packages = list(plugin_packages)
         for service_names, service_type in [(plugin_services, 'plugin'),
                                             (framework_services, 'framework')]:
             if change_services_state(services=service_names,
