@@ -24,22 +24,23 @@ define([
         // Variables
         self.shared               = shared;
         self.guard                = { authenticated: true };
-        self.updating             = ko.observable(false);
         self.widgets              = [];
         self.storageRouterHeaders = [
-            { key: 'name',         value: $.t('ovs:updates.name'),         width: 300 },
-            { key: 'framework',    value: $.t('ovs:updates.framework'),    width: undefined },
-            { key: 'volumedriver', value: $.t('ovs:updates.volumedriver'), width: 400 },
+            { key: 'name',         value: $.t('ovs:updates.name'),               width: 300 },
+            { key: 'framework',    value: $.t('ovs:updates.framework.title'),    width: undefined },
+            { key: 'volumedriver', value: $.t('ovs:updates.volumedriver.title'), width: 400 },
         ];
 
         // Handles
         self.storageRoutersHandle = {};
 
         // Observables
-        self.storageRouters     = ko.observableArray([]);
-        self.upgradeOngoing     = ko.observable(false);
-        self.frameworkUpdate    = ko.observable(false);
-        self.volumedriverUpdate = ko.observable(false);
+        self.storageRouters       = ko.observableArray([]);
+        self.upgradeOngoing       = ko.observable(false);  // Whether any upgrade is ongoing (framework or volumedriver)
+        self.frameworkUpdate      = ko.observable(false);  // Whether a framework update is available
+        self.volumedriverUpdate   = ko.observable(false);  // Whether a volumedriver update is available
+        self.frameworkUpdating    = ko.observable(false);  // Whether the framework is being updated
+        self.volumedriverUpdating = ko.observable(false);  // Whether the volumedriver is being updated
 
         // Computed
         self.updates = ko.computed(function() {
@@ -85,6 +86,9 @@ define([
         });
 
         // Functions
+        self.runningVms = function() {
+
+        };
         self.loadStorageRouters = function(page) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRoutersHandle[page])) {
@@ -112,13 +116,13 @@ define([
             }).promise();
         };
         self.updateFramework = function() {
-            if (self.updating() === true) {  // Cleared by refreshing page, kept in memory only
+            if (self.frameworkUpdating() === true) {  // Cleared by refreshing page, kept in memory only
                 return;
             }
             else if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
                 return;
             }
-            self.updating(true);
+            self.frameworkUpdating(true);
 
             return $.Deferred(function(deferred) {
                 var downtimes = [];
@@ -139,7 +143,7 @@ define([
 
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 app.showMessage(
-                    $.t('ovs:updates.start_update_question', { what: $.t('ovs:updates.framework'), downtime: downtimeMessage }).trim(),
+                    $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), downtime: downtimeMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
                     [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                 )
@@ -151,12 +155,12 @@ define([
                                     self.upgradeOngoing(true);
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
                                         .then(function(taskID) {
-                                            self.updating(false);  // Update itself will stop all services, so celery should not reach done status
+                                            self.frameworkUpdating(false);  // Update itself will stop all services, so celery should not reach done status
                                             return self.shared.tasks.wait(taskID);
                                         })
                                         .done(function() {
                                             deferred.resolve();
-                                            self.updating(false);
+                                            self.frameworkUpdating(false);
                                         })
                                         .fail(function(error) {
                                             generic.alertError(
@@ -164,7 +168,7 @@ define([
                                                 $.t('ovs:updates.failed', { why: error })
                                             );
                                             deferred.reject();
-                                            self.updating(false);
+                                            self.frameworkUpdating(false);
                                             self.upgradeOngoing(false);
                                         });
                                     return false;  // break out of $.each loop
@@ -172,14 +176,79 @@ define([
                             });
                         } else {
                             deferred.reject();
-                            self.updating(false);
+                            self.frameworkUpdating(false);
                             self.upgradeOngoing(false);
                         }
                     })
             }).promise();
         };
+
         self.updateVolumedriver = function() {
-            return;
+            if (self.volumedriverUpdating() === true) {  // Cleared by refreshing page, kept in memory only
+                return;
+            }
+            else if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
+                return;
+            }
+            self.volumedriverUpdating(true);
+
+            return $.Deferred(function(deferred) {
+                var downtimes = [];
+                $.each(self.updates().volumedriver.downtime, function(index, downtime) {
+                    if (downtime[2] === null) {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
+                    } else {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
+                    }
+                });
+                $.each(self.updates().volumedriver.downtime, function(index, downtime) {
+                    if (downtime[2] === null) {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
+                    } else {
+                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
+                    }
+                });
+
+                var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
+                app.showMessage(
+                    $.t('ovs:updates.volumedriver.start_update_question', { what: $.t('ovs:updates.volumedriver'), downtime: downtimeMessage }).trim(),
+                    $.t('ovs:generic.areyousure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                    .done(function(answer) {
+                        if (answer === $.t('ovs:generic.yes')) {
+                            generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
+                            $.each(self.storageRouters(), function(index, storageRouter) {
+                                if (storageRouter.nodeType() == 'MASTER') {
+                                    self.upgradeOngoing(true);
+                                    api.post('storagerouters/' + storageRouter.guid() + '/update_volumedriver')
+                                        .then(function(taskID) {
+                                            self.volumedriverUpdating(false);  // Update itself will stop all services, so celery should not reach done status
+                                            return self.shared.tasks.wait(taskID);
+                                        })
+                                        .done(function() {
+                                            deferred.resolve();
+                                            self.volumedriverUpdating(false);
+                                        })
+                                        .fail(function(error) {
+                                            generic.alertError(
+                                                $.t('ovs:generic.error'),
+                                                $.t('ovs:updates.failed', { why: error })
+                                            );
+                                            deferred.reject();
+                                            self.volumedriverUpdating(false);
+                                            self.upgradeOngoing(false);
+                                        });
+                                    return false;  // break out of $.each loop
+                                }
+                            });
+                        } else {
+                            deferred.reject();
+                            self.volumedriverUpdating(false);
+                            self.upgradeOngoing(false);
+                        }
+                    })
+            }).promise();
         };
 
         // Durandal

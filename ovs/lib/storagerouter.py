@@ -1144,11 +1144,21 @@ class StorageRouterController(object):
     @celery.task(name='ovs.storagerouter.update_framework')
     def update_framework(storagerouter_ip):
         """
-        Launch the update-framework method in setup.py
+        Launch the update_framework method in setup.py
         """
         root_client = SSHClient(ip=storagerouter_ip,
                                 username='root')
         root_client.run('ovs update framework')
+
+    @staticmethod
+    @celery.task(name='ovs.storagerouter.update_volumedriver')
+    def update_volumedriver(storagerouter_ip):
+        """
+        Launch the update_volumedriver method in setup.py
+        """
+        root_client = SSHClient(ip=storagerouter_ip,
+                                username='root')
+        root_client.run('ovs update volumedriver')
 
     @staticmethod
     def _get_free_ports(client, ports_in_use, number):

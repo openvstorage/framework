@@ -43,6 +43,10 @@ elif [ "$1" = "update" ] ; then
         echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()"' > /tmp/update
         at -f /tmp/update now
         rm /tmp/update
+    elif [ "$2" = "volumedriver" ] ; then
+        echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_volumedriver()"' > /tmp/update
+        at -f /tmp/update now
+        rm /tmp/update
     fi
 elif [ "$1" = "monitor" ] ; then
     if [ "$2" = "services" ] ; then
