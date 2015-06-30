@@ -16,13 +16,15 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vpool', '../containers/vmachine', '../containers/storagerouter', '../containers/vdisk',
-    '../wizards/storageroutertovpool/index'
-], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, VDisk, StorageRouterToVPoolWizard) {
+    '../wizards/storageroutertovpool/index', '../wizards/addvpool/index', '../wizards/addvpool/data'
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, VDisk,
+            StorageRouterToVPoolWizard, AddVpoolMountpoints, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
+        self.data = data;
         self.shared             = shared;
         self.guard              = { authenticated: true };
         self.refresher          = new Refresher();
@@ -245,19 +247,52 @@ define([
                     });
             }
         };
-        self.updateStorageRouterServing = function() {
+
+        self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
-            var deferred = $.Deferred(), wizard;
+
+            var deferred = $.Deferred(), addingStorageRouter = ko.observableArray();
+            addingStorageRouter.push(sr);
+            var wizard = new AddVpoolMountpoints({
+                modal: true,
+                completed: deferred,
+                vPool: self.vPool(),
+                extendVpool: true,
+                pendingStorageRouters: addingStorageRouter,
+                removingStorageRouters: ko.observableArray()
+            });
+            wizard.closing.always(function() {
+                deferred.resolve();
+            });
+            wizard.finishing.always(function() {
+                self.checkedStorageRouterGuids.push(sr.guid());
+                self.data.storageRouter([]);
+            });
+            dialog.show(wizard);
+            deferred.always(function() {
+                self.updatingStorageRouters(false);
+            });
+        };
+
+        self.removeStorageRouter = function(sr) {
+            self.updatingStorageRouters(true);
+            var deferred = $.Deferred(), wizard, removingStorageRouter = ko.observableArray();
+            removingStorageRouter.push(sr);
+
             wizard = new StorageRouterToVPoolWizard({
                 modal: true,
                 completed: deferred,
                 vPool: self.vPool(),
-                pendingStorageRouters: self.pendingStorageRouters,
-                removingStorageRouters: self.removingStorageRouters
+                pendingStorageRouters: ko.observableArray(),
+                removingStorageRouters: removingStorageRouter
             });
             wizard.closing.always(function() {
-                self.load();
+                //self.load();
                 deferred.resolve();
+            });
+            wizard.finishing.always(function() {
+                self.checkedStorageRouterGuids.remove(sr.guid());
+                self.data.storageRouter([]);
             });
             dialog.show(wizard);
             deferred.always(function() {

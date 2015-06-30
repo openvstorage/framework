@@ -636,6 +636,9 @@
                 "success": "Creation of vPool __what__ finished."
             }
         },
+        "extendvpool": {
+            "title": "Extend existing vPool"
+        },
         "storageroutertovpool": {
             "title": "Change links between vPool and Storage Routers",
             "confirm": {
