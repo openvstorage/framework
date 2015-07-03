@@ -37,20 +37,21 @@ from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
 from ovs.extensions.api.client import OVSClient
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.packages.package import PackageManager
+from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
-from ovs.extensions.packages.package import PackageManager
-from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.disk import DiskController
+from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.services.service import ServiceManager
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 
 
@@ -1083,62 +1084,153 @@ class StorageRouterController(object):
         """
         Checks for new updates
         """
-        # Update apt (only our ovsaptrepo.list)
+        # Check plugin requirements
         root_client = SSHClient(ip=storagerouter_ip,
                                 username='root')
-        PackageManager.update(client=root_client)
-
-        package_map = {'framework': [{'name': 'ovs',
-                                      'packages': ['openvstorage-core', 'openvstorage-webapps'],
-                                      'namespace': 'ovs'}],
-                       'volumedriver': [{'name': 'volumedriver',
-                                         'packages': ['volumedriver-base', 'volumedriver-server'],
-                                         'namespace': 'ovs'}]}
-
-        # Check plugin requirements
-        required_plugin_params = {'name': (str, None),       # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
-                                  'namespace': (str, None),  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
-                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
-                                  'packages': (list, str),   # Packages which contain the plugin code and should be updated
-                                  'downtime': (list, dict)}  # Shows the arakoon clusters which will experience downtime
+        required_plugin_params = {'name': (str, None),             # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
+                                  'version': (str, None),          # Available version to be installed
+                                  'namespace': (str, None),        # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
+                                  'services': (list, str),         # Services which the plugin depends upon and should be stopped during update
+                                  'packages': (list, str),         # Packages which contain the plugin code and should be updated
+                                  'downtime': (list, tuple),       # Information about crucial services which will go down during the update
+                                  'prerequisites': (list, tuple)}  # Information about prerequisites which are unmet (eg running vms for storage driver update)
+        package_map = {}
         plugin_functions = Toolbox.fetch_hooks('update', 'metadata')
         for function in plugin_functions:
-            output = function()
-            if not isinstance(output, list):
+            output = function(root_client)
+            if not isinstance(output, dict):
                 raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
 
-            for out in output:
-                Toolbox.verify_required_params(required_plugin_params, out)
-                package_map['framework'].append(out)
+            for key, value in output.iteritems():
+                for out in value:
+                    Toolbox.verify_required_params(required_plugin_params, out)
+                if key not in package_map:
+                    package_map[key] = []
+                package_map[key] += value
+
+        # Update apt (only our ovsaptrepo.list)
+        PackageManager.update(client=root_client)
 
         # Compare installed and candidate versions
         return_value = {'upgrade_ongoing': os.path.exists('/etc/upgrade_ongoing')}
         for gui_name, package_information in package_map.iteritems():
             return_value[gui_name] = []
             for package_info in package_information:
-                package_versions = {}
-                for package_name in package_info['packages']:
-                    version_info = PackageManager.get_installed_and_candidate_version(package_name = package_name,
-                                                                                      client = root_client)
-                    to_version = version_info[1]
-                    from_version = version_info[0]
-
-                    if from_version == '(none)':  # Package is not installed, but candidate is available
-                        package_versions = {}
-                        break
-
-                    if to_version != from_version:
-                        package_versions[to_version] = from_version
-
-                if package_versions:
-                    to_version = max(package_versions) if package_versions else None  # We're only interested to show the highest version available for any of the sub-packages
-                    from_version = package_versions[to_version] if to_version else None
-                    return_value[gui_name].append({'to': to_version,
-                                                   'from': from_version,
+                version = package_info['version']
+                if version:
+                    return_value[gui_name].append({'to': version,
                                                    'name': package_info['name'],
-                                                   'downtime': package_info.get('downtime', []),
-                                                   'namespace': package_info['namespace']})
+                                                   'downtime': package_info['downtime'],
+                                                   'namespace': package_info['namespace'],
+                                                   'prerequisites': package_info['prerequisites']})
         return return_value
+
+    @staticmethod
+    @add_hooks('update', 'metadata')
+    def get_metadata_framework(client):
+        """
+        Retrieve packages and services on which the framework depends
+        :client: SSHClient on which to retrieve the metadata
+        :return: List of dictionaries which contain services to restart,
+                                                    packages to update,
+                                                    information about potential downtime
+                                                    information about unmet prerequisites
+        """
+        logger.info('Retrieving metadata for framework update')
+        this_sr = StorageRouterList.get_by_ip(client.ip)
+        srs = StorageRouterList.get_storagerouters()
+        ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-ovsdb']
+        downtime = [('ovs', 'ovsdb', None)] if len(ovsdb_cluster) < 3 and this_sr.guid in ovsdb_cluster else []
+
+        ovs_info = PackageManager.verify_update_required(packages=['openvstorage-core', 'openvstorage-webapps'],
+                                                         services=['watcher-framework', 'memcached'],
+                                                         client=client)
+        arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
+                                                             services=['arakoon-ovsdb'],
+                                                             client=client)
+
+        return {'framework': [{'name': 'ovs',
+                               'version': ovs_info['version'],
+                               'services': ovs_info['services'],
+                               'packages': ovs_info['packages'],
+                               'downtime': [],
+                               'namespace': 'ovs',
+                               'prerequisites': []},
+                              {'name': 'arakoon',
+                               'version': arakoon_info['version'],
+                               'services': arakoon_info['services'],
+                               'packages': arakoon_info['packages'],
+                               'downtime': downtime,
+                               'namespace': 'ovs',
+                               'prerequisites': []}]}
+
+    @staticmethod
+    @add_hooks('update', 'metadata')
+    def get_metadata_volumedriver(client):
+        """
+        Retrieve packages and services on which the volumedriver depends
+        :client: SSHClient on which to retrieve the metadata
+        :return: List of dictionaries which contain services to restart,
+                                                    packages to update,
+                                                    information about potential downtime
+                                                    information about unmet prerequisites
+        """
+        logger.info('Retrieving metadata for volumedriver update')
+        running_vms = False
+        for vpool in VPoolList.get_vpools():
+            for vdisk in vpool.vdisks:
+                if vdisk.vmachine_guid is None:
+                    continue
+                if vdisk.vmachine.hypervisor_status in ['RUNNING', 'PAUSED']:
+                    running_vms = True
+                    break
+            if running_vms is True:
+                break
+
+        this_sr = StorageRouterList.get_by_ip(client.ip)
+        alba_proxies = []
+        alba_downtime = []
+        voldrv_cluster = []
+        for sr in StorageRouterList.get_storagerouters():
+            for service in sr.services:
+                if service.type.name == 'Arakoon' and service.name == 'arakoon-voldrv':
+                    voldrv_cluster.append(service.storagerouter_guid)
+                elif service.type.name == 'AlbaProxy' and service.storagerouter_guid == this_sr.guid:
+                    alba_proxies.append(service.alba_proxy)
+                    alba_downtime.append(('ovs', 'proxy', service.alba_proxy.storagedriver.vpool.name))
+
+        prerequisites = [('ovs', 'vmachine', None)] if running_vms is True else []
+        voldrv_info = PackageManager.verify_update_required(packages=['volumedriver-base', 'volumedriver-server'],
+                                                            services=['watcher-volumedriver'],
+                                                            client=client)
+        alba_info = PackageManager.verify_update_required(packages=['alba'],
+                                                          services=[service.service.name for service in alba_proxies],
+                                                          client=client)
+        arakoon_info = PackageManager.verify_update_required(packages=['arakoon'],
+                                                             services=['arakoon-voldrv'],
+                                                             client=client)
+
+        return {'volumedriver': [{'name': 'volumedriver',
+                                  'version': voldrv_info['version'],
+                                  'services': voldrv_info['services'],
+                                  'packages': voldrv_info['packages'],
+                                  'downtime': alba_downtime,
+                                  'namespace': 'ovs',
+                                  'prerequisites': prerequisites},
+                                 {'name': 'alba',
+                                  'version': alba_info['version'],
+                                  'services': alba_info['services'],
+                                  'packages': alba_info['packages'],
+                                  'downtime': alba_downtime,
+                                  'namespace': 'ovs',
+                                  'prerequisites': prerequisites},
+                                 {'name': 'arakoon',
+                                  'version': arakoon_info['version'],
+                                  'services': arakoon_info['services'],
+                                  'packages': arakoon_info['packages'],
+                                  'downtime': [('ovs', 'voldrv', None)] if len(voldrv_cluster) < 3 and this_sr.guid in voldrv_cluster else [],
+                                  'namespace': 'ovs',
+                                  'prerequisites': []}]}
 
     @staticmethod
     @celery.task(name='ovs.storagerouter.update_framework')

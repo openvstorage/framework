@@ -41,21 +41,6 @@ class DebianPackage(object):
         return versions
 
     @staticmethod
-    def get_installed_and_candidate_version(package_name, client):
-        installed = None
-        candidate = None
-        for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
-            line = line.strip()
-            if line.startswith('Installed:'):
-                installed = line.lstrip('Installed:').strip()
-            elif line.startswith('Candidate:'):
-                candidate = line.lstrip('Candidate:').strip()
-
-            if installed is not None and candidate is not None:
-                break
-        return installed, candidate
-
-    @staticmethod
     def install(package_name, client, force=False):
         force_text = '--force-yes' if force is True else ''
         return client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
@@ -63,3 +48,38 @@ class DebianPackage(object):
     @staticmethod
     def update(client):
         return client.run('apt-get update {0}'.format(DebianPackage.APT_CONFIG_STRING))
+
+    @staticmethod
+    def verify_update_required(packages, services, client):
+        services_checked = []
+        update_info = {'version': '',
+                       'packages': [],
+                       'services': []}
+        for package_name in packages:
+            installed = None
+            candidate = None
+            for line in client.run('apt-cache policy {0} {1}'.format(package_name, DebianPackage.APT_CONFIG_STRING)).splitlines():
+                line = line.strip()
+                if line.startswith('Installed:'):
+                    installed = line.lstrip('Installed:').strip()
+                elif line.startswith('Candidate:'):
+                    candidate = line.lstrip('Candidate:').strip()
+
+                if installed is not None and candidate is not None:
+                    break
+
+            if installed != '(none)' and candidate != installed:
+                update_info['packages'].append(package_name)
+                update_info['services'] = services
+                update_info['version'] = candidate
+            else:
+                for service in services:
+                    if service in services_checked:
+                        continue
+                    services_checked.append(service)
+                    if client.file_exists('/opt/OpenvStorage/run/{0}.version'.format(service)):
+                        running_version = client.file_read('/opt/OpenvStorage/run/{0}.version'.format(service)).strip()
+                        if running_version != candidate:
+                            update_info['services'].append(service)
+                            update_info['version'] = candidate
+        return update_info

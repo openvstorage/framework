@@ -47,9 +47,11 @@ define([
             var any_framework_update = false;
             var any_volumedriver_update = false;
             var updates_data = {'framework': {'update': false,
-                                              'downtime': []},
+                                              'downtime': [],
+                                              'prerequisites': []},
                                 'volumedriver': {'update': false,
-                                                 'downtime': []}};
+                                                 'downtime': [],
+                                                 'prerequisites': []}};
             $.each(self.storageRouters(), function(index, storageRouter) {
                 var item = storageRouter.updates();
                 if (item !== undefined) {
@@ -62,6 +64,11 @@ define([
                                     updates_data.framework.downtime.push(downtime);
                                 }
                             });
+                            $.each(framework_info.prerequisites, function(c_index, prereq) {
+                                if (!prereq.nestedIn(updates_data.framework.prerequisites)) {
+                                    updates_data.framework.prerequisites.push(prereq);
+                                }
+                            });
                         });
                     }
                     if (item.volumedriver.length > 0) {
@@ -71,6 +78,11 @@ define([
                             $.each(volumedriver_info.downtime, function(b_index, downtime) {
                                 if (!downtime.nestedIn(updates_data.volumedriver.downtime)) {
                                     updates_data.volumedriver.downtime.push(downtime);
+                                }
+                            });
+                            $.each(volumedriver_info.prerequisites, function(c_index, prereq) {
+                                if (!prereq.nestedIn(updates_data.volumedriver.prerequisites)) {
+                                    updates_data.volumedriver.prerequisites.push(prereq);
                                 }
                             });
                         });
@@ -86,9 +98,6 @@ define([
         });
 
         // Functions
-        self.runningVms = function() {
-
-        };
         self.loadStorageRouters = function(page) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.storageRoutersHandle[page])) {
@@ -126,6 +135,7 @@ define([
 
             return $.Deferred(function(deferred) {
                 var downtimes = [];
+                var prerequisites = [];
                 $.each(self.updates().framework.downtime, function(index, downtime) {
                     if (downtime[2] === null) {
                         downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
@@ -133,17 +143,18 @@ define([
                         downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
                     }
                 });
-                $.each(self.updates().volumedriver.downtime, function(index, downtime) {
-                    if (downtime[2] === null) {
-                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
+                $.each(self.updates().framework.prerequisites, function(index, prereq) {
+                    if (prereq[2] === null) {
+                        prerequisites.push($.t(prereq[0] + ':prerequisites.' + prereq[1]))
                     } else {
-                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
+                        prerequisites.push($.t(prereq[0] + ':prerequisites.' + prereq[1]) + ': ' + prereq[2])
                     }
                 });
 
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
+                var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular') + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
                 app.showMessage(
-                    $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), downtime: downtimeMessage }).trim(),
+                    $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
                     [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                 )
@@ -194,6 +205,7 @@ define([
 
             return $.Deferred(function(deferred) {
                 var downtimes = [];
+                var prerequisites = [];
                 $.each(self.updates().volumedriver.downtime, function(index, downtime) {
                     if (downtime[2] === null) {
                         downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
@@ -201,17 +213,18 @@ define([
                         downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
                     }
                 });
-                $.each(self.updates().volumedriver.downtime, function(index, downtime) {
-                    if (downtime[2] === null) {
-                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]))
+                $.each(self.updates().volumedriver.prerequisites, function(index, prereq) {
+                    if (prereq[2] === null) {
+                        prerequisites.push($.t(prereq[0] + ':prerequisites.' + prereq[1]))
                     } else {
-                        downtimes.push($.t(downtime[0] + ':downtime.' + downtime[1]) + ': ' + downtime[2])
+                        prerequisites.push($.t(prereq[0] + ':prerequisites.' + prereq[1]) + ' ' + prereq[2])
                     }
                 });
 
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
+                var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + (prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular')) + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
                 app.showMessage(
-                    $.t('ovs:updates.volumedriver.start_update_question', { what: $.t('ovs:updates.volumedriver'), downtime: downtimeMessage }).trim(),
+                    $.t('ovs:updates.volumedriver.start_update_question', { what: $.t('ovs:updates.volumedriver.title'), downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
                     [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                 )

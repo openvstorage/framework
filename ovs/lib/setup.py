@@ -421,11 +421,11 @@ class SetupController(object):
 
     @staticmethod
     def update_framework():
-        SetupController.log_message('+++ Starting framework update +++')
+        SetupController._log_message('+++ Starting framework update +++')
 
         from ovs.dal.lists.storagerouterlist import StorageRouterList
 
-        SetupController.log_message('Generating SSH client connections for each storage router')
+        SetupController._log_message('Generating SSH client connections for each storage router')
         upgrade_file = '/etc/ready_for_upgrade'
         upgrade_ongoing_check_file = '/etc/upgrade_ongoing'
         storage_routers = StorageRouterList.get_storagerouters()
@@ -434,57 +434,37 @@ class SetupController(object):
 
         # Commence update !!!!!!!
         # 0. Create locks
-        SetupController.log_message('Creating lock files', client_ip=this_client.ip)
+        SetupController._log_message('Creating lock files', client_ip=this_client.ip)
         for client in ssh_clients:
             client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
             client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
 
-        # 1. Check plugin requirements
-        plugin_services = set()
-        plugin_packages = set()
-        framework_packages = ['openvstorage-core', 'openvstorage-webapps']
-        framework_services = ['watcher-framework', 'arakoon-ovsdb', 'memcached']
-        required_plugin_params = {'name': (str, None),       # Name to describe a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
-                                  'services': (list, str),   # Services which the plugin depends upon and should be stopped during update
-                                  'packages': (list, str),   # Packages which contain the plugin code and should be updated
-                                  'namespace': (str, None)}  # Name of the plugin and is used for translation in html. Eg: ALBA:packages.sdm
-        SetupController.log_message('Retrieving plugin requirements', client_ip=this_client.ip)
-        for function in Toolbox.fetch_hooks('update', 'metadata'):
-            output = function()
-            if not isinstance(output, list):
-                raise ValueError('Update cannot continue. Failed to retrieve correct plugin information ({0})'.format(function.func_name))
+        # 1. Check requirements
+        packages_to_update = []
+        services_to_restart = []
+        for client in ssh_clients:
+            for function in Toolbox.fetch_hooks('update', 'metadata'):
+                output = function(client)
+                for value in output.itervalues():
+                    packages_to_update += value['packages']
+                    services_to_restart += value['services']
 
-            for out in output:
-                Toolbox.verify_required_params(required_plugin_params, out)
-                plugin_services.update(out['services'])
-                plugin_packages.update(out['packages'])
-
-        SetupController.log_message('Plugin   : Services which will be restarted --> {0}'.format(', '.join(plugin_services)))
-        SetupController.log_message('Plugin   : Packages which will be installed --> {0}'.format(', '.join(plugin_packages)))
-        SetupController.log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(framework_services)))
-        SetupController.log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(framework_packages)))
+        services_to_restart = list(services_to_restart)
+        SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
+        SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
 
         # 2. Stop services
-        failed_services = False
-        plugin_services = list(plugin_services)
-        plugin_packages = list(plugin_packages)
-        for service_names, service_type in [(plugin_services, 'plugin'),
-                                            (framework_services, 'framework')]:
-            if SetupController._change_services_state(services=service_names,
-                                                      ssh_clients=ssh_clients,
-                                                      action='stop') is False:
-                SetupController.log_message('Stopping all {0} services on every node failed, cannot continue'.format(service_type), client_ip=this_client.ip, severity='warning')
-                SetupController.remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                failed_services = True
-                break
+        if SetupController._change_services_state(services=services_to_restart,
+                                                  ssh_clients=ssh_clients,
+                                                  action='stop') is False:
+            SetupController._log_message('Stopping all services on every node failed, cannot continue', client_ip=this_client.ip, severity='warning')
+            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
-        if failed_services is True:
-            for service_names, service_type in [(plugin_services, 'plugin'),
-                                                (framework_services, 'framework')]:
-                SetupController._log_message('Attempting to start the {0} services again'.format(service_type), client_ip=this_client.ip)
-                SetupController._change_services_state(services=service_names,
-                                                       ssh_clients=ssh_clients,
-                                                       action='start')
+            # Start services again if a service could not be stopped
+            SetupController._log_message('Attempting to start the services again', client_ip=this_client.ip)
+            SetupController._change_services_state(services=services_to_restart,
+                                                   ssh_clients=ssh_clients,
+                                                   action='start')
 
             SetupController._log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
             return
@@ -493,16 +473,13 @@ class SetupController(object):
         failed_clients = []
         for client in ssh_clients:
             try:
-                for packages, package_type in [(plugin_packages, 'plugin'),
-                                               (framework_packages, 'framework')]:
-                    if packages:
-                        SetupController._log_message('Installing latest {0} packages'.format(package_type), client.ip)
-                    for package_name in packages:
-                        SetupController._log_message('Installing {0}'.format(package_name), client.ip)
-                        PackageManager.install(package_name=package_name,
-                                               client=client,
-                                               force=True)
-                        SetupController._log_message('Installed {0}'.format(package_name), client.ip)
+                SetupController._log_message('Installing latest packages', client.ip)
+                for package in packages_to_update:
+                    SetupController._log_message('Installing {0}'.format(package), client.ip)
+                    PackageManager.install(package_name=package,
+                                           client=client,
+                                           force=True)
+                    SetupController._log_message('Installed {0}'.format(package), client.ip)
                 client.file_delete(upgrade_file)
             except subprocess.CalledProcessError as cpe:
                 SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
@@ -512,7 +489,7 @@ class SetupController(object):
         if failed_clients:
             SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
             SetupController._log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
-            SetupController._change_services_state(services=framework_services + plugin_services,
+            SetupController._change_services_state(services=services_to_restart,
                                                    ssh_clients=ssh_clients,
                                                    action='start')
             SetupController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
@@ -556,7 +533,11 @@ class SetupController(object):
                 SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), this_client.ip, 'error')
 
         # 7. Start watcher and restart support-agent
-        SetupController._change_services_state(services=['watcher-framework'] + plugin_services,
+        if 'arakoon-ovsdb' in services_to_restart:
+            services_to_restart.remove('arakoon-ovsdb')
+        if 'memcached' in services_to_restart:
+            services_to_restart.remove('memcached')
+        SetupController._change_services_state(services=services_to_restart,
                                                ssh_clients=ssh_clients,
                                                action='start')
         SetupController._change_services_state(services=['support-agent'],
