@@ -18,6 +18,8 @@ Upstart module
 
 from subprocess import CalledProcessError
 
+EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
+EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 
 class Upstart(object):
     """
@@ -161,3 +163,28 @@ class Upstart(object):
                         pid = 0
                     break
         return pid
+
+    @staticmethod
+    def patch_cinder_volume_conf(client):
+        cinder_file = open('/etc/init/cinder-volume.conf', 'r')
+        contents = cinder_file.read()
+        if EXPORT not in contents:
+            contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
+            cinder_file.close()
+            cinder_file = open('/etc/init/cinder-volume.conf', 'w')
+            cinder_file.write(contents)
+        cinder_file.close()
+
+    @staticmethod
+    def unpatch_cinder_volume_conf(client):
+        """
+        remove export PYTHONPATH from the upstart service conf file
+        """
+        cinder_file = open('/etc/init/cinder-volume.conf', 'r')
+        contents = cinder_file.read()
+        if EXPORT in contents:
+            contents = contents.replace(EXPORT_, '')
+            cinder_file.close()
+            cinder_file = open('/etc/init/cinder-volume.conf', 'w')
+            cinder_file.write(contents)
+        cinder_file.close()

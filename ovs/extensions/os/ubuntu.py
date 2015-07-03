@@ -48,3 +48,19 @@ class Ubuntu(object):
     @staticmethod
     def get_openstack_web_service_name():
         return 'apache2'
+
+    @staticmethod
+    def get_openstack_cinder_service_name():
+        return 'cinder-volume'
+
+    @staticmethod
+    def get_openstack_services():
+        return ['nova-compute', 'nova-api-os-compute', 'cinder-volume', 'cinder-api']
+
+    @staticmethod
+    def get_openstack_users():
+        return ['libvirt-qemu','cinder']
+
+    @staticmethod
+    def get_openstack_package_base_path():
+        return '/usr/lib/python2.7/dist-packages'

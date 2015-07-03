@@ -48,3 +48,19 @@ class Centos(object):
     @staticmethod
     def get_openstack_web_service_name():
         return 'httpd'
+
+    @staticmethod
+    def get_openstack_cinder_service_name():
+        return 'openstack-cinder-volume'
+
+    @staticmethod
+    def get_openstack_services():
+        return ['openstack-nova-compute', 'openstack-cinder-volume', 'openstack-cinder-api']
+
+    @staticmethod
+    def get_openstack_users():
+        return ['qemu', 'cinder']
+
+    @staticmethod
+    def get_openstack_package_base_path():
+        return '/usr/lib/python2.7/site-packages'

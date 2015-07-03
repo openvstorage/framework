@@ -19,14 +19,12 @@ import os
 import time, datetime
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.log.logHandler import LogHandler
-
+from ovs.extensions.services.service import ServiceManager
+from ovs.extensions.os.os import OSManager
 
 logger = LogHandler('lib', name='openstack_mgmt')
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
-CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
-EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
-EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 NOVA_CONF = '/etc/nova/nova.conf'
 
 def file_exists(ssh_client, location):
@@ -63,6 +61,7 @@ class OpenStackManagement(object):
 
     def configure_vpool(self, vpool_name, mountpoint):
         if (self.is_devstack or self.is_openstack) and self._is_cinder_installed():
+            logger.debug('configure_vpool {0} started, mountpoint {1}'.format(vpool_name, mountpoint))
             self._get_driver_code()
             self._configure_user_groups()
             self._configure_cinder_driver(vpool_name)
@@ -135,29 +134,32 @@ class OpenStackManagement(object):
 
         existing_version = self._get_existing_driver_version()
         remote_version = self._get_remote_driver_version(temp_location)
+
         if self.is_devstack:
             cinder_base_path = self._get_base_path('cinder')
             local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
         elif self.is_openstack:
-            local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
+            driver_location = OSManager.get_openstack_package_base_path()
+            local_driver = '{0}/cinder/volume/drivers/openvstorage.py'.format(driver_location)
         if remote_version > existing_version:
             logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
             if self.is_devstack:
-                self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
+                self.client.run('cp -f {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
             elif self.is_openstack:
-                self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
+                self.client.run('cp -f {0} {1}'.format(temp_location, local_driver))
         else:
             logger.debug('Using driver {0} version {1}'.format(local_driver, existing_version))
         self.client.run('rm {0}'.format(temp_location))
 
     def _is_devstack(self):
         try:
-            return 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep'))
+            return 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep || true'))
         except SystemExit:  # ssh client raises system exit 1
             return False
 
     def _is_openstack(self):
-        return os.path.exists(CINDER_OPENSTACK_SERVICE)
+        cinder_service = OSManager.get_openstack_cinder_service_name()
+        return ServiceManager.has_service(cinder_service, self.client)
 
     def _is_cinder_running(self):
         if self.is_devstack:
@@ -167,7 +169,8 @@ class OpenStackManagement(object):
                 return False
         if self.is_openstack:
             try:
-                return 'start/running' in str(self.client.run('service cinder-volume status'))
+                cinder_service = OSManager.get_openstack_cinder_service_name()
+                return ServiceManager.get_service_status(cinder_service, self.client)
             except SystemExit:
                 return False
         return False
@@ -185,8 +188,9 @@ class OpenStackManagement(object):
             self.client.run('usermod -a -G ovs libvirt-qemu')
             self.client.run('usermod -a -G ovs stack')
         elif self.is_openstack:
-            self.client.run('usermod -a -G ovs libvirt-qemu')
-            self.client.run('usermod -a -G ovs cinder')
+            users = OSManager.get_openstack_users()
+            for user in users:
+                self.client.run('usermod -a -G ovs {0}'.format(user))
 
     def _unchown_mountpoint(self, mountpoint):
         pass
@@ -416,36 +420,25 @@ if vpool_name in enabled_backends:
         """
         export PYTHONPATH in the upstart service conf file
         """
-        if self.is_openstack and os.path.exists(CINDER_OPENSTACK_SERVICE):
-            with open(CINDER_OPENSTACK_SERVICE, 'r') as cinder_file:
-                contents = cinder_file.read()
-            if EXPORT in contents:
-                return True
-            contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
-            logger.debug('changing contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
-            self.client.run('cat >%s <<EOF \n%s' % (CINDER_OPENSTACK_SERVICE, contents))
+        if self.is_openstack:
+            ServiceManager.patch_cinder_volume_conf(self.client)
 
     def _unpatch_etc_init_cindervolume_conf(self):
         """
         remove export PYTHONPATH from the upstart service conf file
         """
-        if self.is_openstack and os.path.exists(CINDER_OPENSTACK_SERVICE):
-            with open(CINDER_OPENSTACK_SERVICE, 'r') as cinder_file:
-                contents = cinder_file.read()
-            if not EXPORT in contents:
-                return True
-            contents = contents.replace(EXPORT_, '')
-            logger.debug('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
-            self.client.run('cat >%s <<EOF \n%s' % (CINDER_OPENSTACK_SERVICE, contents))
+        if self.is_openstack:
+            ServiceManager.unpatch_cinder_volume_conf(self.client)
 
     def _restart_openstack_services(self):
         """
         Restart services on openstack
         """
-        for service_name in ('nova-compute', 'nova-api-os-compute', 'cinder-volume', 'cinder-api'):
-            if os.path.exists('/etc/init/{0}.conf'.format(service_name)):
+        services = OSManager.get_openstack_services()
+        for service_name in services:
+            if ServiceManager.has_service(service_name, self.client):
                 try:
-                    self.client.run('service {0} restart'.format(service_name))
+                    ServiceManager.restart_service(service_name, self.client)
                 except SystemExit as sex:
                     logger.debug('Failed to restart service {0}. {1}'.format(service_name, sex))
         time.sleep(3)
@@ -474,9 +467,10 @@ if vpool_name in enabled_backends:
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
             cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         elif self.is_openstack:
-            nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
-            nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
-            cinder_brick_initiator_file = '/usr/lib/python2.7/dist-packages/cinder/brick/initiator/connector.py'
+            driver_location = OSManager.get_openstack_package_base_path()
+            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(driver_location)
+            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(driver_location)
+            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(driver_location)
 
         self.client.run("""python -c "
 import os

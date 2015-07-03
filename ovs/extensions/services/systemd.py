@@ -18,6 +18,7 @@ Systemd module
 
 from subprocess import CalledProcessError
 
+EXPORT = 'Environment=PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps'
 
 class Systemd(object):
     """
@@ -178,3 +179,30 @@ class Systemd(object):
                             pid = 0
                         break
         return pid
+
+    @staticmethod
+    def patch_cinder_volume_conf(client):
+        cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'r')
+        contents = cinder_file.read()
+        if EXPORT not in contents:
+            contents = contents.replace('\nUser=cinder', '\n{}\nUser=cinder'.format(EXPORT))
+            cinder_file.close()
+            cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'w')
+            cinder_file.write(contents)
+        cinder_file.close()
+        client.run('systemctl daemon-reload')
+
+    @staticmethod
+    def unpatch_cinder_volume_conf(client):
+        """
+        remove export PYTHONPATH from the systemd service file
+        """
+        cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'r')
+        contents = cinder_file.read()
+        if EXPORT in contents:
+            contents = contents.replace(EXPORT, '')
+            cinder_file.close()
+            cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'w')
+            cinder_file.write(contents)
+        cinder_file.close()
+        client.run('systemctl daemon-reload')

@@ -23,7 +23,8 @@ from subprocess import check_output, CalledProcessError
 from ovs.extensions.os.os import OSManager
 
 # Remove existing enabled sites, taking control over nginx
-check_output('rm -f /etc/nginx/sites-enabled/default', shell=True)
+if os.path.exists('/etc/nginx/sites-enabled/default'):
+    os.remove('/etc/nginx/sites-enabled/default')
 
 # Cleanup *.pyc files
 check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
@@ -44,11 +45,15 @@ os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput', shell=True)
 
 run_level_regex = '^[KS][0-9]{2}(.*)'
-service_configured = True
+
+service_configured = False
 for run_level in range(7):
-    if 'nginx' not in [re.match(run_level_regex, run_entry).groups()[0] for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)) if re.match(run_level_regex, run_entry)]:
-        service_configured &= False
-if service_configured is False:
+    for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)):
+        if re.match(run_level_regex, run_entry) and 'nginx' in run_entry:
+            service_configured = True
+            break
+
+if service_configured:
     check_output('service nginx stop', shell=True)
     check_output('update-rc.d nginx disable', shell=True)
 

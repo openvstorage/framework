@@ -48,7 +48,7 @@ elif [ "$1" = "monitor" ] ; then
     service_manager=`cat /proc/1/comm`
     if test "$service_manager" = "systemd"
     then
-      watch -n 1 'echo "OVS running processes:";echo; systemctl -l | grep ovs | grep "loaded active running" | sort; echo; echo "OVS non-running processes:"; systemctl -a | grep ovs | grep "loaded inactive dead" | sort; echo; echo "OVS disabled services:"; systemctl list-unit-files | grep ovs | grep disabled | sort'
+      watch -n 1 'echo "OVS running processes:";echo; systemctl -l | grep ovs | grep "loaded active" | sort; echo; echo "OVS non-running processes:"; systemctl -a | grep ovs | grep "loaded inactive" | sort; echo; echo "OVS disabled services:"; systemctl list-unit-files | grep ovs | grep disabled | sort'
     else
       watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
     fi
