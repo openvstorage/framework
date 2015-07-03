@@ -40,7 +40,7 @@ def log(event_type):
             """
             # Log the call
             if event_type == 'VOLUMEDRIVER_TASK':
-                metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id'])}
+                metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id']).guid}
             else:
                 metadata = {}
             _logger = LogHandler.get('log', name=event_type.lower())
