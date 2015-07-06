@@ -1118,11 +1118,17 @@ class StorageRouterController(object):
             for package_info in package_information:
                 version = package_info['version']
                 if version:
-                    return_value[gui_name].append({'to': version,
-                                                   'name': package_info['name'],
-                                                   'downtime': package_info['downtime'],
-                                                   'namespace': package_info['namespace'],
-                                                   'prerequisites': package_info['prerequisites']})
+                    info_added = False
+                    for index, item in enumerate(return_value[gui_name]):
+                        if item['name'] == package_info['name']:
+                            return_value[gui_name][index]['downtime'].extend(package_info['downtime'])
+                            info_added = True
+                    if info_added is False:  # Some plugins can have same package dependencies as core and we only want to show each package once in GUI (Eg: Arakoon for core and ALBA)
+                        return_value[gui_name].append({'to': version,
+                                                       'name': package_info['name'],
+                                                       'downtime': package_info['downtime'],
+                                                       'namespace': package_info['namespace'],
+                                                       'prerequisites': package_info['prerequisites']})
         return return_value
 
     @staticmethod
@@ -1130,13 +1136,12 @@ class StorageRouterController(object):
     def get_metadata_framework(client):
         """
         Retrieve packages and services on which the framework depends
-        :client: SSHClient on which to retrieve the metadata
+        :param client: SSHClient on which to retrieve the metadata
         :return: List of dictionaries which contain services to restart,
                                                     packages to update,
                                                     information about potential downtime
                                                     information about unmet prerequisites
         """
-        logger.info('Retrieving metadata for framework update')
         this_sr = StorageRouterList.get_by_ip(client.ip)
         srs = StorageRouterList.get_storagerouters()
         ovsdb_cluster = [ser.storagerouter_guid for sr in srs for ser in sr.services if ser.type.name == 'Arakoon' and ser.name == 'arakoon-ovsdb']
@@ -1169,13 +1174,12 @@ class StorageRouterController(object):
     def get_metadata_volumedriver(client):
         """
         Retrieve packages and services on which the volumedriver depends
-        :client: SSHClient on which to retrieve the metadata
+        :param client: SSHClient on which to retrieve the metadata
         :return: List of dictionaries which contain services to restart,
                                                     packages to update,
                                                     information about potential downtime
                                                     information about unmet prerequisites
         """
-        logger.info('Retrieving metadata for volumedriver update')
         running_vms = False
         for vpool in VPoolList.get_vpools():
             for vdisk in vpool.vdisks:

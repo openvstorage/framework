@@ -440,16 +440,24 @@ class SetupController(object):
             client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
 
         # 1. Check requirements
-        packages_to_update = []
-        services_to_restart = []
+        packages_to_update = set()
+        all_services_to_restart = []
         for client in ssh_clients:
             for function in Toolbox.fetch_hooks('update', 'metadata'):
+                SetupController._log_message('Executing function {0}'.format(function.__name__), client_ip=client.ip)
                 output = function(client)
-                for value in output.itervalues():
-                    packages_to_update += value['packages']
-                    services_to_restart += value['services']
+                for key, value in output.iteritems():
+                    if key != 'framework':
+                        continue
+                    for package_info in value:
+                        packages_to_update.update(package_info['packages'])
+                        all_services_to_restart += package_info['services']
 
-        services_to_restart = list(services_to_restart)
+        services_to_restart = []
+        for service in all_services_to_restart:
+            if service not in services_to_restart:
+                services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
+
         SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
         SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
 
@@ -497,7 +505,14 @@ class SetupController(object):
 
         # 4. Start services
         SetupController._log_message('Starting services', client_ip=this_client.ip)
-        SetupController._change_services_state(services=['arakoon-ovsdb', 'memcached'],
+        model_services = []
+        if 'arakoon-ovsdb' in services_to_restart:
+            model_services.append('arakoon-ovsdb')
+            services_to_restart.remove('arakoon-ovsdb')
+        if 'memcached' in services_to_restart:
+            model_services.append('memcached')
+            services_to_restart.remove('memcached')
+        SetupController._change_services_state(services=model_services,
                                                ssh_clients=ssh_clients,
                                                action='start')
 
@@ -525,18 +540,15 @@ class SetupController(object):
 
         # 6. Post upgrade actions
         SetupController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
-        for function in Toolbox.fetch_hooks('update', 'postupgrade'):
-            SetupController._log_message('Executing action: {0}'.format(function.__name__), client_ip=this_client.ip)
-            try:
-                function(this_client.ip)
-            except Exception as ex:
-                SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), this_client.ip, 'error')
+        for client in ssh_clients:
+            for function in Toolbox.fetch_hooks('update', 'postupgrade'):
+                SetupController._log_message('Executing action: {0}'.format(function.__name__), client_ip=client.ip)
+                try:
+                    function(client)
+                except Exception as ex:
+                    SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
 
         # 7. Start watcher and restart support-agent
-        if 'arakoon-ovsdb' in services_to_restart:
-            services_to_restart.remove('arakoon-ovsdb')
-        if 'memcached' in services_to_restart:
-            services_to_restart.remove('memcached')
         SetupController._change_services_state(services=services_to_restart,
                                                ssh_clients=ssh_clients,
                                                action='start')
@@ -560,20 +572,6 @@ class SetupController(object):
         ssh_clients = [SSHClient(storage_router.ip, 'root') for storage_router in storage_routers]
         this_client = [client for client in ssh_clients if client.is_local is True][0]
 
-        for client in ssh_clients:
-            with Remote(client.ip, [os, Configuration, StorageDriverConfiguration], 'ovs') as remote:
-                configuration_dir = '{0}/storagedriver/storagedriver'.format(remote.Configuration.get('ovs.core.cfgdir'))
-                if not remote.os.path.exists(configuration_dir):
-                    remote.os.makedirs(configuration_dir)
-                for json_file in remote.os.listdir(configuration_dir):
-                    vpool_name = json_file.replace('.json', '')
-                    if json_file.endswith('.json'):
-                        if remote.os.path.exists('{0}/{1}.cfg'.format(configuration_dir, vpool_name)):
-                            continue  # There's also a .cfg file, so this is an alba_proxy configuration file
-                        storagedriver_config = remote.StorageDriverConfiguration('storagedriver', vpool_name)
-                        storagedriver_config.load()
-                        storagedriver_config.save()
-
         # Commence update !!!!!!!
         # 0. Create locks
         SetupController._log_message('Creating lock files', client_ip=this_client.ip)
@@ -581,29 +579,39 @@ class SetupController(object):
             client.run('touch {0}'.format(upgrade_file))  # Prevents user to manually install or upgrade individual packages
             client.run('touch {0}'.format(upgrade_ongoing_check_file))  # Used to prevent user to click additional times on 'Update' button in GUI
 
-        volumedriver_packages = ['volumedriver-base', 'volumedriver-server']
-        volumedriver_services = ['watcher-volumedriver', 'arakoon-voldrv']
-        SetupController._log_message('Framework: Services which will be restarted --> {0}'.format(', '.join(volumedriver_services)))
-        SetupController._log_message('Framework: Packages which will be installed --> {0}'.format(', '.join(volumedriver_packages)))
+        # 1. Check requirements
+        packages_to_update = set()
+        all_services_to_restart = []
+        for client in ssh_clients:
+            for function in Toolbox.fetch_hooks('update', 'metadata'):
+                SetupController._log_message('Executing function {0}'.format(function.__name__), client_ip=client.ip)
+                output = function(client)
+                for key, value in output.iteritems():
+                    if key != 'volumedriver':
+                        continue
+                    for package_info in value:
+                        packages_to_update.update(package_info['packages'])
+                        all_services_to_restart += package_info['services']
+
+        services_to_restart = []
+        for service in all_services_to_restart:
+            if service not in services_to_restart:
+                services_to_restart.append(service)  # Filter out duplicates keeping the order of services (eg: watcher-framework before memcached)
+
+        SetupController._log_message('Services which will be restarted --> {0}'.format(', '.join(services_to_restart)))
+        SetupController._log_message('Packages which will be installed --> {0}'.format(', '.join(packages_to_update)))
 
         # 1. Stop services
-        failed_services = False
-        for service_names, service_type in [(volumedriver_services, 'volumedriver')]:
-            if SetupController._change_services_state(services=service_names,
-                                                      ssh_clients=ssh_clients,
-                                                      action='stop') is False:
-                SetupController._log_message('Stopping all {0} services on every node failed, cannot continue'.format(service_type), client_ip=this_client.ip, severity='warning')
-                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
-                failed_services = True
-                break
+        if SetupController._change_services_state(services=services_to_restart,
+                                                  ssh_clients=ssh_clients,
+                                                  action='stop') is False:
+            SetupController._log_message('Stopping all services on every node failed, cannot continue', client_ip=this_client.ip, severity='warning')
+            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
-        if failed_services is True:
-            for service_names, service_type in [(volumedriver_services, 'volumedriver')]:
-                SetupController._log_message('Attempting to start the {0} services again'.format(service_type), client_ip=this_client.ip)
-                SetupController._change_services_state(services=service_names,
-                                                       ssh_clients=ssh_clients,
-                                                       action='start')
-
+            SetupController._log_message('Attempting to start the services again', client_ip=this_client.ip)
+            SetupController._change_services_state(services=services_to_restart,
+                                                   ssh_clients=ssh_clients,
+                                                   action='start')
             SetupController._log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
             return
 
@@ -611,15 +619,12 @@ class SetupController(object):
         failed_clients = []
         for client in ssh_clients:
             try:
-                for packages, package_type in [(volumedriver_packages, 'volumedriver')]:
-                    if packages:
-                        SetupController._log_message('Installing latest {0} packages'.format(package_type), client.ip)
-                    for package_name in packages:
-                        SetupController._log_message('Installing {0}'.format(package_name), client.ip)
-                        PackageManager.install(package_name=package_name,
-                                               client=client,
-                                               force=True)
-                        SetupController._log_message('Installed {0}'.format(package_name), client.ip)
+                for package_name in packages_to_update:
+                    SetupController._log_message('Installing {0}'.format(package_name), client.ip)
+                    PackageManager.install(package_name=package_name,
+                                           client=client,
+                                           force=True)
+                    SetupController._log_message('Installed {0}'.format(package_name), client.ip)
                 client.file_delete(upgrade_file)
             except subprocess.CalledProcessError as cpe:
                 SetupController._log_message('Upgrade failed with error: {0}'.format(cpe.output), client.ip, 'error')
@@ -629,15 +634,25 @@ class SetupController(object):
         if failed_clients:
             SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
             SetupController._log_message('Error occurred. Attempting to start all services again', client_ip=this_client.ip, severity='error')
-            SetupController._change_services_state(services=volumedriver_services,
+            SetupController._change_services_state(services=services_to_restart,
                                                    ssh_clients=ssh_clients,
                                                    action='start')
             SetupController._log_message('Failed to upgrade following nodes:\n - {0}\nPlease check /var/log/ovs/lib.log on {1} for more information'.format('\n - '.join([client.ip for client in failed_clients])), this_client.ip, 'error')
             return
 
-        # 3. Start services
+        # 3. Post upgrade actions
+        SetupController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
+        for client in ssh_clients:
+            for function in Toolbox.fetch_hooks('update', 'postupgrade'):
+                SetupController._log_message('Executing action: {0}'.format(function.__name__), client_ip=client.ip)
+                try:
+                    function(client)
+                except Exception as ex:
+                    SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
+
+        # 4. Start services
         SetupController._log_message('Starting services', client_ip=this_client.ip)
-        SetupController._change_services_state(services=volumedriver_services,
+        SetupController._change_services_state(services=services_to_restart,
                                                ssh_clients=ssh_clients,
                                                action='start')
 

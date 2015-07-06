@@ -74,7 +74,7 @@ limitations under the License.
             <span data-i18n="ovs:updates.buttons.volumedriver"></span>
         </button>
     </div>
-    <div data-bind="visible: upgradeOngoing() !== undefined && upgradeOngoing() === true" class="alert alert-info" style="margin-top: 20px;">
+    <div data-bind="visible: upgradeOngoing() === true" class="alert alert-info" style="margin-top: 20px;">
         <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
         <span data-i18n="ovs:updates.ongoing"></span>
     </div>

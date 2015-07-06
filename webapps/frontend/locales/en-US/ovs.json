@@ -458,8 +458,8 @@
         "name": "Name",
         "noupdates": "No updates available",
         "ongoing": "An upgrade is in progress",
-        "start_update": "Update launched",
-        "start_update_extra": "Update will start shortly",
+        "start_update": "Started",
+        "start_update_extra": "Update has been initiated",
         "title": "Updates",
         "volumedriver": {
             "start_update_question": "Are you sure you want to start the __what__ update?__downtime____prerequisites__",
@@ -475,7 +475,7 @@
     "downtime": {
         "general": "Following service__multiple__ will experience downtime:",
         "ovsdb": "Model availability",
-        "proxy": "Proxy service for vpool __which__",
+        "proxy": "Proxy service for vpool",
         "voldrv": "Storage Driver availability"
     },
     "prerequisites": {

@@ -87,9 +87,7 @@ define([
                             });
                         });
                     }
-                    if (item.upgrade_ongoing === true) {
-                        self.upgradeOngoing(true);
-                    }
+                    self.upgradeOngoing(item.upgrade_ongoing);
                 }
             });
             self.frameworkUpdate(any_framework_update);
@@ -152,11 +150,12 @@ define([
                 });
 
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
-                var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular') + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
+                var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + (prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular')) + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
+                var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')]
                 app.showMessage(
                     $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
-                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    button_options
                 )
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
@@ -166,7 +165,7 @@ define([
                                     self.upgradeOngoing(true);
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
                                         .then(function(taskID) {
-                                            self.frameworkUpdating(false);  // Update itself will stop all services, so celery should not reach done status
+                                            self.frameworkUpdating(false);
                                             return self.shared.tasks.wait(taskID);
                                         })
                                         .done(function() {
@@ -188,7 +187,6 @@ define([
                         } else {
                             deferred.reject();
                             self.frameworkUpdating(false);
-                            self.upgradeOngoing(false);
                         }
                     })
             }).promise();
@@ -223,10 +221,11 @@ define([
 
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + (prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular')) + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
+                var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')]
                 app.showMessage(
                     $.t('ovs:updates.volumedriver.start_update_question', { what: $.t('ovs:updates.volumedriver.title'), downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
-                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                    button_options
                 )
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
@@ -236,7 +235,7 @@ define([
                                     self.upgradeOngoing(true);
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_volumedriver')
                                         .then(function(taskID) {
-                                            self.volumedriverUpdating(false);  // Update itself will stop all services, so celery should not reach done status
+                                            self.volumedriverUpdating(false);
                                             return self.shared.tasks.wait(taskID);
                                         })
                                         .done(function() {
@@ -258,7 +257,6 @@ define([
                         } else {
                             deferred.reject();
                             self.volumedriverUpdating(false);
-                            self.upgradeOngoing(false);
                         }
                     })
             }).promise();
