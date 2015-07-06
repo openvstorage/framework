@@ -451,22 +451,37 @@
         "buttons": {"framework": "Update Framework",
                     "volumedriver": "Update Storage Driver"},
         "failed": "Update failed: __why__",
-        "framework": "Framework",
+        "framework": {
+            "start_update_question": "Are you sure you want to start the __what__ update?<br /><br />The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)__downtime____prerequisites__",
+            "title": "Framework"
+        },
         "name": "Name",
         "noupdates": "No updates available",
         "ongoing": "An upgrade is in progress",
-        "start_update_question": "Are you sure you want to start the __what__ update?<br /><br />The GUI will become unavailable. If the GUI is not available after 10 minutes, please contact support or check the logs (/var/log/ovs/lib.log)__downtime__",
-        "start_update": "Update launched",
-        "start_update_extra": "Update will start shortly",
+        "start_update": "Started",
+        "start_update_extra": "Update has been initiated",
         "title": "Updates",
-        "volumedriver": "Storage Driver"
+        "volumedriver": {
+            "start_update_question": "Are you sure you want to start the __what__ update?__downtime____prerequisites__",
+            "title": "Storage Driver"
+        }
     },
     "packages": {
+        "alba": "OpenvStorage Backend",
+        "arakoon": "Arakoon",
         "ovs": "Core",
         "volumedriver": "Storage Driver"
     },
     "downtime": {
-        "general": "Following service__multiple__ will experience downtime:"
+        "general": "Following service__multiple__ will experience downtime:",
+        "ovsdb": "Model availability",
+        "proxy": "Proxy service for vpool",
+        "voldrv": "Storage Driver availability"
+    },
+    "prerequisites": {
+        "multiple": "The following prerequisites are unmet",
+        "singular": "The following prerequisite is unmet",
+        "vmachine": "Running virtual machines detected"
     },
     "login": {
         "title": "Login",
@@ -785,6 +800,9 @@
                 "password": "Password:",
                 "invalidip": "The IP Address entered is invalid"
             }
+        },
+        "update": {
+            "title": "Update __what__"
         }
     },
     "footer" : {

@@ -65,6 +65,8 @@ class Upstart(object):
 
         for key, value in params.iteritems():
             template_conf = template_conf.replace('<{0}>'.format(key), value)
+        if '<SERVICE_NAME>' in template_conf:
+            template_conf = template_conf.replace('<SERVICE_NAME>', name.lstrip('ovs-'))
 
         client.file_write(upstart_dir.format(upstart_conf), template_conf)
 
