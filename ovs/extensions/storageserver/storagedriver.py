@@ -102,7 +102,7 @@ class MetadataServerClient(object):
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
             except RuntimeError as ex:
-                logger.error('Error loading MDSClient: {0}'.format(ex))
+                logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
                 return None
         return mdsclient_service_cache[key]
 

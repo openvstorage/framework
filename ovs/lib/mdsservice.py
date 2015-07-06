@@ -30,7 +30,7 @@ from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, MetadataServerClient
 from ovs.extensions.generic.system import System
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
 
@@ -373,16 +373,24 @@ class MDSServiceController(object):
             for load in loads:
                 for service in services_per_load[load]:
                     if slave_added is False and service in slave_services and service.storagerouter.ip not in nodes:
-                        new_services.append(service)
-                        slave_services.remove(service)
-                        nodes.add(service.storagerouter.ip)
-                        slave_added = True
+                        try:
+                            SSHClient(service.storagerouter)
+                            new_services.append(service)
+                            slave_services.remove(service)
+                            nodes.add(service.storagerouter.ip)
+                            slave_added = True
+                        except UnableToConnectException:
+                            logger.debug('Skip {0} as it is unreachable'.format(service.storagerouter.ip))
         if len(nodes) < safety:
             for load in loads:
                 for service in services_per_load[load]:
                     if len(nodes) < safety and service.storagerouter.ip not in nodes:
-                        new_services.append(service)
-                        nodes.add(service.storagerouter.ip)
+                        try:
+                            SSHClient(service.storagerouter)
+                            new_services.append(service)
+                            nodes.add(service.storagerouter.ip)
+                        except UnableToConnectException:
+                            logger.debug('Skip {0} as it is unreachable'.format(service.storagerouter.ip))
 
         # Build the new configuration and update the vdisk
         configs = []
@@ -476,7 +484,7 @@ class MDSServiceController(object):
                 if vpool not in mds_dict:
                     mds_dict[vpool] = {}
                 if storagerouter not in mds_dict[vpool]:
-                    mds_dict[vpool][storagerouter] = {'client': SSHClient(storagerouter.ip, username='root'),
+                    mds_dict[vpool][storagerouter] = {'client': SSHClient(storagerouter, username='root'),
                                                       'services': []}
                 mds_dict[vpool][storagerouter]['services'].append(mds_service)
         for vpool, storagerouter_info in mds_dict.iteritems():
@@ -488,7 +496,7 @@ class MDSServiceController(object):
                 has_room = False
                 for mds_service in mds_services[:]:
                     if mds_service.capacity == 0 and len(mds_service.vdisks_guids) == 0:
-                        client = SSHClient(storagerouter.ip)
+                        client = SSHClient(storagerouter)
                         MDSServiceController.remove_mds_service(mds_service, client, storagerouter, vpool, reload_config=True)
                         mds_services.remove(mds_service)
                 for mds_service in mds_services:

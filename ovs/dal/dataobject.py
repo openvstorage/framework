@@ -344,12 +344,12 @@ class DataObject(object):
         """
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
-        remote_key   = info['key']
+        remote_key = info['key']
         datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, attribute, self.guid)
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
         else:
-            self._objects[attribute]['data'].merge(datalist.data)
+            self._objects[attribute]['data'].update(datalist.data)
         if info['list'] is True:
             return self._objects[attribute]['data']
         else:
@@ -407,7 +407,7 @@ class DataObject(object):
             descriptor = Descriptor(value.__class__).descriptor
             if descriptor['identifier'] != self._data[attribute]['identifier']:
                 raise TypeError('An invalid type was given: {0} instead of {1}'.format(
-                    descriptor['type'],  self._data[attribute]['type']
+                    descriptor['type'], self._data[attribute]['type']
                 ))
             self._objects[attribute] = value
             self._data[attribute]['guid'] = value.guid
@@ -708,8 +708,8 @@ class DataObject(object):
         """
         Discard all pending changes, reloading the data from the persistent backend
         """
-        self.__init__(guid           = self._guid,
-                      datastore_wins = self._datastore_wins)
+        self.__init__(guid=self._guid,
+                      datastore_wins=self._datastore_wins)
 
     def invalidate_dynamics(self, properties=None):
         """
@@ -819,8 +819,8 @@ class DataObject(object):
         Handles the internal caching of dynamic properties
         """
         caller_name = dynamic.name
-        cache_key   = '{0}_{1}'.format(self._key, caller_name)
-        mutex       = VolatileMutex(cache_key)
+        cache_key = '{0}_{1}'.format(self._key, caller_name)
+        mutex = VolatileMutex(cache_key)
         try:
             cached_data = self._volatile.get(cache_key)
             if cached_data is None:
@@ -861,7 +861,7 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not isinstance(other, DataObject):
+        if not Descriptor.isinstance(other, self.__class__):
             return False
         return self.__hash__() == other.__hash__()
 
@@ -869,6 +869,6 @@ class DataObject(object):
         """
         Checks whether to objects are not the same.
         """
-        if not isinstance(other, DataObject):
+        if not Descriptor.isinstance(other, self.__class__):
             return True
         return not self.__eq__(other)

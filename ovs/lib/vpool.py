@@ -45,7 +45,7 @@ class VPoolController(object):
         storagedriver.startup_counter += 1
         storagedriver.save()
         if storagedriver.storagerouter.pmachine.hvtype == 'VMWARE':
-            client = SSHClient(storagedriver.storagerouter.ip)
+            client = SSHClient(storagedriver.storagerouter)
             if client.config_read('ovs.storagedriver.vmware_mode') == 'classic':
                 nfs = Nfsexports()
                 nfs.unexport(mountpoint)

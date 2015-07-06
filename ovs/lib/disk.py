@@ -27,7 +27,7 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 
@@ -52,7 +52,11 @@ class DiskController(object):
         else:
             storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in storagerouters:
-            client = SSHClient(storagerouter.ip, username='root')
+            try:
+                client = SSHClient(storagerouter, username='root')
+            except UnableToConnectException:
+                logger.info('Could not connect to StorageRouter {0}, skipping'.format(storagerouter.ip))
+                continue
             configuration = {}
             # Gather mount data
             mount_mapping = {}

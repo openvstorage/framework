@@ -15,6 +15,8 @@
 from subprocess import check_output, CalledProcessError, PIPE, Popen
 from ConfigParser import RawConfigParser
 from ovs.log.logHandler import LogHandler
+from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.helpers import Descriptor
 
 import os
 import re
@@ -22,10 +24,16 @@ import grp
 import pwd
 import glob
 import json
+import time
 import tempfile
 import paramiko
+import socket
 
 logger = LogHandler.get('extensions', name='sshclient')
+
+
+class UnableToConnectException(Exception):
+    pass
 
 
 class SSHClient(object):
@@ -33,13 +41,26 @@ class SSHClient(object):
     Remote/local client
     """
 
-    def __init__(self, ip, username='ovs', password=None):
+    IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
+
+    def __init__(self, endpoint, username='ovs', password=None):
         """
         Initializes an SSHClient
         """
-        ip_regex = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
-        if not re.findall(ip_regex, ip):
-            raise ValueError('Incorrect IP {0} specified'.format(ip))
+        if isinstance(endpoint, basestring):
+            ip = endpoint
+            if not re.findall(SSHClient.IP_REGEX, ip):
+                raise ValueError('Incorrect IP {0} specified'.format(ip))
+        elif Descriptor.isinstance(endpoint, StorageRouter):
+            process_heartbeat = endpoint.heartbeats.get('process')
+            ip = endpoint.ip
+            if process_heartbeat is not None:
+                if time.time() - process_heartbeat > 300:
+                    message = 'StorageRouter {0} process heartbeat > 300s'.format(ip)
+                    logger.error(message)
+                    raise UnableToConnectException(message)
+        else:
+            raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -59,11 +80,21 @@ class SSHClient(object):
         self.password = password
 
         if not self.is_local:
-            self._connect()
+            try:
+                self._connect()
+            except socket.error, ex:
+                if 'No route to host' in str(ex):
+                    message = 'SocketException: No route to host {0}'.format(ip)
+                    logger.error(message)
+                    raise UnableToConnectException(message)
+                raise
 
     def __del__(self):
-        if not self.is_local:
-            self._disconnect()
+        try:
+            if not self.is_local:
+                self._disconnect()
+        except Exception:
+            pass  # Absorb destructor exceptions
 
     def _connect(self):
         """

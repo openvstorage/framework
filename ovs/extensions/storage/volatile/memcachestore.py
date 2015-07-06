@@ -59,7 +59,7 @@ class MemcacheStore(object):
         Initializes the client
         """
         self._nodes = nodes
-        self._client = memcache.Client(self._nodes, cache_cas=True)
+        self._client = memcache.Client(self._nodes, cache_cas=True, socket_timeout=0.5)
         self._lock = Lock()
         self._validate = True
 

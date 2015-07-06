@@ -40,18 +40,22 @@ from ovs.extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
+from ovs.extensions.packages.package import PackageManager
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.services.service import ServiceManager
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 
 
@@ -177,9 +181,12 @@ class StorageRouterController(object):
 
         # Fetch clients services
         ip_client_map = {}
-        for sr in all_storagerouters:
-            ip_client_map[sr.ip] = {'root': SSHClient(sr.ip, username='root'),
-                                    'ovs': SSHClient(sr.ip, username='ovs')}
+        try:
+            for sr in all_storagerouters:
+                ip_client_map[sr.ip] = {'root': SSHClient(sr.ip, username='root'),
+                                        'ovs': SSHClient(sr.ip, username='ovs')}
+        except UnableToConnectException:
+            raise RuntimeError('Not all StorageRouters are reachable')
 
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         if vpool is None:
@@ -683,6 +690,15 @@ class StorageRouterController(object):
         """
         logger.info('Deleting storage driver with guid {0}'.format(storagedriver_guid))
 
+        try:
+            ip_client_map = {}
+            for storagerouter in StorageRouterList.get_storagerouters():
+                client = SSHClient(storagerouter, username='root')
+                if client.ip not in ip_client_map:
+                    ip_client_map[client.ip] = client
+        except UnableToConnectException:
+            raise RuntimeError('Not all StorageRouters are reachable')
+
         # Get objects & Make some checks
         storagedriver = StorageDriver(storagedriver_guid)
         storagerouter = storagedriver.storagerouter
@@ -694,14 +710,9 @@ class StorageRouterController(object):
         storagedrivers_left = False
         vpool = storagedriver.vpool
 
-        # Load clients
-        ip_client_map = {}
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.guid != storagedriver_guid:
                 storagedrivers_left = True
-            client = SSHClient(current_storagedriver.storagerouter.ip, username='root')
-            if client.ip not in ip_client_map:
-                ip_client_map[client.ip] = client
 
         if storagedrivers_left is False and pmachine.guid in pmachine_guids and vpool.guid in vpool_guids:
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
@@ -938,18 +949,23 @@ class StorageRouterController(object):
                     # - This code cannot continue until this new task is completed (as all these Storage Router
                     #   need to be handled sequentially
                     # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
+                    try:
+                        _ = SSHClient(storagerouter_ip)
+                    except UnableToConnectException:
+                        raise RuntimeError('StorageRouter {0} is not reachable'.format(storagerouter_ip))
                     result = StorageRouterController.add_vpool.s(new_parameters).apply_async(
                         routing_key='sr.{0}'.format(storageappliance_machineid)
                     )
                     result.wait()
             except Exception, ex:
-                logger.exception('Error during add_vpool: {0}'.format(ex))
+                logger.error('{0}'.format(ex))
                 success = False
         # Remove Storage Drivers
         for storagedriver_guid in storagedriver_guids:
             try:
                 storagedriver = StorageDriver(storagedriver_guid)
-                storagerouter_machineid = storagedriver.storagerouter.machine_id
+                storagerouter = storagedriver.storagerouter
+                storagerouter_machineid = storagerouter.machine_id
                 local_machineid = System.get_my_machine_id()
                 if local_machineid == storagerouter_machineid:
                     # Inline execution, since it's on the same node (preventing deadlocks)
@@ -961,12 +977,16 @@ class StorageRouterController(object):
                     # - This code cannot continue until this new task is completed (as all these VSAs need to be
                     # handled sequentially
                     # - The wait() or get() method are not allowed anymore from within a task to prevent deadlocks
+                    try:
+                        _ = SSHClient(storagerouter)
+                    except UnableToConnectException:
+                        raise RuntimeError('StorageRouter {0} is not reachable'.format(storagerouter.ip))
                     result = StorageRouterController.remove_storagedriver.s(storagedriver_guid).apply_async(
                         routing_key='sr.{0}'.format(storagerouter_machineid)
                     )
                     result.wait()
             except Exception, ex:
-                logger.exception('Error during remove_storagedriver: {0}'.format(ex))
+                logger.error('{0}'.format(ex))
                 success = False
         return success
 
@@ -1011,7 +1031,7 @@ class StorageRouterController(object):
 
         storagerouter = StorageRouter(local_storagerouter_guid)
         webpath = '/opt/OpenvStorage/webapps/frontend/downloads'
-        client = SSHClient(storagerouter.ip, username='root')
+        client = SSHClient(storagerouter, username='root')
         client.dir_create(webpath)
         client.file_upload('{0}/{1}'.format(webpath, logfilename), logfile)
         client.run('chmod 666 {0}/{1}'.format(webpath, logfilename))
@@ -1023,27 +1043,31 @@ class StorageRouterController(object):
         """
         Configures support on all StorageRouters
         """
-        for storagerouter in StorageRouterList.get_storagerouters():
-            client = SSHClient(storagerouter.ip)
-            client.config_set('ovs.support.enabled', enable)
-            client.config_set('ovs.support.enablesupport', enable_support)
-            client = SSHClient(storagerouter.ip, username='root')
+        clients = []
+        try:
+            for storagerouter in StorageRouterList.get_storagerouters():
+                clients.append((SSHClient(storagerouter), SSHClient(storagerouter, username='root')))
+        except UnableToConnectException:
+            raise RuntimeError('Not all StorageRouters are reachable')
+        for ovs_client, root_client in clients:
+            ovs_client.config_set('ovs.support.enabled', enable)
+            ovs_client.config_set('ovs.support.enablesupport', enable_support)
             if enable_support is False:
-                client.run('service openvpn stop')
-                client.file_delete('/etc/openvpn/ovs_*')
+                root_client.run('service openvpn stop')
+                root_client.file_delete('/etc/openvpn/ovs_*')
             if enable is True:
-                if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=client):
-                    ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=client)
-                    ServiceManager.enable_service(StorageRouterController.SUPPORT_AGENT, client=client)
-                if not ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=client):
-                    ServiceManager.start_service(StorageRouterController.SUPPORT_AGENT, client=client)
+                if not ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    ServiceManager.add_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                    ServiceManager.enable_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                if not ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    ServiceManager.start_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
                 else:
-                    ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=client)
+                    ServiceManager.restart_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
             else:
-                if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=client):
-                    if ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=client):
-                        ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=client)
-                    ServiceManager.remove_service(StorageRouterController.SUPPORT_AGENT, client=client)
+                if ServiceManager.has_service(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                    if ServiceManager.get_service_status(StorageRouterController.SUPPORT_AGENT, client=root_client):
+                        ServiceManager.stop_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
+                    ServiceManager.remove_service(StorageRouterController.SUPPORT_AGENT, client=root_client)
         return True
 
     @staticmethod
@@ -1085,7 +1109,7 @@ class StorageRouterController(object):
         Checks for new updates
         """
         # Check plugin requirements
-        root_client = SSHClient(ip=storagerouter_ip,
+        root_client = SSHClient(storagerouter_ip,
                                 username='root')
         required_plugin_params = {'name': (str, None),             # Name of a subpart of the plugin and is used for translation in html. Eg: alba:packages.SDM
                                   'version': (str, None),          # Available version to be installed
@@ -1242,7 +1266,7 @@ class StorageRouterController(object):
         """
         Launch the update_framework method in setup.py
         """
-        root_client = SSHClient(ip=storagerouter_ip,
+        root_client = SSHClient(storagerouter_ip,
                                 username='root')
         root_client.run('ovs update framework')
 
