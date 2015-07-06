@@ -83,7 +83,6 @@ define([
             self.mtptOK         = ko.observable(true);
             self.storageDrivers = ko.observableArray([]);
             self.mountpoints    = ko.observableArray([]);
-            self.mountpoints    = ko.observableArray([]);
             self.readcaches     = ko.observableArray([]);
             self.writecaches    = ko.observableArray([]);
             self.ipAddresses    = ko.observableArray([]);
@@ -257,7 +256,7 @@ define([
         });
         self.removeValidations = ko.computed(function() {
             $.each(self.data.removingStorageRouters(), function(index, storageRouter) {
-                var foundStorageDriverGuid;
+                var foundStorageDriverGuid='';
                 $.each(storageRouter.storageDriverGuids, function(storageDriverIndex, storageDriverGuid) {
                     $.each(self.data.vPool().storageDriverGuids(), function(pIndex, pStorageDriverGuid) {
                         if (pStorageDriverGuid === storageDriverGuid) {

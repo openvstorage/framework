@@ -263,7 +263,7 @@ define([
         self.activate = function() {
             generic.xhrAbort(self.loadStorageRoutersHandle);
             self.loadStorageRoutersHandle = api.get('storagerouters', {
-                queryparams: {
+                    queryparams: {
                     contents: 'storagedrivers',
                     sort: 'name'
                 }
@@ -311,7 +311,7 @@ define([
                             }
                         });
                     });
-            };
+            }
         };
     };
 });

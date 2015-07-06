@@ -69,7 +69,7 @@ class StorageDriverClient(object):
         Loads and returns the client
         """
 
-        key = vpool.guid
+        key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:

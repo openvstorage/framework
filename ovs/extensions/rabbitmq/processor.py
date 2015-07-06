@@ -16,7 +16,6 @@
 Contains the process method for processing rabbitmq messages
 """
 
-import time
 import inspect
 import json
 from celery.task.control import revoke
@@ -27,7 +26,6 @@ import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
 from ovs.log.logHandler import LogHandler
-from ovs.dal.hybrids.log import Log
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
 
@@ -178,11 +176,11 @@ def _log(task, kwargs, storagedriver_id):
     """
     Log an event
     """
-    log = Log()
-    log.source = 'VOLUMEDRIVER_EVENT'
-    log.module = task.__class__.__module__
-    log.method = task.__class__.__name__
-    log.method_kwargs = kwargs
-    log.time = time.time()
-    log.storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-    log.save()
+    metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(storagedriver_id).guid}
+    _logger = LogHandler.get('log', name='volumedriver_event')
+    _logger.info('[{0}.{1}] - {2} - {3}'.format(
+        task.__class__.__module__,
+        task.__class__.__name__,
+        json.dumps(kwargs),
+        json.dumps(metadata)
+    ))

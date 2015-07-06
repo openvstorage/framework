@@ -18,6 +18,7 @@ Contains various decorator
 
 import math
 import re
+import json
 import inspect
 import time
 from ovs.dal.lists.userlist import UserList
@@ -35,7 +36,6 @@ from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.dal.hybrids.log import Log
 
 
 logger = LogHandler.get('api')
@@ -405,18 +405,18 @@ def log():
             method_args = method_args[method_args.index(request) + 1:]
 
             # Log the call
-            log_entry = Log()
-            log_entry.source = 'API'
-            log_entry.module = f.__module__
-            log_entry.method = f.__name__
-            log_entry.method_args = method_args
-            log_entry.method_kwargs = kwargs
-            log_entry.time = time.time()
-            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
-            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
-                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
-                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
-            log_entry.save()
+            metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                        'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                        'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            _logger = LogHandler.get('log', name='api')
+            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+                f.__module__,
+                f.__name__,
+                getattr(request, 'client').user_guid if hasattr(request, 'client') else None,
+                json.dumps(method_args),
+                json.dumps(kwargs),
+                json.dumps(metadata)
+            ))
 
             # Call the function
             return f(*args, **kwargs)
