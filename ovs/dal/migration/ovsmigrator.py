@@ -179,7 +179,9 @@ class OVSMigrator(object):
                 modified = False
                 for entry in data.keys():
                     if isinstance(data[entry], dict) and 'source' in data[entry] and 'hybrids' in data[entry]['source']:
-                        filename = '/opt/OpenvStorage/ovs/dal/{0}'.format(data[entry]['source'])
+                        filename = data[entry]['source']
+                        if not filename.startswith('/'):
+                            filename = '/opt/OpenvStorage/ovs/dal/{0}'.format(filename)
                         module = imp.load_source(data[entry]['name'], filename)
                         cls = getattr(module, data[entry]['type'])
                         new_data = Descriptor(cls).descriptor
