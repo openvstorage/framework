@@ -371,6 +371,11 @@ class Sdk(object):
                 matches.append(found_file)
         return matches if matches else None
 
+    def is_datastore_available(self, mountpoint):
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host, username='root')
+        return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
+
     @authenticated
     def clone_vm(self, vmid, name, disks):
         """
