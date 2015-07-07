@@ -1,0 +1,118 @@
+<!--
+Copyright 2014 CloudFounders NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<div>
+    <form role="form form-horizontal" class="form-horizontal">
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.basicinfo"></p>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.bfsinfo"
+           data-bind="visible: data.backend() === 'local' || data.backend() === 'distributed'">
+        </p>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('bfs', canContinue().fields) !== -1 },
+                                           visible: data.backend() === 'local' || data.backend() === 'distributed'">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.bfs"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptBFS,
+                                             free: true, defaultfree: '/mnt/bfs/' + data.name(), defaultRegex: /bfs/ }">
+                </span>
+            </div>
+        </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.mtptinfo"></p>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('temp', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.tempfs"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.mountpoints, target: data.mtptTemp,
+                                             free: true, defaultfree: '/', defaultRegex: /tmp/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('md', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.md"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.writecaches, target: data.mtptMD,
+                                             free: true, defaultfree: '/', defaultRegex: /.*/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('readcache', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.readcaches"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.allReadMountpoints, target: data.readCacheDistributor,
+                                             defaultRegex: /.*/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label"></label>
+            <div class="col-lg-7">
+                <div class="input-group">
+                    <span class="input-group-addon" data-i18n="ovs:generic.custompath"></span>
+                    <input type="text" id="inputCustomRC" data-bind="value: data.mtptCustomRC" class="form-control" />
+                    <div class="input-group-btn">
+                        <button type="button" class="btn btn-small btn-default" data-bind="click: addReadCache"
+                                id="buttonAddCustomRC">
+                            <span class="fa" data-i18n="[html]ovs:icons.add"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('writecache', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.writecaches"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.allWriteMountpoints, target: data.writeCacheDistributor,
+                                             defaultRegex: /.*/ }">
+                </span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="col-lg-3 control-label"></label>
+            <div class="col-lg-7">
+                <div class="input-group">
+                    <span class="input-group-addon" data-i18n="ovs:generic.custompath"></span>
+                    <input type="text" id="inputCustomWC" data-bind="value: data.mtptCustomWC" class="form-control" />
+                    <div class="input-group-btn">
+                        <button type="button" class="btn btn-small btn-default" data-bind="click: addWriteCache"
+                                id="buttonAddCustomWC">
+                            <span class="fa" data-i18n="[html]ovs:icons.add"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-group" data-bind="css: { 'has-error': $.inArray('foc', canContinue().fields) !== -1 }">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.foc"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.writecaches, target: data.mtptFOC,
+                                             free: true, defaultfree: '/', defaultRegex: /.*/ }">
+                </span>
+            </div>
+        </div>
+        <p data-i18n="ovs:wizards.addvpool.gathermountpoints.otherinfo"></p>
+        <div class="form-group">
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathermountpoints.ipaddress"></label>
+            <div class="col-lg-7">
+                <span data-bind="dropdown: { items: data.ipAddresses, target: data.storageIP }">
+                </span>
+            </div>
+        </div>
+    </form>
+    <div class="alert alert-danger" data-bind="visible: canContinue().value === false" style="margin-bottom: -10px;">
+        <p data-bind="visible: canContinue().reasons.length === 0"><span data-i18n="ovs:generic.errorsfound"></span></p>
+        <p data-bind="visible: canContinue().reasons.length > 0"><span data-i18n="ovs:generic.followingerrorsfound"></span></p>
+        <ul data-bind="visible: canContinue().reasons.length > 0, foreach: canContinue().reasons">
+            <li data-bind="text: $data"></li>
+        </ul>
+    </div>
+</div>
