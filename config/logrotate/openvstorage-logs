@@ -1,0 +1,26 @@
+/var/log/ovs/*.log {
+    su ovs ovs
+    weekly
+    rotate 4
+    size 100M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 666 ovs ovs
+}
+
+/var/log/arakoon/*/*.log {
+    su ovs ovs
+    weekly
+    rotate 7
+    size 100M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 666 ovs ovs
+    postrotate
+        /usr/bin/pkill -SIGUSR1 arakoon
+    endscript
+}

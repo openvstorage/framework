@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+cd /opt/OpenvStorage
+export PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps:/opt/OpenvStorage/webapps/api"
+export DISPLAY=:0
+
+function show_help {
+    echo "Open vStorage CLI launcer"
+    echo "-------------------------"
+    echo "Usage:"
+    ec  ho "* ovs                       Launch Open vStorage shell (ipython)"
+    echo "* ovs setup                 Launch Open vStorage setup"
+    echo "                              Autodetect required node role (master/extra)"
+    echo "* ovs setup master          Launch Open vStorage setup"
+    echo "                              Install master node"
+    echo "* ovs setup promote         Promote this node (extra -> master)"
+    echo "* ovs setup demote          Demote this node (master -> extra)"
+    echo "* ovs monitor services      Watch Open vStorage services"
+    echo "* ovs monitor heartbeat     Send an internal heartbeat"
+    echo "* ovs monitor mds           Watch MDS configuration/loads"
+    echo "* ovs stop services         Try to stop all Open vStorage services"
+    echo "* ovs start services        Try to start all Open vStorage servces"
+    echo "* ovs collect logs          Collect all Open vStorage logs to a tarball"
+    echo "                              For support purposes"
+    echo "* ovs unittest <filepath>   Run the unittests in <filepath>"
+}
+
+if [ "$1" = "help" ] ; then
+    show_help
+elif [ "$1" = "setup" ] ; then
+    if [ "$#" -ne 2 ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.setup_node()"
+    elif [ "$2" = "master" ] || [ "$2" = "extra" ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.setup_node(force_type='$2')"
+    elif [ "$2" = "promote" ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('promote')"
+    elif [ "$2" = "demote" ] ; then
+        python -c "from ovs.lib.setup import SetupController; SetupController.promote_or_demote_node('demote')"
+    else
+        show_help
+    fi
+elif [ "$1" = "update" ] ; then
+    if [ "$2" = "framework" ] ; then
+        echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_framework()"' > /tmp/update
+        at -f /tmp/update now
+        rm /tmp/update
+    elif [ "$2" = "volumedriver" ] ; then
+        echo 'python -c "from ovs.lib.setup import SetupController; SetupController.update_volumedriver()"' > /tmp/update
+        at -f /tmp/update now
+        rm /tmp/update
+    fi
+elif [ "$1" = "monitor" ] ; then
+    if [ "$2" = "services" ] ; then
+        watch -n 1 'echo "\nOVS running processes:\n";initctl list | grep ovs | grep start/running | sort;echo "\nOVS non-running processes:\n";initctl list | grep ovs | grep -v start/running | sort'
+    elif [ "$2" = "heartbeat" ] ; then
+        python /opt/OpenvStorage/ovs/extensions/generic/heartbeat.py
+    elif [ "$2" = "mds" ] ; then
+        python /opt/OpenvStorage/ovs/lib/mdsservice.py
+    else
+        show_help
+    fi
+elif [ "$1" = "stop" ] ; then
+    if [ "$2" = "services" ] ; then
+        for SERVICE in `cd /etc/init; ls ovs-*`
+            do
+            SERVICE=${SERVICE%.*}
+            echo "Stopping: $SERVICE"
+            stop $SERVICE
+            done
+    else
+        show_help
+    fi
+elif [ "$1" = "start" ] ; then
+    if [ "$2" = "services" ] ; then
+        for SERVICE in `cd /etc/init; ls ovs-*`
+            do
+            SERVICE=${SERVICE%.*}
+            echo "Starting: $SERVICE"
+            start $SERVICE
+            done
+    else
+        show_help
+    fi
+elif [ "$1" = "collect" ] ; then
+    if [ "$2" = "logs" ] ; then
+        LOGFILE=/tmp/ovs-`hostname`-`date "+%Y%m%d%H%M%S"`-logs.tar
+        rm -f $LOGFILE
+        rm -f $LOGFILE.gz
+        touch $LOGFILE
+        tar uvf $LOGFILE /var/log/arakoon* > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/logstash* > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/nginx* > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/ovs* > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/rabbitmq* > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/upstart* > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/*log > /dev/null 2>&1
+        tar uvf $LOGFILE /var/log/dmesg* > /dev/null 2>&1
+        gzip $LOGFILE > /dev/null
+        echo $LOGFILE.gz
+    else
+        show_help
+    fi
+elif [ "$1" = "unittest" ] ; then
+    if [ "$#" -ne 2 ] ; then
+        show_help
+    else
+        shift
+        python $@
+    fi
+else
+    ipython
+fi
