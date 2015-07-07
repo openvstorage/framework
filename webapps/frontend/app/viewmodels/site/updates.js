@@ -45,6 +45,7 @@ define([
             var any_framework_update = false;
             var any_volumedriver_update = false;
             var updates_data = {'framework': {'update': false,
+                                              'guiDown': false,
                                               'downtime': [],
                                               'prerequisites': []},
                                 'volumedriver': {'update': false,
@@ -57,6 +58,9 @@ define([
                         any_framework_update = true;
                         updates_data.framework.update = true;
                         $.each(item.framework, function(a_index, framework_info) {
+                            if (framework_info.gui_down === true) {
+                                updates_data.framework.guiDown = true;
+                            }
                             $.each(framework_info.downtime, function(b_index, downtime) {
                                 if (!downtime.nestedIn(updates_data.framework.downtime)) {
                                     updates_data.framework.downtime.push(downtime);
@@ -126,6 +130,7 @@ define([
             }
             self.upgradeOngoing(true);
             return $.Deferred(function(deferred) {
+                var guiDown = false;
                 var downtimes = [];
                 var prerequisites = [];
                 $.each(self.updates().framework.downtime, function(index, downtime) {
@@ -143,11 +148,12 @@ define([
                     }
                 });
 
+                var guiDownMessage = self.updates().framework.guiDown === true ? '<br /><br />' + $.t('ovs:updates.framework.gui_unavailable') : '';
                 var downtimeMessage = downtimes.length === 0 ? '' : '<br /><br />' + $.t('ovs:downtime.general', { multiple: downtimes.length > 1 ? 's': '' }) + '<ul><li>' + downtimes.join('</li><li>') + '</li></ul>';
                 var prereqMessage = prerequisites.length === 0 ? '' : '<br /><br />' + (prerequisites.length !== 1 ? $.t('ovs:prerequisites.multiple') : $.t('ovs:prerequisites.singular')) + '<ul><li>' + prerequisites.join('</li><li>') + '</li></ul>';
                 var button_options = prerequisites.length === 0 ? [$.t('ovs:generic.no'), $.t('ovs:generic.yes')] : [$.t('ovs:generic.cancel')]
                 app.showMessage(
-                    $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
+                    $.t('ovs:updates.framework.start_update_question', { what: $.t('ovs:updates.framework.title'), guidown: guiDownMessage, downtime: downtimeMessage, prerequisites: prereqMessage }).trim(),
                     $.t('ovs:generic.areyousure'),
                     button_options
                 )

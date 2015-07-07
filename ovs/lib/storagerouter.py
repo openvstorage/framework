@@ -43,19 +43,15 @@ from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.hypervisor.factory import Factory
-from ovs.extensions.packages.package import PackageManager
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration, StorageDriverClient
 from ovs.extensions.support.agent import SupportAgent
 from ovs.extensions.packages.package import PackageManager
-from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
-from ovs.extensions.generic.configuration import Configuration
-from ovs.extensions.services.service import ServiceManager
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
 
 
@@ -1142,14 +1138,18 @@ class StorageRouterController(object):
             for package_info in package_information:
                 version = package_info['version']
                 if version:
+                    gui_down = 'watcher-framework' in package_info['services'] or 'nginx' in package_info['services']
                     info_added = False
                     for index, item in enumerate(return_value[gui_name]):
                         if item['name'] == package_info['name']:
                             return_value[gui_name][index]['downtime'].extend(package_info['downtime'])
                             info_added = True
+                            if gui_down is True and return_value[gui_name][index]['gui_down'] is False:
+                                return_value[gui_name][index]['gui_down'] = True
                     if info_added is False:  # Some plugins can have same package dependencies as core and we only want to show each package once in GUI (Eg: Arakoon for core and ALBA)
                         return_value[gui_name].append({'to': version,
                                                        'name': package_info['name'],
+                                                       'gui_down': gui_down,
                                                        'downtime': package_info['downtime'],
                                                        'namespace': package_info['namespace'],
                                                        'prerequisites': package_info['prerequisites']})
