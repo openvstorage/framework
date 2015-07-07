@@ -1217,6 +1217,21 @@ class Basic(TestCase):
         self.assertTrue(datalist.from_cache, 'The relation set should be cached')
         self.assertEqual(len(datalist.data), 2, 'There should be two disks')
 
+    def test_instance_checks(self):
+        """
+        Validates whether Descriptor.isinstance works
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk = TestDisk()
+        disk.name = 'disk'
+        disk.machine = machine
+        disk.save()
+        self.assertTrue(Descriptor.isinstance(disk, TestDisk), 'The disk should be a TestDisk')
+        self.assertFalse(Descriptor.isinstance(disk, TestMachine), 'The disk is no TestMachine')
+        self.assertTrue(Descriptor.isinstance(disk.machine, TestEMachine), 'The disk.machine is a TestEMachine')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

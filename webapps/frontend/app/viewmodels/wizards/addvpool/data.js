@@ -49,14 +49,18 @@ define([
             albaBackend:      ko.observable(),
             albaPreset:       ko.observable(),
             backends:         ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']),
+            storageRouter:    ko.observable(),
             storageRouters:   ko.observableArray([]),
+            storageDriver:    ko.observable(),
             storageDrivers:   ko.observableArray([]),
             mountpoints:      ko.observableArray([]),
             readcaches:       ko.observableArray([]),
             writecaches:      ko.observableArray([]),
             ipAddresses:      ko.observableArray([]),
+            vPool:            ko.observable(),
             vPools:           ko.observableArray([]),
             albaBackends:     ko.observableArray(),
+            extendVpool:      ko.observable(false),
             integratemgmt:    ko.observable(),
             hasMgmtCenter:    ko.observable(false),
             mgmtcenterUser:   ko.observable(),
@@ -96,7 +100,7 @@ define([
             }
         };
         wizardData.readCacheDistributor.isObservableArray = true;
-        wizardData.readCacheDistributor.identifier = 'mtpt-readcaches'
+        wizardData.readCacheDistributor.identifier = 'mtpt-readcaches';
 
         wizardData.allWriteMountpoints = ko.computed(function() {
             var returnValue = [];
@@ -123,7 +127,7 @@ define([
             }
         };
         wizardData.writeCacheDistributor.isObservableArray = true;
-        wizardData.writeCacheDistributor.identifier = 'mtpt-writecaches'
+        wizardData.writeCacheDistributor.identifier = 'mtpt-writecaches';
 
         wizardData.accesskey.subscribe(resetAlbaBackends);
         wizardData.secretkey.subscribe(resetAlbaBackends);

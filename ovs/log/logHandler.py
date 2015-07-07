@@ -16,8 +16,8 @@
 Contains the loghandler module
 """
 
+import inspect
 import logging
-import logging.handlers
 import os
 from ovs.extensions.generic.configuration import Configuration
 
@@ -36,15 +36,19 @@ def _ignore_formatting_errors():
             """
             try:
                 msg = str(msg)
-                _ = msg % args
                 return f(self, msg, *args, **kwargs)
             except TypeError as exception:
-                if 'not all arguments converted during string formatting' in str(exception):
-                    return f(self, 'String format error, original message: {0}'.format(msg))
-                elif 'not enough arguments for format string' in str(exception):
-                    return f(self, 'String format error, original message: {0}'.format(msg))
-                else:
-                    raise
+                too_many = 'not all arguments converted during string formatting' in str(exception)
+                not_enough = 'not enough arguments for format string' in str(exception)
+                if too_many or not_enough:
+                    msg = msg.replace('%', '%%')
+                    msg = msg % args
+                    msg = msg.replace('%%', '%')
+                    return f(self, msg, *[], **kwargs)
+                raise
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
         return new_function
     return wrap
 
@@ -54,18 +58,24 @@ class LogHandler(object):
     Log handler
     """
 
+    cache = {}
     targets = {'lib': 'lib',
                'api': 'api',
                'extensions': 'extensions',
                'dal': 'dal',
                'celery': 'celery',
                'arakoon': 'arakoon',
-               'support': 'support'}
+               'support': 'support',
+               'log': 'audit_trails'}
 
     def __init__(self, source, name=None):
         """
         Initializes the logger
         """
+        parent_invoker = inspect.stack()[1]
+        if not __file__.startswith(parent_invoker[1]) or parent_invoker[3] != 'get':
+            raise RuntimeError('Cannot invoke instance from outside this class. Please use LogHandler.get(source, name=None) instead')
+
         if name is None:
             name = Configuration.get('ovs.logging.default_name')
 
@@ -78,7 +88,7 @@ class LogHandler(object):
             open(log_filename, 'a').close()
             os.chmod(log_filename, 0o666)
 
-        formatter = logging.Formatter('%(asctime)s - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
+        formatter = logging.Formatter('%(asctime)s - [%(process)s] - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
         handler = logging.FileHandler(log_filename)
         handler.setFormatter(formatter)
 
@@ -86,6 +96,14 @@ class LogHandler(object):
         self.logger.propagate = True
         self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
+
+    @staticmethod
+    def get(source, name=None):
+        key = '{0}_{1}'.format(source, name)
+        if key not in LogHandler.cache:
+            logger = LogHandler(source, name)
+            LogHandler.cache[key] = logger
+        return LogHandler.cache[key]
 
     @_ignore_formatting_errors()
     def info(self, msg, *args, **kwargs):

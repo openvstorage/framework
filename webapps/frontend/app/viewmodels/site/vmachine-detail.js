@@ -195,7 +195,7 @@ define([
             self.refresher.start();
             self.load()
                 .then(function() {
-                    self.refreshVDisks(1);
+                    self.loadVDisks(1);
                 });
             self.shared.footerData(self.vMachine);
         };

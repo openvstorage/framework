@@ -32,7 +32,7 @@ from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 
-logger = LogHandler('api', name='metadata')
+logger = LogHandler.get('api', name='metadata')
 
 
 class MetadataView(View):

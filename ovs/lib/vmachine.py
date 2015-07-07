@@ -35,7 +35,7 @@ from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-logger = LogHandler('lib', name='vmachine')
+logger = LogHandler.get('lib', name='vmachine')
 
 
 class VMachineController(object):
@@ -504,7 +504,6 @@ class VMachineController(object):
             logger.info('Error: {0}'.format(message))
             raise RuntimeError(message)
 
-
         VMachineController.update_vmachine_config(vmachine, vm_object)
 
     @staticmethod
@@ -534,7 +533,7 @@ class VMachineController(object):
             pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
             mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
-                mutex.acquire(wait=5)
+                mutex.acquire(wait=120)
                 limit = 5
                 exists = hypervisor.file_exists(storagedriver, name)
                 while limit > 0 and exists is False:

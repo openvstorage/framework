@@ -175,7 +175,17 @@ class VDisk(DataObject):
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
-            for key in StorageDriverClient.stat_counters:
+            pc = vdiskstats.performance_counters
+            vdiskstatsdict['backend_data_read'] = pc.backend_read_request_size.sum()
+            vdiskstatsdict['backend_data_written'] = pc.backend_write_request_size.sum()
+            vdiskstatsdict['backend_read_operations'] = pc.backend_read_request_size.events()
+            vdiskstatsdict['backend_write_operations'] = pc.backend_write_request_size.events()
+            vdiskstatsdict['data_read'] = pc.read_request_size.sum()
+            vdiskstatsdict['data_written'] = pc.write_request_size.sum()
+            vdiskstatsdict['read_operations'] = pc.read_request_size.events()
+            vdiskstatsdict['write_operations'] = pc.write_request_size.events()
+            for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
             # Precalculate sums
             for key, items in StorageDriverClient.stat_sums.iteritems():

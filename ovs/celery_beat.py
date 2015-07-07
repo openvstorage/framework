@@ -30,7 +30,7 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('celery', name='celery beat')
+logger = LogHandler.get('celery', name='celery beat')
 
 
 class DistributedScheduler(Scheduler):

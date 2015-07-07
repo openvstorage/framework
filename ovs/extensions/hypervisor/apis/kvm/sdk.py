@@ -27,7 +27,7 @@ from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='kvm sdk')
+logger = LogHandler.get('extensions', name='kvm sdk')
 ROOT_PATH = '/etc/libvirt/qemu/'  # Get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = '/var/run/libvirt/qemu/'  # Get live info from here
 
@@ -370,6 +370,11 @@ class Sdk(object):
             if os.path.exists(found_file) and os.path.isfile(found_file):
                 matches.append(found_file)
         return matches if matches else None
+
+    def is_datastore_available(self, mountpoint):
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host, username='root')
+        return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
 
     @authenticated
     def clone_vm(self, vmid, name, disks):

@@ -19,16 +19,6 @@ OVS migration module
 import hashlib
 import random
 import string
-from ovs.dal.hybrids.user import User
-from ovs.dal.hybrids.group import Group
-from ovs.dal.hybrids.role import Role
-from ovs.dal.hybrids.client import Client
-from ovs.dal.hybrids.j_rolegroup import RoleGroup
-from ovs.dal.hybrids.j_roleclient import RoleClient
-from ovs.dal.hybrids.backendtype import BackendType
-from ovs.dal.hybrids.servicetype import ServiceType
-from ovs.dal.hybrids.branding import Branding
-from ovs.dal.lists.backendtypelist import BackendTypeList
 
 
 class OVSMigrator(object):
@@ -55,8 +45,20 @@ class OVSMigrator(object):
 
         working_version = previous_version
 
-        # Version 0.0.1 introduced:
+        # Version 1 introduced:
+        # - The datastore is still empty, add defaults
         if working_version < 1:
+            from ovs.dal.hybrids.user import User
+            from ovs.dal.hybrids.group import Group
+            from ovs.dal.hybrids.role import Role
+            from ovs.dal.hybrids.client import Client
+            from ovs.dal.hybrids.j_rolegroup import RoleGroup
+            from ovs.dal.hybrids.j_roleclient import RoleClient
+            from ovs.dal.hybrids.backendtype import BackendType
+            from ovs.dal.hybrids.servicetype import ServiceType
+            from ovs.dal.hybrids.branding import Branding
+            from ovs.dal.lists.backendtypelist import BackendTypeList
+
             # Create groups
             admin_group = Group()
             admin_group.name = 'administrators'
@@ -160,13 +162,44 @@ class OVSMigrator(object):
             slate.is_default = False
             slate.save()
 
-            # We're now at version 0.0.1
+            # We're now at version 1
             working_version = 1
 
-        # Version 0.0.2 introduced:
+        # Version 2 introduced:
+        # - new Descriptor format
         if working_version < 2:
+            import imp
+            from ovs.dal.helpers import Descriptor
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+
+            client = PersistentFactory.get_client()
+            keys = client.prefix('ovs_data', max_elements=-1)
+            for key in keys:
+                data = client.get(key)
+                modified = False
+                for entry in data.keys():
+                    if isinstance(data[entry], dict) and 'source' in data[entry] and 'hybrids' in data[entry]['source']:
+                        filename = data[entry]['source']
+                        if not filename.startswith('/'):
+                            filename = '/opt/OpenvStorage/ovs/dal/{0}'.format(filename)
+                        module = imp.load_source(data[entry]['name'], filename)
+                        cls = getattr(module, data[entry]['type'])
+                        new_data = Descriptor(cls).descriptor
+                        if 'guid' in data[entry]:
+                            new_data['guid'] = data[entry]['guid']
+                        data[entry] = new_data
+                        modified = True
+                if modified is True:
+                    data['_version'] += 1
+                    client.set(key, data)
+
+            # We're now at version 2
+            working_version = 2
+
+        # Version 3 introduced:
+        if working_version < 3:
             # Execute some code that upgrades to version 2
-            # working_version = 2
+            # working_version = 3
             pass
 
         return working_version

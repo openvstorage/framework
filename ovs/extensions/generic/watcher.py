@@ -20,8 +20,7 @@ import os
 import logging
 from ovs.log.logHandler import LogHandler
 
-logging.basicConfig()
-logger = LogHandler('extensions', name='watcher')
+logger = LogHandler.get('extensions', name='watcher')
 
 
 def _log(log_target, entry, level):
@@ -44,14 +43,18 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
-                    from ovs.extensions.storage.volatilefactory import VolatileFactory
-                    VolatileFactory.store = None
-                    volatile = VolatileFactory.get_client()
-                    volatile.set(key, value)
-                    if volatile.get(key) == value:
+                    try:
+                        logging.disable(logging.WARNING)
+                        from ovs.extensions.storage.volatilefactory import VolatileFactory
+                        VolatileFactory.store = None
+                        volatile = VolatileFactory.get_client()
+                        volatile.set(key, value)
+                        if volatile.get(key) == value:
+                            volatile.delete(key)
+                            break
                         volatile.delete(key)
-                        break
-                    volatile.delete(key)
+                    finally:
+                        logging.disable(logging.NOTSET)
                 except Exception as message:
                     _log(target, '  Error during volatile store test: {0}'.format(message), 2)
                 key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
@@ -68,14 +71,18 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
-                    from ovs.extensions.storage.persistentfactory import PersistentFactory
-                    PersistentFactory.store = None
-                    persistent = PersistentFactory.get_client()
-                    persistent.set(key, value)
-                    if persistent.get(key) == value:
+                    try:
+                        logging.disable(logging.WARNING)
+                        from ovs.extensions.storage.persistentfactory import PersistentFactory
+                        PersistentFactory.store = None
+                        persistent = PersistentFactory.get_client()
+                        persistent.set(key, value)
+                        if persistent.get(key) == value:
+                            persistent.delete(key)
+                            break
                         persistent.delete(key)
-                        break
-                    persistent.delete(key)
+                    finally:
+                        logging.disable(logging.NOTSET)
                 except Exception as message:
                     _log(target, '  Error during persistent store test: {0}'.format(message), 2)
                 key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key

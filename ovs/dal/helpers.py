@@ -16,11 +16,9 @@
 Module containing certain helper classes providing various logic
 """
 
-import re
 import os
 import imp
 import copy
-import logging
 import inspect
 import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -49,18 +47,19 @@ class Descriptor(object):
         else:
             self.initialized = True
 
-            key = 'ovs_descriptor_{0}'.format(re.sub('[\W_]+', '', str(object_type)))
+            filename = os.path.abspath(inspect.getsourcefile(object_type))
+            typename = object_type.__name__
+            identifier = hashlib.sha1(filename).hexdigest()
+            key = 'ovs_descriptor_{0}_{1}'.format(typename, identifier)
             self._volatile = VolatileFactory.get_client()
             self._descriptor = self._volatile.get(key)
             if self._descriptor is None:
                 Toolbox.log_cache_hit('descriptor', False)
-                filename = inspect.getfile(object_type).replace('.pyc', '.py')
                 name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
-                source = os.path.relpath(filename, os.path.dirname(__file__))
                 self._descriptor = {'name': name,
-                                    'source': source,
-                                    'type': object_type.__name__,
-                                    'identifier': name + '_' + hashlib.sha256(name + source + object_type.__name__).hexdigest()}
+                                    'source': filename,
+                                    'type': typename,
+                                    'identifier': '{0}_{1}'.format(typename, identifier)}
                 self._volatile.set(key, self._descriptor)
             else:
                 Toolbox.log_cache_hit('descriptor', True)
@@ -92,8 +91,7 @@ class Descriptor(object):
             raise RuntimeError('Descriptor not yet initialized')
 
         if self._descriptor['identifier'] not in Descriptor.object_cache:
-            filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
-            module = imp.load_source(self._descriptor['name'], filename)
+            module = imp.load_source(self._descriptor['name'], self._descriptor['source'])
             cls = getattr(module, self._descriptor['type'])
             Descriptor.object_cache[self._descriptor['identifier']] = cls
         else:
@@ -105,11 +103,27 @@ class Descriptor(object):
         else:
             return cls
 
+    @staticmethod
+    def isinstance(instance, object_type):
+        """"
+        Checks (based on descriptors) whether a given instance is of a given type
+        """
+        try:
+            return Descriptor(instance.__class__) == Descriptor(object_type)
+        except TypeError:
+            return isinstance(instance, object_type)
+
     def __eq__(self, other):
         """
         Checks the descriptor identifiers
         """
         return self._descriptor['identifier'] == other.descriptor['identifier']
+
+    def __ne__(self, other):
+        """
+        Checks the descriptor identifiers
+        """
+        return not self.__eq__(other)
 
 
 class HybridRunner(object):
@@ -269,9 +283,6 @@ class Migration(object):
         a always increasing by one
         """
 
-        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
-        logging.disable('WARNING')
-
         def execute(function, start, end):
             """
             Executes a single migration, syncing versions
@@ -305,5 +316,3 @@ class Migration(object):
             data[identifier] = new_version
 
         persistent.set(key, data)
-
-        logging.disable(loglevel)  # Restore workaround

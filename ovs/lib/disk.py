@@ -18,6 +18,7 @@ DiskController module
 import re
 import os
 import time
+from subprocess import CalledProcessError
 from pyudev import Context
 from celery.schedules import crontab
 from ovs.celery_run import celery
@@ -26,11 +27,11 @@ from ovs.dal.hybrids.diskpartition import DiskPartition
 from ovs.dal.hybrids.disk import Disk
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.storagerouterlist import StorageRouterList
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.remote import Remote
 from ovs.lib.helpers.decorators import ensure_single
 
-logger = LogHandler('lib', name='disk')
+logger = LogHandler.get('lib', name='disk')
 
 
 class DiskController(object):
@@ -51,7 +52,11 @@ class DiskController(object):
         else:
             storagerouters = StorageRouterList.get_storagerouters()
         for storagerouter in storagerouters:
-            client = SSHClient(storagerouter.ip, username='root')
+            try:
+                client = SSHClient(storagerouter, username='root')
+            except UnableToConnectException:
+                logger.info('Could not connect to StorageRouter {0}, skipping'.format(storagerouter.ip))
+                continue
             configuration = {}
             # Gather mount data
             mount_mapping = {}
@@ -105,7 +110,7 @@ class DiskController(object):
                             del mount_mapping[partition_name]
                             try:
                                 client.run('touch {0}/{1}; rm {0}/{1}'.format(mountpoint, str(time.time())))
-                            except:
+                            except CalledProcessError:
                                 partition_data['state'] = 'ERROR'
                                 pass
                         if 'ID_FS_TYPE' in device:

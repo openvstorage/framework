@@ -29,7 +29,7 @@ from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 class OAuth2TokenView(View):

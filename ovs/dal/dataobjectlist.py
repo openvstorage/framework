@@ -16,6 +16,7 @@
 DataObjectList module
 """
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.helpers import Descriptor
 
 
 class DataObjectList(object):
@@ -49,7 +50,7 @@ class DataObjectList(object):
             dataobjectlist._guids = self._guids  # Keep sorting
             return dataobjectlist
 
-    def merge(self, query_result):
+    def update(self, query_result):
         """
         This method merges in a new query result, preservice objects that might already
         be cached. It also maintains previous sorting, appending new items to the end of the list
@@ -69,7 +70,7 @@ class DataObjectList(object):
             if guid not in self._guids:
                 del self._objects[guid]
         if not self._reduced:
-            self.reduced.merge(query_result)
+            self.reduced.update(query_result)
 
     def _get_object(self, requested_guid):
         """
@@ -159,20 +160,32 @@ class DataObjectList(object):
     def __add__(self, other):
         if not isinstance(other, DataObjectList):
             raise TypeError('Both operands should be of type DataObjectList')
+        if Descriptor(self.type) != Descriptor(other.type):
+            raise TypeError('Both operands should contain the same data')
         new_dol = DataObjectList(self._query_result, self.type)
-        new_dol.merge(other._query_result)
+        guids = self._guids[:]
+        for guid in other._guids:
+            if guid not in guids:
+                guids.append(guid)
+        new_dol._guids = guids
         return new_dol
 
     def __radd__(self, other):
         # This will typically called when "other" is no DataObjectList.
         if other is None:
             return self
-        elif isinstance(other, list) and other == []:
+        if isinstance(other, list) and other == []:
             return self
-        elif not isinstance(other, DataObjectList):
+        if not isinstance(other, DataObjectList):
             raise TypeError('Both operands should be of type DataObjectList')
+        if Descriptor(self.type) != Descriptor(other.type):
+            raise TypeError('Both operands should contain the same data')
         new_dol = DataObjectList(self._query_result, self.type)
-        new_dol.merge(other._query_result)
+        guids = self._guids[:]
+        for guid in other._guids:
+            if guid not in guids:
+                guids.append(guid)
+        new_dol._guids = guids
         return new_dol
 
     def iterloaded(self):

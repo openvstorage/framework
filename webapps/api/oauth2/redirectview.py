@@ -32,7 +32,7 @@ from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
 from oauth2.toolbox import Toolbox
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 class OAuth2RedirectView(View):

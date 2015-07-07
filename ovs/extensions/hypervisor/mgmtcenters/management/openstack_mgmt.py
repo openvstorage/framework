@@ -16,12 +16,13 @@
 This module contains OpenStack Cinder commands
 """
 import os
-import time, datetime
+import time
+import datetime
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.log.logHandler import LogHandler
 
 
-logger = LogHandler('lib', name='openstack_mgmt')
+logger = LogHandler.get('extensions', name='openstack_mgmt')
 
 CINDER_CONF = '/etc/cinder/cinder.conf'
 CINDER_OPENSTACK_SERVICE = '/etc/init/cinder-volume.conf'
@@ -51,7 +52,7 @@ class OpenStackManagement(object):
 
     @property
     def is_openstack(self):
-        return self._is_openstack()
+        return OpenStackManagement._is_openstack()
 
     @property
     def is_cinder_running(self):
@@ -81,7 +82,8 @@ class OpenStackManagement(object):
             self._unpatch_etc_init_cindervolume_conf()
             self._restart_processes()
 
-    def _get_version(self):
+    @staticmethod
+    def _get_version():
         """
         Get openstack cinder version
         """
@@ -101,7 +103,8 @@ class OpenStackManagement(object):
         except Exception as ex:
             raise ValueError('Cannot determine cinder version: %s' % str(ex))
 
-    def _get_existing_driver_version(self):
+    @staticmethod
+    def _get_existing_driver_version():
         """
         Get VERSION string from existing driver
         """
@@ -114,7 +117,8 @@ class OpenStackManagement(object):
                 return getattr(openvstorage.OVSVolumeDriver, 'VERSION', '0.0.0')
         return '0.0.0'
 
-    def _get_remote_driver_version(self, location):
+    @staticmethod
+    def _get_remote_driver_version(location):
         """
         Get VERSION string from downloaded driver
         """
@@ -128,18 +132,20 @@ class OpenStackManagement(object):
         """
         WGET driver, compare versions, allow local code to be updated from OVS repo until driver is patched upstream
         """
-        version = self._get_version()
+        version = OpenStackManagement._get_version()
         remote_driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
         temp_location = "/tmp/openvstorage.py"
         self.client.run('wget {0} -P /tmp'.format(remote_driver))
 
-        existing_version = self._get_existing_driver_version()
-        remote_version = self._get_remote_driver_version(temp_location)
+        existing_version = OpenStackManagement._get_existing_driver_version()
+        remote_version = OpenStackManagement._get_remote_driver_version(temp_location)
         if self.is_devstack:
-            cinder_base_path = self._get_base_path('cinder')
+            cinder_base_path = OpenStackManagement._get_base_path('cinder')
             local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
         elif self.is_openstack:
             local_driver = '/usr/lib/python2.7/dist-packages/cinder/volume/drivers/openvstorage.py'
+        else:
+            raise ValueError('OpenStack or DevStack only')
         if remote_version > existing_version:
             logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
             if self.is_devstack:
@@ -156,7 +162,8 @@ class OpenStackManagement(object):
         except SystemExit:  # ssh client raises system exit 1
             return False
 
-    def _is_openstack(self):
+    @staticmethod
+    def _is_openstack():
         return os.path.exists(CINDER_OPENSTACK_SERVICE)
 
     def _is_cinder_running(self):
@@ -210,7 +217,7 @@ class OpenStackManagement(object):
         if not self.client.file_exists(CINDER_CONF):
             return False
 
-        version = self._get_version()
+        version = OpenStackManagement._get_version()
         if version == 'juno':
             messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
         elif version in ['kilo']:
@@ -348,7 +355,8 @@ if vpool_name in enabled_backends:
         else:
             self._restart_openstack_services()
 
-    def _get_devstack_log_name(self, service, logdir='/opt/stack/logs'):
+    @staticmethod
+    def _get_devstack_log_name(service, logdir='/opt/stack/logs'):
         """
         Construct a log name in format /opt/stack/logs/h-api-cw.log.2015-04-01-123300
         """
@@ -364,7 +372,7 @@ if vpool_name in enabled_backends:
         return process_screen_exists
 
     def _start_screen_process(self, process_name, commands, screen_name='stack', logdir='/opt/stack/logs'):
-        logfile = self._get_devstack_log_name(process_name)
+        logfile = OpenStackManagement._get_devstack_log_name(process_name)
         logger.debug(self.client.run('''su stack -c 'touch {0}' '''.format(logfile)))
         logger.debug(self.client.run('''su stack -c 'screen -S {0} -X screen -t {1}' '''.format(screen_name, process_name)))
         logger.debug(self.client.run('''su stack -c 'screen -S {0} -p {1} -X logfile {2}' '''.format(screen_name, process_name, logfile)))
@@ -432,7 +440,7 @@ if vpool_name in enabled_backends:
         if self.is_openstack and os.path.exists(CINDER_OPENSTACK_SERVICE):
             with open(CINDER_OPENSTACK_SERVICE, 'r') as cinder_file:
                 contents = cinder_file.read()
-            if not EXPORT in contents:
+            if EXPORT not in contents:
                 return True
             contents = contents.replace(EXPORT_, '')
             logger.debug('fixed contents of cinder-volume service conf... %s' % (EXPORT_ in contents))
@@ -464,10 +472,10 @@ if vpool_name in enabled_backends:
             volume_type.set_keys(metadata={'volume_backend_name': volume_type_name})
 
     def _apply_patches(self):
-        nova_base_path = self._get_base_path('nova')
-        cinder_base_path = self._get_base_path('cinder')
+        nova_base_path = OpenStackManagement._get_base_path('nova')
+        cinder_base_path = OpenStackManagement._get_base_path('cinder')
 
-        version = self._get_version()
+        version = OpenStackManagement._get_version()
         # fix "blockdev" issue
         if self.is_devstack:
             nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
@@ -477,6 +485,8 @@ if vpool_name in enabled_backends:
             nova_volume_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/volume.py'
             nova_driver_file = '/usr/lib/python2.7/dist-packages/nova/virt/libvirt/driver.py'
             cinder_brick_initiator_file = '/usr/lib/python2.7/dist-packages/cinder/brick/initiator/connector.py'
+        else:
+            raise ValueError('OpenStack or DevStack only')
 
         self.client.run("""python -c "
 import os
@@ -551,7 +561,8 @@ if not patched:
                     except Exception:
                         pass
 
-    def _get_base_path(self, component):
+    @staticmethod
+    def _get_base_path(component):
         exec('import %s' % component, locals())
         module = locals().get(component)
         return os.path.dirname(os.path.abspath(module.__file__))

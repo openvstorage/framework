@@ -16,14 +16,12 @@
 Contains various decorators
 """
 
-import time
+import json
 from celery.task.control import inspect
-from ovs.dal.hybrids.log import Log
 from ovs.dal.lists.storagedriverlist import StorageDriverList
-from ovs.dal.exceptions import ObjectNotFoundException
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='scheduled tasks')
+logger = LogHandler.get('lib', name='scheduled tasks')
 
 
 def log(event_type):
@@ -41,21 +39,18 @@ def log(event_type):
             Wrapped function
             """
             # Log the call
-            log_entry = Log()
-            log_entry.source = event_type
-            log_entry.module = f.__module__
-            log_entry.method = f.__name__
-            log_entry.method_args = list(args)
-            log_entry.method_kwargs = kwargs
-            log_entry.time = time.time()
             if event_type == 'VOLUMEDRIVER_TASK':
-                try:
-                    log_entry.storagedriver = StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id'])
-                    log_entry.save()
-                except ObjectNotFoundException:
-                    pass
+                metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(kwargs['storagedriver_id']).guid}
             else:
-                log_entry.save()
+                metadata = {}
+            _logger = LogHandler.get('log', name=event_type.lower())
+            _logger.info('[{0}.{1}] - {2} - {3} - {4}'.format(
+                f.__module__,
+                f.__name__,
+                json.dumps(list(args)),
+                json.dumps(kwargs),
+                json.dumps(metadata)
+            ))
 
             # Call the function
             return f(*args, **kwargs)
@@ -93,6 +88,7 @@ def ensure_single(tasknames):
             task_id = self.request.id
 
             reason = ''
+
             def can_run():
                 global reason
                 """

@@ -21,7 +21,7 @@ from ovs.extensions.packages.debian import DebianPackage
 # from ovs.extensions.packages.redhat import RPM
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='packagemanager')
+logger = LogHandler.get('extensions', name='packagemanager')
 
 
 class PackageManager(object):

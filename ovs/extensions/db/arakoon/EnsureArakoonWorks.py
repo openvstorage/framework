@@ -21,7 +21,7 @@ import shutil
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('arakoon', name='validator')
+logger = LogHandler.get('arakoon', name='validator')
 
 
 class EnsureArakoonError(Exception):
@@ -33,7 +33,7 @@ class EnsureArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class EnsureArakoonWorks():
+class EnsureArakoonWorks(object):
     """
     Wait for the following operation to be possible:
     1) Set a value

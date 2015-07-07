@@ -25,9 +25,8 @@ from django.core.handlers.wsgi import WSGIRequest
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.log.logHandler import LogHandler
-from ovs.dal.hybrids.log import Log
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 def _find_request(args):
@@ -138,18 +137,18 @@ def log():
             Wrapped function
             """
             # Log the call
-            log_entry = Log()
-            log_entry.source = 'API'
-            log_entry.module = f.__module__
-            log_entry.method = f.__name__
-            log_entry.method_args = list(args)
-            log_entry.method_kwargs = kwargs
-            log_entry.time = time.time()
-            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
-            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
-                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
-                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
-            log_entry.save()
+            metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                        'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                        'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            _logger = LogHandler.get('log', name='api')
+            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+                f.__module__,
+                f.__name__,
+                getattr(request, 'client').user_guid if hasattr(request, 'client') else None,
+                json.dumps(list(args)),
+                json.dumps(kwargs),
+                json.dumps(metadata)
+            ))
 
             # Call the function
             return f(self, request, *args, **kwargs)

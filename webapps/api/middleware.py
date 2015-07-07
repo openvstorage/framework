@@ -21,7 +21,7 @@ from django.http import HttpResponse
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('api', 'middleware')
+logger = LogHandler.get('api', 'middleware')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
 

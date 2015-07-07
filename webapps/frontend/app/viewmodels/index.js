@@ -16,7 +16,7 @@ define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
     'ovs/shared', 'ovs/generic',
     'jqp/timeago'
-], function(router, dialog, $, shared, generic, _) {
+], function(router, dialog, $, shared, generic) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];

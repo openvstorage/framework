@@ -25,7 +25,7 @@ from ovs.log.logHandler import LogHandler
 
 manager = ArakoonManagementEx()
 ensurearakoonworks = EnsureArakoonWorks()
-logger = LogHandler('arakoon', name='tlogchcker')
+logger = LogHandler.get('arakoon', name='tlogchcker')
 
 
 class CheckArakoonError(Exception):
@@ -37,7 +37,7 @@ class CheckArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class CheckArakoonTlogMark():
+class CheckArakoonTlogMark(object):
     """
     check if tlogs need marking
     mark tlogs that are unmarked

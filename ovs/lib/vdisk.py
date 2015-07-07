@@ -37,11 +37,10 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
-logger = LogHandler('lib', name='vdisk')
+logger = LogHandler.get('lib', name='vdisk')
 
 
 class VDiskController(object):

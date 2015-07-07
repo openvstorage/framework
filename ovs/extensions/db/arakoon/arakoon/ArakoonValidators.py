@@ -20,7 +20,6 @@ limitations under the License.
 from ArakoonExceptions import ArakoonInvalidArguments
 
 import ArakoonProtocol
-import logging
 from functools import wraps
 
 class SignatureValidator :
