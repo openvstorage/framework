@@ -39,8 +39,6 @@ define([
         self.upgradeOngoing       = ko.observable(false);  // Whether any upgrade is ongoing (framework or volumedriver)
         self.frameworkUpdate      = ko.observable(false);  // Whether a framework update is available
         self.volumedriverUpdate   = ko.observable(false);  // Whether a volumedriver update is available
-        self.frameworkUpdating    = ko.observable(false);  // Whether the framework is being updated
-        self.volumedriverUpdating = ko.observable(false);  // Whether the volumedriver is being updated
 
         // Computed
         self.updates = ko.computed(function() {
@@ -123,14 +121,10 @@ define([
             }).promise();
         };
         self.updateFramework = function() {
-            if (self.frameworkUpdating() === true) {  // Cleared by refreshing page, kept in memory only
+            if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
                 return;
             }
-            else if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
-                return;
-            }
-            self.frameworkUpdating(true);
-
+            self.upgradeOngoing(true);
             return $.Deferred(function(deferred) {
                 var downtimes = [];
                 var prerequisites = [];
@@ -162,15 +156,10 @@ define([
                             generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (storageRouter.nodeType() == 'MASTER') {
-                                    self.upgradeOngoing(true);
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
-                                        .then(function(taskID) {
-                                            self.frameworkUpdating(false);
-                                            return self.shared.tasks.wait(taskID);
-                                        })
+                                        .then(self.shared.tasks.wait)
                                         .done(function() {
                                             deferred.resolve();
-                                            self.frameworkUpdating(false);
                                         })
                                         .fail(function(error) {
                                             generic.alertError(
@@ -178,7 +167,6 @@ define([
                                                 $.t('ovs:updates.failed', { why: error })
                                             );
                                             deferred.reject();
-                                            self.frameworkUpdating(false);
                                             self.upgradeOngoing(false);
                                         });
                                     return false;  // break out of $.each loop
@@ -186,21 +174,17 @@ define([
                             });
                         } else {
                             deferred.reject();
-                            self.frameworkUpdating(false);
+                            self.upgradeOngoing(false);
                         }
                     })
             }).promise();
         };
 
         self.updateVolumedriver = function() {
-            if (self.volumedriverUpdating() === true) {  // Cleared by refreshing page, kept in memory only
+            if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
                 return;
             }
-            else if (self.upgradeOngoing() === true) {  // Checked by presence of file /etc/upgrade_ongoing on any of the storagerouters
-                return;
-            }
-            self.volumedriverUpdating(true);
-
+            self.upgradeOngoing(true);
             return $.Deferred(function(deferred) {
                 var downtimes = [];
                 var prerequisites = [];
@@ -232,15 +216,10 @@ define([
                             generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (storageRouter.nodeType() == 'MASTER') {
-                                    self.upgradeOngoing(true);
                                     api.post('storagerouters/' + storageRouter.guid() + '/update_volumedriver')
-                                        .then(function(taskID) {
-                                            self.volumedriverUpdating(false);
-                                            return self.shared.tasks.wait(taskID);
-                                        })
+                                        .then(self.shared.tasks.wait)
                                         .done(function() {
                                             deferred.resolve();
-                                            self.volumedriverUpdating(false);
                                         })
                                         .fail(function(error) {
                                             generic.alertError(
@@ -248,7 +227,6 @@ define([
                                                 $.t('ovs:updates.failed', { why: error })
                                             );
                                             deferred.reject();
-                                            self.volumedriverUpdating(false);
                                             self.upgradeOngoing(false);
                                         });
                                     return false;  // break out of $.each loop
@@ -256,7 +234,7 @@ define([
                             });
                         } else {
                             deferred.reject();
-                            self.volumedriverUpdating(false);
+                            self.upgradeOngoing(false);
                         }
                     })
             }).promise();

@@ -618,6 +618,7 @@ class SetupController(object):
         # 2. Update packages
         failed_clients = []
         for client in ssh_clients:
+            PackageManager.update(client=client)
             try:
                 for package_name in packages_to_update:
                     SetupController._log_message('Installing {0}'.format(package_name), client.ip)

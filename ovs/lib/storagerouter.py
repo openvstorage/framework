@@ -1276,7 +1276,7 @@ class StorageRouterController(object):
         """
         Launch the update_volumedriver method in setup.py
         """
-        root_client = SSHClient(ip=storagerouter_ip,
+        root_client = SSHClient(storagerouter_ip,
                                 username='root')
         root_client.run('ovs update volumedriver')
 
