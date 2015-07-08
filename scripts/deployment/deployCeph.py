@@ -140,7 +140,7 @@ FastCgiExternalServer /var/www/s3gw.fcgi -socket /tmp/radosgw.sock
 
 <VirtualHost *:80>
         ServerName rados
-        ServerAdmin engineering@cloudfounders.com
+        ServerAdmin engineering@openvstorage.com
         DocumentRoot /var/www
         RewriteEngine On
         RewriteRule ^/([a-zA-Z0-9-_.]*)([/]?.*) /s3gw.fcgi?page=$1&params=$2&%{QUERY_STRING} [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L]

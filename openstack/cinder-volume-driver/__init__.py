@@ -24,7 +24,4 @@ Tested on devstack
 0.13.1.6
 
 Copy the ovs_volume_driver.py to /opt/stack/cinder/cinder/volume/drivers/ovs_volume_driver.py
-
-See also:
-http://confluence.cloudfounders.com/display/RES/Installation+of+Cinder+plugin+on+DevStack
 """
