@@ -184,7 +184,7 @@ class OVSMigrator(object):
                             filename = '/opt/OpenvStorage/ovs/dal/{0}'.format(filename)
                         module = imp.load_source(data[entry]['name'], filename)
                         cls = getattr(module, data[entry]['type'])
-                        new_data = Descriptor(cls).descriptor
+                        new_data = Descriptor(cls, cached=False).descriptor
                         if 'guid' in data[entry]:
                             new_data['guid'] = data[entry]['guid']
                         data[entry] = new_data

@@ -33,7 +33,7 @@ class Descriptor(object):
 
     object_cache = {}
 
-    def __init__(self, object_type=None, guid=None):
+    def __init__(self, object_type=None, guid=None, cached=True):
         """
         Initializes a descriptor for a given type. Optionally already providing a guid for the
         instanciator
@@ -53,7 +53,7 @@ class Descriptor(object):
             key = 'ovs_descriptor_{0}_{1}'.format(typename, identifier)
             self._volatile = VolatileFactory.get_client()
             self._descriptor = self._volatile.get(key)
-            if self._descriptor is None:
+            if self._descriptor is None or cached is False:
                 Toolbox.log_cache_hit('descriptor', False)
                 name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
                 self._descriptor = {'name': name,
