@@ -24,7 +24,9 @@ define([
         // Variables
         self.shared               = shared;
         self.guard                = { authenticated: true };
+        self.counter              = 0;
         self.widgets              = [];
+        self.fileSystemChecked    = false;  // Whether the filesystem has been checked for presence of upgrade lock
         self.storageRouterHeaders = [
             { key: 'name',         value: $.t('ovs:updates.name'),               width: 300 },
             { key: 'framework',    value: $.t('ovs:updates.framework.title'),    width: undefined },
@@ -35,10 +37,10 @@ define([
         self.storageRoutersHandle = {};
 
         // Observables
-        self.storageRouters       = ko.observableArray([]);
-        self.upgradeOngoing       = ko.observable(false);  // Whether any upgrade is ongoing (framework or volumedriver)
-        self.frameworkUpdate      = ko.observable(false);  // Whether a framework update is available
-        self.volumedriverUpdate   = ko.observable(false);  // Whether a volumedriver update is available
+        self.storageRouters     = ko.observableArray([]);
+        self.upgradeOngoing     = ko.observable(false);  // Whether any upgrade is ongoing (framework or volumedriver)
+        self.frameworkUpdate    = ko.observable(false);  // Whether a framework update is available
+        self.volumedriverUpdate = ko.observable(false);  // Whether a volumedriver update is available
 
         // Computed
         self.updates = ko.computed(function() {
@@ -89,7 +91,19 @@ define([
                             });
                         });
                     }
-                    self.upgradeOngoing(item.upgrade_ongoing);
+                    if (item.upgrade_ongoing === true) {
+                        self.upgradeOngoing(item.upgrade_ongoing);
+                        self.counter = 0;
+                        self.fileSystemChecked = true;
+                    } else {
+                        if (self.fileSystemChecked === true || self.counter === 4) {
+                            self.upgradeOngoing(item.upgrade_ongoing);
+                            self.counter = 0;
+                        } else {
+                            self.counter += 1;
+                        }
+                        self.fileSystemChecked = false;
+                    }
                 }
             });
             self.frameworkUpdate(any_framework_update);
