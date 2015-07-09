@@ -106,7 +106,7 @@ define([
                     })
                     .fail(deferred.reject);
             }).promise();
-        }
+        };
         self.getDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDisks)) {
@@ -136,7 +136,7 @@ define([
                                 }
                             });
                             self.disks.sort(function(a, b) {
-                                return a.name() > b.name();
+                                return a.name() < b.name() ? -1 : (a.name() > b.name() ? 1 : 0);
                             });
                             self.disksLoaded(true);
                             deferred.resolve();
