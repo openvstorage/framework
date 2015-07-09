@@ -44,6 +44,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 
 logger = LogHandler.get('lib', name='setup')
 logger.logger.propagate = False
@@ -480,13 +481,20 @@ class SetupController(object):
         # 3. Update packages
         failed_clients = []
         for client in ssh_clients:
+            mutex = VolatileMutex('package_update')
+            mutex.acquire(10)
+            PackageManager.update(client=client)
+            mutex.release()
             try:
                 SetupController._log_message('Installing latest packages', client.ip)
                 for package in packages_to_update:
                     SetupController._log_message('Installing {0}'.format(package), client.ip)
+                    mutex = VolatileMutex('package_install')
+                    mutex.acquire(60)
                     PackageManager.install(package_name=package,
                                            client=client,
                                            force=True)
+                    mutex.release()
                     SetupController._log_message('Installed {0}'.format(package), client.ip)
                 client.file_delete(upgrade_file)
             except subprocess.CalledProcessError as cpe:
@@ -612,19 +620,25 @@ class SetupController(object):
             SetupController._change_services_state(services=services_to_restart,
                                                    ssh_clients=ssh_clients,
                                                    action='start')
-            SetupController._log_message('Failed to stop all required services, aborting update', client_ip=this_client.ip, severity='error')
+            SetupController._log_message('Failed to stop all required services, update aborted', client_ip=this_client.ip, severity='error')
             return
 
         # 2. Update packages
         failed_clients = []
         for client in ssh_clients:
+            mutex = VolatileMutex('package_update')
+            mutex.acquire(10)
             PackageManager.update(client=client)
+            mutex.release()
             try:
                 for package_name in packages_to_update:
                     SetupController._log_message('Installing {0}'.format(package_name), client.ip)
+                    mutex = VolatileMutex('package_install')
+                    mutex.acquire(60)
                     PackageManager.install(package_name=package_name,
                                            client=client,
                                            force=True)
+                    mutex.release()
                     SetupController._log_message('Installed {0}'.format(package_name), client.ip)
                 client.file_delete(upgrade_file)
             except subprocess.CalledProcessError as cpe:
