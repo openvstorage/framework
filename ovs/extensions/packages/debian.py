@@ -16,7 +16,11 @@
 Debian Package module
 """
 
+from ovs.log.logHandler import LogHandler
 from subprocess import check_output
+from subprocess import CalledProcessError
+
+logger = LogHandler.get('lib', name='packager')
 
 
 class DebianPackage(object):
@@ -43,11 +47,35 @@ class DebianPackage(object):
     @staticmethod
     def install(package_name, client, force=False):
         force_text = '--force-yes' if force is True else ''
-        return client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
+        counter = 0
+        max_counter = 3
+        while True and counter < max_counter:
+            counter += 1
+            try:
+                client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
+                break
+            except CalledProcessError as cpe:
+                logger.warning('Install failed, trying again. Error: {0}'.format(cpe.output))
+                if cpe.output and 'You may want to run apt-get update' in cpe.output[0]:
+                    DebianPackage.update(client)
+                if counter == max_counter:
+                    raise cpe
+            except Exception as ex:
+                raise ex
 
     @staticmethod
     def update(client):
-        return client.run('apt-get update {0}'.format(DebianPackage.APT_CONFIG_STRING))
+        counter = 0
+        max_counter = 3
+        while True and counter < max_counter:
+            counter += 1
+            try:
+                client.run('apt-get update {0}'.format(DebianPackage.APT_CONFIG_STRING))
+                break
+            except CalledProcessError as cpe:
+                logger.warning('Update failed, trying again. Error: {0}'.format(cpe.output))
+                if counter == max_counter:
+                    raise cpe
 
     @staticmethod
     def verify_update_required(packages, services, client):
