@@ -571,11 +571,12 @@ class SetupController(object):
                 SetupController._log_message('Another framework update is currently in progress!')
             else:
                 SetupController._log_message('Error during framework update: {0}'.format(rte), severity='error')
+                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
         except Exception as ex:
             SetupController._log_message('Error during framework update: {0}'.format(ex), severity='error')
+            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
         finally:
             file_mutex.release()
-            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
     @staticmethod
     def update_volumedriver():
@@ -686,11 +687,12 @@ class SetupController(object):
                 SetupController._log_message('Another volumedriver update is currently in progress!')
             else:
                 SetupController._log_message('Error during volumedriver update: {0}'.format(rte), severity='error')
+                SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
         except Exception as ex:
             SetupController._log_message('Error during volumedriver update: {0}'.format(ex), severity='error')
+            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
         finally:
             file_mutex.release()
-            SetupController._remove_lock_files([upgrade_file, upgrade_ongoing_check_file], ssh_clients)
 
     @staticmethod
     def _prepare_node(cluster_ip, nodes, known_passwords, ip_client_map, hypervisor_info, auto_config, disk_layout):
