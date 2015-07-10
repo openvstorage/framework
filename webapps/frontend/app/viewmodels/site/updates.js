@@ -174,24 +174,28 @@ define([
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
                             generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
+                            var masterStorageRouters = [];
                             $.each(self.storageRouters(), function(index, storageRouter) {
-                                if (storageRouter.nodeType() == 'MASTER') {
-                                    api.post('storagerouters/' + storageRouter.guid() + '/update_framework')
-                                        .then(self.shared.tasks.wait)
-                                        .done(function() {
-                                            deferred.resolve();
-                                        })
-                                        .fail(function(error) {
-                                            generic.alertError(
-                                                $.t('ovs:generic.error'),
-                                                $.t('ovs:updates.failed', { why: error })
-                                            );
-                                            deferred.reject();
-                                            self.upgradeOngoing(false);
-                                        });
-                                    return false;  // break out of $.each loop
+                                if (storageRouter.nodeType() === 'MASTER') {
+                                    masterStorageRouters.push(storageRouter);
                                 }
                             });
+                            var sortedStorageRouters = masterStorageRouters.sort(function(a, b) {
+                                return a.ipAddress() < b.ipAddress() ? 1 : -1;
+                            });
+                            api.post('storagerouters/' + sortedStorageRouters[0].guid() + '/update_framework')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    deferred.resolve();
+                                })
+                                .fail(function(error) {
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:updates.failed', { why: error })
+                                    );
+                                    deferred.reject();
+                                    self.upgradeOngoing(false);
+                                });
                         } else {
                             deferred.reject();
                             self.upgradeOngoing(false);
@@ -234,24 +238,28 @@ define([
                     .done(function(answer) {
                         if (answer === $.t('ovs:generic.yes')) {
                             generic.alertSuccess($.t('ovs:updates.start_update'), $.t('ovs:updates.start_update_extra'));
+                            var masterStorageRouters = [];
                             $.each(self.storageRouters(), function(index, storageRouter) {
-                                if (storageRouter.nodeType() == 'MASTER') {
-                                    api.post('storagerouters/' + storageRouter.guid() + '/update_volumedriver')
-                                        .then(self.shared.tasks.wait)
-                                        .done(function() {
-                                            deferred.resolve();
-                                        })
-                                        .fail(function(error) {
-                                            generic.alertError(
-                                                $.t('ovs:generic.error'),
-                                                $.t('ovs:updates.failed', { why: error })
-                                            );
-                                            deferred.reject();
-                                            self.upgradeOngoing(false);
-                                        });
-                                    return false;  // break out of $.each loop
+                                if (storageRouter.nodeType() === 'MASTER') {
+                                    masterStorageRouters.push(storageRouter);
                                 }
                             });
+                            var sortedStorageRouters = masterStorageRouters.sort(function(a, b) {
+                                return a.ipAddress() < b.ipAddress() ? 1 : -1;
+                            });
+                            api.post('storagerouters/' + sortedStorageRouters[0].guid() + '/update_volumedriver')
+                                .then(self.shared.tasks.wait)
+                                .done(function() {
+                                    deferred.resolve();
+                                })
+                                .fail(function(error) {
+                                    generic.alertError(
+                                        $.t('ovs:generic.error'),
+                                        $.t('ovs:updates.failed', { why: error })
+                                    );
+                                    deferred.reject();
+                                    self.upgradeOngoing(false);
+                                });
                         } else {
                             deferred.reject();
                             self.upgradeOngoing(false);
