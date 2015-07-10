@@ -16,6 +16,7 @@
 Debian Package module
 """
 
+import time
 from ovs.log.logHandler import LogHandler
 from subprocess import check_output
 from subprocess import CalledProcessError
@@ -62,6 +63,7 @@ class DebianPackage(object):
                     raise cpe
             except Exception as ex:
                 raise ex
+            time.sleep(1)
 
     @staticmethod
     def update(client):
@@ -76,6 +78,7 @@ class DebianPackage(object):
                 logger.warning('Update failed, trying again. Error: {0}'.format(cpe.output))
                 if counter == max_counter:
                     raise cpe
+            time.sleep(1)
 
     @staticmethod
     def verify_update_required(packages, services, client):

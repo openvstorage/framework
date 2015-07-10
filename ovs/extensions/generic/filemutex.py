@@ -64,7 +64,7 @@ class FileMutex(object):
 
     def acquire(self, wait=None):
         """
-        Aquire a lock on the mutex, optionally given a maximum wait timeout
+        Acquire a lock on the mutex, optionally given a maximum wait timeout
         """
         if self._has_lock:
             return True
@@ -79,8 +79,8 @@ class FileMutex(object):
             while True:
                 passed = time.time() - self._start
                 if passed > wait:
-                    logger.error('Lock for {0} could not be aquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
-                    raise RuntimeError('Could not aquire lock %s' % self.key())
+                    logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
+                    raise RuntimeError('Could not acquire lock %s' % self.key())
                 try:
                     fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break
