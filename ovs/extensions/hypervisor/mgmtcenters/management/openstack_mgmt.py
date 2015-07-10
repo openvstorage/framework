@@ -219,9 +219,10 @@ class OpenStackManagement(object):
 
         version = OpenStackManagement._get_version()
         if version == 'juno':
-            messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
+            cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier'
+            nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
         elif version in ['kilo']:
-            messaging_driver = 'messaging'
+            cinder_messaging_driver = nova_messaging_driver = 'messaging'
         else:
             return False
         self.client.run("""python -c '''from ConfigParser import RawConfigParser
@@ -249,7 +250,7 @@ else:
 if changed:
     with open(CINDER_CONF, "w") as fp:
        cfg.write(fp)
-'''""".format(CINDER_CONF, messaging_driver))
+'''""".format(CINDER_CONF, cinder_messaging_driver))
 
         if not self.client.file_exists(NOVA_CONF):
             return False
@@ -284,7 +285,7 @@ if not cfg.has_option("DEFAULT", "notify_on_any_change"):
 if changed:
     with open(NOVA_CONF, "w") as fp:
        cfg.write(fp)
-'''""".format(NOVA_CONF, messaging_driver))
+'''""".format(NOVA_CONF, nova_messaging_driver))
 
     def _configure_cinder_driver(self, vpool_name):
         """
