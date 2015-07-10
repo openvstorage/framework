@@ -2048,6 +2048,22 @@ EOF
                     choices = show_layout(default)
                     continue
 
+                has_read = False
+                has_write = False
+                for details in default.itervalues():
+                    disk_type = details['type']
+                    if disk_type == 'readcache':
+                        has_read = True
+                    elif disk_type == 'writecache':
+                        has_write = True
+                if has_read is False or has_write is False:
+                    print
+                    print '>>> At least one readcache partition and one writecache partition must be configured'
+                    print
+                    time.sleep(1)
+                    choices = show_layout(default)
+                    continue
+
                 valid_labels = True
                 partitions = set()
                 nr_of_labels = 0
