@@ -31,6 +31,9 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('dal', name='dataobject')
 
 
 class MetaClass(type):
@@ -406,6 +409,8 @@ class DataObject(object):
         else:
             descriptor = Descriptor(value.__class__).descriptor
             if descriptor['identifier'] != self._data[attribute]['identifier']:
+                if descriptor['type'] == self._data[attribute]['type']:
+                    logger.error('Corrupt descriptors: {0} vs {1}'.format(descriptor, self._data[attribute]))
                 raise TypeError('An invalid type was given: {0} instead of {1}'.format(
                     descriptor['type'], self._data[attribute]['type']
                 ))
