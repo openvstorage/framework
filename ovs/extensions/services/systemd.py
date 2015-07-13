@@ -17,8 +17,10 @@ Systemd module
 """
 
 from subprocess import CalledProcessError
+from ovs.log.logHandler import LogHandler
 
 EXPORT = 'Environment=PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps'
+logger = LogHandler('extensions', name='servicemanager')
 
 class Systemd(object):
     """
@@ -42,6 +44,7 @@ class Systemd(object):
         name = 'ovs-{0}'.format(name)
         if Systemd._service_exists(name, client, path):
             return name
+        logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -82,7 +85,8 @@ class Systemd(object):
             client.run('systemctl enable {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
-            raise Exception('Running systemctl enable {0}.service failed, {1}'.format(name, output))
+            logger.error('Add {0}.service failed, {1}'.format(name, output))
+            raise Exception('Add {0}.service failed, {1}'.format(name, output))
 
     @staticmethod
     def get_service_status(name, client):
@@ -108,7 +112,8 @@ class Systemd(object):
             client.run('systemctl disable {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
-            raise Exception('Running systemctl disable {0} failed, {1}'.format(name, output))
+            logger.error('Disable {0} failed, {1}'.format(name, output))
+            raise Exception('Disable {0} failed, {1}'.format(name, output))
 
     @staticmethod
     def enable_service(name, client):
@@ -117,7 +122,8 @@ class Systemd(object):
             client.run('systemctl enable {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
-            raise Exception('Running systemctl disable {0} failed, {1}'.format(name, output))
+            logger.error('Enable {0} failed, {1}'.format(name, output))
+            raise Exception('Enable {0} failed, {1}'.format(name, output))
 
     @staticmethod
     def start_service(name, client):
@@ -126,6 +132,7 @@ class Systemd(object):
             output = client.run('systemctl start {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Start {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -135,6 +142,7 @@ class Systemd(object):
             output = client.run('systemctl stop {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Stop {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -144,6 +152,7 @@ class Systemd(object):
             output = client.run('systemctl restart {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Restart {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -181,28 +190,29 @@ class Systemd(object):
         return pid
 
     @staticmethod
-    def patch_cinder_volume_conf(client):
-        cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'r')
+    def patch_cinder_volume_conf(name, client):
+        cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'r')
         contents = cinder_file.read()
         if EXPORT not in contents:
             contents = contents.replace('\nUser=cinder', '\n{}\nUser=cinder'.format(EXPORT))
             cinder_file.close()
-            cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'w')
+            client.run('chmod 666 /lib/systemd/system/{0}.service'.format(name))
+            cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'w')
             cinder_file.write(contents)
         cinder_file.close()
         client.run('systemctl daemon-reload')
 
     @staticmethod
-    def unpatch_cinder_volume_conf(client):
+    def unpatch_cinder_volume_conf(name, client):
         """
         remove export PYTHONPATH from the systemd service file
         """
-        cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'r')
+        cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'r')
         contents = cinder_file.read()
         if EXPORT in contents:
             contents = contents.replace(EXPORT, '')
             cinder_file.close()
-            cinder_file = open('/lib/systemd/system/openstack-cinder-volume.service', 'w')
+            cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'w')
             cinder_file.write(contents)
         cinder_file.close()
         client.run('systemctl daemon-reload')

@@ -59,7 +59,7 @@ class Centos(object):
 
     @staticmethod
     def get_openstack_users():
-        return ['qemu', 'cinder']
+        return ['qemu', 'cinder', 'nova']
 
     @staticmethod
     def get_openstack_package_base_path():

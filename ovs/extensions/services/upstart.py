@@ -17,9 +17,11 @@ Upstart module
 """
 
 from subprocess import CalledProcessError
+from ovs.log.logHandler import LogHandler
 
 EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
+logger = LogHandler('extensions', name='servicemanager')
 
 class Upstart(object):
     """
@@ -43,6 +45,7 @@ class Upstart(object):
         name = 'ovs-{0}'.format(name)
         if Upstart._service_exists(name, client, path):
             return name
+        logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
@@ -88,6 +91,7 @@ class Upstart(object):
                 return False
             return False
         except CalledProcessError:
+            logger.error('Get {0}.service status failed, {1}'.format(name, output))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
     @staticmethod
@@ -114,6 +118,7 @@ class Upstart(object):
             output = client.run('start {0}'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Start {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -123,6 +128,7 @@ class Upstart(object):
             output = client.run('stop {0}'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Stop {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -132,6 +138,7 @@ class Upstart(object):
             output = client.run('restart {0}'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
+            logger.error('Restart {0} failed, {1}'.format(name, output))
         return output
 
     @staticmethod
@@ -153,38 +160,39 @@ class Upstart(object):
     def get_service_pid(name, client):
         pid = 0
         name = Upstart._get_name(name, client)
-        output = client.run('status {0}'.format(name))
-        if output:
-            output = output.splitlines()
-            for line in output:
-                if 'start/running' in line:
-                    pid = line.split(' ')[3]
-                    if not pid.isdigit():
-                        pid = 0
-                    break
+        if Upstart.get_service_status(name, client):
+            output = client.run('status {0}'.format(name))
+            if output:
+                output = output.splitlines()
+                for line in output:
+                    if 'start/running' in line:
+                        pid = line.split(' ')[3]
+                        if not pid.isdigit():
+                            pid = 0
+                        break
         return pid
 
     @staticmethod
-    def patch_cinder_volume_conf(client):
-        cinder_file = open('/etc/init/cinder-volume.conf', 'r')
+    def patch_cinder_volume_conf(name, client):
+        cinder_file = open('/etc/init/{0}.conf'.format(name), 'r')
         contents = cinder_file.read()
         if EXPORT not in contents:
             contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
             cinder_file.close()
-            cinder_file = open('/etc/init/cinder-volume.conf', 'w')
+            cinder_file = open('/etc/init/{0}.conf'.format(name), 'w')
             cinder_file.write(contents)
         cinder_file.close()
 
     @staticmethod
-    def unpatch_cinder_volume_conf(client):
+    def unpatch_cinder_volume_conf(name, client):
         """
         remove export PYTHONPATH from the upstart service conf file
         """
-        cinder_file = open('/etc/init/cinder-volume.conf', 'r')
+        cinder_file = open('/etc/init/{0}.conf'.format(name), 'r')
         contents = cinder_file.read()
         if EXPORT in contents:
             contents = contents.replace(EXPORT_, '')
             cinder_file.close()
-            cinder_file = open('/etc/init/cinder-volume.conf', 'w')
+            cinder_file = open('/etc/init/{0}.conf'.format(name), 'w')
             cinder_file.write(contents)
         cinder_file.close()

@@ -1303,6 +1303,7 @@ EOF
 </service-group>
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
+        client.run('avahi-daemon --reload')
         SetupController._change_service_state(client, 'avahi-daemon', 'restart')
 
     @staticmethod

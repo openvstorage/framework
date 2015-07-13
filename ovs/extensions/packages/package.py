@@ -18,7 +18,7 @@ Package Factory module
 
 from subprocess import check_output
 from ovs.extensions.packages.debian import DebianPackage
-# from ovs.extensions.packages.redhat import RPM
+from ovs.extensions.packages.rpm import RpmPackage
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler('extensions', name='packagemanager')
@@ -47,8 +47,8 @@ class PackageManager(object):
                     # All *Package classes used in below code should share the exact same interface!
                     if distributor in ['Ubuntu']:
                         PackageManager.ImplementationClass = DebianPackage
-                    # elif distributor in ['CentOS']:
-                    #     PackageManager.ImplementationClass = RPM
+                    elif distributor in ['CentOS']:
+                        PackageManager.ImplementationClass = RpmPackage
                     else:
                         raise RuntimeError('There is no handler for Distributor ID: {0}'.format(distributor))
                 except Exception as ex:

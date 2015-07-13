@@ -71,6 +71,7 @@ class OpenStackManagement(object):
             self._configure_messaging_driver()
             self._enable_openstack_events_consumer()
             self._restart_processes()
+            logger.debug('configure_vpool {0} completed, mountpoint {1}'.format(vpool_name, mountpoint))
 
     def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
         if self.is_devstack or self.is_openstack:
@@ -216,9 +217,11 @@ class OpenStackManagement(object):
 
         version = self._get_version()
         if version == 'juno':
-            messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
+            nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
+            cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' 
         elif version in ['kilo']:
-            messaging_driver = 'messaging'
+            nova_messaging_driver = 'messaging'
+            cinder_messaging_driver = 'messaging'
         else:
             return False
         self.client.run("""python -c '''from ConfigParser import RawConfigParser
@@ -246,7 +249,7 @@ else:
 if changed:
     with open(CINDER_CONF, "w") as fp:
        cfg.write(fp)
-'''""".format(CINDER_CONF, messaging_driver))
+'''""".format(CINDER_CONF, cinder_messaging_driver))
 
         if not self.client.file_exists(NOVA_CONF):
             return False
@@ -281,7 +284,7 @@ if not cfg.has_option("DEFAULT", "notify_on_any_change"):
 if changed:
     with open(NOVA_CONF, "w") as fp:
        cfg.write(fp)
-'''""".format(NOVA_CONF, messaging_driver))
+'''""".format(NOVA_CONF, nova_messaging_driver))
 
     def _configure_cinder_driver(self, vpool_name):
         """
@@ -421,14 +424,16 @@ if vpool_name in enabled_backends:
         export PYTHONPATH in the upstart service conf file
         """
         if self.is_openstack:
-            ServiceManager.patch_cinder_volume_conf(self.client)
+            cinder_service = OSManager.get_openstack_cinder_service_name()
+            ServiceManager.patch_cinder_volume_conf(cinder_service, self.client)
 
     def _unpatch_etc_init_cindervolume_conf(self):
         """
         remove export PYTHONPATH from the upstart service conf file
         """
         if self.is_openstack:
-            ServiceManager.unpatch_cinder_volume_conf(self.client)
+            cinder_service = OSManager.get_openstack_cinder_service_name()
+            ServiceManager.unpatch_cinder_volume_conf(cinder_service, self.client)
 
     def _restart_openstack_services(self):
         """
