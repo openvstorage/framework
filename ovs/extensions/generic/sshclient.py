@@ -52,6 +52,8 @@ class SSHClient(object):
             if not re.findall(SSHClient.IP_REGEX, ip):
                 raise ValueError('Incorrect IP {0} specified'.format(ip))
         elif Descriptor.isinstance(endpoint, StorageRouter):
+            # Refresh the object before checking its attributes
+            endpoint = StorageRouter(endpoint.guid)
             process_heartbeat = endpoint.heartbeats.get('process')
             ip = endpoint.ip
             if process_heartbeat is not None:
