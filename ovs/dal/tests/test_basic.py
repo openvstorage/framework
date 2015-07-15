@@ -1232,6 +1232,32 @@ class Basic(TestCase):
         self.assertFalse(Descriptor.isinstance(disk, TestMachine), 'The disk is no TestMachine')
         self.assertTrue(Descriptor.isinstance(disk.machine, TestEMachine), 'The disk.machine is a TestEMachine')
 
+    def test_cache_and_save_racecondition(self):
+        """
+        Validates whether concurrent save/loads won't result in outdates sturctures being cached
+        """
+        guid = None
+
+        def update():
+            local_machine = TestMachine(guid)
+            local_machine.name = 'updated'
+            local_machine.save()
+
+        machine = TestMachine()
+        self.assertIsNone(machine._metadata['cache'], 'A new object shouldn\'t imply caching')
+        machine.name = 'one'
+        machine.save()
+        guid = machine.guid
+
+        machine = TestMachine(machine.guid, hook=update)
+        self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
+        self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
+        machine = TestMachine(machine.guid)
+        self.assertEqual(machine.name, 'updated', 'The machine\'s name should be updated')
+        self.assertFalse(machine._metadata['cache'], 'Race condition should have prevented caching')
+        machine = TestMachine(machine.guid)
+        self.assertTrue(machine._metadata['cache'], 'The machine should be loaded from cache')
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

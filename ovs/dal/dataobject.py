@@ -143,7 +143,7 @@ class DataObject(object):
             return super(cls, new_class).__new__(new_class, *args, **kwargs)
         return super(DataObject, cls).__new__(cls)
 
-    def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False):
+    def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False, hook=None):
         """
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
@@ -199,7 +199,7 @@ class DataObject(object):
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(self._namespace, self._classname, self._guid)
 
-        # Version mutex
+        # Worker mutexes
         self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
 
         # Load data from cache or persistent backend where appropriate
@@ -254,9 +254,21 @@ class DataObject(object):
         # Store original data
         self._original = copy.deepcopy(self._data)
 
+        if hook is not None and hasattr(hook, '__call__'):
+            hook()
+
         if not self._new:
-            # Re-cache the object
-            self._volatile.set(self._key, self._data)
+            # Re-cache the object, if required
+            if self._metadata['cache'] is False:
+                # The data wasn't loaded from the cache, so caching is required now
+                try:
+                    self._mutex_version.acquire(5)
+                    this_version = self._data['_version']
+                    store_version = self._persistent.get(self._key)['_version']
+                    if this_version == store_version:
+                        self._volatile.set(self._key, self._data)
+                finally:
+                    self._mutex_version.release()
 
         # Freeze property creation
         self._frozen = True
