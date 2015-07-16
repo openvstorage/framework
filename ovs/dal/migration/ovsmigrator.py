@@ -197,9 +197,30 @@ class OVSMigrator(object):
             working_version = 2
 
         # Version 3 introduced:
+        # - new Descriptor format
         if working_version < 3:
-            # Execute some code that upgrades to version 2
-            # working_version = 3
-            pass
+            import imp
+            from ovs.dal.helpers import Descriptor
+            from ovs.extensions.storage.persistentfactory import PersistentFactory
+
+            client = PersistentFactory.get_client()
+            keys = client.prefix('ovs_data', max_elements=-1)
+            for key in keys:
+                data = client.get(key)
+                modified = False
+                for entry in data.keys():
+                    if isinstance(data[entry], dict) and 'source' in data[entry]:
+                        module = imp.load_source(data[entry]['name'], data[entry]['source'])
+                        cls = getattr(module, data[entry]['type'])
+                        new_data = Descriptor(cls, cached=False).descriptor
+                        if 'guid' in data[entry]:
+                            new_data['guid'] = data[entry]['guid']
+                        data[entry] = new_data
+                        modified = True
+                if modified is True:
+                    data['_version'] += 1
+                    client.set(key, data)
+
+            working_version = 3
 
         return working_version

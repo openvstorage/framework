@@ -23,6 +23,9 @@ import inspect
 import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('dal', name='helper')
 
 
 class Descriptor(object):
@@ -46,20 +49,31 @@ class Descriptor(object):
             self.initialized = False
         else:
             self.initialized = True
-
-            filename = os.path.abspath(inspect.getsourcefile(object_type))
-            typename = object_type.__name__
-            identifier = hashlib.sha1(filename).hexdigest()
-            key = 'ovs_descriptor_{0}_{1}'.format(typename, identifier)
             self._volatile = VolatileFactory.get_client()
+
+            type_name = object_type.__name__
+            module_name = object_type.__module__.split('.')[-1]
+            fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)
+            try:
+                module = __import__(fqm_name, level=0, fromlist=[type_name])
+                _ = getattr(module, type_name)
+            except (ImportError, AttributeError):
+                logger.info('Received object type {0} is not a hybrid'.format(object_type))
+                raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
+            identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
+            key = 'ovs_descriptor_{0}'.format(identifier)
+
             self._descriptor = self._volatile.get(key)
             if self._descriptor is None or cached is False:
+                if self._descriptor is None:
+                    logger.debug('Object type {0} was translated to {1}.{2}'.format(
+                        object_type, fqm_name, type_name
+                    ))
                 Toolbox.log_cache_hit('descriptor', False)
-                name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
-                self._descriptor = {'name': name,
-                                    'source': filename,
-                                    'type': typename,
-                                    'identifier': '{0}_{1}'.format(typename, identifier)}
+                self._descriptor = {'fqmn': fqm_name,
+                                    'type': type_name,
+                                    'identifier': identifier,
+                                    'version': 3}
                 self._volatile.set(key, self._descriptor)
             else:
                 Toolbox.log_cache_hit('descriptor', True)
@@ -91,8 +105,9 @@ class Descriptor(object):
             raise RuntimeError('Descriptor not yet initialized')
 
         if self._descriptor['identifier'] not in Descriptor.object_cache:
-            module = imp.load_source(self._descriptor['name'], self._descriptor['source'])
-            cls = getattr(module, self._descriptor['type'])
+            type_name = self._descriptor['type']
+            module = __import__(self._descriptor['fqmn'], level=0, fromlist=[type_name])
+            cls = getattr(module, type_name)
             Descriptor.object_cache[self._descriptor['identifier']] = cls
         else:
             cls = Descriptor.object_cache[self._descriptor['identifier']]
@@ -154,7 +169,10 @@ class HybridRunner(object):
                         if inspect.isclass(member[1]) \
                                 and member[1].__module__ == name:
                             current_class = member[1]
-                            current_descriptor = Descriptor(current_class).descriptor
+                            try:
+                                current_descriptor = Descriptor(current_class).descriptor
+                            except TypeError:
+                                continue
                             current_identifier = current_descriptor['identifier']
                             if current_identifier not in translation_table:
                                 translation_table[current_identifier] = current_descriptor
