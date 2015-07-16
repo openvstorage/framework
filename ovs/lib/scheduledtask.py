@@ -30,6 +30,7 @@ from ovs.lib.vdisk import VDiskController
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from volumedriver.storagerouter.storagerouterclient import Scrubber
 from ovs.log.logHandler import LogHandler
@@ -182,26 +183,29 @@ class ScheduledTaskController(object):
         vdisks = []
         for vmachine in VMachineList.get_customer_vmachines():
             for vdisk in vmachine.vdisks:
-                if vdisk.info['object_type'] in ['BASE']:
+                if vdisk.info['object_type'] in ['BASE'] and len(vdisk.child_vdisks) == 0:
                     vdisks.append(vdisk)
         for vdisk in VDiskList.get_without_vmachine():
-            if vdisk.info['object_type'] in ['BASE']:
+            if vdisk.info['object_type'] in ['BASE'] and len(vdisk.child_vdisks) == 0:
                 vdisks.append(vdisk)
 
         total = 0
         failed = 0
+        storagedrivers = {}
         for vdisk in vdisks:
-            work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
-            for work_unit in work_units:
-                try:
+            try:
+                work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
+                for work_unit in work_units:
                     total += 1
-                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, vdisk.vpool.mountpoint_temp)
+                    if vdisk.storagedriver_id not in storagedrivers:
+                        storagedrivers[vdisk.storagedriver_id] = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedrivers[vdisk.storagedriver_id].mountpoint_temp))
                     vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
-                except:
-                    failed += 1
-                    logger.info('Failed scrubbing work unit for volume {}'.format(
-                        vdisk.volume_id
-                    ))
+            except Exception, ex:
+                failed += 1
+                logger.info('Failed scrubbing work unit for volume {0}: {1}'.format(
+                    vdisk.volume_id, ex
+                ))
 
         logger.info('Scrubbing finished. {} out of {} items failed.'.format(
             failed, total
