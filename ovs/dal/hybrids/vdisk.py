@@ -168,10 +168,13 @@ class VDisk(DataObject):
         if self.volume_id and self.vpool:
             try:
                 vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
+                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
                 vdiskstats = StorageDriverClient.empty_statistics()
+                vdiskinfo = StorageDriverClient.empty_info()
         else:
             vdiskstats = StorageDriverClient.empty_statistics()
+            vdiskinfo = StorageDriverClient.empty_info()
         # Load volumedriver data in dictionary
         vdiskstatsdict = {}
         try:
@@ -187,6 +190,12 @@ class VDisk(DataObject):
             for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
                         'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
                 vdiskstatsdict[key] = getattr(vdiskstats, key)
+            # Do some more manual calculations
+            block_size = vdiskinfo.lba_size * vdiskinfo.cluster_multiplier
+            if block_size == 0:
+                block_size = 4096
+            vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size
+            vdiskstatsdict['4k_write_operations'] = vdiskstatsdict['data_written'] / block_size
             # Precalculate sums
             for key, items in StorageDriverClient.stat_sums.iteritems():
                 vdiskstatsdict[key] = 0

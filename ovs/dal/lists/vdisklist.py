@@ -106,7 +106,7 @@ class VDiskList(object):
         vdisks = DataList({'object': VDisk,
                            'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
-                                     'items':[('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
+                                     'items': [('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
 
         # pylint: enable=line-too-long
         return DataObjectList(vdisks, VDisk)
