@@ -189,26 +189,37 @@ class VDiskController(object):
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        if storagedriver is None:
-            raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
+        try:
+            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+            if storagedriver is None:
+                raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
 
-        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
-        if mds_service is None:
-            raise RuntimeError('Could not find a MDS service')
+            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+            if mds_service is None:
+                raise RuntimeError('Could not find a MDS service')
 
-        logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
-        volume_id = vdisk.storagedriver_client.create_clone(
-            target_path=location,
-            metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                                            port=mds_service.service.ports[0])]),
-            parent_volume_id=str(vdisk.volume_id),
-            parent_snapshot_id=str(snapshotid),
-            node_id=str(vdisk.storagedriver_id)
-        )
+            logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
+            volume_id = vdisk.storagedriver_client.create_clone(
+                target_path=location,
+                metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                                port=mds_service.service.ports[0])]),
+                parent_volume_id=str(vdisk.volume_id),
+                parent_snapshot_id=str(snapshotid),
+                node_id=str(vdisk.storagedriver_id)
+            )
+        except Exception as ex:
+            logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
+            new_vdisk.delete()
+            VDiskController.delete_volume(location)
+            raise
+
         new_vdisk.volume_id = volume_id
         new_vdisk.save()
-        MDSServiceController.ensure_safety(new_vdisk)
+
+        try:
+            MDSServiceController.ensure_safety(new_vdisk)
+        except Exception as ex:
+            logger.error('Caught exception during "ensure_safety" {0}'.format(ex))
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,

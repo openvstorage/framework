@@ -96,7 +96,7 @@ class OVSVolumeDriver(driver.VolumeDriver):
         cinder type-create <TYPENAME> # e.g. Open vStorage
         cinder type-key <TYPENAME> set volume_backend_name=<VPOOLNAME>
     """
-    VERSION = '1.0.6'
+    VERSION = '1.0.7'
 
     def __init__(self, *args, **kwargs):
         """Init: args, kwargs pass through;
@@ -405,12 +405,18 @@ class OVSVolumeDriver(driver.VolumeDriver):
         LOG.info('[CLONE FROM SNAP] %s %s %s %s'
                  % (ovs_snap_disk.guid, snapshot.id, devicename, pmachineguid))
         try:
-            disk_meta = VDiskController.clone(diskguid = ovs_snap_disk.guid,
-                                              snapshotid = snapshot.id,
-                                              devicename = devicename,
-                                              pmachineguid = pmachineguid,
-                                              machinename = "",
-                                              machineguid=None)
+            kwargs = dict(diskguid = ovs_snap_disk.guid,
+                          snapshotid = snapshot.id,
+                          devicename = devicename,
+                          pmachineguid = pmachineguid,
+                          machinename = "",
+                          machineguid=None)
+            LOG.debug('[CLONE FROM SNAP] Executing clone - async')
+            # Execute "clone" task async, using celery workers
+            # wait for the result for 30 minutes then raise TimeoutError
+            disk_meta = VDiskController.clone.apply_async(kwargs = kwargs)\
+                .get(timeout = 1800)
+            LOG.debug('[CLONE FROM SNAP] Executing clone - async - DONE')
             volume['provider_location'] = '{}{}'.format(
                 mountpoint, disk_meta['backingdevice'])
 
@@ -424,7 +430,6 @@ class OVSVolumeDriver(driver.VolumeDriver):
         except Exception as ex:
             LOG.error('CLONE FROM SNAP: Internal error %s ' % str(ex))
             self.delete_volume(volume)
-            self.delete_snapshot(snapshot)
             raise
 
         return {'provider_location': volume['provider_location'],
