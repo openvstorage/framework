@@ -194,9 +194,9 @@ class ScheduledTaskController(object):
         storagedrivers = {}
         for vdisk in vdisks:
             try:
+                total += 1
                 work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
                 for work_unit in work_units:
-                    total += 1
                     if vdisk.storagedriver_id not in storagedrivers:
                         storagedrivers[vdisk.storagedriver_id] = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
                     scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedrivers[vdisk.storagedriver_id].mountpoint_temp))
