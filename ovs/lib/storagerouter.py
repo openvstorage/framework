@@ -620,10 +620,22 @@ class StorageRouterController(object):
             root_client.run('service nfs-kernel-server start')
 
         if storagerouter.pmachine.hvtype == 'KVM':
-            root_client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name, storagedriver.mountpoint))
-            root_client.run('virsh pool-build {0}'.format(vpool_name))
-            root_client.run('virsh pool-start {0}'.format(vpool_name))
-            root_client.run('virsh pool-autostart {0}'.format(vpool_name))
+            vpool_overview = root_client.run('virsh pool-list --all').splitlines()
+            if vpool_overview:
+                vpool_overview.pop(1)  # Pop   ---------------
+                vpool_overview.pop(0)  # Pop   Name   State   Autostart
+                virsh_pool_already_exists = False
+                for vpool_info in vpool_overview:
+                    vpool_name = vpool_info.split()[0].strip()
+                    if vpool.name == vpool_name:
+                        virsh_pool_already_exists = True
+                        break
+                if not virsh_pool_already_exists:
+                    root_client.run('virsh pool-define-as {0} dir - - - - {1}'.format(vpool_name,
+                                                                                      storagedriver.mountpoint))
+                    root_client.run('virsh pool-build {0}'.format(vpool_name))
+                    root_client.run('virsh pool-start {0}'.format(vpool_name))
+                    root_client.run('virsh pool-autostart {0}'.format(vpool_name))
 
         # Start service
         storagedriver = StorageDriver(storagedriver.guid)
