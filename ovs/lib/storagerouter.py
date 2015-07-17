@@ -626,8 +626,8 @@ class StorageRouterController(object):
                 vpool_overview.pop(0)  # Pop   Name   State   Autostart
                 virsh_pool_already_exists = False
                 for vpool_info in vpool_overview:
-                    vpool_name = vpool_info.split()[0].strip()
-                    if vpool.name == vpool_name:
+                    virsh_vpool_name = vpool_info.split()[0].strip()
+                    if vpool.name == virsh_vpool_name:
                         virsh_pool_already_exists = True
                         break
                 if not virsh_pool_already_exists:
