@@ -267,6 +267,10 @@ class DataObject(object):
                     store_version = self._persistent.get(self._key)['_version']
                     if this_version == store_version:
                         self._volatile.set(self._key, self._data)
+                except KeyNotFoundException:
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
+                        self.__class__.__name__, self._guid
+                    ))
                 finally:
                     self._mutex_version.release()
 

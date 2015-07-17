@@ -1258,6 +1258,24 @@ class Basic(TestCase):
         machine = TestMachine(machine.guid)
         self.assertTrue(machine._metadata['cache'], 'The machine should be loaded from cache')
 
+    def test_delete_during_object_load(self):
+        """
+        Validates whether removing an object during the load does raise a correct exception
+        """
+        guid = None
+
+        def delete():
+            local_machine = TestMachine(guid)
+            local_machine.delete()
+
+        machine = TestMachine()
+        machine.name = 'one'
+        machine.save()
+        guid = machine.guid
+
+        with self.assertRaises(ObjectNotFoundException):
+            _ = TestMachine(guid, hook=delete)
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)
