@@ -33,9 +33,11 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig, MDSMetaDataBackendConfig
-
+from volumedriver.storagerouter import storagerouterclient
 
 logger = LogHandler.get('lib', name='mds')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 
 class MDSServiceController(object):

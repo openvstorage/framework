@@ -66,7 +66,8 @@ class LogHandler(object):
                'celery': 'celery',
                'arakoon': 'arakoon',
                'support': 'support',
-               'log': 'audit_trails'}
+               'log': 'audit_trails',
+               'storagerouterclient': 'storagerouterclient'}
 
     def __init__(self, source, name=None):
         """
@@ -79,14 +80,7 @@ class LogHandler(object):
         if name is None:
             name = Configuration.get('ovs.logging.default_name')
 
-        log_filename = '{0}/{1}.log'.format(
-            Configuration.get('ovs.logging.path'),
-            LogHandler.targets[source] if source in LogHandler.targets else Configuration.get('ovs.logging.default_file')
-        )
-
-        if not os.path.exists(log_filename):
-            open(log_filename, 'a').close()
-            os.chmod(log_filename, 0o666)
+        log_filename = LogHandler.load_path(source)
 
         formatter = logging.Formatter('%(asctime)s - [%(process)s] - [%(levelname)s] - [{0}] - [%(name)s] - %(message)s'.format(source))
         handler = logging.FileHandler(log_filename)
@@ -96,6 +90,17 @@ class LogHandler(object):
         self.logger.propagate = True
         self.logger.setLevel(getattr(logging, Configuration.get('ovs.logging.level')))
         self.logger.addHandler(handler)
+
+    @staticmethod
+    def load_path(source):
+        log_filename = '{0}/{1}.log'.format(
+            Configuration.get('ovs.logging.path'),
+            LogHandler.targets[source] if source in LogHandler.targets else Configuration.get('ovs.logging.default_file')
+        )
+        if not os.path.exists(log_filename):
+            open(log_filename, 'a').close()
+            os.chmod(log_filename, 0o666)
+        return log_filename
 
     @staticmethod
     def get(source, name=None):

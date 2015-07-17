@@ -19,6 +19,7 @@ Wrapper class for the storagedriverclient of the voldrv team
 import os
 import json
 import copy
+from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.extensions.generic.configuration import Configuration
@@ -26,6 +27,8 @@ from ovs.extensions.generic.remote import Remote
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='storagedriver')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}

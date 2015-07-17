@@ -33,10 +33,13 @@ from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
 from volumedriver.storagerouter.storagerouterclient import Scrubber
+from volumedriver.storagerouter import storagerouterclient
 from ovs.log.logHandler import LogHandler
 
 _storagedriver_scrubber = Scrubber()
 logger = LogHandler.get('lib', name='scheduled tasks')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 
 class ScheduledTaskController(object):
