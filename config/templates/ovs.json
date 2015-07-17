@@ -1,0 +1,76 @@
+{
+    "core": {
+        "basedir": "/opt/OpenvStorage",
+        "cfgdir": "/opt/OpenvStorage/config",
+        "broker": {
+            "protocol": "amqp",
+            "login": "ovs",
+            "password": "0penv5tor4ge",
+            "port": 5672,
+            "queues": {
+                "storagedriver": "volumerouter"
+            }
+        },
+        "storage": {
+            "persistent": "arakoon",
+            "volatile": "memcache"
+        },
+        "audittrails": {
+            "keep": 30
+        }
+    },
+    "webapps": {
+        "main": {
+            "uiname": "api",
+            "appname": "api",
+            "dbname": "api.sqlite3",
+            "secret": ""
+        },
+        "html_endpoint": "/",
+        "dir": "webapps",
+        "admin": {
+            "name": "Open vStorage Engineering Dept.",
+            "email": "engineering@openvstorage.com"
+        },
+        "oauth2": {
+            "mode": "local"
+        }
+    },
+    "ports": {
+        "storagedriver": [[26200, 26299]],
+        "mds": [[26300, 26399]],
+        "arakoon": [26400]
+    },
+    "storagedriver": {
+        "rsp": "/var/rsp",
+        "mds": {
+            "safety": 3,
+            "maxload": 75,
+            "tlogs": 100
+        },
+        "vmware_mode": "ganesha"
+    },
+    "grid": {
+        "ip": ""
+    },
+    "arakoon": {
+        "location": "/mnt/db"
+    },
+    "support": {
+        "enabled": false,
+        "cid": "",
+        "nid": "",
+        "enablesupport": false,
+        "interval": 60
+    },
+    "logging": {
+        "level": "DEBUG",
+        "path": "/var/log/ovs",
+        "default_file": "generic",
+        "default_name": "logger"
+    },
+    "plugins": {
+        "generic": [],
+        "backends": []
+    }
+}

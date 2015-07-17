@@ -1,0 +1,80 @@
+<!--
+Copyright 2014 Open vStorage NV
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<section style="display: inline-block;">
+    <!-- ko if: multi() || !free() || ($.inArray(target(), items()) !== -1 && !useFree()) -->
+        <div class="input-group">
+            <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown"
+                    data-bind="style: {
+                                   'paddingTop': small() ? '2px' : '6px',
+                                   'paddingBottom': small() ? '2px' : '6px'
+                               },
+                               attr: { id: (target.hasOwnProperty('identifier') ? ('dropdown-button-' + target.identifier) : undefined) } ">
+                <!-- ko if: multi() -->
+                    <span data-bind="visible: target().length === 0"><i data-i18n="ovs:generic.nothingselected"></i></span>
+                    <span data-bind="foreach: target">
+                        <span data-part="selected-items"></span>&nbsp;
+                        <span data-bind="shortText: $parent.text($data), maxLength: 25"></span><span data-bind="visible: $index() < $parent.target().length - 1">,</span>
+                    </span>
+                <!-- /ko -->
+                <!-- ko if: !multi() -->
+                    <span data-part="selected-item"></span>&nbsp;<span data-bind="html: text(target())"></span>
+                <!-- /ko -->
+                &nbsp; <span class="caret"></span>
+            </button>
+            <!-- ko let: { side: 'left' } -->
+                <!-- ko compose: '../widgets/dropdown/contents.html' -->
+                <!-- /ko -->
+            <!-- /ko -->
+            <span data-bind="visible: items().length === 0" class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin: 10px 0 0 10px;"></span>
+        </div>
+    <!-- /ko -->
+    <!-- ko if: !multi() && free() && ($.inArray(target(), items()) === -1 || useFree()) -->
+        <div class="input-group">
+            <div class="input-group-btn">
+                <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown"
+                        data-bind="style: {
+                                       'paddingTop': small() ? '2px' : '6px',
+                                       'paddingBottom': small() ? '2px' : '6px'
+                                   },
+                                   attr: { id: (target.hasOwnProperty('identifier') ? ('dropdown-button-' + target.identifier) : undefined) } ">
+                    <span data-i18n="ovs:generic.customvalue"></span>
+                </button>
+                <!-- ko let: { side: 'left' } -->
+                    <!-- ko compose: '../widgets/dropdown/contents.html' -->
+                    <!-- /ko -->
+                <!-- /ko -->
+            </div>
+            <input type="text" data-bind="value: freeValue, valueUpdate: 'afterkeydown'" class="form-control"/>
+            <div class="input-group-btn">
+                <button type="button" class="btn btn-small btn-default dropdown-toggle" data-toggle="dropdown"
+                    data-bind="style: {
+                                   'paddingTop': small() ? '2px' : '6px',
+                                   'paddingBottom': small() ? '2px' : '6px'
+                               },
+                               attr: { id: (target.hasOwnProperty('identifier') ? ('dropdown-button-' + target.identifier) : undefined) } ">
+                    <span class="caret"></span>
+                </button>
+                <!-- ko let: { side: 'right' } -->
+                    <!-- ko compose: '../widgets/dropdown/contents.html' -->
+                    <!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+        <div data-bind="visible: items().length === 0" style="position: absolute; right: -7px; top: 7px;">
+            <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
+        </div>
+    <!-- /ko -->
+</section>

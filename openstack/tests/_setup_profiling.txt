@@ -1,0 +1,28 @@
+How to run a test profiled inside ovs shell:
+
+#setup file
+sudo touch /opt/OpenvStorage/profiled_test
+sudo chown stack /opt/OpenvStorage/profiled_test
+#enable warnings
+export PYTHONWARNINGS="d"
+
+#start ovs
+ovs
+
+(inside ovs)
+import sys, cProfile, pstats
+sys.path.insert(0, '/opt/stack/cinder/cinder/tests/')
+
+#from test_ovscp_protection import OVSPluginProtectionTestCase as testcase # choose testcase
+#from test_ovscp_image import OVSPluginImageTestCase as testcase
+from test_ovscp_bugfixing import OVSBugfixingTestCase as testcase
+testcase.runTest = None
+test = testcase()
+test.set_profiled()
+test.setUpClass() #also can be profiled
+
+cProfile.run('test.test_create_delete_volume_snapshots()', '/opt/OpenvStorage/profiled_test') #choose testname
+p = pstats.Stats('/opt/OpenvStorage/profiled_test')
+p.strip_dirs().sort_stats(2).print_stats() #see stats
+
+test.tearDownClass()
