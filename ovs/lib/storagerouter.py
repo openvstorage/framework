@@ -700,15 +700,6 @@ class StorageRouterController(object):
         """
         logger.info('Deleting storage driver with guid {0}'.format(storagedriver_guid))
 
-        try:
-            ip_client_map = {}
-            for storagerouter in StorageRouterList.get_storagerouters():
-                client = SSHClient(storagerouter, username='root')
-                if client.ip not in ip_client_map:
-                    ip_client_map[client.ip] = client
-        except UnableToConnectException:
-            raise RuntimeError('Not all StorageRouters are reachable')
-
         # Get objects & Make some checks
         storagedriver = StorageDriver(storagedriver_guid)
         storagerouter = storagedriver.storagerouter
@@ -720,10 +711,26 @@ class StorageRouterController(object):
         storagedrivers_left = False
         vpool = storagedriver.vpool
 
+        # Validate node connectivity
+        try:
+            for current_storagerouter in [sd.storagerouter for sd in vpool.storagedrivers]:
+                client = SSHClient(current_storagerouter, username='root')
+                configuration_dir = client.config_read('ovs.core.cfgdir')
+                with Remote(client.ip, [LocalStorageRouterClient]) as remote:
+                    lsrc = remote.LocalStorageRouterClient('{0}/storagedriver/storagedriver/{1}.json'.format(configuration_dir, vpool.name))
+                    lsrc.server_revision()
+        except UnableToConnectException:
+            raise RuntimeError('Not all StorageRouters are reachable')
+        except Exception, ex:
+            if 'ClusterNotReachableException' in str(ex):
+                raise RuntimeError('Not all StorageDrivers are reachable, please (re)start them and try again')
+            else:
+                raise
+
+        # Some more checking
         for current_storagedriver in vpool.storagedrivers:
             if current_storagedriver.guid != storagedriver_guid:
                 storagedrivers_left = True
-
         if storagedrivers_left is False and pmachine.guid in pmachine_guids and vpool.guid in vpool_guids:
             raise RuntimeError('There are still vMachines served from the given Storage Driver')
         if any(vdisk for vdisk in vpool.vdisks if vdisk.storagedriver_id == storagedriver.storagedriver_id):
