@@ -58,15 +58,15 @@ class DebianPackager(object):
         shutil.copytree('{0}/packaging/debian'.format(repo_path_code), debian_folder)
 
         # Rename tgz
-        # /<pp>/openvstorage_1.2.3.tar.gz -> /<pp>/debian/openvstorage_1.2.3.orig.tar.gz
+        # /<pp>/<packagename>_1.2.3.tar.gz -> /<pp>/debian/<packagename>_1.2.3.orig.tar.gz
         shutil.copyfile('{0}/{1}_{2}.tar.gz'.format(package_path, package_name, version_string),
                         '{0}/{1}_{2}.orig.tar.gz'.format(debian_folder, package_name, version_string))
-        # /<pp>/debian/openvstorage-1.2.3/...
+        # /<pp>/debian/<packagename>-1.2.3/...
         SourceCollector.run(command='tar -xzf {0}_{1}.orig.tar.gz'.format(package_name, version_string),
                             working_directory=debian_folder)
 
         # Move the debian package metadata into the extracted source
-        # /<pp>/debian/debian -> /<pp>/debian/openvstorage-1.2.3/
+        # /<pp>/debian/debian -> /<pp>/debian/<packagename>-1.2.3/
         SourceCollector.run(command='mv {0}/debian {0}/{1}-{2}/'.format(debian_folder, package_name, version_string),
                             working_directory=package_path)
 
@@ -107,7 +107,7 @@ class DebianPackager(object):
                                                                                                                                                                                     version_string),
                                                                 working_directory=package_path)
         print 'Uploading {0} package: {1}'.format('new' if new_package else 'existing', '{0}_{1}-1_amd64'.format(package_name, version_string))
-        #SourceCollector.run(command='dput -c {0}/debian/dput.cfg ovs-apt {0}/debian/{1}_{2}-1_amd64.changes'.format(package_path, package_name, version_string),
-        #                    working_directory=package_path)
-        #SourceCollector.run(command='ssh ovs-apt@packages.cloudfounders.com "mini-dinstall -b{0}"'.format('' if new_package else ' --no-db'),
-        #                    working_directory=package_path)
+        SourceCollector.run(command='dput -c {0}/debian/dput.cfg ovs-apt {0}/debian/{1}_{2}-1_amd64.changes'.format(package_path, package_name, version_string),
+                            working_directory=package_path)
+        SourceCollector.run(command='ssh ovs-apt@packages.cloudfounders.com "mini-dinstall -b{0}"'.format('' if new_package else ' --no-db'),
+                            working_directory=package_path)
