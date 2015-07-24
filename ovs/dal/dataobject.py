@@ -262,7 +262,7 @@ class DataObject(object):
             if self._metadata['cache'] is False:
                 # The data wasn't loaded from the cache, so caching is required now
                 try:
-                    self._mutex_version.acquire(5)
+                    self._mutex_version.acquire(30)
                     this_version = self._data['_version']
                     store_version = self._persistent.get(self._key)['_version']
                     if this_version == store_version:
@@ -577,15 +577,16 @@ class DataObject(object):
                             else:
                                 reverse_index = {relation.foreign_key: [self.guid]}
                                 self._volatile.set(reverse_key, reverse_index)
-                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
-                reverse_index = self._volatile.get(reverse_key)
-                if reverse_index is None:
-                    reverse_index = {}
-                    relations = RelationMapper.load_foreign_relations(self.__class__)
-                    if relations is not None:
-                        for key, _ in relations.iteritems():
-                            reverse_index[key] = []
-                    self._volatile.set(reverse_key, reverse_index)
+                if self._new is True:
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
+                    reverse_index = self._volatile.get(reverse_key)
+                    if reverse_index is None:
+                        reverse_index = {}
+                        relations = RelationMapper.load_foreign_relations(self.__class__)
+                        if relations is not None:
+                            for key, _ in relations.iteritems():
+                                reverse_index[key] = []
+                        self._volatile.set(reverse_key, reverse_index)
             finally:
                 self._mutex_reverseindex.release()
 
@@ -609,7 +610,7 @@ class DataObject(object):
 
             # Save the data
             try:
-                self._mutex_version.acquire(5)
+                self._mutex_version.acquire(30)
                 this_version = self._data['_version']
                 try:
                     store_version = self._persistent.get(self._key)['_version']
