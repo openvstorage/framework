@@ -124,6 +124,7 @@ class MDSServiceController(object):
         storagedriver = [sd for sd in vpool.storagedrivers if sd.storagerouter_guid == storagerouter.guid][0]
 
         # Clean up model
+        this_service_number = mds_service.number
         service = mds_service.service
         mds_service.delete()
         service.delete()
@@ -149,6 +150,23 @@ class MDSServiceController(object):
         storagedriver_config.clean()  # Clean out obsolete values
         storagedriver_config.configure_metadata_server(mds_nodes=mds_nodes)
         storagedriver_config.save(client, reload_config=reload_config)
+
+        tries = 5
+        cleaned = False
+        while tries > 0 and cleaned is False:
+            try:
+                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
+                                                            vpool.name,
+                                                            this_service_number),
+                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
+                                                            vpool.name,
+                                                            this_service_number)])
+                logger.debug('MDS files cleaned up')
+                cleaned = True
+            except Exception:
+                time.sleep(5)
+                logger.debug('Waiting for the MDS service to go down...')
+                tries -= 1
 
     @staticmethod
     def sync_vdisk_to_reality(vdisk):
