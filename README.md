@@ -8,7 +8,7 @@ The Open vStorage Framework takes care of the communication between the differen
 
 This repo is your starting point to experiment with Open vStorage.
 
-The Open vStorage Framework is built in python (Django, Celery) and javascript.
+The Open vStorage Framework is built using python (Django, Celery) and javascript.
 
 ## Get started
 
@@ -16,7 +16,7 @@ On our community website you can find [more information](https://www.openvstorag
 
 ## Contribution & Packaging
 
-We invite interested parties willing to contribute to this project to please do so.
+We welcome contributions.
 Packaging your own changes for testing can be done using the [packager module](packaging/generic/packager.py)
 
 ## Nightly tests
