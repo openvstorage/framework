@@ -1312,6 +1312,7 @@ class SetupController(object):
                 if memcached_exclude_client is not None and memcached_exclude_client.ip == node_client.ip and service_info[0] == 'memcached':
                     continue  # Skip memcached for demoted nodes, because they don't run that service
                 SetupController._change_service_state(node_client, service_info[0], service_info[1])
+        VolatileFactory.store = None
 
     @staticmethod
     def _configure_rabbitmq(client):
