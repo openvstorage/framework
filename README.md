@@ -1,4 +1,4 @@
-# openvstorage
+# Open vStorage
 
 Open vStorage is an open-source, scale-out, reliable, high performance, software based storage platform which offers a block & file interface on top of ethernet drives (Seagate Kinetic), object storage or a pool of traditional SATA drives. 
 
@@ -13,6 +13,10 @@ The Open vStorage Framework is built using python (Django, Celery) and javascrip
 ## Get started
 
 On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an install](https://www.openvstorage.org/doc/Installation)
+
+## Support
+* For community support, please visit our [community support forum](https://groups.google.com/forum/#!forum/open-vstorage)
+* For commercial support, please [contact Open vStorage](https://www.openvstorage.com/contactus/) 
 
 ## Contribution & Packaging
 
