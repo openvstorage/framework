@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from django.http import HttpResponse
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('api', 'middleware')
+logger = LogHandler.get('api', 'middleware')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
 
 

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 class OAuth2TokenView(View):

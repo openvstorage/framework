@@ -24,7 +24,8 @@ import time
 import types
 import signal
 import string
-import logging
+from ovs.log.logHandler import LogHandler
+logging = LogHandler.get('arakoon', name='internal')
 
 import Arakoon
 from ArakoonExceptions import ArakoonNodeNotLocal

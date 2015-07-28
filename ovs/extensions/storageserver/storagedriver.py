@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,12 +19,16 @@ Wrapper class for the storagedriverclient of the voldrv team
 import os
 import json
 import copy
+from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.remote import Remote
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='storagedriver')
+logger = LogHandler.get('extensions', name='storagedriver')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}
@@ -49,11 +53,13 @@ class StorageDriverClient(object):
                      'data_written', 'metadata_store_hits', 'metadata_store_misses',
                      'read_operations', 'sco_cache_hits', 'sco_cache_misses',
                      'write_operations']
+    extra_keys = ['4k_read_operations', '4k_write_operations']
     stat_sums = {'operations': ['write_operations', 'read_operations'],
+                 '4k_operations': ['4k_read_operations', '4k_write_operations'],
                  'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
                  'cache_misses': ['sco_cache_misses'],
                  'data_transferred': ['data_written', 'data_read']}
-    stat_keys = stat_counters + stat_sums.keys()
+    stat_keys = stat_counters + extra_keys + stat_sums.keys()
 
     def __init__(self):
         """
@@ -68,7 +74,7 @@ class StorageDriverClient(object):
         Loads and returns the client
         """
 
-        key = vpool.guid
+        key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
@@ -101,7 +107,7 @@ class MetadataServerClient(object):
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
             except RuntimeError as ex:
-                logger.error('Error loading MDSClient: {0}'.format(ex))
+                logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
                 return None
         return mdsclient_service_cache[key]
 
@@ -254,14 +260,13 @@ class StorageDriverConfiguration(object):
             client.file_write(self.path, contents)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
-                logger.info('Applying storagedriver configuration changes')
                 if client is None:
+                    logger.info('Applying local storagedriver configuration changes')
                     changes = LSRClient(self.path).update_configuration(self.path)
                 else:
-                    changes = json.loads(client.run('python -c """{0}"""'.format("""
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
-import json
-print json.dumps(LocalStorageRouterClient('{0}').update_configuration('{0}'))""".format(self.path))))
+                    logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
+                    with Remote(client.ip, [LSRClient]) as remote:
+                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.path).update_configuration(self.path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:
                         raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))

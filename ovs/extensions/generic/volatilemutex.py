@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import time
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', 'volatile mutex')
+logger = LogHandler.get('extensions', 'volatile mutex')
 
 
 class VolatileMutex(object):
@@ -55,7 +55,7 @@ class VolatileMutex(object):
 
     def acquire(self, wait=None):
         """
-        Aquire a lock on the mutex, optionally given a maximum wait timeout
+        Acquire a lock on the mutex, optionally given a maximum wait timeout
         """
         if self._has_lock:
             return True
@@ -66,8 +66,8 @@ class VolatileMutex(object):
             time.sleep(0.005)
             passed = time.time() - self._start
             if wait is not None and passed > wait:
-                logger.error('Lock for {0} could not be aquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
-                raise RuntimeError('Could not aquire lock %s' % self.key())
+                logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
+                raise RuntimeError('Could not acquire lock %s' % self.key())
         passed = time.time() - self._start
         if passed > 0.1:  # More than 100 ms is a long time to wait!
             logger.warning('Waited {0} sec for lock {1}'.format(passed, self.key()))

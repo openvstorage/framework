@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='mgmtcenter')
+logger = LogHandler.get('lib', name='mgmtcenter')
 
 
 class MgmtCenterController(object):

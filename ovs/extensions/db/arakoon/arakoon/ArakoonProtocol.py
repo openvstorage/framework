@@ -26,7 +26,6 @@ from NurseryRouting import RoutingInfo
 import os.path
 import ssl
 import struct
-import logging
 import select
 import operator
 import cStringIO
@@ -38,6 +37,9 @@ ARA_CFG_TRY_CNT = 1
 ARA_CFG_CONN_TIMEOUT = 60
 ARA_CFG_CONN_BACKOFF = 5
 ARA_CFG_NO_MASTER_RETRY = 60
+
+from ovs.log.logHandler import LogHandler
+logging = LogHandler.get('arakoon', name='internal')
 
 class ArakoonClientConfig :
 

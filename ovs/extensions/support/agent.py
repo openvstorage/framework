@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ from ovs.extensions.packages.package import PackageManager
 from ovs.log.logHandler import LogHandler
 
 
-logger = LogHandler('support', name='agent')
+logger = LogHandler.get('support', name='agent')
 
 
 class SupportAgent(object):
@@ -41,7 +41,7 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
+        self._enable_support = Configuration.get('ovs.support.enablesupport')
         self.interval = int(Configuration.get('ovs.support.interval'))
         self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
 

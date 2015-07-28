@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
-                self.iops(stats.operations_ps);
+                self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);

@@ -29,8 +29,8 @@
         "html_endpoint": "/",
         "dir": "webapps",
         "admin": {
-            "name": "CloudFounders Engineering Dept.",
-            "email": "engineering@cloudfounders.com"
+            "name": "Open vStorage Engineering Dept.",
+            "email": "engineering@openvstorage.com"
         },
         "oauth2": {
             "mode": "local"

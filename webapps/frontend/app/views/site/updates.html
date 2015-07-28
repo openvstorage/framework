@@ -1,5 +1,5 @@
 <!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,19 +29,26 @@ limitations under the License.
                 <td>
                     <span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
                         <span data-part="lazy-entry">
-                            <span data-bind="visible: item() === undefined || item().framework === null,
+                            <span data-bind="visible: item() === undefined || item().framework.length === 0,
                                              translate: 'ovs:updates.noupdates'"></span>
-                            <span data-bind="if: item() !== undefined && item().framework !== null">
-                                <span data-bind="foreach: item().framework">
-                                    <span data-bind="visible: $index() > 0">,</span>
-                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)
-                                </span>
+                            <span data-bind="if: item() !== undefined && item().framework.length > 0">
+                                <span data-bind="foreach: item().framework"><span data-bind="visible: $index() > 0">,</span>
+                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)</span>
                             </span>
                         </span>
                     </span>
                 </td>
                 <td><span data-bind="lazyloader: { item: updates, undefinedLoading: true }">
-                        <span data-part="lazy-entry" data-bind="text: item() === undefined || item().volumedriver === null ? $.t('ovs:updates.noupdates') : item().volumedriver.to"></span>
+                        <span data-part="lazy-entry">
+                            <span data-bind="visible: item() === undefined || item().volumedriver.length === 0,
+                                             translate: 'ovs:updates.noupdates'"></span>
+                            <span data-bind="if: item() !== undefined && item().volumedriver.length > 0">
+                                <span data-bind="foreach: item().volumedriver">
+                                    <span data-bind="visible: $index() > 0">,</span>
+                                    <span data-bind="translate: $data.namespace + ':packages.' + $data.name"></span> (<span data-bind="text: $data.to"></span>)
+                                </span>
+                            </span>
+                        </span>
                     </span>
                 </td>
             </tr>
@@ -50,7 +57,7 @@ limitations under the License.
     <div>
         <button class="btn btn-default"
                 data-bind="click: updateFramework,
-                           enable: $root.shared.user.roles().contains('manage') && frameworkUpdate() === true && !updating(),
+                           enable: $root.shared.user.roles().contains('manage') && frameworkUpdate() === true && upgradeOngoing() === false,
                            visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
                 id="buttonUpdateFramework"
                 style="margin-top: 20px;">
@@ -60,15 +67,14 @@ limitations under the License.
     <div>
         <button class="btn btn-default"
                 data-bind="click: updateVolumedriver,
-                           enable: $root.shared.user.roles().contains('manage') && volumedriverUpdate() === true && !updating(),
-                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false,
-                           visible: false"
+                           enable: $root.shared.user.roles().contains('manage') && volumedriverUpdate() === true && upgradeOngoing() === false,
+                           visible: upgradeOngoing() === undefined || upgradeOngoing() === false"
                 id="buttonUpdateVolumedriver"
                 style="margin-top: 10px;">
             <span data-i18n="ovs:updates.buttons.volumedriver"></span>
         </button>
     </div>
-    <div data-bind="visible: upgradeOngoing() !== undefined && upgradeOngoing() === true" class="alert alert-info" style="margin-top: 20px;">
+    <div data-bind="visible: upgradeOngoing() === true" class="alert alert-info" style="margin-top: 20px;">
         <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
         <span data-i18n="ovs:updates.ongoing"></span>
     </div>

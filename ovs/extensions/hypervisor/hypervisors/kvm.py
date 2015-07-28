@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -87,7 +87,7 @@ class KVM(object):
         Check whether a given datastore is in use on the hypervisor
         """
         _ = ip
-        return self.sdk.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
+        return self.sdk.is_datastore_available(mountpoint)
 
     def clone_vm(self, vmid, name, disks, wait=False):
         """

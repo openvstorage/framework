@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from ovs.dal.lists.bearertokenlist import BearerTokenList
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 class OAuth2Backend(BaseAuthentication):
@@ -35,6 +35,7 @@ class OAuth2Backend(BaseAuthentication):
         """
         Authenticate method
         """
+        _ = self
         if 'HTTP_AUTHORIZATION' not in request.META:
             return None
         authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')

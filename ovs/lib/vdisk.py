@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,11 +37,13 @@ from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.generic.volatilemutex import VolatileMutex
+from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
-logger = LogHandler('lib', name='vdisk')
+logger = LogHandler.get('lib', name='vdisk')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 
 class VDiskController(object):
@@ -190,26 +192,37 @@ class VDiskController(object):
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        if storagedriver is None:
-            raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
+        try:
+            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+            if storagedriver is None:
+                raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
 
-        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
-        if mds_service is None:
-            raise RuntimeError('Could not find a MDS service')
+            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+            if mds_service is None:
+                raise RuntimeError('Could not find a MDS service')
 
-        logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
-        volume_id = vdisk.storagedriver_client.create_clone(
-            target_path=location,
-            metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                                            port=mds_service.service.ports[0])]),
-            parent_volume_id=str(vdisk.volume_id),
-            parent_snapshot_id=str(snapshotid),
-            node_id=str(vdisk.storagedriver_id)
-        )
+            logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
+            volume_id = vdisk.storagedriver_client.create_clone(
+                target_path=location,
+                metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                                port=mds_service.service.ports[0])]),
+                parent_volume_id=str(vdisk.volume_id),
+                parent_snapshot_id=str(snapshotid),
+                node_id=str(vdisk.storagedriver_id)
+            )
+        except Exception as ex:
+            logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
+            new_vdisk.delete()
+            VDiskController.delete_volume(location)
+            raise
+
         new_vdisk.volume_id = volume_id
         new_vdisk.save()
-        MDSServiceController.ensure_safety(new_vdisk)
+
+        try:
+            MDSServiceController.ensure_safety(new_vdisk)
+        except Exception as ex:
+            logger.error('Caught exception during "ensure_safety" {0}'.format(ex))
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,

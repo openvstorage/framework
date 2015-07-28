@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,9 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('dal', name='dataobject')
 
 
 class MetaClass(type):
@@ -140,7 +143,7 @@ class DataObject(object):
             return super(cls, new_class).__new__(new_class, *args, **kwargs)
         return super(DataObject, cls).__new__(cls)
 
-    def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False):
+    def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False, hook=None):
         """
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
@@ -196,7 +199,7 @@ class DataObject(object):
         # Build base keys
         self._key = '{0}_{1}_{2}'.format(self._namespace, self._classname, self._guid)
 
-        # Version mutex
+        # Worker mutexes
         self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
 
         # Load data from cache or persistent backend where appropriate
@@ -251,9 +254,25 @@ class DataObject(object):
         # Store original data
         self._original = copy.deepcopy(self._data)
 
+        if hook is not None and hasattr(hook, '__call__'):
+            hook()
+
         if not self._new:
-            # Re-cache the object
-            self._volatile.set(self._key, self._data)
+            # Re-cache the object, if required
+            if self._metadata['cache'] is False:
+                # The data wasn't loaded from the cache, so caching is required now
+                try:
+                    self._mutex_version.acquire(30)
+                    this_version = self._data['_version']
+                    store_version = self._persistent.get(self._key)['_version']
+                    if this_version == store_version:
+                        self._volatile.set(self._key, self._data)
+                except KeyNotFoundException:
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
+                        self.__class__.__name__, self._guid
+                    ))
+                finally:
+                    self._mutex_version.release()
 
         # Freeze property creation
         self._frozen = True
@@ -344,12 +363,12 @@ class DataObject(object):
         """
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
-        remote_key   = info['key']
+        remote_key = info['key']
         datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, attribute, self.guid)
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
         else:
-            self._objects[attribute]['data'].merge(datalist.data)
+            self._objects[attribute]['data'].update(datalist.data)
         if info['list'] is True:
             return self._objects[attribute]['data']
         else:
@@ -406,8 +425,10 @@ class DataObject(object):
         else:
             descriptor = Descriptor(value.__class__).descriptor
             if descriptor['identifier'] != self._data[attribute]['identifier']:
+                if descriptor['type'] == self._data[attribute]['type']:
+                    logger.error('Corrupt descriptors: {0} vs {1}'.format(descriptor, self._data[attribute]))
                 raise TypeError('An invalid type was given: {0} instead of {1}'.format(
-                    descriptor['type'],  self._data[attribute]['type']
+                    descriptor['type'], self._data[attribute]['type']
                 ))
             self._objects[attribute] = value
             self._data[attribute]['guid'] = value.guid
@@ -556,15 +577,16 @@ class DataObject(object):
                             else:
                                 reverse_index = {relation.foreign_key: [self.guid]}
                                 self._volatile.set(reverse_key, reverse_index)
-                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
-                reverse_index = self._volatile.get(reverse_key)
-                if reverse_index is None:
-                    reverse_index = {}
-                    relations = RelationMapper.load_foreign_relations(self.__class__)
-                    if relations is not None:
-                        for key, _ in relations.iteritems():
-                            reverse_index[key] = []
-                    self._volatile.set(reverse_key, reverse_index)
+                if self._new is True:
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
+                    reverse_index = self._volatile.get(reverse_key)
+                    if reverse_index is None:
+                        reverse_index = {}
+                        relations = RelationMapper.load_foreign_relations(self.__class__)
+                        if relations is not None:
+                            for key, _ in relations.iteritems():
+                                reverse_index[key] = []
+                        self._volatile.set(reverse_key, reverse_index)
             finally:
                 self._mutex_reverseindex.release()
 
@@ -588,7 +610,7 @@ class DataObject(object):
 
             # Save the data
             try:
-                self._mutex_version.acquire(5)
+                self._mutex_version.acquire(30)
                 this_version = self._data['_version']
                 try:
                     store_version = self._persistent.get(self._key)['_version']
@@ -708,8 +730,8 @@ class DataObject(object):
         """
         Discard all pending changes, reloading the data from the persistent backend
         """
-        self.__init__(guid           = self._guid,
-                      datastore_wins = self._datastore_wins)
+        self.__init__(guid=self._guid,
+                      datastore_wins=self._datastore_wins)
 
     def invalidate_dynamics(self, properties=None):
         """
@@ -819,8 +841,8 @@ class DataObject(object):
         Handles the internal caching of dynamic properties
         """
         caller_name = dynamic.name
-        cache_key   = '{0}_{1}'.format(self._key, caller_name)
-        mutex       = VolatileMutex(cache_key)
+        cache_key = '{0}_{1}'.format(self._key, caller_name)
+        mutex = VolatileMutex(cache_key)
         try:
             cached_data = self._volatile.get(cache_key)
             if cached_data is None:
@@ -861,7 +883,7 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not isinstance(other, DataObject):
+        if not Descriptor.isinstance(other, self.__class__):
             return False
         return self.__hash__() == other.__hash__()
 
@@ -869,6 +891,6 @@ class DataObject(object):
         """
         Checks whether to objects are not the same.
         """
-        if not isinstance(other, DataObject):
+        if not Descriptor.isinstance(other, self.__class__):
             return True
         return not self.__eq__(other)

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ from ovs.lib.mgmtcenter import MgmtCenterController
 
 from celery.exceptions import TimeoutError
 
-logger = LogHandler('api', 'mgmtcenters')
+logger = LogHandler.get('api', 'mgmtcenters')
 
 
 class MgmtCenterViewSet(viewsets.ViewSet):

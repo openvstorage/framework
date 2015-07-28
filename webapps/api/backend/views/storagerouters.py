@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ StorageRouter module
 
 import json
 from rest_framework import status, viewsets
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
 from rest_framework.exceptions import NotAcceptable
@@ -268,3 +267,14 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Initiate a task on 1 storagerouter to update the framework on ALL storagerouters
         """
         return StorageRouterController.update_framework.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def update_volumedriver(self, storagerouter):
+        """
+        Initiate a task on 1 storagerouter to update the volumedriver on ALL storagerouters
+        """
+        return StorageRouterController.update_volumedriver.delay(storagerouter.ip)

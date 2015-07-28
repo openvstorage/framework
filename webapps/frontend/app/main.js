@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ requirejs.config({
         'jquery'     : '../lib/jquery/jquery-1.9.1',
         'jqp'        : '../lib/jquery-plugins/js',
         'd3'         : '../lib/d3/d3.v3.min',
+        'd3p'        : '../lib/d3-plugins/js',
         'ovs'        : '../lib/ovs',
         'i18next'    : '../lib/i18next/i18next.amd.withJQuery-1.7.1'
     },
@@ -40,6 +41,10 @@ requirejs.config({
             exports: 'jQuery'
         },
         'd3': {
+            exports: 'd3'
+        },
+        'd3p/slider': {
+            deps   : ['d3'],
             exports: 'd3'
         }
     },

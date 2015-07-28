@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ Generic persistent factory.
 from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='persistent factory')
+logger = LogHandler.get('extensions', name='persistent factory')
 
 
 class PersistentFactory(object):

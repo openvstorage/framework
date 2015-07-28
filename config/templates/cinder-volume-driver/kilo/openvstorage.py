@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,9 +57,23 @@ CONF = cfg.CONF
 CONF.register_opts(OPTS)
 
 
+# Utils
+def _debug_vol_info(call, volume):
+    """Debug print volume info
+    """
+    vol_info = []
+    for item in sorted(dir(volume)):
+        if not item.startswith('__'):
+            try:
+                vol_info.append("%s: %s" % (item, getattr(volume, item)))
+            except Exception as ex:
+                LOG.info('DEBUG failed %s' % str(ex))
+    LOG.debug('[%s] %s' % (call, str(vol_info)))
+
+
 class OVSVolumeDriver(driver.VolumeDriver):
     """Open vStorage Volume Driver plugin for Cinder"""
-    VERSION = '1.0.6'
+    VERSION = '1.0.7'
 
     def __init__(self, *args, **kwargs):
         """Init: args, kwargs pass through;
@@ -354,6 +368,8 @@ class OVSVolumeDriver(driver.VolumeDriver):
         OVS: Clone from arbitrary volume,
         requires volumedriver 3.6 release > 15.08.2014
         """
+        _debug_vol_info('CLONE_VOL', volume)
+        _debug_vol_info('CLONE_SNAP', snapshot)
 
         mountpoint = self._get_hostname_mountpoint(str(volume.host))
         ovs_snap_disk = self._find_ovs_model_disk_by_snapshot_id(snapshot.id)
@@ -362,31 +378,41 @@ class OVSVolumeDriver(driver.VolumeDriver):
         if not devicename:
             devicename = volume.name
         pmachineguid = self._find_ovs_model_pmachine_guid_by_hostname(
-            six.text_type(volume.host))
+            str(volume.host))
 
-        LOG.debug('[CLONE FROM SNAP] %s %s %s %s',
-                  ovs_snap_disk.guid, snapshot.id, devicename,
-                  pmachineguid)
-        disk_meta = vdisklib.VDiskController.clone(
-            diskguid = ovs_snap_disk.guid,
-            snapshotid = snapshot.id,
-            devicename = devicename,
-            pmachineguid = pmachineguid,
-            machinename = "",
-            machineguid=None)
-        volume['provider_location'] = '{}{}'.format(
-            mountpoint, disk_meta['backingdevice'])
+        LOG.info('[CLONE FROM SNAP] %s %s %s %s'
+                 % (ovs_snap_disk.guid, snapshot.id, devicename, pmachineguid))
+        try:
+            kwargs = dict(diskguid = ovs_snap_disk.guid,
+                          snapshotid = snapshot.id,
+                          devicename = devicename,
+                          pmachineguid = pmachineguid,
+                          machinename = "",
+                          machineguid=None)
+            LOG.debug('[CLONE FROM SNAP] Executing clone - async')
+            # Execute "clone" task async, using celery workers
+            # wait for the result for 30 minutes then raise TimeoutError
+            disk_meta = vdisklib.VDiskController.clone.apply_async(
+                kwargs = kwargs).get(timeout = 1800)
+            LOG.debug('[CLONE FROM SNAP] Executing clone - async - DONE')
+            volume['provider_location'] = '{}{}'.format(
+                mountpoint, disk_meta['backingdevice'])
 
-        LOG.debug('[CLONE FROM SNAP] Meta: %s', six.text_type(disk_meta))
-        LOG.debug('[CLONE FROM SNAP] New volume %s',
-                  volume['provider_location'])
-        vdisk = vdiskhybrid.VDisk(disk_meta['diskguid'])
-        vdisk.cinder_id = volume.id
-        vdisk.name = devicename
-        vdisk.save()
+            LOG.debug('[CLONE FROM SNAP] Meta: %s' % str(disk_meta))
+            LOG.debug('[CLONE FROM SNAP] New volume %s'
+                      % volume['provider_location'])
+            vdisk = vdiskhybrid.VDisk(disk_meta['diskguid'])
+            vdisk.cinder_id = volume.id
+            vdisk.name = devicename
+            vdisk.save()
+        except Exception as ex:
+            LOG.error('CLONE FROM SNAP: Internal error %s ' % str(ex))
+            self.delete_volume(volume)
+            raise
 
         return {'provider_location': volume['provider_location'],
                 'display_name': volume['display_name']}
+
 
     # Attach/detach volume to instance/host
 

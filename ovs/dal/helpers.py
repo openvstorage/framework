@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,15 +16,16 @@
 Module containing certain helper classes providing various logic
 """
 
-import re
 import os
 import imp
 import copy
-import logging
 import inspect
 import hashlib
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('dal', name='helper')
 
 
 class Descriptor(object):
@@ -35,7 +36,7 @@ class Descriptor(object):
 
     object_cache = {}
 
-    def __init__(self, object_type=None, guid=None):
+    def __init__(self, object_type=None, guid=None, cached=True):
         """
         Initializes a descriptor for a given type. Optionally already providing a guid for the
         instanciator
@@ -48,19 +49,31 @@ class Descriptor(object):
             self.initialized = False
         else:
             self.initialized = True
-
-            key = 'ovs_descriptor_{0}'.format(re.sub('[\W_]+', '', str(object_type)))
             self._volatile = VolatileFactory.get_client()
+
+            type_name = object_type.__name__
+            module_name = object_type.__module__.split('.')[-1]
+            fqm_name = 'ovs.dal.hybrids.{0}'.format(module_name)
+            try:
+                module = __import__(fqm_name, level=0, fromlist=[type_name])
+                _ = getattr(module, type_name)
+            except (ImportError, AttributeError):
+                logger.info('Received object type {0} is not a hybrid'.format(object_type))
+                raise TypeError('Invalid type for Descriptor: {0}'.format(object_type))
+            identifier = '{0}_{1}'.format(type_name, hashlib.sha1(fqm_name).hexdigest())
+            key = 'ovs_descriptor_{0}'.format(identifier)
+
             self._descriptor = self._volatile.get(key)
-            if self._descriptor is None:
+            if self._descriptor is None or cached is False:
+                if self._descriptor is None:
+                    logger.debug('Object type {0} was translated to {1}.{2}'.format(
+                        object_type, fqm_name, type_name
+                    ))
                 Toolbox.log_cache_hit('descriptor', False)
-                filename = inspect.getfile(object_type).replace('.pyc', '.py')
-                name = filename.replace(os.path.dirname(filename) + os.path.sep, '').replace('.py', '')
-                source = os.path.relpath(filename, os.path.dirname(__file__))
-                self._descriptor = {'name': name,
-                                    'source': source,
-                                    'type': object_type.__name__,
-                                    'identifier': name + '_' + hashlib.sha256(name + source + object_type.__name__).hexdigest()}
+                self._descriptor = {'fqmn': fqm_name,
+                                    'type': type_name,
+                                    'identifier': identifier,
+                                    'version': 3}
                 self._volatile.set(key, self._descriptor)
             else:
                 Toolbox.log_cache_hit('descriptor', True)
@@ -92,9 +105,9 @@ class Descriptor(object):
             raise RuntimeError('Descriptor not yet initialized')
 
         if self._descriptor['identifier'] not in Descriptor.object_cache:
-            filename = os.path.join(os.path.dirname(__file__), self._descriptor['source'])
-            module = imp.load_source(self._descriptor['name'], filename)
-            cls = getattr(module, self._descriptor['type'])
+            type_name = self._descriptor['type']
+            module = __import__(self._descriptor['fqmn'], level=0, fromlist=[type_name])
+            cls = getattr(module, type_name)
             Descriptor.object_cache[self._descriptor['identifier']] = cls
         else:
             cls = Descriptor.object_cache[self._descriptor['identifier']]
@@ -105,11 +118,27 @@ class Descriptor(object):
         else:
             return cls
 
+    @staticmethod
+    def isinstance(instance, object_type):
+        """"
+        Checks (based on descriptors) whether a given instance is of a given type
+        """
+        try:
+            return Descriptor(instance.__class__) == Descriptor(object_type)
+        except TypeError:
+            return isinstance(instance, object_type)
+
     def __eq__(self, other):
         """
         Checks the descriptor identifiers
         """
         return self._descriptor['identifier'] == other.descriptor['identifier']
+
+    def __ne__(self, other):
+        """
+        Checks the descriptor identifiers
+        """
+        return not self.__eq__(other)
 
 
 class HybridRunner(object):
@@ -140,7 +169,10 @@ class HybridRunner(object):
                         if inspect.isclass(member[1]) \
                                 and member[1].__module__ == name:
                             current_class = member[1]
-                            current_descriptor = Descriptor(current_class).descriptor
+                            try:
+                                current_descriptor = Descriptor(current_class).descriptor
+                            except TypeError:
+                                continue
                             current_identifier = current_descriptor['identifier']
                             if current_identifier not in translation_table:
                                 translation_table[current_identifier] = current_descriptor
@@ -269,9 +301,6 @@ class Migration(object):
         a always increasing by one
         """
 
-        loglevel = logging.root.manager.disable  # Workaround for disabling Arakoon logging
-        logging.disable('WARNING')
-
         def execute(function, start, end):
             """
             Executes a single migration, syncing versions
@@ -305,5 +334,3 @@ class Migration(object):
             data[identifier] = new_version
 
         persistent.set(key, data)
-
-        logging.disable(loglevel)  # Restore workaround

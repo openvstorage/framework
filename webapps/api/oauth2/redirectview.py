@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.rolelist import RoleList
 from oauth2.toolbox import Toolbox
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
 class OAuth2RedirectView(View):

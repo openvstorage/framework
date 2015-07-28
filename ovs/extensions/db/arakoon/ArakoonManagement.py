@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +22,13 @@ import subprocess
 from ConfigParser import RawConfigParser
 
 from arakoon.Arakoon import ArakoonClientConfig, ArakoonClient
-from arakoon.ArakoonManagement import ArakoonManagement, ArakoonCluster, logging
+from arakoon.ArakoonManagement import ArakoonManagement, ArakoonCluster
 from ovs.extensions.generic.system import System
+from ovs.log.logHandler import LogHandler
 
 config_dir = '/opt/OpenvStorage/config'
+
+logging = LogHandler.get('arakoon', name='arakoon_management')
 
 
 class ArakoonManagementEx(ArakoonManagement):

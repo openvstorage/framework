@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -106,7 +106,7 @@ class VDiskList(object):
         vdisks = DataList({'object': VDisk,
                            'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
-                                     'items':[('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
+                                     'items': [('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
 
         # pylint: enable=line-too-long
         return DataObjectList(vdisks, VDisk)

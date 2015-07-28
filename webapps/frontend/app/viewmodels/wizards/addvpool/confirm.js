@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -53,7 +53,13 @@ define([
                         integratemgmt: self.data.integratemgmt()
                     }
                 };
-                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })
+                var target_guid;
+                if (self.data.extendVpool() === true) {
+                    target_guid = self.data.storageRouter().guid()
+                } else {
+                    target_guid = self.data.target().guid()
+                }
+                api.post('storagerouters/' + target_guid + '/add_vpool', { data: post_data })
                         .then(shared.tasks.wait)
                         .done(function() {
                             generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.addvpool.confirm.success', { what: self.data.name() }));

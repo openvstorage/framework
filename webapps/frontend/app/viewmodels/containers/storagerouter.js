@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -101,12 +101,22 @@ define([
                 api.get('storagerouters/' + self.guid() + '/get_update_status')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
+                        if (data.framework.length > 0) {
+                            data.framework.sort(function(a, b) {
+                                return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+                            });
+                        }
+                        if (data.volumedriver.length > 0) {
+                            data.volumedriver.sort(function(a, b) {
+                                return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+                            });
+                        }
                         self.updates(data);
                         deferred.resolve();
                     })
                     .fail(deferred.reject);
             }).promise();
-        }
+        };
         self.getDisks = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadDisks)) {
@@ -136,7 +146,7 @@ define([
                                 }
                             });
                             self.disks.sort(function(a, b) {
-                                return a.name() > b.name();
+                                return a.name() < b.name() ? -1 : (a.name() > b.name() ? 1 : 0);
                             });
                             self.disksLoaded(true);
                             deferred.resolve();
@@ -212,7 +222,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
-                self.iops(stats.operations_ps);
+                self.iops(stats['4k_operations_ps']);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);

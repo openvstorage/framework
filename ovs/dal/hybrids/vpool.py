@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ class VPool(DataObject):
                     Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domainname, Zone, ...) for the Storage BackendType.'),
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('status',      str, 10),
-                  Dynamic('statistics',  dict, 4, locked=True),
+    __dynamics = [Dynamic('status', str, 10),
+                  Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60)]
 
     def _status(self):

@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,6 +68,8 @@ class Upstart(object):
 
         for key, value in params.iteritems():
             template_file = template_file.replace('<{0}>'.format(key), value)
+        if '<SERVICE_NAME>' in template_conf:
+            template_conf = template_conf.replace('<SERVICE_NAME>', name.lstrip('ovs-'))
 
         if additional_dependencies:
             dependencies = ''

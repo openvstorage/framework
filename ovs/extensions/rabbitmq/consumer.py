@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='consumer')
+logger = LogHandler.get('extensions', name='consumer')
 logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 KVM_RUN = '/run/libvirt/qemu/'
@@ -70,7 +70,7 @@ def callback(ch, method, properties, body):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description = 'KVM File Watcher and Rabbitmq Event Processor for OVS',
-                                    formatter_class = argparse.RawDescriptionHelpFormatter)
+                                     formatter_class = argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument('rabbitmq_queue', type=str,
                         help='Rabbitmq queue name')
@@ -146,8 +146,8 @@ if __name__ == '__main__':
                                                   port=int(server.split(':')[1]),
                                                   credentials=pika.PlainCredentials(
                                                       Configuration.get('ovs.core.broker.login'),
-                                                      Configuration.get('ovs.core.broker.password')
-                                                  ))
+                                                      Configuration.get('ovs.core.broker.password'))
+                                                  )
                     )
                     channel = connection.channel()
                     break

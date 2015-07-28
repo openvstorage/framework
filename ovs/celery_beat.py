@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('celery', name='celery beat')
+logger = LogHandler.get('celery', name='celery beat')
 
 
 class DistributedScheduler(Scheduler):

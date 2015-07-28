@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic) {
+define([
+    'knockout', 'jquery', 'd3', 'ovs/generic', 'd3p/slider'
+], function(ko, $, d3, generic, Slider) {
     "use strict";
     ko.bindingHandlers.status = {
         init: function(element) {
@@ -224,6 +226,29 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
                 }
             }
             $(element).html(value);
+        }
+    };
+    ko.bindingHandlers.slider = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor(),
+                id = 'id_' + generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
+            $(element).attr('id', id);
+            $(element).data('slider', new Slider());
+            d3.select('#' + id).call(
+                $(element).data('slider')
+                    .value(value())
+                    .axis(true)
+                    .min(value.min)
+                    .max(value.max)
+                    .step(1)
+                    .on('slide', function(event, newValue) {
+                        value(newValue);
+                    })
+            );
+        },
+        update: function(element, valueAccessor) {
+            var value = valueAccessor();
+            $(element).data('slider').value(value());
         }
     };
     ko.bindingHandlers.let = {

@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
     'ovs/shared', 'ovs/generic',
     'jqp/timeago'
-], function(router, dialog, $, shared, generic, _) {
+], function(router, dialog, $, shared, generic) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];

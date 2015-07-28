@@ -15,7 +15,6 @@ limitations under the License.
 """
 
 import socket
-import logging
 import struct
 
 

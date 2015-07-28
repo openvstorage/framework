@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ celery.conf.CELERY_ACKS_LATE = True          # This, together with the below PRE
 celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # workers basically won't be prefetching tasks, to prevent deadlocks
 celery.conf.CELERYBEAT_SCHEDULE = {}
 
-loghandler = LogHandler('celery', name='celery')
+loghandler = LogHandler.get('celery', name='celery')
 
 
 @task_postrun.connect

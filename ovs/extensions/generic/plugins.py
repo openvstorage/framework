@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import time
 from ovs.extensions.services.service import ServiceManager
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.generic.system import System
 
 
@@ -29,9 +29,14 @@ class PluginManager(object):
             # If the watcher is running, 'ovs setup' was executed and we need to restart everything to load
             # the plugin. In the other case, the plugin will be loaded once 'ovs setup' is executed
             from ovs.dal.lists.storagerouterlist import StorageRouterList
-            ips = [storagerouter.ip for storagerouter in StorageRouterList.get_storagerouters()]
-            for ip in ips:
-                client = SSHClient(ip, username='root')
+            clients = []
+            try:
+                for storagerouter in StorageRouterList.get_storagerouters():
+                    clients.append(SSHClient(storagerouter, username='root'))
+            except UnableToConnectException:
+                raise RuntimeError('Not all StorageRouters are reachable')
+
+            for client in clients:
                 for service_name in ['watcher-framework', 'memcached']:
                     ServiceManager.stop_service(service_name, client=client)
                     wait = 30
@@ -43,8 +48,7 @@ class PluginManager(object):
                     if wait == 0:
                         raise RuntimeError('Could not stop service: {0}'.format(service_name))
 
-            for ip in ips:
-                client = SSHClient(ip, username='root')
+            for client in clients:
                 for service_name in ['memcached', 'watcher-framework']:
                     ServiceManager.start_service(service_name, client=client)
                     wait = 30

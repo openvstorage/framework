@@ -1,11 +1,14 @@
 import os
 import ConfigParser
 import shutil
-import logging
 import subprocess
 import StringIO
 import fnmatch
 import sys
+from ovs.log.logHandler import LogHandler
+
+logging = LogHandler.get('arakoon', name='internal')
+
 
 class Status:
     HALTED = 'HALTED'

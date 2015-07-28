@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 import re
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='fstab')
+logger = LogHandler.get('extensions', name='fstab')
 
 
 class Fstab(object):
@@ -65,7 +65,7 @@ class Fstab(object):
         @param fs_passno: fsck value
         """
         logger.debug(
-            "/etc/fstab: appending entry %s %s %s %s %s %s to %s" % \
+            "/etc/fstab: appending entry %s %s %s %s %s %s to %s" %
             (fs_spec, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
         )
         f = open(self.fstab_file, 'a')
@@ -84,7 +84,7 @@ class Fstab(object):
         @param fs_passno: fsck value
         """
         logger.debug(
-            "%s: modifying entry %s to %s %s %s %s %s to %s" % \
+            "%s: modifying entry %s to %s %s %s %s %s to %s" %
             (self.fstab_file, device, fs_file, fs_vfstype, fs_mntops, fs_freq, fs_passno, self.fstab_file)
         )
 

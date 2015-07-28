@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +13,5 @@
 # limitations under the License.
 
 """
-This package contains the openstack cinder driver
-
-Tested on devstack
-/opt/devstack# cinder --version
-1.0.9.23
-/opt/devstack# nova --version
-2.18.0.8
-/opt/devstack# glance --version
-0.13.1.6
-
-Copy the ovs_volume_driver.py to /opt/stack/cinder/cinder/volume/drivers/ovs_volume_driver.py
-
-See also:
-http://confluence.cloudfounders.com/display/RES/Installation+of+Cinder+plugin+on+DevStack
+Packaging/generic package
 """

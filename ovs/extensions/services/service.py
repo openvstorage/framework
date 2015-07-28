@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ from ovs.extensions.services.upstart import Upstart
 from ovs.extensions.services.systemd import Systemd
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='servicemanager')
+logger = LogHandler.get('extensions', name='servicemanager')
 
 
 class ServiceManager(object):

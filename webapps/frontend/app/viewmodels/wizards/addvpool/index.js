@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,18 +22,31 @@ define([
         build(self);
 
         // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
+        data.extendVpool(generic.tryGet(options, 'extendVpool', false));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new GatherVPool(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
+
+        if (data.extendVpool() === true) {
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.extendvpool.title')));
+            self.steps([new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
+            self.storagedriver_guid = "";
+            data.storageRouter(options.pendingStorageRouters()[0]);
+            data.target(options.pendingStorageRouters()[0]);
+        } else {
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
+            self.steps([new GatherVPool(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
+            data.storageRouter([]);
+            data.target(undefined);
+        }
+        data.vPool(options.vPool);
+        data.storageDriver(options.storagedriver);
         self.step(0);
         self.activateStep();
 
         // Cleaning data
-        data.target(undefined);
         data.accesskey('');
         data.secretkey('');
         data.backend('local');
-        data.mtptTemp(undefined);
+        data.mtptTemp('/var/tmp');
         data.mtptBFS(undefined);
         data.mtptReadCaches([]);
         data.mtptWriteCaches([]);

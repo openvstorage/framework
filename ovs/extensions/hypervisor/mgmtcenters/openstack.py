@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import os
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.hypervisor.mgmtcenters.management.openstack_mgmt import OpenStackManagement
 
-logger = LogHandler('lib', name='openstack_mgmt')
+logger = LogHandler.get('extensions', name='openstack_mgmt')
 
 class OpenStack(object):
     """
@@ -57,7 +57,7 @@ class OpenStack(object):
         self.management = OpenStackManagement(cinder_client = self.cinder_client)
         self.metadata = {}
         self.config_cinder = False
-        self.STATE_MAPPING = {'up' : 'RUNNING'}
+        self.STATE_MAPPING = {'up': 'RUNNING'}
 
         logger.debug('Init complete')
 
@@ -66,6 +66,7 @@ class OpenStack(object):
         Get specific config values:
         - config_cinder (first time comes from GUI integratemgmt: True/False)
         """
+        _ = self
         config_cinder = parameters.get('integratemgmt', metadata.get('integratemgmt', False))
         return {'integratemgmt': config_cinder}
 
@@ -76,7 +77,6 @@ class OpenStack(object):
         self.metadata = metadata
         self.config_cinder = metadata.get('integratemgmt')
         logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
-
 
     def configure_vpool(self, vpool_name, mountpoint):
         if self.config_cinder:
