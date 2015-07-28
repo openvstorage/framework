@@ -67,13 +67,15 @@ class Systemd(object):
 
         for key, value in params.iteritems():
             template_file = template_file.replace('<{0}>'.format(key), value)
+        if '<SERVICE_NAME>' in template_file:
+            template_file = template_file.replace('<SERVICE_NAME>', name.lstrip('ovs-'))
 
         if additional_dependencies:
             dependencies = ''
             for service in additional_dependencies:
                 dependencies += '{0}.service '.format(service)
             template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
-            
+
         if target_name is None:
             client.file_write('/lib/systemd/system/{0}.service'.format(name), template_file)
         else:
@@ -118,7 +120,7 @@ class Systemd(object):
     @staticmethod
     def enable_service(name, client):
         name = Systemd._get_name(name, client)
-        try:           
+        try:
             client.run('systemctl enable {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
@@ -162,7 +164,7 @@ class Systemd(object):
             return True
         except ValueError:
             return False
-        
+
     @staticmethod
     def is_enabled(name, client):
         name = Systemd._get_name(name, client)
