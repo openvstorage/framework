@@ -787,8 +787,8 @@ class StorageRouterController(object):
                         try:
                             client.run('alba proxy-statistics --host 127.0.0.1 --port {0}'.format(port))
                             running = True
-                        except CalledProcessError:
-                            pass
+                        except CalledProcessError as ex:
+                            logger.debug('Got error fetching Alba proxy-statistics, ignoring. {0}'.format(ex))
                     if running is False:
                         raise RuntimeError('Alba proxy failed to start')
                     logger.debug('Alba proxy running')
@@ -824,8 +824,8 @@ class StorageRouterController(object):
                     client.run('virsh pool-destroy {0}'.format(vpool.name))
                     try:
                         client.run('virsh pool-undefine {0}'.format(vpool.name))
-                    except:
-                        pass  # Ignore undefine errors, since that can happen on re-entrance
+                    except Exception as ex:
+                        logger.info('Got error during pool-undefine: {0}'.format(ex))
                     break
 
         # Remove services
