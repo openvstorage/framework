@@ -37,6 +37,7 @@ define([
             data.storageRouter([]);
             data.target(undefined);
         }
+        data.completed = options.completed;
         data.vPool(options.vPool);
         data.storageDriver(options.storagedriver);
         self.step(0);
