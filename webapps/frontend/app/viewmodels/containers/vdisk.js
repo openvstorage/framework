@@ -84,7 +84,7 @@ define([
             }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
-                self.iops(stats['4k_operations_ps']);
+                self.iops(stats.operations_ps);
                 self.cacheHits(stats.cache_hits_ps);
                 self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
