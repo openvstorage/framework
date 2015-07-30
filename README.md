@@ -25,5 +25,5 @@ Packaging your own changes for testing can be done using the [packager module](p
 
 ## Nightly tests
 
-A view on the different sets of Nightly test runs can be found [here](http://testrail.openvstorage.com/index.php?/runs/overview/12).
+A view on the different sets of Nightly test runs can be found [here](http://testrail.openvstorage.com/index.php?/runs/overview/10).
 Email address ovs-guest@openvstorage.com with password 0vsgu3st should allow you to login and view the results
