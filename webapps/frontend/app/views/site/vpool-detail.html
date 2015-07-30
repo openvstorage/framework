@@ -203,7 +203,12 @@ limitations under the License.
                                         <label data-bind="attr: { for: 'storagerouter_' + guid() }" style="font-weight: normal; margin-left: 7px; margin-right: 7px;">
                                             <span data-bind="text: name"></span>
                                         </label>
-                                        <button type="button" class="btn btn-mini btn-default" data-bind="click: $root.addStorageRouter, attr: { id: 'button_add_' + guid() }">
+                                        <button type="button"
+                                                class="btn btn-mini btn-default"
+                                                data-bind="click: $root.addStorageRouter,
+                                                           attr: { id: 'button_add_' + guid()},
+                                                           enable: $root.updatingStorageRouters() === false,
+                                                           visible: $root.updatingStorageRouters() === false ">
                                             <span class="fa" data-i18n="[html]ovs:icons.add"></span>
                                         </button>
                                     </div>
@@ -211,7 +216,12 @@ limitations under the License.
                                         <label data-bind="attr: { for: 'storagerouter_' + guid() }" style="font-weight: normal; margin-left: 7px; margin-right: 7px;">
                                             <span data-bind="text: name"></span>
                                         </label>
-                                        <button type="button" class="btn btn-mini btn-default" data-bind="click: $root.removeStorageRouter,  attr: { id: 'button_remove_' + guid() }">
+                                        <button type="button"
+                                                class="btn btn-mini btn-default"
+                                                data-bind="click: $root.removeStorageRouter,
+                                                           attr: { id: 'button_remove_' + guid()},
+                                                           enable: $root.updatingStorageRouters() === false,
+                                                           visible: $root.updatingStorageRouters() === false ">
                                             <span class="fa" data-i18n="[html]ovs:icons.delete"></span>
                                         </button>
                                     </div>

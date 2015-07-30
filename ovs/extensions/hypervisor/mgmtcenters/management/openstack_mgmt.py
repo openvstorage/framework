@@ -120,7 +120,7 @@ class OpenStackManagement(object):
     @staticmethod
     def _get_remote_driver_version(location):
         """
-        Get VERSION string from downloaded driver
+        Get VERSION string from updated driver
         """
         with open(location, 'r') as f:
             for line in f.readlines():
@@ -130,15 +130,13 @@ class OpenStackManagement(object):
 
     def _get_driver_code(self):
         """
-        WGET driver, compare versions, allow local code to be updated from OVS repo until driver is patched upstream
+        CP driver, compare versions, allow local code to be updated with version from current package
         """
         version = OpenStackManagement._get_version()
-        remote_driver = "https://bitbucket.org/openvstorage/openvstorage/raw/default/openstack/cinder-volume-driver/%s/openvstorage.py" % version
-        temp_location = "/tmp/openvstorage.py"
-        self.client.run('wget {0} -P /tmp'.format(remote_driver))
+        remote_driver = "/opt/OpenvStorage/config/templates/cinder-volume-driver/%s/openvstorage.py" % version
 
         existing_version = OpenStackManagement._get_existing_driver_version()
-        remote_version = OpenStackManagement._get_remote_driver_version(temp_location)
+        remote_version = OpenStackManagement._get_remote_driver_version(remote_driver)
         if self.is_devstack:
             cinder_base_path = OpenStackManagement._get_base_path('cinder')
             local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
@@ -149,12 +147,12 @@ class OpenStackManagement(object):
         if remote_version > existing_version:
             logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
             if self.is_devstack:
-                self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(temp_location))
+                self.client.run('cp {0} /opt/stack/cinder/cinder/volume/drivers'.format(remote_driver))
             elif self.is_openstack:
-                self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(temp_location))
+                self.client.run('cp {0} /usr/lib/python2.7/dist-packages/cinder/volume/drivers'.format(remote_driver))
         else:
             logger.debug('Using driver {0} version {1}'.format(local_driver, existing_version))
-        self.client.run('rm {0}'.format(temp_location))
+
 
     def _is_devstack(self):
         try:

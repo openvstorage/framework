@@ -1276,6 +1276,34 @@ class Basic(TestCase):
         with self.assertRaises(ObjectNotFoundException):
             _ = TestMachine(guid, hook=delete)
 
+    def test_object_save_reverseindex_build(self):
+        """
+        Validates whether saving an object won't create an empty reverse index if not required
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        key = 'ovs_reverseindex_testemachine_{0}'.format(machine.guid)
+        self.assertIsNotNone(VolatileFactory.store.get(key), 'The reverse index should be created (save on new object)')
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+        VolatileFactory.store.delete(key)
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+        VolatileFactory.store.delete(key)
+        machine.save()
+        self.assertIsNone(VolatileFactory.store.get(key), 'The reverse index should not be created (save on existing object)')
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

@@ -66,6 +66,11 @@ define([
                         })
                         .fail(function() {
                             generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.addvpool.confirm.creating') }));
+                        })
+                        .always(function() {
+                            if (self.data.completed !== undefined) {
+                                self.data.completed.resolve(true);
+                            }
                         });
                 generic.alertInfo($.t('ovs:wizards.addvpool.confirm.started'), $.t('ovs:wizards.addvpool.confirm.inprogress', { what: self.data.name() }));
                 deferred.resolve();

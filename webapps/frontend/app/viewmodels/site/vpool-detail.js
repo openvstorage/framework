@@ -251,9 +251,9 @@ define([
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
 
-            var deferred = $.Deferred(), addingStorageRouter = ko.observableArray();
+            var deferred = $.Deferred(), wizard, addingStorageRouter = ko.observableArray();
             addingStorageRouter.push(sr);
-            var wizard = new AddVpoolMountpoints({
+            wizard = new AddVpoolMountpoints({
                 modal: true,
                 completed: deferred,
                 vPool: self.vPool(),
@@ -287,7 +287,6 @@ define([
                 removingStorageRouters: removingStorageRouter
             });
             wizard.closing.always(function() {
-                //self.load();
                 deferred.resolve();
             });
             wizard.finishing.always(function() {
