@@ -12,7 +12,7 @@ The Open vStorage Framework is built using python (Django, Celery) and javascrip
 
 ## Get started
 
-On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an install](https://www.openvstorage.org/doc/Installation)
+On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an installation](https://www.openvstorage.org/doc/Installation).
 
 ## Support
 * For community support, please visit our [community support forum](https://groups.google.com/forum/#!forum/open-vstorage)
