@@ -21,7 +21,7 @@ from ovs.log.logHandler import LogHandler
 
 EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
-logger = LogHandler('extensions', name='servicemanager')
+logger = LogHandler.get('extensions', name='servicemanager')
 
 class Upstart(object):
     """

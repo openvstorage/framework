@@ -20,7 +20,7 @@ from subprocess import CalledProcessError
 from ovs.log.logHandler import LogHandler
 
 EXPORT = 'Environment=PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps'
-logger = LogHandler('extensions', name='servicemanager')
+logger = LogHandler.get('extensions', name='servicemanager')
 
 class Systemd(object):
     """

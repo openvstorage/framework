@@ -50,7 +50,7 @@ class OpenStackManagement(object):
 
     @property
     def is_openstack(self):
-        return OpenStackManagement._is_openstack()
+        return self._is_openstack()
 
     @property
     def is_cinder_running(self):
@@ -161,8 +161,7 @@ class OpenStackManagement(object):
         except SystemExit:  # ssh client raises system exit 1
             return False
 
-    @staticmethod
-    def _is_openstack():
+    def _is_openstack(self):
         cinder_service = OSManager.get_openstack_cinder_service_name()
         return ServiceManager.has_service(cinder_service, self.client)
 
@@ -481,8 +480,6 @@ if vpool_name in enabled_backends:
             nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(driver_location)
             nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(driver_location)
             cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(driver_location)
-        else:
-            raise ValueError('OpenStack or DevStack only')
         else:
             raise ValueError('OpenStack or DevStack only')
 

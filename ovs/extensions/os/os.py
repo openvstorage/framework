@@ -21,7 +21,7 @@ from ovs.extensions.os.ubuntu import Ubuntu
 from ovs.extensions.os.centos import Centos
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='osmanager')
+logger = LogHandler.get('extensions', name='osmanager')
 
 
 class OSManager(object):
