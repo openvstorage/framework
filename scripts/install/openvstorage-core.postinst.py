@@ -16,9 +16,14 @@
 import os
 import re
 from subprocess import check_output
-from ovs.extensions.os.os import OSManager
 
 SECRET_KEY_LENGTH = 50
+
+dist_info = check_output('cat /etc/os-release', shell=True)
+if 'CentOS Linux' in dist_info:
+    ssh_service = 'sshd'
+else:  # Default fallback to Ubuntu in this case
+    ssh_service = 'ssh'
 
 
 def file_read(fn):
@@ -96,7 +101,6 @@ if os.path.isfile(config_file):
     file_write(config_file, '{0}\n'.format('\n'.join(new_contents)))
 ssh_content_after = file_read(config_file)
 if ssh_content_after != ssh_content_before:
-    ssh_service = OSManager.get_ssh_service_name()
     check_output('service {0} restart'.format(ssh_service), shell=True)
 
 # Configure coredumps

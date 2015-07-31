@@ -20,7 +20,12 @@ import string
 import sys
 import json
 from subprocess import check_output, CalledProcessError
-from ovs.extensions.os.os import OSManager
+
+dist_info = check_output('cat /etc/os-release', shell=True)
+if 'CentOS Linux' in dist_info:
+    openstack_webservice_name = 'httpd'
+else:  # Default fallback to Ubuntu in this case
+    openstack_webservice_name = 'apache2'
 
 # Remove existing enabled sites, taking control over nginx
 if os.path.exists('/etc/nginx/sites-enabled/default'):
@@ -82,8 +87,7 @@ for filename in filenames:
 
 # Check conflicts with apache2 running on port 80 (most likely devstack/openstack gui)
 try:
-    web_service = OSManager.get_openstack_web_service_name()
-    running = check_output('ps aux | grep {0} | grep -v grep'.format(web_service), shell=True)
+    running = check_output('ps aux | grep {0} | grep -v grep'.format(openstack_webservice_name), shell=True)
 except CalledProcessError:
     running = False
 if running:
