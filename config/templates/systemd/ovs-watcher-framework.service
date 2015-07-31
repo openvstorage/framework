@@ -1,0 +1,17 @@
+[Unit]
+Description=Watcher for Open vStorage master services
+Wants=ovs-nginx.service ovs-openstack-events-consumer.service ovs-scheduled-tasks.service ovs-snmp.service ovs-volumerouter-consumer.service ovs-webapp-api.service ovs-workers.service
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/OpenvStorage
+# The watcher will block until all services are running
+ExecStartPre=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py framework wait
+# The waiter will block until one of the services is not reachable anymore
+ExecStart=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py framework check
+Restart=on-failure
+TimeoutStopSec=3600
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

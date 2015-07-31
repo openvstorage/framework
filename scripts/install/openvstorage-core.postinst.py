@@ -16,6 +16,9 @@
 import os
 import re
 from subprocess import check_output
+from ovs.extensions.os.os import OSManager
+
+SECRET_KEY_LENGTH = 50
 
 
 def file_read(fn):
@@ -30,11 +33,14 @@ def file_write(fn, cts):
 # Disable/stop default services. Will be replaced by upstart scripts
 run_level_regex = '^[KS][0-9]{2}(.*)'
 for service_name in ('rabbitmq-server', 'memcached'):
-    service_configured = True
+    service_configured = False
     for run_level in range(7):
-        if service_name not in [re.match(run_level_regex, run_entry).groups()[0] for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)) if re.match(run_level_regex, run_entry)]:
-            service_configured &= False
-    if service_configured is False:
+        for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)):
+            if re.match(run_level_regex, run_entry) and service_name in run_entry:
+                service_configured = True
+                break
+
+    if service_configured is True:
         check_output('service {0} stop'.format(service_name), shell=True)
         check_output('update-rc.d {0} disable'.format(service_name), shell=True)
 
@@ -44,13 +50,14 @@ check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True
 
 # Few logstash cleanups
 check_output('usermod -a -G adm logstash', shell=True)
-check_output('echo manual > /etc/init/logstash-web.override', shell=True)
+if os.path.exists('/etc/init/logstash-web.conf'):
+    check_output('echo manual > /etc/init/logstash-web.override', shell=True)
 
 # Configure logging
 check_output('chmod 755 /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh', shell=True)
 if not os.path.exists('/etc/rsyslog.d/90-ovs.conf') or '$KLogPermitNonKernelFacility on' not in file_read('/etc/rsyslog.d/90-ovs.conf'):
     check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
-    check_output('restart rsyslog', shell=True)
+    check_output('service rsyslog restart', shell=True)
 
 # Add crontabs
 cron_contents = check_output('crontab -l 2>/dev/null || true', shell=True).splitlines()
@@ -89,7 +96,8 @@ if os.path.isfile(config_file):
     file_write(config_file, '{0}\n'.format('\n'.join(new_contents)))
 ssh_content_after = file_read(config_file)
 if ssh_content_after != ssh_content_before:
-    check_output('service ssh restart', shell=True)
+    ssh_service = OSManager.get_ssh_service_name()
+    check_output('service {0} restart'.format(ssh_service), shell=True)
 
 # Configure coredumps
 limits_file = '/etc/security/limits.conf'

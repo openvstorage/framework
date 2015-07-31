@@ -1,0 +1,16 @@
+[Unit]
+Description=ovs openstack events consumer
+Requires=ovs-watcher-framework.service
+After=ovs-watcher-framework.service
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/OpenvStorage
+WorkingDirectory=/opt/OpenvStorage
+ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/rabbitmq/consumer.py notifications.info
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

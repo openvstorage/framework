@@ -18,7 +18,7 @@ Service Factory module
 
 from subprocess import check_output
 from ovs.extensions.services.upstart import Upstart
-# from ovs.extensions.services.systemd import SystemD
+from ovs.extensions.services.systemd import Systemd
 from ovs.log.logHandler import LogHandler
 
 logger = LogHandler.get('extensions', name='servicemanager')
@@ -42,12 +42,16 @@ class ServiceManager(object):
             _ = cls
             if ServiceManager.ImplementationClass is None:
                 try:
-                    init_info = check_output('init --version', shell=True)
+                    init_info = check_output('cat /proc/1/comm', shell=True)
                     # All service classes used in below code should share the exact same interface!
-                    if 'upstart' in init_info:
-                        ServiceManager.ImplementationClass = Upstart
-                    # elif 'systemd' in init_info:
-                    #     ServiceManager.ImplementationClass = SystemD
+                    if 'init' in init_info:
+                        version_info = check_output('init --version', shell=True)
+                        if 'upstart' in version_info:
+                            ServiceManager.ImplementationClass = Upstart
+                        else:
+                            raise RuntimeError('The ServiceManager is unrecognizable')
+                    elif 'systemd' in init_info:
+                        ServiceManager.ImplementationClass = Systemd
                     else:
                         raise RuntimeError('There was no known ServiceManager detected')
                 except Exception as ex:

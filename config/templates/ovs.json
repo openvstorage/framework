@@ -72,5 +72,8 @@
     "plugins": {
         "generic": [],
         "backends": []
+    },
+    "path": {
+        "celery": []
     }
 }

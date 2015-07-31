@@ -1,4 +1,4 @@
-# Copyright 2015 Open vStorage NV
+# Copyright 2015 CloudFounders NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,26 +13,25 @@
 # limitations under the License.
 
 """
-Upstart module
+Systemd module
 """
 
 from subprocess import CalledProcessError
 from ovs.log.logHandler import LogHandler
 
-EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
-EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
+EXPORT = 'Environment=PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps'
 logger = LogHandler.get('extensions', name='servicemanager')
 
-class Upstart(object):
+class Systemd(object):
     """
-    Contains all logic related to Upstart services
+    Contains all logic related to Systemd services
     """
 
     @staticmethod
     def _service_exists(name, client, path):
         if path is None:
-            path = '/etc/init/'
-        file_to_check = '{0}{1}.conf'.format(path, name)
+            path = '/lib/systemd/system/'
+        file_to_check = '{0}{1}.service'.format(path, name)
         return client.file_exists(file_to_check)
 
     @staticmethod
@@ -40,17 +39,17 @@ class Upstart(object):
         """
         Make sure that for e.g. 'ovs-workers' the given service name can be either 'ovs-workers' as just 'workers'
         """
-        if Upstart._service_exists(name, client, path):
+        if Systemd._service_exists(name, client, path):
             return name
         name = 'ovs-{0}'.format(name)
-        if Upstart._service_exists(name, client, path):
+        if Systemd._service_exists(name, client, path):
             return name
         logger.info('Service {0} could not be found.'.format(name))
         raise ValueError('Service {0} could not be found.'.format(name))
 
     @staticmethod
     def prepare_template(base_name, target_name, client):
-        template_name = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
+        template_name = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
         if client.file_exists(template_name.format(base_name)):
             client.run('cp -f {0} {1}'.format(
                 template_name.format(base_name),
@@ -62,9 +61,9 @@ class Upstart(object):
         if params is None:
             params = {}
 
-        name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
-        template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
-        template_file = client.file_read(template_conf.format(name))
+        name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
+        template_service = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
+        template_file = client.file_read(template_service.format(name))
 
         for key, value in params.iteritems():
             template_file = template_file.replace('<{0}>'.format(key), value)
@@ -74,50 +73,65 @@ class Upstart(object):
         if additional_dependencies:
             dependencies = ''
             for service in additional_dependencies:
-                dependencies += '{0} '.format(service)
+                dependencies += '{0}.service '.format(service)
             template_file = template_file.replace('<ADDITIONAL_DEPENDENCIES>', dependencies)
 
         if target_name is None:
-            client.file_write('/etc/init/{0}.conf'.format(name), template_file)
+            client.file_write('/lib/systemd/system/{0}.service'.format(name), template_file)
         else:
-            client.file_write('/etc/init/{0}.conf'.format(target_name), template_file)
+            client.file_write('/lib/systemd/system/{0}.service'.format(target_name), template_file)
+            name = target_name
+
+        try:
+            client.run('systemctl daemon-reload')
+            client.run('systemctl enable {0}.service'.format(name))
+        except CalledProcessError as cpe:
+            output = cpe.output
+            logger.error('Add {0}.service failed, {1}'.format(name, output))
+            raise Exception('Add {0}.service failed, {1}'.format(name, output))
 
     @staticmethod
     def get_service_status(name, client):
-        try:
-            name = Upstart._get_name(name, client)
-            output = client.run('status {0}'.format(name))
-            if 'start' in output:
-                return True
-            if 'stop' in output:
-                return False
+        name = Systemd._get_name(name, client)
+        output = client.run('systemctl is-active {0} || true'.format(name))
+        if 'active' == output:
+            return True
+        if 'inactive' == output:
             return False
-        except CalledProcessError:
-            logger.error('Get {0}.service status failed, {1}'.format(name, output))
-            raise Exception('Retrieving status for service "{0}" failed'.format(name))
+        return False
 
     @staticmethod
     def remove_service(name, client):
-        # remove upstart.conf file
-        name = Upstart._get_name(name, client)
-        client.file_delete('/etc/init/{0}.conf'.format(name))
-        client.file_delete('/etc/init/{0}.override'.format(name))
+        # remove systemd.service file
+        name = Systemd._get_name(name, client)
+        client.file_delete('/lib/systemd/system/{0}.service'.format(name))
+        client.run('systemctl daemon-reload')
 
     @staticmethod
     def disable_service(name, client):
-        name = Upstart._get_name(name, client)
-        client.run('echo "manual" > /etc/init/{0}.override'.format(name))
+        name = Systemd._get_name(name, client)
+        try:
+            client.run('systemctl disable {0}.service'.format(name))
+        except CalledProcessError as cpe:
+            output = cpe.output
+            logger.error('Disable {0} failed, {1}'.format(name, output))
+            raise Exception('Disable {0} failed, {1}'.format(name, output))
 
     @staticmethod
     def enable_service(name, client):
-        name = Upstart._get_name(name, client)
-        client.file_delete('/etc/init/{0}.override'.format(name))
+        name = Systemd._get_name(name, client)
+        try:
+            client.run('systemctl enable {0}.service'.format(name))
+        except CalledProcessError as cpe:
+            output = cpe.output
+            logger.error('Enable {0} failed, {1}'.format(name, output))
+            raise Exception('Enable {0} failed, {1}'.format(name, output))
 
     @staticmethod
     def start_service(name, client):
         try:
-            name = Upstart._get_name(name, client)
-            output = client.run('start {0}'.format(name))
+            name = Systemd._get_name(name, client)
+            output = client.run('systemctl start {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
             logger.error('Start {0} failed, {1}'.format(name, output))
@@ -126,8 +140,8 @@ class Upstart(object):
     @staticmethod
     def stop_service(name, client):
         try:
-            name = Upstart._get_name(name, client)
-            output = client.run('stop {0}'.format(name))
+            name = Systemd._get_name(name, client)
+            output = client.run('systemctl stop {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
             logger.error('Stop {0} failed, {1}'.format(name, output))
@@ -136,8 +150,8 @@ class Upstart(object):
     @staticmethod
     def restart_service(name, client):
         try:
-            name = Upstart._get_name(name, client)
-            output = client.run('restart {0}'.format(name))
+            name = Systemd._get_name(name, client)
+            output = client.run('systemctl restart {0}.service'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
             logger.error('Restart {0} failed, {1}'.format(name, output))
@@ -146,28 +160,31 @@ class Upstart(object):
     @staticmethod
     def has_service(name, client):
         try:
-            Upstart._get_name(name, client)
+            Systemd._get_name(name, client)
             return True
         except ValueError:
             return False
 
     @staticmethod
     def is_enabled(name, client):
-        name = Upstart._get_name(name, client)
-        if client.file_exists('/etc/init/{0}.override'.format(name)):
+        name = Systemd._get_name(name, client)
+        output = client.run('systemctl is-enabled {0} || true'.format(name))
+        if 'enabled' in output:
+            return True
+        if 'disabled' in output:
             return False
-        return True
+        return False
 
     @staticmethod
     def get_service_pid(name, client):
         pid = 0
-        name = Upstart._get_name(name, client)
-        if Upstart.get_service_status(name, client):
-            output = client.run('status {0}'.format(name))
+        name = Systemd._get_name(name, client)
+        if Systemd.get_service_status(name, client):
+            output = client.run('systemctl status {0} || true'.format(name))
             if output:
                 output = output.splitlines()
                 for line in output:
-                    if 'start/running' in line:
+                    if 'Main PID' in line:
                         pid = line.split(' ')[3]
                         if not pid.isdigit():
                             pid = 0
@@ -176,25 +193,28 @@ class Upstart(object):
 
     @staticmethod
     def patch_cinder_volume_conf(name, client):
-        cinder_file = open('/etc/init/{0}.conf'.format(name), 'r')
+        cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'r')
         contents = cinder_file.read()
         if EXPORT not in contents:
-            contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
+            contents = contents.replace('\nUser=cinder', '\n{}\nUser=cinder'.format(EXPORT))
             cinder_file.close()
-            cinder_file = open('/etc/init/{0}.conf'.format(name), 'w')
+            client.run('chmod 666 /lib/systemd/system/{0}.service'.format(name))
+            cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'w')
             cinder_file.write(contents)
         cinder_file.close()
+        client.run('systemctl daemon-reload')
 
     @staticmethod
     def unpatch_cinder_volume_conf(name, client):
         """
-        remove export PYTHONPATH from the upstart service conf file
+        remove export PYTHONPATH from the systemd service file
         """
-        cinder_file = open('/etc/init/{0}.conf'.format(name), 'r')
+        cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'r')
         contents = cinder_file.read()
         if EXPORT in contents:
-            contents = contents.replace(EXPORT_, '')
+            contents = contents.replace(EXPORT, '')
             cinder_file.close()
-            cinder_file = open('/etc/init/{0}.conf'.format(name), 'w')
+            cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'w')
             cinder_file.write(contents)
         cinder_file.close()
+        client.run('systemctl daemon-reload')

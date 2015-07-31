@@ -1,0 +1,17 @@
+[Unit]
+Description=Watcher for Open vStorage master services
+Wants=ovs-ganesha.service ovs-volumedriver_<VPOOL_NAME>.service
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/OpenvStorage
+# The watcher will block until all services are running
+ExecStartPre=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py volumedriver wait
+# The waiter will block until one of the services is not reachable anymore
+ExecStart=/usr/bin/python /opt/OpenvStorage/ovs/extensions/generic/watcher.py volumedriver check
+Restart=on-failure
+TimeoutStopSec=3600
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

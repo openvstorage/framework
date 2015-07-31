@@ -44,6 +44,7 @@ from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 from ovs.extensions.services.service import ServiceManager
 from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.os.os import OSManager
 from ovs.extensions.generic.filemutex import FileMutex
 
 logger = LogHandler.get('lib', name='setup')
@@ -949,7 +950,7 @@ class SetupController(object):
         for service in SetupController.model_services:
             if ServiceManager.has_service(service, client=target_client):
                 ServiceManager.enable_service(service, client=target_client)
-                SetupController._change_service_state(target_client, service, 'start')
+                SetupController._change_service_state(target_client, service, 'restart')
 
         print 'Start model migration'
         logger.debug('Start model migration')
@@ -984,7 +985,7 @@ class SetupController(object):
                 ServiceManager.enable_service(service, client=target_client)
                 SetupController._change_service_state(target_client, service, 'start')
         # Enable HA for the rabbitMQ queues
-        SetupController._start_rabbitmq_and_check_process(target_client)
+        SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
 
         for service in ['watcher-framework', 'watcher-volumedriver']:
             ServiceManager.enable_service(service, client=target_client)
@@ -1182,7 +1183,7 @@ class SetupController(object):
 
         # Enable HA for the rabbitMQ queues
         SetupController._change_service_state(target_client, 'rabbitmq', 'start')
-        SetupController._start_rabbitmq_and_check_process(target_client)
+        SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Starting services'
@@ -1331,19 +1332,20 @@ class SetupController(object):
 ].
 EOF
 """.format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
-        rabbitmq_running, rabbitmq_pid, _, _ = SetupController._is_rabbitmq_running(client)
-        if rabbitmq_running is True and rabbitmq_pid:
+        rabbitmq_running, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
+        if rabbitmq_running is False:
+            pass
+        elif rabbitmq_running is True and same_process is False:
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
             try:
                 client.run('service rabbitmq-server stop')
+                if ovs_rabbitmq_running is True:
+                    ServiceManager.stop_service('ovs-rabbitmq', client) 
             except subprocess.CalledProcessError:
-                print('  Failure stopping the rabbitmq-server process')
-            time.sleep(5)
-            try:
-                client.run('kill {0}'.format(rabbitmq_pid))
-                print('  Process killed')
-            except subprocess.CalledProcessError:
-                print('  Process already stopped')
+                print('  Failure stopping the rabbitmq process')
+        else:
+            ServiceManager.stop_service('ovs-rabbitmq', client) 
+
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
         # Sometimes/At random the rabbitmq server takes longer than 5 seconds to start,
@@ -1364,37 +1366,23 @@ EOF
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
-    def _start_rabbitmq_and_check_process(client):
-        output = Toolbox.retry_client_run(client,
-                                          'sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'',
-                                          time_sleep=1,
-                                          logger=logger).splitlines()
-
-        for line in output:
-            if 'Error: unable to connect to node ' in line:
-                rabbitmq_running, rabbitmq_pid, _, _ = SetupController._is_rabbitmq_running(client)
-                if rabbitmq_running is True and rabbitmq_pid:
-                    client.run('kill {0}'.format(rabbitmq_pid))
-                    print('  Process killed, restarting')
-                    client.run('service ovs-rabbitmq start')
-                    client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
-                    break
-
-        rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
-        if ovs_rabbitmq_running is True and same_process is True:  # Correct process is running
+    def _check_rabbitmq_and_enable_ha_mode(client):
+        rabbitmq_running, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
+        if rabbitmq_running is True and same_process is True:
             pass
-        elif rabbitmq_running is True and ovs_rabbitmq_running is False:  # Wrong process is running, must be stopped and correct one started
+        elif rabbitmq_running is True and same_process is False:  # Wrong process is running, must be stopped and correct one started
             print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped, ovs-rabbitmq will be started instead')
             client.run('service rabbitmq-server stop')
             time.sleep(5)
-            try:
-                client.run('kill {0}'.format(rabbitmq_pid))
-                print('  Process killed')
-            except SystemExit:
-                print('  Process already stopped')
-            client.run('service ovs-rabbitmq start')
-        elif rabbitmq_running is False and ovs_rabbitmq_running is False:  # Neither running
-            client.run('service ovs-rabbitmq start')
+            if ovs_rabbitmq_running is False:
+                SetupController._change_service_state(client, 'ovs-rabbitmq', 'start')
+        else:  # Neither is running
+            if ServiceManager.has_service('ovs-rabbitmq', client):
+                SetupController._change_service_state(client, 'ovs-rabbitmq', 'start')
+            else:
+                raise RuntimeError('Service ovs-rabbitmq has not been added on node {0}'.format(client.ip))
+
+        client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
     @staticmethod
     def _configure_amqp_to_volumedriver(node_ips):
@@ -1443,6 +1431,8 @@ EOF
                                                  config_file='/etc/logstash/conf.d/indexer.conf',
                                                  old_value='<CLUSTER_NAME>',
                                                  new_value='ovses_{0}'.format(cluster_name))
+        if ServiceManager.has_service('logstash', client) is False:
+            ServiceManager.add_service('logstash', client)
         SetupController._change_service_state(client, 'logstash', 'restart')
 
     @staticmethod
@@ -1464,6 +1454,7 @@ EOF
 </service-group>
 EOF
 """.format(cluster_name, node_name, node_type, SetupController.avahi_filename, client.ip.replace('.', '_')))
+        client.run('avahi-daemon --reload')
         SetupController._change_service_state(client, 'avahi-daemon', 'restart')
 
     @staticmethod
@@ -1666,7 +1657,6 @@ EOF
 
     @staticmethod
     def _partition_disks(client, partition_layout):
-        fstab_entry = 'LABEL={0}    {1}         ext4    defaults,nobootwait,noatime,discard    0    2'
         fstab_separator = ('# BEGIN Open vStorage', '# END Open vStorage')  # Don't change, for backwards compatibility
         mounted = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 2").strip().splitlines()]
 
@@ -1680,7 +1670,7 @@ EOF
             # Umount partitions
             if mp in mounted and values['device'] != 'DIR_ONLY':
                 print 'Unmounting {0}'.format(mp)
-                client.run('umount {0}'.format(mp))
+                client.run('umount -l {0}'.format(mp))
 
         mounted_devices = [device.strip() for device in client.run("cat /etc/mtab | cut -d ' ' -f 1").strip().splitlines()]
 
@@ -1690,7 +1680,7 @@ EOF
                     continue
                 if chosen_device in mounted_device:
                     print 'Unmounting {0}'.format(mounted_device)
-                    client.run('umount {0}'.format(mounted_device))
+                    client.run('umount -l {0}'.format(mounted_device))
 
         # Wipe disks
         for disk in unique_disks:
@@ -1733,7 +1723,8 @@ EOF
                     start = int(float(client.run(command).split('%')[0])) + 1
                     nr_of_partitions = int(client.run('lsblk {0} | grep part | wc -l'.format(boot_disk))) + 1
                     client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
-                    fstab_entries.append(fstab_entry.format(label, mp))
+                    fstab_entry = OSManager.get_fstab_entry(label, mp)
+                    fstab_entries.append(fstab_entry)
                     client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
                     mpts_to_mount.append(mp)
                 continue
@@ -1748,7 +1739,8 @@ EOF
                     size_in_percentage = int(start) + int(percentage)
                     client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
                 client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
-                fstab_entries.append(fstab_entry.format(label, mp))
+                fstab_entry = OSManager.get_fstab_entry(label, mp)
+                fstab_entries.append(fstab_entry)
                 mpts_to_mount.append(mp)
                 count += 1
                 start = size_in_percentage
@@ -1771,9 +1763,12 @@ EOF
         client.file_write('/etc/fstab', '{0}\n'.format('\n'.join(new_content)))
 
         print 'Mounting all partitions ...'
+        output = client.run('mount -l || true')
         for mp in mpts_to_mount:
             client.dir_create(mp)
-            client.run('mount {0}'.format(mp))
+            if mp not in output:
+                client.run('mount {0}'.format(mp))
+   
         client.run('chmod 1777 /var/tmp')
 
     @staticmethod
@@ -2164,6 +2159,11 @@ EOF
         Starts/stops/restarts a service
         """
         action = None
+        # Enable service before changing the state
+        status = ServiceManager.is_enabled(name, client=client)
+        if status is False:
+            ServiceManager.enable_service(name, client=client)
+
         status = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
             ServiceManager.start_service(name, client=client)
@@ -2192,45 +2192,24 @@ EOF
 
     @staticmethod
     def _is_rabbitmq_running(client):
-        def check_rabbitmq_status(service):
-            try:
-                out = client.run('service {0} status'.format(service))
-            except subprocess.CalledProcessError:
-                out = client.run('service {0} status | true'.format(service))
-            return out
-
         rabbitmq_running, rabbitmq_pid = False, 0
         ovs_rabbitmq_running, pid = False, -1
-        output = check_rabbitmq_status('rabbitmq-server')
-        if 'unrecognized service' in output:
-            output = None
+        output = client.run('rabbitmqctl status || true')
         if output:
             output = output.splitlines()
             for line in output:
                 if 'pid' in line:
                     rabbitmq_running = True
                     rabbitmq_pid = line.split(',')[1].replace('}', '')
+                    if not rabbitmq_pid.isdigit():
+                        rabbitmq_pid = 0
                     break
-        else:
-            try:
-                output = client.run('ps aux | grep rabbit@ | grep -v grep')
-            except subprocess.CalledProcessError:
-                output = client.run('ps aux | grep rabbit@ | grep -v grep | true')
 
-            output = output.split(' ')
-            if output[0] == 'rabbitmq':
-                rabbitmq_pid = output[1]
-                for item in output[2:]:
-                    if 'erlang' in item or 'rabbitmq' in item or 'beam' in item:
-                        rabbitmq_running = True
-        output = check_rabbitmq_status('ovs-rabbitmq')
-        if 'stop/waiting' in output:
-            pass
-        if 'start/running' in output:
-            pid = output.split('process ')[1].strip()
+        if ServiceManager.has_service('ovs-rabbitmq', client) and ServiceManager.get_service_status('ovs-rabbitmq', client):
             ovs_rabbitmq_running = True
-        same_process = rabbitmq_pid == pid
-        return rabbitmq_running, rabbitmq_pid, ovs_rabbitmq_running, same_process
+            pid = ServiceManager.get_service_pid('ovs-rabbitmq', client)
+        same_process = (rabbitmq_pid == pid)
+        return rabbitmq_running, ovs_rabbitmq_running, same_process
 
     @staticmethod
     def _run_hooks(hook_type, cluster_ip, master_ip=None):
