@@ -550,12 +550,14 @@ class SetupController(object):
             # 6. Post upgrade actions
             SetupController._log_message('Executing post upgrade actions', client_ip=this_client.ip)
             for client in ssh_clients:
-                for function in Toolbox.fetch_hooks('update', 'postupgrade'):
-                    SetupController._log_message('Executing action: {0}'.format(function.__name__), client_ip=client.ip)
-                    try:
-                        function(client)
-                    except Exception as ex:
-                        SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
+                with Remote(client.ip, [Toolbox, SSHClient]) as remote:
+                    for function in remote.Toolbox.fetch_hooks('update', 'postupgrade'):
+                        SetupController._log_message('Executing action {0}'.format(function.__name__), client_ip=client.ip)
+                        try:
+                            function(remote.SSHClient(client.ip, username='root'))
+                            SetupController._log_message('Executing action {0} completed'.format(function.__name__), client_ip=client.ip)
+                        except Exception as ex:
+                            SetupController._log_message('Post upgrade action failed with error: {0}'.format(ex), client.ip, 'error')
 
             # 7. Start watcher and restart support-agent
             SetupController._change_services_state(services=services_to_restart,

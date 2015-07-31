@@ -12,7 +12,7 @@ The Open vStorage Framework is built using python (Django, Celery) and javascrip
 
 ## Get started
 
-On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an install](https://www.openvstorage.org/doc/Installation)
+On our community website you can find [more information](https://www.openvstorage.org) and [how to get started with an installation](https://www.openvstorage.org/doc/Installation).
 
 ## Support
 * For community support, please visit our [community support forum](https://groups.google.com/forum/#!forum/open-vstorage)
@@ -25,5 +25,5 @@ Packaging your own changes for testing can be done using the [packager module](p
 
 ## Nightly tests
 
-A view on the different sets of Nightly test runs can be found [here](http://testrail.openvstorage.com/index.php?/runs/overview/12).
+A view on the different sets of Nightly test runs can be found [here](http://testrail.openvstorage.com/index.php?/runs/overview/10).
 Email address ovs-guest@openvstorage.com with password 0vsgu3st should allow you to login and view the results
