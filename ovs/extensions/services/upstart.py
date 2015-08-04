@@ -64,6 +64,12 @@ class Upstart(object):
 
         name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
         template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
+
+        if not os.path.exists(template_conf.format(name)):
+            # Given template doesn't exist so we are problably using system
+            # init scripts
+            return
+
         template_file = client.file_read(template_conf.format(name))
 
         for key, value in params.iteritems():
