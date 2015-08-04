@@ -3,7 +3,7 @@ Maintainer: Kenneth Henderick <kenneth.henderick@openvstorage.com>
 Standards-Version: 3.9.4.0
 Section: python
 Priority: optional
-Build-Depends: python (>= 2.7.2)
+Build-Depends: python-all (>= 2.7.2), debhelper (>= 9)
 
 Package: openvstorage-core
 Architecture: amd64
@@ -13,7 +13,7 @@ Depends: rabbitmq-server (>= 3.2.4), python-memcache (>= 1.47-2), memcached (>= 
  python-libvirt (>= 1.1.1), python-dev (>= 2.7.5), python-pyinotify, sudo,
  libev4 (>= 1:4.11-1), python-boto, nfs-kernel-server,
  ipython, gcc, devscripts, openssh-server, python-paramiko,
- python-pysnmp, python-kombu (>= 3.0.7), python-celery (>= 3.1.6), python-pika,
+ python-pysnmp4, python-kombu (>= 3.0.7), python-celery (>= 3.1.6), python-pika,
  python-six, python-protobuf, python-pyudev
 Recommends: avahi-utils (>= 0.6.31), openvpn, ntp
 Suggests: logstash (>= 1.4.0-1-c82dc09), virtinst (>= 0.600.4)
