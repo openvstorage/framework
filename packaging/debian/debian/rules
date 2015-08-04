@@ -7,6 +7,7 @@ openvstorage-core:
 	dh_installchangelogs  -p$@  CHANGELOG.txt
 	dh_install -p$@
 	dh_installman  -p$@
+	dh_installcron  -p$@
 	dh_link  -p$@
 	dh_strip  -p$@
 	dh_compress  -p$@
@@ -24,6 +25,7 @@ openvstorage-webapps:
 	dh_installchangelogs  -p$@  CHANGELOG.txt
 	dh_install -p$@
 	dh_installman  -p$@
+	dh_installcron  -p$@
 	dh_link  -p$@
 	dh_strip  -p$@
 	dh_compress  -p$@
@@ -41,6 +43,7 @@ openvstorage:
 	dh_installchangelogs  -p$@ CHANGELOG.txt
 	dh_install -p$@
 	dh_installman  -p$@
+	dh_installcron  -p$@
 	dh_link  -p$@
 	dh_strip  -p$@
 	dh_compress  -p$@

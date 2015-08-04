@@ -64,14 +64,6 @@ if not os.path.exists('/etc/rsyslog.d/90-ovs.conf') or '$KLogPermitNonKernelFaci
     check_output('echo "\$KLogPermitNonKernelFacility on" > /etc/rsyslog.d/90-ovs.conf', shell=True)
     check_output('service rsyslog restart', shell=True)
 
-# Add crontabs
-cron_contents = check_output('crontab -l 2>/dev/null || true', shell=True).splitlines()
-for cron_rule in ['0 * * * * /usr/sbin/ntpdate pool.ntp.org',
-                  '* * * * * ovs monitor heartbeat',
-                  '59 23 * * * /opt/OpenvStorage/scripts/system/rotate-storagedriver-logs.sh']:
-    if cron_rule not in cron_contents:
-        check_output('(crontab -l 2>/dev/null; echo "{0}") | crontab -'.format(cron_rule), shell=True)
-
 # Creating configuration file
 if not os.path.isfile('/opt/OpenvStorage/config/ovs.json'):
     check_output('cp /opt/OpenvStorage/config/templates/ovs.json /opt/OpenvStorage/config/ovs.json', shell=True)
