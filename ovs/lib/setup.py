@@ -934,6 +934,7 @@ class SetupController(object):
         SetupController._configure_logstash(target_client, cluster_name)
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._configure_rabbitmq(target_client)
+        SetupController._configure_memcached(target_client)
 
         print 'Build configuration files'
         logger.info('Build configuration files')
@@ -1108,6 +1109,7 @@ class SetupController(object):
             raise RuntimeError('There should be at least one other master node')
 
         SetupController._configure_logstash(target_client, cluster_name)
+        SetupController._configure_memcached(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Joining arakoon cluster'
@@ -1315,6 +1317,11 @@ class SetupController(object):
                     continue  # Skip memcached for demoted nodes, because they don't run that service
                 SetupController._change_service_state(node_client, service_info[0], service_info[1])
         VolatileFactory.store = None
+
+    @staticmethod
+    def _configure_memcached(client):
+        print "Setting up Memcached"
+        client.run("""sed -i 's/^-l.*/-l 0.0.0.0/g' /etc/memcached.conf""")
 
     @staticmethod
     def _configure_rabbitmq(client):
