@@ -1322,6 +1322,7 @@ class SetupController(object):
     def _configure_memcached(client):
         print "Setting up Memcached"
         client.run("""sed -i 's/^-l.*/-l 0.0.0.0/g' /etc/memcached.conf""")
+        client.run("""sed -i 's/^-m.*/-m 1024/g' /etc/memcached.conf""")
 
     @staticmethod
     def _configure_rabbitmq(client):
