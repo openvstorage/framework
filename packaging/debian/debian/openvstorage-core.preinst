@@ -26,7 +26,7 @@ else
     then
         echo 'Creating OVS user'
         useradd ovs -d /opt/OpenvStorage
-        echo '%ovs ALL=NOPASSWD: ALL' >> /etc/sudoers
+        [ -f /etc/sudoers.d/ovs ] || echo '%ovs ALL=NOPASSWD: ALL' >> /etc/sudoers.d/ovs
     else
         echo 'OVS user already exists'
     fi
