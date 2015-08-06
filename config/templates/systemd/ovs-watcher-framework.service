@@ -1,6 +1,6 @@
 [Unit]
 Description=Watcher for Open vStorage master services
-Wants=ovs-nginx.service ovs-openstack-events-consumer.service ovs-scheduled-tasks.service ovs-snmp.service ovs-volumerouter-consumer.service ovs-webapp-api.service ovs-workers.service
+Wants=nginx.service ovs-openstack-events-consumer.service ovs-scheduled-tasks.service ovs-snmp.service ovs-volumerouter-consumer.service ovs-webapp-api.service ovs-workers.service
 [Service]
 Type=simple
 Environment=PYTHONPATH=/opt/OpenvStorage
