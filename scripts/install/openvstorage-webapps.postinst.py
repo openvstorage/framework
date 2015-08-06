@@ -27,10 +27,6 @@ if 'CentOS Linux' in dist_info:
 else:  # Default fallback to Ubuntu in this case
     openstack_webservice_name = 'apache2'
 
-# Remove existing enabled sites, taking control over nginx
-if os.path.exists('/etc/nginx/sites-enabled/default'):
-    os.remove('/etc/nginx/sites-enabled/default')
-
 # Cleanup *.pyc files
 check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
 check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
@@ -85,6 +81,16 @@ for filename in filenames:
         with open(filename, 'w') as changed:
             changed.write(contents)
 
+# Disable default nginx site if it's configured
+if os.path.exists('/etc/nginx/sites-enabled/default'):
+    os.remove('/etc/nginx/sites-enabled/default')
+
+# Setup nginx site
+if not os.path.exists("/etc/nginx/sites-enabled/openvstorage.conf"):
+    check_output("ln -s /etc/nginx/sites-available/openvstorage.conf /etc/nginx/sites-enabled/openvstorage.conf", shell=True)
+if not os.path.exists("/etc/nginx/sites-enabled/openvstorage_ssl.conf"):
+    check_output("ln -s /etc/nginx/sites-available/openvstorage_ssl.conf /etc/nginx/sites-enabled/openvstorage_ssl.conf", shell=True)
+
 # Check conflicts with apache2 running on port 80 (most likely devstack/openstack gui)
 try:
     running = check_output('ps aux | grep {0} | grep -v grep'.format(openstack_webservice_name), shell=True)
@@ -95,3 +101,6 @@ if running:
         os.remove('/etc/nginx/sites-enabled/openvstorage.conf')
     if os.path.exists('/etc/nginx/conf.d/openvstorage.conf'):
         os.remove('/etc/nginx/conf.d/openvstorage.conf')
+
+# Restart Nginx
+check_output("service nginx restart", shell=True)
