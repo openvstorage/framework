@@ -406,7 +406,7 @@ class StorageRouterController(object):
                           'vrouter_min_workers': 4,
                           'vrouter_max_workers': 16,
                           'vrouter_backend_sync_timeout_ms': 5000,
-                          'vrouter_migrate_timeout_ms': 500}
+                          'vrouter_migrate_timeout_ms': 5000}
         voldrv_arakoon_cluster_id = 'voldrv'
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
