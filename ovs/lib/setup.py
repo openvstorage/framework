@@ -179,14 +179,19 @@ class SetupController(object):
             # Getting cluster information
             current_cluster_names = []
             clusters = []
-            discovery_result = SetupController._discover_nodes(target_client)
-            if discovery_result:
-                clusters = discovery_result.keys()
-                current_cluster_names = clusters[:]
-                logger.debug('Cluster names: {0}'.format(current_cluster_names))
+            avahi_installed = SetupController._avahi_installed(target_client)
+            discovery_result = {}
+            if avahi_installed is True:
+                discovery_result = SetupController._discover_nodes(target_client)
+                if discovery_result:
+                    clusters = discovery_result.keys()
+                    current_cluster_names = clusters[:]
+                    logger.debug('Cluster names: {0}'.format(current_cluster_names))
+                else:
+                    print 'No existing Open vStorage clusters are found.'
+                    logger.debug('No clusters found')
             else:
-                print 'No existing Open vStorage clusters are found.'
-                logger.debug('No clusters found')
+                print 'Cannot determine possible clusters on the network, please provide the required information manually.'
 
             local_cluster_name = None
             if remote_install is True:
@@ -200,7 +205,36 @@ class SetupController(object):
             node_name = target_client.run('hostname')
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
-                if len(clusters) > 0:
+                if avahi_installed is False:
+                    while True:
+                        first_node = Interactive.ask_yesno(message='Is this the 1st node of the cluster?')
+                        if first_node is False:
+                            master_ip = Interactive.ask_string('Please enter the IP of the master node')
+                            if not re.match(SSHClient.IP_REGEX, master_ip):
+                                print 'Incorrect IP provided'
+                                continue
+                            if first_node is False and master_ip in target_client.local_ips:
+                                print 'Master IP is configured on this node'
+                                continue
+
+                            master_password = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
+
+                            from ovs.dal.lists.storagerouterlist import StorageRouterList
+                            with Remote(master_ip, [StorageRouterList], password=master_password) as remote:
+                                sr_ips = [sr.ip for sr in remote.StorageRouterList.get_storagerouters()]
+                            correct = Interactive.ask_yesno(message='Detected the following configured storagerouters. Is this correct: \n- {0}\n'.format('\n- '.join(sr_ips)))
+                            if correct is False:
+                                raise Exception('Cannot continue because of incorrect storagerouter configuration')
+
+                            known_passwords[master_ip] = master_password
+                            SetupController.discovered_nodes = {node_name: {'ip': master_ip,
+                                                                            'type': 'master' if len(sr_ips) < 3 else 'extra',
+                                                                            'ip_list': [master_ip]}}
+                            if master_ip not in ip_client_map:
+                                ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
+                            break
+
+                elif len(clusters) > 0:
                     clusters.sort()
                     dont_join = "Don't join any of these clusters."
                     logger.debug('Manual cluster selection')
@@ -253,7 +287,7 @@ class SetupController(object):
                     # @TODO: update the ip to the chosen one in autoconfig file?
                     nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
                 first_node = not join_cluster
-            if not cluster_name:
+            if not cluster_name and not (avahi_installed is False and first_node is False):
                 raise RuntimeError('The name of the cluster should be known by now.')
 
             # Get target cluster ip
@@ -931,7 +965,7 @@ class SetupController(object):
             arakoon_ports[cluster] = [result['client_port'], result['messaging_port']]
             exclude_ports += arakoon_ports[cluster]
 
-        SetupController._configure_logstash(target_client, cluster_name)
+        SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._configure_rabbitmq(target_client)
 
@@ -1013,7 +1047,8 @@ class SetupController(object):
             ServiceManager.enable_service(service, client=target_client)
             SetupController._change_service_state(target_client, service, 'start')
 
-        SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
+        if SetupController._avahi_installed(target_client) is True:
+            SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('First node complete')
@@ -1028,7 +1063,7 @@ class SetupController(object):
         logger.info('Adding extra node')
 
         target_client = ip_client_map[cluster_ip]
-        SetupController._configure_logstash(target_client, cluster_name)
+        SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'extra')
 
         print 'Configuring services'
@@ -1072,7 +1107,8 @@ class SetupController(object):
 
         SetupController._run_hooks('extranode', cluster_ip, master_ip)
 
-        SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+        if SetupController._avahi_installed(target_client) is True:
+            SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         logger.info('Extra node complete')
 
@@ -1107,7 +1143,7 @@ class SetupController(object):
         if len(master_nodes) == 0:
             raise RuntimeError('There should be at least one other master node')
 
-        SetupController._configure_logstash(target_client, cluster_name)
+        SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Joining arakoon cluster'
@@ -1200,7 +1236,8 @@ class SetupController(object):
             print 'Restarting services'
             SetupController._restart_framework_and_memcache_services(ip_client_map)
 
-        SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
+        if SetupController._avahi_installed(target_client) is True:
+            SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('Promote complete')
@@ -1302,7 +1339,8 @@ class SetupController(object):
             print 'Restarting services'
             SetupController._restart_framework_and_memcache_services(ip_client_map, target_client)
 
-        SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+        if SetupController._avahi_installed(target_client) is True:
+            SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
 
         logger.info('Demote complete')
 
@@ -1424,6 +1462,16 @@ EOF
                         storagedriver_config.save()
 
     @staticmethod
+    def _avahi_installed(client):
+        installed = client.run('which avahi-daemon')
+        if installed == '':
+            print 'Avahi not installed'
+            return False
+        else:
+            print 'Avahi installed'
+            return True
+
+    @staticmethod
     def _logstash_installed(client):
         if client.file_exists('/usr/sbin/logstash') \
            or client.file_exists('/usr/bin/logstash') \
@@ -1432,17 +1480,13 @@ EOF
         return False
 
     @staticmethod
-    def _configure_logstash(client, cluster_name):
+    def _configure_logstash(client):
         if not SetupController._logstash_installed(client):
             logger.debug("Logstash is not installed, skipping it's configuration")
             return False
 
         print 'Configuring logstash'
         logger.info('Configuring logstash')
-        SetupController._replace_param_in_config(client=client,
-                                                 config_file='/etc/logstash/conf.d/indexer.conf',
-                                                 old_value='<CLUSTER_NAME>',
-                                                 new_value='ovses_{0}'.format(cluster_name))
         if ServiceManager.has_service('logstash', client) is False:
             ServiceManager.add_service('logstash', client)
         SetupController._change_service_state(client, 'logstash', 'restart')
