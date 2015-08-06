@@ -6,16 +6,6 @@ then
     echo -e '\n\nPlease start upgrade through GUI because all nodes in the cluster need to be upgraded simultaneously!!!!!\n\n'
     exit 1
 else
-    pip install kombu==3.0.26
-    pip install celery==3.1.6
-    pip install suds-jurko==0.5
-    pip install pika
-    pip install six --upgrade
-    pip install protobuf
-    pip install pyudev
-    pip install datadiff
-    pip install rpyc
-
     if [ ! -f /etc/openvstorage_id ]
     then
         echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
