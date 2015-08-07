@@ -141,14 +141,16 @@ class SSHClient(object):
                     return out.strip()
 
             except CalledProcessError as cpe:
-                logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, cpe.output))
+                logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
                 raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                logger.error('Command:\n{0}\nfailed :\n{1}\nand error:\n{2}\n'.format(command, stdout, stderr))
-                raise CalledProcessError(exit_code, command, stderr.readlines())
+                stderr = ''.join(stderr.readlines()).replace('\n', '\\n')
+                stdout = ''.join(stdout.readlines()).replace('\n', '\\n')
+                logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                raise CalledProcessError(exit_code, command, stderr)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
             else:
