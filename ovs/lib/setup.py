@@ -75,7 +75,7 @@ class SetupController(object):
 
     # Services
     model_services = ['memcached', ARAKOON_OVSDB]
-    master_services = model_services + ['rabbitmq', ARAKOON_VOLDRV]
+    master_services = model_services + ['rabbitmq-server', ARAKOON_VOLDRV]
     extra_node_services = ['workers', 'volumerouter-consumer']
     master_node_services = master_services + ['scheduled-tasks', 'snmp', 'webapp-api', 'nginx',
                                               'volumerouter-consumer'] + extra_node_services
@@ -984,6 +984,7 @@ class SetupController(object):
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
         SetupController._configure_rabbitmq(target_client)
+        SetupController._configure_memcached(target_client)
 
         print 'Build configuration files'
         logger.info('Build configuration files')
@@ -1160,6 +1161,7 @@ class SetupController(object):
             raise RuntimeError('There should be at least one other master node')
 
         SetupController._configure_logstash(target_client)
+        SetupController._configure_memcached(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Joining arakoon cluster'
@@ -1234,7 +1236,7 @@ class SetupController(object):
         target_client.run('rabbitmqctl stop; sleep 5;')
 
         # Enable HA for the rabbitMQ queues
-        SetupController._change_service_state(target_client, 'rabbitmq', 'start')
+        SetupController._change_service_state(target_client, 'rabbitmq-server', 'start')
         SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
@@ -1323,12 +1325,11 @@ class SetupController(object):
 
         print 'Removing/unconfiguring RabbitMQ'
         logger.debug('Removing/unconfiguring RabbitMQ')
-        if ServiceManager.has_service('rabbitmq', client=target_client):
+        if ServiceManager.has_service('rabbitmq-server', client=target_client):
             target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
             target_client.run('rabbitmqctl reset; sleep 5;')
             target_client.run('rabbitmqctl stop; sleep 5;')
-            SetupController._change_service_state(target_client, 'rabbitmq', 'stop')
-            ServiceManager.remove_service('rabbitmq', client=target_client)
+            SetupController._change_service_state(target_client, 'rabbitmq-server', 'stop')
             target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
@@ -1372,6 +1373,12 @@ class SetupController(object):
         VolatileFactory.store = None
 
     @staticmethod
+    def _configure_memcached(client):
+        print "Setting up Memcached"
+        client.run("""sed -i 's/^-l.*/-l 0.0.0.0/g' /etc/memcached.conf""")
+        client.run("""sed -i 's/^-m.*/-m 1024/g' /etc/memcached.conf""")
+
+    @staticmethod
     def _configure_rabbitmq(client):
         print 'Setting up RabbitMQ'
         logger.debug('Setting up RabbitMQ')
@@ -1394,11 +1401,11 @@ EOF
             try:
                 client.run('service rabbitmq-server stop')
                 if ovs_rabbitmq_running is True:
-                    ServiceManager.stop_service('ovs-rabbitmq', client)
+                    ServiceManager.stop_service('rabbitmq-server', client)
             except subprocess.CalledProcessError:
                 print('  Failure stopping the rabbitmq process')
         else:
-            ServiceManager.stop_service('ovs-rabbitmq', client)
+            ServiceManager.stop_service('rabbitmq-server', client)
 
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
@@ -1425,16 +1432,16 @@ EOF
         if rabbitmq_running is True and same_process is True:
             pass
         elif rabbitmq_running is True and same_process is False:  # Wrong process is running, must be stopped and correct one started
-            print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped, ovs-rabbitmq will be started instead')
+            print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped, rabbitmq-server will be started instead')
             client.run('service rabbitmq-server stop')
             time.sleep(5)
             if ovs_rabbitmq_running is False:
-                SetupController._change_service_state(client, 'ovs-rabbitmq', 'start')
+                SetupController._change_service_state(client, 'rabbitmq-server', 'start')
         else:  # Neither is running
-            if ServiceManager.has_service('ovs-rabbitmq', client):
-                SetupController._change_service_state(client, 'ovs-rabbitmq', 'start')
+            if ServiceManager.has_service('rabbitmq-server', client):
+                SetupController._change_service_state(client, 'rabbitmq-server', 'start')
             else:
-                raise RuntimeError('Service ovs-rabbitmq has not been added on node {0}'.format(client.ip))
+                raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
 
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
@@ -2278,9 +2285,9 @@ EOF
                         rabbitmq_pid = 0
                     break
 
-        if ServiceManager.has_service('ovs-rabbitmq', client) and ServiceManager.get_service_status('ovs-rabbitmq', client):
+        if ServiceManager.has_service('rabbitmq-server', client) and ServiceManager.get_service_status('rabbitmq-server', client):
             ovs_rabbitmq_running = True
-            pid = ServiceManager.get_service_pid('ovs-rabbitmq', client)
+            pid = ServiceManager.get_service_pid('rabbitmq-server', client)
         same_process = (rabbitmq_pid == pid)
         return rabbitmq_running, ovs_rabbitmq_running, same_process
 

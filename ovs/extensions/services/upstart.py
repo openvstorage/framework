@@ -42,6 +42,8 @@ class Upstart(object):
         """
         if Upstart._service_exists(name, client, path):
             return name
+        if client.file_exists('/etc/init.d/{0}'.format(name)):
+            return name
         name = 'ovs-{0}'.format(name)
         if Upstart._service_exists(name, client, path):
             return name
@@ -64,6 +66,12 @@ class Upstart(object):
 
         name = Upstart._get_name(name, client, '/opt/OpenvStorage/config/templates/upstart/')
         template_conf = '/opt/OpenvStorage/config/templates/upstart/{0}.conf'
+
+        if not client.file_exists(template_conf.format(name)):
+            # Given template doesn't exist so we are problably using system
+            # init scripts
+            return
+
         template_file = client.file_read(template_conf.format(name))
 
         for key, value in params.iteritems():
@@ -86,10 +94,10 @@ class Upstart(object):
     def get_service_status(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('status {0}'.format(name))
-            if 'start' in output:
+            output = client.run('service {0} status'.format(name))
+            if 'start' in output or 'is running' in output:
                 return True
-            if 'stop' in output:
+            if 'stop' in output or 'not running' in output:
                 return False
             return False
         except CalledProcessError:
@@ -117,7 +125,7 @@ class Upstart(object):
     def start_service(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('start {0}'.format(name))
+            output = client.run('service {0} start'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
             logger.error('Start {0} failed, {1}'.format(name, output))
@@ -127,7 +135,7 @@ class Upstart(object):
     def stop_service(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('stop {0}'.format(name))
+            output = client.run('service {0} stop'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
             logger.error('Stop {0} failed, {1}'.format(name, output))
@@ -137,7 +145,7 @@ class Upstart(object):
     def restart_service(name, client):
         try:
             name = Upstart._get_name(name, client)
-            output = client.run('restart {0}'.format(name))
+            output = client.run('service {0} restart'.format(name))
         except CalledProcessError as cpe:
             output = cpe.output
             logger.error('Restart {0} failed, {1}'.format(name, output))

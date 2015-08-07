@@ -28,6 +28,7 @@ else:  # Default fallback to Ubuntu in this case
     openstack_webservice_name = 'apache2'
 
 # Cleanup *.pyc files
+# TODO: set owner:group only where it is really needed
 check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
 check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
 
@@ -46,17 +47,6 @@ os.chdir('/opt/OpenvStorage/webapps/api')
 check_output('export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput', shell=True)
 
 run_level_regex = '^[KS][0-9]{2}(.*)'
-
-service_configured = False
-for run_level in range(7):
-    for run_entry in os.listdir('/etc/rc{0}.d'.format(run_level)):
-        if re.match(run_level_regex, run_entry) and 'nginx' in run_entry:
-            service_configured = True
-            break
-
-if service_configured:
-    check_output('service nginx stop', shell=True)
-    check_output('update-rc.d nginx disable', shell=True)
 
 # Create web certificates
 if not os.path.exists('/opt/OpenvStorage/config/ssl/server.crt'):
