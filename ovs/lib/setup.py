@@ -188,10 +188,9 @@ class SetupController(object):
                     current_cluster_names = clusters[:]
                     logger.debug('Cluster names: {0}'.format(current_cluster_names))
                 else:
-                    print 'No existing Open vStorage clusters are found.'
                     logger.debug('No clusters found')
             else:
-                print 'Cannot determine possible clusters on the network, please provide the required information manually.'
+                logger.debug('No avahi installed/detected')
 
             local_cluster_name = None
             if remote_install is True:
@@ -205,38 +204,56 @@ class SetupController(object):
             node_name = target_client.run('hostname')
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
-                if avahi_installed is False:
+                if avahi_installed is False or len(clusters) == 0:
+                    print 'No Open vStorage clusters were found.'
                     while True:
-                        first_node = Interactive.ask_yesno(message='Is this the 1st node of the cluster?')
+                        logger.debug('Manual cluster selection')
+                        new_cluster = 'Create a new cluster'
+                        join_cluster = 'Join an existing cluster'
+                        if force_type is not None and force_type != 'master':
+                            options = [new_cluster]
+                        else:
+                            options = [new_cluster, join_cluster]
+                        first_node = Interactive.ask_choice(options, 'Select an action') == new_cluster
                         if first_node is False:
-                            master_ip = Interactive.ask_string('Please enter the IP of the master node')
-                            if not re.match(SSHClient.IP_REGEX, master_ip):
+                            node_ip = Interactive.ask_string('Please enter the IP of one of the cluster\'s nodes')
+                            if not re.match(SSHClient.IP_REGEX, node_ip):
                                 print 'Incorrect IP provided'
                                 continue
-                            if first_node is False and master_ip in target_client.local_ips:
-                                print 'Master IP is configured on this node'
+                            if node_ip in target_client.local_ips:
+                                print "A local ip address was given, please select '{0}'".format(new_cluster)
                                 continue
 
-                            master_password = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
+                            node_password = Interactive.ask_password('Enter the root password for {0}'.format(node_ip))
 
-                            from ovs.dal.lists.storagerouterlist import StorageRouterList
-                            with Remote(master_ip, [StorageRouterList], password=master_password) as remote:
-                                sr_ips = [sr.ip for sr in remote.StorageRouterList.get_storagerouters()]
-                            correct = Interactive.ask_yesno(message='Detected the following configured storagerouters. Is this correct: \n- {0}\n'.format('\n- '.join(sr_ips)))
+                            sr_ips = []
+                            try:
+                                from ovs.dal.lists.storagerouterlist import StorageRouterList
+                                with Remote(node_ip, [StorageRouterList], password=node_password) as remote:
+                                    srs = [sr for sr in remote.StorageRouterList.get_storagerouters()]
+                                    sr_ips = [sr.ip for sr in srs]
+                            except Exception, ex:
+                                logger.error('Error loading storagerouters: {0}'.format(ex))
+                            if len(sr_ips) == 0:
+                                logger.debug('No StorageRouters could be loaded, cannot join the cluster')
+                                print 'The cluster on the given master node cannot be joined as no StorageRouters could be loaded'
+                                continue
+                            correct = Interactive.ask_yesno(message='Following storagerouters were detected. Is this correct?{0}\n'.format('\n- '.join(sr_ips)))
                             if correct is False:
-                                raise Exception('Cannot continue because of incorrect storagerouter configuration')
+                                print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
+                                continue
 
-                            known_passwords[master_ip] = master_password
-                            SetupController.discovered_nodes = {node_name: {'ip': master_ip,
-                                                                            'type': 'master' if len(sr_ips) < 3 else 'extra',
-                                                                            'ip_list': [master_ip]}}
-                            if master_ip not in ip_client_map:
-                                ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
-                            break
+                            known_passwords[node_ip] = node_password
+                            SetupController.discovered_nodes = {node_name: {'ip': node_ip,
+                                                                            'type': 'unknown',
+                                                                            'ip_list': [node_ip]}}
+                            if node_ip not in ip_client_map:
+                                ip_client_map[master_ip] = SSHClient(node_ip, username='root', password=node_password)
+                        break
 
-                elif len(clusters) > 0:
+                else:  # Avahi is installed and clusters were found
                     clusters.sort()
-                    dont_join = "Don't join any of these clusters."
+                    dont_join = "Create a new cluster"
                     logger.debug('Manual cluster selection')
                     if force_type in [None, 'master']:
                         clusters = [dont_join] + clusters
@@ -268,8 +285,6 @@ class SetupController(object):
                     else:
                         cluster_name = None
                         logger.debug('No cluster will be joined')
-                elif force_type is not None and force_type != 'master':
-                    raise RuntimeError('No clusters were found. Only a Master node can be set up.')
 
                 if first_node is True and cluster_name is None:
                     while True:
@@ -280,6 +295,7 @@ class SetupController(object):
                             print "The new cluster name can only contain numbers, letters and dashes."
                         else:
                             break
+
             else:  # Automated install
                 logger.debug('Automated installation')
                 if cluster_name in discovery_result:
