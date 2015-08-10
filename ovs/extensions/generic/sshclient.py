@@ -130,7 +130,7 @@ class SSHClient(object):
                 try:
                     process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
                 except OSError as ose:
-                    logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, str(ose)))
+                    logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
                 if debug:
@@ -147,8 +147,8 @@ class SSHClient(object):
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                stderr = ''.join(stderr.readlines()).replace('\n', '\\n')
-                stdout = ''.join(stdout.readlines()).replace('\n', '\\n')
+                stderr = ''.join(stderr.readlines())
+                stdout = ''.join(stdout.readlines())
                 logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
                 raise CalledProcessError(exit_code, command, stderr)
             if debug:
