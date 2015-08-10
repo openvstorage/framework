@@ -181,12 +181,9 @@ class Upstart(object):
                 # Special cases (especially old SysV ones)
                 if 'rabbitmq' in name:
                     match = re.search('\{pid,(?P<pid>\d+?)\}', output)
-                    if match is not None:
-                        match_groups = match.groupdict()
-                        if 'pid' in match_groups:
-                            return match_groups['pid']
-                # Normal cases - or if the above code didn't yield an outcome
-                match = re.search('start/running, process (?P<pid>\d+)', output)
+                else:
+                    # Normal cases - or if the above code didn't yield an outcome
+                    match = re.search('start/running, process (?P<pid>\d+)', output)
                 if match is not None:
                     match_groups = match.groupdict()
                     if 'pid' in match_groups:
