@@ -141,7 +141,6 @@ def services_running(target):
                                           pika.BasicProperties(content_type='text/plain', delivery_mode=1))
                     connection.close()
                     good_node = True
-                    break
                 except Exception as message:
                     _log(target, '  Error during rabbitMQ test on node {0}: {1}'.format(server, message), 2)
             if good_node is False:
