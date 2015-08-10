@@ -27,6 +27,7 @@ from ovs.extensions.generic.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
@@ -73,7 +74,7 @@ class ScheduledTaskController(object):
         ))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True, schedule=crontab(minute='30', hour='0'))
+    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True, schedule=crontab(minute='0', hour='2'))
     @ensure_single(['ovs.scheduled.deletescrubsnapshots'])
     def deletescrubsnapshots(timestamp=None):
         """
@@ -194,15 +195,38 @@ class ScheduledTaskController(object):
 
         total = 0
         failed = 0
+        skipped = 0
         storagedrivers = {}
         for vdisk in vdisks:
             try:
                 total += 1
+                # Load the vDisk's StorageDriver
+                vdisk.invalidate_dynamics(['info', 'storagedriver_id'])
+                if vdisk.storagedriver_id not in storagedrivers:
+                    storagedrivers[vdisk.storagedriver_id] = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+                storagedriver = storagedrivers[vdisk.storagedriver_id]
+                # Load the vDisk's MDS configuration
+                vdisk.invalidate_dynamics(['info'])
+                configs = vdisk.info['metadata_backend_config']
+                if len(configs) == 0:
+                    raise RuntimeError('Could not load MDS configuration')
+                if configs[0]['ip'] != storagedriver.storagerouter.ip:
+                    # The MDS master is not local. Trigger an MDS handover and try again
+                    logger.debug('MDS for volume {0} is not local. Trigger handover'.format(vdisk.volume_id))
+                    MDSServiceController.ensure_safety(vdisk)
+                    vdisk.invalidate_dynamics(['info'])
+                    configs = vdisk.info['metadata_backend_config']
+                    if len(configs) == 0:
+                        raise RuntimeError('Could not load MDS configuration')
+                    if configs[0]['ip'] != storagedriver.storagerouter.ip:
+                        skipped += 1
+                        logger.info('Skipping scrubbing work unit for volume {0}: MDS master is not local'.format(
+                            vdisk.volume_id
+                        ))
+                        continue
                 work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
                 for work_unit in work_units:
-                    if vdisk.storagedriver_id not in storagedrivers:
-                        storagedrivers[vdisk.storagedriver_id] = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedrivers[vdisk.storagedriver_id].mountpoint_temp))
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedriver.mountpoint_temp))
                     vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
             except Exception, ex:
                 failed += 1
@@ -210,8 +234,8 @@ class ScheduledTaskController(object):
                     vdisk.volume_id, ex
                 ))
 
-        logger.info('Scrubbing finished. {} out of {} items failed.'.format(
-            failed, total
+        logger.info('Scrubbing finished. {0} volumes: {1} success, {2} failed, {3} skipped.'.format(
+            total, (total - failed - skipped), failed, skipped
         ))
 
     @staticmethod
