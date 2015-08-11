@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import copy
+import json
 import time
 import glob
 import base64
@@ -136,6 +137,8 @@ class SetupController(object):
             auto_config = config.getboolean('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
+            if config.has_option('setup', 'other_nodes'):
+                SetupController.discovered_nodes = json.loads(config.get('setup', 'other_nodes'))
             enable_heartbeats = False
 
         try:
@@ -152,7 +155,7 @@ class SetupController(object):
                 ip = '127.0.0.1'
             if target_password is None:
                 node_string = 'this node' if ip == '127.0.0.1' else ip
-                target_node_password = Interactive.ask_password('Enter the root password for {0}'.format(node_string))
+                target_node_password = SetupController._ask_validate_password(ip, node_string=node_string)
             else:
                 target_node_password = target_password
             target_client = SSHClient(ip, username='root', password=target_node_password)
@@ -165,6 +168,10 @@ class SetupController(object):
 
             print '\n+++ Collecting cluster information +++\n'
             logger.info('Collecting cluster information')
+
+            ipaddresses = target_client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
+            ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
+            SetupController.host_ips = set(ipaddresses)
 
             # Check whether running local or remote
             unique_id = System.get_my_machine_id(target_client)
@@ -185,6 +192,7 @@ class SetupController(object):
                 discovery_result = SetupController._discover_nodes(target_client)
                 if discovery_result:
                     clusters = discovery_result.keys()
+                    clusters.sort()
                     current_cluster_names = clusters[:]
                     logger.debug('Cluster names: {0}'.format(current_cluster_names))
                 else:
@@ -204,62 +212,72 @@ class SetupController(object):
             node_name = target_client.run('hostname')
             logger.debug('Current host: {0}'.format(node_name))
             if cluster_name is None:
-                if avahi_installed is False or len(clusters) == 0:
-                    print 'No Open vStorage clusters were found.'
-                    while True:
-                        logger.debug('Manual cluster selection')
-                        new_cluster = 'Create a new cluster'
-                        join_cluster = 'Join an existing cluster'
-                        if force_type is not None and force_type != 'master':
-                            options = [new_cluster]
-                        else:
-                            options = [new_cluster, join_cluster]
-                        first_node = Interactive.ask_choice(options, 'Select an action') == new_cluster
-                        if first_node is False:
-                            node_ip = Interactive.ask_string('Please enter the IP of one of the cluster\'s nodes')
-                            if not re.match(SSHClient.IP_REGEX, node_ip):
-                                print 'Incorrect IP provided'
-                                continue
-                            if node_ip in target_client.local_ips:
-                                print "A local ip address was given, please select '{0}'".format(new_cluster)
-                                continue
+                while True:
+                    logger.debug('Cluster selection')
+                    new_cluster = 'Create a new cluster'
+                    join_manually = 'Join {0} cluster'.format('a' if len(clusters) == 0 else 'a different')
+                    cluster_options = [new_cluster] + clusters + [join_manually]
+                    question = 'Select a cluster to join' if len(clusters) > 0 else 'No clusters found'
+                    cluster_name = Interactive.ask_choice(cluster_options, question,
+                                                          default_value=local_cluster_name,
+                                                          sort_choices=False)
+                    if cluster_name == new_cluster:
+                        cluster_name = None
+                        first_node = True
+                    elif cluster_name == join_manually:
+                        cluster_name = None
+                        first_node = False
+                        node_ip = Interactive.ask_string('Please enter the IP of one of the cluster\'s nodes')
+                        if not re.match(SSHClient.IP_REGEX, node_ip):
+                            print 'Incorrect IP provided'
+                            continue
+                        if node_ip in target_client.local_ips:
+                            print "A local ip address was given, please select '{0}'".format(new_cluster)
+                            continue
+                        logger.debug('Trying to manually join cluster on {0}'.format(node_ip))
 
-                            node_password = Interactive.ask_password('Enter the root password for {0}'.format(node_ip))
+                        node_password = SetupController._ask_validate_password(node_ip)
+                        storagerouters = {}
+                        try:
+                            from ovs.dal.lists.storagerouterlist import StorageRouterList
+                            with Remote(node_ip, [StorageRouterList],
+                                        username='root',
+                                        password=node_password,
+                                        strict_host_key_checking=False) as remote:
+                                for sr in remote.StorageRouterList.get_storagerouters():
+                                    storagerouters[sr.ip] = sr.name
+                                    if sr.node_type == 'MASTER':
+                                        if sr.ip == node_ip:
+                                            master_ip = node_ip
+                                            known_passwords[master_ip] = node_password
+                                        elif master_ip is None:
+                                            master_ip = sr.ip
+                        except Exception, ex:
+                            logger.error('Error loading storagerouters: {0}'.format(ex))
+                        if len(storagerouters) == 0:
+                            logger.debug('No StorageRouters could be loaded, cannot join the cluster')
+                            print 'The cluster on the given master node cannot be joined as no StorageRouters could be loaded'
+                            continue
+                        correct = Interactive.ask_yesno(
+                            message='Following StorageRouters were detected:\n    {0}\nAre they correct?'.format(
+                                ', '.join(storagerouters.keys()))
+                        )
+                        if correct is False:
+                            print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
+                            continue
 
-                            sr_ips = []
-                            try:
-                                from ovs.dal.lists.storagerouterlist import StorageRouterList
-                                with Remote(node_ip, [StorageRouterList], password=node_password) as remote:
-                                    srs = [sr for sr in remote.StorageRouterList.get_storagerouters()]
-                                    sr_ips = [sr.ip for sr in srs]
-                            except Exception, ex:
-                                logger.error('Error loading storagerouters: {0}'.format(ex))
-                            if len(sr_ips) == 0:
-                                logger.debug('No StorageRouters could be loaded, cannot join the cluster')
-                                print 'The cluster on the given master node cannot be joined as no StorageRouters could be loaded'
-                                continue
-                            correct = Interactive.ask_yesno(message='Following storagerouters were detected. Is this correct?{0}\n'.format('\n- '.join(sr_ips)))
-                            if correct is False:
-                                print 'The cluster on the given master node cannot be joined as not all StorageRouters could be loaded'
-                                continue
-
-                            known_passwords[node_ip] = node_password
-                            SetupController.discovered_nodes = {node_name: {'ip': node_ip,
-                                                                            'type': 'unknown',
-                                                                            'ip_list': [node_ip]}}
-                            if node_ip not in ip_client_map:
-                                ip_client_map[master_ip] = SSHClient(node_ip, username='root', password=node_password)
-                        break
-
-                else:  # Avahi is installed and clusters were found
-                    clusters.sort()
-                    dont_join = "Create a new cluster"
-                    logger.debug('Manual cluster selection')
-                    if force_type in [None, 'master']:
-                        clusters = [dont_join] + clusters
-                    print 'Following Open vStorage clusters are found.'
-                    cluster_name = Interactive.ask_choice(clusters, 'Select a cluster to join', default_value=local_cluster_name, sort_choices=False)
-                    if cluster_name != dont_join:
+                        known_passwords[node_ip] = node_password
+                        if master_ip is not None and master_ip not in known_passwords:
+                            master_password = SetupController._ask_validate_password(master_ip)
+                            known_passwords[master_ip] = master_password
+                        for sr_ip, sr_name in storagerouters.iteritems():
+                            SetupController.discovered_nodes = {sr_name: {'ip': sr_ip,
+                                                                          'type': 'unknown',
+                                                                          'ip_list': [sr_ip]}}
+                            nodes.append(sr_ip)
+                        if node_ip not in ip_client_map:
+                            ip_client_map[node_ip] = SSHClient(node_ip, username='root', password=node_password)
+                    else:
                         logger.debug('Cluster {0} selected'.format(cluster_name))
                         SetupController.discovered_nodes = discovery_result[cluster_name]
                         nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
@@ -275,16 +293,13 @@ class SetupController(object):
                                         if node_properties.get('type', None) == 'master']
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                        # @TODO: we should be able to choose the ip here too in a multiple nic setup?
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
-                        master_password = Interactive.ask_password('Enter the root password for {0}'.format(master_ip))
+                        master_password = SetupController._ask_validate_password(master_ip)
                         known_passwords[master_ip] = master_password
                         if master_ip not in ip_client_map:
                             ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
                         first_node = False
-                    else:
-                        cluster_name = None
-                        logger.debug('No cluster will be joined')
+                    break
 
                 if first_node is True and cluster_name is None:
                     while True:
@@ -298,12 +313,12 @@ class SetupController(object):
 
             else:  # Automated install
                 logger.debug('Automated installation')
-                if cluster_name in discovery_result:
-                    SetupController.discovered_nodes = discovery_result[cluster_name]
-                    # @TODO: update the ip to the chosen one in autoconfig file?
-                    nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+                if SetupController._avahi_installed(target_client):
+                    if cluster_name in discovery_result:
+                        SetupController.discovered_nodes = discovery_result[cluster_name]
+                nodes = [node_property['ip'] for node_property in SetupController.discovered_nodes.values()]
                 first_node = not join_cluster
-            if not cluster_name and not (avahi_installed is False and first_node is False):
+            if not cluster_name and first_node is False and avahi_installed is False:
                 raise RuntimeError('The name of the cluster should be known by now.')
 
             # Get target cluster ip
@@ -406,6 +421,8 @@ class SetupController(object):
             print '\n+++ Collecting information +++\n'
             logger.info('Collecting information')
 
+            # @TODO: Make avahi optional here too
+
             if not os.path.exists(SetupController.avahi_filename):
                 raise RuntimeError('No local OVS setup found.')
             with open(SetupController.avahi_filename, 'r') as avahi_file:
@@ -421,7 +438,7 @@ class SetupController(object):
                 raise RuntimeError('No cluster information found.')
             cluster_name = match_groups['cluster']
 
-            target_password = Interactive.ask_password('Enter the root password for this node')
+            target_password = SetupController._ask_validate_password('127.0.0.1', node_string='this node')
             target_client = SSHClient('127.0.0.1', username='root', password=target_password)
             discovery_result = SetupController._discover_nodes(target_client)
             master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems() if node_properties.get('type') == 'master']
@@ -761,8 +778,8 @@ class SetupController(object):
         logger.info('Preparing node')
 
         # Exchange ssh keys
-        print 'Exchanging SSH keys'
-        logger.info('Exchanging SSH keys')
+        print 'Exchanging SSH keys and updating hosts files'
+        logger.info('Exchanging SSH keys and updating hosts files')
         passwords = {}
         first_request = True
         prev_node_password = ''
@@ -773,17 +790,14 @@ class SetupController(object):
                     ip_client_map[node] = SSHClient(node, username='root', password=known_passwords[node])
                 continue
             if first_request is True:
-                prev_node_password = Interactive.ask_password('Enter root password for {0}'.format(node))
+                prev_node_password = SetupController._ask_validate_password(node)
                 logger.debug('Custom password for {0}'.format(node))
                 passwords[node] = prev_node_password
                 first_request = False
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
             else:
-                this_node_password = Interactive.ask_password('Enter root password for {0}, just press enter if identical as above'.format(node))
-                if this_node_password == '':
-                    logger.debug('Identical password for {0}'.format(node))
-                    this_node_password = prev_node_password
+                this_node_password = SetupController._ask_validate_password(node, previous=prev_node_password)
                 passwords[node] = this_node_password
                 prev_node_password = this_node_password
                 if node not in ip_client_map:
@@ -827,8 +841,6 @@ class SetupController(object):
             all_hostnames.add(node_hostname)
             mapping[node] = node_hostname
 
-        print 'Updating hosts files'
-        logger.debug('Updating hosts files')
         for node, node_client in ip_client_map.iteritems():
             for hostname_node, hostname in mapping.iteritems():
                 System.update_hosts_file(hostname, hostname_node, node_client)
@@ -1469,10 +1481,10 @@ EOF
     def _avahi_installed(client):
         installed = client.run('which avahi-daemon')
         if installed == '':
-            print 'Avahi not installed'
+            logger.debug('Avahi not installed')
             return False
         else:
-            print 'Avahi installed'
+            logger.debug('Avahi installed')
             return True
 
     @staticmethod
@@ -2172,16 +2184,12 @@ EOF
     @staticmethod
     def _discover_nodes(client):
         nodes = {}
-        ipaddresses = client.run("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1").strip().splitlines()
-        ipaddresses = [found_ip.strip() for found_ip in ipaddresses if found_ip.strip() != '127.0.0.1']
-        SetupController.host_ips = set(ipaddresses)
         SetupController._change_service_state(client, 'dbus', 'start')
         SetupController._change_service_state(client, 'avahi-daemon', 'start')
         discover_result = client.run('timeout -k 60 45 avahi-browse -artp 2> /dev/null | grep ovs_cluster || true')
-        logger.debug('Avahi discovery result:\n{0}'.format(discover_result))
         for entry in discover_result.splitlines():
             entry_parts = entry.split(';')
-            if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in ipaddresses:
+            if entry_parts[0] == '=' and entry_parts[2] == 'IPv4' and entry_parts[7] not in SetupController.host_ips:
                 # =;eth0;IPv4;ovs_cluster_kenneth_ovs100;_ovs_master_node._tcp;local;ovs100.local;172.22.1.10;443;
                 # split(';') -> [3]  = ovs_cluster_kenneth_ovs100
                 #               [4]  = _ovs_master_node._tcp -> contains _ovs_<type>_node
@@ -2300,3 +2308,27 @@ EOF
             else:
                 function(cluster_ip=cluster_ip, master_ip=master_ip)
         return functions_found
+
+    @staticmethod
+    def _ask_validate_password(ip, username='root', previous=None, node_string=None):
+        """
+        Asks a user to enter the password for a given user on a given ip and validates it
+        """
+        while True:
+            try:
+                extra = ''
+                if previous is not None:
+                    extra = ', just press enter if identical as above'
+                password = Interactive.ask_password('Enter the {0} password for {1}{2}'.format(
+                    username,
+                    ip if node_string is None else node_string,
+                    extra
+                ))
+                if password == '':
+                    password = previous
+                client = SSHClient(ip, username=username, password=password)
+                client.run('ls /')
+                return password
+            except:
+                previous = None
+                print 'Password invalid or could not connect to this node'

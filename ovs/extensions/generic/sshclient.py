@@ -25,6 +25,7 @@ import pwd
 import glob
 import json
 import time
+import logging
 import tempfile
 import paramiko
 import socket
@@ -64,6 +65,7 @@ class SSHClient(object):
         else:
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
+        logging.getLogger('paramiko').setLevel(logging.WARNING)
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 

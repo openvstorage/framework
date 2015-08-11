@@ -33,7 +33,7 @@ class Remote(object):
     Each module mentioned in the initialization of the remote object will be made available locally (remote1.module1), but will actually be executed remotely on the respective IP (ip1)
     """
 
-    def __init__(self, ip_info, modules, username=None, password=None):
+    def __init__(self, ip_info, modules, username=None, password=None, strict_host_key_checking=True):
         """
         Initializes the context
         """
@@ -49,7 +49,10 @@ class Remote(object):
             raise ValueError('Modules should be a list, set or tuple')
 
         self.username = username if username is not None else check_output('whoami').strip()
-        self.machines = [SshMachine(ip, user=self.username, password=password) for ip in self.ips]
+        ssh_opts = []
+        if strict_host_key_checking is False:
+            ssh_opts.append('-o StrictHostKeyChecking=no')
+        self.machines = [SshMachine(ip, user=self.username, password=password, ssh_opts=tuple(ssh_opts)) for ip in self.ips]
         self.servers = [DeployedServer(machine) for machine in self.machines]
         self.modules = modules
 
