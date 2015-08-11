@@ -67,7 +67,6 @@ class OpenStackManagement(object):
             self._configure_user_groups()
             self._configure_cinder_driver(vpool_name)
             self._create_volume_type(vpool_name)
-            self._patch_etc_init_cindervolume_conf()
             self._apply_patches()
             self._configure_messaging_driver()
             self._enable_openstack_events_consumer()
@@ -79,7 +78,6 @@ class OpenStackManagement(object):
             self._unconfigure_cinder_driver(vpool_name)
             if remove_volume_type:
                 self._delete_volume_type(vpool_name)
-            self._unpatch_etc_init_cindervolume_conf()
             self._restart_processes()
 
     @staticmethod
@@ -221,7 +219,7 @@ class OpenStackManagement(object):
         version = OpenStackManagement._get_version()
         if version == 'juno':
             nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier'
-            cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' 
+            cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier'
         elif version in ['kilo']:
             nova_messaging_driver = 'messaging'
             cinder_messaging_driver = 'messaging'
@@ -422,22 +420,6 @@ if vpool_name in enabled_backends:
         except SystemExit as se:  # failed command or non-zero exit codes raise SystemExit
             raise RuntimeError(str(se))
         return self._is_cinder_running()
-
-    def _patch_etc_init_cindervolume_conf(self):
-        """
-        export PYTHONPATH in the upstart service conf file
-        """
-        if self.is_openstack:
-            cinder_service = OSManager.get_openstack_cinder_service_name()
-            ServiceManager.patch_cinder_volume_conf(cinder_service, self.client)
-
-    def _unpatch_etc_init_cindervolume_conf(self):
-        """
-        remove export PYTHONPATH from the upstart service conf file
-        """
-        if self.is_openstack:
-            cinder_service = OSManager.get_openstack_cinder_service_name()
-            ServiceManager.unpatch_cinder_volume_conf(cinder_service, self.client)
 
     def _restart_openstack_services(self):
         """
