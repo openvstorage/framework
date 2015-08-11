@@ -1393,19 +1393,9 @@ class SetupController(object):
 ].
 EOF
 """.format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
-        rabbitmq_running, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
-        if rabbitmq_running is False:
-            pass
-        elif rabbitmq_running is True and same_process is False:
-            print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped')
-            try:
-                client.run('service rabbitmq-server stop')
-                if ovs_rabbitmq_running is True:
-                    ServiceManager.stop_service('rabbitmq-server', client)
-            except subprocess.CalledProcessError:
-                print('  Failure stopping the rabbitmq process')
-        else:
-            ServiceManager.stop_service('rabbitmq-server', client)
+        rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
+        if rabbitmq_running is True:
+            SetupController._change_service_state(client, 'rabbitmq-server', 'stop')
 
         client.run('rabbitmq-server -detached 2> /dev/null; sleep 5;')
 
@@ -1428,20 +1418,11 @@ EOF
 
     @staticmethod
     def _check_rabbitmq_and_enable_ha_mode(client):
-        rabbitmq_running, ovs_rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
-        if rabbitmq_running is True and same_process is True:
-            pass
-        elif rabbitmq_running is True and same_process is False:  # Wrong process is running, must be stopped and correct one started
-            print('  WARNING: an instance of rabbitmq-server is running, this needs to be stopped, rabbitmq-server will be started instead')
-            client.run('service rabbitmq-server stop')
-            time.sleep(5)
-            if ovs_rabbitmq_running is False:
-                SetupController._change_service_state(client, 'rabbitmq-server', 'start')
-        else:  # Neither is running
-            if ServiceManager.has_service('rabbitmq-server', client):
-                SetupController._change_service_state(client, 'rabbitmq-server', 'start')
-            else:
-                raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
+        if not ServiceManager.has_service('rabbitmq-server', client):
+            raise RuntimeError('Service rabbitmq-server has not been added on node {0}'.format(client.ip))
+        rabbitmq_running, same_process = SetupController._is_rabbitmq_running(client)
+        if rabbitmq_running is False or same_process is False:
+            SetupController._change_service_state(client, 'rabbitmq-server', 'restart')
 
         client.run('sleep 5;rabbitmqctl set_policy ha-all "^(volumerouter|ovs_.*)$" \'{"ha-mode":"all"}\'')
 
@@ -2242,54 +2223,64 @@ EOF
         # Enable service before changing the state
         status = ServiceManager.is_enabled(name, client=client)
         if status is False:
+            logger.debug('  Enabling service {0}'.format(name))
             ServiceManager.enable_service(name, client=client)
 
         status = ServiceManager.get_service_status(name, client=client)
         if status is False and state in ['start', 'restart']:
+            logger.debug('  Starting service {0}'.format(name))
             ServiceManager.start_service(name, client=client)
             action = 'started'
         elif status is True and state == 'stop':
+            logger.debug('  Stopping service {0}'.format(name))
             ServiceManager.stop_service(name, client=client)
             action = 'stopped'
         elif status is True and state == 'restart':
+            logger.debug('  Restarting service {0}'.format(name))
             ServiceManager.restart_service(name, client=client)
             action = 'restarted'
 
         if action is None:
             print '  [{0}] {1} already {2}'.format(client.ip, name, 'running' if status is True else 'halted')
         else:
-            timeout = 300
-            safetycounter = 0
-            while safetycounter < timeout:
+            tries = 10
+            success = False
+            while tries > 0:
+                logger.debug('  Waiting for service {0} to be {1}...'.format(name, action))
                 status = ServiceManager.get_service_status(name, client=client)
                 if (status is False and state == 'stop') or (status is True and state in ['start', 'restart']):
+                    success = True
                     break
-                safetycounter += 1
-                time.sleep(1)
-            if safetycounter == timeout:
+                tries -= 1
+                time.sleep(10 - tries)
+            if success is False:
                 raise RuntimeError('Service {0} could not be {1} on node {2}'.format(name, action, client.ip))
+            logger.debug('  Service {0} {1}'.format(name, action))
             print '  [{0}] {1} {2}'.format(client.ip, name, action)
 
     @staticmethod
     def _is_rabbitmq_running(client):
-        rabbitmq_running, rabbitmq_pid = False, 0
-        ovs_rabbitmq_running, pid = False, -1
+        rabbitmq_running = False
+        rabbitmq_pid_ctl = -1
+        rabbitmq_pid_sm = -1
         output = client.run('rabbitmqctl status || true')
         if output:
-            output = output.splitlines()
-            for line in output:
-                if 'pid' in line:
+            match = re.search('\{pid,(?P<pid>\d+?)\}', output)
+            if match is not None:
+                match_groups = match.groupdict()
+                if 'pid' in match_groups:
                     rabbitmq_running = True
-                    rabbitmq_pid = line.split(',')[1].replace('}', '')
-                    if not rabbitmq_pid.isdigit():
-                        rabbitmq_pid = 0
-                    break
+                    rabbitmq_pid_ctl = match_groups['pid']
 
         if ServiceManager.has_service('rabbitmq-server', client) and ServiceManager.get_service_status('rabbitmq-server', client):
-            ovs_rabbitmq_running = True
-            pid = ServiceManager.get_service_pid('rabbitmq-server', client)
-        same_process = (rabbitmq_pid == pid)
-        return rabbitmq_running, ovs_rabbitmq_running, same_process
+            rabbitmq_running = True
+            rabbitmq_pid_sm = ServiceManager.get_service_pid('rabbitmq-server', client)
+
+        same_process = rabbitmq_pid_ctl == rabbitmq_pid_sm
+        logger.debug('Rabbitmq is reported {0}running, pids: {1} and {2}'.format('' if rabbitmq_running else 'not ',
+                                                                                 rabbitmq_pid_ctl,
+                                                                                 rabbitmq_pid_sm))
+        return rabbitmq_running, same_process
 
     @staticmethod
     def _run_hooks(hook_type, cluster_ip, master_ip=None):

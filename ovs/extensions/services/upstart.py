@@ -16,12 +16,14 @@
 Upstart module
 """
 
+import re
 from subprocess import CalledProcessError
 from ovs.log.logHandler import LogHandler
 
 EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 logger = LogHandler.get('extensions', name='servicemanager')
+
 
 class Upstart(object):
     """
@@ -95,13 +97,17 @@ class Upstart(object):
         try:
             name = Upstart._get_name(name, client)
             output = client.run('service {0} status'.format(name))
+            # Special cases (especially old SysV ones)
+            if 'rabbitmq' in name:
+                return re.search('\{pid,\d+?\}', output) is not None
+            # Normal cases - or if the above code didn't yield an outcome
             if 'start' in output or 'is running' in output:
                 return True
             if 'stop' in output or 'not running' in output:
                 return False
             return False
-        except CalledProcessError:
-            logger.error('Get {0}.service status failed, {1}'.format(name, output))
+        except CalledProcessError, ex:
+            logger.error('Get {0}.service status failed: {1}'.format(name, ex))
             raise Exception('Retrieving status for service "{0}" failed'.format(name))
 
     @staticmethod
@@ -168,41 +174,37 @@ class Upstart(object):
 
     @staticmethod
     def get_service_pid(name, client):
-        pid = 0
         name = Upstart._get_name(name, client)
         if Upstart.get_service_status(name, client):
-            output = client.run('status {0}'.format(name))
+            output = client.run('service {0} status'.format(name))
             if output:
-                output = output.splitlines()
-                for line in output:
-                    if 'start/running' in line:
-                        pid = line.split(' ')[3]
-                        if not pid.isdigit():
-                            pid = 0
-                        break
-        return pid
+                # Special cases (especially old SysV ones)
+                if 'rabbitmq' in name:
+                    match = re.search('\{pid,(?P<pid>\d+?)\}', output)
+                else:
+                    # Normal cases - or if the above code didn't yield an outcome
+                    match = re.search('start/running, process (?P<pid>\d+)', output)
+                if match is not None:
+                    match_groups = match.groupdict()
+                    if 'pid' in match_groups:
+                        return match_groups['pid']
+        return -1
 
     @staticmethod
     def patch_cinder_volume_conf(name, client):
-        cinder_file = open('/etc/init/{0}.conf'.format(name), 'r')
-        contents = cinder_file.read()
+        path = '/etc/init/{0}.conf'.format(name)
+        contents = client.file_read(path)
         if EXPORT not in contents:
             contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
-            cinder_file.close()
-            cinder_file = open('/etc/init/{0}.conf'.format(name), 'w')
-            cinder_file.write(contents)
-        cinder_file.close()
+            client.file_write(path, contents)
 
     @staticmethod
     def unpatch_cinder_volume_conf(name, client):
         """
         remove export PYTHONPATH from the upstart service conf file
         """
-        cinder_file = open('/etc/init/{0}.conf'.format(name), 'r')
-        contents = cinder_file.read()
+        path = '/etc/init/{0}.conf'.format(name)
+        contents = client.file_read(path)
         if EXPORT in contents:
             contents = contents.replace(EXPORT_, '')
-            cinder_file.close()
-            cinder_file = open('/etc/init/{0}.conf'.format(name), 'w')
-            cinder_file.write(contents)
-        cinder_file.close()
+            client.file_write(path, contents)

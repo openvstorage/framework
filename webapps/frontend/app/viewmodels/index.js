@@ -46,7 +46,7 @@ define([
                     return metadata.authorize_uri +
                         '?response_type=code' +
                         '&client_id=' + encodeURIComponent(metadata.client_id) +
-                        '&redirect_uri=' + encodeURIComponent('https://' + metadata.ip + '/api/oauth2/redirect/') +
+                        '&redirect_uri=' + encodeURIComponent('https://' + window.location.host + '/api/oauth2/redirect/') +
                         '&state=' + encodeURIComponent(state) +
                         '&scope=' + encodeURIComponent(metadata.scope);
                 }
