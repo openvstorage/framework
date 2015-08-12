@@ -163,7 +163,7 @@ class SetupController(object):
 
             logger.debug('Target client loaded')
 
-            if target_client.file_exists(SetupController.avahi_filename):
+            if target_client.config_read('ovs.core.setupcompleted') is True:
                 raise RuntimeError('This node has already been configured for Open vStorage. Re-running the setup is not supported.')
 
             print '\n+++ Collecting cluster information +++\n'
@@ -421,40 +421,64 @@ class SetupController(object):
             print '\n+++ Collecting information +++\n'
             logger.info('Collecting information')
 
-            # @TODO: Make avahi optional here too
-
-            if not os.path.exists(SetupController.avahi_filename):
+            if Configuration.get('ovs.core.setupcompleted') is False:
                 raise RuntimeError('No local OVS setup found.')
-            with open(SetupController.avahi_filename, 'r') as avahi_file:
-                avahi_contents = avahi_file.read()
 
-            if node_action == 'promote' and '_ovs_master_node._tcp' in avahi_contents:
+            node_type = Configuration.get('ovs.core.nodetype')
+            if node_action == 'promote' and node_type == 'MASTER':
                 raise RuntimeError('This node is already master.')
-            elif node_action == 'demote' and '_ovs_master_node._tcp' not in avahi_contents:
+            elif node_action == 'demote' and node_type == 'EXTRA':
                 raise RuntimeError('This node should be a master.')
-
-            match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
-            if 'cluster' not in match_groups:
-                raise RuntimeError('No cluster information found.')
-            cluster_name = match_groups['cluster']
+            elif node_type not in ['MASTER', 'EXTRA']:
+                raise RuntimeError('This node is not correctly configured.')
 
             target_password = SetupController._ask_validate_password('127.0.0.1', node_string='this node')
             target_client = SSHClient('127.0.0.1', username='root', password=target_password)
-            discovery_result = SetupController._discover_nodes(target_client)
-            master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems() if node_properties.get('type') == 'master']
-            nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
-            if len(master_nodes) == 0:
-                if node_action == 'promote':
-                    raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
-                else:
-                    raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
-            master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
 
             unique_id = System.get_my_machine_id(target_client)
             ip = target_client.config_read('ovs.grid.ip')
-            nodes.append(ip)  # The client node is never included in the discovery results
 
-            ip_client_map = dict((node_ip, SSHClient(node_ip, username='root', password=target_password)) for node_ip in nodes if node_ip)
+            cluster_name = None
+            if SetupController._avahi_installed(target_client):
+                with open(SetupController.avahi_filename, 'r') as avahi_file:
+                    avahi_contents = avahi_file.read()
+                match_groups = re.search('>ovs_cluster_(?P<cluster>[^_]+)_.+?<', avahi_contents).groupdict()
+                if 'cluster' not in match_groups:
+                    raise RuntimeError('No cluster information found.')
+                cluster_name = match_groups['cluster']
+                discovery_result = SetupController._discover_nodes(target_client)
+                master_nodes = [this_node_name for this_node_name, node_properties in discovery_result[cluster_name].iteritems() if node_properties.get('type') == 'master']
+                nodes = [node_property['ip'] for node_property in discovery_result[cluster_name].values()]
+                if len(master_nodes) == 0:
+                    if node_action == 'promote':
+                        raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+                    else:
+                        raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
+                master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
+                nodes.append(ip)  # The client node is never included in the discovery results
+            else:
+                master_nodes = []
+                nodes = []
+                try:
+                    from ovs.dal.lists.storagerouterlist import StorageRouterList
+                    with Remote(target_client.ip, [StorageRouterList],
+                                username='root',
+                                password=target_password,
+                                strict_host_key_checking=False) as remote:
+                        for sr in remote.StorageRouterList.get_storagerouters():
+                            nodes.append(sr.ip)
+                            if sr.machine_id != unique_id and sr.node_type == 'MASTER':
+                                master_nodes.append(ip)
+                except Exception, ex:
+                    logger.error('Error loading storagerouters: {0}'.format(ex))
+                if len(master_nodes) == 0:
+                    if node_action == 'promote':
+                        raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+                    else:
+                        raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
+                master_ip = master_nodes[0]
+
+            ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in nodes if node_ip)
             if node_action == 'promote':
                 SetupController._promote_node(cluster_ip=ip,
                                               master_ip=master_ip,
@@ -1078,6 +1102,8 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
+        target_client.config_set('ovs.core.setupcompleted', True)
+        target_client.config_set('ovs.core.nodetype', 'MASTER')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('First node complete')
@@ -1138,6 +1164,8 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+        target_client.config_set('ovs.core.setupcompleted', True)
+        target_client.config_set('ovs.core.nodetype', 'EXTRA')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
         logger.info('Extra node complete')
 
@@ -1268,6 +1296,7 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'master')
+        target_client.config_set('ovs.core.nodetype', 'MASTER')
         target_client.run('chown -R ovs:ovs /opt/OpenvStorage/config')
 
         logger.info('Promote complete')
@@ -1370,6 +1399,7 @@ class SetupController(object):
 
         if SetupController._avahi_installed(target_client) is True:
             SetupController._configure_avahi(target_client, cluster_name, node_name, 'extra')
+        target_client.config_set('ovs.core.nodetype', 'EXTRA')
 
         logger.info('Demote complete')
 
@@ -2326,6 +2356,8 @@ EOF
                 ))
                 if password == '':
                     password = previous
+                if password is None:
+                    continue
                 client = SSHClient(ip, username=username, password=password)
                 client.run('ls /')
                 return password
