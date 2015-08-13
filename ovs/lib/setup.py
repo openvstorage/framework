@@ -115,6 +115,8 @@ class SetupController(object):
         disk_layout = None
         arakoon_mountpoint = None
         join_cluster = False
+        configure_memcached = True
+        configure_rabbitmq = True
         enable_heartbeats = True
         ip_client_map = {}
 
@@ -137,6 +139,8 @@ class SetupController(object):
             auto_config = config.getboolean('setup', 'auto_config')
             disk_layout = eval(config.get('setup', 'disk_layout'))
             join_cluster = config.getboolean('setup', 'join_cluster')
+            configure_memcached = config.getboolean('setup', 'configure_memcached')
+            configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
             if config.has_option('setup', 'other_nodes'):
                 SetupController.discovered_nodes = json.loads(config.get('setup', 'other_nodes'))
             enable_heartbeats = False
@@ -357,6 +361,8 @@ class SetupController(object):
                                                   hypervisor_info=hypervisor_info,
                                                   arakoon_mountpoint=arakoon_mountpoint,
                                                   enable_heartbeats=enable_heartbeats,
+                                                  configure_memcached=configure_memcached,
+                                                  configure_rabbitmq=configure_rabbitmq,
                                                   writecaches=writecaches)
             else:
                 # Deciding master/extra
@@ -385,6 +391,8 @@ class SetupController(object):
                                                   unique_id=unique_id,
                                                   mountpoints=mountpoints,
                                                   arakoon_mountpoint=arakoon_mountpoint,
+                                                  configure_memcached=configure_memcached,
+                                                  configure_rabbitmq=configure_rabbitmq,
                                                   writecaches=writecaches)
 
             print ''
@@ -994,7 +1002,7 @@ class SetupController(object):
         return True
 
     @staticmethod
-    def _setup_first_node(target_client, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, writecaches):
+    def _setup_first_node(target_client, unique_id, mountpoints, cluster_name, node_name, hypervisor_info, arakoon_mountpoint, enable_heartbeats, configure_memcached, configure_rabbitmq, writecaches):
         """
         Sets up the first node services. This node is always a master
         """
@@ -1019,8 +1027,10 @@ class SetupController(object):
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
-        SetupController._configure_rabbitmq(target_client)
-        SetupController._configure_memcached(target_client)
+        if configure_rabbitmq:
+            SetupController._configure_rabbitmq(target_client)
+        if configure_memcached:
+            SetupController._configure_memcached(target_client)
 
         print 'Build configuration files'
         logger.info('Build configuration files')
@@ -1170,7 +1180,7 @@ class SetupController(object):
         logger.info('Extra node complete')
 
     @staticmethod
-    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, mountpoints, arakoon_mountpoint, writecaches):
+    def _promote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, mountpoints, arakoon_mountpoint, configure_memcached, configure_rabbitmq, writecaches):
         """
         Promotes a given node
         """
@@ -1201,7 +1211,8 @@ class SetupController(object):
             raise RuntimeError('There should be at least one other master node')
 
         SetupController._configure_logstash(target_client)
-        SetupController._configure_memcached(target_client)
+        if configure_memcached:
+            SetupController._configure_memcached(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
 
         print 'Joining arakoon cluster'
@@ -1261,23 +1272,25 @@ class SetupController(object):
             service.storagerouter = storagerouter
             service.save()
 
-        SetupController._configure_rabbitmq(target_client)
+        if configure_rabbitmq:
+            SetupController._configure_rabbitmq(target_client)
 
-        # Copy rabbitmq cookie
-        logger.debug('Copying Rabbit MQ cookie')
-        rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
-        contents = master_client.file_read(rabbitmq_cookie_file)
-        master_hostname = master_client.run('hostname')
-        target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
-        target_client.file_write(rabbitmq_cookie_file, contents)
-        target_client.file_attribs(rabbitmq_cookie_file, mode=400)
-        target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-        target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
-        target_client.run('rabbitmqctl stop; sleep 5;')
+            # Copy rabbitmq cookie
+            logger.debug('Copying Rabbit MQ cookie')
+            rabbitmq_cookie_file = '/var/lib/rabbitmq/.erlang.cookie'
+            contents = master_client.file_read(rabbitmq_cookie_file)
+            master_hostname = master_client.run('hostname')
+            target_client.dir_create(os.path.dirname(rabbitmq_cookie_file))
+            target_client.file_write(rabbitmq_cookie_file, contents)
+            target_client.file_attribs(rabbitmq_cookie_file, mode=400)
+            target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+            target_client.run('rabbitmqctl join_cluster rabbit@{0}; sleep 5;'.format(master_hostname))
+            target_client.run('rabbitmqctl stop; sleep 5;')
 
-        # Enable HA for the rabbitMQ queues
-        SetupController._change_service_state(target_client, 'rabbitmq-server', 'start')
-        SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
+            # Enable HA for the rabbitMQ queues
+            SetupController._change_service_state(target_client, 'rabbitmq-server', 'start')
+            SetupController._check_rabbitmq_and_enable_ha_mode(target_client)
+
         SetupController._configure_amqp_to_volumedriver(ip_client_map)
 
         print 'Starting services'
