@@ -1648,7 +1648,7 @@ EOF
 
             blk_devices = dict()
             devices = [remote.os.path.basename(device_path) for device_path in remote.glob.glob('/sys/block/*')]
-            matching_devices = [device for device in devices if re.match('^(?:sd|fio|vd|xvd).*', device)]
+            matching_devices = [device for device in devices if re.match('^(?:sd|fio|vd|xvd|nvme).*', device)]
 
             for matching_device in matching_devices:
                 model = ''
@@ -1828,7 +1828,10 @@ EOF
                     client.run('parted -s -a optimal {0} unit % mkpart primary ext4 {1}% 100%'.format(disk, start))
                     fstab_entry = OSManager.get_fstab_entry(label, mp)
                     fstab_entries.append(fstab_entry)
-                    client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
+                    if 'nvme' in disk:
+                        client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + 'p' + str(nr_of_partitions), label))
+                    else:
+                        client.run('mkfs.ext4 -q {0} -L {1}'.format(boot_disk + str(nr_of_partitions), label))
                     mpts_to_mount.append(mp)
                 continue
 
@@ -1841,7 +1844,10 @@ EOF
                 else:
                     size_in_percentage = int(start) + int(percentage)
                     client.run('parted {0} -s mkpart {1} {2}% {3}%'.format(disk, label, start, size_in_percentage))
-                client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
+                if 'nvme' in disk:
+                    client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + 'p' + str(count), label))
+                else:
+                    client.run('mkfs.ext4 -q {0} -L {1}'.format(disk + str(count), label))
                 fstab_entry = OSManager.get_fstab_entry(label, mp)
                 fstab_entries.append(fstab_entry)
                 mpts_to_mount.append(mp)
@@ -1923,6 +1929,11 @@ EOF
                 print_and_sleep('More than 100% specified for device {0}, please update manually'.format(device_to_check))
             elif total_percentage_assigned < 100:
                 print_and_sleep('Less than 100% specified for device {0}, please update manually if required'.format(device_to_check))
+
+        # use the partition layout already defined in the openvstorage_preconfig.cfg
+        if auto_config is True and default is not None:
+            SetupController._partition_disks(client, default)
+            return default
 
         blk_devices = SetupController._get_disk_configuration(client)
         boot_disk = ''

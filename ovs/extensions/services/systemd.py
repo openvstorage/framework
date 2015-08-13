@@ -41,6 +41,8 @@ class Systemd(object):
         """
         if Systemd._service_exists(name, client, path):
             return name
+        if Systemd._service_exists(name, client, '/lib/systemd/system/'):
+            return name
         name = 'ovs-{0}'.format(name)
         if Systemd._service_exists(name, client, path):
             return name
@@ -63,6 +65,12 @@ class Systemd(object):
 
         name = Systemd._get_name(name, client, '/opt/OpenvStorage/config/templates/systemd/')
         template_service = '/opt/OpenvStorage/config/templates/systemd/{0}.service'
+
+        if not client.file_exists(template_service.format(name)):
+            # Given template doesn't exist so we are problably using system
+            # init scripts
+            return
+
         template_file = client.file_read(template_service.format(name))
 
         for key, value in params.iteritems():
