@@ -318,7 +318,7 @@ class SetupController(object):
                         SetupController.discovered_nodes = discovery_result[cluster_name]
                 nodes = [node_property['ip'] for node_property in SetupController.discovered_nodes.values()]
                 first_node = not join_cluster
-            if not cluster_name and first_node is False and avahi_installed is False:
+            if not cluster_name and first_node is False and avahi_installed is True:
                 raise RuntimeError('The name of the cluster should be known by now.')
 
             # Get target cluster ip
