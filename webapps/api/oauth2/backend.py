@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,16 +21,21 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('api', 'oauth2')
+
 
 class OAuth2Backend(BaseAuthentication):
     """
     OAuth 2 based authentication for Bearer tokens
     """
 
-    def authenticate(self, request):
+    def authenticate(self, request, **kwargs):
         """
         Authenticate method
         """
+        _ = self
         if 'HTTP_AUTHORIZATION' not in request.META:
             return None
         authorization_type, access_token = request.META['HTTP_AUTHORIZATION'].split(' ')
@@ -62,6 +67,8 @@ class OAuth2Backend(BaseAuthentication):
             duser.is_superuser = False
             duser.save()
 
+        if 'native_django' in kwargs and kwargs['native_django'] is True:
+            return duser
         return duser, None
 
     def get_user(self, user_id):

@@ -1,5 +1,5 @@
 <!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ limitations under the License.
                     </span>
                 <!-- /ko -->
                 <!-- ko if: !multi() -->
-                    <span data-part="selected-item"></span>&nbsp;<span data-bind="text: text(target())"></span>
+                    <span data-part="selected-item"></span>&nbsp;<span data-bind="html: text(target())"></span>
                 <!-- /ko -->
                 &nbsp; <span class="caret"></span>
             </button>

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,6 +52,21 @@ class VDiskList(object):
         return None
 
     @staticmethod
+    def get_vdisk_by_name(vdiskname):
+        """
+        Returns all VDisks which have a given name
+        """
+        # pylint: disable=line-too-long
+        vdisks = DataList({'object': VDisk,
+                           'data': DataList.select.GUIDS,
+                           'query': {'type': DataList.where_operator.AND,
+                                     'items': [('name', DataList.operator.EQUALS, vdiskname)]}}).data
+        # pylint: enable=line-too-long
+        if vdisks:
+            return DataObjectList(vdisks, VDisk)
+        return None
+
+    @staticmethod
     def get_by_devicename_and_vpool(devicename, vpool):
         """
         Returns a list of all VDisks based on a given device name and vpool
@@ -91,7 +106,7 @@ class VDiskList(object):
         vdisks = DataList({'object': VDisk,
                            'data': DataList.select.GUIDS,
                            'query': {'type': DataList.where_operator.AND,
-                                     'items':[('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
+                                     'items': [('parentsnapshot', DataList.operator.EQUALS, snapshotid)]}}).data
 
         # pylint: enable=line-too-long
         return DataObjectList(vdisks, VDisk)

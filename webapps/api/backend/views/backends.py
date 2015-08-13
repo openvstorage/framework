@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,25 +41,13 @@ class BackendViewSet(viewsets.ViewSet):
     @required_roles(['read'])
     @return_list(Backend)
     @load()
-    def list(self, backend_type=None, ip=None, port=None, client_id=None, client_secret=None, contents=None):
+    def list(self, backend_type=None):
         """
         Overview of all backends (from a certain type, if given) on the local node (or a remote one)
         """
-        if ip is None:
-            if backend_type is None:
-                return BackendList.get_backends()
-            return BackendTypeList.get_backend_type_by_code(backend_type).backends
-        client = OVSClient(ip, port, credentials=(client_id, client_secret))
-        try:
-            remote_backends = client.get('/backends/', params={'backend_type': backend_type,
-                                                               'contents': '' if contents is None else contents})
-        except (HTTPError, URLError):
-            raise NotAcceptable('Could not load remote backends')
-        backend_list = []
-        for entry in remote_backends['data']:
-            backend = type('Backend', (), entry)()
-            backend_list.append(backend)
-        return backend_list
+        if backend_type is None:
+            return BackendList.get_backends()
+        return BackendTypeList.get_backend_type_by_code(backend_type).backends
 
     @log()
     @required_roles(['read'])

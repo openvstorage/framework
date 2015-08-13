@@ -1,8 +1,8 @@
                      Open vStorage
-          Copyright 2013-2014 CloudFounders NV
+          Copyright 2013-2014 Open vStorage NV
 
         This product includes software developed at
-      CloudFounders NV (http://www.cloudfounders.com/).
+      Open vStorage NV (https://www.openvstorage.com/).
 
 
 This product includes and/or uses software developed by third parties. This
@@ -115,6 +115,8 @@ INCLUDED AND/OR USED SOFTWARE
     timeago                     MIT             Custom modifications
         Copyright (c) 2008-2013, Ryan McGeary (ryan -[at]- mcgeary [*dot*] org)
 
+    d3 slider                   BSD
+        Copyright (c) 2013, Bjorn Sandvik - http://blog.thematicmapping.org
 
 LICENSES
 

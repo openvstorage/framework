@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -414,6 +414,44 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function arrayFilterUnique(value, index, array) {
         return array.indexOf(value) === index;
     }
+    function getHash(length) {
+        if (length === undefined) {
+            length = 16;
+        }
+        var text = '', possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', i;
+        for(i = 0; i < length; i += 1) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
+    function setCookie(name, value, days) {
+        var expires, date;
+        if (days !== undefined) {
+            date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = '; expires=' + date.toGMTString();
+        } else {
+            expires = '';
+        }
+        document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value) + expires + '; path=/';
+    }
+    function getCookie(name) {
+        var cookies = document.cookie.split(';'), cookie, i;
+        name = encodeURIComponent(name);
+        for (i = 0; i < cookies.length; i += 1) {
+            cookie = cookies[i];
+            while (cookie.charAt(0) === ' ') {
+                cookie = cookie.substring(1, cookie.length);
+            }
+            if (cookie.indexOf(name) === 0) {
+                return decodeURIComponent(cookie.substring(name.length + 1, cookie.length));
+            }
+        }
+        return null;
+    }
+    function removeCookie(name) {
+        setCookie(name, '', -1);
+    }
 
     Array.prototype.equals = function(array) {
         return arrayEquals(this, array);
@@ -462,6 +500,10 @@ define(['jquery', 'jqp/pnotify'], function($) {
         overlap: overlap,
         getColor: getColor,
         getLocalTime: getLocalTime,
-        arrayFilterUnique: arrayFilterUnique
+        arrayFilterUnique: arrayFilterUnique,
+        getHash: getHash,
+        setCookie: setCookie,
+        getCookie: getCookie,
+        removeCookie: removeCookie
     };
 });

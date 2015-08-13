@@ -1,5 +1,5 @@
 <!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,9 +27,10 @@ limitations under the License.
          style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
-                <td>
-                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
-                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                <td style="position: relative;">
+                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                       <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    </span>
                     <a data-bind="text: name, attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
                 </td>
                 <td><span data-bind="text: storedData"></span></td>
@@ -41,7 +42,7 @@ limitations under the License.
                     </span>
                 </td>
                 <td><span data-bind="text: backendConnection"></span></td>
-                <td><span data-bind="text: backendLogin"></span></td>
+                <td><span data-bind="shortText: backendLogin() !== undefined ? backendLogin() : '', maxLength: 25"></span></td>
             </tr>
         </table>
     </div>

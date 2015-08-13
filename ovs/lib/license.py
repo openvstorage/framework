@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,17 +21,18 @@ import zlib
 import json
 import base64
 from ovs.celery_run import celery
-from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.sshclient import SSHClient, UnableToConnectException
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.support.agent import SupportAgent
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.dal.hybrids.license import License
 from ovs.dal.lists.licenselist import LicenseList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.lib.helpers.toolbox import Toolbox
+from ovs.lib.helpers.decorators import add_hooks
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='license')
+logger = LogHandler.get('lib', name='license')
 
 
 class LicenseController(object):
@@ -90,6 +91,13 @@ class LicenseController(object):
         will simply skip them.
         """
         try:
+            clients = {}
+            storagerouters = StorageRouterList.get_storagerouters()
+            try:
+                for storagerouter in storagerouters:
+                    clients[storagerouter] = SSHClient(storagerouter.ip)
+            except UnableToConnectException:
+                raise RuntimeError('Not all StorageRouters are reachable')
             data = LicenseController._decode(license_string)
             for component in data:
                 cdata = data[component]
@@ -120,8 +128,8 @@ class LicenseController(object):
             license_contents = []
             for lic in LicenseList.get_licenses():
                 license_contents.append(lic.hash)
-            for storagerouter in StorageRouterList.get_storagerouters():
-                client = SSHClient.load(storagerouter.ip)
+            for storagerouter in storagerouters:
+                client = clients[storagerouter]
                 client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
         except Exception, ex:
             logger.exception('Error applying license: {0}'.format(ex))
@@ -133,6 +141,13 @@ class LicenseController(object):
         """
         Removes a license
         """
+        clients = {}
+        storagerouters = StorageRouterList.get_storagerouters()
+        try:
+            for storagerouter in storagerouters:
+                clients[storagerouter] = SSHClient(storagerouter.ip)
+        except UnableToConnectException:
+            raise RuntimeError('Not all StorageRouters are reachable')
         lic = License(license_guid)
         if lic.can_remove is True:
             remove_functions = Toolbox.fetch_hooks('license', '{0}.remove'.format(lic.component))
@@ -142,11 +157,21 @@ class LicenseController(object):
                 license_contents = []
                 for lic in LicenseList.get_licenses():
                     license_contents.append(lic.hash)
-                for storagerouter in StorageRouterList.get_storagerouters():
-                    client = SSHClient.load(storagerouter.ip)
+                for storagerouter in storagerouters:
+                    client = clients[storagerouter]
                     client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
             return result
         return None
+
+    @staticmethod
+    @add_hooks('setup', 'extranode')
+    def add_extra_node(**kwargs):
+        ip = kwargs['cluster_ip']
+        license_contents = []
+        for lic in LicenseList.get_licenses():
+            license_contents.append(lic.hash)
+        client = SSHClient(ip)
+        client.file_write('/opt/OpenvStorage/config/licenses', '{0}\n'.format('\n'.join(license_contents)))
 
     @staticmethod
     @celery.task(name='ovs.license.get_free_license')

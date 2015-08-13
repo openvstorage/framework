@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,7 +108,15 @@ define([
             generic.trySet(self.storedData, data, 'stored_data');
             generic.trySet(self.ipAddress, data, 'ip');
             generic.trySet(self.isVTemplate, data, 'is_vtemplate');
-            generic.trySet(self.snapshots, data, 'snapshots');
+            if (data.hasOwnProperty('snapshots')) {
+                var snapshots = [];
+                $.each(data.snapshots, function(index, snapshot) {
+                    if (snapshot.in_backend) {
+                        snapshots.push(snapshot);
+                    }
+                });
+                self.snapshots(snapshots);
+            }
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');

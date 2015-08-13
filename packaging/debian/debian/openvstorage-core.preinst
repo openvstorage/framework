@@ -1,30 +1,38 @@
 #!/usr/bin/env bash
+set -e
 
-pip install kombu==3.0.7
-pip install celery==3.1.6
-pip install suds-jurko==0.5
-pip install pika
-pip install six --upgrade
-pip install protobuf
-pip install choice
-pip install pyudev
-pip install datadiff
-
-if [ ! -f /etc/openvstorage_id ]; then
-  echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
-fi
-
-id -a ovs &> /dev/null
-if [[ $? -eq 1 ]]
+if [[ ! -z "$2" && ! -f /etc/ready_for_upgrade ]]
 then
-  echo 'Creating OVS user'
-  useradd ovs -d /opt/OpenvStorage
-  echo '%ovs ALL=NOPASSWD: ALL' >> /etc/sudoers
+    echo -e '\n\nPlease start upgrade through GUI because all nodes in the cluster need to be upgraded simultaneously!!!!!\n\n'
+    exit 1
 else
-  echo 'OVS user already exists'
-fi
+    pip install kombu==3.0.7
+    pip install celery==3.1.6
+    pip install suds-jurko==0.5
+    pip install pika
+    pip install six --upgrade
+    pip install protobuf
+    pip install pyudev
+    pip install datadiff
+    pip install rpyc
 
-# logging
-mkdir -p /var/log/ovs/volumedriver
-chown -R ovs:ovs /var/log/ovs
-chmod 777 /var/log/ovs
+    if [ ! -f /etc/openvstorage_id ]
+    then
+        echo `openssl rand -base64 64 | tr -dc A-Z-a-z-0-9 | head -c 16` > /etc/openvstorage_id
+    fi
+
+    user_exists=$(id -a ovs > /dev/null 2>&1; echo $?)
+    if [[ $user_exists -eq 1 ]]
+    then
+        echo 'Creating OVS user'
+        useradd ovs -d /opt/OpenvStorage
+        echo '%ovs ALL=NOPASSWD: ALL' >> /etc/sudoers
+    else
+        echo 'OVS user already exists'
+    fi
+
+    # logging
+    mkdir -p /var/log/ovs/volumedriver
+    chown -R ovs:ovs /var/log/ovs
+    chmod 777 /var/log/ovs
+fi

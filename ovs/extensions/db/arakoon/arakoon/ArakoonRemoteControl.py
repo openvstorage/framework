@@ -15,8 +15,9 @@ limitations under the License.
 """
 
 import socket
-import logging
 
+from ovs.log.logHandler import LogHandler
+logging = LogHandler.get('arakoon', name='internal')
 import RemoteControlProtocol as RCP
 
 def collapse(ip, port, clusterId, n):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-#  Copyright 2014 CloudFounders NV
+#  Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -180,9 +180,9 @@ class Authentication(TestCase):
         """
         Validates whether the json response behave correctly
         """
-        from oauth2.decorators import json_response
+        from oauth2.decorators import auto_response
 
-        @json_response()
+        @auto_response()
         def the_function(return_type, return_value, return_code=None):
             """
             Decorated function
@@ -205,9 +205,9 @@ class Authentication(TestCase):
         """
         Validates whether the rate limiter behaves correctly
         """
-        from oauth2.decorators import limit, json_response
+        from oauth2.decorators import limit, auto_response
 
-        @json_response()
+        @auto_response()
         @limit(amount=2, per=2, timeout=2)
         def the_function(input_value, *args, **kwargs):
             """

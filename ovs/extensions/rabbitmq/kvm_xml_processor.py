@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import os
 import re
 import shutil
 
-logger = LogHandler('extensions', name='xml processor')
+logger = LogHandler.get('extensions', name='xml processor')
 
 
 class Kxp(pyinotify.ProcessEvent):
@@ -146,7 +146,6 @@ class Kxp(pyinotify.ProcessEvent):
                 shutil.copy2(event.pathname, target_xml)
         except Exception as exception:
             logger.error('Exception during process_IN_MOVED_TO: {0}'.format(str(exception)), print_msg=True)
-
 
     def process_IN_UNMOUNT(self, event):
         """

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import json
 import copy
 from random import randint
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
@@ -362,35 +362,36 @@ class DataList(object):
         foreign_guids = {}
 
         remote_namespace = blueprint_object._namespace
+        for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
+            if relation.foreign_type is None:
+                classname = remote_name
+                foreign_namespace = blueprint_object._namespace
+            else:
+                classname = relation.foreign_type.__name__.lower()
+                foreign_namespace = relation.foreign_type()._namespace
+            if classname not in foreign_guids:
+                foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
+            try:
+                mutex.acquire(60)
+                for foreign_guid in foreign_guids[classname]:
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, foreign_guid)
+                    reverse_index = volatile.get(reverse_key)
+                    if reverse_index is None:
+                        reverse_index = {}
+                    if relation.foreign_key not in reverse_index:
+                        reverse_index[relation.foreign_key] = []
+                        volatile.set(reverse_key, reverse_index)
+            finally:
+                mutex.release()
         remote_keys = DataList.get_pks(remote_namespace, remote_name)
-        handled_flows = []
         for guid in remote_keys:
             try:
                 instance = remote_class(guid)
                 for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
                     if relation.foreign_type is None:
                         classname = remote_name
-                        foreign_namespace = blueprint_object._namespace
                     else:
                         classname = relation.foreign_type.__name__.lower()
-                        foreign_namespace = relation.foreign_type()._namespace
-                    if classname not in foreign_guids:
-                        foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
-                    flow = '{0}_{1}'.format(classname, relation.foreign_key)
-                    if flow not in handled_flows:
-                        handled_flows.append(flow)
-                        try:
-                            mutex.acquire(60)
-                            for foreign_guid in foreign_guids[classname]:
-                                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, foreign_guid)
-                                reverse_index = volatile.get(reverse_key)
-                                if reverse_index is None:
-                                    reverse_index = {}
-                                if relation.foreign_key not in reverse_index:
-                                    reverse_index[relation.foreign_key] = []
-                                    volatile.set(reverse_key, reverse_index)
-                        finally:
-                            mutex.release()
                     key = getattr(instance, '{0}_guid'.format(relation.name))
                     if key is not None:
                         try:
@@ -401,11 +402,15 @@ class DataList(object):
                             if relation.foreign_key not in reverse_index:
                                 reverse_index[relation.foreign_key] = []
                             if guid not in reverse_index[relation.foreign_key]:
+                                if instance.updated_on_datastore():
+                                    raise ConcurrencyException()
                                 reverse_index[relation.foreign_key].append(guid)
                                 volatile.set('ovs_reverseindex_{0}_{1}'.format(classname, key), reverse_index)
                         finally:
                             mutex.release()
             except ObjectNotFoundException:
+                pass
+            except ConcurrencyException:
                 pass
 
         try:

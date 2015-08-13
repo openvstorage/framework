@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ Contains various decorator
 
 import math
 import re
+import json
 import inspect
 import time
 from ovs.dal.lists.userlist import UserList
@@ -26,6 +27,8 @@ from rest_framework.response import Response
 from toolbox import Toolbox
 from rest_framework.exceptions import PermissionDenied, NotAuthenticated, NotAcceptable, Throttled
 from rest_framework import status
+from rest_framework.request import Request
+from django.core.handlers.wsgi import WSGIRequest
 from django.http import Http404
 from django.conf import settings
 from ovs.dal.exceptions import ObjectNotFoundException
@@ -33,11 +36,19 @@ from backend.serializers.serializers import FullSerializer
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.dal.hybrids.log import Log
 
 
-logger = LogHandler('api')
+logger = LogHandler.get('api')
 regex = re.compile('^(.*; )?version=(?P<version>([0-9]+|\*)?)(;.*)?$')
+
+
+def _find_request(args):
+    """
+    Finds the "request" object in args
+    """
+    for item in args:
+        if isinstance(item, Request) or isinstance(item, WSGIRequest):
+            return item
 
 
 def required_roles(roles):
@@ -52,7 +63,7 @@ def required_roles(roles):
             """
             Wrapped function
             """
-            request = args[1]
+            request = _find_request(args)
             if not hasattr(request, 'user') or not hasattr(request, 'client'):
                 raise NotAuthenticated()
             user = UserList.get_user_by_username(request.user.username)
@@ -80,16 +91,17 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
             """
             Tries to parse a value to a pythonic value
             """
-            if value == 'true':
+            if value == 'true' or value == 'True':
                 return True
-            if value == 'false':
+            if value == 'false' or value == 'False':
                 return False
             return value
 
-        def new_function(self, request, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
+            request = _find_request(args)
             new_kwargs = {}
             # Find out the arguments of the decorated function
             function_info = inspect.getargspec(f)
@@ -130,27 +142,29 @@ def load(object_type=None, min_version=settings.VERSION[0], max_version=settings
                 new_kwargs['local_storagerouter'] = storagerouter
                 mandatory_vars.remove('local_storagerouter')
             # Fill mandatory parameters
+            post_data = request.DATA if hasattr(request, 'DATA') else request.POST
+            get_data = request.QUERY_PARAMS if hasattr(request, 'QUERY_PARAMS') else request.GET
             for name in mandatory_vars:
                 if name in kwargs:
                     new_kwargs[name] = kwargs[name]
                 else:
-                    if name not in request.DATA:
-                        if name not in request.QUERY_PARAMS:
+                    if name not in post_data:
+                        if name not in get_data:
                             raise NotAcceptable('Invalid data passed: {0} is missing'.format(name))
-                        new_kwargs[name] = _try_parse(request.QUERY_PARAMS[name])
+                        new_kwargs[name] = _try_parse(get_data[name])
                     else:
-                        new_kwargs[name] = _try_parse(request.DATA[name])
+                        new_kwargs[name] = _try_parse(post_data[name])
             # Try to fill optional parameters
             for name in optional_vars:
                 if name in kwargs:
                     new_kwargs[name] = kwargs[name]
                 else:
-                    if name in request.DATA:
-                        new_kwargs[name] = _try_parse(request.DATA[name])
-                    elif name in request.QUERY_PARAMS:
-                        new_kwargs[name] = _try_parse(request.QUERY_PARAMS[name])
+                    if name in post_data:
+                        new_kwargs[name] = _try_parse(post_data[name])
+                    elif name in get_data:
+                        new_kwargs[name] = _try_parse(get_data[name])
             # Call the function
-            return f(self, **new_kwargs)
+            return f(args[0], **new_kwargs)
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
@@ -166,11 +180,11 @@ def return_list(object_type, default_sort=None):
         """
         Wrapper function
         """
-        def new_function(self, request, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
-            _ = self
+            request = _find_request(args)
 
             # 1. Pre-loading request data
             sort = request.QUERY_PARAMS.get('sort')
@@ -188,7 +202,7 @@ def return_list(object_type, default_sort=None):
             kwargs['hints']['full'] = sort is not None or contents is not None
 
             # 3. Fetch data
-            data_list = f(self, request=request, *args, **kwargs)
+            data_list = f(*args, **kwargs)
             guid_list = isinstance(data_list, list) and len(data_list) > 0 and isinstance(data_list[0], basestring)
 
             # 4. Sorting
@@ -257,18 +271,18 @@ def return_object(object_type):
         """
         Wrapper function
         """
-        def new_function(self, request, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
-            _ = self
+            request = _find_request(args)
 
             # 1. Pre-loading request data
             contents = request.QUERY_PARAMS.get('contents')
             contents = None if contents is None else contents.split(',')
 
             # 5. Serializing
-            obj = f(self, request, *args, **kwargs)
+            obj = f(*args, **kwargs)
             return Response(FullSerializer(object_type, contents=contents, instance=obj).data, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
@@ -285,12 +299,11 @@ def return_task():
         """
         Wrapper function
         """
-        def new_function(self, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
-            _ = self
-            task = f(self, *args, **kwargs)
+            task = f(*args, **kwargs)
             return Response(task.id, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
@@ -309,12 +322,11 @@ def return_plain():
         Wrapper function
         """
 
-        def new_function(self, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
-            _ = self
-            result = f(self, *args, **kwargs)
+            result = f(*args, **kwargs)
             return Response(result, status=status.HTTP_200_OK)
 
         new_function.__name__ = f.__name__
@@ -332,10 +344,12 @@ def limit(amount, per, timeout):
         """
         Wrapper function
         """
-        def new_function(self, request, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
+            request = _find_request(args)
+
             now = time.time()
             key = 'ovs_api_limit_{0}.{1}_{2}'.format(
                 f.__module__, f.__name__,
@@ -350,6 +364,7 @@ def limit(amount, per, timeout):
                 active_timeout = rate_info['timeout']
                 if active_timeout is not None:
                     if active_timeout > now:
+                        logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, active_timeout - now))
                         raise Throttled(wait=active_timeout - now)
                     else:
                         rate_info['timeout'] = None
@@ -358,11 +373,12 @@ def limit(amount, per, timeout):
                 if calls > amount:
                     rate_info['timeout'] = now + timeout
                     client.set(key, rate_info)
+                    logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, timeout))
                     raise Throttled(wait=timeout)
                 client.set(key, rate_info)
             finally:
                 mutex.release()
-            return f(self, request, *args, **kwargs)
+            return f(*args, **kwargs)
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
@@ -380,26 +396,30 @@ def log():
         Wrapper function
         """
 
-        def new_function(self, request, *args, **kwargs):
+        def new_function(*args, **kwargs):
             """
             Wrapped function
             """
+            request = _find_request(args)
+            method_args = list(args)[:]
+            method_args = method_args[method_args.index(request) + 1:]
+
             # Log the call
-            log_entry = Log()
-            log_entry.source = 'API'
-            log_entry.module = f.__module__
-            log_entry.method = f.__name__
-            log_entry.method_args = list(args)
-            log_entry.method_kwargs = kwargs
-            log_entry.time = time.time()
-            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
-            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
-                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
-                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
-            log_entry.save()
+            metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                        'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                        'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            _logger = LogHandler.get('log', name='api')
+            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+                f.__module__,
+                f.__name__,
+                getattr(request, 'client').user_guid if hasattr(request, 'client') else None,
+                json.dumps(method_args),
+                json.dumps(kwargs),
+                json.dumps(metadata)
+            ))
 
             # Call the function
-            return f(self, request, *args, **kwargs)
+            return f(*args, **kwargs)
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__

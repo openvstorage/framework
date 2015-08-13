@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk'
-], function($, ko, generic, api, shared, VDisk) {
+    'viewmodels/containers/vdisk', 'viewmodels/containers/disk'
+], function($, ko, generic, api, shared, VDisk, Disk) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -30,6 +30,7 @@ define([
         // Handles
         self.loadHandle  = undefined;
         self.loadActions = undefined;
+        self.loadDisks   = undefined;
 
         // External dependencies
         self.pMachine  = ko.observable();
@@ -45,6 +46,7 @@ define([
         self.machineId        = ko.observable();
         self.ipAddress        = ko.observable();
         self.status           = ko.observable();
+        self.nodeType         = ko.observable();
         self.iops             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.storedData       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.cacheHits        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
@@ -58,6 +60,9 @@ define([
         self.vDisks           = ko.observableArray([]);
         self.availableActions = ko.observableArray([]);
         self.downloadLogState = ko.observable($.t('ovs:support.downloadlogs'));
+        self.disks            = ko.observableArray([]);
+        self.disksLoaded      = ko.observable(false);
+        self.updates          = ko.observable();
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -91,6 +96,67 @@ define([
         });
 
         // Functions
+        self.getUpdates = function() {
+            return $.Deferred(function(deferred) {
+                api.get('storagerouters/' + self.guid() + '/get_update_status')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        if (data.framework.length > 0) {
+                            data.framework.sort(function(a, b) {
+                                return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+                            });
+                        }
+                        if (data.volumedriver.length > 0) {
+                            data.volumedriver.sort(function(a, b) {
+                                return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+                            });
+                        }
+                        self.updates(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise();
+        };
+        self.getDisks = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadDisks)) {
+                    self.loadDisks = api.get('disks', { queryparams: {
+                        storagerouterguid: self.guid(),
+                        contents: '_relations',
+                        sort: 'name'
+                    }})
+                        .done(function(data) {
+                            var guids = [], ddata = {};
+                            $.each(data.data, function(index, item) {
+                                guids.push(item.guid);
+                                ddata[item.guid] = item;
+                            });
+                            generic.crossFiller(
+                                guids, self.disks,
+                                function(guid) {
+                                    var d = new Disk(guid);
+                                    d.loading(true);
+                                    return d;
+                                }, 'guid'
+                            );
+                            $.each(self.disks(), function(index, disk) {
+                                if (ddata.hasOwnProperty(disk.guid())) {
+                                    disk.fillData(ddata[disk.guid()]);
+                                    disk.getPartitions();
+                                }
+                            });
+                            self.disks.sort(function(a, b) {
+                                return a.name() < b.name() ? -1 : (a.name() > b.name() ? 1 : 0);
+                            });
+                            self.disksLoaded(true);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
         self.getAvailableActions = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadActions)) {
@@ -124,6 +190,7 @@ define([
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
             generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
+            generic.trySet(self.nodeType, data, 'node_type');
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
             }
@@ -140,6 +207,16 @@ define([
                         var vd = new VDisk(guid);
                         vd.loading(true);
                         return vd;
+                    }, 'guid'
+                );
+            }
+            if (data.hasOwnProperty('disks_guids')) {
+                generic.crossFiller(
+                    data.disks_guids, self.disks,
+                    function(guid) {
+                        var d = new Disk(guid);
+                        d.loading(true);
+                        return d;
                     }, 'guid'
                 );
             }

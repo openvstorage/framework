@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,16 +17,28 @@ Contains various decorator
 """
 import json
 import time
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseServerError
+from django.contrib.auth import authenticate, login
+from rest_framework.request import Request
+from rest_framework.exceptions import PermissionDenied
+from django.core.handlers.wsgi import WSGIRequest
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.log.logHandler import LogHandler
-from ovs.dal.hybrids.log import Log
 
-logger = LogHandler('api', 'oauth2')
+logger = LogHandler.get('api', 'oauth2')
 
 
-def json_response():
+def _find_request(args):
+    """
+    Finds the "request" object in args
+    """
+    for item in args:
+        if isinstance(item, Request) or isinstance(item, WSGIRequest):
+            return item
+
+
+def auto_response():
     """
     Json response wrapper
     """
@@ -39,12 +51,22 @@ def json_response():
             Wrapped function
             """
             results = f(*args, **kw)
-            return_type, data = results[0], results[1]
-            if len(results) == 2:
-                return return_type(json.dumps(data), content_type='application/json')
+            if isinstance(results, tuple) or isinstance(results, list):
+                return_type, data = results[0], results[1]
+                if len(results) == 2:
+                    if isinstance(data, dict):
+                        return return_type(json.dumps(data), content_type='application/json')
+                    return return_type(data)
+                else:
+                    status_code = results[2]
+                    if isinstance(data, dict):
+                        return return_type(json.dumps(data), content_type='application/json', status=status_code)
+                    return return_type(data, status=status_code)
+            elif isinstance(results, HttpResponse):
+                return results
             else:
-                status_code = results[2]
-                return return_type(json.dumps(data), content_type='application/json', status=status_code)
+                logger.error('Got invalid function return data in auto_reponse')
+                return HttpResponseServerError()
 
         new_function.__name__ = f.__name__
         new_function.__module__ = f.__module__
@@ -115,18 +137,18 @@ def log():
             Wrapped function
             """
             # Log the call
-            log_entry = Log()
-            log_entry.source = 'API'
-            log_entry.module = f.__module__
-            log_entry.method = f.__name__
-            log_entry.method_args = list(args)
-            log_entry.method_kwargs = kwargs
-            log_entry.time = time.time()
-            log_entry.user = getattr(request, 'client').user if hasattr(request, 'client') else None
-            log_entry.metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
-                                  'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
-                                  'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
-            log_entry.save()
+            metadata = {'meta': dict((str(key), str(value)) for key, value in request.META.iteritems()),
+                        'request': dict((str(key), str(value)) for key, value in request.REQUEST.iteritems()),
+                        'cookies': dict((str(key), str(value)) for key, value in request.COOKIES.iteritems())}
+            _logger = LogHandler.get('log', name='api')
+            _logger.info('[{0}.{1}] - {2} - {3} - {4} - {5}'.format(
+                f.__module__,
+                f.__name__,
+                getattr(request, 'client').user_guid if hasattr(request, 'client') else None,
+                json.dumps(list(args)),
+                json.dumps(kwargs),
+                json.dumps(metadata)
+            ))
 
             # Call the function
             return f(self, request, *args, **kwargs)
@@ -137,3 +159,30 @@ def log():
 
     return wrap
 
+
+def authenticated():
+    """
+    Forces an authentication run
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(*args, **kwargs):
+            """
+            Wrapped function
+            """
+            request = _find_request(args)
+            user = authenticate(request=request, native_django=True)
+            if user is None:
+                raise PermissionDenied('Authentication credentials were not provided.')
+            login(request, user)
+            return f(*args, **kwargs)
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
+    return wrap

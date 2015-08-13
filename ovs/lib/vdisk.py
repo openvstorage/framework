@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ import pickle
 import uuid
 import os
 import time
+from subprocess import check_output
 
 from ovs.lib.helpers.decorators import log
 from ovs.celery_run import celery
@@ -26,23 +27,23 @@ from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
-from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.pmachinelist import PMachineList
+from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
 from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.log.logHandler import LogHandler
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.extensions.generic.sshclient import SSHClient
-from ovs.extensions.generic.system import System
 from ovs.extensions.generic.volatilemutex import VolatileMutex
-from ovs.extensions.openstack.oscinder import OpenStackCinder
+from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
 
-logger = LogHandler('lib', name='vdisk')
+logger = LogHandler.get('lib', name='vdisk')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 
 class VDiskController(object):
@@ -51,7 +52,7 @@ class VDiskController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.disk.list_volumes')
+    @celery.task(name='ovs.vdisk.list_volumes')
     def list_volumes(vpool_guid=None):
         """
         List all known volumes on a specific vpool or on all
@@ -68,7 +69,7 @@ class VDiskController(object):
         return response
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_from_voldrv')
+    @celery.task(name='ovs.vdisk.delete_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def delete_from_voldrv(volumename, storagedriver_id):
         """
@@ -91,11 +92,12 @@ class VDiskController(object):
                     # else: pmachine can't be loaded, because the volumedriver doesn't know about it anymore
                 if pmachine is not None:
                     limit = 5
+                    storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                     hypervisor = Factory.get(pmachine)
-                    exists = hypervisor.file_exists(disk.vpool, disk.devicename)
+                    exists = hypervisor.file_exists(storagedriver, disk.devicename)
                     while limit > 0 and exists is True:
                         time.sleep(1)
-                        exists = hypervisor.file_exists(disk.vpool, disk.devicename)
+                        exists = hypervisor.file_exists(storagedriver, disk.devicename)
                         limit -= 1
                     if exists is True:
                         logger.info('Disk {0} still exists, ignoring delete'.format(disk.devicename))
@@ -108,7 +110,7 @@ class VDiskController(object):
                 mutex.release()
 
     @staticmethod
-    @celery.task(name='ovs.disk.resize_from_voldrv')
+    @celery.task(name='ovs.vdisk.resize_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def resize_from_voldrv(volumename, volumesize, volumepath, storagedriver_id):
         """
@@ -138,10 +140,11 @@ class VDiskController(object):
         disk.size = volumesize
         disk.vpool = storagedriver.vpool
         disk.save()
+        VDiskController.sync_with_mgmtcenter(disk, pmachine, storagedriver)
         MDSServiceController.ensure_safety(disk)
 
     @staticmethod
-    @celery.task(name='ovs.disk.rename_from_voldrv')
+    @celery.task(name='ovs.vdisk.rename_from_voldrv')
     @log('VOLUMEDRIVER_TASK')
     def rename_from_voldrv(volumename, volume_old_path, volume_new_path, storagedriver_id):
         """
@@ -165,7 +168,7 @@ class VDiskController(object):
             disk.save()
 
     @staticmethod
-    @celery.task(name='ovs.disk.clone')
+    @celery.task(name='ovs.vdisk.clone')
     def clone(diskguid, snapshotid, devicename, pmachineguid, machinename, machineguid=None):
         """
         Clone a disk
@@ -189,33 +192,44 @@ class VDiskController(object):
         new_vdisk.vpool = vdisk.vpool
         new_vdisk.save()
 
-        storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
-        if storagedriver is None:
-            raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
+        try:
+            storagedriver = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+            if storagedriver is None:
+                raise RuntimeError('Could not find StorageDriver with id {0}'.format(vdisk.storagedriver_id))
 
-        mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
-        if mds_service is None:
-            raise RuntimeError('Could not find a MDS service')
+            mds_service = MDSServiceController.get_preferred_mds(storagedriver.storagerouter, vdisk.vpool)
+            if mds_service is None:
+                raise RuntimeError('Could not find a MDS service')
 
-        logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
-        volume_id = vdisk.storagedriver_client.create_clone(
-            target_path=location,
-            metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
-                                                                            port=mds_service.service.ports[0])]),
-            parent_volume_id=str(vdisk.volume_id),
-            parent_snapshot_id=str(snapshotid),
-            node_id=str(vdisk.storagedriver_id)
-        )
+            logger.info('Clone snapshot {} of disk {} to location {}'.format(snapshotid, vdisk.name, location))
+            volume_id = vdisk.storagedriver_client.create_clone(
+                target_path=location,
+                metadata_backend_config=MDSMetaDataBackendConfig([MDSNodeConfig(address=str(mds_service.service.storagerouter.ip),
+                                                                                port=mds_service.service.ports[0])]),
+                parent_volume_id=str(vdisk.volume_id),
+                parent_snapshot_id=str(snapshotid),
+                node_id=str(vdisk.storagedriver_id)
+            )
+        except Exception as ex:
+            logger.error('Caught exception during clone, trying to delete the volume. {0}'.format(ex))
+            new_vdisk.delete()
+            VDiskController.delete_volume(location)
+            raise
+
         new_vdisk.volume_id = volume_id
         new_vdisk.save()
-        MDSServiceController.ensure_safety(new_vdisk)
+
+        try:
+            MDSServiceController.ensure_safety(new_vdisk)
+        except Exception as ex:
+            logger.error('Caught exception during "ensure_safety" {0}'.format(ex))
 
         return {'diskguid': new_vdisk.guid,
                 'name': new_vdisk.name,
                 'backingdevice': location}
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_snapshot')
+    @celery.task(name='ovs.vdisk.create_snapshot')
     def create_snapshot(diskguid, metadata, snapshotid=None):
         """
         Create a disk snapshot
@@ -237,7 +251,7 @@ class VDiskController(object):
         return snapshotid
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_snapshot')
+    @celery.task(name='ovs.vdisk.delete_snapshot')
     def delete_snapshot(diskguid, snapshotid):
         """
         Delete a disk snapshot
@@ -255,7 +269,7 @@ class VDiskController(object):
         disk.invalidate_dynamics(['snapshots'])
 
     @staticmethod
-    @celery.task(name='ovs.disk.set_as_template')
+    @celery.task(name='ovs.vdisk.set_as_template')
     def set_as_template(diskguid):
         """
         Set a disk as template
@@ -266,7 +280,7 @@ class VDiskController(object):
         disk.storagedriver_client.set_volume_as_template(str(disk.volume_id))
 
     @staticmethod
-    @celery.task(name='ovs.disk.rollback')
+    @celery.task(name='ovs.vdisk.rollback')
     def rollback(diskguid, timestamp):
         """
         Rolls back a disk based on a given disk snapshot timestamp
@@ -281,13 +295,11 @@ class VDiskController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_from_template')
+    @celery.task(name='ovs.vdisk.create_from_template')
     def create_from_template(diskguid, machinename, devicename, pmachineguid, machineguid=None, storagedriver_guid=None):
         """
         Create a disk from a template
 
-        @param parentdiskguid: guid of the disk
-        @param location: location where virtual device should be created (eg: myVM)
         @param devicename: device file name for the disk (eg: mydisk-flat.vmdk)
         @param machineguid: guid of the machine to assign disk to
         @return diskguid: guid of new disk
@@ -349,21 +361,11 @@ class VDiskController(object):
             new_vdisk.delete()
             raise
 
-        # Allow "regular" users to use this volume
-        # Do not use run for other user than ovs as it blocks asking for root password
-        # Do not use run_local for other user as it doesn't have permission
-        # So this method only works if this is called by root or ovs
-        #storagerouter = StorageRouter(new_vdisk.storagerouter_guid)
-        #mountpoint = storagedriver.mountpoint
-        #location = "{0}{1}".format(mountpoint, disk_path)
-        #client = SSHClient.load(storagerouter.pmachine.ip)
-        #print(client.run('chmod 664 "{0}"'.format(location)))
-        #print(client.run('chown ovs:ovs "{0}"'.format(location)))
         return {'diskguid': new_vdisk.guid, 'name': new_vdisk.name,
                 'backingdevice': disk_path}
 
     @staticmethod
-    @celery.task(name='ovs.disk.create_volume')
+    @celery.task(name='ovs.vdisk.create_volume')
     def create_volume(location, size):
         """
         Create a volume using filesystem calls
@@ -377,18 +379,15 @@ class VDiskController(object):
         """
         if os.path.exists(location):
             raise RuntimeError('File already exists at %s' % location)
-        client = SSHClient.load('127.0.0.1')
-        try:
-            output = client.run_local('truncate -s {0}G "{1}"'.format(size, location))
-        except SystemExit as ex:
-            raise RuntimeError(str(ex))
+
+        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+
         if not os.path.exists(location):
             raise RuntimeError('Cannot create file %s. Output: %s' % (location, output))
-        #VDiskController.own_volume(location)
 
     @staticmethod
-    @celery.task(name='ovs.disk.delete_volume')
+    @celery.task(name='ovs.vdisk.delete_volume')
     def delete_volume(location):
         """
         Create a volume using filesystem calls
@@ -402,9 +401,9 @@ class VDiskController(object):
         if not os.path.exists(location):
             logger.error('File already deleted at %s' % location)
             return
-        client = SSHClient.load('127.0.0.1')
-        output = client.run_local('rm -f "{0}"'.format(location))
+        output = check_output('rm "{0}"'.format(location), shell=True).strip()
         output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        logger.info(output)
         if os.path.exists(location):
             raise RuntimeError('Could not delete file %s, check logs. Output: %s' % (location, output))
         if output == '':
@@ -412,7 +411,7 @@ class VDiskController(object):
         raise RuntimeError(output)
 
     @staticmethod
-    @celery.task(name='ovs.disk.extend_volume')
+    @celery.task(name='ovs.vdisk.extend_volume')
     def extend_volume(location, size):
         """
         Extend a volume using filesystem calls
@@ -426,28 +425,83 @@ class VDiskController(object):
         """
         if not os.path.exists(location):
             raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
-        client = SSHClient.load('127.0.0.1')
-        print(client.run_local('truncate -s {0}G "{1}"'.format(size, location)))
-        #VDiskController.own_volume(location)
+        output = check_output('truncate -s {0}G "{1}"'.format(size, location), shell=True).strip()
+        output = output.replace('\xe2\x80\x98', '"').replace('\xe2\x80\x99', '"')
+        logger.info(output)
 
     @staticmethod
-    def own_volume(location):
+    @celery.task(name='ovs.vdisk.update_vdisk_name')
+    def update_vdisk_name(volume_id, old_name, new_name):
         """
-        Change permissions and ownership of file
+        Update a vDisk name using Management Center: set new name
         """
-        if not os.path.exists(location):
-            raise RuntimeError('Volume not found at %s, use create_volume first.' % location)
+        vdisk = None
+        for mgmt_center in MgmtCenterList.get_mgmtcenters():
+            mgmt = Factory.get_mgmtcenter(mgmt_center = mgmt_center)
+            try:
+                disk_info = mgmt.get_vdisk_device_info(volume_id)
+                device_path = disk_info['device_path']
+                vpool_name = disk_info['vpool_name']
+                vp = VPoolList.get_vpool_by_name(vpool_name)
+                file_name = os.path.basename(device_path)
+                vdisk = VDiskList.get_by_devicename_and_vpool(file_name, vp)
+                if vdisk:
+                    break
+            except Exception as ex:
+                logger.info('Trying to get mgmt center failed for disk {0} with volume_id {1}. {2}'.format(old_name, volume_id, ex))
+        if not vdisk:
+            logger.error('No vdisk found for name {0}'.format(old_name))
+            return
 
-        return
-        """
-        client = SSHClient.load('127.0.0.1')
-        osc = OpenStackCinder()
-        print(client.run_local('chmod 664 "{0}"'.format(location)))
+        vpool = vdisk.vpool
+        mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
         try:
-            if osc.is_devstack:
-                print(client.run_local('chgrp stack "{0}"'.format(location)))
-            elif osc.is_openstack:
-                print(client.run_local('chgrp cinder "{0}"'.format(location)))
-        except SystemExit as ex:
-            raise RuntimeError(str(ex))
+            mutex.acquire(wait=5)
+            vdisk.name = new_name
+            vdisk.save()
+        finally:
+            mutex.release()
+
+    @staticmethod
+    def sync_with_mgmtcenter(disk, pmachine, storagedriver):
         """
+        Update disk info using management center (if available)
+         If no management center, try with hypervisor
+         If no info retrieved, use devicename
+        @param disk: vDisk hybrid (vdisk to be updated)
+        @param pmachine: pmachine hybrid (pmachine running the storagedriver)
+        @param storagedriver: storagedriver hybrid (storagedriver serving the vdisk)
+        """
+        disk_name = None
+        if pmachine.mgmtcenter is not None:
+            logger.debug('Sync vdisk {0} with management center {1} on storagedriver {2}'.format(disk.name, pmachine.mgmtcenter.name, storagedriver.name))
+            mgmt = Factory.get_mgmtcenter(mgmt_center = pmachine.mgmtcenter)
+            volumepath = disk.devicename
+            mountpoint = storagedriver.mountpoint
+            devicepath = '{0}/{1}'.format(mountpoint, volumepath)
+            try:
+                disk_mgmt_center_info = mgmt.get_vdisk_model_by_devicepath(devicepath)
+                if disk_mgmt_center_info is not None:
+                    disk_name = disk_mgmt_center_info.get('name')
+            except Exception as ex:
+                logger.error('Failed to sync vdisk {0} with mgmt center {1}. {2}'.format(disk.name, pmachine.mgmtcenter.name, str(ex)))
+
+        if disk_name is None:
+            logger.info('Sync vdisk with hypervisor on {0}'.format(pmachine.name))
+            try:
+                hv = Factory.get(pmachine)
+                info = hv.get_vm_agnostic_object(disk.vmachine.hypervisor_id)
+                for disk in info['disks']:
+                    if disk['filename'] == disk.devicename:
+                        disk_name = disk['name']
+                        break
+            except Exception as ex:
+                logger.error('Failed to get vdisk info from hypervisor. %s' % ex)
+
+        if disk_name is None:
+            logger.info('No info retrieved from hypervisor, using devicename')
+            disk_name = disk.devicename.split('/')[-1].split('.')[0]
+
+        if disk_name is not None:
+            disk.name = disk_name
+            disk.save()

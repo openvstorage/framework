@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,27 +16,29 @@
 Contains the process method for processing rabbitmq messages
 """
 
-import time
 import inspect
+import json
 from celery.task.control import revoke
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storage.volatilefactory import VolatileFactory
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 import volumedriver.storagerouter.FileSystemEvents_pb2 as FileSystemEvents
 import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from google.protobuf.descriptor import FieldDescriptor
 from ovs.log.logHandler import LogHandler
-from ovs.dal.hybrids.log import Log
+from ovs.lib.vmachine import VMachineController
+from ovs.lib.vdisk import VDiskController
 
-logger = LogHandler('extensions', name='processor')
+logger = LogHandler.get('extensions', name='processor')
+
+CINDER_VOLUME_UPDATE_CACHE = {}
 
 
 def process(queue, body, mapping):
     """
     Processes the actual received body
     """
-    if queue == Configuration.get('ovs.core.broker.volumerouter.queue'):
-        import json
+    if queue == Configuration.get('ovs.core.broker.queues.storagedriver'):
         cache = VolatileFactory.get_client()
         all_extensions = None
 
@@ -126,6 +128,35 @@ def process(queue, body, mapping):
                 if message.event.HasExtension(extension):
                     message_type = extension.full_name
             logger.info('A message with type {0} was received. Skipped.'.format(message_type))
+    elif queue == 'notifications.info':
+        logger.info('Received notification from openstack...')
+        try:
+            body = json.loads(body)
+            print(body)
+            event_type = body['event_type']
+            logger.info('Processing notification for event {0}'.format(event_type))
+            if event_type == 'compute.instance.update':
+                old_display_name = body['payload'].get('old_display_name')
+                instance_id = body['payload']['instance_id']
+                display_name = body['payload'].get('display_name')
+                if old_display_name and old_display_name != display_name:
+                    logger.info('Caught instance rename event')
+                    VMachineController.update_vmachine_name.apply_async(kwargs={'old_name': old_display_name, 'new_name': display_name, 'instance_id': instance_id})
+            elif event_type == 'volume.update.start':
+                volume_id = body['payload']['volume_id']
+                display_name = body['payload']['display_name']
+                CINDER_VOLUME_UPDATE_CACHE[volume_id] = display_name
+            elif event_type == 'volume.update.end':
+                volume_id = body['payload']['volume_id']
+                display_name = body['payload']['display_name']
+                old_display_name = CINDER_VOLUME_UPDATE_CACHE.get(volume_id)
+                if old_display_name and old_display_name != display_name:
+                    logger.info('Caught volume rename event')
+                    VDiskController.update_vdisk_name.apply_async(kwargs={'volume_id': volume_id, 'old_name': old_display_name, 'new_name': display_name})
+                    del CINDER_VOLUME_UPDATE_CACHE[volume_id]
+        except Exception as ex:
+            logger.error('Processing notification failed {0}'.format(ex))
+        logger.info('Processed notification from openstack.')
     else:
         raise NotImplementedError('Queue {} is not yet implemented'.format(queue))
 
@@ -145,11 +176,11 @@ def _log(task, kwargs, storagedriver_id):
     """
     Log an event
     """
-    log = Log()
-    log.source = 'VOLUMEDRIVER_EVENT'
-    log.module = task.__class__.__module__
-    log.method = task.__class__.__name__
-    log.method_kwargs = kwargs
-    log.time = time.time()
-    log.storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-    log.save()
+    metadata = {'storagedriver': StorageDriverList.get_by_storagedriver_id(storagedriver_id).guid}
+    _logger = LogHandler.get('log', name='volumedriver_event')
+    _logger.info('[{0}.{1}] - {2} - {3}'.format(
+        task.__class__.__module__,
+        task.__class__.__name__,
+        json.dumps(kwargs),
+        json.dumps(metadata)
+    ))

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,20 +23,24 @@ import os
 import traceback
 from time import mktime
 from datetime import datetime
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.vdisk import VDiskController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.lib.helpers.decorators import ensure_single
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.loglist import LogList
+from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.db.arakoon.ArakoonManagement import ArakoonManagementEx
-from volumedriver.scrubber.scrubber import Scrubber
+from volumedriver.storagerouter.storagerouterclient import Scrubber
+from volumedriver.storagerouter import storagerouterclient
 from ovs.log.logHandler import LogHandler
 
 _storagedriver_scrubber = Scrubber()
-logger = LogHandler('lib', name='scheduled tasks')
+logger = LogHandler.get('lib', name='scheduled tasks')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 
 class ScheduledTaskController(object):
@@ -70,7 +74,7 @@ class ScheduledTaskController(object):
         ))
 
     @staticmethod
-    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True, schedule=crontab(minute='30', hour='0'))
+    @celery.task(name='ovs.scheduled.deletescrubsnapshots', bind=True, schedule=crontab(minute='0', hour='2'))
     @ensure_single(['ovs.scheduled.deletescrubsnapshots'])
     def deletescrubsnapshots(timestamp=None):
         """
@@ -183,29 +187,55 @@ class ScheduledTaskController(object):
         vdisks = []
         for vmachine in VMachineList.get_customer_vmachines():
             for vdisk in vmachine.vdisks:
-                if vdisk.info['object_type'] in ['BASE']:
+                if vdisk.info['object_type'] in ['BASE'] and len(vdisk.child_vdisks) == 0:
                     vdisks.append(vdisk)
         for vdisk in VDiskList.get_without_vmachine():
-            if vdisk.info['object_type'] in ['BASE']:
+            if vdisk.info['object_type'] in ['BASE'] and len(vdisk.child_vdisks) == 0:
                 vdisks.append(vdisk)
 
         total = 0
         failed = 0
+        skipped = 0
+        storagedrivers = {}
         for vdisk in vdisks:
-            work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
-            for work_unit in work_units:
-                try:
-                    total += 1
-                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, vdisk.vpool.mountpoint_temp)
+            try:
+                total += 1
+                # Load the vDisk's StorageDriver
+                vdisk.invalidate_dynamics(['info', 'storagedriver_id'])
+                if vdisk.storagedriver_id not in storagedrivers:
+                    storagedrivers[vdisk.storagedriver_id] = StorageDriverList.get_by_storagedriver_id(vdisk.storagedriver_id)
+                storagedriver = storagedrivers[vdisk.storagedriver_id]
+                # Load the vDisk's MDS configuration
+                vdisk.invalidate_dynamics(['info'])
+                configs = vdisk.info['metadata_backend_config']
+                if len(configs) == 0:
+                    raise RuntimeError('Could not load MDS configuration')
+                if configs[0]['ip'] != storagedriver.storagerouter.ip:
+                    # The MDS master is not local. Trigger an MDS handover and try again
+                    logger.debug('MDS for volume {0} is not local. Trigger handover'.format(vdisk.volume_id))
+                    MDSServiceController.ensure_safety(vdisk)
+                    vdisk.invalidate_dynamics(['info'])
+                    configs = vdisk.info['metadata_backend_config']
+                    if len(configs) == 0:
+                        raise RuntimeError('Could not load MDS configuration')
+                    if configs[0]['ip'] != storagedriver.storagerouter.ip:
+                        skipped += 1
+                        logger.info('Skipping scrubbing work unit for volume {0}: MDS master is not local'.format(
+                            vdisk.volume_id
+                        ))
+                        continue
+                work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
+                for work_unit in work_units:
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedriver.mountpoint_temp))
                     vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
-                except:
-                    failed += 1
-                    logger.info('Failed scrubbing work unit for volume {}'.format(
-                        vdisk.volume_id
-                    ))
+            except Exception, ex:
+                failed += 1
+                logger.info('Failed scrubbing work unit for volume {0}: {1}'.format(
+                    vdisk.volume_id, ex
+                ))
 
-        logger.info('Scrubbing finished. {} out of {} items failed.'.format(
-            failed, total
+        logger.info('Scrubbing finished. {0} volumes: {1} success, {2} failed, {3} skipped.'.format(
+            total, (total - failed - skipped), failed, skipped
         ))
 
     @staticmethod
@@ -230,16 +260,3 @@ class ScheduledTaskController(object):
                         )
                     )
         logger.info('Arakoon collapse finished')
-
-    @staticmethod
-    @celery.task(name='ovs.scheduled.clean_logs', bind=True, schedule=crontab(minute='30', hour='0'))
-    @ensure_single(['ovs.scheduled.clean_logs'])
-    def clean_logs():
-        """
-        Cleans audit trail logs
-        """
-        days = int(Configuration.get('ovs.core.audittrails.keep'))
-        mark = time.time() - days * 24 * 60 * 60
-        for log in LogList.get_logs():
-            if log.time < mark:
-                log.delete()

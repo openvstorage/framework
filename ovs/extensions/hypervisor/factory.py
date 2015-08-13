@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,6 +85,7 @@ class Factory(object):
                     elif mgmtcenter_type == 'OPENSTACK':
                         from mgmtcenters.openstack import OpenStack
                         mgmtcenter = OpenStack(ip, username, password)
+                        mgmtcenter.set_metadata(mgmt_center.metadata)
                     else:
                         raise NotImplementedError('Management center for {0} is not yet supported'.format(mgmtcenter_type))
                     Factory.mgmtcenters[key] = mgmtcenter

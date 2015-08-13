@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ define([
                 // The observed data is not set, or an empyt list
                 (!self.data()() || (self.data()().hasOwnProperty('length') && self.data()().length === 0))
             );
-        }).extend({ throttle: 50 });
+        }).extend({ rateLimit: 50 });
         self.cacheHits = ko.computed(function() {
             var total = 0;
             if (self.hasData()) {

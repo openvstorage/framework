@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ class Mapping(object):
                                                            'dedupe': True,
                                                            'dedupe_key': '[TASK_NAME]_[new_name]_[storagedriver_id]',
                                                            'execonstoragerouter': True}}],
-               FileSystemEvents.up_and_running: [{'task': VPoolController.mountpoint_available_from_voldrv,
+               FileSystemEvents.up_and_running: [{'task': VPoolController.up_and_running,
                                                   'arguments': {'mountpoint': 'mountpoint',
                                                                 '[NODE_ID]': 'storagedriver_id'},
                                                   'options': {'execonstoragerouter': True}}],
@@ -72,4 +72,5 @@ class Mapping(object):
                                                                              'dedupe_key': '[TASK_NAME]_[storagedriver_id]'}}],
                VolumeDriverEvents.volumedriver_error: [{'task': StorageDriverController.volumedriver_error,
                                                         'arguments': {'code': 'code',
-                                                                      'volume_name': 'volumename'}}]}
+                                                                      'volume_name': 'volumename',
+                                                                      '[NODE_ID]': 'storagedriver_id'}}]}

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
 """
 Generic persistent factory.
 """
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='persistent factory')
+logger = LogHandler.get('extensions', name='persistent factory')
 
 
 class PersistentFactory(object):
@@ -39,8 +39,7 @@ class PersistentFactory(object):
             PersistentFactory.store = None
             if client_type == 'arakoon':
                 from ovs.extensions.storage.persistent.arakoonstore import ArakoonStore
-                cluster = Configuration.get('ovs.core.db.arakoon.clusterid')
-                PersistentFactory.store = ArakoonStore(cluster)
+                PersistentFactory.store = ArakoonStore('ovsdb')
             if client_type == 'default':
                 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
                 PersistentFactory.store = DummyPersistentStore()

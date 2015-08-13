@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,18 @@ define(function(){
         self.stop = function() {
             if (self.refreshTimeout !== undefined) {
                 window.clearInterval(self.refreshTimeout);
+                self.refreshTimeout = undefined;
             }
+        };
+        self.setInterval = function(interval) {
+            self.interval = interval;
+            if (self.refreshTimeout !== undefined) {
+                self.stop();
+                self.start();
+            }
+        };
+        self.setLoad = function(load) {
+            self.load = load;
         };
         self.run = function() {
             self.load();

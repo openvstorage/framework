@@ -1,4 +1,4 @@
-// Copyright 2015 CloudFounders NV
+// Copyright 2015 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,8 +30,7 @@ define([
         self.licenseHeaders = [
             { key: 'component',  value: $.t('ovs:generic.component'),  width: 250       },
             { key: 'name',       value: $.t('ovs:generic.name'),       width: 250       },
-            { key: 'metadata',   value: $.t('ovs:generic.metadata'),   width: undefined },
-            { key: 'validUntil', value: $.t('ovs:generic.validuntil'), width: 250       }
+            { key: 'metadata',   value: $.t('ovs:generic.metadata'),   width: undefined }
         ];
 
         // Observable

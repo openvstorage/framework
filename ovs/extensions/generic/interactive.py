@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -150,7 +150,7 @@ class Interactive(object):
             else:
                 corrected_lines.append(line)
         maxlen = len(max(corrected_lines, key=len))
-        newlines  = []
+        newlines = []
         if character is not None:
             newlines.append(character * (maxlen + 10))
         for line in corrected_lines:

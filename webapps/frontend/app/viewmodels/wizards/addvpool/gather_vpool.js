@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -157,8 +157,8 @@ define([
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
-                                self.data.readcaches(data.readcaches)
-                                self.data.writecaches(data.writecaches)
+                                self.data.readcaches(data.readcaches);
+                                self.data.writecaches(data.writecaches);
                                 self.data.ipAddresses(data.ipaddresses);
                                 self.data.files(data.files);
                                 self.data.allowVPool(data.allow_vpool);
@@ -193,35 +193,61 @@ define([
         self.loadAlbaBackends = function() {
             return $.Deferred(function(albaDeferred) {
                 generic.xhrAbort(self.fetchAlbaVPoolHandle);
-                var getData = {
+                var getData, relay = '', remoteInfo = {};
+                getData = {
                     backend_type: 'alba',
                     contents: '_dynamics'
                 };
                 if (!self.data.localHost()) {
-                    getData.ip = self.data.host();
-                    getData.port = self.data.port();
-                    getData.client_id = self.data.accesskey();
-                    getData.client_secret = self.data.secretkey();
+                    relay = 'relay/';
+                    remoteInfo.ip = self.data.host();
+                    remoteInfo.port = self.data.port();
+                    remoteInfo.client_id = self.data.accesskey();
+                    remoteInfo.client_secret = self.data.secretkey();
                 }
+                $.extend(getData, remoteInfo);
                 self.albaBackendLoading(true);
                 self.invalidAlbaInfo(false);
-                self.fetchAlbaVPoolHandle = api.get('backends', { queryparams: getData })
+                self.fetchAlbaVPoolHandle = api.get(relay + 'backends', { queryparams: getData })
                     .done(function(data) {
-                        var available_backends = [];
+                        var available_backends = [], calls = [];
                         $.each(data.data, function (index, item) {
                             if (item.available === true) {
-                                available_backends.push(item);
+                                calls.push(
+                                    api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
+                                        .then(function(data) {
+                                            data.presetNames = ko.observableArray(data.presets.filter(function(preset) {
+                                                return preset.is_available === true;
+                                            }));
+                                            if (data.available === true && data.presetNames().length > 0) {
+                                                available_backends.push(data);
+                                            }
+                                        })
+                                );
                             }
                         });
-                        if (available_backends.length > 0) {
-                            self.data.albaBackends(available_backends)
-                            self.data.albaBackend(available_backends[0]);
-                        } else {
-                            self.data.albaBackends(undefined);
-                            self.data.albaBackend(undefined);
-                        }
-                        self.albaBackendLoading(false);
-                        albaDeferred.resolve();
+                        $.when.apply($, calls)
+                            .then(function() {
+                                if (available_backends.length > 0) {
+                                    self.data.albaBackends(available_backends);
+                                    self.data.albaBackend(available_backends[0]);
+                                    self.data.albaPreset(available_backends[0].presetNames()[0]);
+                                } else {
+                                    self.data.albaBackends(undefined);
+                                    self.data.albaBackend(undefined);
+                                    self.data.albaPreset(undefined);
+                                }
+                                self.albaBackendLoading(false);
+                            })
+                            .done(albaDeferred.resolve)
+                            .fail(function() {
+                                self.data.albaBackends(undefined);
+                                self.data.albaBackend(undefined);
+                                self.data.albaPreset(undefined);
+                                self.albaBackendLoading(false);
+                                self.invalidAlbaInfo(true);
+                                albaDeferred.reject();
+                            });
                     })
                     .fail(function() {
                         self.data.albaBackends(undefined);
@@ -237,7 +263,7 @@ define([
         self.activate = function() {
             generic.xhrAbort(self.loadStorageRoutersHandle);
             self.loadStorageRoutersHandle = api.get('storagerouters', {
-                queryparams: {
+                    queryparams: {
                     contents: 'storagedrivers',
                     sort: 'name'
                 }
@@ -285,7 +311,7 @@ define([
                             }
                         });
                     });
-            };
+            }
         };
     };
 });

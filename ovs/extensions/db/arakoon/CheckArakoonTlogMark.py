@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,11 +22,10 @@ from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
 from ovs.extensions.generic.system import System
 from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler
-from ovs.plugin.provider.process import Process
 
 manager = ArakoonManagementEx()
 ensurearakoonworks = EnsureArakoonWorks()
-logger = LogHandler('arakoon', name='tlogchcker')
+logger = LogHandler.get('arakoon', name='tlogchcker')
 
 
 class CheckArakoonError(Exception):
@@ -38,7 +37,7 @@ class CheckArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class CheckArakoonTlogMark():
+class CheckArakoonTlogMark(object):
     """
     check if tlogs need marking
     mark tlogs that are unmarked
@@ -117,7 +116,8 @@ class CheckArakoonTlogMark():
         CheckArakoonTlogMark._speak(
             'Arakoon getStatusOne for Localnode {1}: {0}'.format(extensionstatus, localnode))
         if extensionstatus is True:
-            processstatus = Process.checkProcess('arakoon')
+            output = subprocess.check_output('ps aux | grep -v grep | grep arakoon || true', shell=True)
+            processstatus = 1 if 'arakoon' not in output else 0
             if processstatus:
                 CheckArakoonTlogMark._speak('Arakoon Process is not Running')
                 return False

@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,12 +24,12 @@ import base64
 import requests
 from subprocess import check_output
 from ConfigParser import RawConfigParser
-from ovs.plugin.provider.configuration import Configuration
-from ovs.plugin.provider.package import Package
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.packages.package import PackageManager
 from ovs.log.logHandler import LogHandler
 
 
-logger = LogHandler('support', name='agent')
+logger = LogHandler.get('support', name='agent')
 
 
 class SupportAgent(object):
@@ -41,7 +41,7 @@ class SupportAgent(object):
         """
         Initializes the client
         """
-        self._enable_support = int(Configuration.get('ovs.support.enablesupport')) > 0
+        self._enable_support = Configuration.get('ovs.support.enablesupport')
         self.interval = int(Configuration.get('ovs.support.interval'))
         self._url = 'https://monitoring.openvstorage.com/api/support/heartbeat/'
 
@@ -57,7 +57,7 @@ class SupportAgent(object):
 
         try:
             # Versions
-            data['metadata']['versions'] = Package.get_versions()
+            data['metadata']['versions'] = PackageManager.get_versions()
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
@@ -155,7 +155,7 @@ class SupportAgent(object):
 
 if __name__ == '__main__':
     try:
-        if int(Configuration.get('ovs.support.enabled')) == 0:
+        if Configuration.get('ovs.support.enabled') is False:
             print 'Support not enabled'
             sys.exit(0)
         logger.info('Starting up')

@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
         }).extend({ notify: 'always' });
         computed(target());
+        computed.min = generic.tryGet(settings, 'min', undefined);
+        computed.max = generic.tryGet(settings, 'max', undefined);
         return computed;
     };
     ko.extenders.smooth = function(target, settings) {

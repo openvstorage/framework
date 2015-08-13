@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ from ovs.log.logHandler import LogHandler
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.system import System
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 
 memcache_ini = RawConfigParser()
 memcache_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'memcacheclient.cfg'))
@@ -71,7 +71,7 @@ celery.conf.CELERY_ACKS_LATE = True          # This, together with the below PRE
 celery.conf.CELERYD_PREFETCH_MULTIPLIER = 1  # workers basically won't be prefetching tasks, to prevent deadlocks
 celery.conf.CELERYBEAT_SCHEDULE = {}
 
-loghandler = LogHandler('celery', name='celery')
+loghandler = LogHandler.get('celery', name='celery')
 
 
 @task_postrun.connect

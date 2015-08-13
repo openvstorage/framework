@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ define([
                                     if (storageRouterGuid && (item.storageRouter() === undefined || item.storageRouter().guid() !== storageRouterGuid)) {
                                         if (!self.storageRouterCache.hasOwnProperty(storageRouterGuid)) {
                                             sr = new StorageRouter(storageRouterGuid);
-                                            sr.load();
+                                            sr.load('');
                                             self.storageRouterCache[storageRouterGuid] = sr;
                                         }
                                         item.storageRouter(self.storageRouterCache[storageRouterGuid]);
@@ -82,7 +82,7 @@ define([
                                     if (vMachineGuid && (item.vMachine() === undefined || item.vMachine().guid() !== vMachineGuid)) {
                                         if (!self.vMachineCache.hasOwnProperty(vMachineGuid)) {
                                             vm = new VMachine(vMachineGuid);
-                                            vm.load();
+                                            vm.load('');
                                             self.vMachineCache[vMachineGuid] = vm;
                                         }
                                         item.vMachine(self.vMachineCache[vMachineGuid]);
@@ -90,7 +90,7 @@ define([
                                     if (vPoolGuid && (item.vpool() === undefined || item.vpool().guid() !== vPoolGuid)) {
                                         if (!self.vPoolCache.hasOwnProperty(vPoolGuid)) {
                                             pool = new VPool(vPoolGuid);
-                                            pool.load();
+                                            pool.load('');
                                             self.vPoolCache[vPoolGuid] = pool;
                                         }
                                         item.vpool(self.vPoolCache[vPoolGuid]);
@@ -132,7 +132,7 @@ define([
                             });
                         });
                 }
-            }, 5000);
+            }, 60000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ define([
         self.topVmachineMode       = ko.observable('topstoreddata');
         self.storageRouters        = ko.observableArray([]);
         self.vPools                = ko.observableArray([]);
-        self.vMachineGuids         = ko.observableArray([]);
+        self.amountOfVMachines     = ko.observable(0);
         self.topVMachines          = ko.observableArray([]);
         self.topVpoolModes         = ko.observableArray(['topstoreddata', 'topbandwidth']);
         self.topVmachineModes      = ko.observableArray(['topstoreddata', 'topbandwidth']);
@@ -56,7 +56,7 @@ define([
             return self.vPools.slice(0, 10);
         });
         self._cacheRatio = ko.computed(function() {
-            var hits = 0, misses = 0, total, initialized = true, i, raw;
+            var hits = 0, misses = 0, total, raw;
             $.each(self.vPools(), function(index, vpool) {
                 hits += (vpool.cacheHits.raw() || 0);
                 misses += (vpool.cacheMisses.raw() || 0);
@@ -111,61 +111,40 @@ define([
         // Functions
         self.load = function() {
             return $.Deferred(function(deferred) {
-                $.when.apply($, [
-                        self.loadStorageRouters(),
-                        self.loadVPools(),
-                        self.loadVMachines()
-                    ])
+                self.loadStorageRouters()
+                    .then(self.loadVPools)
+                    .then(self.loadVMachines)
                     .done(deferred.resolve)
                     .fail(deferred.reject);
             }).promise();
         };
         self.loadVMachines = function() {
             return $.Deferred(function(deferred) {
-                self.vMachinesLoading(true);
-                $.when(
-                        $.Deferred(function(vms_dfr) {
-                            if (generic.xhrCompleted(self.loadVMachinesHandle)) {
-                                var filter = {
-                                    contents: 'statistics,stored_data',
-                                    sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
-                                    page: 1,
-                                    query: JSON.stringify(self.query)
-                                };
-                                self.loadVMachinesHandle = api.get('vmachines', { queryparams: filter })
-                                    .done(function(data) {
-                                        var vms = [], vm;
-                                        $.each(data.data, function(index, vmdata) {
-                                            vm = new VMachine(vmdata.guid);
-                                            vm.fillData(vmdata);
-                                            vms.push(vm);
-                                        });
-                                        self.topVMachines(vms);
-                                        vms_dfr.resolve();
-                                    })
-                                    .fail(vms_dfr.reject);
-                            } else {
-                                vms_dfr.reject();
-                            }
-                        }).promise(),
-                        $.Deferred(function(vmg_dfr) {
-                            if (generic.xhrCompleted(self.loadVMachineGuidsHandle)) {
-                                self.loadVMachineGuidsHandle = api.get('vmachines', { queryparams: { query: JSON.stringify(self.query) } })
-                                    .done(function(data) {
-                                        self.vMachineGuids(data.data);
-                                        vmg_dfr.resolve();
-                                    })
-                                    .fail(vmg_dfr.reject);
-                            } else {
-                                vmg_dfr.reject();
-                            }
-                        }).promise()
-                    )
-                    .done(function() {
-                        self.vMachinesLoading(false);
-                        deferred.resolve();
-                    })
-                    .fail(deferred.reject);
+                if (generic.xhrCompleted(self.loadVMachinesHandle)) {
+                    self.vMachinesLoading(true);
+                    var filter = {
+                        contents: (self.topVmachineMode() === 'topstoreddata' ? 'stored_data' : 'statistics'),
+                        sort: (self.topVmachineMode() === 'topstoreddata' ? '-stored_data,name' : '-statistics[data_transferred_ps],name'),
+                        page: 1,
+                        query: JSON.stringify(self.query)
+                    };
+                    self.loadVMachinesHandle = api.get('vmachines', { queryparams: filter })
+                        .done(function(data) {
+                            var vms = [], vm;
+                            $.each(data.data, function(index, vmdata) {
+                                vm = new VMachine(vmdata.guid);
+                                vm.fillData(vmdata);
+                                vms.push(vm);
+                            });
+                            self.topVMachines(vms);
+                            self.amountOfVMachines(data._paging.total_items);
+                            self.vMachinesLoading(false);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
         self.loadVPools = function() {
@@ -243,12 +222,18 @@ define([
 
         // Durandal
         self.activate = function() {
+            $.each(shared.hooks.dashboards, function(index, dashboard) {
+                dashboard.activator.activateItem(dashboard.module);
+            });
             self.refresher.init(self.load, 5000);
             self.refresher.run();
             self.refresher.start();
             self.shared.footerData(self.vPools);
         };
         self.deactivate = function() {
+            $.each(shared.hooks.dashboards, function(index, dashboard) {
+                dashboard.activator.deactivateItem(dashboard.module);
+            });
             self.refresher.stop();
             self.shared.footerData(ko.observable());
         };

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,10 +82,6 @@ class DeleteSnapshots(TestCase):
         VolatileFactory.store.clean()
         PersistentFactory.store.clean()
 
-        # Logging
-        DeleteSnapshots.logLevel = logging.root.manager.disable
-        logging.disable('INFO')
-
     @classmethod
     def setUp(cls):
         """
@@ -95,13 +91,6 @@ class DeleteSnapshots(TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store = DummyVolatileStore()
         VolatileFactory.store.clean()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Clean up the unittest
-        """
-        logging.disable(DeleteSnapshots.logLevel)
 
     def test_happypath(self):
         """

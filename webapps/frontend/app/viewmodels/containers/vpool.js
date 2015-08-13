@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -185,7 +185,8 @@ define([
                 }
             }).promise();
         };
-        self.loadBackendType = function() {
+        self.loadBackendType = function(refresh) {
+            refresh = !!refresh;
             return $.Deferred(function(deferred) {
                 if (self.backendTypeGuid() !== undefined) {
                     if (self.backendType() === undefined || self.backendTypeGuid() !== self.backendType().guid()) {
@@ -194,7 +195,7 @@ define([
                             .then(deferred.resolve)
                             .fail(deferred.reject);
                         self.backendType(backendType);
-                    } else {
+                    } else if (refresh) {
                         self.backendType().load()
                             .then(deferred.resolve)
                             .fail(deferred.reject);

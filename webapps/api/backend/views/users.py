@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -124,7 +124,7 @@ class UserViewSet(viewsets.ViewSet):
             for junction in client.roles.itersafe():
                 junction.delete()
             client.delete()
-        user.delete(abandon=True)  # Detach from the log entries
+        user.delete(abandon=['logs'])  # Detach from the log entries
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @log()

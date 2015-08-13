@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,116 +23,125 @@ define([
     ipRegex = /^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$/;
 
     singleton = function() {
-        var mtptData = {
-            target:          ko.observable(),
-            files:           ko.observable(),
-            accesskey:       ko.observable(''),
-            secretkey:       ko.observable(''),
-            allowVPool:      ko.observable(true),
-            localHost:       ko.observable(true),
-            backend:         ko.observable('local'),
-            mtptTemp:        ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
-            mtptBFS:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
-            mtptMD:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
-            mtptReadCaches:  ko.observableArray([]), // Final target containing read caches
-            mtptCustomRCs:   ko.observableArray([]),
-            mtptCustomRC:    ko.observable(),
-            mtptWriteCaches: ko.observableArray([]), // Final target containing write caches
-            mtptCustomWCs:   ko.observableArray([]),
-            mtptCustomWC:    ko.observable(),
-            mtptFOC:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-foc' }),
-            storageIP:       ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
-            name:            ko.observable('').extend({ regex: nameRegex }),
-            host:            ko.observable('').extend({ regex: hostRegex }),
-            port:            ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
-            timeout:         ko.observable(600).extend({ numeric: {}}),
-            albaBackend:     ko.observable(),
-            backends:        ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']),
-            storageRouters:  ko.observableArray([]),
-            storageDrivers:  ko.observableArray([]),
-            mountpoints:     ko.observableArray([]),
-            readcaches:      ko.observableArray([]),
-            writecaches:     ko.observableArray([]),
-            ipAddresses:     ko.observableArray([]),
-            vPools:          ko.observableArray([]),
-            albaBackends:    ko.observableArray(),
-            hasCinder:       ko.observable(),
-            configCinder:    ko.observable(),
-            cinderUser:      ko.observable('admin'),
-            cinderPassword:  ko.observable(''),
-            cinderTenant:    ko.observable('admin'),
-            cinderCtrlIP:    ko.observable('').extend({ regex: ipRegex }),
-            mountpointRegex: mountpointRegex
+        var wizardData = {
+            target:           ko.observable(),
+            files:            ko.observable(),
+            accesskey:        ko.observable(''),
+            secretkey:        ko.observable(''),
+            allowVPool:       ko.observable(true),
+            localHost:        ko.observable(true),
+            backend:          ko.observable('local'),
+            mtptTemp:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
+            mtptBFS:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
+            mtptMD:           ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
+            mtptReadCaches:   ko.observableArray([]), // Final target containing read caches
+            mtptCustomRCs:    ko.observableArray([]),
+            mtptCustomRC:     ko.observable(),
+            mtptWriteCaches:  ko.observableArray([]), // Final target containing write caches
+            mtptCustomWCs:    ko.observableArray([]),
+            mtptCustomWC:     ko.observable(),
+            mtptFOC:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-foc' }),
+            storageIP:        ko.observable().extend({ regex: ipRegex, identifier: 'storageip' }),
+            name:             ko.observable('').extend({ regex: nameRegex }),
+            host:             ko.observable('').extend({ regex: hostRegex }),
+            port:             ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
+            timeout:          ko.observable(600).extend({ numeric: {}}),
+            albaBackend:      ko.observable(),
+            albaPreset:       ko.observable(),
+            backends:         ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']),
+            storageRouter:    ko.observable(),
+            storageRouters:   ko.observableArray([]),
+            storageDriver:    ko.observable(),
+            storageDrivers:   ko.observableArray([]),
+            mountpoints:      ko.observableArray([]),
+            readcaches:       ko.observableArray([]),
+            writecaches:      ko.observableArray([]),
+            ipAddresses:      ko.observableArray([]),
+            vPool:            ko.observable(),
+            vPools:           ko.observableArray([]),
+            albaBackends:     ko.observableArray(),
+            extendVpool:      ko.observable(false),
+            integratemgmt:    ko.observable(),
+            hasMgmtCenter:    ko.observable(false),
+            mgmtcenterUser:   ko.observable(),
+            mgmtcenterIp:     ko.observable(),
+            mgmtcenterType:   ko.observable(),
+            mgmtcenterName:   ko.observable(),
+            mgmtcenterLoaded: ko.observable(false),
+            mountpointRegex:  mountpointRegex
         }, resetAlbaBackends = function() {
-            mtptData.albaBackends(undefined);
-            mtptData.albaBackend(undefined);
+            wizardData.albaBackends(undefined);
+            wizardData.albaBackend(undefined);
+            wizardData.albaPreset(undefined);
         };
 
-        mtptData.allReadMountpoints = ko.computed(function() {
+        wizardData.allReadMountpoints = ko.computed(function() {
             var returnValue = [];
-            $.each(mtptData.readcaches(), function(i, e) {
+            $.each(wizardData.readcaches(), function(i, e) {
                 returnValue.push(e);
             });
-            $.each(mtptData.mtptCustomRCs(), function(i, e) {
+            $.each(wizardData.mtptCustomRCs(), function(i, e) {
                 returnValue.push(e);
             });
             return returnValue;
         });
-        mtptData.readCacheDistributor = ko.computed(function() {
-            return mtptData.mtptReadCaches();
+        wizardData.readCacheDistributor = ko.computed(function() {
+            return wizardData.mtptReadCaches();
         });
-        mtptData.readCacheDistributor.push = function(element) {
-            mtptData.mtptReadCaches.push(element);
+        wizardData.readCacheDistributor.push = function(element) {
+            wizardData.mtptReadCaches.push(element);
         };
-        mtptData.readCacheDistributor.remove = function(element) {
-            if ($.inArray(element, mtptData.mtptCustomRCs()) !== -1) {
-                mtptData.mtptCustomRCs.remove(element);
+        wizardData.readCacheDistributor.remove = function(element) {
+            if ($.inArray(element, wizardData.mtptCustomRCs()) !== -1) {
+                wizardData.mtptCustomRCs.remove(element);
             }
-            if ($.inArray(element, mtptData.mtptReadCaches()) !== -1) {
-                mtptData.mtptReadCaches.remove(element);
+            if ($.inArray(element, wizardData.mtptReadCaches()) !== -1) {
+                wizardData.mtptReadCaches.remove(element);
             }
         };
-        mtptData.readCacheDistributor.isObservableArray = true;
+        wizardData.readCacheDistributor.isObservableArray = true;
+        wizardData.readCacheDistributor.identifier = 'mtpt-readcaches';
 
-        mtptData.allWriteMountpoints = ko.computed(function() {
+        wizardData.allWriteMountpoints = ko.computed(function() {
             var returnValue = [];
-            $.each(mtptData.writecaches(), function(i, e) {
+            $.each(wizardData.writecaches(), function(i, e) {
                 returnValue.push(e);
             });
-            $.each(mtptData.mtptCustomWCs(), function(i, e) {
+            $.each(wizardData.mtptCustomWCs(), function(i, e) {
                 returnValue.push(e);
             });
             return returnValue;
         });
-        mtptData.writeCacheDistributor = ko.computed(function() {
-            return mtptData.mtptWriteCaches();
+        wizardData.writeCacheDistributor = ko.computed(function() {
+            return wizardData.mtptWriteCaches();
         });
-        mtptData.writeCacheDistributor.push = function(element) {
-            mtptData.mtptWriteCaches.push(element);
+        wizardData.writeCacheDistributor.push = function(element) {
+            wizardData.mtptWriteCaches.push(element);
         };
-        mtptData.writeCacheDistributor.remove = function(element) {
-            if ($.inArray(element, mtptData.mtptCustomWCs()) !== -1) {
-                mtptData.mtptCustomWCs.remove(element);
+        wizardData.writeCacheDistributor.remove = function(element) {
+            if ($.inArray(element, wizardData.mtptCustomWCs()) !== -1) {
+                wizardData.mtptCustomWCs.remove(element);
             }
-            if ($.inArray(element, mtptData.mtptWriteCaches()) !== -1) {
-                mtptData.mtptWriteCaches.remove(element);
+            if ($.inArray(element, wizardData.mtptWriteCaches()) !== -1) {
+                wizardData.mtptWriteCaches.remove(element);
             }
         };
-        mtptData.writeCacheDistributor.isObservableArray = true;
+        wizardData.writeCacheDistributor.isObservableArray = true;
+        wizardData.writeCacheDistributor.identifier = 'mtpt-writecaches';
 
-        mtptData.accesskey.subscribe(resetAlbaBackends);
-        mtptData.secretkey.subscribe(resetAlbaBackends);
-        mtptData.host.subscribe(resetAlbaBackends);
-        mtptData.port.subscribe(resetAlbaBackends);
-        mtptData.localHost.subscribe(function() {
-            mtptData.host('');
-            mtptData.port(80);
-            mtptData.accesskey('');
-            mtptData.secretkey('');
+        wizardData.accesskey.subscribe(resetAlbaBackends);
+        wizardData.secretkey.subscribe(resetAlbaBackends);
+        wizardData.host.subscribe(resetAlbaBackends);
+        wizardData.port.subscribe(resetAlbaBackends);
+        wizardData.localHost.subscribe(function() {
+            wizardData.host('');
+            wizardData.port(80);
+            wizardData.accesskey('');
+            wizardData.secretkey('');
             resetAlbaBackends();
         });
 
-        return mtptData;
+        return wizardData;
     };
     return singleton();
 });

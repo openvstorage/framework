@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,14 @@
 # limitations under the License.
 
 """
-Delete snapshots test module
+MDSService test module
 """
 import unittest
 import sys
 import json
 from unittest import TestCase
 from ovs.lib.tests.mockups import StorageDriverModule, StorageDriverClient
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatilefactory import VolatileFactory
@@ -29,7 +29,7 @@ from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
 
 class MDSServices(TestCase):
     """
-    This test class will validate the various scenarios of the delete snapshots logic
+    This test class will validate the various scenarios of the MDSService logic
     """
 
     VDisk = None
@@ -94,11 +94,7 @@ class MDSServices(TestCase):
                 return c.get(key)
             return None
 
-        def _get_int(key):
-            return int(Configuration.get(key))
-
         Configuration.get = staticmethod(_get)
-        Configuration.getInt = staticmethod(_get_int)
 
         # Cleaning storage
         VolatileFactory.store.clean()
@@ -276,7 +272,7 @@ class MDSServices(TestCase):
         """
         Validates whether storagedriver configuration is generated as expected
         """
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
         vpools, storagerouters, storagedrivers, services, mds_services, _ = self._build_service_structure(
             {'vpools': [1, 2],
              'storagerouters': [1, 2, 3, 4, 5, 6],
@@ -433,9 +429,9 @@ class MDSServices(TestCase):
             if test is True:
                 self.assertListEqual(reality_loads, _loads)
 
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', '3')
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', '75')
-        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', '100')
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.safety', 3)
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.maxload', 75)
+        PersistentFactory.get_client().set('ovs.storagedriver.mds.tlogs', 100)
         vpools, storagerouters, storagedrivers, _, mds_services, service_type = self._build_service_structure(
             {'vpools': [1],
              'storagerouters': [1, 2, 3, 4],

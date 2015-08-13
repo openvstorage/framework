@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ define([
         self.onLoggedIn  = [];
         self.onLoggedOut = [];
         self.required    = false;
+        self.metadata    = {};
 
         // Observables
         self.accessToken = ko.observable();
@@ -73,6 +74,7 @@ define([
         };
         self.logout = function() {
             self.accessToken(undefined);
+            self.metadata = {};
             window.localStorage.removeItem('accesstoken');
             self.dispatch(false)
                 .always(function() {

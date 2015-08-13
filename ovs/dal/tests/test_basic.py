@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-#  Copyright 2014 CloudFounders NV
+#  Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -126,6 +126,9 @@ class Basic(TestCase):
         disk = TestDisk(data={'name': 'diskx'})
         disk.save()
         self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
+        disk = TestDisk(data={'name': 'disky', 'foo': 'bar'})
+        disk.save()
+        self.assertEqual(disk.name, 'disky', 'Disk name should be preloaded, without raising for invalid preload data')
 
     def test_datapersistent(self):
         """
@@ -816,7 +819,7 @@ class Basic(TestCase):
         self.assertIsNotNone(disk_3.machine, 'The machine should still be linked')
         _ = machine.disks  # Make sure we loaded the list
         disk_2.delete()
-        machine.delete(abandon=True)  # Should not raise due to disk_2 being deleted
+        machine.delete(abandon=['disks'])  # Should not raise
         disk_4 = TestDisk(disk_1.guid)
         self.assertIsNone(disk_4.machine, 'The machine should be unlinked')
 
@@ -1167,6 +1170,139 @@ class Basic(TestCase):
         disk2.save()
         with self.assertRaises(InvalidRelationException):
             _ = machine.one
+
+    def test_object_cleanup(self):
+        """
+        Validates whether using an object property to delete these entries does not cause issues when deleting the
+        object itself afterwards
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
+
+    def test_relation_set_build(self):
+        """
+        Validates whether relationsets are (re)build correctly
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        VolatileFactory.store.clean()
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertFalse(datalist.from_cache, 'The relation set should be generated')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+
+    def test_instance_checks(self):
+        """
+        Validates whether Descriptor.isinstance works
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk = TestDisk()
+        disk.name = 'disk'
+        disk.machine = machine
+        disk.save()
+        self.assertTrue(Descriptor.isinstance(disk, TestDisk), 'The disk should be a TestDisk')
+        self.assertFalse(Descriptor.isinstance(disk, TestMachine), 'The disk is no TestMachine')
+        self.assertTrue(Descriptor.isinstance(disk.machine, TestEMachine), 'The disk.machine is a TestEMachine')
+
+    def test_cache_and_save_racecondition(self):
+        """
+        Validates whether concurrent save/loads won't result in outdates sturctures being cached
+        """
+        guid = None
+
+        def update():
+            local_machine = TestMachine(guid)
+            local_machine.name = 'updated'
+            local_machine.save()
+
+        machine = TestMachine()
+        self.assertIsNone(machine._metadata['cache'], 'A new object shouldn\'t imply caching')
+        machine.name = 'one'
+        machine.save()
+        guid = machine.guid
+
+        machine = TestMachine(machine.guid, hook=update)
+        self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
+        self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
+        machine = TestMachine(machine.guid)
+        self.assertEqual(machine.name, 'updated', 'The machine\'s name should be updated')
+        self.assertFalse(machine._metadata['cache'], 'Race condition should have prevented caching')
+        machine = TestMachine(machine.guid)
+        self.assertTrue(machine._metadata['cache'], 'The machine should be loaded from cache')
+
+    def test_delete_during_object_load(self):
+        """
+        Validates whether removing an object during the load does raise a correct exception
+        """
+        guid = None
+
+        def delete():
+            local_machine = TestMachine(guid)
+            local_machine.delete()
+
+        machine = TestMachine()
+        machine.name = 'one'
+        machine.save()
+        guid = machine.guid
+
+        with self.assertRaises(ObjectNotFoundException):
+            _ = TestMachine(guid, hook=delete)
+
+    def test_object_save_reverseindex_build(self):
+        """
+        Validates whether saving an object won't create an empty reverse index if not required
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        key = 'ovs_reverseindex_testemachine_{0}'.format(machine.guid)
+        self.assertIsNotNone(VolatileFactory.store.get(key), 'The reverse index should be created (save on new object)')
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+        VolatileFactory.store.delete(key)
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+        VolatileFactory.store.delete(key)
+        machine.save()
+        self.assertIsNone(VolatileFactory.store.get(key), 'The reverse index should not be created (save on existing object)')
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
 
 if __name__ == '__main__':
     import unittest

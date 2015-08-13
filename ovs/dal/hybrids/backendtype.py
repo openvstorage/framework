@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ BackendType module
 """
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Dynamic
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 
 
 class BackendType(DataObject):
@@ -35,6 +35,6 @@ class BackendType(DataObject):
         Checks whether this BackendType has a plugin installed
         """
         try:
-            return True if Configuration.get('ovs.plugins.backend.' + self.code) else False
+            return self.code in Configuration.get('ovs.plugins.backends')
         except:
             return False

@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,8 @@ define(['jquery'], function($) {
         { route: 'users',                moduleId: 'users',                title: $.t('ovs:users.title'),                 titlecode: 'ovs:users.title',                 nav: true,  main: false },
         { route: 'statistics',           moduleId: 'statistics',           title: $.t('ovs:statistics.title'),            titlecode: 'ovs:statistics.title',            nav: true,  main: false },
         { route: 'support',              moduleId: 'support',              title: $.t('ovs:support.title'),               titlecode: 'ovs:support.title',               nav: true,  main: false },
-        { route: 'licenses',             moduleId: 'licenses',             title: $.t('ovs:licenses.title'),              titlecode: 'ovs:licenses.title',              nav: true,  main: false }
+        { route: 'licenses',             moduleId: 'licenses',             title: $.t('ovs:licenses.title'),              titlecode: 'ovs:licenses.title',              nav: true,  main: false },
+        { route: 'updates',              moduleId: 'updates',              title: $.t('ovs:updates.title'),               titlecode: 'ovs:updates.title',               nav: true,  main: false }
     ];
     extraRoutes = [];
     routePatches = [];
@@ -75,7 +76,9 @@ define(['jquery'], function($) {
                         hash = hash.replace(':' + item, params[item].call ? params[item]() : params[item]);
                     }
                 }
-                return hash;
+                if (hash.indexOf(':') === -1) {
+                    return hash;
+                }
             }
         }
         return '/';

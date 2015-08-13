@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,15 +20,17 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
-from ovs.extensions.hypervisor.factory import Factory
 from backend.serializers.serializers import FullSerializer
 from rest_framework.exceptions import NotAcceptable
 from rest_framework.response import Response
 from rest_framework import status
 from backend.decorators import required_roles, load, return_object, return_list, log
 from ovs.log.logHandler import LogHandler
+from ovs.lib.mgmtcenter import MgmtCenterController
 
-logger = LogHandler('api', 'mgmtcenters')
+from celery.exceptions import TimeoutError
+
+logger = LogHandler.get('api', 'mgmtcenters')
 
 
 class MgmtCenterViewSet(viewsets.ViewSet):
@@ -66,7 +68,7 @@ class MgmtCenterViewSet(viewsets.ViewSet):
         """
         Deletes a Management center
         """
-        mgmtcenter.delete(abandon=True)
+        mgmtcenter.delete(abandon=['pmachines'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @log()
@@ -81,17 +83,37 @@ class MgmtCenterViewSet(viewsets.ViewSet):
             mgmt_center = serializer.object
             duplicate = MgmtCenterList.get_by_ip(mgmt_center.ip)
             if duplicate is None:
-                try:
-                    mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
-                    is_mgmt_center = mgmt_center_client.test_connection()
-                except Exception as ex:
-                    logger.debug('Management center testing: {0}'.format(ex))
-                    raise NotAcceptable('The given information is invalid.')
-                if not is_mgmt_center:
-                    raise NotAcceptable('The given information is not for a Management center.')
                 mgmt_center.save()
-                return Response(serializer.data, status=status.HTTP_201_CREATED)
+                try:
+                    task_id = MgmtCenterController.test_connection.apply_async(kwargs = {'mgmt_center_guid': mgmt_center.guid}).id
+                    task = MgmtCenterController.test_connection.AsyncResult(task_id)
+                except:
+                    mgmt_center.delete()
+                    raise
+                try:
+                    is_mgmt_center = task.get(timeout = 60,
+                                              propagate = True)
+                except TimeoutError:
+                    mgmt_center.delete()
+                    logger.error('Timed out waiting for test_connection')
+                    raise NotAcceptable('Timed out waiting for test_connection')
+                except Exception as ex:
+                    # propagate reraises the exception raised in the task
+                    mgmt_center.delete()
+                    logger.error('Task exception %s' % ex)
+                    raise NotAcceptable('Task exception')
+                if is_mgmt_center is True:
+                    return Response(serializer.data, status=status.HTTP_201_CREATED)
+                elif is_mgmt_center is None:
+                    mgmt_center.delete()
+                    raise NotAcceptable('The given information is invalid.')
+                elif is_mgmt_center is False:
+                    mgmt_center.delete()
+                    raise NotAcceptable('The given information is not for a Management center.')
+                else:
+                    mgmt_center.delete()
+                    raise NotAcceptable('Unexpected result %s' % is_mgmt_center)
             else:
-                raise NotAcceptable('A Mangement Center with this ip already exists.')
+                raise NotAcceptable('A Management Center with this ip already exists.')
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

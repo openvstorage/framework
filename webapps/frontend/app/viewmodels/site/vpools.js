@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ define([
                                     return self.vPoolCache[guid];
                                 },
                                 dependencyLoader: function(item) {
-                                    item.loadBackendType();
+                                    item.loadBackendType(false);
                                 }
                             });
                         })
@@ -107,7 +107,7 @@ define([
                             });
                         });
                 }
-            }, 5000);
+            }, 60000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

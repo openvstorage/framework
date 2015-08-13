@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,12 +19,16 @@ Wrapper class for the storagedriverclient of the voldrv team
 import os
 import json
 import copy
+from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import StorageRouterClient as SRClient, LocalStorageRouterClient as LSRClient, MDSClient, MDSNodeConfig
 from volumedriver.storagerouter.storagerouterclient import ClusterContact, Statistics, VolumeInfo
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.generic.remote import Remote
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='storagedriver')
+logger = LogHandler.get('extensions', name='storagedriver')
+storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
+storagerouterclient.Logger.enableLogging()
 
 client_vpool_cache = {}
 client_storagedriver_cache = {}
@@ -49,11 +53,13 @@ class StorageDriverClient(object):
                      'data_written', 'metadata_store_hits', 'metadata_store_misses',
                      'read_operations', 'sco_cache_hits', 'sco_cache_misses',
                      'write_operations']
+    extra_keys = ['4k_read_operations', '4k_write_operations']
     stat_sums = {'operations': ['write_operations', 'read_operations'],
+                 '4k_operations': ['4k_read_operations', '4k_write_operations'],
                  'cache_hits': ['sco_cache_hits', 'cluster_cache_hits'],
                  'cache_misses': ['sco_cache_misses'],
                  'data_transferred': ['data_written', 'data_read']}
-    stat_keys = stat_counters + stat_sums.keys()
+    stat_keys = stat_counters + extra_keys + stat_sums.keys()
 
     def __init__(self):
         """
@@ -68,7 +74,7 @@ class StorageDriverClient(object):
         Loads and returns the client
         """
 
-        key = vpool.guid
+        key = '{0}_{1}'.format(vpool.guid, '_'.join(guid for guid in vpool.storagedrivers_guids))
         if key not in client_vpool_cache:
             cluster_contacts = []
             for storagedriver in vpool.storagedrivers[:3]:
@@ -100,7 +106,8 @@ class MetadataServerClient(object):
             try:
                 client = MDSClient(MDSNodeConfig(address=str(service.storagerouter.ip), port=service.ports[0]))
                 mdsclient_service_cache[key] = client
-            except RuntimeError:
+            except RuntimeError as ex:
+                logger.error('Error loading MDSClient on {0}: {1}'.format(service.storagerouter.ip, ex))
                 return None
         return mdsclient_service_cache[key]
 
@@ -116,21 +123,21 @@ class StorageDriverConfiguration(object):
 
     parameters = {
         # hg branch: 3.6
-        # hg revision: e7b3ffed419a
-        # buildTime: Wed Apr  1 17:14:31 UTC 2015
+        # hg revision: 4d71655c8b41
+        # buildTime: Tue Aug  4 07:18:42 UTC 2015
         'metadataserver': {
-            'metadata_server': {
-                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_address', 'mds_port', ],
-                'mandatory': ['mds_scratch_dir', 'mds_rocksdb_path', ]
-            },
             'backend_connection_manager': {
-                'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', ],
+                'optional': ['backend_connection_pool_capacity', 'backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
                 'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
+            },
+            'metadata_server': {
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
+                'mandatory': []
             },
         },
         'storagedriver': {
             'backend_connection_manager': {
-                'optional': ['backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', ],
+                'optional': ['backend_connection_pool_capacity', 'backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
                 'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
             },
             'content_addressed_cache': {
@@ -150,8 +157,12 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_cache_dentries', ],
                 'mandatory': ['fs_virtual_disk_format', ]
+            },
+            'metadata_server': {
+                'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
+                'mandatory': []
             },
             'scocache': {
                 'optional': [],
@@ -170,7 +181,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['vregistry_arakoon_cluster_id', 'vregistry_arakoon_cluster_nodes', ]
             },
             'volume_router': {
-                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', ],
+                'optional': ['vrouter_local_io_sleep_before_retry_usecs', 'vrouter_local_io_retries', 'vrouter_volume_read_threshold', 'vrouter_volume_write_threshold', 'vrouter_file_read_threshold', 'vrouter_file_write_threshold', 'vrouter_redirect_timeout_ms', 'vrouter_backend_sync_timeout_ms', 'vrouter_migrate_timeout_ms', 'vrouter_redirect_retries', 'vrouter_sco_multiplier', 'vrouter_routing_retries', 'vrouter_min_workers', 'vrouter_max_workers', 'vrouter_registry_cache_capacity', ],
                 'mandatory': ['vrouter_id', ]
             },
             'volume_router_cluster': {
@@ -245,18 +256,17 @@ class StorageDriverConfiguration(object):
             with open(self.path, 'w') as config_file:
                 config_file.write(contents)
         else:
-            client.run('mkdir -p {0}'.format(self.base_path))
+            client.dir_create(self.base_path)
             client.file_write(self.path, contents)
         if self.config_type == 'storagedriver' and reload_config is True:
             if len(self.dirty_entries) > 0:
-                logger.info('Applying storagedriver configuration changes')
                 if client is None:
+                    logger.info('Applying local storagedriver configuration changes')
                     changes = LSRClient(self.path).update_configuration(self.path)
                 else:
-                    changes = json.loads(client.run('python -c """{0}"""'.format("""
-from volumedriver.storagerouter.storagerouterclient import LocalStorageRouterClient
-import json
-print json.dumps(LocalStorageRouterClient('{0}').update_configuration('{0}'))""".format(self.path))))
+                    logger.info('Applying storagedriver configuration changes on {0}'.format(client.ip))
+                    with Remote(client.ip, [LSRClient]) as remote:
+                        changes = copy.deepcopy(remote.LocalStorageRouterClient(self.path).update_configuration(self.path))
                 for change in changes:
                     if change['param_name'] not in self.dirty_entries:
                         raise RuntimeError('Unexpected configuration change: {0}'.format(change['param_name']))

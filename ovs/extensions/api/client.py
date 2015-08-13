@@ -1,4 +1,4 @@
-# Copyright 2015 CloudFounders NV
+# Copyright 2015 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ class OVSClient(object):
     Represents the OVS client
     """
 
-    def __init__(self, ip, port, credentials=None, verify=False):
+    def __init__(self, ip, port, credentials=None, verify=False, version='*', raw_response=False):
         """
         Initializes the object with credentials and connection information
         """
@@ -38,6 +38,8 @@ class OVSClient(object):
         self._url = 'https://{0}:{1}/api'.format(ip, port)
         self._token = None
         self._verify = verify
+        self._version = version
+        self._raw_response = raw_response
 
     def _connect(self):
         """
@@ -45,13 +47,15 @@ class OVSClient(object):
         """
         headers = {'Accept': 'application/json',
                    'Authorization': 'Basic {0}'.format(base64.b64encode('{0}:{1}'.format(self.client_id, self.client_secret)).strip())}
-        response = requests.post(url='{0}/oauth2/token/'.format(self._url),
-                                 data={'grant_type': 'client_credentials'},
-                                 headers=headers,
-                                 verify=self._verify).json()
-
+        raw_response = requests.post(url='{0}/oauth2/token/'.format(self._url),
+                                     data={'grant_type': 'client_credentials'},
+                                     headers=headers,
+                                     verify=self._verify)
+        response = raw_response.json()
         if len(response.keys()) == 1 and 'error' in response:
-            raise RuntimeError(response['error'])
+            error = RuntimeError(response['error'])
+            error.status_code = raw_response.status_code
+            raise error
         self._token = response['access_token']
 
     def _prepare(self, **kwargs):
@@ -63,7 +67,7 @@ class OVSClient(object):
         if self.client_id is not None and self._token is None:
             self._connect()
 
-        headers = {'Accept': 'application/json; version=*'}
+        headers = {'Accept': 'application/json; version={0}'.format(self._version)}
         if self._token is not None:
             headers['Authorization'] = 'Bearer {0}'.format(self._token)
 
@@ -74,17 +78,21 @@ class OVSClient(object):
 
         return headers, url
 
-    @staticmethod
-    def _process(response):
+    def _process(self, response):
         """
         Processes a call result
         """
+        if self._raw_response is True:
+            return response
+
         if response.status_code == 403:
             raise RuntimeError('No access to the requested API')
         if response.status_code == 404:
             raise RuntimeError('The requested API could not be located')
         if response.status_code == 405:
             raise RuntimeError('Requested method not allowed')
+        if response.status_code == 406:
+            raise RuntimeError('The request was unacceptable: {0}'.format(response.text))
         if response.status_code == 429:
             raise RuntimeError('The requested API has rate limiting: {0}'.format(response.text))
         if response.status_code == 500:
@@ -100,39 +108,39 @@ class OVSClient(object):
         Executes a GET call
         """
         headers, url = self._prepare(params=params)
-        return OVSClient._process(requests.get(url=url.format(api),
-                                               headers=headers,
-                                               verify=self._verify))
+        return self._process(requests.get(url=url.format(api),
+                                          headers=headers,
+                                          verify=self._verify))
 
     def post(self, api, data=None, params=None):
         """
         Executes a POST call
         """
         headers, url = self._prepare(params=params)
-        return OVSClient._process(requests.post(url=url.format(api),
-                                                data=data,
-                                                headers=headers,
-                                                verify=self._verify))
+        return self._process(requests.post(url=url.format(api),
+                                           data=data,
+                                           headers=headers,
+                                           verify=self._verify))
 
     def put(self, api, data=None, params=None):
         """
         Executes a PUT call
         """
         headers, url = self._prepare(params=params)
-        return OVSClient._process(requests.put(url=url.format(api),
-                                               data=data,
-                                               headers=headers,
-                                               verify=self._verify))
+        return self._process(requests.put(url=url.format(api),
+                                          data=data,
+                                          headers=headers,
+                                          verify=self._verify))
 
     def patch(self, api, data=None, params=None):
         """
         Executes a PATCH call
         """
         headers, url = self._prepare(params=params)
-        return OVSClient._process(requests.patch(url=url.format(api),
-                                                 data=data,
-                                                 headers=headers,
-                                                 verify=self._verify))
+        return self._process(requests.patch(url=url.format(api),
+                                            data=data,
+                                            headers=headers,
+                                            verify=self._verify))
 
     def wait_for_task(self, task_id, timeout=None):
         """

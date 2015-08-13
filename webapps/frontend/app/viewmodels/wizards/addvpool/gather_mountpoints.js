@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,14 +13,16 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout', 'ovs/generic', './data'
-], function($, ko, generic, data) {
+    'jquery', 'knockout', 'ovs/generic', './data', 'ovs/api', '../../containers/storagerouter',
+    '../../containers/storagedriver', 'ovs/shared'
+], function($, ko, generic, data, api, StorageRouter, StorageDriver, shared) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
         self.data = data;
+        self.shared = shared;
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -31,7 +33,7 @@ define([
                 if (self.data.target() !== undefined && storageDriver.storageDriverID() === (self.data.name() + self.data.target().machineId())) {
                     return true;
                 }
-                if (storageDriver.mountpointBFS() !== undefined) {
+                if (storageDriver.mountpointBFS() !== undefined && storageDriver.mountpointBFS() !== "") {
                     bfs_mountpoints.push(storageDriver.mountpointBFS());
                     storagedriver_mountpoints.push(storageDriver.mountpointBFS());
                 }
@@ -85,7 +87,7 @@ define([
                 }
             }
             else {
-                self.data.mtptBFS('/mnt/bfs'); // BFS isn't used, so set it to a non-conflicting value
+                self.data.mtptBFS('');
             }
 
             // Temp mountpoint checks
@@ -168,8 +170,10 @@ define([
         self.addReadCache = function() {
             var value = self.data.mtptCustomRC();
             if (value !== undefined && value !== '') {
-                if (!self.data.mtptCustomRCs().contains(value) && !self.data.mountpoints().contains(value)) {
+                if (!self.data.mtptCustomRCs().contains(value)) {
                     self.data.mtptCustomRCs.push(value);
+                }
+                if (!self.data.mtptReadCaches().contains(value)) {
                     self.data.mtptReadCaches.push(value);
                 }
                 self.data.mtptCustomRC('');
@@ -179,8 +183,10 @@ define([
         self.addWriteCache = function() {
             var value = self.data.mtptCustomWC();
             if (value !== undefined && value !== '') {
-                if (!self.data.mtptCustomWCs().contains(value) && !self.data.mountpoints().contains(value)) {
+                if (!self.data.mtptCustomWCs().contains(value)) {
                     self.data.mtptCustomWCs.push(value);
+                }
+                if (!self.data.mtptWriteCaches().contains(value)) {
                     self.data.mtptWriteCaches.push(value);
                 }
                 self.data.mtptCustomWC('');
@@ -188,6 +194,75 @@ define([
         };
 
         self.activate = function() {
+            if (data.extendVpool() === true) {
+                self.loadStorageRoutersHandle = api.get('storagerouters', {
+                        queryparams: {
+                        contents: 'storagedrivers',
+                        sort: 'name'
+                    }
+                }).done(function(data) {
+                        var guids = [], srdata = {};
+                        $.each(data.data, function(index, item) {
+                            guids.push(item.guid);
+                            srdata[item.guid] = item;
+                        });
+                        generic.crossFiller(
+                            guids, self.data.storageRouters,
+                            function(guid) {
+                                return new StorageRouter(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.data.storageRouters(), function(index, storageRouter) {
+                            storageRouter.fillData(srdata[storageRouter.guid()]);
+                        });
+                        if (self.data.target() === undefined && self.data.storageRouter() !== undefined) {
+                            self.data.target(self.data.storageRouter);
+                        }
+                    });
+
+                if (data.vPool() !== undefined) {
+                    self.data.vPool().load('storagedrivers', { skipDisks: true })
+                        .then(function() {
+                            self.data.storageDriver(new StorageDriver(self.data.vPool().storageDriverGuids()[0]));
+                            self.data.storageDriver().load()
+                                .then(function() {
+                                    self.data.storageIP(self.data.storageDriver().storageIP())
+                                });
+                            self.data.vPool().backendType().load();
+                            self.data.backend(self.data.vPool().backendType().name());
+                            self.data.name(self.data.vPool().name());
+                            if (self.data.storageRouter() !== undefined) {
+                                api.post('storagerouters/' + self.data.storageRouter().guid() + '/get_physical_metadata')
+                                .then(self.shared.tasks.wait)
+                                .then(function(data) {
+                                        self.data.mountpoints(data.mountpoints);
+                                        self.data.readcaches(data.readcaches);
+                                        self.data.writecaches(data.writecaches);
+                                        self.data.ipAddresses(data.ipaddresses);
+                                        self.data.files(data.files);
+                                        self.data.allowVPool(data.allow_vpool);
+                                        if (self.data.mountpoints().length >= 1) {
+                                            self.data.mtptBFS(self.data.mountpoints()[0]);
+                                        }
+                                        if (self.data.writecaches().length >= 1) {
+                                            self.data.mtptMD(self.data.writecaches()[0]);
+                                            self.data.mtptFOC(self.data.writecaches()[0]);
+                                        }
+                                        if (self.data.readcaches().length >= 1) {
+                                            if (!self.data.mtptReadCaches().contains(self.data.readcaches()[0])) {
+                                                self.data.mtptReadCaches.push(self.data.readcaches()[0]);
+                                            }
+                                        }
+                                        if (self.data.writecaches().length >= 1) {
+                                            if (!self.data.mtptWriteCaches().contains(self.data.writecaches()[0])) {
+                                                self.data.mtptWriteCaches.push(self.data.writecaches()[0]);
+                                            }
+                                        }
+                                })
+                            }
+                        })
+                }
+            }
             if (self.data.readcaches().length >= 1) {
                 if (!self.data.mtptReadCaches().contains(self.data.readcaches()[0])) {
                     self.data.mtptReadCaches.push(self.data.readcaches()[0]);

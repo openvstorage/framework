@@ -1,5 +1,5 @@
 #!/usr/bin/env python2
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -140,7 +140,7 @@ FastCgiExternalServer /var/www/s3gw.fcgi -socket /tmp/radosgw.sock
 
 <VirtualHost *:80>
         ServerName rados
-        ServerAdmin engineering@cloudfounders.com
+        ServerAdmin engineering@openvstorage.com
         DocumentRoot /var/www
         RewriteEngine On
         RewriteRule ^/([a-zA-Z0-9-_.]*)([/]?.*) /s3gw.fcgi?page=$1&params=$2&%{QUERY_STRING} [E=HTTP_AUTHORIZATION:%{HTTP:Authorization},L]

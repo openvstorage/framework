@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ from suds.sudsobject import Property
 from suds.plugin import MessagePlugin
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='vmware sdk')
+logger = LogHandler.get('extensions', name='vmware sdk')
 
 
 class NotAuthenticatedException(BaseException):
@@ -131,7 +131,7 @@ class Sdk(object):
             ).obj_identifier
             # pylint: enable=line-too-long
         else:
-            self._esxHost = None
+            self._esxHost = self._get_vcenter_hosts()[0].obj_identifier  # TODO?
 
     @authenticated(force=True)
     def _get_vcenter_hosts(self):
@@ -157,6 +157,9 @@ class Sdk(object):
                                                                  'path': 'host'}}}},
             properties=['name', 'summary.runtime', 'config.virtualNicManagerInfo.netConfig']
         )
+        # If there's a single host, datacenter_info is ObjectContent instead of list(ObjectContent)
+        if hasattr(datacenter_info, 'name'):
+            return [datacenter_info]
         return datacenter_info
 
     def get_host_status_by_ip(self, host_ip):
@@ -292,7 +295,7 @@ class Sdk(object):
         """
         Checks whether a vm with a given name or key exists on a given esxi host
         """
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
         if name is not None or key is not None:
             try:
                 if name is not None:
@@ -309,7 +312,7 @@ class Sdk(object):
                         return vms[0].obj_identifier
                 if key is not None:
                     return self._get_object(
-                        self._build_property('VirtualMachine', key),
+                        Sdk._build_property('VirtualMachine', key),
                         properties=['name']).obj_identifier
             except:
                 return None
@@ -326,6 +329,83 @@ class Sdk(object):
             raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
         vm = self._get_object(vmid)
         return vm
+
+    @authenticated()
+    def get_vm_device_info(self, key):
+        """
+        Return a vm config, based on its key
+        """
+        vm = self.get_vm(key)
+        filename = vm.config.files.vmPathName
+        regex = '\[([^\]]+)\]\s(.+)'
+        match = re.search(regex, filename)
+        disks = self._get_vmachine_vdisks(vm)
+        return {'file_name': match.group(2),
+                'host_name': vm.name,
+                'vpool_name': match.group(1),
+                'disks': disks}
+
+    @authenticated()
+    def get_all_vms(self):
+        """
+        Get all vMachines on all esxhosts registered to this vCenter
+        :return: list
+        """
+        if not self._is_vcenter:
+            raise RuntimeError('Must be connected to a vCenter Server API.')
+        hosts = self._get_vcenter_hosts()
+        guests = []
+        for host in hosts:
+            esxhost = self._validate_host(host.obj_identifier)
+            vms = self._get_object(esxhost,
+                                   prop_type='VirtualMachine',
+                                   traversal={'name': 'HostSystemTraversalSpec',
+                                              'type': 'HostSystem',
+                                              'path': 'vm'},
+                                   properties=['name', 'config'])
+            for vm in vms:
+                guests.append({'id': vm.obj_identifier.value,
+                               'name': vm.name,
+                               'instance_name': vm.name})
+        return guests
+
+    def _get_vmachine_vdisks(self, vm_object):
+        disks = []
+        regex = '\[([^\]]+)\]\s(.+)'
+        disk_type = type(self._client.factory.create('ns0:VirtualDisk'))
+        for device in vm_object.config.hardware.device:
+            if isinstance(device, disk_type):
+                backingfile = device.backing.fileName
+                match = re.search(regex, backingfile)
+                if match:
+                    disks.append({'filename': match.group(2),
+                                  'datastore': match.group(1),
+                                  'name': device.deviceInfo.label})
+        return disks
+
+    @authenticated()
+    def get_all_vdisks(self):
+        """
+        Get all vDisks on all esxhosts registered to this vCenter
+        # similar to cinder.volumes.list()
+        :return: list
+        """
+        if not self._is_vcenter:
+            raise RuntimeError('Must be connected to a vCenter Server API.')
+        hosts = self._get_vcenter_hosts()
+
+        disks = []
+        for host in hosts:
+            esxhost = self._validate_host(host.obj_identifier)
+            vms = self._get_object(esxhost,
+                                   prop_type='VirtualMachine',
+                                   traversal={'name': 'HostSystemTraversalSpec',
+                                              'type': 'HostSystem',
+                                              'path': 'vm'},
+                                   properties=['name', 'config'])
+            for vm in vms:
+                disks.extend(self._get_vmachine_vdisks(vm))
+        return disks
 
     @authenticated()
     def get_vms(self, ip, mountpoint):
@@ -367,12 +447,12 @@ class Sdk(object):
                 backing.diskMode = mode
                 device = self._client.factory.create('ns0:VirtualDisk')
                 device.backing = backing
-                diskSpec = self._client.factory.create(
+                disk_spec = self._client.factory.create(
                     'ns0:VirtualDeviceConfigSpec')
-                diskSpec.operation = 'edit'
-                diskSpec.fileOperation = None
-                diskSpec.device = device
-                config.deviceChange.append(diskSpec)
+                disk_spec.operation = 'edit'
+                disk_spec.fileOperation = None
+                disk_spec.device = device
+                config.deviceChange.append(disk_spec)
 
         task = self._client.service.ReconfigVM_Task(vm.obj_identifier, config)
 
@@ -380,14 +460,15 @@ class Sdk(object):
             self.wait_for_task(task)
         return task
 
-    def _create_disk(self, factory, key, disk, unit, datastore):
+    @staticmethod
+    def _create_disk(factory, key, disk, unit, datastore):
         """
         Creates a disk spec for a given backing device
         Example for parameter disk: {'name': diskname, 'backingdevice': 'disk-flat.vmdk'}
         """
-        deviceInfo = factory.create('ns0:Description')
-        deviceInfo.label = disk['name']
-        deviceInfo.summary = 'Disk %s' % disk['name']
+        device_info = factory.create('ns0:Description')
+        device_info.label = disk['name']
+        device_info.summary = 'Disk %s' % disk['name']
         backing = factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
         backing.diskMode = 'persistent'
         backing.fileName = '[%s] %s' % (datastore.name, disk['backingdevice'])
@@ -396,29 +477,31 @@ class Sdk(object):
         device.controllerKey = key
         device.key = -200 - unit
         device.unitNumber = unit
-        device.deviceInfo = deviceInfo
+        device.deviceInfo = device_info
         device.backing = backing
-        diskSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-        diskSpec.operation = 'add'
-        diskSpec.fileOperation = None
-        diskSpec.device = device
-        return diskSpec
+        disk_spec = factory.create('ns0:VirtualDeviceConfigSpec')
+        disk_spec.operation = 'add'
+        disk_spec.fileOperation = None
+        disk_spec.device = device
+        return disk_spec
 
-    def _create_file_info(self, factory, datastore):
+    @staticmethod
+    def _create_file_info(factory, datastore):
         """
         Creates a file info object
         """
-        fileInfo = factory.create('ns0:VirtualMachineFileInfo')
-        fileInfo.vmPathName = '[%s]' % datastore
-        return fileInfo
+        file_info = factory.create('ns0:VirtualMachineFileInfo')
+        file_info.vmPathName = '[%s]' % datastore
+        return file_info
 
-    def _create_nic(self, factory, device_type, device_label, device_summary, network, unit):
+    @staticmethod
+    def _create_nic(factory, device_type, device_label, device_summary, network, unit):
         """
         Creates a NIC spec
         """
-        deviceInfo = factory.create('ns0:Description')
-        deviceInfo.label = device_label
-        deviceInfo.summary = device_summary
+        device_info = factory.create('ns0:Description')
+        device_info.label = device_label
+        device_info.summary = device_summary
         backing = factory.create('ns0:VirtualEthernetCardNetworkBackingInfo')
         backing.deviceName = network
         device = factory.create('ns0:%s' % device_type)
@@ -428,32 +511,33 @@ class Sdk(object):
         device.key = -300 - unit
         device.unitNumber = unit
         device.backing = backing
-        device.deviceInfo = deviceInfo
-        nicSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-        nicSpec.operation = 'add'
-        nicSpec.fileOperation = None
-        nicSpec.device = device
-        return nicSpec
+        device.deviceInfo = device_info
+        nic_spec = factory.create('ns0:VirtualDeviceConfigSpec')
+        nic_spec.operation = 'add'
+        nic_spec.fileOperation = None
+        nic_spec.device = device
+        return nic_spec
 
     def _create_disk_controller(self, factory, key):
         """
         Create a disk controller
         """
-        deviceInfo = self._client.factory.create('ns0:Description')
-        deviceInfo.label = 'SCSI controller 0'
-        deviceInfo.summary = 'LSI Logic SAS'
+        device_info = self._client.factory.create('ns0:Description')
+        device_info.label = 'SCSI controller 0'
+        device_info.summary = 'LSI Logic SAS'
         controller = factory.create('ns0:VirtualLsiLogicSASController')
         controller.busNumber = 0
         controller.key = key
         controller.sharedBus = 'noSharing'
-        controller.deviceInfo = deviceInfo
-        controllerSpec = factory.create('ns0:VirtualDeviceConfigSpec')
-        controllerSpec.operation = 'add'
-        controllerSpec.fileOperation = None
-        controllerSpec.device = controller
-        return controllerSpec
+        controller.deviceInfo = device_info
+        controller_spec = factory.create('ns0:VirtualDeviceConfigSpec')
+        controller_spec.operation = 'add'
+        controller_spec.fileOperation = None
+        controller_spec.device = controller
+        return controller_spec
 
-    def _create_option_value(self, factory, key, value):
+    @staticmethod
+    def _create_option_value(factory, key, value):
         """
         Create option values
         """
@@ -495,7 +579,7 @@ class Sdk(object):
         config.guestId = source_vm.config.guestId
         config.deviceChange = []
         config.extraConfig = []
-        config.files = self._create_file_info(self._client.factory, datastore.name)
+        config.files = Sdk._create_file_info(self._client.factory, datastore.name)
 
         disk_controller_key = -101
         config.deviceChange.append(
@@ -505,29 +589,29 @@ class Sdk(object):
         # Add disk devices
         for disk in disks:
             config.deviceChange.append(
-                self._create_disk(self._client.factory, disk_controller_key,
-                                  disk, disks.index(disk), datastore))
+                Sdk._create_disk(self._client.factory, disk_controller_key,
+                                 disk, disks.index(disk), datastore))
 
         # Add network
         nw_type = type(self._client.factory.create('ns0:VirtualEthernetCardNetworkBackingInfo'))
         for device in source_vm.config.hardware.device:
             if hasattr(device, 'backing') and type(device.backing) == nw_type:
                 config.deviceChange.append(
-                    self._create_nic(self._client.factory,
-                                     device.__class__.__name__,
-                                     device.deviceInfo.label,
-                                     device.deviceInfo.summary,
-                                     device.backing.deviceName,
-                                     device.unitNumber))
+                    Sdk._create_nic(self._client.factory,
+                                    device.__class__.__name__,
+                                    device.deviceInfo.label,
+                                    device.deviceInfo.summary,
+                                    device.backing.deviceName,
+                                    device.unitNumber))
 
         # Copy additional properties
         extraconfigstoskip = ['nvram']
         for item in source_vm.config.extraConfig:
-            if not item.key in extraconfigstoskip:
+            if item.key not in extraconfigstoskip:
                 config.extraConfig.append(
-                    self._create_option_value(self._client.factory,
-                                              item.key,
-                                              item.value))
+                    Sdk._create_option_value(self._client.factory,
+                                             item.key,
+                                             item.value))
 
         task = self._client.service.CreateVM_Task(host_data['folder'],
                                                   config=config,
@@ -546,8 +630,6 @@ class Sdk(object):
         @param vmid: unique id of the vm
         @param name: name of the clone vm
         @param disks: list of disks to use in vm configuration
-        @param kvmport: kvm port for the clone vm
-        @param esxhost: esx host identifier on which to clone the vm
         @param wait: wait for task to complete or not (True/False)
         """
 
@@ -568,7 +650,7 @@ class Sdk(object):
         config.guestId = source_vm.config.guestId
         config.deviceChange = []
         config.extraConfig = []
-        config.files = self._create_file_info(
+        config.files = Sdk._create_file_info(
             self._client.factory, datastore.name)
 
         disk_controller_key = -101
@@ -579,8 +661,8 @@ class Sdk(object):
         # Add disk devices
         for disk in disks:
             config.deviceChange.append(
-                self._create_disk(self._client.factory, disk_controller_key,
-                                  disk, disks.index(disk), datastore))
+                Sdk._create_disk(self._client.factory, disk_controller_key,
+                                 disk, disks.index(disk), datastore))
             self.copy_file(
                 '[{0}] {1}'.format(datastore.name, '%s.vmdk'
                                    % disk['name'].split('_')[-1].replace('-clone', '')),
@@ -592,21 +674,21 @@ class Sdk(object):
         for device in source_vm.config.hardware.device:
             if hasattr(device, 'backing') and type(device.backing) == nw_type:
                 config.deviceChange.append(
-                    self._create_nic(self._client.factory,
-                                     device.__class__.__name__,
-                                     device.deviceInfo.label,
-                                     device.deviceInfo.summary,
-                                     device.backing.deviceName,
-                                     device.unitNumber))
+                    Sdk._create_nic(self._client.factory,
+                                    device.__class__.__name__,
+                                    device.deviceInfo.label,
+                                    device.deviceInfo.summary,
+                                    device.backing.deviceName,
+                                    device.unitNumber))
 
         # Copy additional properties
         extraconfigstoskip = ['nvram']
         for item in source_vm.config.extraConfig:
-            if not item.key in extraconfigstoskip:
+            if item.key not in extraconfigstoskip:
                 config.extraConfig.append(
-                    self._create_option_value(self._client.factory,
-                                              item.key,
-                                              item.value))
+                    Sdk._create_option_value(self._client.factory,
+                                             item.key,
+                                             item.value))
 
         task = self._client.service.CreateVM_Task(host_data['folder'],
                                                   config=config,
@@ -615,14 +697,6 @@ class Sdk(object):
         if wait:
             self.wait_for_task(task)
         return task
-
-    @authenticated()
-    def get_vm(self, key):
-        vmid = self.exists(key=key)
-        if vmid is None:
-            raise RuntimeError('Virtual Machine with key {} could not be found.'.format(key))
-        vm = self._get_object(vmid)
-        return vm
 
     @authenticated()
     def get_datastore(self, ip, mountpoint):
@@ -634,12 +708,12 @@ class Sdk(object):
         """
 
         datastore = None
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
         host_system = self._get_object(esxhost, properties=['datastore'])
         for store in host_system.datastore[0]:
             store = self._get_object(store)
             if not store.summary.accessible:
-                raise RuntimeError('Datastore {0} is not accessible at mountpoint {1}'.format(store.name, mountpoint))
+                logger.warning('Datastore {0} is not accessible, skipping'.format(store.name))
             if hasattr(store.info, 'nas'):
                 if store.info.nas.remoteHost == ip and store.info.nas.remotePath == mountpoint:
                     datastore = store
@@ -663,7 +737,7 @@ class Sdk(object):
     def make_agnostic_config(self, vm_object):
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
 
         config = {'name': vm_object.config.name,
                   'id': vm_object.obj_identifier.value,
@@ -703,15 +777,16 @@ class Sdk(object):
         Delete a given vm
         """
         machine = None
+        task = None
         if vmid:
             try:
-                machine = self._build_property('VirtualMachine', vmid)
+                machine = Sdk._build_property('VirtualMachine', vmid)
             except Exception as ex:
                 logger.error('SDK domain retrieve failed by vmid: {}'.format(ex))
         elif storagedriver_mountpoint and storagedriver_storage_ip and devicename:
             try:
                 machine_info = self.get_nfs_datastore_object(storagedriver_storage_ip, storagedriver_mountpoint, devicename)[0]
-                machine = self._build_property('VirtualMachine', machine_info.obj_identifier.value)
+                machine = Sdk._build_property('VirtualMachine', machine_info.obj_identifier.value)
             except Exception as ex:
                 logger.error('SDK domain retrieve failed by nfs datastore info: {}'.format(ex))
         if machine:
@@ -736,7 +811,7 @@ class Sdk(object):
         """
         Get the power state of a given vm
         """
-        return self._get_object(self._build_property('VirtualMachine', vmid),
+        return self._get_object(Sdk._build_property('VirtualMachine', vmid),
                                 properties=['runtime.powerState']).runtime.powerState
 
     @authenticated()
@@ -800,7 +875,7 @@ class Sdk(object):
         filename = filename.replace('-flat.vmdk', '.vmdk')  # Support both -flat.vmdk and .vmdk
         if not filename.endswith('.vmdk') and not filename.endswith('.vmx'):
             raise ValueError('Unexpected filetype')
-        esxhost = self._validate_host(None)
+        esxhost = self._validate_host(self._esxHost)
 
         datastore = self.get_datastore(ip, mountpoint)
         if not datastore:
@@ -820,6 +895,14 @@ class Sdk(object):
                 if filename in mapping[datastore.name]:
                     return vm, mapping[datastore.name][filename]
         raise RuntimeError('Could not locate given file on the given datastore')
+
+    def file_exists(self, ip, mountpoint, filename):
+        try:
+            self.get_nfs_datastore_object(ip, mountpoint, filename)
+            return True
+        except Exception, ex:
+            logger.debug('File does not exist: {0}'.format(ex))
+            return False
 
     def _get_vm_datastore_mapping(self, vm):
         """
@@ -973,7 +1056,7 @@ class Sdk(object):
                         for part in path:
                             part_counter += 1
                             if part_counter < len(path):
-                                if not part in working_item.__dict__:
+                                if part not in working_item.__dict__:
                                     setattr(working_item, part, type(part, (), {})())
                                 working_item = working_item.__dict__[part]
                             else:
@@ -988,7 +1071,8 @@ class Sdk(object):
 
         return None
 
-    def _build_property(self, property_name, value=None):
+    @staticmethod
+    def _build_property(property_name, value=None):
         """
         Create a property object with given name and value
         """
@@ -1013,7 +1097,7 @@ class Sdk(object):
                 return self._get_object(host, properties=['name']).obj_identifier
             else:
                 return self._get_object(
-                    self._build_property('HostSystem', host),
+                    Sdk._build_property('HostSystem', host),
                     properties=['name']).obj_identifier
 
     def _login(self):

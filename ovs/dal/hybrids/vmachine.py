@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ class VMachine(DataObject):
                    Relation('vpool', VPool, 'vmachines', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('hypervisor_status', str, 300),
-                  Dynamic('statistics', dict, 0),
+                  Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60),
                   Dynamic('failover_mode', str, 60),
                   Dynamic('storagerouters_guids', list, 15),
@@ -60,9 +60,11 @@ class VMachine(DataObject):
                                                       'is_consistent': snapshot['is_consistent'],
                                                       'is_automatic': snapshot.get('is_automatic', True),
                                                       'stored': 0,
+                                                      'in_backend': snapshot['in_backend'],
                                                       'snapshots': {}}
                 snapshots_structure[timestamp]['snapshots'][disk.guid] = snapshot['guid']
                 snapshots_structure[timestamp]['stored'] = snapshots_structure[timestamp]['stored'] + snapshot['stored']
+                snapshots_structure[timestamp]['in_backend'] &= snapshot['in_backend']
 
         snapshots = []
         for timestamp in sorted(snapshots_structure.keys()):
@@ -72,6 +74,7 @@ class VMachine(DataObject):
                               'is_consistent': item['is_consistent'],
                               'is_automatic': item.get('is_automatic', True),
                               'stored': item['stored'],
+                              'in_backend': item['in_backend'],
                               'snapshots': item['snapshots']})
         return snapshots
 
@@ -87,20 +90,21 @@ class VMachine(DataObject):
         except:
             return 'UNKNOWN'
 
-    def _statistics(self):
+    def _statistics(self, dynamic):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk of the vMachine.
         """
-        vdiskstatsdict = {}
+        from ovs.dal.hybrids.vdisk import VDisk
+        statistics = {}
         for key in StorageDriverClient.stat_keys:
-            vdiskstatsdict[key] = 0
-            vdiskstatsdict['{0}_ps'.format(key)] = 0
+            statistics[key] = 0
+            statistics['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
-            for key, value in vdisk.statistics.iteritems():
-                if key != 'timestamp':
-                    vdiskstatsdict[key] += value
-        vdiskstatsdict['timestamp'] = time.time()
-        return vdiskstatsdict
+            for key, value in vdisk.fetch_statistics().iteritems():
+                statistics[key] += value
+        statistics['timestamp'] = time.time()
+        VDisk.calculate_delta(self._key, dynamic, statistics)
+        return statistics
 
     def _stored_data(self):
         """
