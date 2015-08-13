@@ -25,6 +25,7 @@ import pwd
 import glob
 import json
 import time
+import logging
 import tempfile
 import paramiko
 import socket
@@ -64,13 +65,14 @@ class SSHClient(object):
         else:
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
+        logging.getLogger('paramiko').setLevel(logging.WARNING)
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         self.ip = ip
         local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        local_ips = [ip.strip() for ip in local_ips]
-        self.is_local = self.ip in local_ips
+        self.local_ips = [ip.strip() for ip in local_ips]
+        self.is_local = self.ip in self.local_ips
 
         current_user = check_output('whoami', shell=True).strip()
         if username is None:
