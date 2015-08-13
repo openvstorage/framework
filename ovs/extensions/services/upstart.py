@@ -20,8 +20,6 @@ import re
 from subprocess import CalledProcessError
 from ovs.log.logHandler import LogHandler
 
-EXPORT = 'env PYTHONPATH="${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
-EXPORT_ = 'env PYTHONPATH="\\\${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps"'
 logger = LogHandler.get('extensions', name='servicemanager')
 
 
@@ -189,22 +187,3 @@ class Upstart(object):
                     if 'pid' in match_groups:
                         return match_groups['pid']
         return -1
-
-    @staticmethod
-    def patch_cinder_volume_conf(name, client):
-        path = '/etc/init/{0}.conf'.format(name)
-        contents = client.file_read(path)
-        if EXPORT not in contents:
-            contents = contents.replace('\nexec start-stop-daemon', '\n\n{}\nexec start-stop-daemon'.format(EXPORT_))
-            client.file_write(path, contents)
-
-    @staticmethod
-    def unpatch_cinder_volume_conf(name, client):
-        """
-        remove export PYTHONPATH from the upstart service conf file
-        """
-        path = '/etc/init/{0}.conf'.format(name)
-        contents = client.file_read(path)
-        if EXPORT in contents:
-            contents = contents.replace(EXPORT_, '')
-            client.file_write(path, contents)

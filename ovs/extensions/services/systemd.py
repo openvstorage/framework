@@ -19,7 +19,6 @@ Systemd module
 from subprocess import CalledProcessError
 from ovs.log.logHandler import LogHandler
 
-EXPORT = 'Environment=PYTHONPATH=${PYTHONPATH}:/opt/OpenvStorage:/opt/OpenvStorage/webapps'
 logger = LogHandler.get('extensions', name='servicemanager')
 
 class Systemd(object):
@@ -198,31 +197,3 @@ class Systemd(object):
                             pid = 0
                         break
         return pid
-
-    @staticmethod
-    def patch_cinder_volume_conf(name, client):
-        cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'r')
-        contents = cinder_file.read()
-        if EXPORT not in contents:
-            contents = contents.replace('\nUser=cinder', '\n{}\nUser=cinder'.format(EXPORT))
-            cinder_file.close()
-            client.run('chmod 666 /lib/systemd/system/{0}.service'.format(name))
-            cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'w')
-            cinder_file.write(contents)
-        cinder_file.close()
-        client.run('systemctl daemon-reload')
-
-    @staticmethod
-    def unpatch_cinder_volume_conf(name, client):
-        """
-        remove export PYTHONPATH from the systemd service file
-        """
-        cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'r')
-        contents = cinder_file.read()
-        if EXPORT in contents:
-            contents = contents.replace(EXPORT, '')
-            cinder_file.close()
-            cinder_file = open('/lib/systemd/system/{0}.service'.format(name), 'w')
-            cinder_file.write(contents)
-        cinder_file.close()
-        client.run('systemctl daemon-reload')
