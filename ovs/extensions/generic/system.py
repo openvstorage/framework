@@ -75,6 +75,10 @@ class System(object):
         """
         import re
 
+        if re.match(r'^localhost$|^127(?:\.[0-9]{1,3}){3}$|^::1$', ip):
+            # Never update loopback addresses
+            return
+
         contents = client.file_read('/etc/hosts').strip() + '\n'
 
         if isinstance(hostname, list):
