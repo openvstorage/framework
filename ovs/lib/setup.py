@@ -481,13 +481,21 @@ class SetupController(object):
                     logger.error('Error loading storagerouters: {0}'.format(ex))
                 if len(master_nodes) == 0:
                     if node_action == 'promote':
-                        raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
+                        raise RuntimeError('No master node could be found')
                     else:
-                        raise RuntimeError('It is not possible to remove the only master in cluster {0}'.format(cluster_name))
+                        raise RuntimeError('It is not possible to remove the only master')
                 master_ip = master_nodes[0]
 
             ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in nodes if node_ip)
             if node_action == 'promote':
+                configure_rabbitmq = True
+                configure_memcached = True
+                preconfig = '/tmp/openvstorage_preconfig.cfg'
+                if os.path.exists(preconfig):
+                    config = RawConfigParser()
+                    config.read(preconfig)
+                    configure_memcached = config.getboolean('setup', 'configure_memcached')
+                    configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
                 SetupController._promote_node(cluster_ip=ip,
                                               master_ip=master_ip,
                                               cluster_name=cluster_name,
@@ -495,6 +503,8 @@ class SetupController(object):
                                               unique_id=unique_id,
                                               mountpoints=None,
                                               arakoon_mountpoint=None,
+                                              configure_memcached=configure_memcached,
+                                              configure_rabbitmq=configure_rabbitmq,
                                               writecaches=None)
             else:
                 SetupController._demote_node(cluster_ip=ip,
