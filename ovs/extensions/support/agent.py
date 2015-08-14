@@ -61,8 +61,19 @@ class SupportAgent(object):
         except Exception, ex:
             data['errors'].append(str(ex))
         try:
+            init_info = check_output('cat /proc/1/comm', shell=True)
+            # All service classes used in below code should share the exact same interface!
+            if 'init' in init_info:
+                version_info = check_output('init --version', shell=True)
+                if 'upstart' in version_info:
+                    services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
+                else:
+                    RuntimeError('There was no known service manager detected in /proc/1/comm')
+            elif 'systemd' in init_info:
+                services = check_output("systemctl -a | grep ovs", shell=True).strip().split('\n')
+            else:
+                raise RuntimeError('There was no known service manager detected in /proc/1/comm')
             # Service status
-            services = check_output("initctl list | grep ovs", shell=True).strip().split('\n')
             servicedata = dict((service.split(' ')[0].strip(), service.split(' ', 1)[1].strip()) for service in services)
             data['metadata']['services'] = servicedata
         except Exception, ex:
