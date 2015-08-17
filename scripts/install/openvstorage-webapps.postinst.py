@@ -76,9 +76,9 @@ if os.path.exists('/etc/nginx/sites-enabled/default'):
     os.remove('/etc/nginx/sites-enabled/default')
 
 # Setup nginx site
-if not os.path.exists("/etc/nginx/sites-enabled/openvstorage.conf"):
+if not os.path.exists("/etc/nginx/sites-enabled/openvstorage.conf") and os.path.exists('/etc/nginx/sites-available/openvstorage.conf'):
     check_output("ln -s /etc/nginx/sites-available/openvstorage.conf /etc/nginx/sites-enabled/openvstorage.conf", shell=True)
-if not os.path.exists("/etc/nginx/sites-enabled/openvstorage_ssl.conf"):
+if not os.path.exists("/etc/nginx/sites-enabled/openvstorage_ssl.conf") and os.path.exists('/etc/nginx/sites-available/openvstorage_ssl.conf'):
     check_output("ln -s /etc/nginx/sites-available/openvstorage_ssl.conf /etc/nginx/sites-enabled/openvstorage_ssl.conf", shell=True)
 
 # Check conflicts with apache2 running on port 80 (most likely devstack/openstack gui)
