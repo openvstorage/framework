@@ -28,6 +28,7 @@ import urllib2
 import subprocess
 from string import digits
 from pyudev import Context
+from paramiko import AuthenticationException
 
 from ConfigParser import RawConfigParser
 from ovs.extensions.db.arakoon.ArakoonInstaller import ArakoonInstaller, ArakoonClusterConfig
@@ -126,7 +127,7 @@ class SetupController(object):
             config = RawConfigParser()
             config.read(preconfig)
             ip = config.get('setup', 'target_ip')
-            target_password = config.get('setup', 'target_password')
+            target_password = config.get('setup', 'target_password')  # @TODO: Replace by using "known_passwords"
             cluster_ip = config.get('setup', 'cluster_ip')
             cluster_name = str(config.get('setup', 'cluster_name'))
             master_ip = config.get('setup', 'master_ip')
@@ -143,6 +144,8 @@ class SetupController(object):
             configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
             if config.has_option('setup', 'other_nodes'):
                 SetupController.discovered_nodes = json.loads(config.get('setup', 'other_nodes'))
+            if config.has_option('setup', 'passwords'):
+                known_passwords = json.loads(config.get('setup', 'passwords'))
             enable_heartbeats = False
 
         try:
@@ -159,7 +162,7 @@ class SetupController(object):
                 ip = '127.0.0.1'
             if target_password is None:
                 node_string = 'this node' if ip == '127.0.0.1' else ip
-                target_node_password = SetupController._ask_validate_password(ip, node_string=node_string)
+                target_node_password = SetupController._ask_validate_password(ip, username='root', node_string=node_string)
             else:
                 target_node_password = target_password
             target_client = SSHClient(ip, username='root', password=target_node_password)
@@ -240,7 +243,7 @@ class SetupController(object):
                             continue
                         logger.debug('Trying to manually join cluster on {0}'.format(node_ip))
 
-                        node_password = SetupController._ask_validate_password(node_ip)
+                        node_password = SetupController._ask_validate_password(node_ip, username='root')
                         storagerouters = {}
                         try:
                             from ovs.dal.lists.storagerouterlist import StorageRouterList
@@ -272,7 +275,7 @@ class SetupController(object):
 
                         known_passwords[node_ip] = node_password
                         if master_ip is not None and master_ip not in known_passwords:
-                            master_password = SetupController._ask_validate_password(master_ip)
+                            master_password = SetupController._ask_validate_password(master_ip, username='root')
                             known_passwords[master_ip] = master_password
                         for sr_ip, sr_name in storagerouters.iteritems():
                             SetupController.discovered_nodes = {sr_name: {'ip': sr_ip,
@@ -298,7 +301,7 @@ class SetupController(object):
                         if len(master_nodes) == 0:
                             raise RuntimeError('No master node could be found in cluster {0}'.format(cluster_name))
                         master_ip = discovery_result[cluster_name][master_nodes[0]]['ip']
-                        master_password = SetupController._ask_validate_password(master_ip)
+                        master_password = SetupController._ask_validate_password(master_ip, username='root')
                         known_passwords[master_ip] = master_password
                         if master_ip not in ip_client_map:
                             ip_client_map[master_ip] = SSHClient(master_ip, username='root', password=master_password)
@@ -440,7 +443,7 @@ class SetupController(object):
             elif node_type not in ['MASTER', 'EXTRA']:
                 raise RuntimeError('This node is not correctly configured.')
 
-            target_password = SetupController._ask_validate_password('127.0.0.1', node_string='this node')
+            target_password = SetupController._ask_validate_password('127.0.0.1', username='root', node_string='this node')
             target_client = SSHClient('127.0.0.1', username='root', password=target_password)
 
             unique_id = System.get_my_machine_id(target_client)
@@ -832,14 +835,14 @@ class SetupController(object):
                     ip_client_map[node] = SSHClient(node, username='root', password=known_passwords[node])
                 continue
             if first_request is True:
-                prev_node_password = SetupController._ask_validate_password(node)
+                prev_node_password = SetupController._ask_validate_password(node, username='root')
                 logger.debug('Custom password for {0}'.format(node))
                 passwords[node] = prev_node_password
                 first_request = False
                 if node not in ip_client_map:
                     ip_client_map[node] = SSHClient(node, username='root', password=prev_node_password)
             else:
-                this_node_password = SetupController._ask_validate_password(node, previous=prev_node_password)
+                this_node_password = SetupController._ask_validate_password(node, username='root', previous=prev_node_password)
                 passwords[node] = this_node_password
                 prev_node_password = this_node_password
                 if node not in ip_client_map:
@@ -2380,6 +2383,12 @@ EOF
         """
         while True:
             try:
+                try:
+                    client = SSHClient(ip, username)
+                    client.run('ls /')
+                    return None
+                except AuthenticationException:
+                    pass
                 extra = ''
                 if previous is not None:
                     extra = ', just press enter if identical as above'
@@ -2395,6 +2404,8 @@ EOF
                 client = SSHClient(ip, username=username, password=password)
                 client.run('ls /')
                 return password
+            except KeyboardInterrupt:
+                raise
             except:
                 previous = None
                 print 'Password invalid or could not connect to this node'
