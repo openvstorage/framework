@@ -966,7 +966,7 @@ class SetupController(object):
                     print 'Could not connect to {0}: {1}'.format(hypervisor_info['ip'], ex)
         elif hypervisor_info['type'] == 'KVM':
             hypervisor_info['ip'] = cluster_ip
-            hypervisor_info['password'] = passwords[cluster_ip]
+            hypervisor_info['password'] = None
             hypervisor_info['username'] = 'root'
         logger.debug('Hypervisor at {0} with username {1}'.format(hypervisor_info['ip'], hypervisor_info['username']))
 
