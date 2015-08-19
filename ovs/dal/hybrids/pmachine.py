@@ -29,7 +29,7 @@ class PMachine(DataObject):
     __properties = {Property('name', str, doc='Name of the pMachine.'),
                     Property('description', str, mandatory=False, doc='Description of the pMachine.'),
                     Property('username', str, doc='Username of the pMachine.'),
-                    Property('password', str, doc='Password of the pMachine.'),
+                    Property('password', str, mandatory=False, doc='Password of the pMachine.'),
                     Property('ip', str, doc='IP address of the pMachine.'),
                     Property('hvtype', ['HYPERV', 'VMWARE', 'XEN', 'KVM'], doc='Hypervisor type running on the pMachine.'),
                     Property('hypervisor_id', str, mandatory=False, doc='Hypervisor id - primary key on Management Center')}
