@@ -8,6 +8,7 @@ User=ovs
 Group=ovs
 Environment=PYTHONPATH=/opt/OpenvStorage
 WorkingDirectory=/opt/OpenvStorage
+ExecStartPre=/bin/bash -c "if [ ! -d /opt/OpenvStorage/run ]; then mkdir /opt/OpenvStorage/run; chown ovs:ovs /opt/OpenvStorage/run; fi; echo `arakoon --version | grep version: | awk '{print $2}'` > /opt/OpenvStorage/run/<SERVICE_NAME>.version"
 ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/db/arakoon/ArakoonManagement.py --start --cluster <CLUSTER>
 Restart=on-failure
 RestartSec=5

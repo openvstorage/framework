@@ -1,6 +1,5 @@
 [Unit]
 Description=ovs volumedriver
-#From OVS 2.2, the metadatasever isn't a separate process anymore, the volumedriver manages it by itself
 Requires=ovs-watcher-volumedriver.service ovs-failovercache_<VPOOL_NAME>.service <ADDITIONAL_DEPENDENCIES>
 After=ovs-watcher-volumedriver.service
 
