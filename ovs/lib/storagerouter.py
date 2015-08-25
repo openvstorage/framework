@@ -484,7 +484,7 @@ class StorageRouterController(object):
 
             # manifest cache is in memory
             client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
-                'log_level': 'debug',
+                'log_level': 'info',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
                 'manifest_cache_size': 100000,
