@@ -296,8 +296,7 @@ class SourceCollector(object):
         """
         if not os.path.exists('{0}/.git'.format(path)):
             SourceCollector.run('git clone {0} {1}'.format(settings.get('packaging', 'repo'), path), path)
-        SourceCollector.run('git pull', path)
-        SourceCollector.run('git fetch -p', path)
+        SourceCollector.run('git pull --all --tags --prune', path)
         SourceCollector.run('git checkout {0}'.format(revision), path)
 
     @staticmethod
