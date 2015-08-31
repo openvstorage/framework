@@ -68,4 +68,3 @@ class MgmtCenterController(object):
     @celery.task(name='ovs.mgmtcenter.unconfigure_host')
     def unconfigure_host(pmachine_guid):
         pass
-
