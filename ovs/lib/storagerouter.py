@@ -484,7 +484,7 @@ class StorageRouterController(object):
 
             # manifest cache is in memory
             client.file_write('{0}/{1}_alba.json'.format(config_dir, vpool_name), json.dumps({
-                'log_level': 'info',
+                'log_level': 'debug',
                 'port': alba_proxy.service.ports[0],
                 'ips': ['127.0.0.1'],
                 'manifest_cache_size': 100000,
@@ -680,13 +680,13 @@ class StorageRouterController(object):
 
         mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmt_center:
-            # Store specific metadata in mgmtcenter object
+            # Store specific metadata in management center object
             metadata = mgmt_center.get_metadata(storagerouter.pmachine.mgmtcenter.metadata, parameters)
             storagerouter.pmachine.mgmtcenter.metadata.update(metadata)
             storagerouter.pmachine.mgmtcenter.save()
             mgmt_center.set_metadata(metadata)
             # Configure vpool on management center
-            mgmt_center.configure_vpool(vpool_name, storagedriver.mountpoint)
+            mgmt_center.configure_vpool(vpool_name)
         else:
             logger.info('Storagerouter {0} does not have management center'.format(storagerouter.name))
 
@@ -805,7 +805,7 @@ class StorageRouterController(object):
         with Remote(ip, [System, Factory]) as remote:
             mgmtcenter = remote.Factory.get_mgmtcenter(remote.System.get_my_storagerouter().pmachine)
             if mgmtcenter:
-                mgmtcenter.unconfigure_vpool(vpool.name, storagedriver.mountpoint, not storagedrivers_left)
+                mgmtcenter.unconfigure_vpool(vpool.name, not storagedrivers_left)
 
         # KVM pool
         if pmachine.hvtype == 'KVM':

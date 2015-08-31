@@ -16,7 +16,11 @@
 Module for the vcenter management center client
 """
 
+import time
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('lib', name='mgmtcenter')
 
 
 class VCenter(object):
@@ -28,10 +32,11 @@ class VCenter(object):
         """
         Initializes the object with credentials and connection information
         """
+        self.metadata = None
         self.sdk = Sdk(ip, username, password)
-        self.STATE_MAPPING = {'poweredOn' : 'RUNNING',
+        self.STATE_MAPPING = {'poweredOn': 'RUNNING',
                               'poweredOff': 'HALTED',
-                              'suspended' : 'PAUSED'}
+                              'suspended': 'PAUSED'}
 
     def get_host_status_by_ip(self, host_ip):
         """
@@ -70,11 +75,14 @@ class VCenter(object):
         """
         return self.sdk.get_hosts()
 
-    def get_metadata(self, metadata, parameters):
+    @staticmethod
+    def get_metadata(metadata, parameters):
         """
         Get specific config values:
         - integratemgmt: True/False
         """
+        _ = metadata
+        _ = parameters
         return {}
 
     def set_metadata(self, metadata):
@@ -83,10 +91,10 @@ class VCenter(object):
         """
         self.metadata = metadata
 
-    def configure_vpool(self, vpool_name, mountpoint):
+    def configure_vpool(self, vpool_name):
         pass
 
-    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
+    def unconfigure_vpool(self, vpool_name, remove_volume_type):
         pass
 
     def get_guests(self):
@@ -150,3 +158,16 @@ class VCenter(object):
         'name': 'instance1'}
         """
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
+
+    def is_host_configured(self):
+        """
+        :return: boolean
+        """
+        _ = self
+        return True
+
+    def configure_host(self):
+        pass
+
+    def unconfigure_host(self):
+        pass

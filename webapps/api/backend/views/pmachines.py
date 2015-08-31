@@ -16,14 +16,16 @@
 PMachine module
 """
 
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from ovs.dal.lists.pmachinelist import PMachineList
-from ovs.dal.hybrids.pmachine import PMachine
+from backend.decorators import required_roles, load, return_object, return_list, log, return_task
 from backend.serializers.serializers import FullSerializer
-from rest_framework.response import Response
+from ovs.dal.hybrids.pmachine import PMachine
+from ovs.dal.lists.pmachinelist import PMachineList
+from ovs.lib.mgmtcenter import MgmtCenterController
 from rest_framework import status
-from backend.decorators import required_roles, load, return_object, return_list, log
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 
 class PMachineViewSet(viewsets.ViewSet):
@@ -68,3 +70,31 @@ class PMachineViewSet(viewsets.ViewSet):
             return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def configure_host(self, pmachine, request):
+        """
+        Configure the physical host
+        """
+        serializer = FullSerializer(PMachine, instance=pmachine, data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return MgmtCenterController.configure_host.delay(pmachine.guid)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def unconfigure_host(self, pmachine, request):
+        """
+        Unconfigure the physical host
+        """
+        serializer = FullSerializer(PMachine, instance=pmachine, data=request.DATA)
+        if serializer.is_valid():
+            serializer.save()
+            return MgmtCenterController.unconfigure_host.delay(pmachine.guid)

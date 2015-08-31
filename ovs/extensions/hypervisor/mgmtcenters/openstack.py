@@ -21,6 +21,7 @@ from ovs.extensions.hypervisor.mgmtcenters.management.openstack_mgmt import Open
 
 logger = LogHandler.get('extensions', name='openstack_mgmt')
 
+
 class OpenStack(object):
     """
     Represents the management center for OpenStack
@@ -75,24 +76,42 @@ class OpenStack(object):
         Update local metadata
         """
         self.metadata = metadata
-        self.config_cinder = metadata.get('integratemgmt')
+        self.config_cinder = metadata.get('integratemgmt', False)
         logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
 
-    def configure_vpool(self, vpool_name, mountpoint):
+    def configure_vpool(self, vpool_name):
         if self.config_cinder:
             try:
-                return self.management.configure_vpool(vpool_name, mountpoint)
+                return self.management.configure_vpool(vpool_name)
             except (SystemExit, Exception) as ex:
                 logger.error('Management action "configure_vpool" failed %s' % ex)
         else:
             logger.info('Cinder configuration is disabled')
 
-    def unconfigure_vpool(self, vpool_name, mountpoint, remove_volume_type):
+    def unconfigure_vpool(self, vpool_name, remove_volume_type):
         if self.config_cinder:
             try:
-                return self.management.unconfigure_vpool(vpool_name, mountpoint, remove_volume_type)
+                return self.management.unconfigure_vpool(vpool_name, remove_volume_type)
             except (SystemExit, Exception) as ex:
                 logger.error('Management action "unconfigure_vpool" failed %s' % ex)
+        else:
+            logger.info('Cinder configuration is disabled')
+
+    def configure_host(self):
+        if self.config_cinder:
+            try:
+                return self.management.configure_host()
+            except (SystemExit, Exception) as ex:
+                logger.error('Management action "configure_host" failed {0}'.format(ex))
+        else:
+            logger.info('Cinder configuration is disabled')
+
+    def unconfigure_host(self):
+        if self.config_cinder:
+            try:
+                return self.management.unconfigure_host()
+            except (SystemExit, Exception) as ex:
+                logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
         else:
             logger.info('Cinder configuration is disabled')
 
@@ -274,3 +293,13 @@ class OpenStack(object):
                                      'order': order})
             order += 1
         return vm_info
+
+    def is_host_configured(self):
+        if self.config_cinder:
+            try:
+                return self.management.is_host_configured()
+            except (SystemExit, Exception) as ex:
+                logger.error('Management action "is_host_configured" failed {0}'.format(ex))
+        else:
+            logger.info('Cinder configuration is disabled')
+        return False
