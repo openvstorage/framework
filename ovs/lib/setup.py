@@ -1493,7 +1493,7 @@ EOF
                                          'rabbitmqctl list_users',
                                          logger=logger).splitlines()[1:-1]
         users = [usr.split('\t')[0] for usr in users]
-        logger.debug('Rabbitmq users %s' % users)
+        logger.debug('Rabbitmq users {0}'.format(users))
         client.run('rabbitmqctl stop; sleep 5;')
 
     @staticmethod
