@@ -601,19 +601,21 @@ class StorageRouterController(object):
 
         logger.info('volumedriver_mode: {0}'.format(volumedriver_mode))
         logger.info('backend_type: {0}'.format(vpool.backend_type.code))
-        ServiceManager.add_service(name='ovs-failovercache', params=params, client=root_client, target_name='ovs-failovercache_{0}'.format(vpool.name))
-        ServiceManager.start_service('ovs-failovercache_{0}'.format(vpool.name), client=root_client)
+        foc_service = 'ovs-failovercache_{0}'.format(vpool.name)
+        ServiceManager.add_service(name='ovs-failovercache', params=params, client=root_client, target_name=foc_service)
+        ServiceManager.start_service(foc_service, client=root_client)
         if vpool.backend_type.code == 'alba':
-            ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name='ovs-albaproxy_{0}'.format(vpool.name))
-            ServiceManager.start_service('ovs-albaproxy_{0}'.format(vpool.name), client=root_client)
+            alba_proxy_service = 'ovs-albaproxy_{0}'.format(vpool.name)
+            ServiceManager.add_service(name='ovs-albaproxy', params=params, client=root_client, target_name=alba_proxy_service)
+            ServiceManager.start_service(alba_proxy_service, client=root_client)
+            dependencies = [alba_proxy_service]
+        else:
+            dependencies = None
         if volumedriver_mode == 'ganesha':
-            ServiceManager.add_service(name='ovs-ganesha', params=params, client=root_client, target_name='ovs-volumedriver_{0}'.format(vpool.name))
-        elif vpool.backend_type.code == 'alba':
-            dependencies = ['ovs-albaproxy_{0}'.format(vpool.name)]
-            ServiceManager.add_service(name='ovs-volumedriver', params=params, client=root_client, target_name='ovs-volumedriver_{0}'.format(vpool.name), additional_dependencies=dependencies)
-        else:  # classic
-            ServiceManager.add_service(name='ovs-volumedriver', params=params, client=root_client, target_name='ovs-volumedriver_{0}'.format(vpool.name))
-        ServiceManager.start_service('ovs-volumedriver_{0}'.format(vpool.name), client=root_client)
+            template_name = 'ovs-ganesha'
+        else:
+            template_name = 'ovs-volumedriver'
+        ServiceManager.add_service(name=template_name, params=params, client=root_client, target_name=voldrv_service, additional_dependencies=dependencies)
 
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':
             root_client.run("grep -q '/tmp localhost(ro,no_subtree_check)' /etc/exports || echo '/tmp localhost(ro,no_subtree_check)' >> /etc/exports")
