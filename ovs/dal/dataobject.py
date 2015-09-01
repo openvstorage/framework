@@ -500,6 +500,10 @@ class DataObject(object):
                                 if item is not None:
                                     item.save(recursive=True, skip=info['key'])
 
+            for relation in self._relations:
+                if self._data[relation.name]['guid'] is not None:
+                    _ = relation.foreign_type(self._data[relation.name]['guid'])
+
             try:
                 data = self._persistent.get(self._key)
             except KeyNotFoundException:
