@@ -204,7 +204,7 @@ class StorageRouterController(object):
                                   'local_connection_path': mountpoint_bfs}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
-                    connection_host = Configuration.get('ovs.grid.ip')
+                    connection_host = StorageRouterList.get_masters()[0].ip
                     connection_port = 443
                     clients = ClientList.get_by_types('INTERNAL', 'CLIENT_CREDENTIALS')
                     oauth_client = None
