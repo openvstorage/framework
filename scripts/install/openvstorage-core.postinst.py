@@ -36,10 +36,10 @@ def file_write(fn, cts):
     with open(fn, 'w') as the_file:
         the_file.write(cts)
 
-# Cleanup *.pyc files
 # TODO: set owner:group only where it is really needed
 check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
-check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
+# Cleanup *.pyc files to make sure that on upgrade old obolete pyc files are removed
+check_output('find /opt/OpenvStorage -name *.pyc -exec rm -f {} \;', shell=True)
 
 # Few logstash cleanups if it's installed
 try:
