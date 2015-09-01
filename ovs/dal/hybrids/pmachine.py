@@ -51,9 +51,9 @@ class PMachine(DataObject):
 
     def _is_configured(self):
         """
-        :return: boolean
+        Returns whether the physical machine has been configured for use with the corresponding management center (e.g. vCenter or OpenStack)
         """
         mgmtcentersdk = Factory.get_mgmtcenter(self)
         if mgmtcentersdk:
-            return mgmtcentersdk.is_host_configured()
+            return mgmtcentersdk.is_host_configured(self.ip)
         return False

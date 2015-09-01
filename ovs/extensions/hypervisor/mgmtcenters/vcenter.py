@@ -16,7 +16,6 @@
 Module for the vcenter management center client
 """
 
-import time
 from ovs.extensions.hypervisor.apis.vmware.sdk import Sdk
 from ovs.log.logHandler import LogHandler
 
@@ -91,10 +90,10 @@ class VCenter(object):
         """
         self.metadata = metadata
 
-    def configure_vpool(self, vpool_name):
+    def configure_vpool(self, vpool_name, ip):
         pass
 
-    def unconfigure_vpool(self, vpool_name, remove_volume_type):
+    def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
         pass
 
     def get_guests(self):
@@ -159,14 +158,14 @@ class VCenter(object):
         """
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
 
-    def is_host_configured(self):
+    def is_host_configured(self, ip):
         """
         :return: boolean
         """
         _ = self
-        return True
+        return False
 
-    def configure_host(self):
+    def configure_host(self, ip):
         pass
 
     def unconfigure_host(self):

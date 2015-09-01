@@ -76,25 +76,23 @@ class PMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(PMachine)
-    def configure_host(self, pmachine, request):
+    def configure_host(self, pmachine, mgmtcenter_guid):
         """
         Configure the physical host
         """
-        serializer = FullSerializer(PMachine, instance=pmachine, data=request.DATA)
-        if serializer.is_valid():
-            serializer.save()
-            return MgmtCenterController.configure_host.delay(pmachine.guid)
+        return MgmtCenterController.configure_host.s(pmachine.guid, mgmtcenter_guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
 
     @action()
     @log()
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(PMachine)
-    def unconfigure_host(self, pmachine, request):
+    def unconfigure_host(self, pmachine):
         """
         Unconfigure the physical host
         """
-        serializer = FullSerializer(PMachine, instance=pmachine, data=request.DATA)
-        if serializer.is_valid():
-            serializer.save()
-            return MgmtCenterController.unconfigure_host.delay(pmachine.guid)
+        return MgmtCenterController.unconfigure_host.s(pmachine.guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )

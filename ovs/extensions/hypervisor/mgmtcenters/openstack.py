@@ -48,12 +48,12 @@ class OpenStack(object):
         self.nova_client = nova_client.Client(username = username,
                                               api_key = password,
                                               project_id = 'admin',
-                                              auth_url = 'http://{}:35357/v2.0'.format(ip),
+                                              auth_url = 'http://{0}:35357/v2.0'.format(ip),
                                               service_type="compute")
         self.cinder_client = cinder_client.Client(username = username,
                                                   api_key = password,
                                                   project_id = 'admin',
-                                                  auth_url = 'http://{}:35357/v2.0'.format(ip),
+                                                  auth_url = 'http://{0}:35357/v2.0'.format(ip),
                                                   service_type="volumev2")
         self.management = OpenStackManagement(cinder_client = self.cinder_client)
         self.metadata = {}
@@ -79,30 +79,31 @@ class OpenStack(object):
         self.config_cinder = metadata.get('integratemgmt', False)
         logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
 
-    def configure_vpool(self, vpool_name):
+    def configure_vpool(self, vpool_name, ip):
         if self.config_cinder:
             try:
-                return self.management.configure_vpool(vpool_name)
+                return self.management.configure_vpool(vpool_name, ip)
             except (SystemExit, Exception) as ex:
-                logger.error('Management action "configure_vpool" failed %s' % ex)
+                logger.error('Management action "configure_vpool" failed {0}'.format(ex))
         else:
             logger.info('Cinder configuration is disabled')
 
-    def unconfigure_vpool(self, vpool_name, remove_volume_type):
+    def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
         if self.config_cinder:
             try:
-                return self.management.unconfigure_vpool(vpool_name, remove_volume_type)
+                return self.management.unconfigure_vpool(vpool_name, remove_volume_type, ip)
             except (SystemExit, Exception) as ex:
-                logger.error('Management action "unconfigure_vpool" failed %s' % ex)
+                logger.error('Management action "unconfigure_vpool" failed {0}'.format(ex))
         else:
             logger.info('Cinder configuration is disabled')
 
-    def configure_host(self):
+    def configure_host(self, ip):
         if self.config_cinder:
             try:
-                return self.management.configure_host()
+                return self.management.configure_host(ip)
             except (SystemExit, Exception) as ex:
                 logger.error('Management action "configure_host" failed {0}'.format(ex))
+                raise ex
         else:
             logger.info('Cinder configuration is disabled')
 
@@ -112,6 +113,7 @@ class OpenStack(object):
                 return self.management.unconfigure_host()
             except (SystemExit, Exception) as ex:
                 logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
+                raise ex
         else:
             logger.info('Cinder configuration is disabled')
 
@@ -294,10 +296,10 @@ class OpenStack(object):
             order += 1
         return vm_info
 
-    def is_host_configured(self):
+    def is_host_configured(self, ip):
         if self.config_cinder:
             try:
-                return self.management.is_host_configured()
+                return self.management.is_host_configured(ip)
             except (SystemExit, Exception) as ex:
                 logger.error('Management action "is_host_configured" failed {0}'.format(ex))
         else:

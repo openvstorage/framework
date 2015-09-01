@@ -33,6 +33,10 @@ define([
         self.finish = function() {
             return $.Deferred(function(deferred) {
                 deferred.resolve();
+                generic.alertInfo(
+                    $.t('ovs:wizards.linkhosts.gather.started'),
+                    $.t('ovs:wizards.linkhosts.gather.started_msg')
+                );
                 $.each(self.data.pmachinemap(), function(pmachineGuid, pmachine) {
                     var action = undefined;
                     if (pmachine.originalMgmtCenterGuid() === null && pmachine.mgmtCenter() !== undefined) {
@@ -40,11 +44,7 @@ define([
                     } else if (pmachine.originalMgmtCenterGuid() !== null && pmachine.mgmtCenter() === undefined) {
                         action = '/unconfigure_host'
                     }
-                    if (pmachine.configure() === true && action !== undefined) {
-                        generic.alertInfo(
-                            $.t('ovs:wizards.linkhosts.gather.started'),
-                            $.t('ovs:wizards.linkhosts.gather.inprogress', { which: (action == '/configure_host' ? 'Configuring' : 'Unconfiguring'), what: pmachine.name() })
-                        );
+                    if (pmachine.configure() === true && action !== undefined && !(action === '/unconfigure_host' && pmachine.isConfigured() === false)) {
                         api.post('pmachines/' + pmachine.guid() + action, {
                             data: {
                                 mgmtcenter_guid: pmachine.mgmtCenter() === undefined ? null : pmachine.mgmtCenter().guid()
@@ -52,47 +52,36 @@ define([
                         })
                         .then(shared.tasks.wait)
                         .done(function() {
+                            pmachine.isConfigured((action === '/configure_host' ? true : false));
                             generic.alertSuccess(
-                                $.t('ovs:wizards.linkhosts.gather.completed', { which: (action == '/configure_host' ? 'Configure' : 'Unconfigure')}),
-                                $.t('ovs:wizards.linkhosts.gather.success', { which: (action == '/configure_host' ? 'configured' : 'unconfigured'), what: pmachine.name() })
+                                $.t('ovs:wizards.linkhosts.gather.completed', { which: (action === '/configure_host' ? 'Configure' : 'Unconfigure')}),
+                                $.t('ovs:wizards.linkhosts.gather.success', { which: (action === '/configure_host' ? 'configured' : 'unconfigured'), what: pmachine.name() })
                             );
                         })
                         .fail(function(error) {
+                            pmachine.isConfigured((action === '/unconfigure_host' ? true : false));
                             generic.alertError(
                                 $.t('ovs:generic.error'),
                                 $.t('ovs:wizards.linkhosts.gather.failed', {
-                                    which: (action == '/configure_host' ? 'Configuring' : 'Unconfiguring'),
+                                    which: (action === '/configure_host' ? 'Configuring' : 'Unconfiguring'),
                                     what: pmachine.name(),
                                     why: error
                                 })
                             );
                         })
-                    } else if (pmachine.configure() === false && action !== undefined) {
+                    } else if (action !== undefined) {
                         api.patch('pmachines/' + pmachine.guid(), {
                             data: {
                                 mgmtcenter_guid: pmachine.mgmtCenter() === undefined ? null : pmachine.mgmtCenter().guid()
                             },
                             queryparams: { contents: 'mgmtcenter' }
                         })
-                        .then(shared.tasks.wait)
-                        .done(function() {
-                            generic.alertSuccess(
-                                $.t('ovs:wizards.linkhosts.gather.completed', { which: (action == '/configure_host' ? 'Link' : 'Unlink')}),
-                                $.t('ovs:wizards.linkhosts.gather.success', { which: (action == '/configure_host' ? 'linked' : 'unlinked'), what: pmachine.name() })
-                            );
-                        })
-                        .fail(function(error) {
-                            generic.alertError(
-                                $.t('ovs:generic.error'),
-                                $.t('ovs:wizards.linkhosts.gather.failed', {
-                                    which: (action == '/configure_host' ? 'Linking' : 'Unlinking'),
-                                    what: pmachine.name(),
-                                    why: error
-                                })
-                            );
-                        })
+                        generic.alertSuccess(
+                            $.t('ovs:wizards.linkhosts.gather.completed', { which: (action === '/configure_host' ? 'Link' : 'Unlink')}),
+                            $.t('ovs:wizards.linkhosts.gather.success', { which: (action === '/configure_host' ? 'linked' : 'unlinked'), what: pmachine.name() })
+                        );
                     }
-                    pmachine.configure(true);
+                    pmachine.configure(true); //Set configure/unconfigure flag always on true
                     pmachine.originalMgmtCenterGuid(pmachine.mgmtCenter() === undefined ? null : pmachine.mgmtCenter().guid());
                 });
             }).promise();

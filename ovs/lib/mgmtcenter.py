@@ -16,7 +16,6 @@
 Module for MgmtCenterController
 """
 
-import os
 from ovs.celery_run import celery
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 from ovs.dal.hybrids.pmachine import PMachine
@@ -35,7 +34,7 @@ class MgmtCenterController(object):
     @celery.task(name='ovs.mgmtcenter.test_connection')
     def test_connection(mgmt_center_guid):
         """
-        Test mgmtcenter connection
+        Test management center connection
         """
         mgmt_center = MgmtCenter(mgmt_center_guid)
         try:
@@ -52,19 +51,23 @@ class MgmtCenterController(object):
 
     @staticmethod
     @celery.task(name='ovs.mgmtcenter.configure_host')
-    def configure_host(pmachine_guid):
+    def configure_host(pmachine_guid, mgmtcenter_guid):
         pmachine = PMachine(pmachine_guid)
-        mgmt_center = MgmtCenter(pmachine.mgmtcenter_guid)
+        mgmt_center = MgmtCenter(mgmtcenter_guid)
         mgmt_center_client = None
         try:
             mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
         except Exception as ex:
-            logger.error('Cannot get mgmt center client: {0}'.format(ex))
+            logger.error('Cannot get management center client: {0}'.format(ex))
         if mgmt_center_client is not None:
             logger.info('Configuring host {0} on management center {1}'.format(pmachine.name, mgmt_center.name))
-            mgmt_center_client.configure_host()
+            mgmt_center_client.configure_host(pmachine.ip)
+            pmachine.mgmtcenter = mgmt_center
+            pmachine.save()
 
     @staticmethod
     @celery.task(name='ovs.mgmtcenter.unconfigure_host')
     def unconfigure_host(pmachine_guid):
-        pass
+        pmachine = PMachine(pmachine_guid)
+        pmachine.mgmtcenter = None
+        pmachine.save()

@@ -793,8 +793,8 @@
                 "completed": "__which__ completed",
                 "configure": "Configure",
                 "failed": "__which__ __what__ failed: __why__",
-                "inprogress": "__which__ physical host __what__ has started.",
                 "started": "Started",
+                "started_msg": "Linking / configuring started",
                 "success": "Pmachine __what__ __which__",
                 "unconfigure": "Unconfigure"
             }

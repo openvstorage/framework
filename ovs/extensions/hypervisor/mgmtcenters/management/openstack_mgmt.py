@@ -50,17 +50,13 @@ class OpenStackManagement(object):
         except Exception:
             self._is_devstack = False
 
-    def is_host_configured(self):
-        if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
-            logger.warning('No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
-            return False
+    def is_host_configured(self, ip):
+        _ = self
+        _ = ip
+        # @TODO: Implement correctly
+        return True
 
-        with Remote('127.0.0.1', [RawConfigParser], 'root') as remote:
-            cfg = remote.RawConfigParser()
-            cfg.read([self._CINDER_CONF])
-            return cfg.has_option("DEFAULT", "notification_topics") and cfg.get("DEFAULT", "notification_topics") == "notifications"
-
-    def configure_vpool(self, vpool_name):
+    def configure_vpool(self, vpool_name, ip):
         if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
             logger.warning('No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
@@ -68,7 +64,7 @@ class OpenStackManagement(object):
         logger.debug('configure_vpool {0} started'.format(vpool_name))
 
         # 1. Configure Cinder driver
-        with Remote('127.0.0.1', [RawConfigParser], 'root') as remote:
+        with Remote(ip, [RawConfigParser, open], 'root') as remote:
             changed = False
             cfg = remote.RawConfigParser()
             cfg.read([self._CINDER_CONF])
@@ -86,7 +82,7 @@ class OpenStackManagement(object):
                 enabled_backends.append(vpool_name)
                 cfg.set("DEFAULT", "enabled_backends", ", ".join(enabled_backends))
             if changed is True:
-                with open(self._CINDER_CONF, "w") as fp:
+                with remote.open(self._CINDER_CONF, "w") as fp:
                     cfg.write(fp)
 
         # 2. Create volume type
@@ -98,12 +94,12 @@ class OpenStackManagement(object):
         self._restart_processes()
         logger.debug('configure_vpool {0} completed'.format(vpool_name))
 
-    def unconfigure_vpool(self, vpool_name, remove_volume_type):
-        if self._is_devstack is False and self._is_openstack is False or self._cinder_installed is False:
-            logger.warning('No OpenStack nor DevStack installation detected or Cinder plugin is not installed')
+    def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
+        if self._is_devstack is False and self._is_openstack is False or self._cinder_installed is False or self._nova_installed is False:
+            logger.warning('No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
 
-        with Remote('127.0.0.1', [RawConfigParser], 'root') as remote:
+        with Remote(ip, [RawConfigParser, open], 'root') as remote:
             changed = False
             cfg = remote.RawConfigParser()
             cfg.read([self._CINDER_CONF])
@@ -117,7 +113,7 @@ class OpenStackManagement(object):
                     enabled_backends.remove(vpool_name)
                     cfg.set("DEFAULT", "enabled_backends", ", ".join(enabled_backends))
             if changed is True:
-                with open(self._CINDER_CONF, "w") as fp:
+                with remote.open(self._CINDER_CONF, "w") as fp:
                     cfg.write(fp)
 
         if remove_volume_type and self.cinder_client:
@@ -131,7 +127,7 @@ class OpenStackManagement(object):
 
         self._restart_processes()
 
-    def configure_host(self):
+    def configure_host(self, ip):
         driver_location = OSManager.get_openstack_package_base_path()
 
         try:
@@ -210,9 +206,9 @@ class OpenStackManagement(object):
         conf.source_type = 'file'
         conf.source_path = connection_info['data']['device_path']
         return conf
+
 '''.splitlines()])
-            with open(nova_volume_file, 'w') as nova_vol_file:
-                nova_vol_file.writelines(file_contents)
+            self.client.file_write(nova_volume_file, "".join(file_contents))
 
         with open(nova_driver_file, 'r') as nova_driv_file:
             file_contents = nova_driv_file.readlines()
@@ -223,8 +219,7 @@ class OpenStackManagement(object):
                     whitespaces = len(stripped_line) - len(stripped_line.lstrip())
                     new_line = "{0}'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver',\n".format(' ' * whitespaces)
                     fc = file_contents[:file_contents.index(line)] + [new_line] + file_contents[file_contents.index(line):]
-                    with open(nova_driver_file, 'w') as nova_driv_file:
-                        nova_driv_file.writelines(fc)
+                    self.client.file_write(nova_driver_file, "".join(fc))
                     break
 
         if os.path.exists(cinder_brick_initiator_file):
@@ -235,12 +230,9 @@ class OpenStackManagement(object):
         nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
         cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
 
-        nova_conf = '/etc/nova/nova.conf'
-        cinder_conf = '/etc/cinder/cinder.conf'
-
-        with Remote('127.0.0.1', [RawConfigParser], 'root') as remote:
-            for config_file, driver in {nova_conf: nova_messaging_driver,
-                                        cinder_conf: cinder_messaging_driver}.iteritems():
+        with Remote(ip, [RawConfigParser, open], 'root') as remote:
+            for config_file, driver in {self._NOVA_CONF: nova_messaging_driver,
+                                        self._CINDER_CONF: cinder_messaging_driver}.iteritems():
                 changed = False
                 cfg = remote.RawConfigParser()
                 cfg.read([config_file])
@@ -261,7 +253,7 @@ class OpenStackManagement(object):
                     changed = True
                     cfg.set("DEFAULT", "notification_topics", "notifications")
 
-                if config_file == nova_conf:
+                if config_file == self._NOVA_CONF:
                     for param, value in {'notify_on_any_change': 'True',
                                          'notify_on_state_change': 'vm_and_task_state'}.iteritems():
                         if not cfg.has_option("DEFAULT", param):
@@ -269,7 +261,7 @@ class OpenStackManagement(object):
                             cfg.set("DEFAULT", param, value)
 
                 if changed is True:
-                    with open(config_file, "w") as fp:
+                    with remote.open(config_file, "w") as fp:
                         cfg.write(fp)
 
         # 5.. Enable events consumer
@@ -284,7 +276,7 @@ class OpenStackManagement(object):
 
     @staticmethod
     def _get_base_path(component):
-        exec('import %s' % component, locals())
+        exec('import {0}'.format(component), locals())
         module = locals().get(component)
         return os.path.dirname(os.path.abspath(module.__file__))
 
