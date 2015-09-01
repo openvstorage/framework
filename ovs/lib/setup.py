@@ -1435,9 +1435,9 @@ class SetupController(object):
         print 'Removing services'
         logger.info('Removing services')
         services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]
-        if configure_rabbitmq:
+        if not configure_rabbitmq:
             services.remove('rabbitmq-server')
-        if configure_memcached:
+        if not configure_memcached:
             services.remove('memcached')
         for service in services:
             if ServiceManager.has_service(service, client=target_client):
