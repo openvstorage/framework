@@ -1304,6 +1304,20 @@ class Basic(TestCase):
         amount = len(machine.disks)
         self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
 
+    def test_save_nonexisting_relation(self):
+        """
+        Validates the behavior when saving ab object having nonexisting relations
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        disk1 = TestDisk()
+        disk1.name = 'disk'
+        disk1.machine = machine
+        with self.assertRaises(ObjectNotFoundException):
+            disk1.save()
+        machine.save()
+        disk1.save()
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

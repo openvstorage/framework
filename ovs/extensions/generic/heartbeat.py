@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import time
-from subprocess import check_output
+from subprocess import check_output, CalledProcessError
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.extensions.generic.system import System
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.os.os import OSManager
+
+from ovs.log.logHandler import LogHandler
+logger = LogHandler.get('extensions', name='heartbeat')
 
 ARP_TIMEOUT = 30
 current_time = int(time.time())
@@ -38,8 +41,11 @@ for node in routers:
     if node.machine_id == machine_id:
         node.heartbeats['process'] = current_time
     else:
-        # check timeout of other nodes and clear arp cache
-        if node.heartbeats and 'process' in node.heartbeats:
-            if current_time - node.heartbeats['process'] >= ARP_TIMEOUT:
-                check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
+        try:
+            # check timeout of other nodes and clear arp cache
+            if node.heartbeats and 'process' in node.heartbeats:
+                if current_time - node.heartbeats['process'] >= ARP_TIMEOUT:
+                    check_output("/usr/sbin/arp -d {0}".format(node.name), shell=True)
+        except CalledProcessError:
+            logger.exception('Error clearing ARP cache')
     node.save()

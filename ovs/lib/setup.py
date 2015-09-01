@@ -71,8 +71,8 @@ class SetupController(object):
                         'voldrv': ARAKOON_VOLDRV}
 
     # Generic configfiles
-    generic_configfiles = {'/opt/OpenvStorage/config/memcacheclient.cfg': 11211,
-                           '/opt/OpenvStorage/config/rabbitmqclient.cfg': 5672}
+    generic_configfiles = {'memcached': ('/opt/OpenvStorage/config/memcacheclient.cfg', 11211),
+                           'rabbitmq': ('/opt/OpenvStorage/config/rabbitmqclient.cfg', 5672)}
     avahi_filename = '/etc/avahi/services/ovs_cluster.service'
 
     # Services
@@ -385,7 +385,9 @@ class SetupController(object):
                                                   cluster_name=cluster_name,
                                                   unique_id=unique_id,
                                                   ip_client_map=ip_client_map,
-                                                  hypervisor_info=hypervisor_info)
+                                                  hypervisor_info=hypervisor_info,
+                                                  configure_memcached=configure_memcached,
+                                                  configure_rabbitmq=configure_rabbitmq)
                 if promote:
                     SetupController._promote_node(cluster_ip=cluster_ip,
                                                   master_ip=master_ip,
@@ -490,15 +492,15 @@ class SetupController(object):
                 master_ip = master_nodes[0]
 
             ip_client_map = dict((node_ip, SSHClient(node_ip, username='root')) for node_ip in nodes if node_ip)
+            configure_rabbitmq = True
+            configure_memcached = True
+            preconfig = '/tmp/openvstorage_preconfig.cfg'
+            if os.path.exists(preconfig):
+                config = RawConfigParser()
+                config.read(preconfig)
+                configure_memcached = config.getboolean('setup', 'configure_memcached')
+                configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
             if node_action == 'promote':
-                configure_rabbitmq = True
-                configure_memcached = True
-                preconfig = '/tmp/openvstorage_preconfig.cfg'
-                if os.path.exists(preconfig):
-                    config = RawConfigParser()
-                    config.read(preconfig)
-                    configure_memcached = config.getboolean('setup', 'configure_memcached')
-                    configure_rabbitmq = config.getboolean('setup', 'configure_rabbitmq')
                 SetupController._promote_node(cluster_ip=ip,
                                               master_ip=master_ip,
                                               cluster_name=cluster_name,
@@ -514,7 +516,9 @@ class SetupController(object):
                                              master_ip=master_ip,
                                              cluster_name=cluster_name,
                                              ip_client_map=ip_client_map,
-                                             unique_id=unique_id)
+                                             unique_id=unique_id,
+                                             configure_memcached=configure_memcached,
+                                             configure_rabbitmq=configure_rabbitmq)
 
             print ''
             print Interactive.boxed_message(['{0} complete.'.format(node_action.capitalize())])
@@ -1040,14 +1044,18 @@ class SetupController(object):
 
         SetupController._configure_logstash(target_client)
         SetupController._add_services(target_client, unique_id, 'master')
+        config_types = []
         if configure_rabbitmq:
+            config_types.append('rabbitmq')
             SetupController._configure_rabbitmq(target_client)
         if configure_memcached:
+            config_types.append('memcached')
             SetupController._configure_memcached(target_client)
 
         print 'Build configuration files'
         logger.info('Build configuration files')
-        for config_file, port in SetupController.generic_configfiles.iteritems():
+        for config_type in config_types:
+            config_file, port = SetupController.generic_configfiles[config_type]
             config = RawConfigParser()
             config.add_section('main')
             config.set('main', 'nodes', unique_id)
@@ -1132,7 +1140,7 @@ class SetupController(object):
         logger.info('First node complete')
 
     @staticmethod
-    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info):
+    def _setup_extra_node(cluster_ip, master_ip, cluster_name, unique_id, ip_client_map, hypervisor_info, configure_memcached, configure_rabbitmq):
         """
         Sets up an additional node
         """
@@ -1148,8 +1156,14 @@ class SetupController(object):
         logger.info('Copying client configurations')
         for cluster in SetupController.arakoon_clusters:
             ArakoonInstaller.deploy_to_slave(master_ip, cluster_ip, cluster)
+        config_types = []
+        if configure_rabbitmq:
+            config_types.append('rabbitmq')
+        if configure_memcached:
+            config_types.append('memcached')
         master_client = ip_client_map[master_ip]
-        for config in SetupController.generic_configfiles.keys():
+        for config_type in config_types:
+            config = SetupController.generic_configfiles[config_type][0]
             client_config = master_client.rawconfig_read(config)
             target_client.rawconfig_write(config, client_config)
 
@@ -1205,6 +1219,9 @@ class SetupController(object):
         print '\n+++ Promoting node +++\n'
         logger.info('Promoting node')
 
+        if SetupController._validate_local_memcache_servers(ip_client_map) is False:
+            raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
+
         target_client = ip_client_map[cluster_ip]
         node_name = target_client.run('hostname')
 
@@ -1258,8 +1275,14 @@ class SetupController(object):
 
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
+        config_types = []
+        if configure_rabbitmq:
+            config_types.append('rabbitmq')
+        if configure_memcached:
+            config_types.append('memcached')
         master_client = ip_client_map[master_ip]
-        for config_file, port in SetupController.generic_configfiles.iteritems():
+        for config_type in config_types:
+            config_file, port = SetupController.generic_configfiles[config_type]
             config = master_client.rawconfig_read(config_file)
             config_nodes = [n.strip() for n in config.get('main', 'nodes').split(',')]
             if unique_id not in config_nodes:
@@ -1328,7 +1351,7 @@ class SetupController(object):
         logger.info('Promote complete')
 
     @staticmethod
-    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id):
+    def _demote_node(cluster_ip, master_ip, cluster_name, ip_client_map, unique_id, configure_memcached, configure_rabbitmq):
         """
         Demotes a given node
         """
@@ -1336,6 +1359,9 @@ class SetupController(object):
 
         print '\n+++ Demoting node +++\n'
         logger.info('Demoting node')
+
+        if SetupController._validate_local_memcache_servers(ip_client_map) is False:
+            raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
         target_client = ip_client_map[cluster_ip]
         node_name = target_client.run('hostname')
@@ -1363,7 +1389,13 @@ class SetupController(object):
         print 'Distribute configuration files'
         logger.info('Distribute configuration files')
         master_client = ip_client_map[master_ip]
-        for config_file, port in SetupController.generic_configfiles.iteritems():
+        config_types = []
+        if configure_memcached:
+            config_types.append('memcached')
+        if configure_rabbitmq:
+            config_types.append('rabbitmq')
+        for config_type in config_types:
+            config_file, port = SetupController.generic_configfiles[config_type]
             config = master_client.rawconfig_read(config_file)
             config_nodes = [n.strip() for n in config.get('main', 'nodes').split(',')]
             if unique_id in config_nodes:
@@ -1390,18 +1422,24 @@ class SetupController(object):
             if service.name in service_names:
                 service.delete()
 
-        print 'Removing/unconfiguring RabbitMQ'
-        logger.debug('Removing/unconfiguring RabbitMQ')
-        if ServiceManager.has_service('rabbitmq-server', client=target_client):
-            target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
-            target_client.run('rabbitmqctl reset; sleep 5;')
-            target_client.run('rabbitmqctl stop; sleep 5;')
-            SetupController._change_service_state(target_client, 'rabbitmq-server', 'stop')
-            target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
+        if configure_rabbitmq:
+            print 'Removing/unconfiguring RabbitMQ'
+            logger.debug('Removing/unconfiguring RabbitMQ')
+            if ServiceManager.has_service('rabbitmq-server', client=target_client):
+                target_client.run('rabbitmq-server -detached 2> /dev/null; sleep 5; rabbitmqctl stop_app; sleep 5;')
+                target_client.run('rabbitmqctl reset; sleep 5;')
+                target_client.run('rabbitmqctl stop; sleep 5;')
+                SetupController._change_service_state(target_client, 'rabbitmq-server', 'stop')
+                target_client.file_unlink("/var/lib/rabbitmq/.erlang.cookie")
 
         print 'Removing services'
         logger.info('Removing services')
-        for service in [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]:
+        services = [s for s in SetupController.master_node_services if s not in (SetupController.extra_node_services + [SetupController.ARAKOON_OVSDB, SetupController.ARAKOON_VOLDRV])]
+        if not configure_rabbitmq:
+            services.remove('rabbitmq-server')
+        if not configure_memcached:
+            services.remove('memcached')
+        for service in services:
             if ServiceManager.has_service(service, client=target_client):
                 logger.debug('Removing service {0}'.format(service))
                 SetupController._change_service_state(target_client, service, 'stop')
@@ -2409,3 +2447,20 @@ EOF
             except:
                 previous = None
                 print 'Password invalid or could not connect to this node'
+
+    @staticmethod
+    def _validate_local_memcache_servers(ip_client_map):
+        """
+        Reads the rabbitmq client configuration file from one of the given nodes, and validates whether it can reach all
+        nodes to handle a possible future memcache restart
+        """
+        if len(ip_client_map) <= 1:
+            return True
+        client = ip_client_map.values()[0]
+        config = client.rawconfig_read('{0}/{1}'.format(client.config_read('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+        nodes = [node.strip() for node in config.get('main', 'nodes').split(',')]
+        ips = map(lambda n: config.get(n, 'location').split(':')[0], nodes)
+        for ip in ips:
+            if ip not in ip_client_map:
+                return False
+        return True
