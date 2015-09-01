@@ -1,6 +1,5 @@
 [Unit]
 Description=Watcher for Open vStorage master services
-Wants=ovs-ganesha.service ovs-volumedriver_<VPOOL_NAME>.service
 [Service]
 Type=simple
 Environment=PYTHONPATH=/opt/OpenvStorage

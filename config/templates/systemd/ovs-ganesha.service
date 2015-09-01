@@ -10,7 +10,6 @@ Environment=GANESHA_LOG_FILE=/var/log/ovs/volumedriver/<VPOOL_NAME>_ganesha.log
 Environment=GANESHA_CONFIG_FILE=/opt/OpenvStorage/config/storagedriver/storagedriver/<VPOOL_NAME>_ganesha.conf
 Environment=GANESHA_PID_FILE=/var/run/ganesha-<VPOOL_NAME>-cf.pid
 ExecStart=/usr/bin/ganesha-cf
-ExecStopPost=/bin/bash -c 'if mount | grep <VPOOL_MOUNTPOINT> ; then fusermount -u <VPOOL_MOUNTPOINT>; fi'
 Restart=on-failure
 RestartSec=360
 TimeoutStopSec=<KILL_TIMEOUT>
