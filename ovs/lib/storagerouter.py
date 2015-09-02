@@ -452,6 +452,25 @@ class StorageRouterController(object):
                                                                       queue_password,
                                                                       current_storagerouter.ip)})
 
+        # Updating the model
+        storagedriver.name = vrouter_id.replace('_', ' ')
+        storagedriver.ports = ports
+        storagedriver.vpool = vpool
+        storagedriver.cluster_ip = grid_ip
+        storagedriver.storage_ip = volumedriver_storageip
+        storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
+        storagedriver.description = storagedriver.name
+        storagedriver.storagerouter = storagerouter
+        storagedriver.storagedriver_id = vrouter_id
+        storagedriver.mountpoint_md = mountpoint_md
+        storagedriver.mountpoint_foc = mountpoint_foc
+        storagedriver.mountpoint_bfs = mountpoint_bfs
+        storagedriver.mountpoint_temp = mountpoint_temp
+        storagedriver.mountpoint_readcaches = mountpoint_readcaches
+        storagedriver.mountpoint_writecaches = mountpoint_writecaches
+        storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
+        storagedriver.save()
+
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
         client.dir_create(config_dir)
         alba_proxy = storagedriver.alba_proxy
@@ -538,25 +557,6 @@ class StorageRouterController(object):
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=queue_volumerouterqueue,
                                                        events_amqp_uris=queue_urls)
         storagedriver_config.save(client, reload_config=False)
-
-        # Updating the model
-        storagedriver.name = vrouter_id.replace('_', ' ')
-        storagedriver.ports = ports
-        storagedriver.vpool = vpool
-        storagedriver.cluster_ip = grid_ip
-        storagedriver.storage_ip = volumedriver_storageip
-        storagedriver.mountpoint = '/mnt/{0}'.format(vpool_name)
-        storagedriver.description = storagedriver.name
-        storagedriver.storagerouter = storagerouter
-        storagedriver.storagedriver_id = vrouter_id
-        storagedriver.mountpoint_md = mountpoint_md
-        storagedriver.mountpoint_foc = mountpoint_foc
-        storagedriver.mountpoint_bfs = mountpoint_bfs
-        storagedriver.mountpoint_temp = mountpoint_temp
-        storagedriver.mountpoint_readcaches = mountpoint_readcaches
-        storagedriver.mountpoint_writecaches = mountpoint_writecaches
-        storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
-        storagedriver.save()
 
         DiskController.sync_with_reality(storagerouter.guid)
         for mountpoint, usage in {mountpoint_md: {'type': 'metadata',
