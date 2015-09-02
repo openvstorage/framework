@@ -38,7 +38,8 @@ limitations under the License.
                 <!-- ko compose: '../widgets/dropdown/contents.html' -->
                 <!-- /ko -->
             <!-- /ko -->
-            <span data-bind="visible: items().length === 0" class="fa fa-spin" data-i18n="[html]ovs:icons.loading" style="margin: 10px 0 0 10px;"></span>
+            <span data-bind="visible: items().length === 0 && emptyIsLoading()" class="fa fa-spin"
+                  data-i18n="[html]ovs:icons.loading" style="margin: 10px 0 0 10px;"></span>
         </div>
     <!-- /ko -->
     <!-- ko if: !multi() && free() && ($.inArray(target(), items()) === -1 || useFree()) -->
@@ -73,7 +74,7 @@ limitations under the License.
                 <!-- /ko -->
             </div>
         </div>
-        <div data-bind="visible: items().length === 0" style="position: absolute; right: -7px; top: 7px;">
+        <div data-bind="visible: items().length === 0 && emptyIsLoading()" style="position: absolute; right: -7px; top: 7px;">
             <span class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></span>
         </div>
     <!-- /ko -->
