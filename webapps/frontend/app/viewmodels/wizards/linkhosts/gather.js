@@ -32,7 +32,6 @@ define([
 
         self.finish = function() {
             return $.Deferred(function(deferred) {
-                deferred.resolve();
                 generic.alertInfo(
                     $.t('ovs:wizards.linkhosts.gather.started'),
                     $.t('ovs:wizards.linkhosts.gather.started_msg')
@@ -76,14 +75,27 @@ define([
                             },
                             queryparams: { contents: 'mgmtcenter' }
                         })
-                        generic.alertSuccess(
-                            $.t('ovs:wizards.linkhosts.gather.completed', { which: (action === '/configure_host' ? 'Link' : 'Unlink')}),
-                            $.t('ovs:wizards.linkhosts.gather.success', { which: (action === '/configure_host' ? 'linked' : 'unlinked'), what: pmachine.name() })
-                        );
+                        .done(function() {
+                            generic.alertSuccess(
+                                $.t('ovs:wizards.linkhosts.gather.completed', { which: (action === '/configure_host' ? 'Link' : 'Unlink')}),
+                                $.t('ovs:wizards.linkhosts.gather.success', { which: (action === '/configure_host' ? 'linked' : 'unlinked'), what: pmachine.name() })
+                            );
+                        })
+                        .fail(function(error) {
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:wizards.linkhosts.gather.failed', {
+                                    which: (action === '/configure_host' ? 'Linking' : 'Unlinking'),
+                                    what: pmachine.name(),
+                                    why: error
+                                })
+                            );
+                        })
                     }
                     pmachine.configure(true); //Set configure/unconfigure flag always on true
                     pmachine.originalMgmtCenterGuid(pmachine.mgmtCenter() === undefined ? null : pmachine.mgmtCenter().guid());
                 });
+                deferred.resolve();
             }).promise();
         };
     };
