@@ -25,6 +25,7 @@ define([
 
         // Variables
         self.shared            = shared;
+        self.holdLoading       = false;
         self.guard             = { authenticated: true };
         self.refresher         = new Refresher();
         self.widgets           = [];
@@ -44,7 +45,6 @@ define([
             { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined },
             { key: undefined,         value: '',                            width: 30        }
         ];
-        self.holdLoading       = false;
 
         // Observables
         self.pMachines         = ko.observableArray([]);
@@ -70,7 +70,7 @@ define([
                     mapping[mgmtCenter.guid()].total += 1;
                     match = false;
                     $.each(host.ips, function(iindex, ip) {
-                        if ($.inArray(ip, pMachineIPs) !== -1) {
+                        if (pMachineIPs.contains(ip)) {
                             match = true;
                             return false;
                         }
@@ -126,10 +126,32 @@ define([
                                         },
                                         owner: pm
                                     });
+                                    pm.missingMgmtCenter = ko.computed({
+                                        read: function() {
+                                            var pmachine = this,
+                                                missing = false;
+                                            $.each(self.mgmtCenters(), function(mcindex, mgmtCenter) {
+                                                $.each(mgmtCenter.hosts(), function(hindex, host) {
+                                                    $.each(host.ips, function(iindex, ip) {
+                                                        if (ip === pmachine.ipAddress() && (pmachine.mgmtCenterGuid() === null || pmachine.mgmtCenterGuid() === undefined)) {
+                                                            missing = true;
+                                                            return false;
+                                                        }
+                                                        return true;
+                                                    });
+                                                });
+                                            });
+                                            return missing;
+                                        },
+                                        owner: pm
+                                    });
                                     pm.mgmtCenterValid = ko.computed({
                                         read: function() {
                                             // Currently, matching is based on ip address
                                             // TODO: Replace this by hypervisorid matching
+                                            if (pm.missingMgmtCenter()) {
+                                                return true;
+                                            }
                                             var mgmtCenterGuid, pmachine = this,
                                                 currentMgmtCenterGuid = pmachine.mgmtCenterGuid();
                                             $.each(self.mgmtCenters(), function(mcindex, mgmtCenter) {
