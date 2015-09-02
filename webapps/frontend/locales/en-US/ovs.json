@@ -400,7 +400,8 @@
         "pmachines": {
             "link": "Link Hosts",
             "title": "Managed Hosts",
-            "incorrectmgmtcenter": "The selected Management center might be incorrect."
+            "incorrectmgmtcenter": "The selected management center might be incorrect.",
+            "missingmgmtcenter": "Host is not yet linked to the correct management center"
         },
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
