@@ -33,6 +33,7 @@ define([
         self.hvtype         = ko.observable();
         self.mgmtCenterGuid = ko.observable();
         self.backupValue    = ko.observable();
+        self.isConfigured   = ko.observable();
 
         // Functions
         self.fillData = function(data) {
@@ -42,6 +43,9 @@ define([
                 self.ipAddress(data.ip);
                 if (data.hasOwnProperty('mgmtcenter_guid')) {
                     self.mgmtCenterGuid(data.mgmtcenter_guid);
+                }
+                if (data.hasOwnProperty('is_configured')) {
+                    self.isConfigured(data.is_configured);
                 }
             }
             self.loaded(true);
@@ -58,40 +62,6 @@ define([
                     .fail(deferred.reject)
                     .always(function() {
                         self.loading(false);
-                    });
-            }).promise();
-        };
-        self.save = function() {
-            return $.Deferred(function(deferred) {
-                self.loading(true);
-                api.patch('pmachines/' + self.guid(), {
-                        data: {
-                            name: self.name(),
-                            mgmtcenter_guid: self.mgmtCenterGuid() === undefined ? null : self.mgmtCenterGuid(),
-                            ip: self.ipAddress(),
-                            hvtype: self.hvtype()
-                        },
-                        queryparams: { contents: 'mgmtcenter' }
-                    })
-                    .done(function() {
-                        generic.alertSuccess(
-                            $.t('ovs:pmachines.save.complete'),
-                            $.t('ovs:pmachines.save.success', { what: self.name() })
-                        );
-                        self.loading(false);
-                        deferred.resolve();
-                    })
-                    .fail(function(error) {
-                        error = $.parseJSON(error.responseText);
-                        generic.alertError(
-                            $.t('ovs:generic.error'),
-                            $.t('ovs:pmachines.save.failed', {
-                                what: self.name(),
-                                why: error.detail
-                            })
-                        );
-                        self.loading(false);
-                        deferred.reject();
                     });
             }).promise();
         };

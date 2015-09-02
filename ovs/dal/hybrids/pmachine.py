@@ -18,7 +18,7 @@ PMachine module
 from ovs.dal.dataobject import DataObject
 from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.mgmtcenter import MgmtCenter
-from ovs.extensions.hypervisor.factory import Factory as hvFactory
+from ovs.extensions.hypervisor.factory import Factory
 
 
 class PMachine(DataObject):
@@ -34,13 +34,14 @@ class PMachine(DataObject):
                     Property('hvtype', ['HYPERV', 'VMWARE', 'XEN', 'KVM'], doc='Hypervisor type running on the pMachine.'),
                     Property('hypervisor_id', str, mandatory=False, doc='Hypervisor id - primary key on Management Center')}
     __relations = [Relation('mgmtcenter', MgmtCenter, 'pmachines', mandatory=False)]
-    __dynamics = [Dynamic('host_status', str, 60)]
+    __dynamics = [Dynamic('host_status', str, 60),
+                  Dynamic('is_configured', bool, 60)]
 
     def _host_status(self):
         """
         Returns the host status as reported by the management center (e.g. vCenter Server)
         """
-        mgmtcentersdk = hvFactory.get_mgmtcenter(self)
+        mgmtcentersdk = Factory.get_mgmtcenter(self)
         if mgmtcentersdk:
             if self.hypervisor_id:
                 return mgmtcentersdk.get_host_status_by_pk(self.hypervisor_id)
@@ -48,5 +49,11 @@ class PMachine(DataObject):
                 return mgmtcentersdk.get_host_status_by_ip(self.ip)
         return 'UNKNOWN'
 
-
-
+    def _is_configured(self):
+        """
+        Returns whether the physical machine has been configured for use with the corresponding management center (e.g. vCenter or OpenStack)
+        """
+        mgmtcentersdk = Factory.get_mgmtcenter(self)
+        if mgmtcentersdk:
+            return mgmtcentersdk.is_host_configured(self.ip)
+        return False

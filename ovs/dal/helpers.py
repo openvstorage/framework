@@ -30,7 +30,7 @@ logger = LogHandler.get('dal', name='helper')
 
 class Descriptor(object):
     """
-    The descriptor class contains metadata to instanciate objects that can be serialized.
+    The descriptor class contains metadata to instantiate objects that can be serialized.
     It points towards the sourcefile, class name and class type
     """
 
@@ -38,8 +38,7 @@ class Descriptor(object):
 
     def __init__(self, object_type=None, guid=None, cached=True):
         """
-        Initializes a descriptor for a given type. Optionally already providing a guid for the
-        instanciator
+        Initializes a descriptor for a given type. Optionally already providing a guid for the instance
         """
 
         # Initialize super class
@@ -99,7 +98,7 @@ class Descriptor(object):
 
     def get_object(self, instantiate=False):
         """
-        This method will yield an instance or the class to which the decriptor points
+        This method will yield an instance or the class to which the descriptor points
         """
         if not self.initialized:
             raise RuntimeError('Descriptor not yet initialized')

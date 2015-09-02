@@ -1,4 +1,4 @@
-﻿// Copyright 2014 Open vStorage NV
+﻿﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,9 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/pmachine', '../containers/mgmtcenter',
-    '../wizards/addmgmtcenter/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, MgmtCenter, AddMgmtCenterWizard) {
+    '../wizards/addmgmtcenter/index',
+    '../wizards/linkhosts/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, MgmtCenter, AddMgmtCenterWizard, LinkHostsWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -39,15 +40,16 @@ define([
         self.pMachineHeaders   = [
             { key: 'name',            value: $.t('ovs:generic.name'),       width: 250       },
             { key: 'ipAddress',       value: $.t('ovs:generic.ip'),         width: 150       },
-            { key: 'hvtype',          value: $.t('ovs:generic.type'),       width: 150       },
+            { key: 'hvtype',          value: $.t('ovs:generic.type'),       width: 210       },
             { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined },
             { key: undefined,         value: '',                            width: 30        }
         ];
+        self.holdLoading       = false;
 
         // Observables
-        self.pMachines              = ko.observableArray([]);
-        self.mgmtCenters            = ko.observableArray([]);
-        self.mgmtCenterMapping      = ko.observable({});
+        self.pMachines         = ko.observableArray([]);
+        self.mgmtCenters       = ko.observableArray([]);
+        self.mgmtCenterMapping = ko.observable({});
 
         // Handles
         self.pMachinesHandle   = {};
@@ -90,10 +92,14 @@ define([
         // Functions
         self.loadPMachines = function(page) {
             return $.Deferred(function(deferred) {
+                if (self.holdLoading === true) {
+                    deferred.resolve();
+                    return;
+                }
                 if (generic.xhrCompleted(self.pMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        contents: 'mgmtcenter',
+                        contents: 'mgmtcenter,is_configured',
                         page: page
                     };
                     self.pMachinesHandle[page] = api.get('pmachines', { queryparams: options })
@@ -102,6 +108,8 @@ define([
                                 data: data,
                                 loader: function(guid) {
                                     var pm = new PMachine(guid);
+                                    pm.configure = ko.observable(true);
+                                    pm.originalMgmtCenterGuid = ko.observable();
                                     pm.mgmtCenter = ko.computed({
                                         write: function(mgmtCenter) {
                                             if (mgmtCenter === undefined) {
@@ -145,6 +153,11 @@ define([
                                         owner: pm
                                     });
                                     return pm;
+                                },
+                                dependencyLoader: function(pmachine) {
+                                    if (pmachine.originalMgmtCenterGuid() === undefined || pmachine.originalMgmtCenterGuid() === null) {
+                                        pmachine.originalMgmtCenterGuid(pmachine.mgmtCenterGuid());
+                                    }
                                 }
                             });
                         })
@@ -188,6 +201,17 @@ define([
             dialog.show(new AddMgmtCenterWizard({
                 modal: true
             }));
+        };
+        self.linkHosts = function() {
+            self.holdLoading = true;
+            var wizard = dialog.show(new LinkHostsWizard({
+                modal: true,
+                pmachines: self.pMachines(),
+                mgmtcenters: self.mgmtCenters()
+            }));
+            wizard.always(function() {
+                self.holdLoading = false;
+            })
         };
         self.deleteMgmtCenter = function(guid) {
             var mgmtCenter;
