@@ -170,6 +170,8 @@
         "nrofvmachines": "# vMachines",
         "nrofvpools": "# vPools",
         "nothingselected": "Nothing selected",
+        "noelements": "No items available",
+        "elementsloading": "Items loading...",
         "customvalue": "Custom:",
         "errorsfound": "Errors were found. Please check the contents of all fields.",
         "followingerrorsfound": "Following errors were found:",
