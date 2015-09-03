@@ -502,7 +502,11 @@ class DataObject(object):
 
             for relation in self._relations:
                 if self._data[relation.name]['guid'] is not None:
-                    _ = relation.foreign_type(self._data[relation.name]['guid'])
+                    if relation.foreign_type is None:
+                        cls = self.__class__
+                    else:
+                        cls = relation.foreign_type
+                    _ = cls(self._data[relation.name]['guid'])
 
             try:
                 data = self._persistent.get(self._key)
