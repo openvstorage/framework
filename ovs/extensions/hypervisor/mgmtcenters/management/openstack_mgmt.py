@@ -51,14 +51,87 @@ class OpenStackManagement(object):
             self._is_devstack = False
 
     def is_host_configured(self, ip):
-        _ = self
-        _ = ip
-        # @TODO: Implement correctly
-        return True
+        if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
+            logger.warning('Host configured: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
+            return
+
+        driver_location = OSManager.get_openstack_package_base_path()
+
+        # 1. Check driver code
+        if self._is_devstack is True:
+            if not self.client.file_exists(filename = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'):
+                return False
+        else:
+            if not self.client.file_exists(filename = '{0}/cinder/volume/drivers/openvstorage.py'.format(driver_location)):
+                return False
+
+        # 2. Check patches
+        nova_base_path = self._get_base_path('nova')
+        cinder_base_path = self._get_base_path('cinder')
+        if self._is_devstack is True:
+            nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
+            nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
+            cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
+        else:
+            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(driver_location)
+            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(driver_location)
+            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(driver_location)
+
+        with open(nova_volume_file, 'r') as nova_vol_file:
+            file_contents = nova_vol_file.readlines()
+            if not [line for line in file_contents if line.startswith('class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):')]:
+                return False
+
+        with open(nova_driver_file, 'r') as nova_driv_file:
+            file_contents = nova_driv_file.readlines()
+            if not [line for line in file_contents if 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver' in line]:
+                return False
+
+        if os.path.exists(cinder_brick_initiator_file):
+            with open(cinder_brick_initiator_file, 'r') as cinder_brick_init:
+                file_contents = cinder_brick_init.readlines()
+                if not [line for line in file_contents if 'elif protocol in ["LOCAL", "FILE"]:' in line]:
+                    return False
+
+        # 3. Check messaging driver configuration
+        try:
+            from cinder import version
+            version_string = version.version_string()
+            if version_string.startswith('2015.2') or version_string.startswith('2015.1') or version_string.startswith('7.0'):
+                version = 'kilo'  # For the moment use K driver
+            elif version_string.startswith('2014.2'):
+                version = 'juno'
+            else:
+                raise ValueError('Unsupported cinder version: {0}'.format(version_string))
+        except Exception as ex:
+            raise ValueError('Cannot determine cinder version: {0}'.format(ex))
+
+        nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
+        cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
+
+        host_configured = True
+        with Remote(ip, [RawConfigParser], 'root') as remote:
+            for config_file, driver in {self._NOVA_CONF: nova_messaging_driver,
+                                        self._CINDER_CONF: cinder_messaging_driver}.iteritems():
+                cfg = remote.RawConfigParser()
+                cfg.read([config_file])
+                host_configured &= cfg.get("DEFAULT", "notification_driver") == driver
+                host_configured &= "notifications" in cfg.get("DEFAULT", "notification_topics")
+
+                if config_file == self._NOVA_CONF:
+                    host_configured &= cfg.get("DEFAULT", "notify_on_any_change") == "True"
+                    host_configured &= cfg.get("DEFAULT", "notify_on_state_change") == "vm_and_task_state"
+
+        if host_configured is False:
+            return host_configured
+
+        # 4. Check events consumer service
+        service_name = 'ovs-openstack-events-consumer'
+        return ServiceManager.has_service(service_name, self.client) and ServiceManager.get_service_status(service_name, self.client) is True
 
     def configure_vpool(self, vpool_name, ip):
         if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
-            logger.warning('No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
+            logger.warning('Configure vPool: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
 
         logger.debug('configure_vpool {0} started'.format(vpool_name))
@@ -96,7 +169,7 @@ class OpenStackManagement(object):
 
     def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
         if self._is_devstack is False and self._is_openstack is False or self._cinder_installed is False or self._nova_installed is False:
-            logger.warning('No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
+            logger.warning('Unconfigure vPool: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
 
         with Remote(ip, [RawConfigParser, open], 'root') as remote:
@@ -264,7 +337,7 @@ class OpenStackManagement(object):
                     with remote.open(config_file, "w") as fp:
                         cfg.write(fp)
 
-        # 5.. Enable events consumer
+        # 5. Enable events consumer
         service_name = 'ovs-openstack-events-consumer'
         if not ServiceManager.has_service(service_name, self.client):
             ServiceManager.add_service(service_name, self.client)

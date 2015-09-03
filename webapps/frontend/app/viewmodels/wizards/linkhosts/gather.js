@@ -51,14 +51,12 @@ define([
                         })
                         .then(shared.tasks.wait)
                         .done(function() {
-                            pmachine.isConfigured((action === '/configure_host' ? true : false));
                             generic.alertSuccess(
                                 $.t('ovs:wizards.linkhosts.gather.completed', { which: (action === '/configure_host' ? 'Configure' : 'Unconfigure')}),
                                 $.t('ovs:wizards.linkhosts.gather.success', { which: (action === '/configure_host' ? 'configured' : 'unconfigured'), what: pmachine.name() })
                             );
                         })
                         .fail(function(error) {
-                            pmachine.isConfigured((action === '/unconfigure_host' ? true : false));
                             generic.alertError(
                                 $.t('ovs:generic.error'),
                                 $.t('ovs:wizards.linkhosts.gather.failed', {

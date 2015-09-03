@@ -71,3 +71,18 @@ class MgmtCenterController(object):
         pmachine = PMachine(pmachine_guid)
         pmachine.mgmtcenter = None
         pmachine.save()
+
+    @staticmethod
+    @celery.task(name='ovs.mgmtcenter.is_host_configured')
+    def is_host_configured(pmachine_guid):
+        pmachine = PMachine(pmachine_guid)
+        mgmt_center_client = None
+        try:
+            mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
+        except Exception as ex:
+            if pmachine.mgmtcenter_guid:
+                logger.error('Cannot get management center client: {0}'.format(ex))
+
+        if mgmt_center_client is not None:
+            return mgmt_center_client.is_host_configured(pmachine.ip)
+        return False

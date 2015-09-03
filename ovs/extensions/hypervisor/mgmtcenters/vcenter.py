@@ -159,9 +159,6 @@ class VCenter(object):
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
 
     def is_host_configured(self, ip):
-        """
-        :return: boolean
-        """
         _ = self
         return False
 

@@ -42,8 +42,7 @@ define([
             { key: 'name',            value: $.t('ovs:generic.name'),       width: 250       },
             { key: 'ipAddress',       value: $.t('ovs:generic.ip'),         width: 150       },
             { key: 'hvtype',          value: $.t('ovs:generic.type'),       width: 210       },
-            { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined },
-            { key: undefined,         value: $.t('ovs:generic.actions'),    width: 60        }
+            { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined }
         ];
 
         // Observables
@@ -99,7 +98,7 @@ define([
                 if (generic.xhrCompleted(self.pMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
-                        contents: 'mgmtcenter,is_configured',
+                        contents: 'mgmtcenter',
                         page: page
                     };
                     self.pMachinesHandle[page] = api.get('pmachines', { queryparams: options })
@@ -180,6 +179,7 @@ define([
                                     if (pmachine.originalMgmtCenterGuid() === undefined || pmachine.originalMgmtCenterGuid() === null) {
                                         pmachine.originalMgmtCenterGuid(pmachine.mgmtCenterGuid());
                                     }
+                                    pmachine.loadConfigurationState();
                                 }
                             });
                         })
