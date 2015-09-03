@@ -48,7 +48,8 @@ limitations under the License.
                                       }
                                   },
                                   style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete">
+                    </i>
                 </td>
             </tr>
         </table>
@@ -65,7 +66,7 @@ limitations under the License.
     </div>
     <div data-bind="pager: { loadData: loadPMachines, headers: pMachineHeaders, refreshInterval: 5000, controls: true, container: pMachines }" style="clear: both;">
         <table data-dummy="dummy">
-            <tr data-part="vitem" data-bind="css: { 'danger': !mgmtCenterValid() }">
+            <tr data-part="vitem" data-bind="css: { 'danger': !mgmtCenterValid() || missingMgmtCenter() }">
                 <td style="position: relative;">
                     <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
                        <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
@@ -74,10 +75,42 @@ limitations under the License.
                 </td>
                 <td><span data-bind="text: ipAddress"></span></td>
                 <td><span data-bind="text: hvtype"></span></td>
-                <td><span data-bind="text: mgmtCenter() !== undefined ? mgmtCenter().name() : '-'"></span></td>
                 <td>
-                    <i class="fa fa-fw pointer" data-i18n="[html]ovs:icons.warning"
-                       data-bind="visible: !mgmtCenterValid(), tooltip: 'ovs:pmachines.pmachines.incorrectmgmtcenter'"></i>
+                    <div>
+                        <span data-bind="text: mgmtCenter() !== undefined ? mgmtCenter().name() : ''"></span>
+                        <i class="fa fa-fw pointer"
+                           data-i18n="[html]ovs:icons.warning"
+                           data-bind="visible: !mgmtCenterValid(), tooltip: 'ovs:pmachines.pmachines.incorrectmgmtcenter'">
+                        </i>
+                        <i class="fa fa-fw pointer"
+                           data-i18n="[html]ovs:icons.warning"
+                           data-bind="visible: missingMgmtCenter(), tooltip: 'ovs:pmachines.pmachines.missingmgmtcenter'">
+                        </i>
+                    </div>
+                </td>
+                <td>
+                    <span class="fa-stack">
+                        <i data-bind="click: function() {
+                                          if ($root.shared.user.roles().contains('manage')) {
+                                              $root.reconfigureHost(guid(), true);
+                                          }
+                                      },
+                                      tooltip: 'ovs:wizards.linkhosts.gather.configure',
+                                      style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' },
+                                      visible: (missingMgmtCenter() === false && isConfigured() === false && $root.mgmtCenters.length > 0) || isConfigured() === true"
+                           class="hand fa fa-fw fa-stack-1x" data-i18n="[html]ovs:icons.cog">
+                        </i>
+                        <i data-bind="click: function() {
+                                          if ($root.shared.user.roles().contains('manage')) {
+                                              $root.reconfigureHost(guid(), false);
+                                          }
+                                      },
+                                      tooltip: 'ovs:wizards.linkhosts.gather.unconfigure',
+                                      style: { color: $root.shared.user.roles().contains('manage') ? 'red' : 'lightgrey' },
+                                      visible: isConfigured() === true"
+                           class="hand fa fa-fw fa-stack-1px6" data-i18n="[html]ovs:icons.ban">
+                        </i>
+                    </span>
                 </td>
             </tr>
         </table>
