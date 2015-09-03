@@ -405,6 +405,9 @@
             "incorrectmgmtcenter": "The selected management center might be incorrect.",
             "missingmgmtcenter": "Host is not yet linked to the correct management center"
         },
+        "configure": {
+            "warning": "Are you want you want to __what__ __which__?"
+        },
         "delete": {
             "warning": "Are you sure you want to delete __what__?",
             "marked": "Marked for deletion",
@@ -848,8 +851,10 @@
     "title": "Open vStorage",
     "icons": {
         "add": "&#xf067;",
+        "ban": "&#xf05e;",
         "cancel": "&#xf00d;",
         "checked": "&#xf046;",
+        "cog": "&#xf013;",
         "collapse": "&#xf147;",
         "consistent": "&#xf02e;",
         "delete": "&#xf014;",

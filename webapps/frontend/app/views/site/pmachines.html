@@ -48,7 +48,8 @@ limitations under the License.
                                       }
                                   },
                                   style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete"></i>
+                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.delete">
+                    </i>
                 </td>
             </tr>
         </table>
@@ -88,6 +89,28 @@ limitations under the License.
                     </div>
                 </td>
                 <td>
+                    <span class="fa-stack">
+                        <i data-bind="click: function() {
+                                          if ($root.shared.user.roles().contains('manage')) {
+                                              $root.reconfigureHost(guid(), true);
+                                          }
+                                      },
+                                      tooltip: 'ovs:wizards.linkhosts.gather.configure',
+                                      style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' },
+                                      visible: (missingMgmtCenter() === false && isConfigured() === false && $root.mgmtCenters.length > 0) || isConfigured() === true"
+                           class="hand fa fa-fw fa-stack-1x" data-i18n="[html]ovs:icons.cog">
+                        </i>
+                        <i data-bind="click: function() {
+                                          if ($root.shared.user.roles().contains('manage')) {
+                                              $root.reconfigureHost(guid(), false);
+                                          }
+                                      },
+                                      tooltip: 'ovs:wizards.linkhosts.gather.unconfigure',
+                                      style: { color: $root.shared.user.roles().contains('manage') ? 'red' : 'lightgrey' },
+                                      visible: isConfigured() === true"
+                           class="hand fa fa-fw fa-stack-1px6" data-i18n="[html]ovs:icons.ban">
+                        </i>
+                    </span>
                 </td>
             </tr>
         </table>
