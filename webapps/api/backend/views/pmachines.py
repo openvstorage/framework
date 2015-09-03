@@ -24,6 +24,7 @@ from ovs.lib.mgmtcenter import MgmtCenterController
 from rest_framework import status
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.decorators import link
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -94,5 +95,18 @@ class PMachineViewSet(viewsets.ViewSet):
         Unconfigure the physical host
         """
         return MgmtCenterController.unconfigure_host.s(pmachine.guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def is_configured(self, pmachine):
+        """
+        Checks whether the hypervisor is configured for use with the management center (OpenStack or vCenter)
+        """
+        return MgmtCenterController.is_host_configured.s(pmachine.guid).apply_async(
             routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
         )

@@ -14,14 +14,17 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    'ovs/generic', 'ovs/api'
-], function($, ko, generic, api) {
+    'ovs/generic', 'ovs/api', 'ovs/shared'
+], function($, ko, generic, api, shared) {
     "use strict";
     return function(guid) {
         var self = this;
 
+        // Variables
+        self.shared = shared;
+
         // Handles
-        self.loadHandle  = undefined;
+        self.loadConfigured = undefined;
 
         // Observables
         self.edit           = ko.observable(false);
@@ -33,7 +36,7 @@ define([
         self.hvtype         = ko.observable();
         self.mgmtCenterGuid = ko.observable();
         self.backupValue    = ko.observable();
-        self.isConfigured   = ko.observable();
+        self.isConfigured   = ko.observable(false);
 
         // Functions
         self.fillData = function(data) {
@@ -43,9 +46,6 @@ define([
                 self.ipAddress(data.ip);
                 if (data.hasOwnProperty('mgmtcenter_guid')) {
                     self.mgmtCenterGuid(data.mgmtcenter_guid);
-                }
-                if (data.hasOwnProperty('is_configured')) {
-                    self.isConfigured(data.is_configured);
                 }
             }
             self.loaded(true);
@@ -63,6 +63,21 @@ define([
                     .always(function() {
                         self.loading(false);
                     });
+            }).promise();
+        };
+        self.loadConfigurationState = function() {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadConfigured)) {
+                    self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_configured')
+                        .then(self.shared.tasks.wait)
+                        .done(function(data) {
+                            self.isConfigured(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
             }).promise();
         };
     };

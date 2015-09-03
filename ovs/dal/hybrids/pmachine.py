@@ -34,8 +34,7 @@ class PMachine(DataObject):
                     Property('hvtype', ['HYPERV', 'VMWARE', 'XEN', 'KVM'], doc='Hypervisor type running on the pMachine.'),
                     Property('hypervisor_id', str, mandatory=False, doc='Hypervisor id - primary key on Management Center')}
     __relations = [Relation('mgmtcenter', MgmtCenter, 'pmachines', mandatory=False)]
-    __dynamics = [Dynamic('host_status', str, 60),
-                  Dynamic('is_configured', bool, 60)]
+    __dynamics = [Dynamic('host_status', str, 60)]
 
     def _host_status(self):
         """
@@ -49,11 +48,3 @@ class PMachine(DataObject):
                 return mgmtcentersdk.get_host_status_by_ip(self.ip)
         return 'UNKNOWN'
 
-    def _is_configured(self):
-        """
-        Returns whether the physical machine has been configured for use with the corresponding management center (e.g. vCenter or OpenStack)
-        """
-        mgmtcentersdk = Factory.get_mgmtcenter(self)
-        if mgmtcentersdk:
-            return mgmtcentersdk.is_host_configured(self.ip)
-        return False
