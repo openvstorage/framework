@@ -22,6 +22,13 @@
             </a>
         </li>
     <!-- /ko -->
+    <!-- ko if: items().length === 0 -->
+        <li class="disabled">
+            <a style="white-space: nowrap;">
+                <i data-bind="translate: emptyIsLoading() ? 'ovs:generic.elementsloading' : 'ovs:generic.noelements'"></i>
+            </a>
+        </li>
+    <!-- /ko -->
     <!-- ko if: free() && !multi() -->
         <li data-bind="css: { active: $.inArray(target(), items()) === -1 && useFree() },
                        click: function() { useFree(true); set(freeValue()); }" class="hand">

@@ -209,3 +209,8 @@ a {
 .noline {
     text-decoration: none !important;
 }
+
+code {
+    color: #555 !important;
+    background-color: #eee !important;
+}
