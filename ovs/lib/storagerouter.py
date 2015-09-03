@@ -682,7 +682,7 @@ class StorageRouterController(object):
 
         mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmt_center:
-            # Store specific metadata in management center object
+            # Store specific metadata in management center object to allow extend vpool to know whether to configure or not
             metadata = mgmt_center.get_metadata(storagerouter.pmachine.mgmtcenter.metadata, parameters)
             storagerouter.pmachine.mgmtcenter.metadata.update(metadata)
             storagerouter.pmachine.mgmtcenter.save()

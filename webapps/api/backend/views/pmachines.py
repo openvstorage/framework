@@ -77,11 +77,11 @@ class PMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(PMachine)
-    def configure_host(self, pmachine, mgmtcenter_guid):
+    def configure_host(self, pmachine, mgmtcenter_guid, update_link=True):
         """
         Configure the physical host
         """
-        return MgmtCenterController.configure_host.s(pmachine.guid, mgmtcenter_guid).apply_async(
+        return MgmtCenterController.configure_host.s(pmachine.guid, mgmtcenter_guid, update_link).apply_async(
             routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
         )
 
@@ -90,11 +90,11 @@ class PMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(PMachine)
-    def unconfigure_host(self, pmachine):
+    def unconfigure_host(self, pmachine, mgmtcenter_guid, update_link=True):
         """
         Unconfigure the physical host
         """
-        return MgmtCenterController.unconfigure_host.s(pmachine.guid).apply_async(
+        return MgmtCenterController.unconfigure_host.s(pmachine.guid, mgmtcenter_guid, update_link).apply_async(
             routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
         )
 
