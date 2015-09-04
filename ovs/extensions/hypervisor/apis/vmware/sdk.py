@@ -108,8 +108,8 @@ class Sdk(object):
             service_reference)
 
         # In case of an ESXi host, this would be 'HostAgent'
-        self._is_vcenter = self._serviceContent.about.apiType == 'VirtualCenter'
-        if not self._is_vcenter:
+        self.is_vcenter = self._serviceContent.about.apiType == 'VirtualCenter'
+        if not self.is_vcenter:
             # pylint: disable=line-too-long
             self._login()
             self._esxHost = self._get_object(
@@ -138,7 +138,7 @@ class Sdk(object):
         """
         reload vCenter info (host name and summary)
         """
-        if not self._is_vcenter:
+        if not self.is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
         datacenter_info = self._get_object(
             self._serviceContent.rootFolder,
@@ -351,7 +351,7 @@ class Sdk(object):
         Get all vMachines on all esxhosts registered to this vCenter
         :return: list
         """
-        if not self._is_vcenter:
+        if not self.is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
         hosts = self._get_vcenter_hosts()
         guests = []
@@ -390,7 +390,7 @@ class Sdk(object):
         # similar to cinder.volumes.list()
         :return: list
         """
-        if not self._is_vcenter:
+        if not self.is_vcenter:
             raise RuntimeError('Must be connected to a vCenter Server API.')
         hosts = self._get_vcenter_hosts()
 
@@ -1087,7 +1087,7 @@ class Sdk(object):
         Validates wheteher a given host is valid
         """
         if host is None:
-            if self._is_vcenter:
+            if self.is_vcenter:
                 raise Exception(
                     'A HostSystem reference is mandatory for a vCenter Server')
             else:

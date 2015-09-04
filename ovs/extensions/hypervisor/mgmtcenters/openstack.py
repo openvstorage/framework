@@ -56,28 +56,10 @@ class OpenStack(object):
                                                   auth_url = 'http://{0}:35357/v2.0'.format(ip),
                                                   service_type="volumev2")
         self.management = OpenStackManagement(cinder_client = self.cinder_client)
-        self.metadata = {}
         self.config_cinder = False
         self.STATE_MAPPING = {'up': 'RUNNING'}
 
         logger.debug('Init complete')
-
-    def get_metadata(self, metadata, parameters):
-        """
-        Get specific config values:
-        - config_cinder (first time comes from GUI integratemgmt: True/False)
-        """
-        _ = self
-        config_cinder = parameters.get('integratemgmt', metadata.get('integratemgmt', False))
-        return {'integratemgmt': config_cinder}
-
-    def set_metadata(self, metadata):
-        """
-        Update local metadata
-        """
-        self.metadata = metadata
-        self.config_cinder = metadata.get('integratemgmt', False)
-        logger.debug('Cinder configuration is <{0}>'.format(str(self.config_cinder)))
 
     def configure_vpool(self, vpool_name, ip):
         if self.config_cinder:
