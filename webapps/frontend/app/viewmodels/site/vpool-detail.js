@@ -31,6 +31,7 @@ define([
         self.widgets            = [];
         self.storageRouterCache = {};
         self.vMachineCache      = {};
+        self.vDiskCache         = {};
         self.checksInit         = false;
         self.vDiskHeaders       = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
@@ -94,7 +95,7 @@ define([
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
                 $.when.apply($, [
-                    vpool.load('storagedrivers,_dynamics,backend_type', { skipDisks: true }),
+                    vpool.load('storagedrivers,vdisks,_dynamics,backend_type'),
                     vpool.loadStorageRouters()
                         .then(function() {
                             if (self.checksInit === false) {
@@ -161,7 +162,16 @@ define([
                             deferred.resolve({
                                 data: data,
                                 loader: function(guid) {
-                                    return new VDisk(guid);
+                                    if (!self.vDiskCache.hasOwnProperty(guid)) {
+                                        self.vDiskCache[guid] = new VDisk(guid);
+                                    }
+                                    return self.vDiskCache[guid];
+                                },
+                                dependencyLoader: function(item) {
+                                    var guid = item.vMachineGuid();
+                                    if (self.vMachineCache.hasOwnProperty(guid)) {
+                                        item.vMachine(self.vMachineCache[guid]);
+                                    }
                                 }
                             });
                         })
@@ -177,7 +187,7 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_dynamics,-snapshots,-hypervisor_status',
+                        contents: 'vdisks,_dynamics,-snapshots,-hypervisor_status',
                         vpoolguid: self.vPool().guid()
                     };
                     self.vMachinesHandle[page] = api.get('vmachines', { queryparams: options })
