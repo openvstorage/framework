@@ -25,6 +25,7 @@ import pwd
 import glob
 import json
 import time
+import logging
 import tempfile
 import paramiko
 import socket
@@ -64,13 +65,14 @@ class SSHClient(object):
         else:
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
 
+        logging.getLogger('paramiko').setLevel(logging.WARNING)
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         self.ip = ip
         local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
-        local_ips = [ip.strip() for ip in local_ips]
-        self.is_local = self.ip in local_ips
+        self.local_ips = [ip.strip() for ip in local_ips]
+        self.is_local = self.ip in self.local_ips
 
         current_user = check_output('whoami', shell=True).strip()
         if username is None:
@@ -130,7 +132,7 @@ class SSHClient(object):
                 try:
                     process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
                 except OSError as ose:
-                    logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, str(ose)))
+                    logger.error('Command: "{0}" failed with output: "{1}"'.format(command, str(ose)))
                     raise CalledProcessError(1, command, str(ose))
                 out, err = process.communicate()
                 if debug:
@@ -141,14 +143,16 @@ class SSHClient(object):
                     return out.strip()
 
             except CalledProcessError as cpe:
-                logger.error('Command:\n{0}\nfailed with output:\n{1}\n'.format(command, cpe.output))
+                logger.error('Command: "{0}" failed with output: "{1}"'.format(command, cpe.output))
                 raise cpe
         else:
             _, stdout, stderr = self.client.exec_command(command)  # stdin, stdout, stderr
             exit_code = stdout.channel.recv_exit_status()
             if exit_code != 0:  # Raise same error as check_output
-                logger.error('Command:\n{0}\nfailed :\n{1}\nand error:\n{2}\n'.format(command, stdout, stderr))
-                raise CalledProcessError(exit_code, command, stderr.readlines())
+                stderr = ''.join(stderr.readlines())
+                stdout = ''.join(stdout.readlines())
+                logger.error('Command: "{0}" failed with output "{1}" and error "{2}"'.format(command, stdout, stderr))
+                raise CalledProcessError(exit_code, command, stderr)
             if debug:
                 return '\n'.join(line.rstrip() for line in stdout).strip(), stderr
             else:
@@ -369,7 +373,7 @@ import sys, json
 sys.path.append('/opt/OpenvStorage')
 from ovs.extensions.generic.configuration import Configuration
 Configuration.set('{0}', json.loads('{1}'))
-""".format(key, json.dumps(value))
+""".format(key, json.dumps(value).replace('"', '\\"'))
             self.run('python -c """{0}"""'.format(write))
 
     def rawconfig_read(self, filename):

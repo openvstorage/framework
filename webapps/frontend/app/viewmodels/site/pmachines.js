@@ -16,14 +16,16 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/pmachine', '../containers/mgmtcenter',
-    '../wizards/addmgmtcenter/index'
-], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, MgmtCenter, AddMgmtCenterWizard) {
+    '../wizards/addmgmtcenter/index',
+    '../wizards/linkhosts/index'
+], function($, app, dialog, ko, shared, generic, Refresher, api, PMachine, MgmtCenter, AddMgmtCenterWizard, LinkHostsWizard) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
         self.shared            = shared;
+        self.holdLoading       = false;
         self.guard             = { authenticated: true };
         self.refresher         = new Refresher();
         self.widgets           = [];
@@ -39,15 +41,15 @@ define([
         self.pMachineHeaders   = [
             { key: 'name',            value: $.t('ovs:generic.name'),       width: 250       },
             { key: 'ipAddress',       value: $.t('ovs:generic.ip'),         width: 150       },
-            { key: 'hvtype',          value: $.t('ovs:generic.type'),       width: 150       },
+            { key: 'hvtype',          value: $.t('ovs:generic.type'),       width: 210       },
             { key: 'mgmtcenter_guid', value: $.t('ovs:generic.mgmtcenter'), width: undefined },
-            { key: undefined,         value: '',                            width: 30        }
+            { key: undefined,         value: $.t('ovs:generic.actions'),    width: 60        }
         ];
 
         // Observables
-        self.pMachines              = ko.observableArray([]);
-        self.mgmtCenters            = ko.observableArray([]);
-        self.mgmtCenterMapping      = ko.observable({});
+        self.pMachines         = ko.observableArray([]);
+        self.mgmtCenters       = ko.observableArray([]);
+        self.mgmtCenterMapping = ko.observable({});
 
         // Handles
         self.pMachinesHandle   = {};
@@ -68,7 +70,7 @@ define([
                     mapping[mgmtCenter.guid()].total += 1;
                     match = false;
                     $.each(host.ips, function(iindex, ip) {
-                        if ($.inArray(ip, pMachineIPs) !== -1) {
+                        if (pMachineIPs.contains(ip)) {
                             match = true;
                             return false;
                         }
@@ -90,6 +92,10 @@ define([
         // Functions
         self.loadPMachines = function(page) {
             return $.Deferred(function(deferred) {
+                if (self.holdLoading === true) {
+                    deferred.resolve();
+                    return;
+                }
                 if (generic.xhrCompleted(self.pMachinesHandle[page])) {
                     var options = {
                         sort: 'name',
@@ -102,6 +108,8 @@ define([
                                 data: data,
                                 loader: function(guid) {
                                     var pm = new PMachine(guid);
+                                    pm.configure = ko.observable(true);
+                                    pm.originalMgmtCenterGuid = ko.observable();
                                     pm.mgmtCenter = ko.computed({
                                         write: function(mgmtCenter) {
                                             if (mgmtCenter === undefined) {
@@ -118,10 +126,32 @@ define([
                                         },
                                         owner: pm
                                     });
+                                    pm.missingMgmtCenter = ko.computed({
+                                        read: function() {
+                                            var pmachine = this,
+                                                missing = false;
+                                            $.each(self.mgmtCenters(), function(mcindex, mgmtCenter) {
+                                                $.each(mgmtCenter.hosts(), function(hindex, host) {
+                                                    $.each(host.ips, function(iindex, ip) {
+                                                        if (ip === pmachine.ipAddress() && (pmachine.mgmtCenterGuid() === null || pmachine.mgmtCenterGuid() === undefined)) {
+                                                            missing = true;
+                                                            return false;
+                                                        }
+                                                        return true;
+                                                    });
+                                                });
+                                            });
+                                            return missing;
+                                        },
+                                        owner: pm
+                                    });
                                     pm.mgmtCenterValid = ko.computed({
                                         read: function() {
                                             // Currently, matching is based on ip address
                                             // TODO: Replace this by hypervisorid matching
+                                            if (pm.missingMgmtCenter()) {
+                                                return true;
+                                            }
                                             var mgmtCenterGuid, pmachine = this,
                                                 currentMgmtCenterGuid = pmachine.mgmtCenterGuid();
                                             $.each(self.mgmtCenters(), function(mcindex, mgmtCenter) {
@@ -145,6 +175,12 @@ define([
                                         owner: pm
                                     });
                                     return pm;
+                                },
+                                dependencyLoader: function(pmachine) {
+                                    if (pmachine.originalMgmtCenterGuid() === undefined || pmachine.originalMgmtCenterGuid() === null) {
+                                        pmachine.originalMgmtCenterGuid(pmachine.mgmtCenterGuid());
+                                    }
+                                    pmachine.loadConfigurationState();
                                 }
                             });
                         })
@@ -189,6 +225,60 @@ define([
                 modal: true
             }));
         };
+        self.linkHosts = function() {
+            self.holdLoading = true;
+            var wizard = dialog.show(new LinkHostsWizard({
+                modal: true,
+                pmachines: self.pMachines(),
+                mgmtcenters: self.mgmtCenters()
+            }));
+            wizard.always(function() {
+                self.holdLoading = false;
+            })
+        };
+        self.reconfigureHost = function(guid, configure) {
+            var pmachine;
+            $.each(self.pMachines(), function(index, pm) {
+                if (pm.guid() === guid) {
+                    pmachine = pm;
+                }
+            });
+            if (pmachine !== undefined) {
+                app.showMessage(
+                    $.t('ovs:pmachines.configure.warning', { what: configure === true ? 'configure' : 'unconfigure', which: pmachine.name() }),
+                    $.t('ovs:generic.areyousure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                .done(function(answer) {
+                    if (answer === $.t('ovs:generic.yes')) {
+                        var action = configure === true ? '/configure_host' : '/unconfigure_host';
+                        api.post('pmachines/' + pmachine.guid() + action, {
+                            data: {
+                                update_link: false,
+                                mgmtcenter_guid: pmachine.mgmtCenter() === undefined ? null : pmachine.mgmtCenter().guid()
+                            }
+                        })
+                        .then(shared.tasks.wait)
+                        .done(function() {
+                            generic.alertSuccess(
+                                $.t('ovs:wizards.linkhosts.gather.completed', { which: (action === '/configure_host' ? 'Configure' : 'Unconfigure')}),
+                                $.t('ovs:wizards.linkhosts.gather.success', { which: (action === '/configure_host' ? 'configured' : 'unconfigured'), what: pmachine.name() })
+                            );
+                        })
+                        .fail(function(error) {
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:wizards.linkhosts.gather.failed', {
+                                    which: (action === '/configure_host' ? 'Configuring' : 'Unconfiguring'),
+                                    what: pmachine.name(),
+                                    why: error
+                                })
+                            );
+                        })
+                    }
+                });
+            }
+        }
         self.deleteMgmtCenter = function(guid) {
             var mgmtCenter;
             $.each(self.mgmtCenters(), function(index, mc) {
@@ -198,36 +288,36 @@ define([
             });
             if (mgmtCenter !== undefined) {
                 app.showMessage(
-                        $.t('ovs:pmachines.delete.warning', { what: mgmtCenter.name() }),
-                        $.t('ovs:generic.areyousure'),
-                        [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
-                    )
-                    .done(function(answer) {
-                        if (answer === $.t('ovs:generic.yes')) {
-                            self.mgmtCenters.destroy(mgmtCenter);
-                            generic.alertInfo(
-                                $.t('ovs:pmachines.delete.marked'),
-                                $.t('ovs:pmachines.delete.markedmsg', { what: mgmtCenter.name() })
-                            );
-                            api.del('mgmtcenters/' + mgmtCenter.guid())
-                                .done(function() {
-                                    generic.alertSuccess(
-                                        $.t('ovs:pmachines.delete.done'),
-                                        $.t('ovs:pmachines.delete.donemsg', { what: mgmtCenter.name() })
-                                    );
-                                })
-                                .fail(function(error) {
-                                    generic.alertError(
-                                        $.t('ovs:generic.error'),
-                                        $.t('ovs:generic.messages.errorwhile', {
-                                            context: 'error',
-                                            what: $.t('ovs:pmachines.delete.errormsg', { what: mgmtCenter.name() }),
-                                            error: error.responseText
-                                        })
-                                    );
-                                });
-                        }
-                    });
+                    $.t('ovs:pmachines.delete.warning', { what: mgmtCenter.name() }),
+                    $.t('ovs:generic.areyousure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                .done(function(answer) {
+                    if (answer === $.t('ovs:generic.yes')) {
+                        self.mgmtCenters.destroy(mgmtCenter);
+                        generic.alertInfo(
+                            $.t('ovs:pmachines.delete.marked'),
+                            $.t('ovs:pmachines.delete.markedmsg', { what: mgmtCenter.name() })
+                        );
+                        api.del('mgmtcenters/' + mgmtCenter.guid())
+                            .done(function() {
+                                generic.alertSuccess(
+                                    $.t('ovs:pmachines.delete.done'),
+                                    $.t('ovs:pmachines.delete.donemsg', { what: mgmtCenter.name() })
+                                );
+                            })
+                            .fail(function(error) {
+                                generic.alertError(
+                                    $.t('ovs:generic.error'),
+                                    $.t('ovs:generic.messages.errorwhile', {
+                                        context: 'error',
+                                        what: $.t('ovs:pmachines.delete.errormsg', { what: mgmtCenter.name() }),
+                                        error: error.responseText
+                                    })
+                                );
+                            });
+                    }
+                });
             }
         };
     };

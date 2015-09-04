@@ -1,0 +1,12 @@
+[Unit]
+Description=Open vStorage support agent
+
+[Service]
+Type=simple
+Environment=PYTHONPATH=/opt/OpenvStorage
+ExecStart=/usr/bin/python2 /opt/OpenvStorage/ovs/extensions/support/agent.py
+Restart=on-failure
+TimeoutStopSec=3600
+
+[Install]
+WantedBy=multi-user.target

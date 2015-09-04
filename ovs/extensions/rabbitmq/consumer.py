@@ -62,6 +62,9 @@ def callback(ch, method, properties, body):
     """
     _ = properties
     try:
+        if type(body) == unicode:
+            data = bytearray(body, 'utf-8')
+            body = bytes(data)
         process(queue, body, mapping)
     except Exception as e:
         logger.exception('Error processing message: {0}'.format(e))

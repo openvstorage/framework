@@ -89,6 +89,11 @@ div[data-view]:not(.modal-dialog) {
     font-size: 1.5em;
 }
 
+.fa-stack-1px6 {
+    font-size: 1.6em;
+    padding-top: 3px;
+}
+
 .table-noborder td {
     border: 0 !important;
 }
@@ -203,4 +208,9 @@ a {
 
 .noline {
     text-decoration: none !important;
+}
+
+code {
+    color: #555 !important;
+    background-color: #eee !important;
 }

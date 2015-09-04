@@ -74,7 +74,7 @@ class VPoolViewSet(viewsets.ViewSet):
     @load(VPool)
     def storagerouters(self, vpool, hints):
         """
-        Retreives a list of StorageRouters, serving a given vPool
+        Retrieves a list of StorageRouters, serving a given vPool
         """
         storagerouter_guids = []
         storagerouter = []
@@ -109,20 +109,20 @@ class VPoolViewSet(viewsets.ViewSet):
                     valid_storagedriver_guids.append(storagedriver.guid)
 
         storagedriver = StorageDriver(storagedriver_guid)
-        parameters = {'vpool_name':             vpool.name,
-                      'type':                   vpool.backend_type.code,
-                      'connection_host':        None if vpool.connection is None else vpool.connection.split(':')[0],
-                      'connection_port':        None if vpool.connection is None else int(vpool.connection.split(':')[1]),
-                      'connection_timeout':     0,  # Not in use anyway
-                      'connection_username':    vpool.login,
-                      'connection_password':    vpool.password,
-                      'mountpoint_bfs':         storagedriver.mountpoint_bfs,
-                      'mountpoint_temp':        storagedriver.mountpoint_temp,
-                      'mountpoint_md':          storagedriver.mountpoint_md,
-                      'mountpoint_readcaches':  storagedriver.mountpoint_readcaches,
+        parameters = {'connection_host': None if vpool.connection is None else vpool.connection.split(':')[0],
+                      'connection_port': None if vpool.connection is None else int(vpool.connection.split(':')[1]),
+                      'connection_timeout': 0,  # Not in use anyway
+                      'connection_username': vpool.login,
+                      'connection_password': vpool.password,
+                      'mountpoint_bfs': storagedriver.mountpoint_bfs,
+                      'mountpoint_temp': storagedriver.mountpoint_temp,
+                      'mountpoint_md': storagedriver.mountpoint_md,
+                      'mountpoint_readcaches': storagedriver.mountpoint_readcaches,
                       'mountpoint_writecaches': storagedriver.mountpoint_writecaches,
-                      'mountpoint_foc':         storagedriver.mountpoint_foc,
-                      'storage_ip':             storagedriver.storage_ip}
+                      'mountpoint_foc': storagedriver.mountpoint_foc,
+                      'storage_ip': storagedriver.storage_ip,
+                      'type': vpool.backend_type.code,
+                      'vpool_name': vpool.name}
         for field in parameters:
             if isinstance(parameters[field], basestring):
                 parameters[field] = str(parameters[field])
