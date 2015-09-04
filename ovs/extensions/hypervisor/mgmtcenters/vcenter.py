@@ -31,7 +31,6 @@ class VCenter(object):
         """
         Initializes the object with credentials and connection information
         """
-        self.metadata = None
         self.sdk = Sdk(ip, username, password)
         self.STATE_MAPPING = {'poweredOn': 'RUNNING',
                               'poweredOff': 'HALTED',
@@ -66,29 +65,13 @@ class VCenter(object):
          extra check to make sure sdk points to vCenter
         """
         self.sdk.test_connection()
-        return self.sdk._is_vcenter
+        return self.sdk.is_vcenter
 
     def get_hosts(self):
         """
         Gets a list of all hosts/hypervisors
         """
         return self.sdk.get_hosts()
-
-    @staticmethod
-    def get_metadata(metadata, parameters):
-        """
-        Get specific config values:
-        - integratemgmt: True/False
-        """
-        _ = metadata
-        _ = parameters
-        return {}
-
-    def set_metadata(self, metadata):
-        """
-        Update local metadata
-        """
-        self.metadata = metadata
 
     def configure_vpool(self, vpool_name, ip):
         pass
@@ -160,6 +143,7 @@ class VCenter(object):
 
     def is_host_configured(self, ip):
         _ = self
+        _ = ip
         return False
 
     def configure_host(self, ip):
