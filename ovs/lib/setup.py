@@ -402,7 +402,7 @@ class SetupController(object):
 
             print ''
             print Interactive.boxed_message(['Setup complete.',
-                                             'Point your browser to http://{0} to use Open vStorage'.format(cluster_ip)])
+                                             'Point your browser to https://{0} to use Open vStorage'.format(cluster_ip)])
             logger.info('Setup complete')
 
         except Exception as exception:
