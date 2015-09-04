@@ -165,5 +165,5 @@ class VCenter(object):
     def configure_host(self, ip):
         pass
 
-    def unconfigure_host(self):
+    def unconfigure_host(self, ip):
         pass

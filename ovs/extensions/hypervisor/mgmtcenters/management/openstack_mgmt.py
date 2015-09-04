@@ -42,6 +42,7 @@ class OpenStackManagement(object):
         self._is_openstack = ServiceManager.has_service(OSManager.get_openstack_cinder_service_name(), self.client)
         self._nova_installed = self.client.file_exists(self._NOVA_CONF)
         self._cinder_installed = self.client.file_exists(self._CINDER_CONF)
+        self._driver_location = OSManager.get_openstack_package_base_path()
 
         try:
             self._is_devstack = 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep || true'))
@@ -50,19 +51,29 @@ class OpenStackManagement(object):
         except Exception:
             self._is_devstack = False
 
+        try:
+            from cinder import version
+            version_string = version.version_string()
+            if version_string.startswith('2015.2') or version_string.startswith('2015.1') or version_string.startswith('7.0'):
+                self._stack_version = 'kilo'  # For the moment use K driver
+            elif version_string.startswith('2014.2'):
+                self._stack_version = 'juno'
+            else:
+                raise ValueError('Unsupported cinder version: {0}'.format(version_string))
+        except Exception as ex:
+            raise ValueError('Cannot determine cinder version: {0}'.format(ex))
+
     def is_host_configured(self, ip):
         if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
             logger.warning('Host configured: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
-
-        driver_location = OSManager.get_openstack_package_base_path()
 
         # 1. Check driver code
         if self._is_devstack is True:
             if not self.client.file_exists(filename = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'):
                 return False
         else:
-            if not self.client.file_exists(filename = '{0}/cinder/volume/drivers/openvstorage.py'.format(driver_location)):
+            if not self.client.file_exists(filename = '{0}/cinder/volume/drivers/openvstorage.py'.format(self._driver_location)):
                 return False
 
         # 2. Check patches
@@ -73,9 +84,9 @@ class OpenStackManagement(object):
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
             cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
-            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(driver_location)
-            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(driver_location)
-            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(driver_location)
+            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
+            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
+            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
         with open(nova_volume_file, 'r') as nova_vol_file:
             file_contents = nova_vol_file.readlines()
@@ -94,20 +105,8 @@ class OpenStackManagement(object):
                     return False
 
         # 3. Check messaging driver configuration
-        try:
-            from cinder import version
-            version_string = version.version_string()
-            if version_string.startswith('2015.2') or version_string.startswith('2015.1') or version_string.startswith('7.0'):
-                version = 'kilo'  # For the moment use K driver
-            elif version_string.startswith('2014.2'):
-                version = 'juno'
-            else:
-                raise ValueError('Unsupported cinder version: {0}'.format(version_string))
-        except Exception as ex:
-            raise ValueError('Cannot determine cinder version: {0}'.format(ex))
-
-        nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
-        cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
+        nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
+        cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
 
         host_configured = True
         with Remote(ip, [RawConfigParser], 'root') as remote:
@@ -201,22 +200,14 @@ class OpenStackManagement(object):
         self._restart_processes()
 
     def configure_host(self, ip):
-        driver_location = OSManager.get_openstack_package_base_path()
-
-        try:
-            from cinder import version
-            version_string = version.version_string()
-            if version_string.startswith('2015.2') or version_string.startswith('2015.1') or version_string.startswith('7.0'):
-                version = 'kilo'  # For the moment use K driver
-            elif version_string.startswith('2014.2'):
-                version = 'juno'
-            else:
-                raise ValueError('Unsupported cinder version: {0}'.format(version_string))
-        except Exception as ex:
-            raise ValueError('Cannot determine cinder version: {0}'.format(ex))
+        if self._is_devstack is False and self._is_openstack is False or self._cinder_installed is False or self._nova_installed is False:
+            logger.warning('Configure host: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
+            return
 
         # 1. Get Driver code
-        remote_driver = "/opt/OpenvStorage/config/templates/cinder-volume-driver/{0}/openvstorage.py".format(version)
+        logger.info('*** Configuring host with IP {0} ***'.format(ip))
+        logger.info('  Copy driver code')
+        remote_driver = "/opt/OpenvStorage/config/templates/cinder-volume-driver/{0}/openvstorage.py".format(self._stack_version)
         remote_version = '0.0.0'
         existing_version = '0.0.0'
         try:
@@ -238,7 +229,7 @@ class OpenStackManagement(object):
         if self._is_devstack is True:
             local_driver = '{0}/volume/drivers/openvstorage.py'.format(cinder_base_path)
         else:
-            local_driver = '{0}/cinder/volume/drivers/openvstorage.py'.format(driver_location)
+            local_driver = '{0}/cinder/volume/drivers/openvstorage.py'.format(self._driver_location)
 
         if remote_version > existing_version:
             logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
@@ -250,20 +241,23 @@ class OpenStackManagement(object):
             logger.debug('Using driver {0} version {1}'.format(local_driver, existing_version))
 
         # 2. Configure users and groups
+        logger.info('  Add users to group ovs')
         users = ['libvirt-qemu', 'stack'] if self._is_devstack is True else OSManager.get_openstack_users()
         for user in users:
             self.client.run('usermod -a -G ovs {0}'.format(user))
 
         # 3. Apply patches
+        logger.info('  Applying patches')
         if self._is_devstack is True:
             nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
             cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
-            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(driver_location)
-            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(driver_location)
-            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(driver_location)
+            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
+            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
+            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
+        logger.info('    Patching file {0}'.format(nova_volume_file))
         with open(nova_volume_file, 'r') as nova_vol_file:
             file_contents = nova_vol_file.readlines()
         if not [line for line in file_contents if line.startswith('class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):')]:
@@ -283,6 +277,7 @@ class OpenStackManagement(object):
 '''.splitlines()])
             self.client.file_write(nova_volume_file, "".join(file_contents))
 
+        logger.info('    Patching file {0}'.format(nova_driver_file))
         with open(nova_driver_file, 'r') as nova_driv_file:
             file_contents = nova_driv_file.readlines()
         if not [line for line in file_contents if 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver' in line]:
@@ -297,11 +292,13 @@ class OpenStackManagement(object):
 
         if os.path.exists(cinder_brick_initiator_file):
             # fix brick/upload to glance
+            logger.info('    Patching file {0}'.format(cinder_brick_initiator_file))
             self.client.run("""sed -i 's/elif protocol == "LOCAL":/elif protocol in ["LOCAL", "FILE"]:/g' {0}""".format(cinder_brick_initiator_file))
 
         # 4. Configure messaging driver
-        nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
-        cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if version == 'juno' else 'messaging'
+        logger.info('   - Configure messaging driver')
+        nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
+        cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
 
         with Remote(ip, [RawConfigParser, open], 'root') as remote:
             for config_file, driver in {self._NOVA_CONF: nova_messaging_driver,
@@ -338,14 +335,107 @@ class OpenStackManagement(object):
                         cfg.write(fp)
 
         # 5. Enable events consumer
+        logger.info('   - Enabling events consumer service')
         service_name = 'ovs-openstack-events-consumer'
         if not ServiceManager.has_service(service_name, self.client):
             ServiceManager.add_service(service_name, self.client)
             ServiceManager.enable_service(service_name, self.client)
             ServiceManager.start_service(service_name, self.client)
 
-    def unconfigure_host(self):
-        pass
+    def unconfigure_host(self, ip):
+        if self._is_devstack is False and self._is_openstack is False or self._cinder_installed is False or self._nova_installed is False:
+            logger.warning('Unconfigure host: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
+            return
+
+        # 1. Remove driver code
+        logger.info('*** Unconfiguring host with IP {0} ***'.format(ip))
+        logger.info(' Removing driver code')
+        if self._is_devstack is True:
+            self.client.file_delete('/opt/stack/cinder/cinder/volume/drivers/openvstorage.py')
+        else:
+            self.client.file_delete('{0}/cinder/volume/drivers/openvstorage.py'.format(self._driver_location))
+
+        # 2. Removing users from group
+        logger.info('  Removing users from group ovs')
+        for user in ['libvirt-qemu', 'stack'] if self._is_devstack is True else OSManager.get_openstack_users():
+            self.client.run('deluser {0} ovs'.format(user))
+
+        # 3. Revert patches
+        logger.info('  Reverting patches')
+        nova_base_path = self._get_base_path('nova')
+        cinder_base_path = self._get_base_path('cinder')
+        if self._is_devstack is True:
+            nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
+            nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
+            cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
+        else:
+            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
+            nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
+            cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
+
+        logger.info('    Reverting patched file: {0}'.format(nova_volume_file))
+        new_contents = []
+        with open(nova_volume_file, 'r') as nova_vol_file:
+            skip_class = False
+            for line in nova_vol_file.readlines():
+                if line.startswith('class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):'):
+                    skip_class = True
+                    continue
+                if line.startswith('class'):
+                    skip_class = False
+                if skip_class is False:
+                    new_contents.append(line)
+            self.client.file_write(nova_volume_file, "".join(new_contents))
+
+        logger.info('    Reverting patched file: {0}'.format(nova_driver_file))
+        new_contents = []
+        with open(nova_driver_file, 'r') as nova_driv_file:
+            for line in nova_driv_file.readlines():
+                stripped_line = line.strip()
+                if stripped_line.startswith("'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver'"):
+                    continue
+                new_contents.append(line)
+            self.client.file_write(nova_driver_file, "".join(new_contents))
+
+        if os.path.exists(cinder_brick_initiator_file):
+            logger.info('    Reverting patched file: {0}'.format(cinder_brick_initiator_file))
+            self.client.run("""sed -i 's/elif protocol in ["LOCAL", "FILE"]:/elif protocol == "LOCAL":/g' {0}""".format(cinder_brick_initiator_file))
+
+        # 4. Unconfigure messaging driver
+        logger.info('  Unconfiguring messaging driver')
+        nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
+        cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
+
+        with Remote(ip, [RawConfigParser, open], 'root') as remote:
+            for config_file, driver in {self._NOVA_CONF: nova_messaging_driver,
+                                        self._CINDER_CONF: cinder_messaging_driver}.iteritems():
+                cfg = remote.RawConfigParser()
+                cfg.read([config_file])
+                if cfg.has_option("DEFAULT", "notification_driver"):
+                    cfg.remove_option("DEFAULT", "notification_driver")
+                if cfg.has_option("DEFAULT", "notification_topics"):
+                    notification_topics = cfg.get("DEFAULT", "notification_topics").split(",")
+                    if "notifications" in notification_topics:
+                        notification_topics.remove("notifications")
+                        cfg.set("DEFAULT", "notification_topics", ",".join(notification_topics))
+
+                if config_file == self._NOVA_CONF:
+                    for param, value in {'notify_on_any_change': 'True',
+                                         'notify_on_state_change': 'vm_and_task_state'}.iteritems():
+                        if cfg.has_option("DEFAULT", param):
+                            cfg.remove_option("DEFAULT", param)
+
+                with remote.open(config_file, "w") as fp:
+                    cfg.write(fp)
+
+        # 5. Disable events consumer
+        logger.info('  Disabling events consumer')
+        service_name = 'ovs-openstack-events-consumer'
+        if ServiceManager.has_service(service_name, self.client):
+            ServiceManager.stop_service(service_name, self.client)
+            ServiceManager.disable_service(service_name, self.client)
+            ServiceManager.remove_service(service_name, self.client)
+
 
     @staticmethod
     def _get_base_path(component):

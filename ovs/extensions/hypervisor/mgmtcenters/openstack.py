@@ -107,10 +107,10 @@ class OpenStack(object):
         else:
             logger.info('Cinder configuration is disabled')
 
-    def unconfigure_host(self):
+    def unconfigure_host(self, ip):
         if self.config_cinder:
             try:
-                return self.management.unconfigure_host()
+                return self.management.unconfigure_host(ip)
             except (SystemExit, Exception) as ex:
                 logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
                 raise ex

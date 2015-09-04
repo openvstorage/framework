@@ -51,7 +51,7 @@ class MgmtCenterController(object):
 
     @staticmethod
     @celery.task(name='ovs.mgmtcenter.configure_host')
-    def configure_host(pmachine_guid, mgmtcenter_guid):
+    def configure_host(pmachine_guid, mgmtcenter_guid, update_link):
         pmachine = PMachine(pmachine_guid)
         mgmt_center = MgmtCenter(mgmtcenter_guid)
         mgmt_center_client = None
@@ -62,15 +62,26 @@ class MgmtCenterController(object):
         if mgmt_center_client is not None:
             logger.info('Configuring host {0} on management center {1}'.format(pmachine.name, mgmt_center.name))
             mgmt_center_client.configure_host(pmachine.ip)
-            pmachine.mgmtcenter = mgmt_center
-            pmachine.save()
+            if update_link is True:
+                pmachine.mgmtcenter = mgmt_center
+                pmachine.save()
 
     @staticmethod
     @celery.task(name='ovs.mgmtcenter.unconfigure_host')
-    def unconfigure_host(pmachine_guid):
+    def unconfigure_host(pmachine_guid, mgmtcenter_guid, update_link):
         pmachine = PMachine(pmachine_guid)
-        pmachine.mgmtcenter = None
-        pmachine.save()
+        mgmt_center = MgmtCenter(mgmtcenter_guid)
+        mgmt_center_client = None
+        try:
+            mgmt_center_client = Factory.get_mgmtcenter(mgmt_center=mgmt_center)
+        except Exception as ex:
+            logger.error('Cannot get management center client: {0}'.format(ex))
+        if mgmt_center_client is not None:
+            logger.info('Unconfiguring host {0} from management center {1}'.format(pmachine.name, mgmt_center.name))
+            mgmt_center_client.unconfigure_host(pmachine.ip)
+            if update_link is True:
+                pmachine.mgmtcenter = None
+                pmachine.save()
 
     @staticmethod
     @celery.task(name='ovs.mgmtcenter.is_host_configured')
