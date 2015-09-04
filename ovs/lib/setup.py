@@ -1483,6 +1483,8 @@ class SetupController(object):
         print "Setting up Memcached"
         client.run("""sed -i 's/^-l.*/-l 0.0.0.0/g' /etc/memcached.conf""")
         client.run("""sed -i 's/^-m.*/-m 1024/g' /etc/memcached.conf""")
+        client.run("""sed -i -E 's/^-v(.*)/# -v\1/g' /etc/memcached.conf""")  # Put all -v, -vv, ... back in comment
+        client.run("""sed -i 's/^# -v[^v]*$/-v/g' /etc/memcached.conf""")     # Uncomment only -v
 
     @staticmethod
     def _configure_rabbitmq(client):
