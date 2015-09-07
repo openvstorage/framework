@@ -103,10 +103,49 @@ class PMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(PMachine)
-    def is_configured(self, pmachine):
+    def is_host_configured(self, pmachine):
         """
-        Checks whether the hypervisor is configured for use with the management center (OpenStack or vCenter)
+        Checks whether the hypervisor is configured for use with the management center, e.g. OpenStack or vCenter
         """
         return MgmtCenterController.is_host_configured.s(pmachine.guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def configure_vpool_for_host(self, pmachine, vpool_guid):
+        """
+        Configure the vPool on the physical host for use with the management center, e.g. OpenStack or vCenter
+        """
+        return MgmtCenterController.configure_vpool_for_host.s(pmachine.guid, vpool_guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def unconfigure_vpool_for_host(self, pmachine, vpool_guid):
+        """
+        Unconfigure the vPool from the physical host
+        """
+        return MgmtCenterController.unconfigure_vpool_for_host.s(pmachine.guid, vpool_guid).apply_async(
+            routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(PMachine)
+    def is_host_configured_for_vpool(self, pmachine, vpool_guid):
+        """
+        Checks whether the vPool is configured on the hypervisor for use with the management center, e.g. OpenStack or vCenter
+        """
+        return MgmtCenterController.is_host_configured_for_vpool.s(pmachine.guid, vpool_guid).apply_async(
             routing_key='sr.{0}'.format(pmachine.storagerouters[0].machine_id)
         )

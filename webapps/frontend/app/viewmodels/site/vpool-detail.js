@@ -24,7 +24,7 @@ define([
         var self = this;
 
         // Variables
-        self.data = data;
+        self.data               = data;
         self.shared             = shared;
         self.guard              = { authenticated: true };
         self.refresher          = new Refresher();
@@ -72,8 +72,8 @@ define([
         self.pendingStorageRouters = ko.computed(function() {
             var storageRouters = [];
             $.each(self.storageRouters(), function(index, storageRouter) {
-                if ($.inArray(storageRouter.guid(), self.checkedStorageRouterGuids()) !== -1 &&
-                        $.inArray(storageRouter.guid(), self.vPool().storageRouterGuids()) === -1) {
+                if (self.checkedStorageRouterGuids().contains(storageRouter.guid()) &&
+                        !self.vPool().storageRouterGuids().contains(storageRouter.guid())) {
                     storageRouters.push(storageRouter);
                 }
             });
@@ -82,8 +82,8 @@ define([
         self.removingStorageRouters = ko.computed(function() {
             var storageRouters = [];
             $.each(self.storageRouters(), function(index, storageRouter) {
-                if ($.inArray(storageRouter.guid(), self.checkedStorageRouterGuids()) === -1 &&
-                        $.inArray(storageRouter.guid(), self.vPool().storageRouterGuids()) !== -1) {
+                if (!self.checkedStorageRouterGuids().contains(storageRouter.guid()) &&
+                        self.vPool().storageRouterGuids().contains(storageRouter.guid())) {
                     storageRouters.push(storageRouter);
                 }
             });
@@ -119,7 +119,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'storagedrivers'
+                        contents: 'storagedrivers,pmachine'
                     };
                     self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
@@ -137,6 +137,10 @@ define([
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (sadata.hasOwnProperty(storageRouter.guid())) {
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
+                                    if (storageRouter.pMachine() !== undefined) {
+                                        storageRouter.pMachine().load();
+                                        storageRouter.pMachine().loadVPoolConfigurationState(self.vPool().guid());
+                                    }
                                 }
                             });
                             self.storageRoutersLoaded(true);
@@ -256,6 +260,52 @@ define([
                         }
                     });
             }
+        };
+
+        self.reconfigurePmachine = function(sr_guid, configure) {
+            self.updatingStorageRouters(true);
+            var pmachine_guid;
+            $.each(self.storageRouters(), function(index, storagerouter) {
+                if (storagerouter.guid() === sr_guid) {
+                    pmachine_guid = storagerouter.pMachineGuid();
+                }
+            });
+            if (pmachine_guid !== undefined) {
+                app.showMessage(
+                    $.t('ovs:pmachines.configure.vpool.warning', { what: configure === true ? 'configure' : 'unconfigure' }),
+                    $.t('ovs:generic.areyousure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                .done(function(answer) {
+                    if (answer === $.t('ovs:generic.yes')) {
+                        var action = configure === true ? '/configure_vpool_for_host' : '/unconfigure_vpool_for_host';
+                        generic.alertInfo(
+                            $.t('ovs:pmachines.configure.vpool.started'),
+                            $.t('ovs:pmachines.configure.vpool.started_msg', { which: (action === '/configure_vpool_for_host' ? 'Configuration' : 'Unconfiguration') })
+                        );
+                        api.post('pmachines/' + pmachine_guid + action, {
+                            data: { vpool_guid: self.vPool().guid() }
+                        })
+                        .then(shared.tasks.wait)
+                        .done(function() {
+                            generic.alertSuccess(
+                                $.t('ovs:pmachines.configure.vpool.success'),
+                                $.t('ovs:pmachines.configure.vpool.success_msg', { which: (action === '/configure_vpool_for_host' ? 'configured' : 'unconfigured') })
+                            );
+                        })
+                        .fail(function(error) {
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:pmachines.configure.vpool.failed', {
+                                    which: (action === '/configure_vpool_for_host' ? 'configure' : 'unconfigure'),
+                                    why: error
+                                })
+                            );
+                        });
+                    }
+                });
+            }
+            self.updatingStorageRouters(false);
         };
 
         self.addStorageRouter = function(sr) {

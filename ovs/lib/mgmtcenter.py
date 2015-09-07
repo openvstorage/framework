@@ -97,3 +97,44 @@ class MgmtCenterController(object):
         if mgmt_center_client is not None:
             return mgmt_center_client.is_host_configured(pmachine.ip)
         return False
+
+    @staticmethod
+    @celery.task(name='ovs.mgmtcenter.configure_vpool_for_host')
+    def configure_vpool_for_host(pmachine_guid, vpool_guid):
+        pmachine = PMachine(pmachine_guid)
+        mgmt_center_client = None
+        try:
+            mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
+        except Exception as ex:
+            logger.error('Cannot get management center client: {0}'.format(ex))
+        if mgmt_center_client is not None:
+            logger.info('Configuring vPool {0} on host {1}'.format(vpool_guid, pmachine.name))
+            mgmt_center_client.configure_vpool_for_host(vpool_guid, pmachine.ip)
+
+    @staticmethod
+    @celery.task(name='ovs.mgmtcenter.unconfigure_vpool_for_host')
+    def unconfigure_vpool_for_host(pmachine_guid, vpool_guid):
+        pmachine = PMachine(pmachine_guid)
+        mgmt_center_client = None
+        try:
+            mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
+        except Exception as ex:
+            logger.error('Cannot get management center client: {0}'.format(ex))
+        if mgmt_center_client is not None:
+            logger.info('Unconfiguring vPool {0} on host {1}'.format(vpool_guid, pmachine.name))
+            mgmt_center_client.unconfigure_vpool_for_host(vpool_guid, False, pmachine.ip)
+
+    @staticmethod
+    @celery.task(name='ovs.mgmtcenter.is_host_configured_for_vpool')
+    def is_host_configured_for_vpool(pmachine_guid, vpool_guid):
+        pmachine = PMachine(pmachine_guid)
+        mgmt_center_client = None
+        try:
+            mgmt_center_client = Factory.get_mgmtcenter(pmachine=pmachine)
+        except Exception as ex:
+            if pmachine.mgmtcenter_guid:
+                logger.error('Cannot get management center client: {0}'.format(ex))
+
+        if mgmt_center_client is not None:
+            return mgmt_center_client.is_host_configured_for_vpool(vpool_guid, pmachine.ip)
+        return False
