@@ -56,48 +56,37 @@ class OpenStack(object):
                                                   auth_url = 'http://{0}:35357/v2.0'.format(ip),
                                                   service_type="volumev2")
         self.management = OpenStackManagement(cinder_client = self.cinder_client)
-        self.config_cinder = False
         self.STATE_MAPPING = {'up': 'RUNNING'}
 
         logger.debug('Init complete')
 
-    def configure_vpool(self, vpool_name, ip):
-        if self.config_cinder:
-            try:
-                return self.management.configure_vpool(vpool_name, ip)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "configure_vpool" failed {0}'.format(ex))
-        else:
-            logger.info('Cinder configuration is disabled')
+    def configure_vpool_for_host(self, vpool_guid, ip):
+        try:
+            return self.management.configure_vpool_for_host(vpool_guid, ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "configure_vpool_for_host" failed {0}'.format(ex))
+            raise ex
 
-    def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
-        if self.config_cinder:
-            try:
-                return self.management.unconfigure_vpool(vpool_name, remove_volume_type, ip)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "unconfigure_vpool" failed {0}'.format(ex))
-        else:
-            logger.info('Cinder configuration is disabled')
+    def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
+        try:
+            return self.management.unconfigure_vpool_for_host(vpool_guid, remove_volume_type, ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "unconfigure_vpool_for_host" failed {0}'.format(ex))
+            raise ex
 
     def configure_host(self, ip):
-        if self.config_cinder:
-            try:
-                return self.management.configure_host(ip)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "configure_host" failed {0}'.format(ex))
-                raise ex
-        else:
-            logger.info('Cinder configuration is disabled')
+        try:
+            return self.management.configure_host(ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "configure_host" failed {0}'.format(ex))
+            raise ex
 
     def unconfigure_host(self, ip):
-        if self.config_cinder:
-            try:
-                return self.management.unconfigure_host(ip)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
-                raise ex
-        else:
-            logger.info('Cinder configuration is disabled')
+        try:
+            return self.management.unconfigure_host(ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "unconfigure_host" failed {0}'.format(ex))
+            raise ex
 
     def get_host_status_by_ip(self, host_ip):
         """
@@ -279,11 +268,15 @@ class OpenStack(object):
         return vm_info
 
     def is_host_configured(self, ip):
-        if self.config_cinder:
-            try:
-                return self.management.is_host_configured(ip)
-            except (SystemExit, Exception) as ex:
-                logger.error('Management action "is_host_configured" failed {0}'.format(ex))
-        else:
-            logger.info('Cinder configuration is disabled')
+        try:
+            return self.management.is_host_configured(ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "is_host_configured" failed {0}'.format(ex))
+        return False
+
+    def is_host_configured_for_vpool(self, vpool_guid, ip):
+        try:
+            return self.management.is_host_configured_for_vpool(vpool_guid, ip)
+        except (SystemExit, Exception) as ex:
+            logger.error('Management action "is_host_configured_for_vpool" failed {0}'.format(ex))
         return False

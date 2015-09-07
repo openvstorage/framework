@@ -27,16 +27,17 @@ define([
         self.loadConfigured = undefined;
 
         // Observables
-        self.edit           = ko.observable(false);
-        self.loading        = ko.observable(false);
-        self.loaded         = ko.observable(false);
-        self.guid           = ko.observable(guid);
-        self.name           = ko.observable();
-        self.ipAddress      = ko.observable();
-        self.hvtype         = ko.observable();
-        self.mgmtCenterGuid = ko.observable();
-        self.backupValue    = ko.observable();
-        self.isConfigured   = ko.observable(false);
+        self.edit              = ko.observable(false);
+        self.loading           = ko.observable(false);
+        self.loaded            = ko.observable(false);
+        self.guid              = ko.observable(guid);
+        self.name              = ko.observable();
+        self.ipAddress         = ko.observable();
+        self.hvtype            = ko.observable();
+        self.mgmtCenterGuid    = ko.observable();
+        self.backupValue       = ko.observable();
+        self.isConfigured      = ko.observable(false);
+        self.isVPoolConfigured = ko.observable({});
 
         // Functions
         self.fillData = function(data) {
@@ -65,13 +66,33 @@ define([
                     });
             }).promise();
         };
-        self.loadConfigurationState = function() {
+        self.loadHostConfigurationState = function() {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadConfigured)) {
-                    self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_configured')
+                    self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_host_configured')
                         .then(self.shared.tasks.wait)
                         .done(function(data) {
                             self.isConfigured(data);
+                            deferred.resolve();
+                        })
+                        .fail(deferred.reject);
+                } else {
+                    deferred.reject();
+                }
+            }).promise();
+        };
+        self.loadVPoolConfigurationState = function(vpoolGuid) {
+            return $.Deferred(function(deferred) {
+                if (generic.xhrCompleted(self.loadConfigured)) {
+                    self.load();
+                    self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_host_configured_for_vpool', {
+                        queryparams: { vpool_guid: vpoolGuid }
+                    })
+                        .then(self.shared.tasks.wait)
+                        .done(function(data) {
+                            var configuredVPools = self.isVPoolConfigured();
+                            configuredVPools[vpoolGuid] = data;
+                            self.isVPoolConfigured(configuredVPools);
                             deferred.resolve();
                         })
                         .fail(deferred.reject);
