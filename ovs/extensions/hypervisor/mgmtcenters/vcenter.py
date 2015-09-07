@@ -73,10 +73,10 @@ class VCenter(object):
         """
         return self.sdk.get_hosts()
 
-    def configure_vpool(self, vpool_name, ip):
+    def configure_vpool_for_host(self, vpool_guid, ip):
         pass
 
-    def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
+    def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
         pass
 
     def get_guests(self):
@@ -140,6 +140,12 @@ class VCenter(object):
         'name': 'instance1'}
         """
         return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
+
+    def is_host_configured_for_vpool(self, vpool_guid, ip):
+        _ = self
+        _ = ip
+        _ = vpool_guid
+        return False
 
     def is_host_configured(self, ip):
         _ = self
