@@ -84,7 +84,6 @@ define([
         self.loadVPoolConfigurationState = function(vpoolGuid) {
             return $.Deferred(function(deferred) {
                 if (generic.xhrCompleted(self.loadConfigured)) {
-                    self.load();
                     self.loadConfigured = api.get('pmachines/' + self.guid() + '/is_host_configured_for_vpool', {
                         queryparams: { vpool_guid: vpoolGuid }
                     })

@@ -45,6 +45,7 @@ class OpenStackManagement(object):
         self._cinder_installed = self.client.file_exists(self._CINDER_CONF)
         self._driver_location = OSManager.get_openstack_package_base_path()
         self._openstack_users = OSManager.get_openstack_users()
+        self._devstack_driver = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'
 
         try:
             self._is_devstack = 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep || true'))
@@ -72,13 +73,27 @@ class OpenStackManagement(object):
 
         # 1. Check driver code
         if self._is_devstack is True:
-            if not self.client.file_exists(filename = '/opt/stack/cinder/cinder/volume/drivers/openvstorage.py'):
+            if not self.client.file_exists(filename = self._devstack_driver):
+                logger.info('  File "{0}" does not exist'.format(self._devstack_driver))
                 return False
         else:
             if not self.client.file_exists(filename = '{0}/cinder/volume/drivers/openvstorage.py'.format(self._driver_location)):
+                logger.info('  File "{0}/cinder/volume/drivers/openvstorage.py" does not exist'.format(self._driver_location))
                 return False
 
-        # 2. Check patches
+        # 2. Check configured users
+        ovs_id = self.client.run('id -u ovs')
+        if not ovs_id:
+            logger.info('Failed to determine the OVS user group ID')
+            return False
+
+        users = ['libvirt-qemu', 'stack'] if self._is_devstack is True else self._openstack_users
+        for user in users:
+            if '{0}(ovs)'.format(ovs_id) not in self.client.run('id -a {0}'.format(user)):
+                logger.info('User "{0}" is not part of the OVS user group')
+                return False
+
+        # 3. Check patches
         nova_base_path = self._get_base_path('nova')
         cinder_base_path = self._get_base_path('cinder')
         if self._is_devstack is True:
@@ -93,20 +108,23 @@ class OpenStackManagement(object):
         with open(nova_volume_file, 'r') as nova_vol_file:
             file_contents = nova_vol_file.readlines()
             if not [line for line in file_contents if line.startswith('class LibvirtFileVolumeDriver(LibvirtBaseVolumeDriver):')]:
+                logger.info('File "{0}" is not configured properly'.format(nova_volume_file))
                 return False
 
         with open(nova_driver_file, 'r') as nova_driv_file:
             file_contents = nova_driv_file.readlines()
             if not [line for line in file_contents if 'file=nova.virt.libvirt.volume.LibvirtFileVolumeDriver' in line]:
+                logger.info('File "{0}" is not configured properly'.format(nova_driver_file))
                 return False
 
         if os.path.exists(cinder_brick_initiator_file):
             with open(cinder_brick_initiator_file, 'r') as cinder_brick_init:
                 file_contents = cinder_brick_init.readlines()
                 if not [line for line in file_contents if 'elif protocol in ["LOCAL", "FILE"]:' in line]:
+                    logger.info('File "{0}" is not configured properly'.format(cinder_brick_initiator_file))
                     return False
 
-        # 3. Check messaging driver configuration
+        # 4. Check messaging driver configuration
         nova_messaging_driver = 'nova.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
         cinder_messaging_driver = 'cinder.openstack.common.notifier.rpc_notifier' if self._stack_version == 'juno' else 'messaging'
 
@@ -124,11 +142,16 @@ class OpenStackManagement(object):
                     host_configured &= cfg.get("DEFAULT", "notify_on_state_change") == "vm_and_task_state"
 
         if host_configured is False:
+            logger.info('Nova and/or Cinder configuration files are not configured properly')
             return host_configured
 
-        # 4. Check events consumer service
+        # 5. Check events consumer service
         service_name = 'ovs-openstack-events-consumer'
-        return ServiceManager.has_service(service_name, self.client) and ServiceManager.get_service_status(service_name, self.client) is True
+        if not (ServiceManager.has_service(service_name, self.client) and ServiceManager.get_service_status(service_name, self.client) is True):
+            logger.info('Service "{0}" is not configured properly'.format(service_name))
+            return False
+
+        return True
 
     def is_host_configured_for_vpool(self, vpool_guid, ip):
         if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
@@ -141,22 +164,26 @@ class OpenStackManagement(object):
             cfg = remote.RawConfigParser()
             cfg.read([self._CINDER_CONF])
             if not cfg.has_section(vpool.name):
+                logger.info('Section "{0}" was not found in cinder configuration file'.format(vpool.name))
                 return False
 
             for key, value in {"volume_driver": "cinder.volume.drivers.openvstorage.OVSVolumeDriver",
                                "volume_backend_name": vpool.name,
                                "vpool_name": vpool.name}.iteritems():
                 if cfg.get(vpool.name, key) != value:
+                    logger.info('Configuration parameter "{0}" does not contain the expected value "{1}"'.format(key, value))
                     return False
 
             enabled_backends = []
             if cfg.has_option("DEFAULT", "enabled_backends"):
                 enabled_backends = cfg.get("DEFAULT", "enabled_backends").split(", ")
             if vpool.name not in enabled_backends:
+                logger.info('vPool {0} has not been added to the enabled backends property'.format(vpool.name))
                 return False
 
         # 2. Check volume type
         if self.cinder_client and not [volume_type for volume_type in self.cinder_client.volume_types.list() if volume_type.name == vpool.name]:
+            logger.info('Cinder client does not contain a volume of type "{0}"'.format(vpool.name))
             return False
 
         return True
@@ -385,7 +412,7 @@ class OpenStackManagement(object):
         logger.info('*** Unconfiguring host with IP {0} ***'.format(ip))
         logger.info(' Removing driver code')
         if self._is_devstack is True:
-            self.client.file_delete('/opt/stack/cinder/cinder/volume/drivers/openvstorage.py')
+            self.client.file_delete(self._devstack_driver)
         else:
             self.client.file_delete('{0}/cinder/volume/drivers/openvstorage.py'.format(self._driver_location))
 
