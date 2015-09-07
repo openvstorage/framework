@@ -138,6 +138,7 @@ define([
                                 if (sadata.hasOwnProperty(storageRouter.guid())) {
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
                                     if (storageRouter.pMachine() !== undefined) {
+                                        storageRouter.pMachine().load();
                                         storageRouter.pMachine().loadVPoolConfigurationState(self.vPool().guid());
                                     }
                                 }
