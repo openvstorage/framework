@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api', 'ovs/shared',
-    'viewmodels/containers/vdisk', 'viewmodels/containers/disk'
-], function($, ko, generic, api, shared, VDisk, Disk) {
+    'viewmodels/containers/vdisk', 'viewmodels/containers/disk', 'viewmodels/containers/pmachine'
+], function($, ko, generic, api, shared, VDisk, Disk, PMachine) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -189,10 +189,15 @@ define([
             generic.trySet(self.machineId, data, 'machineid');
             generic.trySet(self.status, data, 'status', generic.lower);
             generic.trySet(self.failoverMode, data, 'failover_mode', generic.lower);
-            generic.trySet(self.pMachineGuid, data, 'pmachine_guid');
             generic.trySet(self.nodeType, data, 'node_type');
             if (data.hasOwnProperty('vpools_guids')) {
                 self.vPoolGuids = data.vpools_guids;
+            }
+            if (data.hasOwnProperty('pmachine_guid')) {
+                if (data.pmachine_guid !== self.pMachineGuid()) {
+                    self.pMachineGuid(data.pmachine_guid);
+                    self.pMachine(new PMachine(data.pmachine_guid))
+                }
             }
             if (data.hasOwnProperty('storagedrivers_guids')) {
                 self.storageDriverGuids = data.storagedrivers_guids;

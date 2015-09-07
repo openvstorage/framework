@@ -406,7 +406,18 @@
             "missingmgmtcenter": "Host is not yet linked to the correct management center"
         },
         "configure": {
-            "warning": "Are you want you want to __what__ __which__?"
+            "host": {
+                "warning": "Are you want you want to __what__ __which__?"
+            },
+            "vpool": {
+                "failed": "Failed to __which__ vPool",
+                "started": "Started",
+                "started_msg": "__which__ commenced",
+                "success": "Success",
+                "success_msg": "Successfully __which__ vPool",
+                "warning": "Are you sure you want to __what__ the vPool?"
+            }
+
         },
         "delete": {
             "warning": "Are you sure you want to delete __what__?",

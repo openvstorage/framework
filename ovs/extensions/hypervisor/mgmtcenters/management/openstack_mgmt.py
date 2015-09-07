@@ -19,6 +19,7 @@ import os
 import time
 import datetime
 from ConfigParser import RawConfigParser
+from ovs.dal.hybrids.vpool import VPool
 from ovs.extensions.generic.remote import Remote
 from ovs.extensions.generic.sshclient import SSHClient
 from ovs.extensions.os.os import OSManager
@@ -43,6 +44,7 @@ class OpenStackManagement(object):
         self._nova_installed = self.client.file_exists(self._NOVA_CONF)
         self._cinder_installed = self.client.file_exists(self._CINDER_CONF)
         self._driver_location = OSManager.get_openstack_package_base_path()
+        self._openstack_users = OSManager.get_openstack_users()
 
         try:
             self._is_devstack = 'stack' in str(self.client.run('ps aux | grep SCREEN | grep stack | grep -v grep || true'))
@@ -66,7 +68,7 @@ class OpenStackManagement(object):
     def is_host_configured(self, ip):
         if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
             logger.warning('Host configured: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
-            return
+            return False
 
         # 1. Check driver code
         if self._is_devstack is True:
@@ -128,61 +130,93 @@ class OpenStackManagement(object):
         service_name = 'ovs-openstack-events-consumer'
         return ServiceManager.has_service(service_name, self.client) and ServiceManager.get_service_status(service_name, self.client) is True
 
-    def configure_vpool(self, vpool_name, ip):
+    def is_host_configured_for_vpool(self, vpool_guid, ip):
+        if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
+            logger.warning('vPool configured: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
+            return False
+
+        # 1. Check cinder driver
+        vpool = VPool(vpool_guid)
+        with Remote(ip, [RawConfigParser], 'root') as remote:
+            cfg = remote.RawConfigParser()
+            cfg.read([self._CINDER_CONF])
+            if not cfg.has_section(vpool.name):
+                return False
+
+            for key, value in {"volume_driver": "cinder.volume.drivers.openvstorage.OVSVolumeDriver",
+                               "volume_backend_name": vpool.name,
+                               "vpool_name": vpool.name}.iteritems():
+                if cfg.get(vpool.name, key) != value:
+                    return False
+
+            enabled_backends = []
+            if cfg.has_option("DEFAULT", "enabled_backends"):
+                enabled_backends = cfg.get("DEFAULT", "enabled_backends").split(", ")
+            if vpool.name not in enabled_backends:
+                return False
+
+        # 2. Check volume type
+        if self.cinder_client and not [volume_type for volume_type in self.cinder_client.volume_types.list() if volume_type.name == vpool.name]:
+            return False
+
+        return True
+
+    def configure_vpool_for_host(self, vpool_guid, ip):
         if (self._is_devstack is False and self._is_openstack is False) or self._cinder_installed is False or self._nova_installed is False:
             logger.warning('Configure vPool: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
 
-        logger.debug('configure_vpool {0} started'.format(vpool_name))
-
+        vpool = VPool(vpool_guid)
+        logger.debug('configure_vpool {0} started'.format(vpool.name))
         # 1. Configure Cinder driver
         with Remote(ip, [RawConfigParser, open], 'root') as remote:
             changed = False
             cfg = remote.RawConfigParser()
             cfg.read([self._CINDER_CONF])
-            if not cfg.has_section(vpool_name):
+            if not cfg.has_section(vpool.name):
                 changed = True
-                cfg.add_section(vpool_name)
-                cfg.set(vpool_name, "volume_driver", "cinder.volume.drivers.openvstorage.OVSVolumeDriver")
-                cfg.set(vpool_name, "volume_backend_name", vpool_name)
-                cfg.set(vpool_name, "vpool_name", vpool_name)
+                cfg.add_section(vpool.name)
+                cfg.set(vpool.name, "volume_driver", "cinder.volume.drivers.openvstorage.OVSVolumeDriver")
+                cfg.set(vpool.name, "volume_backend_name", vpool.name)
+                cfg.set(vpool.name, "vpool_name", vpool.name)
             enabled_backends = []
             if cfg.has_option("DEFAULT", "enabled_backends"):
                 enabled_backends = cfg.get("DEFAULT", "enabled_backends").split(", ")
-            if vpool_name not in enabled_backends:
+            if vpool.name not in enabled_backends:
                 changed = True
-                enabled_backends.append(vpool_name)
+                enabled_backends.append(vpool.name)
                 cfg.set("DEFAULT", "enabled_backends", ", ".join(enabled_backends))
             if changed is True:
                 with remote.open(self._CINDER_CONF, "w") as fp:
                     cfg.write(fp)
 
         # 2. Create volume type
-        if self.cinder_client and not [volume_type for volume_type in self.cinder_client.volume_types.list() if volume_type.name == vpool_name]:
-            volume_type = self.cinder_client.volume_types.create(vpool_name)
-            volume_type.set_keys(metadata={'volume_backend_name': vpool_name})
+        if self.cinder_client and not [volume_type for volume_type in self.cinder_client.volume_types.list() if volume_type.name == vpool.name]:
+            volume_type = self.cinder_client.volume_types.create(vpool.name)
+            volume_type.set_keys(metadata={'volume_backend_name': vpool.name})
 
         # 3. Restart processes
         self._restart_processes()
-        logger.debug('configure_vpool {0} completed'.format(vpool_name))
+        logger.debug('configure_vpool {0} completed'.format(vpool.name))
 
-    def unconfigure_vpool(self, vpool_name, remove_volume_type, ip):
+    def unconfigure_vpool_for_host(self, vpool_guid, remove_volume_type, ip):
         if self._is_devstack is False and self._is_openstack is False or self._cinder_installed is False or self._nova_installed is False:
             logger.warning('Unconfigure vPool: No OpenStack nor DevStack installation detected or Cinder and Nova plugins are not installed')
             return
 
+        vpool = VPool(vpool_guid)
         with Remote(ip, [RawConfigParser, open], 'root') as remote:
             changed = False
             cfg = remote.RawConfigParser()
             cfg.read([self._CINDER_CONF])
-            if cfg.has_section(vpool_name):
+            if cfg.has_section(vpool.name):
                 changed = True
-                cfg.remove_section(vpool_name)
+                cfg.remove_section(vpool.name)
             if cfg.has_option("DEFAULT", "enabled_backends"):
                 enabled_backends = cfg.get("DEFAULT", "enabled_backends").split(", ")
-                if vpool_name in enabled_backends:
+                if vpool.name in enabled_backends:
                     changed = True
-                    enabled_backends.remove(vpool_name)
+                    enabled_backends.remove(vpool.name)
                     cfg.set("DEFAULT", "enabled_backends", ", ".join(enabled_backends))
             if changed is True:
                 with remote.open(self._CINDER_CONF, "w") as fp:
@@ -190,7 +224,7 @@ class OpenStackManagement(object):
 
         if remove_volume_type and self.cinder_client:
             for volume_type in self.cinder_client.volume_types.list():
-                if volume_type.name == vpool_name:
+                if volume_type.name == vpool.name:
                     try:
                         self.cinder_client.volume_types.delete(volume_type.id)
                     except Exception as ex:
@@ -242,7 +276,7 @@ class OpenStackManagement(object):
 
         # 2. Configure users and groups
         logger.info('  Add users to group ovs')
-        users = ['libvirt-qemu', 'stack'] if self._is_devstack is True else OSManager.get_openstack_users()
+        users = ['libvirt-qemu', 'stack'] if self._is_devstack is True else self._openstack_users
         for user in users:
             self.client.run('usermod -a -G ovs {0}'.format(user))
 
@@ -357,7 +391,7 @@ class OpenStackManagement(object):
 
         # 2. Removing users from group
         logger.info('  Removing users from group ovs')
-        for user in ['libvirt-qemu', 'stack'] if self._is_devstack is True else OSManager.get_openstack_users():
+        for user in ['libvirt-qemu', 'stack'] if self._is_devstack is True else self._openstack_users:
             self.client.run('deluser {0} ovs'.format(user))
 
         # 3. Revert patches
@@ -435,7 +469,6 @@ class OpenStackManagement(object):
             ServiceManager.stop_service(service_name, self.client)
             ServiceManager.disable_service(service_name, self.client)
             ServiceManager.remove_service(service_name, self.client)
-
 
     @staticmethod
     def _get_base_path(component):

@@ -684,7 +684,7 @@ class StorageRouterController(object):
         mgmt_center = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmt_center:
             if parameters['integratemgmt'] is True:
-                mgmt_center.configure_vpool(vpool_name, storagerouter.pmachine.ip)
+                mgmt_center.configure_vpool_for_host(vpool.guid, storagerouter.pmachine.ip)
         else:
             logger.info('Storagerouter {0} does not have management center'.format(storagerouter.name))
 
@@ -802,7 +802,7 @@ class StorageRouterController(object):
         logger.debug('Unconfigure vPool from MgmtCenter')
         mgmtcenter = Factory.get_mgmtcenter(storagerouter.pmachine)
         if mgmtcenter:
-            mgmtcenter.unconfigure_vpool(vpool.name, not storagedrivers_left, storagerouter.pmachine.ip)
+            mgmtcenter.unconfigure_vpool_for_host(vpool.guid, not storagedrivers_left, storagerouter.pmachine.ip)
 
         # KVM pool
         if pmachine.hvtype == 'KVM':

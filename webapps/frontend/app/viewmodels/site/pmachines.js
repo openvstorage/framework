@@ -180,7 +180,7 @@ define([
                                     if (pmachine.originalMgmtCenterGuid() === undefined || pmachine.originalMgmtCenterGuid() === null) {
                                         pmachine.originalMgmtCenterGuid(pmachine.mgmtCenterGuid());
                                     }
-                                    pmachine.loadConfigurationState();
+                                    pmachine.loadHostConfigurationState();
                                 }
                             });
                         })
@@ -245,7 +245,7 @@ define([
             });
             if (pmachine !== undefined) {
                 app.showMessage(
-                    $.t('ovs:pmachines.configure.warning', { what: configure === true ? 'configure' : 'unconfigure', which: pmachine.name() }),
+                    $.t('ovs:pmachines.configure.host.warning', { what: configure === true ? 'configure' : 'unconfigure', which: pmachine.name() }),
                     $.t('ovs:generic.areyousure'),
                     [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
                 )
