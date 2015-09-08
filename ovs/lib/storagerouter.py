@@ -557,6 +557,7 @@ class StorageRouterController(object):
                                                    fd_namespace='fd-{0}-{1}'.format(vpool_name, vpool.guid))
         storagedriver_config.configure_event_publisher(events_amqp_routing_key=queue_volumerouterqueue,
                                                        events_amqp_uris=queue_urls)
+        storagedriver_config.configure_threadpool_component(num_threads=16)
         storagedriver_config.save(client, reload_config=False)
 
         DiskController.sync_with_reality(storagerouter.guid)
