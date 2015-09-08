@@ -176,7 +176,6 @@ class StorageRouterController(object):
         all_storagerouters = [storagerouter]
         if vpool is not None:
             all_storagerouters += [sd.storagerouter for sd in vpool.storagedrivers]
-        voldrv_service = 'volumedriver_{0}'.format(vpool_name)
 
         # Fetch clients services
         ip_client_map = {}
@@ -616,6 +615,7 @@ class StorageRouterController(object):
             template_name = 'ovs-ganesha'
         else:
             template_name = 'ovs-volumedriver'
+        voldrv_service = 'ovs-volumedriver_{0}'.format(vpool.name)
         ServiceManager.add_service(name=template_name, params=params, client=root_client, target_name=voldrv_service, additional_dependencies=dependencies)
 
         if storagerouter.pmachine.hvtype == 'VMWARE' and volumedriver_mode == 'classic':
