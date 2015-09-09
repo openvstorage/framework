@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,12 +22,14 @@ import time
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse, HttpResponseBadRequest
-from oauth2.decorators import json_response, limit, log
+from oauth2.decorators import auto_response, limit, log
 from oauth2.toolbox import Toolbox
 from ovs.dal.lists.userlist import UserList
 from ovs.dal.lists.rolelist import RoleList
 from ovs.dal.hybrids.client import Client
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('api', 'oauth2')
 
 
 class OAuth2TokenView(View):
@@ -37,7 +39,7 @@ class OAuth2TokenView(View):
 
     @log()
     @limit(amount=5, per=60, timeout=60)
-    @json_response()
+    @auto_response()
     def post(self, request, *args, **kwargs):
         """
         Handles token post
@@ -60,7 +62,7 @@ class OAuth2TokenView(View):
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
             if user.is_active is False:
                 return HttpResponseBadRequest, {'error': 'inactive_user'}
-            clients = [client for client in user.clients if client.ovs_type == 'FRONTEND' and client.grant_type == 'PASSWORD']
+            clients = [client for client in user.clients if client.ovs_type == 'INTERNAL' and client.grant_type == 'PASSWORD']
             if len(clients) != 1:
                 return HttpResponseBadRequest, {'error': 'unauthorized_client'}
             client = clients[0]
@@ -79,11 +81,13 @@ class OAuth2TokenView(View):
             if 'HTTP_AUTHORIZATION' not in request.META:
                 return HttpResponseBadRequest, {'error': 'missing_header'}
             _, password_hash = request.META['HTTP_AUTHORIZATION'].split(' ')
-            client_id, client_secret = base64.decodestring(password_hash).split(':', 1)
+            client_id, client_secret = base64.b64decode(password_hash).split(':', 1)
             try:
                 client = Client(client_id)
                 if client.grant_type != 'CLIENT_CREDENTIALS':
                     return HttpResponseBadRequest, {'error': 'invalid_grant'}
+                if client.client_secret != client_secret:
+                    return HttpResponseBadRequest, {'error': 'invalid_client'}
                 if not client.user.is_active:
                     return HttpResponseBadRequest, {'error': 'inactive_user'}
                 try:
@@ -94,7 +98,8 @@ class OAuth2TokenView(View):
                 return HttpResponse, {'access_token': access_token.access_token,
                                       'token_type': 'bearer',
                                       'expires_in': 3600}
-            except:
+            except Exception as ex:
+                logger.exception('Error matching client: {0}'.format(ex))
                 return HttpResponseBadRequest, {'error': 'invalid_client'}
         else:
             return HttpResponseBadRequest, {'error': 'unsupported_grant_type'}

@@ -1,5 +1,5 @@
-#!/usr/bin/python2
-#  Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+#  Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -125,7 +125,7 @@ class LotsOfObjects(TestCase):
         Cleans all disks and machines
         """
         machine = TestMachine()
-        keys = DataList.get_pks(machine._namespace, machine._name)
+        keys = DataList.get_pks(machine._namespace, machine._classname)
         for guid in keys:
             try:
                 machine = TestMachine(guid)
@@ -133,15 +133,15 @@ class LotsOfObjects(TestCase):
                     disk.delete()
                 machine.delete()
             except (ObjectNotFoundException, ValueError):
-                DataList.delete_pk(machine._namespace, machine._name, guid)
+                pass
         disk = TestDisk()
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         for guid in keys:
             try:
                 disk = TestDisk(guid)
                 disk.delete()
             except (ObjectNotFoundException, ValueError):
-                DataList.delete_pk(disk._namespace, disk._name, guid)
+                pass
 
 if __name__ == '__main__':
     import unittest

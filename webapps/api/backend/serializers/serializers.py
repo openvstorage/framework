@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ class FullSerializer(serializers.Serializer):
         super(FullSerializer, self).__init__(*args, **kwargs)
         self.hybrid = hybrid
         for prop in self.hybrid._properties:
-            if not 'password' in prop.name or allow_passwords:
+            if 'password' not in prop.name or allow_passwords:
                 self.fields[prop.name] = FullSerializer._map_type_to_field(prop.property_type)
         for dynamic in self.hybrid._dynamics:
             if contents is None or (('_dynamics' in contents or dynamic.name in contents)
@@ -89,6 +89,8 @@ class FullSerializer(serializers.Serializer):
             return serializers.IntegerField(required=False)
         if field_type is bool:
             return serializers.BooleanField(required=False)
+        if field_type is dict:
+            return serializers.WritableField(required=False)
         return serializers.Field()
 
     class Meta:

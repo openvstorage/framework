@@ -1,9 +1,8 @@
-
                      Open vStorage
-          Copyright 2013-2014 CloudFounders NV
+          Copyright 2013-2014 Open vStorage NV
 
         This product includes software developed at
-      CloudFounders NV (http://www.cloudfounders.com/).
+      Open vStorage NV (https://www.openvstorage.com/).
 
 
 This product includes and/or uses software developed by third parties. This
@@ -55,13 +54,6 @@ INCLUDED AND/OR USED SOFTWARE
     Suds-jurko                  LGPL 3
     Tornado                     Apache 2.0
 
-    ConfigObj                   BSD 3
-        Copyright (c) 2003-2010, Michael Foord. All rights reserved.
-        Copyright (c) 2014, Eli Courtwright, Rob Dennis. All rights reserved.
-        E-mails: fuzzyman AT voidspace DOT org DOT uk
-                 eli AT courtwright DOT org
-                 rdennis AT gmail DOT com
-
     Memcached                   BSD 3
         Copyright (c) 2003, Danga Interactive, Inc. All rights reserved.
 
@@ -105,11 +97,6 @@ INCLUDED AND/OR USED SOFTWARE
     Logstash                    Apache 2.0
         Copyright 2009-2013 Jordan Sissel, Pete Fritchman, and contributors.
 
-    Elastic search              Apache 2.0
-
-    Kibana                      Apache 2.0
-        Copyright 2012-2013 Elasticsearch BV
-
     PySNMP                      liberal BSD-style
         http://pysnmp.sourceforge.net/license.html
         Copyright (c) 2005-2014, Ilya Etingof
@@ -125,6 +112,11 @@ INCLUDED AND/OR USED SOFTWARE
         Copyright (c) 2013, Pete Fein
         All rights reserved.
 
+    timeago                     MIT             Custom modifications
+        Copyright (c) 2008-2013, Ryan McGeary (ryan -[at]- mcgeary [*dot*] org)
+
+    d3 slider                   BSD
+        Copyright (c) 2013, Bjorn Sandvik - http://blog.thematicmapping.org
 
 LICENSES
 

@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
 // limitations under the License.
 /*global define, window, require */
 define([
-    'jquery', 'plugins/router', 'bootstrap', 'i18next',
+    'jquery', 'plugins/router', 'durandal/system', 'durandal/activator', 'bootstrap', 'i18next',
     'ovs/shared', 'ovs/routing', 'ovs/messaging', 'ovs/generic', 'ovs/tasks',
     'ovs/authentication', 'ovs/api', 'ovs/plugins/cssloader', 'ovs/notifications'
-], function($, router, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
+], function($, router, system, activator, bootstrap, i18n, shared, routing, Messaging, generic, Tasks, Authentication, api, cssLoader, notifications) {
     "use strict";
     router.map(routing.mainRoutes)
           .buildNavigationModel()
@@ -64,13 +64,13 @@ define([
                     api.get('')
                         .then(function(metadata) {
                             return $.Deferred(function(mdDeferred) {
+                                self.shared.authentication.metadata = metadata.authentication_metadata;
                                 self.shared.user.username(undefined);
                                 self.shared.user.guid(undefined);
                                 self.shared.user.roles([]);
                                 if (!metadata.authenticated) {
-                                    window.localStorage.removeItem('accesstoken');
-                                    self.shared.authentication.accessToken(undefined);
-                                    router.navigate('/');
+                                    // This shouldn't be the case, but is checked anyway.
+                                    self.shared.authentication.logout();
                                     return mdDeferred.reject();
                                 }
                                 self.shared.user.username(metadata.username);
@@ -96,49 +96,79 @@ define([
                 self.shared.language = self.shared.defaultLanguage;
                 return self._translate();
             });
-            var activationTasks = [],
-                token = window.localStorage.getItem('accesstoken');
+            var token = window.localStorage.getItem('accesstoken'), state, expectedState;
+            if (token === null) {
+                token = generic.getCookie('accesstoken');
+                if (token !== null) {
+                    state = generic.getCookie('state');
+                    expectedState = window.localStorage.getItem('state');
+                    if (state === null || state !== expectedState) {
+                        token = null;
+                    } else {
+                        window.localStorage.setItem('accesstoken', token);
+                    }
+                    generic.removeCookie('accesstoken');
+                    generic.removeCookie('state');
+                }
+            }
             if (token !== null) {
                 self.shared.authentication.accessToken(token);
-                activationTasks.push(self.shared.authentication.dispatch(true));
             }
-            activationTasks.push($.Deferred(function(deferred) {
-                api.get('')
-                    .then(function(metadata) {
-                        var pluginHandlers = [], backendsActive = false;
-                        $.each(metadata.plugins, function(plugin, types) {
-                            if ($.inArray('gui', types) !== -1) {
-                                pluginHandlers.push($.Deferred(function(moduleDeferred) {
-                                    require(['ovs/routes/' + plugin], function(routes) {
-                                        routing.extraRoutes.push(routes.routes);
-                                        moduleDeferred.resolve();
+            return $.Deferred(function(activateDeferred) {
+                $.Deferred(function(metadataCheckDeferred) {
+                    api.get('')
+                        .done(function(metadata) {
+                            var metadataHandlers = [], backendsActive = false;
+                            $.each(metadata.plugins, function(plugin, types) {
+                                if ($.inArray('gui', types) !== -1) {
+                                    var moduleHandler = $.Deferred(function(translationDeferred) {
+                                        i18n.loadNamespace(plugin, function () {
+                                            translationDeferred.resolve();
+                                        });
+                                    }).promise();
+                                    moduleHandler.then(function() {
+                                        return $.Deferred(function(moduleDeferred) {
+                                            require(['ovs/hooks/' + plugin], function(hook) {
+                                                routing.extraRoutes.push(hook.routes);
+                                                routing.routePatches.push(hook.routePatches);
+                                                $.each(hook.dashboards, function(index, dashboard) {
+                                                    system.acquire('viewmodels/site/' + dashboard)
+                                                        .then(function(module) {
+                                                            var moduleInstance = new module();
+                                                            shared.hooks.dashboards.push({
+                                                                module: moduleInstance,
+                                                                activator: activator.create()
+                                                            });
+                                                        });
+                                                });
+                                                moduleDeferred.resolve();
+                                            });
+                                        }).promise();
                                     });
-                                }).promise());
-                                pluginHandlers.push($.Deferred(function(translationDeferred) {
-                                    i18n.loadNamespace(plugin, function () {
-                                        translationDeferred.resolve();
+                                    metadataHandlers.push(moduleHandler);
+                                }
+                                if ($.inArray('backend', types) !== -1 && !backendsActive) {
+                                    routing.siteRoutes.push({
+                                        route: 'backends',
+                                        moduleId: 'backends',
+                                        title: $.t('ovs:backends.title'),
+                                        titlecode: 'ovs:backends.title',
+                                        nav: true,
+                                        main: true
                                     });
-                                }).promise());
+                                    backendsActive = true;
+                                }
+                            });
+                            self.shared.authentication.metadata = metadata.authentication_metadata;
+                            if (metadata.authenticated) {
+                                metadataHandlers.push(self.shared.authentication.dispatch(true));
                             }
-                            if ($.inArray('backend', types) !== -1 && !backendsActive) {
-                                routing.siteRoutes.push({
-                                    route: 'backends',
-                                    moduleId: 'backends',
-                                    title: $.t('ovs:backends.title'),
-                                    titlecode: 'ovs:backends.title',
-                                    nav: true,
-                                    main: true
-                                });
-                                backendsActive = true;
-                            }
-                        });
-                        $.when.apply($, pluginHandlers).always(deferred.resolve);
-                    });
-            }).promise());
-            return $.Deferred(function(deferred) {
-                $.when.apply($, activationTasks)
+                            $.when.apply($, metadataHandlers).always(metadataCheckDeferred.resolve);
+                        })
+                        .fail(metadataCheckDeferred.resolve);
+                }).promise()
                     .then(router.activate)
-                    .always(deferred.resolve);
+                    .always(activateDeferred.resolve);
             }).promise();
         };
     };

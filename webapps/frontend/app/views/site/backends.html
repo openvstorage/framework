@@ -1,5 +1,5 @@
 <!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section>
-    <h2 data-i18n="ovs:backends.title"></h2>
-    <div data-bind="pager: { items: backends, headers: backendHeaders, initialLoad: backendsInitialLoad,
-                             viewportRefresh: refreshBackends, viewportRefreshInterval: 5000, controls: true }">
+    <div>
+        <h2 class="pull-left" data-i18n="ovs:backends.title"></h2>
+        <button class="btn btn-default pull-right" id="buttonAddBackend"
+                data-bind="click: addBackend, enable: $.inArray('manage', $root.shared.user.roles()) !== -1"
+                style="margin-top: 20px; margin-bottom: 10px;">
+            <span class="fa" data-i18n="[html]ovs:icons.add"></span>&nbsp;
+            <span data-i18n="ovs:backends.add"></span>
+        </button>
+    </div>
+    <div data-bind="pager: { loadData: loadBackends, headers: backendHeaders, refreshInterval: 5000, controls: true }" style="clear: both;">
         <table data-dummy="dummy">
             <tr data-part="vitem">
-                <td>
-                    <i data-bind="visible: loading" style="position: relative; left: -25px; margin-right: -15px;"
-                       class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                <td style="position: relative;">
+                    <span data-bind="visible: loading()" style="position: absolute; top: 7px; left: -15px;">
+                       <i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i>
+                    </span>
                     <!-- ko if: backendType() !== undefined -->
                         <a data-bind="text: name,
                                       attr: { href: $root.shared.routing.loadHash('backend-' + backendType().code() + '-detail', { guid: guid }) }"></a>
@@ -39,55 +47,15 @@ limitations under the License.
                 <td>
                     <div data-bind="status: {
                                         colors: {
-                                            green: false
+                                            blue: status() == 'new',
+                                            green: status() == 'running',
+                                            orange: status() == 'installing',
+                                            red: status() == 'failure',
+                                            black: status() == 'stopped'
                                         },
                                         defaultColor: 'lightgrey'
-                                    }"
+                                    }, tooltip: 'ovs:generic.states.backend.' + status()"
                          style="width: 14px; height: 14px;"></div>
-                </td>
-            </tr>
-            <tr data-part="vnew" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newBackend()">
-                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
-                <td>
-                    <span data-bind="dropdown: {
-                                         items: $root.backendTypes, target: backendType,
-                                         text: function(item) {
-                                             if (item !== undefined) {
-                                                 return $.t('ovs:generic.backendtypes.' + item.code());
-                                             }
-                                         }, key: 'guid', keyisfunction: true, small: true
-                                     }"></span>
-                </td>
-                <td>
-                    <i data-bind="click: function() {
-                                      if (name() !== undefined && name() !== '') {
-                                          $root.saveBackend();
-                                      }
-                                  },
-                                  style: { color: name() !== undefined && name() !== '' ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
-                </td>
-            </tr>
-            <tr data-part="vfirst" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1, with: $root.newBackend()">
-                <td><input type="text" data-bind="value: name, valueUpdate: 'input'" style="width: 200px;"/></td>
-                <td>
-                    <span data-bind="dropdown: {
-                                         items: $root.backendTypes, target: backendType,
-                                         text: function(item) {
-                                             if (item !== undefined) {
-                                                 return $.t('ovs:generic.backendtypes.' + item.code());
-                                             }
-                                         }, key: 'guid', keyisfunction: true, small: true
-                                     }"></span>
-                </td>
-                <td>
-                    <i data-bind="click: function() {
-                                      if (name() !== undefined && name() !== '') {
-                                          $root.saveBackend();
-                                      }
-                                  },
-                                  style: { color: name() !== undefined && name() !== '' ? 'black' : 'lightgrey' }"
-                       class="hand fa fa-fw" data-i18n="[html]ovs:icons.save"></i>
                 </td>
             </tr>
         </table>

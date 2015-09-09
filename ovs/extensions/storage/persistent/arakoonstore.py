@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,6 +100,13 @@ class ArakoonStore(object):
         Executes a nop command
         """
         return ArakoonStore._try(self._client.nop)
+
+    @locked()
+    def exists(self, key):
+        """
+        Check if key exists
+        """
+        return ArakoonStore._try(self._client.exists, key)
 
     @staticmethod
     def _try(method, *args, **kwargs):

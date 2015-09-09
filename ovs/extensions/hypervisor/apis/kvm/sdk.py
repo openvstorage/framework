@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,15 +17,17 @@ This module contains all code for using the KVM libvirt api
 """
 
 from xml.etree import ElementTree
-from threading import Lock
 import subprocess
 import os
 import glob
 import re
 import time
+import libvirt
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.system import System
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='kvm sdk')
+logger = LogHandler.get('extensions', name='kvm sdk')
 ROOT_PATH = '/etc/libvirt/qemu/'  # Get static info from here, or use dom.XMLDesc(0)
 RUN_PATH = '/var/run/libvirt/qemu/'  # Get live info from here
 
@@ -39,6 +41,7 @@ def _recurse(treeitem):
         result[child.tag] = _recurse(child)
         for key, item in child.items():
             result[child.tag][key] = item
+        result[child.tag]['<text>'] = child.text
     return result
 
 
@@ -65,30 +68,30 @@ class Sdk(object):
     This class contains all SDK related methods
     """
 
-    def __init__(self, host='localhost', login='root'):
+    def __init__(self, host='127.0.0.1', login='root'):
         logger.debug('Init libvirt')
-        import libvirt
-        self.states = {libvirt.VIR_DOMAIN_NOSTATE:  'NO STATE',
-                       libvirt.VIR_DOMAIN_RUNNING:  'RUNNING',
-                       libvirt.VIR_DOMAIN_BLOCKED:  'BLOCKED',
-                       libvirt.VIR_DOMAIN_PAUSED:   'PAUSED',
+        self.states = {libvirt.VIR_DOMAIN_NOSTATE: 'NO STATE',
+                       libvirt.VIR_DOMAIN_RUNNING: 'RUNNING',
+                       libvirt.VIR_DOMAIN_BLOCKED: 'BLOCKED',
+                       libvirt.VIR_DOMAIN_PAUSED: 'PAUSED',
                        libvirt.VIR_DOMAIN_SHUTDOWN: 'SHUTDOWN',
-                       libvirt.VIR_DOMAIN_SHUTOFF:  'TURNEDOFF',
-                       libvirt.VIR_DOMAIN_CRASHED:  'CRASHED'}
+                       libvirt.VIR_DOMAIN_SHUTOFF: 'TURNEDOFF',
+                       libvirt.VIR_DOMAIN_CRASHED: 'CRASHED'}
 
         self.libvirt = libvirt
         self.host = host
         self.login = login
         self._conn = None
-        self._ssh_client = None
+        self.ssh_client = None
         logger.debug('Init complete')
 
-    def _connect(self, attempt = 0):
+    def _connect(self, attempt=0):
         if self._conn:
             self._disconnect()  # Clean up existing conn
         logger.debug('Init connection: %s, %s, %s, %s', self.host, self.login, os.getgid(), os.getuid())
         try:
-            if self.host == 'localhost':  # Or host in (localips...):
+            if self.host.lower() in ['localhost', '127.0.0.1']:  # Or host in (localips...):
+                self.host = '127.0.0.1'
                 self._conn = self.libvirt.open('qemu:///system')  # Only local connection
             else:
                 self._conn = self.libvirt.open('qemu+ssh://{0}@{1}/system'.format(self.login, self.host))
@@ -130,6 +133,16 @@ class Sdk(object):
     def _get_nics(vm_object):
         tree = ElementTree.fromstring(vm_object.XMLDesc(0))
         return [_recurse(item) for item in tree.findall('devices/interface')]
+
+    @staticmethod
+    def _get_nova_name(vm_object):
+        tree = ElementTree.fromstring(vm_object.XMLDesc(0))
+        metadata = tree.findall('metadata')[0]
+        nova_instance_namespace_tag = metadata.getchildren()[0].tag
+        nova_instance_namespace = nova_instance_namespace_tag[nova_instance_namespace_tag.find('{') + 1:nova_instance_namespace_tag.find('}')]
+        instance = metadata.findall('{%s}instance' % nova_instance_namespace)[0]
+        name = instance.findall('{%s}name' % nova_instance_namespace)[0]
+        return name.text
 
     @staticmethod
     def _get_ram(vm_object):
@@ -210,12 +223,7 @@ class Sdk(object):
             # Cleaning up
             mountpoint = '/mnt/{0}'.format(match.group(1))
             filename = backingfilename.replace(mountpoint, '').strip('/')
-            if 'alias' in disk:
-                # A diskname was specified
-                diskname = disk['alias'].get('name', 'unknown')
-            else:
-                # No diskname specified. Using the .raw filename
-                diskname = filename.split('/')[-1].split('.')[0]
+            diskname = filename.split('/')[-1].split('.')[0]
 
             # Collecting data
             config['disks'].append({'filename': filename,
@@ -226,11 +234,13 @@ class Sdk(object):
             order += 1
             mountpoints.append(mountpoint)
 
-        vm_filename = self.ssh_run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host, username='root')
+        vm_filename = self.ssh_client.run("grep -l '<uuid>{0}</uuid>' {1}*.xml".format(vm_object.UUIDString(), ROOT_PATH))
         vm_filename = vm_filename.strip().split('/')[-1]
-        vm_location = self._get_unique_id()
+        vm_location = System.get_my_machine_id(self.ssh_client)
         vm_datastore = None
-        possible_datastores = self.ssh_run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
+        possible_datastores = self.ssh_client.run("find /mnt -name '{0}'".format(vm_filename)).split('\n')
         for datastore in possible_datastores:
             # Filter results so only the correct machineid/xml combinations are left over
             if '{0}/{1}'.format(vm_location, vm_filename) in datastore.strip():
@@ -238,7 +248,11 @@ class Sdk(object):
                     if mountpoint in datastore.strip():
                         vm_datastore = mountpoint
 
-        config['name'] = vm_object.name()
+        try:
+            config['name'] = self._get_nova_name(vm_object)
+        except Exception as ex:
+            logger.error('Cannot retrieve nova:name {0}'.format(ex))
+            config['name'] = vm_object.name()
         config['id'] = str(vm_object.UUIDString())
         config['backing'] = {'filename': '{0}/{1}'.format(vm_location, vm_filename),
                              'datastore': vm_datastore}
@@ -305,6 +319,8 @@ class Sdk(object):
         Delete domain from libvirt
         Try to delete all files from vpool (xml, .raw)
         """
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host, username='root')
         vm_object = None
         try:
             vm_object = self.get_vm_object(vmid)
@@ -313,7 +329,7 @@ class Sdk(object):
         found_files = self.find_devicename(devicename)
         if found_files is not None:
             for found_file in found_files:
-                self.ssh_run('rm {0}'.format(found_file))
+                self.ssh_client.file_delete(found_file)
                 logger.info('File on vpool deleted: {0}'.format(found_file))
         if vm_object:
             found_file = ''
@@ -326,7 +342,7 @@ class Sdk(object):
                 elif 'dev' in disk['source']:
                     found_file = disk['source']['dev']
                 if found_file and os.path.exists(found_file) and os.path.isfile(found_file):
-                    self.ssh_run('rm {0}'.format(found_file))
+                    self.ssh_client.file_delete(found_file)
                     logger.info('File on vpool deleted: {0}'.format(found_file))
             vm_object.undefine()
         elif disks_info:
@@ -334,7 +350,7 @@ class Sdk(object):
             for path, devicename in disks_info:
                 found_file = '{}/{}'.format(path, devicename)
                 if os.path.exists(found_file) and os.path.isfile(found_file):
-                    self.ssh_run('rm {0}'.format(found_file))
+                    self.ssh_client.file_delete(found_file)
                     logger.info('File on vpool deleted: {0}'.format(found_file))
         return True
 
@@ -354,6 +370,11 @@ class Sdk(object):
             if os.path.exists(found_file) and os.path.isfile(found_file):
                 matches.append(found_file)
         return matches if matches else None
+
+    def is_datastore_available(self, mountpoint):
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host, username='root')
+        return self.ssh_client.run("[ -d {0} ] && echo 'yes' || echo 'no'".format(mountpoint)) == 'yes'
 
     @authenticated
     def clone_vm(self, vmid, name, disks):
@@ -456,40 +477,8 @@ class Sdk(object):
         else:
             for network in networks:
                 options.append('--network {}'.format(','.join(network)))
-        self.ssh_run('{} {}'.format(command, ' '.join(options)))
+        if self.ssh_client is None:
+            self.ssh_client = SSHClient(self.host, username='root')
+        self.ssh_client.run('{0} {1}'.format(command, ' '.join(options)))
         if start is False:
-            self.ssh_run('virsh destroy {}'.format(name))
-
-    def _get_unique_id(self):
-        """
-        Gets the unique identifier from the KVM node connected to
-        """
-        # This needs to use this SSH client, as it need to be executed on the machine the SDK is connected to, and not
-        # on the machine running the code
-        output = self.ssh_run("ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort")
-        for mac in output.strip().split('\n'):
-            if mac.strip() != '000000000000':
-                return mac.strip()
-
-    def ssh_run(self, command):
-        """
-        Executes an SSH command in a locked context. Since the ssh client is shared in between processes,
-        the client should be reconnected before each new call, since another SDK instance running in the same process
-        could have connected the client to another node. By adding the connect and run in a locking context,
-        it is ensure that within a process the connect and run are executed sequentially.
-        """
-        if self._ssh_client is None:
-            logger.debug('Init SSH client')
-            from ovs.plugin.provider.remote import Remote
-            self._ssh_client = Remote.cuisine.api
-            self._ssh_client.lock = Lock()
-        try:
-            self._ssh_client.lock.acquire()
-            self._ssh_client.connect(self.host)
-            return self._ssh_client.run(command)
-        except SystemExit as sex:
-            # SystemExit kills the worker, WorkerLostError: Worker exited prematurely: exitcode 1.
-            # we need to cleanup but also trigger an exception
-            raise RuntimeError('Command "{}" returned SystemExit({})'.format(command, sex.message))
-        finally:
-            self._ssh_client.lock.release()
+            self.ssh_client.run('virsh destroy {0}'.format(name))

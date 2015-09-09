@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,13 +26,16 @@ from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
+from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
+from ovs.dal.lists.vpoollist import VPoolList
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vdisk import VDiskController
 from ovs.lib.messaging import MessageController
+from ovs.lib.mdsservice import MDSServiceController
 from ovs.log.logHandler import LogHandler
 from ovs.extensions.generic.volatilemutex import VolatileMutex
 
-logger = LogHandler('lib', name='vmachine')
+logger = LogHandler.get('lib', name='vmachine')
 
 
 class VMachineController(object):
@@ -266,6 +269,8 @@ class VMachineController(object):
 
         for disk in machine.vdisks:
             logger.debug('Deleting disk {0} with guid: {1}'.format(disk.name, disk.guid))
+            for junction in disk.mds_services:
+                junction.delete()
             disk.delete()
         logger.debug('Deleting vmachine {0} with guid {1}'.format(machine.name, machine.guid))
         machine.delete()
@@ -292,7 +297,7 @@ class VMachineController(object):
         if vm is not None:
             MessageController.fire(MessageController.Type.EVENT, {'type': 'vmachine_deleted',
                                                                   'metadata': {'name': vm.name}})
-            vm.delete(abandon=True)
+            vm.delete(abandon=['vdisks'])
 
     @staticmethod
     @celery.task(name='ovs.machine.rename_from_voldrv')
@@ -326,12 +331,12 @@ class VMachineController(object):
             if vm is None:
                 # The vMachine doesn't seem to exist, so it's likely the create didn't came trough
                 # Let's create it anyway
-                VMachineController.update_from_voldrv(new_name, storagedriver_id)
+                VMachineController.update_from_voldrv(new_name, storagedriver_id=storagedriver_id)
             vm = VMachineList.get_by_devicename_and_vpool(new_name, vpool)
             if vm is None:
                 raise RuntimeError('Could not create vMachine on rename. Aborting.')
             try:
-                VMachineController.sync_with_hypervisor(vm.guid, storagedriver_id)
+                VMachineController.sync_with_hypervisor(vm.guid, storagedriver_id=storagedriver_id)
                 vm.status = 'SYNC'
             except:
                 vm.status = 'SYNC_NOK'
@@ -444,22 +449,43 @@ class VMachineController(object):
     @log('VOLUMEDRIVER_TASK')
     def sync_with_hypervisor(vmachineguid, storagedriver_id=None):
         """
-        Updates a given vmachine with data retreived from a given pmachine
+        Updates a given vmachine with data retrieved from a given pmachine
         """
         try:
             vmachine = VMachine(vmachineguid)
-            if storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
+        except Exception as ex:
+            logger.info('Cannot get VMachine object: {0}'.format(str(ex)))
+            raise
+
+        vm_object = None
+        if vmachine.pmachine.mgmtcenter and storagedriver_id is not None and vmachine.devicename is not None:
+            try:
+                mgmt_center = Factory.get_mgmtcenter(vmachine.pmachine)
+                storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
+                logger.info('Syncing vMachine (name {}) with Management center {}'.format(vmachine.name, vmachine.pmachine.mgmtcenter.name))
+                vm_object = mgmt_center.get_vm_agnostic_object(devicename=vmachine.devicename,
+                                                               ip=storagedriver.storage_ip,
+                                                               mountpoint=storagedriver.mountpoint)
+            except Exception as ex:
+                logger.info('Error while fetching vMachine info from management center: {0}'.format(str(ex)))
+
+        if vm_object is None and storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
+            try:
                 # Only the vmachine was received, so base the sync on hypervisorid and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
                 logger.info('Syncing vMachine (name {})'.format(vmachine.name))
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisor_id)
-            elif storagedriver_id is not None and vmachine.devicename is not None:
+            except Exception as ex:
+                logger.info('Error while fetching vMachine info from hypervisor: {0}'.format(str(ex)))
+
+        if vm_object is None and storagedriver_id is not None and vmachine.devicename is not None:
+            try:
                 # Storage Driver id was given, using the devicename instead (to allow hypervisorid updates
                 # which can be caused by re-adding a vm to the inventory)
                 pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
                 hypervisor = Factory.get(pmachine)
-                if not hypervisor.file_exists(vmachine.vpool, hypervisor.clean_vmachine_filename(vmachine.devicename)):
+                if not hypervisor.file_exists(storagedriver, hypervisor.clean_vmachine_filename(vmachine.devicename)):
                     return
                 vmachine.pmachine = pmachine
                 vmachine.save()
@@ -470,20 +496,15 @@ class VMachineController(object):
                 vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
                                                                    ip=storagedriver.storage_ip,
                                                                    mountpoint=storagedriver.mountpoint)
-            else:
-                message = 'Not enough information to sync vmachine'
-                logger.info('Error: {0}'.format(message))
-                raise RuntimeError(message)
-        except Exception as ex:
-            logger.info('Error while fetching vMachine info: {0}'.format(str(ex)))
-            raise
+            except Exception as ex:
+                logger.info('Error while fetching vMachine info from hypervisor using devicename: {0}'.format(str(ex)))
 
         if vm_object is None:
-            message = 'Could not retreive hypervisor vmachine object'
+            message = 'Not enough information to sync vmachine'
             logger.info('Error: {0}'.format(message))
             raise RuntimeError(message)
-        else:
-            VMachineController.update_vmachine_config(vmachine, vm_object)
+
+        VMachineController.update_vmachine_config(vmachine, vm_object)
 
     @staticmethod
     @celery.task(name='ovs.machine.update_from_voldrv')
@@ -512,18 +533,18 @@ class VMachineController(object):
             pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
             mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
-                mutex.acquire(wait=5)
+                mutex.acquire(wait=120)
                 limit = 5
-                exists = hypervisor.file_exists(vpool, name)
+                exists = hypervisor.file_exists(storagedriver, name)
                 while limit > 0 and exists is False:
                     time.sleep(1)
-                    exists = hypervisor.file_exists(vpool, name)
+                    exists = hypervisor.file_exists(storagedriver, name)
                     limit -= 1
                 if exists is False:
-                    logger.info('Could not locate vmachine with name {0} on vpool {1}'.format(name, vpool))
+                    logger.info('Could not locate vmachine with name {0} on vpool {1}'.format(name, vpool.name))
                     vmachine = VMachineList.get_by_devicename_and_vpool(name, vpool)
                     if vmachine is not None:
-                        VMachineController.delete_from_voldrv(name, storagedriver_id)
+                        VMachineController.delete_from_voldrv(name, storagedriver_id=storagedriver_id)
                     return
             finally:
                 mutex.release()
@@ -542,7 +563,7 @@ class VMachineController(object):
 
             if pmachine.hvtype == 'KVM':
                 try:
-                    VMachineController.sync_with_hypervisor(vmachine.guid, storagedriver_id)
+                    VMachineController.sync_with_hypervisor(vmachine.guid, storagedriver_id=storagedriver_id)
                     vmachine.status = 'SYNC'
                 except:
                     vmachine.status = 'SYNC_NOK'
@@ -590,6 +611,7 @@ class VMachineController(object):
                             vdisk.devicename = disk['filename']
                             vdisk.volume_id = vdisk.storagedriver_client.get_volume_id(str(disk['backingfilename']))
                             vdisk.size = vdisk.info['volume_size']
+                            MDSServiceController.ensure_safety(vdisk)
                         # Update the disk with information from the hypervisor
                         if vdisk.vmachine is None:
                             MessageController.fire(MessageController.Type.EVENT,
@@ -646,3 +668,42 @@ class VMachineController(object):
                 if resolved_config.get(key) != new_resolved_config.get(key):
                     # @TODO: update the 'key' property on the disk.
                     logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))
+
+    @staticmethod
+    @celery.task(name='ovs.machine.update_vmachine_name')
+    def update_vmachine_name(instance_id, old_name, new_name):
+        """
+        Update a vMachine name: find vmachine by management center instance id, set new name
+        """
+        vmachine = None
+        for mgmt_center in MgmtCenterList.get_mgmtcenters():
+            mgmt = Factory.get_mgmtcenter(mgmt_center = mgmt_center)
+            try:
+                machine_info = mgmt.get_vmachine_device_info(instance_id)
+                file_name = machine_info['file_name']
+                host_name = machine_info['host_name']
+                vpool_name = machine_info['vpool_name']
+                storage_router = StorageRouterList.get_by_name(host_name)
+                machine_id = storage_router.machine_id
+                device_name = '{0}/{1}'.format(machine_id, file_name)
+                vp = VPoolList.get_vpool_by_name(vpool_name)
+                vmachine = VMachineList.get_by_devicename_and_vpool(device_name, vp)
+                if vmachine:
+                    break
+                vmachine = VMachineList.get_by_devicename_and_vpool(device_name, None)
+                if vmachine:
+                    break
+            except Exception as ex:
+                logger.info('Trying to get mgmt center failed for vmachine {0}. {1}'.format(old_name, ex))
+        if not vmachine:
+            logger.error('No vmachine found for name {0}'.format(old_name))
+            return
+
+        vpool = vmachine.vpool
+        mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
+        try:
+            mutex.acquire(wait=5)
+            vmachine.name = new_name
+            vmachine.save()
+        finally:
+            mutex.release()

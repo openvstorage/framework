@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import json
 import copy
 from random import randint
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
-from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.generic.volatilemutex import VolatileMutex
@@ -32,6 +32,9 @@ class DataList(object):
     """
     The DataList is a class that provide query functionality for the hybrid DAL
     """
+
+    # Test hooks for unit tests
+    test_hooks = {}
 
     class Select(object):
         """
@@ -66,7 +69,7 @@ class DataList(object):
     cachelink = 'ovs_listcache'
     partsize_pks = 5000
 
-    def __init__(self, query, key=None, load=True, post_query_hook=None):
+    def __init__(self, query, key=None, load=True):
         """
         Initializes a DataList class with a given key (used for optional caching) and a given query
         """
@@ -83,7 +86,6 @@ class DataList(object):
         self._volatile = VolatileFactory.get_client()
         self._persistent = PersistentFactory.get_client()
         self._query = query
-        self._post_query_hook = post_query_hook
         self.data = None
         self.from_cache = False
         self._can_cache = True
@@ -148,15 +150,25 @@ class DataList(object):
                 return False  # Fail the filter
 
         # Apply operators
+        ignorecase = len(item) == 4 and item[3] is False
         if item[1] == DataList.operator.NOT_EQUALS:
+            if ignorecase is True:
+                return value.lower() != item[2].lower()
             return value != item[2]
         if item[1] == DataList.operator.EQUALS:
+            if ignorecase is True:
+                return value.lower() == item[2].lower()
             return value == item[2]
         if item[1] == DataList.operator.GT:
             return value > item[2]
         if item[1] == DataList.operator.LT:
             return value < item[2]
         if item[1] == DataList.operator.IN:
+            if ignorecase:
+                if isinstance(item[2], list):
+                    return value.lower() in [x.lower() for x in item[2]]
+                else:
+                    return value.lower() in item[2].lower()
             return value in item[2]
         raise NotImplementedError('The given operator {} is not yet implemented.'.format(item[1]))
 
@@ -238,8 +250,8 @@ class DataList(object):
                 except ObjectNotFoundException:
                     pass
 
-            if self._post_query_hook is not None:
-                self._post_query_hook(self)
+            if 'post_query' in DataList.test_hooks:
+                DataList.test_hooks['post_query'](self)
 
             if self._key is not None and len(guids) > 0 and self._can_cache:
                 invalidated = False
@@ -350,35 +362,36 @@ class DataList(object):
         foreign_guids = {}
 
         remote_namespace = blueprint_object._namespace
+        for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
+            if relation.foreign_type is None:
+                classname = remote_name
+                foreign_namespace = blueprint_object._namespace
+            else:
+                classname = relation.foreign_type.__name__.lower()
+                foreign_namespace = relation.foreign_type()._namespace
+            if classname not in foreign_guids:
+                foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
+            try:
+                mutex.acquire(60)
+                for foreign_guid in foreign_guids[classname]:
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, foreign_guid)
+                    reverse_index = volatile.get(reverse_key)
+                    if reverse_index is None:
+                        reverse_index = {}
+                    if relation.foreign_key not in reverse_index:
+                        reverse_index[relation.foreign_key] = []
+                        volatile.set(reverse_key, reverse_index)
+            finally:
+                mutex.release()
         remote_keys = DataList.get_pks(remote_namespace, remote_name)
-        handled_flows = []
         for guid in remote_keys:
             try:
                 instance = remote_class(guid)
                 for relation in blueprint_object._relations:  # E.g. vmachine or vpool relation
                     if relation.foreign_type is None:
                         classname = remote_name
-                        foreign_namespace = blueprint_object._namespace
                     else:
                         classname = relation.foreign_type.__name__.lower()
-                        foreign_namespace = relation.foreign_type()._namespace
-                    if classname not in foreign_guids:
-                        foreign_guids[classname] = DataList.get_pks(foreign_namespace, classname)
-                    flow = '{0}_{1}'.format(classname, relation.foreign_key)
-                    if flow not in handled_flows:
-                        handled_flows.append(flow)
-                        try:
-                            mutex.acquire(60)
-                            for foreign_guid in foreign_guids[classname]:
-                                reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, foreign_guid)
-                                reverse_index = volatile.get(reverse_key)
-                                if reverse_index is None:
-                                    reverse_index = {}
-                                if relation.foreign_key not in reverse_index:
-                                    reverse_index[relation.foreign_key] = []
-                                    volatile.set(reverse_key, reverse_index)
-                        finally:
-                            mutex.release()
                     key = getattr(instance, '{0}_guid'.format(relation.name))
                     if key is not None:
                         try:
@@ -389,11 +402,15 @@ class DataList(object):
                             if relation.foreign_key not in reverse_index:
                                 reverse_index[relation.foreign_key] = []
                             if guid not in reverse_index[relation.foreign_key]:
+                                if instance.updated_on_datastore():
+                                    raise ConcurrencyException()
                                 reverse_index[relation.foreign_key].append(guid)
                                 volatile.set('ovs_reverseindex_{0}_{1}'.format(classname, key), reverse_index)
                         finally:
                             mutex.release()
             except ObjectNotFoundException:
+                pass
+            except ConcurrencyException:
                 pass
 
         try:
@@ -416,81 +433,6 @@ class DataList(object):
         """
         This method will load the primary keys for a given namespace and name
         """
-        #return DataList._get_pks(namespace, name)
         persistent = PersistentFactory.get_client()
         prefix = '{0}_{1}_'.format(namespace, name)
         return set([key.replace(prefix, '') for key in persistent.prefix(prefix, max_elements=-1)])
-
-    @staticmethod
-    def add_pk(namespace, name, key):
-        """
-        This adds the current primary key to the primary key index
-        """
-        #mutex = VolatileMutex('primarykeys_{0}'.format(name))
-        #try:
-        #    mutex.acquire(10)
-        #    keys = DataList._get_pks(namespace, name)
-        #    keys.add(key)
-        #    DataList._save_pks(name, keys)
-        #finally:
-        #    mutex.release()
-        pass
-
-    @staticmethod
-    def delete_pk(namespace, name, key):
-        """
-        This deletes the current primary key from the primary key index
-        """
-        #mutex = VolatileMutex('primarykeys_{0}'.format(name))
-        #try:
-        #    mutex.acquire(10)
-        #    keys = DataList._get_pks(namespace, name)
-        #    try:
-        #        keys.remove(key)
-        #    except KeyError:
-        #        pass
-        #    DataList._save_pks(name, keys)
-        #finally:
-        #    mutex.release()
-        pass
-
-    @staticmethod
-    def _get_pks(namespace, name):
-        """
-        Loads the primary key set information and pages, merges them to a single set
-        and returns it
-        """
-        internal_key = 'ovs_primarykeys_{0}_{{0}}'.format(name)
-        volatile = VolatileFactory.get_client()
-        persistent = PersistentFactory.get_client()
-        pointer = internal_key.format(0)
-        keys = set()
-        while pointer is not None:
-            subset = volatile.get(pointer)
-            if subset is None:
-                prefix = '{0}_{1}_'.format(namespace, name)
-                keys = set([key.replace(prefix, '') for key in persistent.prefix(prefix, max_elements=-1)])
-                DataList._save_pks(name, keys)
-                return keys
-            keys = keys.union(subset[0])
-            pointer = subset[1]
-        return keys
-
-    @staticmethod
-    def _save_pks(name, keys):
-        """
-        Pages and saves a set
-        """
-        internal_key = 'ovs_primarykeys_{0}_{{0}}'.format(name)
-        volatile = VolatileFactory.get_client()
-        keys = list(keys)
-        if len(keys) <= DataList.partsize_pks:
-            volatile.set(internal_key.format(0), [keys, None])
-        else:
-            sets = range(0, len(keys), DataList.partsize_pks)
-            sets.reverse()
-            pointer = None
-            for i in sets:
-                data = [keys[i:i + DataList.partsize_pks], pointer]
-                pointer = internal_key.format(i)
-                volatile.set(pointer, data)

@@ -1,5 +1,5 @@
 <!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,11 +13,18 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<div class="table-responsive">
+<div>
     <table class="table table-striped table-hover">
         <thead>
             <tr data-bind="foreach: headers">
-                <th data-bind="style: { width: width !== undefined ? width + 'px' : 'auto' }, html: value"></th>
+                <th data-bind="style: { width: width !== undefined ? width + 'px' : 'auto' },
+                               click: $parent.sort, css: { 'hand': $parent.sortable() }">
+                    <span data-bind="html: value, css: { 'hand': $parent.sortable() }"></span>
+                    <!-- ko if: $parent.sorting().directions.hasOwnProperty(key) -->
+                        <i data-bind="translate: 'ovs:icons.' + ($parent.sorting().directions[key] ? 'down' : 'up'),
+                                      css: { 'hand': $parent.sortable() }" class="fa fa-fw"></i>
+                    <!-- /ko -->
+                </th>
             </tr>
         </thead>
         <tbody>

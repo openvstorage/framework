@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,13 +19,13 @@ import time
 import subprocess
 import shutil
 from ovs.extensions.db.arakoon.EnsureArakoonWorks import EnsureArakoonWorks
+from ovs.extensions.generic.system import System
 from ArakoonManagement import ArakoonManagementEx
 from ovs.log.logHandler import LogHandler
-from ovs.plugin.provider.process import Process
 
 manager = ArakoonManagementEx()
 ensurearakoonworks = EnsureArakoonWorks()
-logger = LogHandler('arakoon', name='tlogchcker')
+logger = LogHandler.get('arakoon', name='tlogchcker')
 
 
 class CheckArakoonError(Exception):
@@ -37,7 +37,7 @@ class CheckArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class CheckArakoonTlogMark():
+class CheckArakoonTlogMark(object):
     """
     check if tlogs need marking
     mark tlogs that are unmarked
@@ -116,7 +116,8 @@ class CheckArakoonTlogMark():
         CheckArakoonTlogMark._speak(
             'Arakoon getStatusOne for Localnode {1}: {0}'.format(extensionstatus, localnode))
         if extensionstatus is True:
-            processstatus = Process.checkProcess('arakoon')
+            output = subprocess.check_output('ps aux | grep -v grep | grep arakoon || true', shell=True)
+            processstatus = 1 if 'arakoon' not in output else 0
             if processstatus:
                 CheckArakoonTlogMark._speak('Arakoon Process is not Running')
                 return False
@@ -138,7 +139,7 @@ class CheckArakoonTlogMark():
         for loop in range(loops):
             duration -= self._waitduration
             if arakoonstatus:
-                continue
+                return arakoonstatus
             else:
                 CheckArakoonTlogMark._speak(
                     'Remaining Wait Duration: {0} Seconds'.format(duration))
@@ -154,7 +155,7 @@ class CheckArakoonTlogMark():
     def _gatherlocalnodes(self, cluster):
         """ gather all localnodes for all clusters """
 
-        localnodes = cluster.listLocalNodes()
+        localnodes = [System.get_my_machine_id()]  # cluster.listLocalNodes()
         CheckArakoonTlogMark._speak('Found local nodes {0}'.format(localnodes))
 
         for localnode in localnodes:
@@ -278,7 +279,7 @@ class CheckArakoonTlogMark():
             for dbfile in dbfiles:
                 os.rename(dbfile, budir)
         else:
-            CheckArakoonTlogMark._speak('Db files do not exist')
+            CheckArakoonTlogMark._speak('Db files do not exist on {0}'.format(dbdir))
 
         if headdb:
             headdb = os.path.join(tlogdir, 'head.db')
@@ -304,7 +305,7 @@ class CheckArakoonTlogMark():
     def _startreturnstatus(self, localnode, cluster):
         """ start one local node get and return status """
 
-        if cluster._getStatusOne(localnode) == 'running':
+        if cluster._getStatusOne(localnode):
             estatus = self._waitandcheck(self._initialwait, localnode, cluster)
         else:
             cluster._startOne(localnode)
@@ -315,7 +316,7 @@ class CheckArakoonTlogMark():
         """ failover arakoon """
 
         if not self._isgrid:
-            CheckArakoonTlogMark._speak('Failover cannot be accmoplished without grid env')
+            CheckArakoonTlogMark._speak('Failover cannot be accomplished without grid env')
             return False
 
         self._movearakoondb(localnode, failover=True)
@@ -369,17 +370,21 @@ class CheckArakoonTlogMark():
         failednode = list()
         finalmessage = self._finalmessage
         CheckArakoonTlogMark._speak('Initial Starting Arakoon Node {0}'.format(localnode))
-        status = self._startreturnstatus(localnode, cluster)
+        # Do not try to start at this point, just check
+        status = self._checkarakoonstatus(localnode, cluster)
         if status:
             CheckArakoonTlogMark._speak(finalmessage.format(localnode))
         else:
             message = 'Node {0} not running'
             CheckArakoonTlogMark._speak(message.format(localnode))
 
+            # Move the db files
             self._movearakoondb(localnode)
 
             CheckArakoonTlogMark._speak(
                 'Tlog Replay: Catching up on Arakoon Node {0}'.format(localnode))
+
+            # Try to replay local tlogs
             self._managetlog(localnode, cluster)
 
             CheckArakoonTlogMark._speak(
@@ -420,7 +425,7 @@ class CheckArakoonTlogMark():
             raise CheckArakoonError(
                 'Starting Arakoon Failed on these Nodes:\n * {0}'.format('\n * '.join(failednodesset)))
 
-    def fixtlogs(self, clustername):
+    def fixtlogs(self, clustername, always_stop=False):
         """
         fix tlog for a specific cluster
         returns list of nodes for which it was not possible to fix tlogs
@@ -457,6 +462,8 @@ class CheckArakoonTlogMark():
                     failmessage = 'Tlogs are missing - now attempting failover'
                     CheckArakoonTlogMark._speak(failmessage)
                     if self._failover(localnode, cluster):
+                        if always_stop:
+                            cluster._stopOne(localnode)
                         continue
 
                 else:

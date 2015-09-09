@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ from datadiff.tools import assert_equal
 
 import sys
 import pexpect
+
 
 class PartitionLayout(unittest.TestCase):
     full_map = {
@@ -1154,7 +1155,7 @@ class PartitionLayout(unittest.TestCase):
         global client
         global sc
 
-        client = SSHClient.load('127.0.0.1', 'rooter')
+        client = SSHClient('127.0.0.1', username='root')
         sc = SetupController()
 
     @classmethod
@@ -1266,7 +1267,6 @@ class PartitionLayout(unittest.TestCase):
 
         self.assertTrue(valid, 'At least one generated config failed!')
 
-
     def test_interactive_menu(self):
         # Use a known config - and process expected menu structure
 
@@ -1291,7 +1291,6 @@ class PartitionLayout(unittest.TestCase):
                 child.sendline(opt)
             return bool(opt)
 
-
         disk_layout = ({'/mnt/bfs': {'device': '/dev/sdd', 'label': 'backendfs', 'percentage': 80},
                         '/mnt/cache1': {'device': '/dev/sdb', 'label': 'cache1', 'percentage': 50},
                         '/mnt/db': {'device': '/dev/sdb', 'label': 'db', 'percentage': 25},
@@ -1309,7 +1308,7 @@ class PartitionLayout(unittest.TestCase):
         child.sendline("from ovs.extensions.generic.sshclient import SSHClient")
         child.expect(":")
 
-        child.sendline("client = SSHClient.load('127.0.0.1', 'rooter')")
+        child.sendline("client = SSHClient('127.0.0.1', username='root')")
         child.expect(":")
 
         child.sendline("sc = SetupController()")
@@ -1326,16 +1325,16 @@ class PartitionLayout(unittest.TestCase):
 
         child.expect("Enter number or name; return for next page")
 
-        #0: Add
+        # 0: Add
         child.sendline("0")
-        new_mountpoint = {'/mnt/cache2':  {'device'     : '/dev/sdc',
-                                           'label'      : 'cache2',
-                                           'percentage' : '50'}}
+        new_mountpoint = {'/mnt/cache2': {'device': '/dev/sdc',
+                                          'label': 'cache2',
+                                          'percentage': '50'}}
         child.expect("Enter mountpoint to add")
         child.sendline(new_mountpoint.keys()[0])
         check_partition_layout_table(formated_lines.values() + [new_mountpoint.keys()[0] + r"\s*:\s*device\s*:\s*DIR_ONLY"])
 
-        #2: Update
+        # 2: Update
         child.expect("Enter number or name; return for next page")
         child.sendline("2")
         child.expect("Choose mountpoint to update:")
@@ -1356,12 +1355,12 @@ class PartitionLayout(unittest.TestCase):
         formated_lines = get_formated_lines(disk_layout[0])
         check_partition_layout_table(formated_lines.values())
 
-        #3 Print
+        # 3 Print
         child.expect("Enter number or name; return for next page")
         child.sendline("3")
         check_partition_layout_table(formated_lines.values())
 
-        #1 Remove
+        # 4 Remove
         child.expect("Enter number or name; return for next page")
         child.sendline("1")
         child.expect("Enter mountpoint to remove")
@@ -1370,7 +1369,7 @@ class PartitionLayout(unittest.TestCase):
         formated_lines = get_formated_lines(disk_layout[0])
         check_partition_layout_table(formated_lines.values())
 
-        #5 Quit
+        # 5 Quit
         child.expect("Enter number or name; return for next page")
         child.sendline("5")
         child.expect(":")

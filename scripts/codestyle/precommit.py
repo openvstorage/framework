@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import time
 # from closure_linter import runner
 # from closure_linter.common.erroraccumulator import ErrorAccumulator
 
-from ConfigParser import ConfigParser
+from ConfigParser import RawConfigParser
 
 REGEX_OPTIONS = re.IGNORECASE | re.MULTILINE | re.DOTALL
 CRLF_PATTERN = re.compile(r'\r\n$', REGEX_OPTIONS)
@@ -355,7 +355,7 @@ def install_mercurial_hook():
     repo_dir = get_repo_dir()
 
     config_file = os.path.join(repo_dir, '.hg', 'hgrc')
-    config_parser = ConfigParser()
+    config_parser = RawConfigParser()
     config_parser.read(config_file)
 
     precommit_abs_file = os.path.join(repo_dir, 'scripts',

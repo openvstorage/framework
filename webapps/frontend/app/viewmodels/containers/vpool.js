@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/generic', 'ovs/api',
-    'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
-], function($, ko, generic, api, VDisk, VMachine) {
+    'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
+], function($, ko, generic, api, BackendType, VDisk, VMachine) {
     "use strict";
     return function(guid) {
         var self = this;
@@ -43,10 +43,10 @@ define([
         self.writeSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendWriteSpeed  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.backendReadSpeed   = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReads       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.backendWritten     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendRead        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved     = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendTypeGuid    = ko.observable();
         self.backendType        = ko.observable();
         self.backendConnection  = ko.observable();
         self.backendLogin       = ko.observable();
@@ -176,10 +176,10 @@ define([
                 self._configuration(target);
                 self.configuration($.extend({}, data.configuration));
             }
-            if (data.hasOwnProperty('type')) {
-                self.backendType(data.type);
+            if (data.hasOwnProperty('backend_type_guid')) {
+                self.backendTypeGuid(data.backend_type_guid);
             } else {
-                self.backendType(undefined);
+                self.backendTypeGuid(undefined);
             }
             if (data.hasOwnProperty('vdisks_guids') && !generic.tryGet(options, 'skipDisks', false)) {
                 generic.crossFiller(
@@ -189,17 +189,18 @@ define([
                     }, 'guid'
                 );
             }
-            generic.trySet(self.storageDriverGuids, data, 'storagedrivers_guids');
+            if (data.hasOwnProperty('storagedrivers_guids')) {
+                self.storageDriverGuids(data.storagedrivers_guids);
+            }
             if (data.hasOwnProperty('statistics')) {
                 var stats = data.statistics;
-                self.iops(stats.write_operations_ps + stats.read_operations_ps);
-                self.cacheHits(stats.sco_cache_hits_ps + stats.cluster_cache_hits_ps);
-                self.cacheMisses(stats.sco_cache_misses_ps);
+                self.iops(stats.operations_ps);
+                self.cacheHits(stats.cache_hits_ps);
+                self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
                 self.writeSpeed(stats.data_written_ps);
                 self.backendWritten(stats.backend_data_written);
                 self.backendRead(stats.backend_data_read);
-                self.backendReads(stats.sco_cache_hits + stats.cluster_cache_hits);
                 self.bandwidthSaved(Math.max(0, stats.data_read - stats.backend_data_read));
                 self.backendReadSpeed(stats.backend_data_read_ps);
                 self.backendWriteSpeed(stats.backend_data_written_ps);
@@ -226,7 +227,7 @@ define([
                                 })
                                 .fail(mainDeferred.reject);
                         } else {
-                            mainDeferred.reject();
+                            mainDeferred.resolve();
                         }
                     }).promise(),
                     $.Deferred(function(machineDeferred) {
@@ -239,7 +240,7 @@ define([
                             self.machineHandle = api.get('vmachines', { queryparams: options })
                                 .done(function(data) {
                                     var guids = [], vmdata = {};
-                                    $.each(data, function(index, item) {
+                                    $.each(data.data, function(index, item) {
                                         guids.push(item.guid);
                                         vmdata[item.guid] = item;
                                     });
@@ -258,7 +259,7 @@ define([
                                 })
                                 .fail(machineDeferred.reject);
                         } else {
-                            machineDeferred.reject();
+                            machineDeferred.resolve();
                         }
                     }).promise()];
                 $.when.apply($, calls)
@@ -282,7 +283,28 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
+                }
+            }).promise();
+        };
+        self.loadBackendType = function(refresh) {
+            refresh = !!refresh;
+            return $.Deferred(function(deferred) {
+                if (self.backendTypeGuid() !== undefined) {
+                    if (self.backendType() === undefined || self.backendTypeGuid() !== self.backendType().guid()) {
+                        var backendType = new BackendType(self.backendTypeGuid());
+                        backendType.load()
+                            .then(deferred.resolve)
+                            .fail(deferred.reject);
+                        self.backendType(backendType);
+                    } else if (refresh) {
+                        self.backendType().load()
+                            .then(deferred.resolve)
+                            .fail(deferred.reject);
+                    }
+                } else {
+                    self.backendType(undefined);
+                    deferred.resolve();
                 }
             }).promise();
         };

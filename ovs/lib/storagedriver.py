@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,12 +16,15 @@
 StorageDriver module
 """
 
+import volumedriver.storagerouter.VolumeDriverEvents_pb2 as VolumeDriverEvents
 from ovs.celery_run import celery
 from ovs.dal.hybrids.storagerouter import StorageRouter
+from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
 from ovs.lib.helpers.decorators import log
+from ovs.lib.mdsservice import MDSServiceController
 
 
 class StorageDriverController(object):
@@ -37,7 +40,7 @@ class StorageDriverController(object):
         """
         storagedrivers = StorageRouter(storagerouter_guid).storagedrivers
         if len(storagedrivers) > 0:
-            storagedriver_client = StorageDriverClient().load(storagedrivers[0].vpool)
+            storagedriver_client = StorageDriverClient.load(storagedrivers[0].vpool)
             for storagedriver in storagedrivers:
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
 
@@ -58,9 +61,22 @@ class StorageDriverController(object):
             if host_status != 'RUNNING':
                 # Host is stopped
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                storagedriver_client = StorageDriverClient().load(storagedriver.vpool)
+                storagedriver_client = StorageDriverClient.load(storagedriver.vpool)
                 storagedriver_client.mark_node_offline(str(storagedriver.storagedriver_id))
         else:
             # No management Center, cannot update status via api
-            #TODO: should we try manually (ping, ssh)?
+            # @TODO: should we try manually (ping, ssh)?
             pass
+
+    @staticmethod
+    @celery.task(name='ovs.storagedriver.volumedriver_error')
+    @log('VOLUMEDRIVER_TASK')
+    def volumedriver_error(code, volumename, storagedriver_id):
+        """
+        Handles error messages/events from the volumedriver
+        """
+        _ = storagedriver_id  # Required for the @log decorator
+        if code == VolumeDriverEvents.MDSFailover:
+            disk = VDiskList.get_vdisk_by_volume_id(volumename)
+            if disk is not None:
+                MDSServiceController.ensure_safety(disk)

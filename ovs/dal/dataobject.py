@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,9 @@ import copy
 import re
 import json
 import inspect
-from ovs.dal.exceptions import ObjectNotFoundException, ConcurrencyException, LinkedObjectException, MissingMandatoryFieldsException
+from ovs.dal.exceptions import (ObjectNotFoundException, ConcurrencyException, LinkedObjectException,
+                                MissingMandatoryFieldsException, SaveRaceConditionException, InvalidRelationException,
+                                VolatileObjectException)
 from ovs.dal.helpers import Descriptor, Toolbox, HybridRunner
 from ovs.dal.relations import RelationMapper
 from ovs.dal.dataobjectlist import DataObjectList
@@ -29,6 +31,9 @@ from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.storage.exceptions import KeyNotFoundException
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
+from ovs.log.logHandler import LogHandler
+
+logger = LogHandler.get('dal', name='dataobject')
 
 
 class MetaClass(type):
@@ -115,7 +120,7 @@ class DataObject(object):
     __metaclass__ = MetaClass
 
     #######################
-    ## Attributes
+    # Attributes
     #######################
 
     # Properties that needs to be overwritten by implementation
@@ -124,7 +129,7 @@ class DataObject(object):
     _relations = []   # Blueprint for relations
 
     #######################
-    ## Constructor
+    # Constructor
     #######################
 
     def __new__(cls, *args, **kwargs):
@@ -138,7 +143,7 @@ class DataObject(object):
             return super(cls, new_class).__new__(new_class, *args, **kwargs)
         return super(DataObject, cls).__new__(cls)
 
-    def __init__(self, guid=None, data=None, datastore_wins=False):
+    def __init__(self, guid=None, data=None, datastore_wins=False, volatile=False, hook=None):
         """
         Loads an object with a given guid. If no guid is given, a new object
         is generated with a new guid.
@@ -163,11 +168,12 @@ class DataObject(object):
 
         # Initialize public fields
         self.dirty = False
+        self.volatile = volatile
 
         # Worker fields/objects
-        self._name = self.__class__.__name__.lower()
+        self._classname = self.__class__.__name__.lower()
         self._namespace = 'ovs_data'   # Namespace of the object
-        self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._name))
+        self._mutex_listcache = VolatileMutex('listcache_{0}'.format(self._classname))
         self._mutex_reverseindex = VolatileMutex('reverseindex')
 
         # Rebuild _relation types
@@ -191,7 +197,10 @@ class DataObject(object):
                 raise ValueError('The given guid is invalid: {0}'.format(guid))
 
         # Build base keys
-        self._key = '{0}_{1}_{2}'.format(self._namespace, self._name, self._guid)
+        self._key = '{0}_{1}_{2}'.format(self._namespace, self._classname, self._guid)
+
+        # Worker mutexes
+        self._mutex_version = VolatileMutex('ovs_dataversion_{0}_{1}'.format(self._classname, self._guid))
 
         # Load data from cache or persistent backend where appropriate
         self._volatile = VolatileFactory.get_client()
@@ -245,20 +254,37 @@ class DataObject(object):
         # Store original data
         self._original = copy.deepcopy(self._data)
 
+        if hook is not None and hasattr(hook, '__call__'):
+            hook()
+
         if not self._new:
-            # Re-cache the object
-            self._volatile.set(self._key, self._data)
+            # Re-cache the object, if required
+            if self._metadata['cache'] is False:
+                # The data wasn't loaded from the cache, so caching is required now
+                try:
+                    self._mutex_version.acquire(30)
+                    this_version = self._data['_version']
+                    store_version = self._persistent.get(self._key)['_version']
+                    if this_version == store_version:
+                        self._volatile.set(self._key, self._data)
+                except KeyNotFoundException:
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' could not be found'.format(
+                        self.__class__.__name__, self._guid
+                    ))
+                finally:
+                    self._mutex_version.release()
 
         # Freeze property creation
         self._frozen = True
 
         # Optionally, initialize some fields
         if data is not None:
-            for field, value in data.iteritems():
-                setattr(self, field, value)
+            for prop in self._properties:
+                if prop.name in data:
+                    setattr(self, prop.name, data[prop.name])
 
     #######################
-    ## Helper methods for dynamic getting and setting
+    # Helper methods for dynamic getting and setting
     #######################
 
     def _add_property(self, prop):
@@ -337,16 +363,18 @@ class DataObject(object):
         """
         info = self._objects[attribute]['info']
         remote_class = Descriptor().load(info['class']).get_object()
-        remote_key   = info['key']
+        remote_key = info['key']
         datalist = DataList.get_relation_set(remote_class, remote_key, self.__class__, attribute, self.guid)
         if self._objects[attribute]['data'] is None:
             self._objects[attribute]['data'] = DataObjectList(datalist.data, remote_class)
         else:
-            self._objects[attribute]['data'].merge(datalist.data)
+            self._objects[attribute]['data'].update(datalist.data)
         if info['list'] is True:
             return self._objects[attribute]['data']
         else:
             data = self._objects[attribute]['data']
+            if len(data) > 1:
+                raise InvalidRelationException('More than one element found in {0}'.format(attribute))
             return data[0] if len(data) == 1 else None
 
     def _get_list_guid_property(self, attribute):
@@ -397,8 +425,10 @@ class DataObject(object):
         else:
             descriptor = Descriptor(value.__class__).descriptor
             if descriptor['identifier'] != self._data[attribute]['identifier']:
+                if descriptor['type'] == self._data[attribute]['type']:
+                    logger.error('Corrupt descriptors: {0} vs {1}'.format(descriptor, self._data[attribute]))
                 raise TypeError('An invalid type was given: {0} instead of {1}'.format(
-                    descriptor['type'],  self._data[attribute]['type']
+                    descriptor['type'], self._data[attribute]['type']
                 ))
             self._objects[attribute] = value
             self._data[attribute]['guid'] = value.guid
@@ -423,7 +453,7 @@ class DataObject(object):
             raise RuntimeError('Property {0} does not exist on this object.'.format(key))
 
     #######################
-    ## Saving data to persistent store and invalidating volatile store
+    # Saving data to persistent store and invalidating volatile store
     #######################
 
     def save(self, recursive=False, skip=None):
@@ -433,160 +463,196 @@ class DataObject(object):
         It will also invalidate certain caches if required. For example lists pointing towards this
         object
         """
-        invalid_fields = []
-        for prop in self._properties:
-            if prop.mandatory is True and self._data[prop.name] is None:
-                invalid_fields.append(prop.name)
-        for relation in self._relations:
-            if relation.mandatory is True and self._data[relation.name]['guid'] is None:
-                invalid_fields.append(relation.name)
-        if len(invalid_fields) > 0:
-            raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._name, ', '.join(invalid_fields)))
+        if self.volatile is True:
+            raise VolatileObjectException()
 
-        if recursive:
-            # Save objects that point to us (e.g. disk.vmachine - if this is disk)
+        tries = 0
+        successful = False
+        while successful is False:
+            invalid_fields = []
+            for prop in self._properties:
+                if prop.mandatory is True and self._data[prop.name] is None:
+                    invalid_fields.append(prop.name)
             for relation in self._relations:
-                if relation.name != skip:  # disks will be skipped
-                    item = getattr(self, relation.name)
-                    if item is not None:
-                        item.save(recursive=True, skip=relation.foreign_key)
+                if relation.mandatory is True and self._data[relation.name]['guid'] is None:
+                    invalid_fields.append(relation.name)
+            if len(invalid_fields) > 0:
+                raise MissingMandatoryFieldsException('Missing fields on {0}: {1}'.format(self._classname, ', '.join(invalid_fields)))
 
-            # Save object we point at (e.g. machine.disks - if this is machine)
-            relations = RelationMapper.load_foreign_relations(self.__class__)
-            if relations is not None:
-                for key, info in relations.iteritems():
-                    if key != skip:  # machine will be skipped
-                        if info['list'] is True:
-                            for item in getattr(self, key).iterloaded():
-                                item.save(recursive=True, skip=info['key'])
-                        else:
-                            item = getattr(self, key)
-                            if item is not None:
-                                item.save(recursive=True, skip=info['key'])
+            if recursive:
+                # Save objects that point to us (e.g. disk.vmachine - if this is disk)
+                for relation in self._relations:
+                    if relation.name != skip:  # disks will be skipped
+                        item = getattr(self, relation.name)
+                        if item is not None:
+                            item.save(recursive=True, skip=relation.foreign_key)
 
-        try:
-            data = self._persistent.get(self._key)
-        except KeyNotFoundException:
-            if self._new:
-                data = {}
-            else:
-                raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
-                    self.__class__.__name__, self._guid
-                ))
-        changed_fields = []
-        data_conflicts = []
-        for attribute in self._data.keys():
-            if self._data[attribute] != self._original[attribute]:
-                # We changed this value
-                changed_fields.append(attribute)
-                if attribute in data and self._original[attribute] != data[attribute]:
-                    # Some other process also wrote to the database
-                    if self._datastore_wins is None:
-                        # In case we didn't set a policy, we raise the conflicts
-                        data_conflicts.append(attribute)
-                    elif self._datastore_wins is False:
-                        # If the datastore should not win, we just overwrite the data
-                        data[attribute] = self._data[attribute]
-                    # If the datastore should win, we discard/ignore our change
-                else:
-                    # Normal scenario, saving data
-                    data[attribute] = self._data[attribute]
-            elif attribute not in data:
-                data[attribute] = self._data[attribute]
-        if data_conflicts:
-            raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
-                self._name, ', '.join(data_conflicts)
-            ))
-
-        # Refresh internal data structure
-        self._data = copy.deepcopy(data)
-
-        # First, update reverse index
-        try:
-            self._mutex_reverseindex.acquire(60)
-            for relation in self._relations:
-                key = relation.name
-                original_guid = self._original[key]['guid']
-                new_guid = self._data[key]['guid']
-                if original_guid != new_guid:
-                    if relation.foreign_type is None:
-                        classname = self.__class__.__name__.lower()
-                    else:
-                        classname = relation.foreign_type.__name__.lower()
-                    if original_guid is not None:
-                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
-                        reverse_index = self._volatile.get(reverse_key)
-                        if reverse_index is not None:
-                            if relation.foreign_key in reverse_index:
-                                entries = reverse_index[relation.foreign_key]
-                                if self.guid in entries:
-                                    entries.remove(self.guid)
-                                    reverse_index[relation.foreign_key] = entries
-                                    self._volatile.set(reverse_key, reverse_index)
-                    if new_guid is not None:
-                        reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
-                        reverse_index = self._volatile.get(reverse_key)
-                        if reverse_index is not None:
-                            if relation.foreign_key in reverse_index:
-                                entries = reverse_index[relation.foreign_key]
-                                if self.guid not in entries:
-                                    entries.append(self.guid)
-                                    reverse_index[relation.foreign_key] = entries
-                                    self._volatile.set(reverse_key, reverse_index)
-                            else:
-                                reverse_index[relation.foreign_key] = [self.guid]
-                                self._volatile.set(reverse_key, reverse_index)
-                        else:
-                            reverse_index = {relation.foreign_key: [self.guid]}
-                            self._volatile.set(reverse_key, reverse_index)
-            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._name, self.guid)
-            reverse_index = self._volatile.get(reverse_key)
-            if reverse_index is None:
-                reverse_index = {}
+                # Save object we point at (e.g. machine.vdisks - if this is machine)
                 relations = RelationMapper.load_foreign_relations(self.__class__)
                 if relations is not None:
-                    for key, _ in relations.iteritems():
-                        reverse_index[key] = []
-                self._volatile.set(reverse_key, reverse_index)
-        finally:
-            self._mutex_reverseindex.release()
-        # Second, invalidate property lists
-        try:
-            self._mutex_listcache.acquire(60)
-            cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
-            cache_list = Toolbox.try_get(cache_key, {})
-            change = False
-            for list_key in cache_list.keys():
-                fields = cache_list[list_key]
-                if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
-                    change = True
-                    self._volatile.delete(list_key)
-                    del cache_list[list_key]
-            if change is True:
-                self._volatile.set(cache_key, cache_list)
-                self._persistent.set(cache_key, cache_list)
-        finally:
-            self._mutex_listcache.release()
+                    for key, info in relations.iteritems():
+                        if key != skip:  # machine will be skipped
+                            if info['list'] is True:
+                                for item in getattr(self, key).iterloaded():
+                                    item.save(recursive=True, skip=info['key'])
+                            else:
+                                item = getattr(self, key)
+                                if item is not None:
+                                    item.save(recursive=True, skip=info['key'])
 
-        # Save the data
-        self._persistent.set(self._key, self._data)
-        DataList.add_pk(self._namespace, self._name, self._guid)
+            for relation in self._relations:
+                if self._data[relation.name]['guid'] is not None:
+                    if relation.foreign_type is None:
+                        cls = self.__class__
+                    else:
+                        cls = relation.foreign_type
+                    _ = cls(self._data[relation.name]['guid'])
 
-        # Invalidate the cache
-        self._volatile.delete(self._key)
+            try:
+                data = self._persistent.get(self._key)
+            except KeyNotFoundException:
+                if self._new:
+                    data = {'_version': 0}
+                else:
+                    raise ObjectNotFoundException('{0} with guid \'{1}\' was deleted'.format(
+                        self.__class__.__name__, self._guid
+                    ))
+            changed_fields = []
+            data_conflicts = []
+            for attribute in self._data.keys():
+                if attribute == '_version':
+                    continue
+                if self._data[attribute] != self._original[attribute]:
+                    # We changed this value
+                    changed_fields.append(attribute)
+                    if attribute in data and self._original[attribute] != data[attribute]:
+                        # Some other process also wrote to the database
+                        if self._datastore_wins is None:
+                            # In case we didn't set a policy, we raise the conflicts
+                            data_conflicts.append(attribute)
+                        elif self._datastore_wins is False:
+                            # If the datastore should not win, we just overwrite the data
+                            data[attribute] = self._data[attribute]
+                        # If the datastore should win, we discard/ignore our change
+                    else:
+                        # Normal scenario, saving data
+                        data[attribute] = self._data[attribute]
+                elif attribute not in data:
+                    data[attribute] = self._data[attribute]
+            if data_conflicts:
+                raise ConcurrencyException('Got field conflicts while saving {0}. Conflicts: {1}'.format(
+                    self._classname, ', '.join(data_conflicts)
+                ))
 
+            # Refresh internal data structure
+            self._data = copy.deepcopy(data)
+
+            # First, update reverse index
+            try:
+                self._mutex_reverseindex.acquire(60)
+                for relation in self._relations:
+                    key = relation.name
+                    original_guid = self._original[key]['guid']
+                    new_guid = self._data[key]['guid']
+                    if original_guid != new_guid:
+                        if relation.foreign_type is None:
+                            classname = self.__class__.__name__.lower()
+                        else:
+                            classname = relation.foreign_type.__name__.lower()
+                        if original_guid is not None:
+                            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, original_guid)
+                            reverse_index = self._volatile.get(reverse_key)
+                            if reverse_index is not None:
+                                if relation.foreign_key in reverse_index:
+                                    entries = reverse_index[relation.foreign_key]
+                                    if self.guid in entries:
+                                        entries.remove(self.guid)
+                                        reverse_index[relation.foreign_key] = entries
+                                        self._volatile.set(reverse_key, reverse_index)
+                        if new_guid is not None:
+                            reverse_key = 'ovs_reverseindex_{0}_{1}'.format(classname, new_guid)
+                            reverse_index = self._volatile.get(reverse_key)
+                            if reverse_index is not None:
+                                if relation.foreign_key in reverse_index:
+                                    entries = reverse_index[relation.foreign_key]
+                                    if self.guid not in entries:
+                                        entries.append(self.guid)
+                                        reverse_index[relation.foreign_key] = entries
+                                        self._volatile.set(reverse_key, reverse_index)
+                                else:
+                                    reverse_index[relation.foreign_key] = [self.guid]
+                                    self._volatile.set(reverse_key, reverse_index)
+                            else:
+                                reverse_index = {relation.foreign_key: [self.guid]}
+                                self._volatile.set(reverse_key, reverse_index)
+                if self._new is True:
+                    reverse_key = 'ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid)
+                    reverse_index = self._volatile.get(reverse_key)
+                    if reverse_index is None:
+                        reverse_index = {}
+                        relations = RelationMapper.load_foreign_relations(self.__class__)
+                        if relations is not None:
+                            for key, _ in relations.iteritems():
+                                reverse_index[key] = []
+                        self._volatile.set(reverse_key, reverse_index)
+            finally:
+                self._mutex_reverseindex.release()
+
+            # Second, invalidate property lists
+            try:
+                self._mutex_listcache.acquire(60)
+                cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
+                cache_list = Toolbox.try_get(cache_key, {})
+                change = False
+                for list_key in cache_list.keys():
+                    fields = cache_list[list_key]
+                    if ('__all' in fields and self._new) or list(set(fields) & set(changed_fields)):
+                        change = True
+                        self._volatile.delete(list_key)
+                        del cache_list[list_key]
+                if change is True:
+                    self._volatile.set(cache_key, cache_list)
+                    self._persistent.set(cache_key, cache_list)
+            finally:
+                self._mutex_listcache.release()
+
+            # Save the data
+            try:
+                self._mutex_version.acquire(30)
+                this_version = self._data['_version']
+                try:
+                    store_version = self._persistent.get(self._key)['_version']
+                except KeyNotFoundException:
+                    store_version = 0
+                if this_version == store_version:
+                    self._data['_version'] = this_version + 1
+                    self._persistent.set(self._key, self._data)
+                    self._volatile.delete(self._key)
+                    successful = True
+                else:
+                    tries += 1
+            finally:
+                self._mutex_version.release()
+            if tries > 5:
+                raise SaveRaceConditionException()
+
+        self.invalidate_dynamics()
         self._original = copy.deepcopy(self._data)
+
         self.dirty = False
         self._new = False
 
     #######################
-    ## Other CRUDs
+    # Other CRUDs
     #######################
 
-    def delete(self, abandon=False):
+    def delete(self, abandon=None):
         """
         Delete the given object. It also invalidates certain lists
         """
+        if self.volatile is True:
+            raise VolatileObjectException()
+
         # Check foreign relations
         relations = RelationMapper.load_foreign_relations(self.__class__)
         if relations is not None:
@@ -594,7 +660,7 @@ class DataObject(object):
                 items = getattr(self, key)
                 if info['list'] is True:
                     if len(items) > 0:
-                        if abandon is True:
+                        if abandon is not None and (key in abandon or '_all' in abandon):
                             for item in items.itersafe():
                                 setattr(item, info['key'], None)
                                 try:
@@ -606,7 +672,7 @@ class DataObject(object):
                 elif items is not None:
                     # No list (so a 1-to-1 relation), so there should be an object, or None
                     item = items  # More clear naming
-                    if abandon is True:
+                    if abandon is not None and (key in abandon or '_all' in abandon):
                         setattr(item, info['key'], None)
                         try:
                             item.save()
@@ -614,6 +680,12 @@ class DataObject(object):
                             pass
                     else:
                         raise LinkedObjectException('There is still an item linked in self.{0}'.format(key))
+
+        # Delete the object out of the persistent store
+        try:
+            self._persistent.delete(self._key)
+        except KeyNotFoundException:
+            pass
 
         # First, update reverse index
         try:
@@ -635,13 +707,14 @@ class DataObject(object):
                                 entries.remove(self.guid)
                                 reverse_index[relation.foreign_key] = entries
                                 self._volatile.set(reverse_key, reverse_index)
-            self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._name, self.guid))
+            self._volatile.delete('ovs_reverseindex_{0}_{1}'.format(self._classname, self.guid))
         finally:
             self._mutex_reverseindex.release()
+
         # Second, invalidate property lists
         try:
             self._mutex_listcache.acquire(60)
-            cache_key = '{0}_{1}'.format(DataList.cachelink, self._name)
+            cache_key = '{0}_{1}'.format(DataList.cachelink, self._classname)
             cache_list = Toolbox.try_get(cache_key, {})
             change = False
             for list_key in cache_list.keys():
@@ -656,24 +729,17 @@ class DataObject(object):
         finally:
             self._mutex_listcache.release()
 
-        # Delete the object out of the persistent store
-        try:
-            self._persistent.delete(self._key)
-        except KeyNotFoundException:
-            pass
-
         # Delete the object and its properties out of the volatile store
         self.invalidate_dynamics()
         self._volatile.delete(self._key)
-        DataList.delete_pk(self._namespace, self._name, self._guid)
 
     # Discard all pending changes
     def discard(self):
         """
         Discard all pending changes, reloading the data from the persistent backend
         """
-        self.__init__(guid           = self._guid,
-                      datastore_wins = self._datastore_wins)
+        self.__init__(guid=self._guid,
+                      datastore_wins=self._datastore_wins)
 
     def invalidate_dynamics(self, properties=None):
         """
@@ -698,6 +764,15 @@ class DataObject(object):
         for relation in self._relations:
             if relation.name in self._objects:
                 del self._objects[relation.name]
+
+    def export(self):
+        """
+        Exports this object's data for import in another object
+        """
+        data = {}
+        for prop in self._properties:
+            data[prop.name] = self._data[prop.name]
+        return data
 
     def serialize(self, depth=0):
         """
@@ -751,8 +826,26 @@ class DataObject(object):
         for key in properties_to_copy:
             setattr(self, key, getattr(other_object, key))
 
+    def updated_on_datastore(self):
+        """
+        Checks whether this object has been modified on the datastore
+        """
+        if self.volatile is True:
+            return False
+
+        this_version = self._data['_version']
+        cached_object = self._volatile.get(self._key)
+        if cached_object is None:
+            try:
+                backend_version = self._persistent.get(self._key)['_version']
+            except KeyNotFoundException:
+                backend_version = -1
+        else:
+            backend_version = cached_object['_version']
+        return this_version != backend_version
+
     #######################
-    ## Properties
+    # Properties
     #######################
 
     @property
@@ -763,7 +856,7 @@ class DataObject(object):
         return self._guid
 
     #######################
-    ## Helper methods
+    # Helper methods
     #######################
 
     def _backend_property(self, function, dynamic):
@@ -771,8 +864,8 @@ class DataObject(object):
         Handles the internal caching of dynamic properties
         """
         caller_name = dynamic.name
-        cache_key   = '{0}_{1}'.format(self._key, caller_name)
-        mutex       = VolatileMutex(cache_key)
+        cache_key = '{0}_{1}'.format(self._key, caller_name)
+        mutex = VolatileMutex(cache_key)
         try:
             cached_data = self._volatile.get(cache_key)
             if cached_data is None:
@@ -813,7 +906,7 @@ class DataObject(object):
         """
         Checks whether two objects are the same.
         """
-        if not isinstance(other, DataObject):
+        if not Descriptor.isinstance(other, self.__class__):
             return False
         return self.__hash__() == other.__hash__()
 
@@ -821,6 +914,6 @@ class DataObject(object):
         """
         Checks whether to objects are not the same.
         """
-        if not isinstance(other, DataObject):
-            return False
+        if not Descriptor.isinstance(other, self.__class__):
+            return True
         return not self.__eq__(other)

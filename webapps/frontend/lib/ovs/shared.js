@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,14 @@ define(['knockout'], function(ko){
             routing        : undefined,
             footerData     : ko.observable(ko.observable()),
             nodes          : undefined,
+            identification : ko.observable(),
             user           : {
                 username: ko.observable(),
                 guid    : ko.observable(),
                 roles   : ko.observableArray([])
+            },
+            hooks          : {
+                dashboards: []
             }
         };
     };

@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 /*global define */
-define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic) {
+define([
+    'knockout', 'jquery', 'd3', 'ovs/generic', 'd3p/slider'
+], function(ko, $, d3, generic, Slider) {
     "use strict";
     ko.bindingHandlers.status = {
         init: function(element) {
@@ -117,45 +119,76 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
             $(element).popover({
                 html: true,
                 placement: 'auto',
-                trigger: 'click',
+                trigger: 'focus',
                 title: $.t(value.title),
                 content: $.t(value.content)
             });
         },
         update: function(element, valueAccessor) {
             var value = valueAccessor();
-            $(element).tooltip('destroy');
+            $(element).popover('destroy');
             $(element).popover({
                 html: true,
                 placement: 'auto',
-                trigger: 'click',
+                trigger: 'focus',
                 title: $.t(value.title),
                 content: $.t(value.content)
             });
         }
     };
     ko.bindingHandlers.tooltip = {
-        init: function(element, valueAccessor) {
-            var value = valueAccessor(), title;
+        init: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(), title,
+                placement = allBindings.get('placement');
+            if (placement === undefined) {
+                placement = 'auto top';
+            }
             if (value !== undefined && value !== '') {
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto top',
+                    placement: placement,
                     title: title
                 });
             }
         },
-        update: function(element, valueAccessor) {
-            var value = valueAccessor(), title;
+        update: function(element, valueAccessor, allBindings) {
+            var value = valueAccessor(), title,
+                placement = allBindings.get('placement');
+            if (placement === undefined) {
+                placement = 'auto top';
+            }
             $(element).tooltip('destroy');
             if (value !== undefined && value !== '') {
                 title = $.t(value);
                 $(element).tooltip({
                     html: true,
-                    placement: 'auto top',
+                    placement: placement,
                     title: title
                 });
+            }
+        }
+    };
+    ko.bindingHandlers.timeago = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor(), date;
+            if (value !== undefined && value !== '') {
+                date = new Date(value * 1000);
+                $(element).attr('title', date.toISOString());
+                $(element).timeago();
+            }
+        },
+        update: function(element, valueAccessor) {
+            var value = valueAccessor(), date;
+            if (value !== undefined && value !== '') {
+                date = new Date(value * 1000);
+                if ($(element).attr('title') === undefined) {
+                    $(element).attr('title', date.toISOString());
+                    $(element).timeago();
+                } else {
+                    $(element).attr('title', date.toISOString());
+                    $(element).timeago('updateFromDOM');
+                }
             }
         }
     };
@@ -171,24 +204,157 @@ define(['knockout', 'jquery', 'd3', 'ovs/generic'], function(ko, $, d3, generic)
     };
     ko.bindingHandlers.shortText = {
         init: function(element, valueAccessor, allBindings) {
-            var value = valueAccessor(),
+            var shortValue, value = valueAccessor(),
                 maxLength = allBindings.get('maxLength');
             if (maxLength !== undefined) {
                 if (value.length > maxLength - 3) {
-                    value = value.substr(0, maxLength - 3) + '&hellip;';
+                    shortValue = value.substr(0, maxLength - 3) + '&hellip;';
+                    $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
+                    return;
                 }
             }
-            $(element).text(value);
+            $(element).html(value);
         },
         update: function(element, valueAccessor, allBindings) {
-            var value = valueAccessor(),
+            var shortValue, value = valueAccessor(),
                 maxLength = allBindings.get('maxLength');
             if (maxLength !== undefined) {
                 if (value.length > maxLength - 3) {
-                    value = value.substr(0, maxLength - 3) + '&hellip;';
+                    shortValue = value.substr(0, maxLength - 3) + '&hellip;';
+                    $(element).html('<abbr title="' + value + '"><span>' + shortValue + '</span></abbr>');
+                    return;
                 }
             }
             $(element).html(value);
         }
-    }
+    };
+    ko.bindingHandlers.slider = {
+        init: function(element, valueAccessor) {
+            var value = valueAccessor(),
+                id = 'id_' + generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
+            $(element).attr('id', id);
+            $(element).data('slider', new Slider());
+            d3.select('#' + id).call(
+                $(element).data('slider')
+                    .value(value())
+                    .axis(true)
+                    .min(value.min)
+                    .max(value.max)
+                    .step(1)
+                    .on('slide', function(event, newValue) {
+                        value(newValue);
+                    })
+            );
+        },
+        update: function(element, valueAccessor) {
+            var value = valueAccessor();
+            $(element).data('slider').value(value());
+        }
+    };
+    ko.bindingHandlers.let = {
+        'init': function(element, valueAccessor, allBindingsAccessor, viewModel, bindingContext) {
+            // Make a modified binding context, with extra properties, and apply it to descendant elements
+            var innerContext = bindingContext.extend(valueAccessor());
+            ko.applyBindingsToDescendants(innerContext, element);
+            return { controlsDescendantBindings: true };
+        }
+    };
+    ko.virtualElements.allowedBindings['let'] = true;
+    ko.bindingHandlers.pie = {
+        init: function(element) {
+            var id = 'id_' + generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10), size = 200, svg;
+            $(element).html('<div></div>');
+            $($(element).children()[0]).attr('id', id);
+            svg = d3.select('#' + id).append('svg')
+                .attr('class', 'svg')
+                .attr('width', size * 2.5)
+                .attr('height', size);
+            svg.append('g')
+                .attr('class', 'container')
+                .attr('transform', 'translate(' + size / 2 + ',' + size / 2 + ')');
+            svg.append('g')
+                .attr('class', 'legendcontainer')
+                .attr('transform', 'translate(' + (size + 20) + ',0)');
+        },
+        update: function(element, valueAccessor) {
+            var id, g, pie, path, arc, legend, entry, size = 200, data = valueAccessor(),
+                color = d3.scale.ordinal().range([
+                    '#e6e6e6', '#b2b2b2', '#808080',
+                    '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'
+                ]);
+
+            arc = d3.svg.arc()
+                .outerRadius(size / 2)
+                .innerRadius(0);
+            pie = d3.layout.pie()
+                .sort(null)
+                .value(function(d) { return Math.round(d.percentage * 100) / 100; });
+
+            id = $($(element).children()[0]).attr('id');
+
+            g = d3.select('#' + id).select('.container');
+            g.datum(data).selectAll('path')
+                .data(pie, function(d) { return d.data.name; })
+                .style('fill', function(d) { return color(d.data.name); })
+                .transition()
+                .duration(250)
+                .attrTween('d', function(a) {
+                    var i = d3.interpolate(this._current, a);
+                    this._current = i(0);
+                    return function(t) {
+                        return arc(i(t));
+                    };
+                });
+            g.datum(data).selectAll('path')
+                .data(pie, function(d) { return d.data.name; })
+                .enter().append('path')
+                .style('fill', function(d) { return color(d.data.name); })
+                .attr('d', arc)
+                .each(function(d) { this._current = d; });
+            g.datum(data).selectAll('path')
+                .data(pie, function(d) { return d.data.name; })
+                .exit().remove();
+
+            legend = d3.select('#' + id).select('.legendcontainer');
+            legend.selectAll('g')
+                .data(data, function(d) { return d.name; })
+                .select('text')
+                .text(function(d) {
+                    var text = d.name + ' (' + generic.formatBytes(d.value);
+                    if (d.hasOwnProperty('percentage')) {
+                        text += ' - ' + generic.formatPercentage(d.percentage);
+                    }
+                    text += ')';
+                    return text;
+                });
+            entry = legend.selectAll('g')
+                .data(data, function(d) { return d.name; })
+                .enter()
+                .append('g')
+                .attr('class', 'legend')
+                .attr('transform', function(d, i) {
+                    var height = 25,
+                        vert = i * height;
+                    return 'translate(0,' + vert + ')';
+                });
+            entry.append('rect')
+                .attr('width', 16)
+                .attr('height', 16)
+                .style('fill', function(d) { return color(d.name); })
+            entry.append('text')
+                .attr('x', 20)
+                .attr('y', 14)
+                .text(function(d) {
+                    var text = d.name + ' (' + generic.formatBytes(d.value);
+                    if (d.hasOwnProperty('percentage')) {
+                        text += ' - ' + generic.formatPercentage(d.percentage);
+                    }
+                    text += ')';
+                    return text;
+                });
+            legend.selectAll('g')
+                .data(data, function(d) { return d.name; })
+                .exit().remove();
+        }
+    };
 });

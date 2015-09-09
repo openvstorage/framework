@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,7 +44,8 @@ define([
                 var storageRouter = self.storageRouter();
                 $.when.apply($, [
                         storageRouter.load('_dynamics,_relations'),
-                        storageRouter.getAvailableActions()
+                        storageRouter.getAvailableActions(),
+                        storageRouter.getDisks()
                     ])
                     .then(self.loadStorageDrivers)
                     .then(self.loadVPools)

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,18 +16,23 @@
 Metadata views
 """
 
+import json
 import time
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.generic.system import System
+from ovs.extensions.generic.configuration import Configuration
+from ovs.extensions.api.client import OVSClient
 from django.views.generic import View
 from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.conf import settings
-from oauth2.decorators import json_response, limit
+from oauth2.decorators import auto_response, limit, authenticated
+from backend.decorators import required_roles, load
 from ovs.dal.lists.bearertokenlist import BearerTokenList
 from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 
-logger = LogHandler('api', name='metadata')
+logger = LogHandler.get('api', name='metadata')
 
 
 class MetadataView(View):
@@ -35,7 +40,7 @@ class MetadataView(View):
     Implements retrieval of generic metadata about the services
     """
 
-    @json_response()
+    @auto_response()
     @limit(amount=60, per=60, timeout=60)
     def get(self, request, *args, **kwargs):
         """
@@ -44,9 +49,11 @@ class MetadataView(View):
         _ = args, kwargs
         data = {'authenticated': False,
                 'authentication_state': None,
+                'authentication_metadata': {},
                 'username': None,
                 'userguid': None,
                 'roles': [],
+                'identification': {},
                 'storagerouter_ips': [sr.ip for sr in StorageRouterList.get_storagerouters()],
                 'versions': list(settings.VERSION),
                 'plugins': {}}
@@ -59,7 +66,23 @@ class MetadataView(View):
                     if backend_type.code not in plugins:
                         plugins[backend_type.code] = []
                     plugins[backend_type.code] += ['backend', 'gui']
+            # - Generic plugins, as added to the configuration file(s)
+            generic_plugins = Configuration.get('ovs.plugins.generic')
+            for plugin_name in generic_plugins:
+                if plugin_name not in plugins:
+                    plugins[plugin_name] = []
+                plugins[plugin_name] += ['gui']
             data['plugins'] = plugins
+
+            # Fill identification
+            data['identification'] = {'cluster_id': Configuration.get('ovs.support.cid')}
+
+            # Get authentication metadata
+            authentication_metadata = {'ip': System.get_my_storagerouter().ip}
+            for key in ['mode', 'authorize_uri', 'client_id', 'scope']:
+                if Configuration.exists('ovs.webapps.oauth2.{0}'.format(key)):
+                    authentication_metadata[key] = Configuration.get('ovs.webapps.oauth2.{0}'.format(key))
+            data['authentication_metadata'] = authentication_metadata
 
             # Gather authorization metadata
             if 'HTTP_AUTHORIZATION' not in request.META:
@@ -99,3 +122,49 @@ class MetadataView(View):
         Pass through method to add the CSRF exempt
         """
         return super(MetadataView, self).dispatch(request, *args, **kwargs)
+
+
+def relay(*args, **kwargs):
+    """
+    Relays any call to another node.
+    Assume this example:
+    * A user wants to execute a HTTP GET on /api/storagerouters/
+    ** /api/<call>
+    * He'll have to execute a HTTP GET on /api/relay/<call>
+    ** This will translate to /apt/relay/storagerouters/
+    Parameters:
+    * Mandatory: ip, port, client_id, client_secret
+    * All other parameters will be passed through to the speicified node
+    """
+
+    @authenticated()
+    @required_roles(['read'])
+    @load()
+    def _relay(_, ip, port, client_id, client_secret, version, request):
+        path = '/{0}'.format(request.path.replace('/api/relay/', ''))
+        method = request.META['REQUEST_METHOD'].lower()
+        client = OVSClient(ip, port, credentials=(client_id, client_secret), version=version, raw_response=True)
+        if not hasattr(client, method):
+            return HttpResponseBadRequest, 'Method not available in relay'
+        client_kwargs = {'params': request.GET}
+        if method != 'get':
+            client_kwargs['data'] = request.POST
+        call_response = getattr(client, method)(path, **client_kwargs)
+        response = HttpResponse(call_response.text,
+                                content_type='application/json',
+                                status=call_response.status_code)
+        for header, value in call_response.headers.iteritems():
+            response[header] = value
+        return response
+
+    try:
+        return _relay(*args, **kwargs)
+    except Exception as ex:
+        message = str(ex)
+        status_code = 400
+        if hasattr(ex, 'detail'):
+            message = ex.detail
+        if hasattr(ex, 'status_code'):
+            status_code = ex.status_code
+        logger.exception('Error relaying call: {0}'.format(message))
+        return HttpResponse(json.dumps({'error': message}), content_type='application/json', status=status_code)

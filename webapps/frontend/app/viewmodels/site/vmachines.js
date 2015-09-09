@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle)) {
-                    self.vPoolsHandle = api.get('vpools', { contents: 'statistics,stored_data' })
+                    self.vPoolsHandle = api.get('vpools', { queryparams: { contents: 'statistics,stored_data' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {
@@ -127,7 +127,7 @@ define([
                             });
                         });
                 }
-            }, 5000);
+            }, 60000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

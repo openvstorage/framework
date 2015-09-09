@@ -1,0 +1,16 @@
+[Unit]
+Description=ovs volumedriver
+Requires=ovs-watcher-volumedriver.service ovs-failovercache_<VPOOL_NAME>.service <ADDITIONAL_DEPENDENCIES>
+After=ovs-watcher-volumedriver.service
+
+[Service]
+Type=simple
+ExecStartPost=/bin/bash -c "if [ '<HYPERVISOR_TYPE>' = 'VMWARE' ] ; then grep -q '<VPOOL_MOUNTPOINT> ' /etc/exports || echo '<VPOOL_MOUNTPOINT> *(rw,fsid=<UUID>,async,no_root_squash,no_subtree_check)' >> /etc/exports; exportfs -u *:<VPOOL_MOUNTPOINT>; exportfs *:<VPOOL_MOUNTPOINT>; fi "
+ExecStart=/usr/bin/volumedriver_fs.sh -f --config-file=/opt/OpenvStorage/config/storagedriver/storagedriver/<VPOOL_NAME>.json --logrotation --mountpoint <VPOOL_MOUNTPOINT> --logfile /var/log/ovs/volumedriver/<VPOOL_NAME>.log -o big_writes -o sync_read -o allow_other -o use_ino -o default_permissions -o uid=<OVS_UID> -o gid=<OVS_GID> -o umask=0002
+ExecStop=/bin/bash -c "if [ '<HYPERVISOR_TYPE>' = 'VMWARE' ] ; then exportfs -u *:<VPOOL_MOUNTPOINT>; grep -v '<VPOOL_MOUNTPOINT> *' /etc/exports > /etc/exports_ovs && mv /etc/exports_ovs /etc/exports; fi; if mount | grep <VPOOL_MOUNTPOINT>; then fusermount -u <VPOOL_MOUNTPOINT>; fi "
+Restart=on-failure
+RestartSec=360
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

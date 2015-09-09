@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -167,11 +167,13 @@ define(['jquery', 'jqp/pnotify'], function($) {
     function alertError(title, message) {
         return alert(title, message, 'error');
     }
-    function keys(object) {
+    function keys(object, filter) {
         var allKeys = [], key;
         for (key in object) {
             if (object.hasOwnProperty(key)) {
-                allKeys.push(key);
+                if (filter === undefined || filter(key)) {
+                    allKeys.push(key);
+                }
             }
         }
         return allKeys;
@@ -250,6 +252,36 @@ define(['jquery', 'jqp/pnotify'], function($) {
                     // we'll have to remove the object
                     for (j = 0; j < objectList().length; j += 1) {
                         if (objectList()[j][key]() === currentKeyList[i]) {
+                            objectList.splice(j, 1);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    function syncObservableArray(newArray, objectList, key, clean) {
+        var i, j, newKeyList = [], currentKeyList = [];
+        for (i = 0; i < objectList().length; i += 1) {
+            currentKeyList.push(objectList()[i].key);
+        }
+        for (i = 0; i < newArray.length; i += 1) {
+            newKeyList.push(newArray[i].key);
+        }
+        for (i = 0; i < newKeyList.length; i += 1) {
+            if ($.inArray(newKeyList[i], currentKeyList) === -1) {
+                // One of the new keys is not yet in our current key list. This means
+                // we'll have to load the object.
+                objectList.push(newArray[i]);
+            }
+        }
+        if (clean !== false) {
+            for (i = 0; i < currentKeyList.length; i += 1) {
+                if ($.inArray(currentKeyList[i], newKeyList) === -1) {
+                    // One of the existing keys is not in the new key list anymore. This means
+                    // we'll have to remove the object
+                    for (j = 0; j < objectList().length; j += 1) {
+                        if (objectList()[j].key === currentKeyList[i]) {
                             objectList.splice(j, 1);
                             break;
                         }
@@ -348,39 +380,149 @@ define(['jquery', 'jqp/pnotify'], function($) {
             }
         });
     }
+    function getColor(index) {
+        var colors = ['#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'];
+        return colors[index % colors.length];
+    }
+    function arrayEquals(array1, array2) {
+        var i;
+        if (!array2) {
+            return false;
+        }
+        if (array1.length !== array2.length) {
+            return false;
+        }
 
+        for (i = 0; i < array1.length; i += 1) {
+            if (array1[i] instanceof Array && array2[i] instanceof Array) {
+                if (!arrayEquals(array1[i], array2[i])) {
+                    return false;
+                }
+            } else if (array1[i] !== array2[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+    function arrayHasElement(array, element) {
+        var i;
+        for (i = 0; i < array.length; i += 1) {
+            if (element === array[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function arrayIsIn(array1, array2) {
+        var i;
+        for (i = 0; i < array2.length; i += 1) {
+            if (arrayEquals(array1, array2[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function stringStartsWith(string1, string2) {
+        return string1.indexOf(string2) === 0;
+    }
+    function getLocalTime(timestamp) {
+        var date = new Date(timestamp * 1000);
+        return date.toLocaleTimeString();
+    }
+    function arrayFilterUnique(value, index, array) {
+        return array.indexOf(value) === index;
+    }
+    function getHash(length) {
+        if (length === undefined) {
+            length = 16;
+        }
+        var text = '', possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', i;
+        for(i = 0; i < length; i += 1) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
+    function setCookie(name, value, days) {
+        var expires, date;
+        if (days !== undefined) {
+            date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = '; expires=' + date.toGMTString();
+        } else {
+            expires = '';
+        }
+        document.cookie = encodeURIComponent(name) + '=' + encodeURIComponent(value) + expires + '; path=/';
+    }
+    function getCookie(name) {
+        var cookies = document.cookie.split(';'), cookie, i;
+        name = encodeURIComponent(name);
+        for (i = 0; i < cookies.length; i += 1) {
+            cookie = cookies[i];
+            while (cookie.charAt(0) === ' ') {
+                cookie = cookie.substring(1, cookie.length);
+            }
+            if (cookie.indexOf(name) === 0) {
+                return decodeURIComponent(cookie.substring(name.length + 1, cookie.length));
+            }
+        }
+        return null;
+    }
+    function removeCookie(name) {
+        setCookie(name, '', -1);
+    }
+
+    Array.prototype.equals = function(array) {
+        return arrayEquals(this, array);
+    };
+    Array.prototype.nestedIn = function(array) {
+        return arrayIsIn(this, array);
+    };
+    Array.prototype.contains = function(element) {
+        return arrayHasElement(this, element);
+    };
+    String.prototype.startsWith = function(searchString) {
+        return stringStartsWith(this, searchString);
+    };
     return {
-        getTimestamp     : getTimestamp,
-        formatBytes      : formatBytes,
-        formatSpeed      : formatSpeed,
-        formatRatio      : formatRatio,
-        formatShort      : formatShort,
-        formatNumber     : formatNumber,
+        getTimestamp : getTimestamp,
+        formatBytes : formatBytes,
+        formatSpeed : formatSpeed,
+        formatRatio : formatRatio,
+        formatShort : formatShort,
+        formatNumber : formatNumber,
         formatPercentage : formatPercentage,
-        padRight         : padRight,
-        padLeft          : padLeft,
-        tryGet           : tryGet,
-        trySet           : trySet,
-        lower            : lower,
-        alert            : alert,
-        alertInfo        : alertInfo,
-        alertSuccess     : alertSuccess,
-        alertError       : alertError,
-        keys             : keys,
-        xhrAbort         : xhrAbort,
-        xhrCompleted     : xhrCompleted,
-        removeElement    : removeElement,
-        smooth           : smooth,
-        round            : round,
-        ceil             : ceil,
-        buildString      : buildString,
-        setDecimals      : setDecimals,
-        crossFiller      : crossFiller,
-        deg2rad          : deg2rad,
-        numberSort       : numberSort,
-        advancedSort     : advancedSort,
-        validate         : validate,
-        overlap          : overlap,
-        merge            : merge
+        padRight : padRight,
+        padLeft : padLeft,
+        tryGet : tryGet,
+        trySet : trySet,
+        lower : lower,
+        alert : alert,
+        alertInfo : alertInfo,
+        alertSuccess : alertSuccess,
+        alertError : alertError,
+        keys : keys,
+        xhrAbort : xhrAbort,
+        xhrCompleted : xhrCompleted,
+        removeElement : removeElement,
+        smooth : smooth,
+        round : round,
+        ceil : ceil,
+        buildString : buildString,
+        setDecimals : setDecimals,
+        crossFiller : crossFiller,
+        syncObservableArray: syncObservableArray,
+        deg2rad : deg2rad,
+        numberSort : numberSort,
+        advancedSort : advancedSort,
+        validate : validate,
+        overlap : overlap,
+        merge : merge,
+        getColor: getColor,
+        getLocalTime: getLocalTime,
+        arrayFilterUnique: arrayFilterUnique,
+        getHash: getHash,
+        setCookie: setCookie,
+        getCookie: getCookie,
+        removeCookie: removeCookie
     };
 });

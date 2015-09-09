@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import pika
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='sender')
+logger = LogHandler.get('extensions', name='sender')
 
 if __name__ == '__main__':
     data = sys.argv[1] if len(sys.argv) >= 2 else '{}'

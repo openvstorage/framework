@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
 /*global define */
 define([
     'jquery', 'knockout',
-    '../../containers/vmachine', './data',
+    './data',
     'ovs/api', 'ovs/generic', 'ovs/shared'
-], function($, ko, VMachine, data, api, generic, shared) {
+], function($, ko, data, api, generic, shared) {
     "use strict";
     return function() {
         var self = this;
@@ -41,28 +41,36 @@ define([
                         connection_timeout: self.data.timeout(),
                         connection_username: self.data.accesskey(),
                         connection_password: self.data.secretkey(),
+                        connection_backend: {'backend': (self.data.backend() === 'alba' ? self.data.albaBackend().guid : undefined),
+                                             'metadata': (self.data.backend() === 'alba' ? self.data.albaPreset().name : undefined)},
                         mountpoint_temp: self.data.mtptTemp(),
                         mountpoint_bfs: self.data.mtptBFS(),
                         mountpoint_md: self.data.mtptMD(),
-                        mountpoint_readcache1: self.data.mtptReadCache1(),
-                        mountpoint_readcache2: self.data.mtptReadCache2(),
-                        mountpoint_writecache: self.data.mtptWriteCache(),
+                        mountpoint_readcaches: self.data.mtptReadCaches(),
+                        mountpoint_writecaches: self.data.mtptWriteCaches(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        config_cinder: self.data.configCinder(),
-                        cinder_user: self.data.cinderUser(),
-                        cinder_pass: self.data.cinderPassword(),
-                        cinder_tenant: self.data.cinderTenant(),
-                        cinder_controller: self.data.cinderCtrlIP()
+                        integratemgmt: self.data.integratemgmt()
                     }
                 };
-                api.post('storagerouters/' + self.data.target().guid() + '/add_vpool', { data: post_data })
+                var target_guid;
+                if (self.data.extendVpool() === true) {
+                    target_guid = self.data.storageRouter().guid()
+                } else {
+                    target_guid = self.data.target().guid()
+                }
+                api.post('storagerouters/' + target_guid + '/add_vpool', { data: post_data })
                         .then(shared.tasks.wait)
                         .done(function() {
                             generic.alertSuccess($.t('ovs:generic.saved'), $.t('ovs:wizards.addvpool.confirm.success', { what: self.data.name() }));
                         })
                         .fail(function() {
                             generic.alertError($.t('ovs:generic.error'), $.t('ovs:generic.messages.errorwhile', { what: $.t('ovs:wizards.addvpool.confirm.creating') }));
+                        })
+                        .always(function() {
+                            if (self.data.completed !== undefined) {
+                                self.data.completed.resolve(true);
+                            }
                         });
                 generic.alertInfo($.t('ovs:wizards.addvpool.confirm.started'), $.t('ovs:wizards.addvpool.confirm.inprogress', { what: self.data.name() }));
                 deferred.resolve();

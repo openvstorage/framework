@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,11 +16,13 @@
 Django settings module
 """
 import os
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.system import System
+from ovs.extensions.generic.configuration import Configuration
 
 DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
+UNIQUE_ID = System.get_my_machine_id()
 UI_NAME = Configuration.get('ovs.webapps.main.uiname')
 APP_NAME = Configuration.get('ovs.webapps.main.appname')
 BASE_WWW_DIR = os.path.dirname(__file__)

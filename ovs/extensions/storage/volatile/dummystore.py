@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ class DummyVolatileStore(object):
     """
     This is a dummy volatile store that makes use of a local json file
     """
-    _path = '/tmp/dummyvolatile.json'
+    _path = '/run/dummyvolatile.json'
     _storage = {}
     _timeout = {}
 

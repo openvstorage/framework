@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 CloudFounders NV
+ * Copyright 2014 Open vStorage NV
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
-@font-face {
-    font-family: 'mondaregular' !important;
-    src: url('/lib/ovs/font/monda-regular-webfont.eot');
-    src: url('/lib/ovs/font/monda-regular-webfont.eot?#iefix') format('embedded-opentype'),
-    url('/lib/ovs/font/monda-regular-webfont.woff') format('woff'),
-    url('/lib/ovs/font/monda-regular-webfont.ttf') format('truetype'),
-    url('/lib/ovs/font/monda-regular-webfont.svg#mondaregular') format('svg');
-    font-weight: normal;
-    font-style: normal;
-}
-
 * {
     margin: 0;
 }
 
+:not(a) {
+    cursor: default;
+}
+button * {
+    cursor: pointer;
+}
+
 html, body {
-    font-family: "mondaregular", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-family: "Monda", "Helvetica Neue", Helvetica, Arial, sans-serif !important;
     height: 100%;
 }
 .stretch {
@@ -71,6 +67,12 @@ div[data-view]:not(.modal-dialog) {
 .pointer {
     cursor: default;
 }
+.zoom-in {
+    cursor: zoom-in;
+}
+.zoom-out {
+    cursor: zoom-out;
+}
 
 .quote {
     padding: 10px 20px;
@@ -85,6 +87,11 @@ div[data-view]:not(.modal-dialog) {
 
 .fa-1p5x {
     font-size: 1.5em;
+}
+
+.fa-stack-1px6 {
+    font-size: 1.6em;
+    padding-top: 3px;
 }
 
 .table-noborder td {
@@ -197,4 +204,13 @@ a {
 
 .nav-tabs > li.active > a, .nav-tabs > li.active > a:hover, .nav-tabs > li.active > a:focus {
     color: #377ca8 !important;
+}
+
+.noline {
+    text-decoration: none !important;
+}
+
+code {
+    color: #555 !important;
+    background-color: #eee !important;
 }

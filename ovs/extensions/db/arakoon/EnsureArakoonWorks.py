@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import shutil
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('arakoon', name='validator')
+logger = LogHandler.get('arakoon', name='validator')
 
 
 class EnsureArakoonError(Exception):
@@ -33,7 +33,7 @@ class EnsureArakoonError(Exception):
         print '{0}'.format(self.message)
 
 
-class EnsureArakoonWorks():
+class EnsureArakoonWorks(object):
     """
     Wait for the following operation to be possible:
     1) Set a value

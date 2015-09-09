@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-/*global define */
+/*global define, window */
 define([
     'knockout', 'jquery',
     'ovs/generic'
@@ -25,15 +25,16 @@ define([
         self.unique        = generic.getTimestamp().toString();
 
         // Observables
-        self.key           = ko.observable();
-        self.keyIsFunction = ko.observable(false);
-        self.small         = ko.observable(false);
-        self.multi         = ko.observable(false);
-        self.free          = ko.observable(false);
-        self.items         = ko.observableArray([]);
-        self.target        = ko.observableArray([]);
-        self._freeValue    = ko.observable();
-        self.useFree       = ko.observable(false);
+        self.key            = ko.observable();
+        self.keyIsFunction  = ko.observable(false);
+        self.small          = ko.observable(false);
+        self.multi          = ko.observable(false);
+        self.free           = ko.observable(false);
+        self.items          = ko.observableArray([]);
+        self.target         = ko.observableArray([]);
+        self._freeValue     = ko.observable();
+        self.useFree        = ko.observable(false);
+        self.emptyIsLoading = ko.observable(true);
 
         // Computed
         self.selected  = ko.computed(function() {
@@ -73,6 +74,9 @@ define([
         self.contains = function(item) {
             return $.inArray(item, self.target()) !== -1;
         };
+        self.translate = function() {
+            window.setTimeout(function() { $('html').i18n(); }, 250);
+        };
 
         // Durandal
         self.activate = function(settings) {
@@ -88,6 +92,7 @@ define([
             self.small(generic.tryGet(settings, 'small', false));
             self.keyIsFunction(generic.tryGet(settings, 'keyisfunction', false));
             self.free(generic.tryGet(settings, 'free', false));
+            self.emptyIsLoading(generic.tryGet(settings, 'emptyisloading', true));
             if (self.free()) {
                 if (!settings.hasOwnProperty('defaultfree')) {
                     throw 'If free values are allowed, a default should be provided';

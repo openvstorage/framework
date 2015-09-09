@@ -1,5 +1,5 @@
 <!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,9 +40,9 @@ limitations under the License.
                 <button type="button" class="btn btn-mini btn-default"
                         id="buttonVDiskRollback"
                         data-bind="click: function() { $root.rollback(); },
-                                   style: { color: '#428bca' },
-                                   tooltip: 'ovs:vdisks.detail.rollback',
-                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
+                                   style: { color: vMachine() !== undefined && vMachine().isRunning() ? 'lightgrey' : '#428bca' },
+                                   tooltip: vMachine() !== undefined && vMachine().isRunning() ? 'ovs:generic.messages.notrunningrequired' : 'ovs:vdisks.detail.rollback',
+                                   enable: $root.shared.user.roles().contains('write')">
                     <span class="fa" data-i18n="[html]ovs:icons.rollback"></span>
                 </button>
             </li>
@@ -112,7 +112,7 @@ limitations under the License.
                                 <div data-bind="status: {
                                                      colors: {
                                                          green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
-                                                         yellow: failoverMode() == 'catch_up',
+                                                         orange: failoverMode() == 'catch_up',
                                                          red: failoverMode() == 'degraded'
                                                      },
                                                      defaultColor: 'lightgrey'

@@ -1,0 +1,17 @@
+[Unit]
+Description=ovs workers
+Requires=ovs-watcher-framework.service
+After=ovs-watcher-framework.service
+
+[Service]
+Type=simple
+Group=ovs
+User=ovs
+WorkingDirectory=/opt/OpenvStorage
+ExecStart=/usr/bin/celery worker -A ovs.celery_run -l info -Q ovs_generic,ovs_<WORKER_QUEUE> --autoscale=8,2 -Ofair
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,5 +48,26 @@ class LinkedObjectException(Exception):
 class MissingMandatoryFieldsException(Exception):
     """
     Raised when there are mandatory fields missing
+    """
+    pass
+
+
+class SaveRaceConditionException(Exception):
+    """
+    Raised when an object could not be saved in X attempts
+    """
+    pass
+
+
+class InvalidRelationException(Exception):
+    """
+    Raised when a modeled relation is not confirm the relation's design
+    """
+    pass
+
+
+class VolatileObjectException(Exception):
+    """
+    Raised when ceratin actions are executed on a volatile object (e.g. save)
     """
     pass

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,3 +35,15 @@ class BackendList(object):
                              'query': {'type': DataList.where_operator.AND,
                                        'items': []}}).data
         return DataObjectList(backends, Backend)
+
+    @staticmethod
+    def get_by_name(name):
+        backends = DataList({'object': Backend,
+                             'data': DataList.select.GUIDS,
+                             'query': {'type': DataList.where_operator.AND,
+                                       'items': [('name', DataList.operator.EQUALS, name)]}}).data
+        if backends:
+            if len(backends) != 1:
+                raise RuntimeError('Invalid amount of Backends found: {0}'.format(len(backends)))
+            return DataObjectList(backends, Backend)[0]
+        return None

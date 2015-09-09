@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ class DummyPersistentStore(object):
     """
     This is a dummy persistent store that makes use of a local json file
     """
-    _path = '/tmp/dummypersistent.json'
+    _path = '/run/dummypersistent.json'
 
     @staticmethod
     def clean():
@@ -89,6 +89,16 @@ class DummyPersistentStore(object):
             self._save(data)
         else:
             raise KeyNotFoundException(key)
+
+    def exists(self, key):
+        """
+        Check if key exists
+        """
+        try:
+            self.get(key)
+            return True
+        except KeyNotFoundException:
+            return False
 
     def nop(self):
         """

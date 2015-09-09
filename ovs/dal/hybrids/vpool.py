@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ class VPool(DataObject):
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.'),
                     Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specifc fallback configurations')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
-    __dynamics = [Dynamic('status',      str, 10),
-                  Dynamic('statistics',  dict, 0),
+    __dynamics = [Dynamic('status', str, 10),
+                  Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('stored_data', int, 60)]
 
     def _status(self):
@@ -47,21 +47,21 @@ class VPool(DataObject):
         _ = self
         return None
 
-    def _statistics(self):
+    def _statistics(self, dynamic):
         """
         Aggregates the Statistics (IOPS, Bandwidth, ...) of each vDisk served by the vPool.
         """
-        client = StorageDriverClient()
-        vdiskstatsdict = {}
-        for key in client.stat_keys:
-            vdiskstatsdict[key] = 0
-            vdiskstatsdict['{0}_ps'.format(key)] = 0
+        from ovs.dal.hybrids.vdisk import VDisk
+        statistics = {}
+        for key in StorageDriverClient.stat_keys:
+            statistics[key] = 0
+            statistics['{0}_ps'.format(key)] = 0
         for vdisk in self.vdisks:
-            for key, value in vdisk.statistics.iteritems():
-                if key != 'timestamp':
-                    vdiskstatsdict[key] += value
-        vdiskstatsdict['timestamp'] = time.time()
-        return vdiskstatsdict
+            for key, value in vdisk.fetch_statistics().iteritems():
+                statistics[key] += value
+        statistics['timestamp'] = time.time()
+        VDisk.calculate_delta(self._key, dynamic, statistics)
+        return statistics
 
     def _stored_data(self):
         """

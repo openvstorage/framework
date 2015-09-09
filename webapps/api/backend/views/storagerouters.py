@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ StorageRouter module
 
 import json
 from rest_framework import status, viewsets
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action, link
 from rest_framework.exceptions import NotAcceptable
@@ -28,7 +27,7 @@ from ovs.dal.datalist import DataList
 from ovs.dal.dataobjectlist import DataObjectList
 from ovs.lib.storagerouter import StorageRouterController
 from ovs.lib.storagedriver import StorageDriverController
-from backend.decorators import required_roles, return_list, return_object, return_task, load, log
+from backend.decorators import required_roles, return_list, return_object, return_task, return_plain, load, log
 
 
 class StorageRouterViewSet(viewsets.ViewSet):
@@ -80,6 +79,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
     @link()
     @log()
     @required_roles(['read'])
+    @return_plain()
     @load(StorageRouter)
     def get_available_actions(self):
         """
@@ -89,7 +89,7 @@ class StorageRouterViewSet(viewsets.ViewSet):
         storagerouters = StorageRouterList.get_storagerouters()
         if len(storagerouters) > 1:
             actions.append('MOVE_AWAY')
-        return Response(actions, status=status.HTTP_200_OK)
+        return actions
 
     @action()
     @log()
@@ -115,6 +115,56 @@ class StorageRouterViewSet(viewsets.ViewSet):
         Gets version information of a given Storage Router
         """
         return StorageRouterController.get_version_info.s(storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def get_support_info(self, storagerouter):
+        """
+        Gets support information of a given Storage Router
+        """
+        return StorageRouterController.get_support_info.s(storagerouter.guid).apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @link()
+    @log()
+    @required_roles(['read'])
+    @return_task()
+    @load(StorageRouter)
+    def get_support_metadata(self, storagerouter):
+        """
+        Gets support metadata of a given Storage Router
+        """
+        return StorageRouterController.get_support_metadata.apply_async(
+            routing_key='sr.{0}'.format(storagerouter.machine_id)
+        )
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def configure_support(self, enable, enable_support):
+        """
+        Configures support
+        """
+        return StorageRouterController.configure_support.delay(enable, enable_support)
+
+    @link()
+    @log()
+    @required_roles(['read', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def get_logfiles(self, local_storagerouter, storagerouter):
+        """
+        Collects logs, moves them to a web-accessible location and returns log tgz's filename
+        """
+        return StorageRouterController.get_logfiles.s(local_storagerouter.guid).apply_async(
             routing_key='sr.{0}'.format(storagerouter.machine_id)
         )
 
@@ -159,30 +209,72 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Adds a vPool to a given Storage Router
         """
-        fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout',
+        fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout', 'connection_backend',
                   'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_readcache1', 'mountpoint_readcache2', 'mountpoint_writecache', 'mountpoint_foc',
-                  'storage_ip', 'config_cinder', 'cinder_controller', 'cinder_user', 'cinder_pass', 'cinder_tenant']
-        parameters = {'storagerouter_ip': storagerouter.ip }
+                  'mountpoint_readcaches', 'mountpoint_writecaches', 'mountpoint_foc',
+                  'storage_ip', 'integratemgmt']
+
+        parameters = {'storagerouter_ip': storagerouter.ip}
         for field in fields:
             if field not in call_parameters:
-                if field == 'mountpoint_readcache2':
+                if field in ['connection_backend']:
                     parameters[field] = ''
                     continue
                 else:
                     raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
             parameters[field] = call_parameters[field]
-            if not isinstance(parameters[field], int):
+            if isinstance(parameters[field], basestring):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
 
-    @action()
+    @link()
+    @log()
     @required_roles(['read'])
+    @return_plain()
+    @load(StorageRouter)
+    def get_mgmtcenter_info(self, storagerouter):
+        """
+        Return mgmtcenter info (ip, username, name, type)
+        """
+        data = {}
+        mgmtcenter = storagerouter.pmachine.mgmtcenter
+        if mgmtcenter:
+            data = {'ip': mgmtcenter.ip,
+                    'username': mgmtcenter.username,
+                    'name': mgmtcenter.name,
+                    'type': mgmtcenter.type}
+        return data
+
+    @link()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(StorageRouter)
-    def check_cinder(self, storagerouter):
+    def get_update_status(self, storagerouter):
         """
-        Checks whether cinder process is running on the specified machine
+        Return available updates for framework, volumedriver, ...
         """
-        return StorageRouterController.check_cinder.s().apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        return StorageRouterController.get_update_status.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def update_framework(self, storagerouter):
+        """
+        Initiate a task on 1 storagerouter to update the framework on ALL storagerouters
+        """
+        return StorageRouterController.update_framework.delay(storagerouter.ip)
+
+    @action()
+    @log()
+    @required_roles(['read', 'write', 'manage'])
+    @return_task()
+    @load(StorageRouter)
+    def update_volumedriver(self, storagerouter):
+        """
+        Initiate a task on 1 storagerouter to update the volumedriver on ALL storagerouters
+        """
+        return StorageRouterController.update_volumedriver.delay(storagerouter.ip)

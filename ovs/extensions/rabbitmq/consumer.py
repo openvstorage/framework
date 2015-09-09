@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,14 +24,14 @@ import inspect
 import time
 import sys
 import logging
-from configobj import ConfigObj
 import pyinotify
+from ConfigParser import RawConfigParser
 from ovs.extensions.rabbitmq.processor import process
 from ovs.extensions.generic.system import System
-from ovs.plugin.provider.configuration import Configuration
+from ovs.extensions.generic.configuration import Configuration
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', name='consumer')
+logger = LogHandler.get('extensions', name='consumer')
 logging.basicConfig()
 KVM_ETC = '/etc/libvirt/qemu/'
 KVM_RUN = '/run/libvirt/qemu/'
@@ -50,10 +50,10 @@ def run_event_consumer():
     """
     Check whether to run the event consumer
     """
-    rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-    rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes'], ]
+    rmq_config = RawConfigParser()
+    rmq_config.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
     machine_id = System.get_my_machine_id()
-    return machine_id in rmq_nodes
+    return rmq_config.has_section(machine_id)
 
 
 def callback(ch, method, properties, body):
@@ -62,15 +62,31 @@ def callback(ch, method, properties, body):
     """
     _ = properties
     try:
+        if type(body) == unicode:
+            data = bytearray(body, 'utf-8')
+            body = bytes(data)
         process(queue, body, mapping)
     except Exception as e:
         logger.exception('Error processing message: {0}'.format(e))
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description = 'KVM File Watcher and Rabbitmq Event Processor for OVS',
+                                     formatter_class = argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('rabbitmq_queue', type=str,
+                        help='Rabbitmq queue name')
+    parser.add_argument('--durable', dest='queue_durable', action='store_const', default=False, const=True,
+                        help='Declare queue as durable')
+    parser.add_argument('--watcher', dest='file_watcher', action='store_const', default=False, const=True,
+                        help='Enable file watcher')
+
+    args = parser.parse_args()
+    print(args.rabbitmq_queue, args.queue_durable, args.file_watcher)
     notifier = None
     try:
-        if run_kvm_watcher():
+        if args.file_watcher and run_kvm_watcher():
             from ovs.extensions.rabbitmq.kvm_xml_processor import Kxp
 
             wm = pyinotify.WatchManager()
@@ -114,13 +130,14 @@ if __name__ == '__main__':
                                 mapping[key] += this_mapping[key]
             logger.debug('Event map:')
             for key in mapping:
-                logger.debug('{0}: {1}'.format(mapping[key][0]['property'], [current_map['task'].__name__ for current_map in mapping[key]]))
+                logger.debug('{0}: {1}'.format(key.name, [current_map['task'].__name__ for current_map in mapping[key]]))
 
             # Starting connection and handling
-            rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-            rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
+            rmq_ini = RawConfigParser()
+            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+            rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
             this_server = '{0}:{1}'.format(Configuration.get('ovs.grid.ip'), Configuration.get('ovs.core.broker.port'))
-            rmq_servers = [this_server] + [server for server in map(lambda m: rmq_ini.get(m)['location'], rmq_nodes) if server != this_server]
+            rmq_servers = [this_server] + [server for server in map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes) if server != this_server]
             channel = None
             server = ''
             loglevel = logging.root.manager.disable  # Workaround for disabling logging
@@ -132,8 +149,8 @@ if __name__ == '__main__':
                                                   port=int(server.split(':')[1]),
                                                   credentials=pika.PlainCredentials(
                                                       Configuration.get('ovs.core.broker.login'),
-                                                      Configuration.get('ovs.core.broker.password')
-                                                  ))
+                                                      Configuration.get('ovs.core.broker.password'))
+                                                  )
                     )
                     channel = connection.channel()
                     break
@@ -144,8 +161,9 @@ if __name__ == '__main__':
                 raise RuntimeError('Could not connect to any available RabbitMQ endpoint.')
             logger.debug('Connected to: {0}'.format(server))
 
-            queue = sys.argv[1] if len(sys.argv) == 2 else 'default'
-            channel.queue_declare(queue=queue, durable=True)
+            queue = args.rabbitmq_queue
+            durable = args.queue_durable
+            channel.queue_declare(queue=queue, durable=durable)
             logger.info('Waiting for messages on {0}...'.format(queue), print_msg=True)
             logger.info('To exit press CTRL+C', print_msg=True)
 

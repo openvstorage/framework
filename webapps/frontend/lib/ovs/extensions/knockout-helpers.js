@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,5 +52,25 @@ define(['knockout'], function(ko) {
         result.initialized = initialized;
         result.raw = rawValue;
         return result;
+    };
+    ko.splitRows = function(columns, array) {
+        return ko.computed(function () {
+            var result = [], row;
+            // Loop through items and push each item to a row array that gets pushed to the final result
+            for (var i = 0, j = array().length; i < j; i++) {
+                if (i % columns === 0) {
+                    if (row) {
+                        result.push({ items: row });
+                    }
+                    row = [];
+                }
+                row.push(array()[i]);
+            }
+            // Push the final row
+            if (row) {
+                result.push({ items: row });
+            }
+            return result;
+        });
     };
 });

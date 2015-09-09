@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ define([
             { key: 'storedData',        value: $.t('ovs:generic.storeddata'),       width: 150       },
             { key: 'cacheRatio',        value: $.t('ovs:generic.cache'),            width: 100       },
             { key: 'iops',              value: $.t('ovs:generic.iops'),             width: 100       },
-            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 150       },
+            { key: 'backendType',       value: $.t('ovs:vpools.backendtype'),       width: 180       },
             { key: 'backendConnection', value: $.t('ovs:vpools.backendconnection'), width: 100       },
             { key: 'backendLogin',      value: $.t('ovs:vpools.backendlogin'),      width: undefined }
         ];
@@ -51,7 +51,7 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_dynamics'
+                        contents: '_dynamics,backend_type'
                     };
                     self.vPoolsHandle[page] = api.get('vpools', { queryparams: options })
                         .done(function(data) {
@@ -59,9 +59,12 @@ define([
                                 data: data,
                                 loader: function(guid) {
                                     if (!self.vPoolCache.hasOwnProperty(guid)) {
-                                         self.vPoolCache[guid] = new VPool(guid);
+                                        self.vPoolCache[guid] = new VPool(guid);
                                     }
                                     return self.vPoolCache[guid];
+                                },
+                                dependencyLoader: function(item) {
+                                    item.loadBackendType(false);
                                 }
                             });
                         })
@@ -81,7 +84,7 @@ define([
         self.activate = function() {
             self.refresher.init(function() {
                 if (generic.xhrCompleted(self.vPoolsHandle[undefined])) {
-                    self.vPoolsHandle[undefined] = api.get('vpools', { contents: 'statistics,stored_data' })
+                    self.vPoolsHandle[undefined] = api.get('vpools', { queryparams: { contents: 'statistics,stored_data,backend_type' }})
                         .done(function(data) {
                             var guids = [], vpdata = {};
                             $.each(data.data, function(index, item) {
@@ -104,7 +107,7 @@ define([
                             });
                         });
                 }
-            }, 5000);
+            }, 60000);
             self.refresher.start();
             self.refresher.run();
             self.shared.footerData(self.vPools);

@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,15 @@
 Generic system module, executing statements on local node
 """
 
+import os
+import uuid
+import time
 from subprocess import check_output
+from ConfigParser import RawConfigParser
+from StringIO import StringIO
+
+from ovs.log.logHandler import LogHandler
+logger = LogHandler.get('extensions', name='system')
 
 
 class System(object):
@@ -24,7 +32,8 @@ class System(object):
     Generic helper class
     """
 
-    my_machine_id = ''
+    OVS_ID_FILE = '/etc/openvstorage_id'
+
     my_storagerouter_guid = ''
     my_storagedriver_id = ''
 
@@ -37,19 +46,12 @@ class System(object):
     @staticmethod
     def get_my_machine_id(client=None):
         """
-        Returns unique machine id based on mac address
+        Returns unique machine id, generated at install time.
         """
-        if not System.my_machine_id:
-            cmd = """ip a | grep link/ether | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | sed 's/://g' | sort"""
-            if client is None:
-                output = check_output(cmd, shell=True).strip()
-            else:
-                output = client.run(cmd).strip()
-            for mac in output.split('\n'):
-                if mac.strip() != '000000000000':
-                    System.my_machine_id = mac.strip()
-                    break
-        return System.my_machine_id
+        if client is not None:
+            return client.run('cat {0}'.format(System.OVS_ID_FILE)).strip()
+        with open(System.OVS_ID_FILE, 'r') as the_file:
+            return the_file.read().strip()
 
     @staticmethod
     def get_my_storagerouter():
@@ -67,21 +69,17 @@ class System(object):
         return StorageRouter(System.my_storagerouter_guid)
 
     @staticmethod
-    def get_my_storagedriver_id(vpool_name):
-        """
-        Returns unique machine storagedriver_id based on vpool_name and machineid
-        """
-        return vpool_name + System.get_my_machine_id()
-
-    @staticmethod
-    def update_hosts_file(hostname, ip):
+    def update_hosts_file(hostname, ip, client):
         """
         Update/add entry for hostname ip in /etc/hosts
         """
         import re
 
-        with open('/etc/hosts', 'r') as hosts_file:
-            contents = hosts_file.read()
+        if re.match(r'^localhost$|^127(?:\.[0-9]{1,3}){3}$|^::1$', ip):
+            # Never update loopback addresses
+            return
+
+        contents = client.file_read('/etc/hosts').strip() + '\n'
 
         if isinstance(hostname, list):
             hostnames = ' '.join(hostname)
@@ -94,36 +92,87 @@ class System(object):
         else:
             contents += '{0} {1}\n'.format(ip, hostnames)
 
-        with open('/etc/hosts', 'wb') as hosts_file:
-            hosts_file.write(contents)
-
-    @staticmethod
-    def exec_remote_python(client, script):
-        """
-        Executes a python script on a client
-        """
-        return client.run('python -c """{0}"""'.format(script))
-
-    @staticmethod
-    def read_remote_config(client, key):
-        """
-        Reads remote configuration key
-        """
-        read = """
-from ovs.plugin.provider.configuration import Configuration
-print Configuration.get('{0}')
-""".format(key)
-        return System.exec_remote_python(client, read)
+        client.file_write('/etc/hosts', contents, mode='wb')
 
     @staticmethod
     def ports_in_use(client=None):
         """
         Returns the ports in use
         """
-        cmd = """netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"""
+        cmd = "netstat -ln4 | sed 1,2d | sed 's/\s\s*/ /g' | cut -d ' ' -f 4 | cut -d ':' -f 2"
         if client is None:
-            output = check_output(cmd, shell=True).strip()
+            output = check_output(cmd, shell=True)
         else:
-            output = client.run(cmd).strip()
-        for found_port in output.split('\n'):
+            output = client.run(cmd)
+        for found_port in output.splitlines():
             yield int(found_port.strip())
+
+    @staticmethod
+    def get_free_ports(selected_range, exclude=None, nr=1, client=None):
+        """
+        Return requested nr of free ports not currently in use and not within excluded range
+        :param selected_range: e.g. '2000-2010' or '50000-6000, 8000-8999' ; note single port extends to [port -> 65535]
+        :param exclude: excluded list
+        :param nr: nr of free ports requested
+        :return: sorted incrementing list of nr of free ports
+        """
+
+        requested_range = []
+        for port_range in selected_range:
+            if isinstance(port_range, list):
+                current_range = [port_range[0], port_range[1]]
+            else:
+                current_range = [port_range, 65535]
+            if 0 <= current_range[0] <= 1024:
+                current_range = [1025, current_range[1]]
+            requested_range += range(current_range[0], current_range[1] + 1)
+
+        free_ports = []
+        if exclude is None:
+            exclude = []
+        exclude_list = list(exclude)
+
+        ports_in_use = System.ports_in_use(client)
+        exclude_list += ports_in_use
+
+        cmd = 'cat /proc/sys/net/ipv4/ip_local_port_range'
+        if client is None:
+            output = check_output(cmd, shell=True)
+        else:
+            output = client.run(cmd)
+        start_end = map(int, output.split())
+        ephemeral_port_range = xrange(min(start_end), max(start_end))
+
+        for possible_free_port in requested_range:
+            if possible_free_port not in ephemeral_port_range and possible_free_port not in exclude_list:
+                free_ports.append(possible_free_port)
+            if len(free_ports) == nr:
+                return free_ports
+        raise ValueError('Unable to find requested nr of free ports')
+
+    @staticmethod
+    def read_config(filename, client=None):
+        if client is None:
+            cp = RawConfigParser()
+            with open(filename, 'r') as config_file:
+                cfg = config_file.read()
+            cp.readfp(StringIO(cfg))
+            return cp
+        else:
+            contents = client.file_read(filename)
+            cp = RawConfigParser()
+            cp.readfp(StringIO(contents))
+            return cp
+
+    @staticmethod
+    def write_config(config, filename, client=None):
+        if client is None:
+            with open(filename, 'w') as config_file:
+                config.write(config_file)
+        else:
+            temp_filename = '/var/tmp/{0}'.format(str(uuid.uuid4()).replace('-', ''))
+            with open(temp_filename, 'w') as config_file:
+                config.write(config_file)
+            time.sleep(1)
+            client.file_upload(filename, temp_filename)
+            os.remove(temp_filename)

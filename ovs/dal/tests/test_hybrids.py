@@ -1,5 +1,5 @@
-#!/usr/bin/python2
-#  Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+#  Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import sys
 from unittest import TestCase
 from ovs.extensions.storage.persistent.dummystore import DummyPersistentStore
 from ovs.extensions.storage.volatile.dummystore import DummyVolatileStore
-from ovs.dal.tests.mockups import FactoryModule
+from ovs.dal.tests.mockups import FactoryModule, StorageDriver
 from ovs.extensions.storage.persistentfactory import PersistentFactory
 from ovs.extensions.storage.volatilefactory import VolatileFactory
 from ovs.dal.helpers import HybridRunner, Descriptor
@@ -43,6 +43,7 @@ class Hybrid(TestCase):
         """
         # Replace mocked classes
         sys.modules['ovs.extensions.hypervisor.factory'] = FactoryModule
+        sys.modules['ovs.extensions.storageserver.storagedriver'] = StorageDriver
 
         PersistentFactory.store = DummyPersistentStore()
         PersistentFactory.store.clean()
@@ -126,8 +127,6 @@ class Hybrid(TestCase):
             for dynamic in instance._dynamics:
                 if dynamic.name not in properties:
                     missing_props.append(dynamic.name)
-                else:  # ... and should work
-                    _ = getattr(instance, dynamic.name)
             self.assertEqual(len(missing_props), 0,
                              'Missing dynamic properties in {0}: {1}'.format(cls.__name__, missing_props))
             # An all properties should be either in the blueprint, relations or expiry

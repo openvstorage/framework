@@ -21,7 +21,8 @@ from NurseryRouting import RoutingInfo
 from ArakoonExceptions import NurseryRangeError, NurseryInvalidConfig,ArakoonException
 from functools import wraps
 import time
-import logging
+from ovs.log.logHandler import LogHandler
+logging = LogHandler.get('arakoon', name='internal')
 
 maxDuration = 3
 

@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,19 +16,22 @@ define([
     'jquery', 'durandal/app', 'plugins/dialog', 'knockout', 'plugins/router',
     'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vpool', '../containers/vmachine', '../containers/storagerouter', '../containers/vdisk',
-    '../wizards/storageroutertovpool/index'
-], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, VDisk, StorageRouterToVPoolWizard) {
+    '../wizards/storageroutertovpool/index', '../wizards/addvpool/index', '../wizards/addvpool/data'
+], function($, app, dialog, ko, router, shared, generic, Refresher, api, VPool, VMachine, StorageRouter, VDisk,
+            StorageRouterToVPoolWizard, AddVpoolMountpoints, data) {
     "use strict";
     return function() {
         var self = this;
 
         // Variables
+        self.data               = data;
         self.shared             = shared;
         self.guard              = { authenticated: true };
         self.refresher          = new Refresher();
         self.widgets            = [];
         self.storageRouterCache = {};
         self.vMachineCache      = {};
+        self.vDiskCache         = {};
         self.checksInit         = false;
         self.vDiskHeaders       = [
             { key: 'name',         value: $.t('ovs:generic.name'),       width: undefined },
@@ -69,8 +72,8 @@ define([
         self.pendingStorageRouters = ko.computed(function() {
             var storageRouters = [];
             $.each(self.storageRouters(), function(index, storageRouter) {
-                if ($.inArray(storageRouter.guid(), self.checkedStorageRouterGuids()) !== -1 &&
-                        $.inArray(storageRouter.guid(), self.vPool().storageRouterGuids()) === -1) {
+                if (self.checkedStorageRouterGuids().contains(storageRouter.guid()) &&
+                        !self.vPool().storageRouterGuids().contains(storageRouter.guid())) {
                     storageRouters.push(storageRouter);
                 }
             });
@@ -79,8 +82,8 @@ define([
         self.removingStorageRouters = ko.computed(function() {
             var storageRouters = [];
             $.each(self.storageRouters(), function(index, storageRouter) {
-                if ($.inArray(storageRouter.guid(), self.checkedStorageRouterGuids()) === -1 &&
-                        $.inArray(storageRouter.guid(), self.vPool().storageRouterGuids()) !== -1) {
+                if (!self.checkedStorageRouterGuids().contains(storageRouter.guid()) &&
+                        self.vPool().storageRouterGuids().contains(storageRouter.guid())) {
                     storageRouters.push(storageRouter);
                 }
             });
@@ -92,7 +95,7 @@ define([
             return $.Deferred(function (deferred) {
                 var vpool = self.vPool();
                 $.when.apply($, [
-                    vpool.load('storagedrivers,_dynamics', { skipDisks: true }),
+                    vpool.load('storagedrivers,vdisks,_dynamics,backend_type'),
                     vpool.loadStorageRouters()
                         .then(function() {
                             if (self.checksInit === false) {
@@ -102,8 +105,9 @@ define([
                         }),
                     self.loadStorageRouters()
                 ])
+                    .then(vpool.loadBackendType)
                     .fail(function(error) {
-                        if (error.status === 404) {
+                        if (error !== undefined && error.status === 404) {
                             router.navigate(shared.routing.loadHash('vpools'));
                         }
                     })
@@ -115,7 +119,7 @@ define([
                 if (generic.xhrCompleted(self.loadStorageRoutersHandle)) {
                     var options = {
                         sort: 'name',
-                        contents: 'storagedrivers'
+                        contents: 'storagedrivers,pmachine'
                     };
                     self.loadStorageRoutersHandle = api.get('storagerouters', { queryparams: options })
                         .done(function(data) {
@@ -133,6 +137,10 @@ define([
                             $.each(self.storageRouters(), function(index, storageRouter) {
                                 if (sadata.hasOwnProperty(storageRouter.guid())) {
                                     storageRouter.fillData(sadata[storageRouter.guid()]);
+                                    if (storageRouter.pMachine() !== undefined) {
+                                        storageRouter.pMachine().load();
+                                        storageRouter.pMachine().loadVPoolConfigurationState(self.vPool().guid());
+                                    }
                                 }
                             });
                             self.storageRoutersLoaded(true);
@@ -140,7 +148,7 @@ define([
                         })
                         .fail(deferred.reject);
                 } else {
-                    deferred.reject();
+                    deferred.resolve();
                 }
             }).promise();
         };
@@ -158,7 +166,16 @@ define([
                             deferred.resolve({
                                 data: data,
                                 loader: function(guid) {
-                                    return new VDisk(guid);
+                                    if (!self.vDiskCache.hasOwnProperty(guid)) {
+                                        self.vDiskCache[guid] = new VDisk(guid);
+                                    }
+                                    return self.vDiskCache[guid];
+                                },
+                                dependencyLoader: function(item) {
+                                    var guid = item.vMachineGuid();
+                                    if (self.vMachineCache.hasOwnProperty(guid)) {
+                                        item.vMachine(self.vMachineCache[guid]);
+                                    }
                                 }
                             });
                         })
@@ -174,7 +191,7 @@ define([
                     var options = {
                         sort: 'name',
                         page: page,
-                        contents: '_dynamics,-snapshots,-hypervisor_status',
+                        contents: 'vdisks,_dynamics,-snapshots,-hypervisor_status',
                         vpoolguid: self.vPool().guid()
                     };
                     self.vMachinesHandle[page] = api.get('vmachines', { queryparams: options })
@@ -244,19 +261,97 @@ define([
                     });
             }
         };
-        self.updateStorageRouterServing = function() {
+
+        self.reconfigurePmachine = function(sr_guid, configure) {
             self.updatingStorageRouters(true);
-            var deferred = $.Deferred(), wizard;
+            var pmachine_guid;
+            $.each(self.storageRouters(), function(index, storagerouter) {
+                if (storagerouter.guid() === sr_guid) {
+                    pmachine_guid = storagerouter.pMachineGuid();
+                }
+            });
+            if (pmachine_guid !== undefined) {
+                app.showMessage(
+                    $.t('ovs:pmachines.configure.vpool.warning', { what: configure === true ? 'configure' : 'unconfigure' }),
+                    $.t('ovs:generic.areyousure'),
+                    [$.t('ovs:generic.no'), $.t('ovs:generic.yes')]
+                )
+                .done(function(answer) {
+                    if (answer === $.t('ovs:generic.yes')) {
+                        var action = configure === true ? '/configure_vpool_for_host' : '/unconfigure_vpool_for_host';
+                        generic.alertInfo(
+                            $.t('ovs:pmachines.configure.vpool.started'),
+                            $.t('ovs:pmachines.configure.vpool.started_msg', { which: (action === '/configure_vpool_for_host' ? 'Configuration' : 'Unconfiguration') })
+                        );
+                        api.post('pmachines/' + pmachine_guid + action, {
+                            data: { vpool_guid: self.vPool().guid() }
+                        })
+                        .then(shared.tasks.wait)
+                        .done(function() {
+                            generic.alertSuccess(
+                                $.t('ovs:pmachines.configure.vpool.success'),
+                                $.t('ovs:pmachines.configure.vpool.success_msg', { which: (action === '/configure_vpool_for_host' ? 'configured' : 'unconfigured') })
+                            );
+                        })
+                        .fail(function(error) {
+                            generic.alertError(
+                                $.t('ovs:generic.error'),
+                                $.t('ovs:pmachines.configure.vpool.failed', {
+                                    which: (action === '/configure_vpool_for_host' ? 'configure' : 'unconfigure'),
+                                    why: error
+                                })
+                            );
+                        });
+                    }
+                });
+            }
+            self.updatingStorageRouters(false);
+        };
+
+        self.addStorageRouter = function(sr) {
+            self.updatingStorageRouters(true);
+
+            var deferred = $.Deferred(), wizard, addingStorageRouter = ko.observableArray();
+            addingStorageRouter.push(sr);
+            wizard = new AddVpoolMountpoints({
+                modal: true,
+                completed: deferred,
+                vPool: self.vPool(),
+                extendVpool: true,
+                pendingStorageRouters: addingStorageRouter,
+                removingStorageRouters: ko.observableArray()
+            });
+            wizard.closing.always(function() {
+                deferred.resolve();
+            });
+            wizard.finishing.always(function() {
+                self.checkedStorageRouterGuids.push(sr.guid());
+                self.data.storageRouter([]);
+            });
+            dialog.show(wizard);
+            deferred.always(function() {
+                self.updatingStorageRouters(false);
+            });
+        };
+
+        self.removeStorageRouter = function(sr) {
+            self.updatingStorageRouters(true);
+            var deferred = $.Deferred(), wizard, removingStorageRouter = ko.observableArray();
+            removingStorageRouter.push(sr);
+
             wizard = new StorageRouterToVPoolWizard({
                 modal: true,
                 completed: deferred,
                 vPool: self.vPool(),
-                pendingStorageRouters: self.pendingStorageRouters,
-                removingStorageRouters: self.removingStorageRouters
+                pendingStorageRouters: ko.observableArray(),
+                removingStorageRouters: removingStorageRouter
             });
             wizard.closing.always(function() {
-                self.load();
                 deferred.resolve();
+            });
+            wizard.finishing.always(function() {
+                self.checkedStorageRouterGuids.remove(sr.guid());
+                self.data.storageRouter([]);
             });
             dialog.show(wizard);
             deferred.always(function() {

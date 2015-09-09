@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,47 +14,64 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_cinder', './confirm'
-], function($, generic, build, data, GatherVPool, GatherMountPoints, GatherCinder, Confirm) {
+    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_mgmtcenter', './confirm'
+], function($, generic, build, data, GatherVPool, GatherMountPoints, IntegrateMgmt, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
         build(self);
 
         // Setup
-        self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
+        data.extendVpool(generic.tryGet(options, 'extendVpool', false));
         self.modal(generic.tryGet(options, 'modal', false));
-        self.steps([new GatherVPool(), new GatherMountPoints(), new GatherCinder(self), new Confirm()]);
+
+        if (data.extendVpool() === true) {
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.extendvpool.title')));
+            self.steps([new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
+            self.storagedriver_guid = "";
+            data.storageRouter(options.pendingStorageRouters()[0]);
+            data.target(options.pendingStorageRouters()[0]);
+        } else {
+            self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
+            self.steps([new GatherVPool(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
+            data.storageRouter([]);
+            data.target(undefined);
+        }
+        data.completed = options.completed;
+        data.vPool(options.vPool);
+        data.storageDriver(options.storagedriver);
         self.step(0);
         self.activateStep();
 
         // Cleaning data
-        data.target(undefined);
         data.accesskey('');
         data.secretkey('');
         data.backend('local');
-        data.mtptTemp(undefined);
+        data.mtptTemp('/var/tmp');
         data.mtptBFS(undefined);
-        data.mtptMD(undefined);
-        data.mtptReadCache1(undefined);
-        data.mtptReadCache2(undefined);
-        data.mtptWriteCache(undefined);
-        data.mtptFOC(undefined);
+        data.mtptReadCaches([]);
+        data.mtptWriteCaches([]);
         data.storageIP(undefined);
         data.name('');
         data.host('');
+        data.localHost(true);
         data.port(80);
         data.timeout(600);
-        data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed']);
+        data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']);
         data.storageRouters([]);
         data.storageDrivers([]);
         data.mountpoints([]);
+        data.readcaches([]);
+        data.writecaches([]);
         data.ipAddresses([]);
-        data.cinderUser('admin');
-        data.cinderPassword('');
-        data.cinderTenant('admin');
-        data.cinderCtrlIP('127.0.0.1');
-        data.configCinder(false);
-        data.hasCinder(false);
+        data.albaBackends(undefined);
+        data.albaBackend(undefined);
+        data.integratemgmt(false);
+        data.hasMgmtCenter(false);
+        data.mgmtcenterUser(undefined);
+        data.mgmtcenterIp(undefined);
+        data.mgmtcenterType(undefined);
+        data.mgmtcenterName(undefined);
+        data.mgmtcenterLoaded(undefined);
     };
 });

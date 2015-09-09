@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -191,10 +191,10 @@ class VMware(object):
         _ = self, devicename, machine_ids
         return True
 
-    def file_exists(self, vpool, devicename):
+    def file_exists(self, storagedriver, devicename):
         """
         Check if devicename exists on the given vpool
         """
-        _ = self
-        filename = '/mnt/{0}/{1}'.format(vpool.name, devicename)
-        return os.path.exists(filename) and os.path.isfile(filename)
+        return self.sdk.file_exists(storagedriver.storage_ip,
+                                    storagedriver.mountpoint,
+                                    self.clean_vmachine_filename(devicename))

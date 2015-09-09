@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
 from ovs.extensions.hypervisor.factory import Factory
+from ovs.extensions.generic.sshclient import SSHClient
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.helpers.decorators import log
 from ovs.log.logHandler import LogHandler
@@ -35,20 +36,24 @@ class VPoolController(object):
     """
 
     @staticmethod
-    @celery.task(name='ovs.vpool.mountpoint_available_from_voldrv')
+    @celery.task(name='ovs.vpool.up_and_running')
     @log('VOLUMEDRIVER_TASK')
-    def mountpoint_available_from_voldrv(mountpoint, storagedriver_id):
+    def up_and_running(mountpoint, storagedriver_id):
         """
-        Hook for (re)exporting the NFS mountpoint
+        Volumedriver informs us that the service is completely started. Post-start events can be executed
         """
         storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
         if storagedriver is None:
             raise RuntimeError('A Storage Driver with id {0} could not be found.'.format(storagedriver_id))
+        storagedriver.startup_counter += 1
+        storagedriver.save()
         if storagedriver.storagerouter.pmachine.hvtype == 'VMWARE':
-            nfs = Nfsexports()
-            nfs.unexport(mountpoint)
-            nfs.export(mountpoint)
-            nfs.trigger_rpc_mountd()
+            client = SSHClient(storagedriver.storagerouter)
+            if client.config_read('ovs.storagedriver.vmware_mode') == 'classic':
+                nfs = Nfsexports()
+                nfs.unexport(mountpoint)
+                nfs.export(mountpoint)
+                nfs.trigger_rpc_mountd()
 
     @staticmethod
     @celery.task(name='ovs.vpool.sync_with_hypervisor')

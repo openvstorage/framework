@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 DataObjectList module
 """
 from ovs.dal.exceptions import ObjectNotFoundException
+from ovs.dal.helpers import Descriptor
 
 
 class DataObjectList(object):
@@ -23,6 +24,8 @@ class DataObjectList(object):
     The DataObjectList works on the resulting dataset from a DataList query. It uses the
     descriptor metadata to provide a list-alike experience
     """
+
+    global_object_cache = {}
 
     def __init__(self, query_result, cls, reduced=False):
         """
@@ -33,9 +36,12 @@ class DataObjectList(object):
         """
         self._guids = query_result
         self.type = cls
+        self._type_name = cls.__name__
         self._objects = {}
         self._reduced = reduced
         self._query_result = query_result
+        if self._type_name not in DataObjectList.global_object_cache:
+            DataObjectList.global_object_cache[self._type_name] = {}
 
     @property
     def reduced(self):
@@ -44,7 +50,7 @@ class DataObjectList(object):
             dataobjectlist._guids = self._guids  # Keep sorting
             return dataobjectlist
 
-    def merge(self, query_result):
+    def update(self, query_result):
         """
         This method merges in a new query result, preservice objects that might already
         be cached. It also maintains previous sorting, appending new items to the end of the list
@@ -64,20 +70,36 @@ class DataObjectList(object):
             if guid not in self._guids:
                 del self._objects[guid]
         if not self._reduced:
-            self.reduced.merge(query_result)
+            self.reduced.update(query_result)
 
-    def _get_object(self, guid):
+    def _get_object(self, requested_guid):
         """
         Yields an instance with a given guid, or a fake class with only a guid property in case
         of a reduced list
         """
-        if guid not in self._objects:
+        def load_and_cache(guid):
+            """
+            Loads and caches the object
+            """
             if self._reduced:
-                self._objects[guid] = type(self.type.__name__, (), {})()
+                self._objects[guid] = type(self._type_name, (), {})()
                 setattr(self._objects[guid], 'guid', guid)
             else:
                 self._objects[guid] = self.type(guid)
-        return self._objects[guid]
+                DataObjectList.global_object_cache[self._type_name][guid] = self._objects[guid]
+
+        if requested_guid in self._objects:
+            requested_object = self._objects[requested_guid]
+        elif requested_guid in DataObjectList.global_object_cache[self._type_name]:
+            requested_object = DataObjectList.global_object_cache[self._type_name][requested_guid]
+            self._objects[requested_guid] = requested_object
+        else:
+            load_and_cache(requested_guid)
+            return self._objects[requested_guid]
+        if requested_object.updated_on_datastore():
+            load_and_cache(requested_guid)
+            return self._objects[requested_guid]
+        return requested_object
 
     def index(self, value):
         """
@@ -110,13 +132,61 @@ class DataObjectList(object):
         """
         self._guids.reverse()
 
-    def load(self):
+    def loadunsafe(self):
         """
         Loads all objects (to use on e.g. sorting)
         """
         for guid in self._guids:
             if guid not in self._objects:
                 self._get_object(guid)
+
+    def loadsafe(self):
+        """
+        Loads all objects (to use on e.g. sorting), but not caring about objects that doesn't exist
+        """
+        for guid in self._guids:
+            if guid not in self._objects:
+                try:
+                    self._get_object(guid)
+                except ObjectNotFoundException:
+                    pass
+
+    def load(self):
+        """
+        Loads all objects
+        """
+        return self.loadsafe()
+
+    def __add__(self, other):
+        if not isinstance(other, DataObjectList):
+            raise TypeError('Both operands should be of type DataObjectList')
+        if Descriptor(self.type) != Descriptor(other.type):
+            raise TypeError('Both operands should contain the same data')
+        new_dol = DataObjectList(self._query_result, self.type)
+        guids = self._guids[:]
+        for guid in other._guids:
+            if guid not in guids:
+                guids.append(guid)
+        new_dol._guids = guids
+        return new_dol
+
+    def __radd__(self, other):
+        # This will typically called when "other" is no DataObjectList.
+        if other is None:
+            return self
+        if isinstance(other, list) and other == []:
+            return self
+        if not isinstance(other, DataObjectList):
+            raise TypeError('Both operands should be of type DataObjectList')
+        if Descriptor(self.type) != Descriptor(other.type):
+            raise TypeError('Both operands should contain the same data')
+        new_dol = DataObjectList(self._query_result, self.type)
+        guids = self._guids[:]
+        for guid in other._guids:
+            if guid not in guids:
+                guids.append(guid)
+        new_dol._guids = guids
+        return new_dol
 
     def iterloaded(self):
         """
@@ -127,9 +197,16 @@ class DataObjectList(object):
             if guid in self._objects:
                 yield self._objects[guid]
 
+    def iterunsafe(self):
+        """
+        Yields object instances
+        """
+        for guid in self._guids:
+            yield self._get_object(guid)
+
     def itersafe(self):
         """
-        Allows to iterate over all objects, but not caring about objects that doesn't exist
+        Yields object instances, but not caring about objects that doesn't exist
         """
         for guid in self._guids:
             try:
@@ -137,31 +214,11 @@ class DataObjectList(object):
             except ObjectNotFoundException:
                 pass
 
-    def __add__(self, other):
-        if not isinstance(other, DataObjectList):
-            raise TypeError('Both operands should be of type DataObjectList')
-        new_dol = DataObjectList(self._query_result, self.type)
-        new_dol.merge(other._query_result)
-        return new_dol
-
-    def __radd__(self, other):
-        # This will typically called when "other" is no DataObjectList.
-        if other is None:
-            return self
-        elif isinstance(other, list) and other == []:
-            return self
-        elif not isinstance(other, DataObjectList):
-            raise TypeError('Both operands should be of type DataObjectList')
-        new_dol = DataObjectList(self._query_result, self.type)
-        new_dol.merge(other._query_result)
-        return new_dol
-
     def __iter__(self):
         """
         Yields object instances
         """
-        for guid in self._guids:
-            yield self._get_object(guid)
+        return self.itersafe()
 
     def __len__(self):
         """

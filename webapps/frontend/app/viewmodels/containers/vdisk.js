@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -156,7 +156,15 @@ define([
         self.fillData = function(data) {
             generic.trySet(self.name, data, 'name');
             generic.trySet(self.order, data, 'order');
-            generic.trySet(self.snapshots, data, 'snapshots');
+            if (data.hasOwnProperty('snapshots')) {
+                var snapshots = [];
+                $.each(data.snapshots, function(index, snapshot) {
+                    if (snapshot.in_backend) {
+                        snapshots.push(snapshot);
+                    }
+                });
+                self.snapshots(snapshots);
+            }
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.vpoolGuid, data, 'vpool_guid');
             generic.trySet(self.vMachineGuid, data, 'vmachine_guid');
@@ -183,12 +191,11 @@ define([
                 var stats = data.statistics;
                 self.iops(stats.operations_ps);
                 self.cacheHits(stats.cache_hits_ps);
-                self.cacheMisses(stats.sco_cache_misses_ps);
+                self.cacheMisses(stats.cache_misses_ps);
                 self.readSpeed(stats.data_read_ps);
                 self.writeSpeed(stats.data_written_ps);
                 self.backendWritten(stats.backend_data_written);
                 self.backendRead(stats.backend_data_read);
-                self.backendReads(stats.sco_cache_hits + stats.cluster_cache_hits);
                 self.bandwidthSaved(Math.max(0, stats.data_read - stats.backend_data_read));
             }
 

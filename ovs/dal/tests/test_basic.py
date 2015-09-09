@@ -1,5 +1,5 @@
-#!/usr/bin/python2
-#  Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+#  Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,6 +66,7 @@ class Basic(TestCase):
         PersistentFactory.store.clean()
         VolatileFactory.store = DummyVolatileStore()
         VolatileFactory.store.clean()
+        DataList.test_hooks = {}
 
     @classmethod
     def tearDownClass(cls):
@@ -125,6 +126,9 @@ class Basic(TestCase):
         disk = TestDisk(data={'name': 'diskx'})
         disk.save()
         self.assertEqual(disk.name, 'diskx', 'Disk name should be preloaded')
+        disk = TestDisk(data={'name': 'disky', 'foo': 'bar'})
+        disk.save()
+        self.assertEqual(disk.name, 'disky', 'Disk name should be preloaded, without raising for invalid preload data')
 
     def test_datapersistent(self):
         """
@@ -343,6 +347,21 @@ class Basic(TestCase):
                             'query': {'type': DataList.where_operator.AND,
                                       'items': [('storage.name', DataList.operator.EQUALS, 'machine')]}}).data  # noqa
         self.assertEqual(list_11, 10, 'list should contain int 10')  # disk 10-19
+        list_12 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, 'test_1')]}}).data  # noqa
+        self.assertEqual(list_12, 1, 'list should contain int 1')  # single disk
+        list_13 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, 'tESt_1', False)]}}).data  # noqa
+        self.assertEqual(list_13, 1, 'list should contain int 1')  # single disk
+        list_14 = DataList({'object': TestDisk,
+                            'data': DataList.select.COUNT,
+                            'query': {'type': DataList.where_operator.AND,
+                                      'items': [('name', DataList.operator.EQUALS, 'tESt_1')]}}).data  # noqa
+        self.assertEqual(list_14, 0, 'list should contain int 0')  # single disk
         # pylint: enable=line-too-long
 
     def test_invalidpropertyassignment(self):
@@ -623,13 +642,13 @@ class Basic(TestCase):
         """
         disk = TestDisk()
         disk.name = 'disk'
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
         disk.save()
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         self.assertEqual(len(keys), 1, 'There should be one primary key ({0})'.format(len(keys)))
         disk.delete()
-        keys = DataList.get_pks(disk._namespace, disk._name)
+        keys = DataList.get_pks(disk._namespace, disk._classname)
         self.assertEqual(len(keys), 0, 'There should be no primary keys ({0})'.format(len(keys)))
 
     def test_reduceddatalist(self):
@@ -800,7 +819,7 @@ class Basic(TestCase):
         self.assertIsNotNone(disk_3.machine, 'The machine should still be linked')
         _ = machine.disks  # Make sure we loaded the list
         disk_2.delete()
-        machine.delete(abandon=True)  # Should not raise due to disk_2 being deleted
+        machine.delete(abandon=['disks'])  # Should not raise
         disk_4 = TestDisk(disk_1.guid)
         self.assertIsNone(disk_4.machine, 'The machine should be unlinked')
 
@@ -874,64 +893,64 @@ class Basic(TestCase):
             disk_2.name = 'x'
             disk_2.save()
 
-        disk_z = None
+        disk_z = None  # Needs to be there
         disk_1 = TestDisk()
         disk_1.name = 'test'
         disk_1.save()
         disk_2 = TestDisk()
         disk_2.name = 'test'
         disk_2.save()
-
         # Validates new object creation
+        DataList.test_hooks['post_query'] = inject_new
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
-                                   'items': [('name', DataList.operator.EQUALS, 'test')]}},
-                        post_query_hook=inject_new).data
+                                   'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
+        del DataList.test_hooks['post_query']
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
-
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_6ea1af78996c9eb24a92c968ccc5f16b16686a8134212ea562135046ba146db4')
-
         # Validates object change
+        DataList.test_hooks['post_query'] = inject_update
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
-                                   'items': [('name', DataList.operator.EQUALS, 'test')]}},
-                        post_query_hook=inject_update).data
+                                   'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 3, 'Three disks should be found ({0})'.format(len(disks)))
+        del DataList.test_hooks['post_query']
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
         self.assertEqual(len(disks), 2, 'Two disk should be found ({0})'.format(len(disks)))
-
         # Clear the list cache for the next test
         VolatileFactory.store.delete('ovs_list_6ea1af78996c9eb24a92c968ccc5f16b16686a8134212ea562135046ba146db4')
-
         # Validates object deletion
-        data = DataList({'object': TestDisk,
-                         'data': DataList.select.GUIDS,
-                         'query': {'type': DataList.where_operator.AND,
-                                   'items': [('name', DataList.operator.EQUALS, 'test')]}},
-                        post_query_hook=inject_delete).data
-        disks = DataObjectList(data, TestDisk)
-        self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
+        DataList.test_hooks['post_query'] = inject_delete
         data = DataList({'object': TestDisk,
                          'data': DataList.select.GUIDS,
                          'query': {'type': DataList.where_operator.AND,
                                    'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
         disks = DataObjectList(data, TestDisk)
-        self.assertEqual(len(disks), 1, 'One disks should be found ({0})'.format(len(disks)))
+        self.assertEqual(len(disks), 2, 'Two disks should be found ({0})'.format(len(disks)))
+        del DataList.test_hooks['post_query']
+        iterated_list = [d for d in disks]
+        self.assertEqual(len(iterated_list), 1, 'One disk should be found ({0})'.format(len(iterated_list)))
+        data = DataList({'object': TestDisk,
+                         'data': DataList.select.GUIDS,
+                         'query': {'type': DataList.where_operator.AND,
+                                   'items': [('name', DataList.operator.EQUALS, 'test')]}}).data
+        disks = DataObjectList(data, TestDisk)
+        self.assertEqual(len(disks), 1, 'One disk should be found ({0})'.format(len(disks)))
         _ = disk_z  # Ignore this object not being used
 
     def test_guid_query(self):
@@ -1063,34 +1082,212 @@ class Basic(TestCase):
         # Restore relation
         [_ for _ in disk._relations if _.name == 'machine'][0].mandatory = False
 
-    def test_saveorder(self):
+    def test_versioning(self):
         """
-        Validates whether the order of saving related objects doesn't matter
+        Validates whether the versioning system works
         """
-        machine1 = TestMachine()
-        machine1.name = 'machine'
-        disk1_1 = TestDisk()
-        disk1_1.name = 'disk1'
-        disk1_1.machine = machine1
-        disk1_1.save()
-        disk1_2 = TestDisk()
-        disk1_2.name = 'disk2'
-        disk1_2.machine = machine1
-        disk1_2.save()
-        machine1.save()
-        self.assertEqual(len(machine1.disks), 2, 'There should be two disks. {0}'.format(len(machine1.disks)))
-        machine2 = TestMachine()
-        machine2.name = 'machine'
-        machine2.save()
-        disk2_1 = TestDisk()
-        disk2_1.name = 'disk1'
-        disk2_1.machine = machine2
-        disk2_1.save()
-        disk2_2 = TestDisk()
-        disk2_2.name = 'disk2'
-        disk2_2.machine = machine2
-        disk2_2.save()
-        self.assertEqual(len(machine2.disks), 2, 'There should be two disks. {0}'.format(len(machine2.disks)))
+        machine = TestMachine()
+        machine.name = 'machine0'
+        machine.save()
+        self.assertEqual(machine._data['_version'], 1, 'Version should be 1, is {0}'.format(machine._data['_version']))
+        machine.save()
+        self.assertEqual(machine._data['_version'], 2, 'Version should be 2, is {0}'.format(machine._data['_version']))
+        machine_x = TestMachine(machine.guid)
+        machine_x.name = 'machine1'
+        machine_x.save()
+        self.assertTrue(machine.updated_on_datastore(), 'Machine is updated on datastore')
+        machine.name = 'machine2'
+        machine.save()
+        self.assertEqual(machine._data['_version'], 4, 'Version should be 4, is {0}'.format(machine._data['_version']))
+        self.assertFalse(machine.updated_on_datastore(), 'Machine is not updated on datastore')
+
+    def test_outdated_listobjects(self):
+        """
+        Validates whether elements in a (cached) list are reloaded if they are changed externally
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        self.assertListEqual(['disk1', 'disk2'], sorted([disk.name for disk in machine.disks]), 'Names should be disk1 and disk2')
+        disk2.name = 'disk_'
+        self.assertListEqual(['disk1', 'disk2'], sorted([disk.name for disk in machine.disks]), 'Names should still be disk1 and disk2')
+        disk2.save()
+        self.assertListEqual(['disk1', 'disk_'], sorted([disk.name for disk in machine.disks]), 'Names should be disk1 and disk_')
+
+    def test_invalidonetoone(self):
+        """
+        Validates that if a one-to-one is used as a one-to-many an exception will be raised
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        self.assertIsNone(machine.one, 'There should not be any disk(s)')
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.one = machine
+        disk1.save()
+        self.assertEqual(machine.one, disk1, 'The correct disk should be returned')
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.one = machine
+        disk2.save()
+        with self.assertRaises(InvalidRelationException):
+            _ = machine.one
+
+    def test_object_cleanup(self):
+        """
+        Validates whether using an object property to delete these entries does not cause issues when deleting the
+        object itself afterwards
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        for disk in machine.disks:
+            disk.delete()
+        machine.delete()
+
+    def test_relation_set_build(self):
+        """
+        Validates whether relationsets are (re)build correctly
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        VolatileFactory.store.clean()
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertFalse(datalist.from_cache, 'The relation set should be generated')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+        datalist = DataList.get_relation_set(TestDisk, 'machine', TestEMachine, 'disks', machine.guid)
+        self.assertTrue(datalist.from_cache, 'The relation set should be cached')
+        self.assertEqual(len(datalist.data), 2, 'There should be two disks')
+
+    def test_instance_checks(self):
+        """
+        Validates whether Descriptor.isinstance works
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        disk = TestDisk()
+        disk.name = 'disk'
+        disk.machine = machine
+        disk.save()
+        self.assertTrue(Descriptor.isinstance(disk, TestDisk), 'The disk should be a TestDisk')
+        self.assertFalse(Descriptor.isinstance(disk, TestMachine), 'The disk is no TestMachine')
+        self.assertTrue(Descriptor.isinstance(disk.machine, TestEMachine), 'The disk.machine is a TestEMachine')
+
+    def test_cache_and_save_racecondition(self):
+        """
+        Validates whether concurrent save/loads won't result in outdates sturctures being cached
+        """
+        guid = None
+
+        def update():
+            local_machine = TestMachine(guid)
+            local_machine.name = 'updated'
+            local_machine.save()
+
+        machine = TestMachine()
+        self.assertIsNone(machine._metadata['cache'], 'A new object shouldn\'t imply caching')
+        machine.name = 'one'
+        machine.save()
+        guid = machine.guid
+
+        machine = TestMachine(machine.guid, hook=update)
+        self.assertEqual(machine.name, 'one', 'The machine\'s name should still be one')
+        self.assertFalse(machine._metadata['cache'], 'The machine should be loaded from persistent store')
+        machine = TestMachine(machine.guid)
+        self.assertEqual(machine.name, 'updated', 'The machine\'s name should be updated')
+        self.assertFalse(machine._metadata['cache'], 'Race condition should have prevented caching')
+        machine = TestMachine(machine.guid)
+        self.assertTrue(machine._metadata['cache'], 'The machine should be loaded from cache')
+
+    def test_delete_during_object_load(self):
+        """
+        Validates whether removing an object during the load does raise a correct exception
+        """
+        guid = None
+
+        def delete():
+            local_machine = TestMachine(guid)
+            local_machine.delete()
+
+        machine = TestMachine()
+        machine.name = 'one'
+        machine.save()
+        guid = machine.guid
+
+        with self.assertRaises(ObjectNotFoundException):
+            _ = TestMachine(guid, hook=delete)
+
+    def test_object_save_reverseindex_build(self):
+        """
+        Validates whether saving an object won't create an empty reverse index if not required
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        machine.save()
+        key = 'ovs_reverseindex_testemachine_{0}'.format(machine.guid)
+        self.assertIsNotNone(VolatileFactory.store.get(key), 'The reverse index should be created (save on new object)')
+        disk1 = TestDisk()
+        disk1.name = 'disk1'
+        disk1.machine = machine
+        disk1.save()
+        disk2 = TestDisk()
+        disk2.name = 'disk2'
+        disk2.machine = machine
+        disk2.save()
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+        VolatileFactory.store.delete(key)
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+        VolatileFactory.store.delete(key)
+        machine.save()
+        self.assertIsNone(VolatileFactory.store.get(key), 'The reverse index should not be created (save on existing object)')
+        amount = len(machine.disks)
+        self.assertEqual(amount, 2, 'There should be 2 disks ({0} found)'.format(amount))
+
+    def test_save_nonexisting_relation(self):
+        """
+        Validates the behavior when saving ab object having nonexisting relations
+        """
+        machine = TestMachine()
+        machine.name = 'machine'
+        disk1 = TestDisk()
+        disk1.name = 'disk'
+        disk1.machine = machine
+        with self.assertRaises(ObjectNotFoundException):
+            disk1.save()
+        machine.save()
+        disk1.save()
 
     def test_invalidate_dynamics(self):
         """

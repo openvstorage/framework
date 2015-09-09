@@ -1,5 +1,5 @@
 ﻿<!--
-Copyright 2014 CloudFounders NV
+Copyright 2014 Open vStorage NV
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,11 +24,12 @@ limitations under the License.
                     <b data-i18n="ovs:dashboard.panels.storagerouter.title"></b>
                     <div style="float:right;">
                         <span data-bind="visible: storageRoutersLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-                        <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.storagerouter.helptitle',
-                                             content: 'ovs:dashboard.panels.storagerouter.helpcontent'
-                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: white;">
-                        </span>
+                        <a data-bind="popover: {
+                                          title: 'ovs:dashboard.panels.storagerouter.helptitle',
+                                          content: 'ovs:dashboard.panels.storagerouter.helpcontent'
+                                      }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
+                           style="margin-left: 5px; color: white;" role="button" tabindex="-1">
+                        </a>
                     </div>
                 </div>
                 <div class="panel-body">
@@ -63,6 +64,9 @@ limitations under the License.
                     </div>
                  </div>
             </div>
+            <!-- ko foreach: shared.hooks.dashboards -->
+                <div class="panel panel-default" data-bind="compose: $data.activator"></div>
+            <!-- /ko -->
         </div>
         <div class="col-md-4">
             <!-- Center column -->
@@ -72,11 +76,12 @@ limitations under the License.
                     <b data-i18n="ovs:dashboard.panels.cache.title"></b>
                     <div style="float:right;">
                         <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-                        <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.cache.helptitle',
-                                             content: 'ovs:dashboard.panels.cache.helpcontent'
-                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: white;">
-                        </span>
+                        <a data-bind="popover: {
+                                          title: 'ovs:dashboard.panels.cache.helptitle',
+                                          content: 'ovs:dashboard.panels.cache.helpcontent'
+                                      }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
+                           style="margin-left: 5px; color: white;" role="button" tabindex="-1">
+                        </a>
                     </div>
                 </div>
                 <div class="panel-body" data-bind="gauge: { primary: cacheRatio, secondary: iops }"></div>
@@ -85,19 +90,20 @@ limitations under the License.
                 <!-- vMachines -->
                 <div class="panel-heading">
                     <b data-i18n="ovs:dashboard.panels.vmachines.title"></b>
-                    <a data-bind="text: vMachineGuids().length,
+                    <a data-bind="text: amountOfVMachines(),
                                   attr: { href: $root.shared.routing.loadHash('vmachines', {}) }"
                        class="label label-default" style="margin-left: 5px;"></a>
                     <div style="float:right;">
                         <span data-bind="visible: vMachinesLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <select data-bind="options: topVmachineModes, value: topVmachineMode,
                                            optionsText: function(item) { return $.t('ovs:generic.' + item); }"
-                                style="margin-left: 5px;"></select>
-                        <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.vmachines.helptitle',
-                                             content: 'ovs:dashboard.panels.vmachines.helpcontent'
-                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: white;">
-                        </span>
+                                style="margin-left: 5px; margin-top: -3px; border-width: 1px;"></select>
+                        <a data-bind="popover: {
+                                          title: 'ovs:dashboard.panels.vmachines.helptitle',
+                                          content: 'ovs:dashboard.panels.vmachines.helpcontent'
+                                      }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
+                           style="margin-left: 5px; color: white;" role="button" tabindex="-1">
+                        </a>
                     </div>
                 </div>
                 <div class="panel-body" data-bind="foreach: topVMachines">
@@ -120,11 +126,12 @@ limitations under the License.
                     <b data-i18n="ovs:dashboard.panels.statistics.title"></b>
                     <div style="float:right;">
                         <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
-                        <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.statistics.helptitle',
-                                             content: 'ovs:dashboard.panels.statistics.helpcontent'
-                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: white;">
-                        </span>
+                        <a data-bind="popover: {
+                                          title: 'ovs:dashboard.panels.statistics.helptitle',
+                                          content: 'ovs:dashboard.panels.statistics.helpcontent'
+                                      }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
+                           style="margin-left: 5px; color: white;" role="button" tabindex="-1">
+                        </a>
                     </div>
                 </div>
                 <div class="panel-body">
@@ -167,12 +174,13 @@ limitations under the License.
                         <span data-bind="visible: vPoolsLoading()"><i class="fa fa-spin" data-i18n="[html]ovs:icons.loading"></i></span>
                         <select data-bind="options: topVpoolModes, value: topVPoolMode,
                                            optionsText: function(item) { return $.t('ovs:generic.' + item); }"
-                                style="margin-left: 5px;"></select>
-                        <span data-bind="popover: {
-                                             title: 'ovs:dashboard.panels.vpools.helptitle',
-                                             content: 'ovs:dashboard.panels.vpools.helpcontent'
-                                         }" class="hand fa" data-i18n="[html]ovs:icons.help" style="margin-left: 5px; color: white;">
-                        </span>
+                                style="margin-left: 5px; margin-top: -3px; border-width: 1px;"></select>
+                        <a data-bind="popover: {
+                                          title: 'ovs:dashboard.panels.vpools.helptitle',
+                                          content: 'ovs:dashboard.panels.vpools.helpcontent'
+                                      }" class="hand fa noline" data-i18n="[html]ovs:icons.help"
+                           style="margin-left: 5px; color: white;" role="button" tabindex="-1">
+                        </a>
                     </div>
                 </div>
                 <div class="panel-body" data-bind="foreach: topVPools">

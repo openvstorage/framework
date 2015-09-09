@@ -1,4 +1,4 @@
-﻿// Copyright 2014 CloudFounders NV
+﻿// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 /*global define, window */
 define([
     'plugins/router', 'plugins/dialog', 'jqp/pnotify',
-    'ovs/shared'
-], function(router, dialog, $, shared) {
+    'ovs/shared', 'ovs/generic',
+    'jqp/timeago'
+], function(router, dialog, $, shared, generic) {
     "use strict";
     var mode, childRouter;
     mode = router.activeInstruction().params[0];
@@ -29,15 +30,30 @@ define([
                         .map(shared.routing.siteRoutes)
                         .buildNavigationModel();
     childRouter.guardRoute = function(instance, instruction) {
+        var state, metadata;
         if (instance !== undefined && instance.hasOwnProperty('guard')) {
             if (instance.guard.authenticated === true) {
                 if (instance.shared.authentication.validate()) {
+                    window.localStorage.removeItem('state');
                     return true;
                 }
                 window.localStorage.setItem('referrer', instruction.fragment);
+                state = window.localStorage.getItem('state');
+                if (state === null && instance.shared.authentication.metadata.mode === 'remote') {
+                    metadata = instance.shared.authentication.metadata;
+                    state = generic.getTimestamp() + '_' + Math.random().toString().substr(2, 10);
+                    window.localStorage.setItem('state', state);
+                    return metadata.authorize_uri +
+                        '?response_type=code' +
+                        '&client_id=' + encodeURIComponent(metadata.client_id) +
+                        '&redirect_uri=' + encodeURIComponent('https://' + window.location.host + '/api/oauth2/redirect/') +
+                        '&state=' + encodeURIComponent(state) +
+                        '&scope=' + encodeURIComponent(metadata.scope);
+                }
                 return instruction.params[0] + '/login';
             }
         }
+        window.localStorage.removeItem('state');
         return true;
     };
     childRouter.mapUnknownRoutes('../404');
@@ -54,15 +70,16 @@ define([
             $.pnotify.defaults.history = false;
             $.pnotify.defaults.styling = "bootstrap";
 
-            // Cache node ips
+            // Fetch main API metadata
             $.ajax('/api/?timestamp=' + (new Date().getTime()), {
                     type: 'GET',
                     contentType: 'application/json',
                     timeout: 5000,
                     headers: { Accept: 'application/json' }
                 })
-                .done(function(nodes) {
-                    shared.nodes = nodes.storagerouter_ips;
+                .done(function(metadata) {
+                    shared.nodes = metadata.storagerouter_ips;
+                    shared.identification(metadata.identification);
                     window.localStorage.setItem('nodes', JSON.stringify(shared.nodes));
                 });
         }

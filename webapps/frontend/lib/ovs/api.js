@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ define([
         queryparams.timestamp = generic.getTimestamp();
         for (key in queryparams) {
             if (queryparams.hasOwnProperty(key)) {
-                querystring.push(key + '=' + queryparams[key]);
+                querystring.push(key + '=' + encodeURIComponent(queryparams[key]));
             }
         }
 

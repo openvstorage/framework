@@ -1,5 +1,5 @@
-#!/usr/bin/python2
-# Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@ import os
 import logging
 from ovs.log.logHandler import LogHandler
 
-logging.basicConfig()
-logger = LogHandler('extensions', name='watcher')
+logger = LogHandler.get('extensions', name='watcher')
 
 
 def _log(log_target, entry, level):
@@ -44,14 +43,18 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
-                    from ovs.extensions.storage.volatilefactory import VolatileFactory
-                    VolatileFactory.store = None
-                    volatile = VolatileFactory.get_client()
-                    volatile.set(key, value)
-                    if volatile.get(key) == value:
+                    try:
+                        logging.disable(logging.WARNING)
+                        from ovs.extensions.storage.volatilefactory import VolatileFactory
+                        VolatileFactory.store = None
+                        volatile = VolatileFactory.get_client()
+                        volatile.set(key, value)
+                        if volatile.get(key) == value:
+                            volatile.delete(key)
+                            break
                         volatile.delete(key)
-                        break
-                    volatile.delete(key)
+                    finally:
+                        logging.disable(logging.NOTSET)
                 except Exception as message:
                     _log(target, '  Error during volatile store test: {0}'.format(message), 2)
                 key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
@@ -68,14 +71,18 @@ def services_running(target):
             tries = 0
             while tries < max_tries:
                 try:
-                    from ovs.extensions.storage.persistentfactory import PersistentFactory
-                    PersistentFactory.store = None
-                    persistent = PersistentFactory.get_client()
-                    persistent.set(key, value)
-                    if persistent.get(key) == value:
+                    try:
+                        logging.disable(logging.WARNING)
+                        from ovs.extensions.storage.persistentfactory import PersistentFactory
+                        PersistentFactory.store = None
+                        persistent = PersistentFactory.get_client()
+                        persistent.set(key, value)
+                        if persistent.get(key) == value:
+                            persistent.delete(key)
+                            break
                         persistent.delete(key)
-                        break
-                    persistent.delete(key)
+                    finally:
+                        logging.disable(logging.NOTSET)
                 except Exception as message:
                     _log(target, '  Error during persistent store test: {0}'.format(message), 2)
                 key = 'ovs-watcher-{0}'.format(str(uuid.uuid4()))  # Get another key
@@ -115,11 +122,12 @@ def services_running(target):
             # RabbitMQ
             _log(target, 'Test rabbitMQ...', 0)
             import pika
-            from configobj import ConfigObj
-            from ovs.plugin.provider.configuration import Configuration
-            rmq_ini = ConfigObj(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
-            rmq_nodes = rmq_ini.get('main')['nodes'] if type(rmq_ini.get('main')['nodes']) == list else [rmq_ini.get('main')['nodes']]
-            rmq_servers = map(lambda m: rmq_ini.get(m)['location'], rmq_nodes)
+            from ConfigParser import RawConfigParser
+            from ovs.extensions.generic.configuration import Configuration
+            rmq_ini = RawConfigParser()
+            rmq_ini.read(os.path.join(Configuration.get('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+            rmq_nodes = [node.strip() for node in rmq_ini.get('main', 'nodes').split(',')]
+            rmq_servers = map(lambda n: rmq_ini.get(n, 'location'), rmq_nodes)
             good_node = False
             for server in rmq_servers:
                 try:
@@ -133,7 +141,6 @@ def services_running(target):
                                           pika.BasicProperties(content_type='text/plain', delivery_mode=1))
                     connection.close()
                     good_node = True
-                    break
                 except Exception as message:
                     _log(target, '  Error during rabbitMQ test on node {0}: {1}'.format(server, message), 2)
             if good_node is False:

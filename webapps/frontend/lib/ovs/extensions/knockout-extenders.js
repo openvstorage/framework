@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             }
         }).extend({ notify: 'always' });
         computed(target());
+        computed.min = generic.tryGet(settings, 'min', undefined);
+        computed.max = generic.tryGet(settings, 'max', undefined);
         return computed;
     };
     ko.extenders.smooth = function(target, settings) {
@@ -44,7 +46,7 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
             read: target,
             write: function(newValue) {
                 var diff, stepSize, decimals, execute, currentValue = target();
-                if (currentValue === undefined) {
+                if (currentValue === undefined || currentValue === null) {
                     target(newValue);
                 } else {
                     diff = newValue - currentValue;
@@ -55,16 +57,16 @@ define(['knockout', 'ovs/generic'], function(ko, generic) {
                         );
                         stepSize = generic.ceil(diff / generic.tryGet(settings, 'steps', 3), decimals);
                         stepSize = stepSize === 0 ? 1 : stepSize;
-                        execute = function() {
-                            if (Math.abs(newValue - currentValue) > Math.abs(stepSize)) {
+                        execute = function(safety) {
+                            if (Math.abs(newValue - currentValue) > Math.abs(stepSize) && safety >= 0) {
                                 currentValue += stepSize;
                                 target(currentValue);
-                                window.setTimeout(execute, 75);
+                                window.setTimeout(function() { execute(safety - 1); }, 75);
                             } else {
                                 target(newValue);
                             }
                         };
-                        window.setTimeout(execute, 75);
+                        window.setTimeout(function() { execute(stepSize); }, 75);
                     }
                 }
             }

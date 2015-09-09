@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -217,8 +217,11 @@ define([
         self.activate = function(mode, guid) {
             self.vMachine(new VMachine(guid));
             self.refresher.init(self.load, 5000);
-            self.refresher.run();
             self.refresher.start();
+            self.load()
+                .then(function() {
+                    self.loadVDisks(1);
+                });
             self.shared.footerData(self.vMachine);
         };
         self.deactivate = function() {

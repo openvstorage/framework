@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import stat
 
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('extensions', 'file mutex')
+logger = LogHandler.get('extensions', 'file mutex')
 
 
 class FileMutex(object):
@@ -31,7 +31,7 @@ class FileMutex(object):
     its limited to the boundaries of a filesystem
     """
 
-    def __init__(self, name):
+    def __init__(self, name, wait=None):
         """
         Creates a file mutex object
         """
@@ -39,6 +39,7 @@ class FileMutex(object):
         self._has_lock = False
         self._start = 0
         self._handle = open(self.key(), 'w')
+        self._wait = wait
         try:
             os.chmod(
                 self.key(),
@@ -49,13 +50,27 @@ class FileMutex(object):
         except OSError:
             pass
 
+    def __call__(self, wait):
+        self._wait = wait
+        return self
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        _ = args, kwargs
+        self.release()
+
     def acquire(self, wait=None):
         """
-        Aquire a lock on the mutex, optionally given a maximum wait timeout
+        Acquire a lock on the mutex, optionally given a maximum wait timeout
         """
         if self._has_lock:
             return True
         self._start = time.time()
+        if wait is None:
+            wait = self._wait
         if wait is None:
             fcntl.flock(self._handle, fcntl.LOCK_EX)
             passed = time.time() - self._start
@@ -64,8 +79,8 @@ class FileMutex(object):
             while True:
                 passed = time.time() - self._start
                 if passed > wait:
-                    logger.error('Lock for {0} could not be aquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
-                    raise RuntimeError('Could not aquire lock %s' % self.key())
+                    logger.error('Lock for {0} could not be acquired. {1} sec > {2} sec'.format(self.key(), passed, wait))
+                    raise RuntimeError('Could not acquire lock %s' % self.key())
                 try:
                     fcntl.flock(self._handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     break

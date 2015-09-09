@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ class VDisk(DataObject):
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
                   Dynamic('info', dict, 60),
-                  Dynamic('statistics', dict, 5, locked=True),
+                  Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('storagedriver_id', str, 60),
                   Dynamic('storagerouter_guid', str, 15),
                   Dynamic('resolved_configuration', dict, 300, locked=True)]
@@ -82,6 +82,7 @@ class VDisk(DataObject):
                                       'label': metadata['label'],
                                       'is_consistent': metadata['is_consistent'],
                                       'is_automatic': metadata.get('is_automatic', True),
+                                      'in_backend': snapshot.in_backend,
                                       'stored': int(snapshot.stored)})
         return snapshots
 
@@ -93,59 +94,40 @@ class VDisk(DataObject):
             try:
                 vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
             except:
-                vdiskinfo = StorageDriverClient().empty_info()
+                vdiskinfo = StorageDriverClient.empty_info()
         else:
-            vdiskinfo = StorageDriverClient().empty_info()
+            vdiskinfo = StorageDriverClient.empty_info()
 
         vdiskinfodict = {}
         for key, value in vdiskinfo.__class__.__dict__.items():
             if type(value) is property:
-                vdiskinfodict[key] = getattr(vdiskinfo, key)
+                objectvalue = getattr(vdiskinfo, key)
                 if key == 'object_type':
-                    vdiskinfodict[key] = str(vdiskinfodict[key])
+                    vdiskinfodict[key] = str(objectvalue)
+                elif key == 'metadata_backend_config':
+                    vdiskinfodict[key] = {}
+                    if hasattr(objectvalue, 'node_configs') and callable(objectvalue.node_configs):
+                        vdiskinfodict[key] = []
+                        for nodeconfig in objectvalue.node_configs():
+                            vdiskinfodict[key].append({'ip': nodeconfig.address(),
+                                                       'port': nodeconfig.port()})
+                else:
+                    vdiskinfodict[key] = objectvalue
         return vdiskinfodict
 
     def _statistics(self, dynamic):
         """
         Fetches the Statistics for the vDisk.
         """
-        client = StorageDriverClient()
-        volatile = VolatileFactory.get_client()
-        prev_key = '{0}_{1}'.format(self._key, 'statistics_previous')
-        # Load data from volumedriver
-        if self.volume_id and self.vpool:
-            try:
-                vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
-            except:
-                vdiskstats = client.empty_statistics()
-        else:
-            vdiskstats = client.empty_statistics()
-        # Load volumedriver data in dictionary
-        vdiskstatsdict = {}
-        for key, value in vdiskstats.__class__.__dict__.items():
-            if type(value) is property and key in client.stat_counters:
-                vdiskstatsdict[key] = getattr(vdiskstats, key)
-        # Precalculate sums
-        for key, items in client.stat_sums.iteritems():
-            vdiskstatsdict[key] = 0
-            for item in items:
-                vdiskstatsdict[key] += vdiskstatsdict[item]
-        vdiskstatsdict['timestamp'] = time.time()
-        # Calculate delta's based on previously loaded dictionary
-        previousdict = volatile.get(prev_key, default={})
-        for key in vdiskstatsdict.keys():
-            if key in client.stat_keys:
-                delta = vdiskstatsdict['timestamp'] - previousdict.get('timestamp',
-                                                                       vdiskstatsdict['timestamp'])
-                if delta < 0:
-                    vdiskstatsdict['{0}_ps'.format(key)] = 0
-                elif delta == 0:
-                    vdiskstatsdict['{0}_ps'.format(key)] = previousdict.get('{0}_ps'.format(key), 0)
-                else:
-                    vdiskstatsdict['{0}_ps'.format(key)] = max(0, (vdiskstatsdict[key] - previousdict[key]) / delta)
-        volatile.set(prev_key, vdiskstatsdict, dynamic.timeout * 10)
-        # Returning the dictionary
-        return vdiskstatsdict
+        statistics = {}
+        for key in StorageDriverClient.stat_keys:
+            statistics[key] = 0
+            statistics['{0}_ps'.format(key)] = 0
+        for key, value in self.fetch_statistics().iteritems():
+            statistics[key] += value
+        statistics['timestamp'] = time.time()
+        VDisk.calculate_delta(self._key, dynamic, statistics)
+        return statistics
 
     def _storagedriver_id(self):
         """
@@ -193,5 +175,69 @@ class VDisk(DataObject):
         """
         if self.vpool:
             self._frozen = False
-            self.storagedriver_client = StorageDriverClient().load(self.vpool)
+            self.storagedriver_client = StorageDriverClient.load(self.vpool)
             self._frozen = True
+
+    def fetch_statistics(self):
+        """
+        Loads statistics from this vDisk - returns unprocessed data
+        """
+        # Load data from volumedriver
+        if self.volume_id and self.vpool:
+            try:
+                vdiskstats = self.storagedriver_client.statistics_volume(str(self.volume_id))
+                vdiskinfo = self.storagedriver_client.info_volume(str(self.volume_id))
+            except:
+                vdiskstats = StorageDriverClient.empty_statistics()
+                vdiskinfo = StorageDriverClient.empty_info()
+        else:
+            vdiskstats = StorageDriverClient.empty_statistics()
+            vdiskinfo = StorageDriverClient.empty_info()
+        # Load volumedriver data in dictionary
+        vdiskstatsdict = {}
+        try:
+            pc = vdiskstats.performance_counters
+            vdiskstatsdict['backend_data_read'] = pc.backend_read_request_size.sum()
+            vdiskstatsdict['backend_data_written'] = pc.backend_write_request_size.sum()
+            vdiskstatsdict['backend_read_operations'] = pc.backend_read_request_size.events()
+            vdiskstatsdict['backend_write_operations'] = pc.backend_write_request_size.events()
+            vdiskstatsdict['data_read'] = pc.read_request_size.sum()
+            vdiskstatsdict['data_written'] = pc.write_request_size.sum()
+            vdiskstatsdict['read_operations'] = pc.read_request_size.events()
+            vdiskstatsdict['write_operations'] = pc.write_request_size.events()
+            for key in ['cluster_cache_hits', 'cluster_cache_misses', 'metadata_store_hits',
+                        'metadata_store_misses', 'sco_cache_hits', 'sco_cache_misses']:
+                vdiskstatsdict[key] = getattr(vdiskstats, key)
+            # Do some more manual calculations
+            block_size = vdiskinfo.lba_size * vdiskinfo.cluster_multiplier
+            if block_size == 0:
+                block_size = 4096
+            vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size
+            vdiskstatsdict['4k_write_operations'] = vdiskstatsdict['data_written'] / block_size
+            # Precalculate sums
+            for key, items in StorageDriverClient.stat_sums.iteritems():
+                vdiskstatsdict[key] = 0
+                for item in items:
+                    vdiskstatsdict[key] += vdiskstatsdict[item]
+        except:
+            pass
+        return vdiskstatsdict
+
+    @staticmethod
+    def calculate_delta(key, dynamic, current_stats):
+        """
+        Calculate statistics deltas
+        """
+        volatile = VolatileFactory.get_client()
+        prev_key = '{0}_{1}'.format(key, 'statistics_previous')
+        previous_stats = volatile.get(prev_key, default={})
+        for key in current_stats.keys():
+            if key in StorageDriverClient.stat_keys:
+                delta = current_stats['timestamp'] - previous_stats.get('timestamp', current_stats['timestamp'])
+                if delta < 0:
+                    current_stats['{0}_ps'.format(key)] = 0
+                elif delta == 0:
+                    current_stats['{0}_ps'.format(key)] = previous_stats.get('{0}_ps'.format(key), 0)
+                else:
+                    current_stats['{0}_ps'.format(key)] = max(0, (current_stats[key] - previous_stats[key]) / delta)
+        volatile.set(prev_key, current_stats, dynamic.timeout * 10)

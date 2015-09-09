@@ -1,4 +1,4 @@
-# Copyright 2014 CloudFounders NV
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-import os, uuid, time, shutil, subprocess
+import os, uuid, time, shutil, subprocess, sys
 import inspect #for profiling
 
 #OPENSTACK
@@ -26,12 +26,19 @@ from cinderclient import exceptions as cinder_client_exceptions
 #OVS
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.vdisklist import VDiskList
-from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.lib.storagerouter import StorageRouterController
+from ovs.extensions.generic.system import System
+from ovs.dal.hybrids.mgmtcenter import MgmtCenter
 
 #CONFIG
 from ovs_config import *
-from ConfigParser import ConfigParser
+from ConfigParser import RawConfigParser
+
+class OVSPluginTestException(Exception): pass
+class WaitTimedOut(OVSPluginTestException): pass
+class VolumeInErrorState(OVSPluginTestException): pass
+class TooManyAttempts(OVSPluginTestException): pass
+
 
 class OVSPluginTestCase(test.TestCase):
     """
@@ -83,12 +90,6 @@ class OVSPluginTestCase(test.TestCase):
         restart = False
         if not self._vpool_exists():
             self._create_vpool()
-            restart = True
-        restart |= self._set_cinder_driver_config()
-        restart |= self._set_cinder_volume_type()
-        if restart:
-            self._restart_cinder()
-
         self._debug('setUp complete')
 
     def _cleanup(self):
@@ -100,9 +101,6 @@ class OVSPluginTestCase(test.TestCase):
                     method(**kwargs)
 
         if VPOOL_CLEANUP:
-            self._revert_cinder_config()
-            self._remove_cinder_volume_type()
-            self._restart_cinder()
             if self._vpool_exists():
                 self._remove_vpool()
 
@@ -128,6 +126,8 @@ class OVSPluginTestCase(test.TestCase):
             def _shell_client(command):
                 proc = subprocess.Popen(command, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell = True)
                 out, err = proc.communicate()
+                if SHELL_DEBUG:
+                    sys.stderr.write('[SHELL_DEBUG] Command %s Out %s Err %s \n' % (command, out, err))
                 self._debug('Command %s Out %s Err %s' % (command, out, err))
                 return out, err
             self.shell_client = _shell_client
@@ -173,21 +173,39 @@ class OVSPluginTestCase(test.TestCase):
         This is not actually a test of "Add Vpool to OVS",
         so any failure here will be reported as a setUp error and no tests will run
         """
+        pmachine = System.get_my_storagerouter().pmachine
+        mgmt_center = MgmtCenter(data={'name':'Openstack',
+                                       'description':'test',
+                                       'username':CINDER_USER,
+                                       'password':CINDER_PASS,
+                                       'ip':CINDER_CONTROLLER,
+                                       'port':80,
+                                       'type':'OPENSTACK',
+                                       'metadata':{'integratemgmt':True}})
+        mgmt_center.save()
+        pmachine.mgmtcenter = mgmt_center
+        pmachine.save()
         self._debug('Creating vpool')
         backend_type = 'local'
         fields = ['storage_ip', 'vrouter_port']
+
         parameters = {'storagerouter_ip': IP,
                       'vpool_name': VPOOL_NAME,
-                      'type': 'LOCAL',
+                      'type': 'local',
                       'mountpoint_bfs': VPOOL_BFS,
                       'mountpoint_temp': VPOOL_TEMP,
                       'mountpoint_md': VPOOL_MD,
-                      'mountpoint_readcache1': VPOOL_READCACHE1,
-                      'mountpoint_readcache2': VPOOL_READCACHE2,
-                      'mountpoint_writecache': VPOOL_WRITECACHE,
+                      'mountpoint_readcaches': [VPOOL_READCACHE],
+                      'mountpoint_writecaches': [VPOOL_WRITECACHE],
                       'mountpoint_foc': VPOOL_FOC,
                       'storage_ip': '127.0.0.1', #KVM
-                      'vrouter_port': VPOOL_PORT
+                      'vrouter_port': VPOOL_PORT,
+                      'integrate_vpool': True,
+                      'connection_host': IP,
+                      'connection_port': VPOOL_PORT,
+                      'connection_username': '',
+                      'connection_password': '',
+                      'connection_backend': {},
                       }
         StorageRouterController.add_vpool(parameters)
         attempt = 0
@@ -196,8 +214,6 @@ class OVSPluginTestCase(test.TestCase):
             if vpool is not None:
                 self._debug('vpool %s created' % VPOOL_NAME)
                 try:
-                    self._get_shell_client()
-                    self.shell_client('chown %s %s' % (self.current_user_id, VPOOL_MOUNTPOINT))
                     os.listdir(VPOOL_MOUNTPOINT)
                     return vpool
                 except Exception as ex:
@@ -205,7 +221,7 @@ class OVSPluginTestCase(test.TestCase):
                     self._debug('vpool not ready yet %s' % (str(ex)))
                     pass
             attempt += 1
-            time.sleep(1)
+            time.sleep(2)
         raise RuntimeError('Vpool %s was not modeled correctly or did not start.' % VPOOL_NAME)
 
     def _remove_vpool(self):
@@ -229,7 +245,7 @@ class OVSPluginTestCase(test.TestCase):
                 self._debug('vpool %s deleted' % VPOOL_NAME)
                 return
             attempt += 1
-            time.sleep(1)
+            time.sleep(2)
         raise RuntimeError('Vpool %s was not removed correctly.' % VPOOL_NAME)
 
 
@@ -249,7 +265,7 @@ class OVSPluginTestCase(test.TestCase):
                     return True
             self._debug('not found, sleep 1')
             attempt += 1
-            time.sleep(1)
+            time.sleep(2)
         self._debug('still not found, return')
         return False
 
@@ -267,7 +283,7 @@ class OVSPluginTestCase(test.TestCase):
                 if len(snaps) == 1:
                     return True
             attempt += 1
-            time.sleep(1)
+            time.sleep(2)
         return False
 
     def _random_volume_name(self):
@@ -333,11 +349,11 @@ class OVSPluginTestCase(test.TestCase):
         image = self._glance_get_image_by_name(image_name)
         self.glance_client.images.delete(image)
 
-    def _glance_wait_until_image_state(self, image_name, state='active', timeout_sec=300):
+    def _glance_wait_until_image_state(self, image_name, state='active', timeout_sec=600):
         start = time.time()
-        not_found = 0
         initial_state = None
         self._debug('wait until image %s becomes %s' % (image_name, state))
+        image = None
         while time.time() < start + timeout_sec:
             try:
                 image = self._glance_get_image_by_name(image_name)
@@ -345,12 +361,12 @@ class OVSPluginTestCase(test.TestCase):
                     raise RuntimeError('Image %s in error state' % image_name)
                 if image.status == state:
                     return image
-            except ValueError:
-                not_found += 1
-            time.sleep(1)
-            if not_found > 10:
-                raise RuntimeError('Image %s not created after 10 seconds' % image_name)
-        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s' % (image_name, state, timeout_sec, image.status))
+            except ValueError as ve:
+                pass
+            time.sleep(2)
+        images = self._glance_list_images_names()
+        raise RuntimeError('Image %s is not in state %s after %i seconds, current status %s. Images found: %s'
+                           % (image_name, state, 2*timeout_sec, image.status if image else "Unknown", str(images)))
 
     # CINDER
     def _get_cinder_config(self):
@@ -365,7 +381,7 @@ class OVSPluginTestCase(test.TestCase):
         cinder_backup = cinder_backup % i
         shutil.copy(cinder_conf, cinder_backup)
         self._debug('backup cinder.conf to %s' % cinder_backup)
-        cfg = ConfigParser()
+        cfg = RawConfigParser()
         cfg.read(cinder_conf)
         return cfg
 
@@ -385,7 +401,7 @@ class OVSPluginTestCase(test.TestCase):
     def _set_cinder_driver_config(self):
         cfg = self._get_cinder_config()
         changed = False
-        config_map = {'volume_driver': 'cinder.volume.drivers.ovs_volume_driver.OVSVolumeDriver',
+        config_map = {'volume_driver': 'cinder.volume.drivers.openvstorage.OVSVolumeDriver',
                       'volume_backend_name': VPOOL_NAME,
                       'vpool_name': VPOOL_NAME,
                       'default_volume_type': VOLUME_TYPE}
@@ -413,7 +429,7 @@ class OVSPluginTestCase(test.TestCase):
             self.shell_client('''screen -S stack -X screen -t c-vol''')
             time.sleep(3)
             self.shell_client('''screen -S stack -p c-vol -X stuff "export PYTHONPATH=\"${PYTHONPATH}:/opt/OpenvStorage\"\012"''')
-            self.shell_client('''screen -S stack -p c-vol -X stuff "cd /opt/stack/cinder && /opt/stack/cinder/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"''')
+            self.shell_client('''screen -S stack -p c-vol -X stuff "/usr/local/bin/cinder-volume --config-file /etc/cinder/cinder.conf & echo \$! >/opt/stack/status/stack/c-vol.pid; fg || echo  c-vol failed to start | tee \"/opt/stack/status/stack/c-vol.failure\"\012"''')
             time.sleep(3)
         elif PROCESS == 'service':
             # restart service
@@ -467,12 +483,14 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         return self.cinder_client.volume_snapshots.get(snapshot_id)
 
-    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None, size = VOLUME_SIZE):
+    def _cinder_create_volume(self, name, snapshot_id = None, volume_id = None, image_id = None, size = VOLUME_SIZE, attempt = 0):
         """
         Creates a volume based partially on DEFAULT values
         - can be created from snapshot or another volume or an image
         """
-        self._debug('new volume %s %s %s %s' % (name, snapshot_id, volume_id, image_id))
+        if attempt > 3:
+            raise TooManyAttempts('Cannot create volume after %s attempts' % attempt)
+        self._debug('new volume %s %s %s %s (attempt %s)' % (name, snapshot_id, volume_id, image_id, attempt))
         self._get_cinder_client()
         volume = self.cinder_client.volumes.create(size = size,
                                                    display_name = name,
@@ -480,11 +498,18 @@ class OVSPluginTestCase(test.TestCase):
                                                    snapshot_id = snapshot_id,
                                                    source_volid = volume_id,
                                                    imageRef = image_id)
-        self._cinder_wait_until_volume_state(volume.id, 'available') #allow changes to propagate, model to update
+        try:
+            self._cinder_wait_until_volume_state(volume.id, 'available', timeout_sec=300) #allow changes to propagate, model to update
+        except WaitTimedOut:
+            volume = self._cinder_get_volume_by_display_name(name)
+            if volume.status == 'creating':
+                self._cinder_reset_volume_state(volume, 'error')
+                self._cinder_delete_volume(volume, force=True, wait=False)
+                return self._cinder_create_volume(name, snapshot_id, volume_id, image_id, size, attempt+1)
         self._debug('volume %s is available' % name)
         return volume
 
-    def _cinder_delete_volume(self, volume, timeout = 300):
+    def _cinder_delete_volume(self, volume, timeout=300, force=False, wait=False):
         """
         Delete volume, wait(volume might not be yet in state to be deleted)
         If volume is in-use we will raise error immediately
@@ -496,14 +521,20 @@ class OVSPluginTestCase(test.TestCase):
         except cinder_client_exceptions.NotFound:
             self._debug('Volume %s not found, already deleted' % volume.id)
             return
+
         if volume.status == 'in-use':
             raise RuntimeError('Cannot delete volume %s while it is in use' % volume.id)
 
-        self._cinder_wait_until_volume_state(volume.id, status='available')
-        self._debug('volume is now available')
+        if not force:
+            self._cinder_wait_until_volume_state(volume.id, status='available')
+            self._debug('volume is now available')
         volume = self._cinder_get_volume_by_id(volume.id)
-        self.cinder_client.volumes.delete(volume)
-        self._cinder_wait_until_volume_not_found(volume.id, timeout)
+        if force:
+            self.cinder_client.volumes.force_delete(volume)
+        else:
+            self.cinder_client.volumes.delete(volume)
+        if wait:
+            self._cinder_wait_until_volume_not_found(volume.id, timeout)
         self._debug('deleted volume %s' % volume.id)
 
     def _cinder_create_snapshot(self, volume, snap_name):
@@ -521,8 +552,10 @@ class OVSPluginTestCase(test.TestCase):
         self._get_cinder_client()
         return  dict((s.id, s.display_name) for s in self.cinder_client.volume_snapshots.list())
 
-    def _cinder_delete_snapshot(self, snapshot, timeout=300):
+    def _cinder_delete_snapshot(self, snapshot, force=False, timeout=300):
         self._get_cinder_client()
+        if force:
+            self._cinder_reset_snapshot_state(snapshot, 'error')
         self.cinder_client.volume_snapshots.delete(snapshot)
         self._cinder_wait_until_snapshot_not_found(snapshot.id, timeout)
 
@@ -572,18 +605,19 @@ class OVSPluginTestCase(test.TestCase):
         initial_state = None
         while time.time() < start + timeout_sec:
             volume = self._cinder_get_volume_by_id(volume_id)
-            if volume.status == 'error':
-                raise RuntimeError('Volume %s in error state' % volume_id)
+            if status != 'error':
+                if volume.status == 'error':
+                    raise VolumeInErrorState('Volume %s in error state' % volume_id)
             if volume.status == status:
-                self._debug('volume entered expected state')
+                self._debug('volume entered expected state after %s seconds' % (3*timeout_sec))
                 return
             if initial_state is None:
                 initial_state = volume.status
             if volume.status != initial_state:
                 self._debug('volume %s changed state from %s to %s' % (volume_id, initial_state, volume.status))
                 initial_state = volume.status
-            time.sleep(1)
-        raise RuntimeError('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, timeout_sec, volume.status))
+            time.sleep(3)
+        raise WaitTimedOut('Volume %s is not in state %s after %i seconds, current status %s' % (volume_id, status, timeout_sec, volume.status))
 
     def _cinder_wait_until_snapshot_state(self, snapshot_id, status, timeout_sec=300):
         """
@@ -600,7 +634,7 @@ class OVSPluginTestCase(test.TestCase):
             time.sleep(1)
         raise RuntimeError('Snapshot %s is not in state %s after %i seconds, current status %s' % (snapshot_id, status, timeout_sec, snapshot.status))
 
-    def _cinder_wait_until_snapshot_not_found(self, snapshot_id, timeout_sec = 300):
+    def _cinder_wait_until_snapshot_not_found(self, snapshot_id, timeout_sec=300):
         """
         Wait until snapshot.get returns 404
         Other errors are raised, timeout after X sec
@@ -661,13 +695,13 @@ class OVSPluginTestCase(test.TestCase):
         self._debug('new snapshot for %s' % volume.id)
         snap_name = self._random_snapshot_name()
         snapshot = self._cinder_create_snapshot(volume, snap_name)
-        self.register_tearDown(5, snap_name, self._cinder_delete_snapshot, {'snapshot': snapshot})
+        self.register_tearDown(5, snap_name, self._cinder_delete_snapshot, {'snapshot': snapshot, 'force': True})
         self._debug('snapshot %s created' % snap_name)
         return snapshot, snap_name
 
-    def _remove_snapshot(self, snap_name, snapshot, timeout=300):
+    def _remove_snapshot(self, snap_name, snapshot, timeout=300, force=False):
         self._debug('delete snapshot %s' % snap_name)
-        self._cinder_delete_snapshot(snapshot, timeout)
+        self._cinder_delete_snapshot(snapshot, timeout = timeout, force = force)
         self.unregister_tearDown(snap_name)
         self._cinder_wait_until_snapshot_not_found(snapshot.id, timeout)
         self._debug('snapshot %s deleted' % snap_name)

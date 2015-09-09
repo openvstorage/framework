@@ -1,4 +1,4 @@
-// Copyright 2014 CloudFounders NV
+// Copyright 2014 Open vStorage NV
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
 define([
     'jquery', 'knockout',
     'ovs/shared', 'ovs/api', 'ovs/generic',
-    '../../containers/storagerouter', '../../containers/storagedriver', './data'
-], function($, ko, shared, api, generic, StorageRouter, StorageDriver, data) {
+    '../../containers/storagerouter', '../../containers/storagedriver', '../../containers/vpool', './data'
+], function($, ko, shared, api, generic, StorageRouter, StorageDriver, VPool, data) {
     "use strict";
     return function() {
         var self = this;
@@ -27,11 +27,14 @@ define([
         self.loadStorageRoutersHandle = undefined;
         self.checkS3Handle            = undefined;
         self.checkMtptHandle          = undefined;
+        self.fetchAlbaVPoolHandle     = undefined;
         self.loadStorageRouterHandle  = undefined;
         self.loadStorageDriversHandle = {};
 
         // Observables
-        self.preValidateResult = ko.observable({ valid: true, reasons: [], fields: [] });
+        self.preValidateResult  = ko.observable({ valid: true, reasons: [], fields: [] });
+        self.albaBackendLoading = ko.observable(false);
+        self.invalidAlbaInfo    = ko.observable(false);
 
         // Computed
         self.canContinue = ko.computed(function() {
@@ -40,6 +43,15 @@ define([
                 valid = false;
                 fields.push('name');
                 reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidname'));
+            }
+            else {
+                $.each(self.data.vPools(), function(index, vpool) {
+                    if (vpool.name() === self.data.name()) {
+                        valid = false;
+                        fields.push('name');
+                        reasons.push($.t('ovs:wizards.addvpool.gathervpool.duplicatename'));
+                    }
+                });
             }
             if (self.data.backend().match(/^.+_s3$/)) {
                 if (!self.data.host.valid()) {
@@ -52,6 +64,20 @@ define([
                     fields.push('accesskey');
                     fields.push('secretkey');
                     reasons.push($.t('ovs:wizards.addvpool.gathervpool.nocredentials'));
+                }
+            }
+            if (self.data.backend() === 'alba') {
+                if (self.data.albaBackend() === undefined) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.addvpool.gathervpool.choosebackend'));
+                    fields.push('backend');
+                }
+                if (self.invalidAlbaInfo()) {
+                    valid = false;
+                    reasons.push($.t('ovs:wizards.addvpool.gathervpool.invalidalbainfo'));
+                    fields.push('clientid');
+                    fields.push('clientsecret');
+                    fields.push('host');
                 }
             }
 
@@ -131,6 +157,8 @@ define([
                             .then(self.shared.tasks.wait)
                             .then(function(data) {
                                 self.data.mountpoints(data.mountpoints);
+                                self.data.readcaches(data.readcaches);
+                                self.data.writecaches(data.writecaches);
                                 self.data.ipAddresses(data.ipaddresses);
                                 self.data.files(data.files);
                                 self.data.allowVPool(data.allow_vpool);
@@ -162,12 +190,80 @@ define([
                     .fail(deferred.reject);
             });
         };
+        self.loadAlbaBackends = function() {
+            return $.Deferred(function(albaDeferred) {
+                generic.xhrAbort(self.fetchAlbaVPoolHandle);
+                var getData, relay = '', remoteInfo = {};
+                getData = {
+                    backend_type: 'alba',
+                    contents: '_dynamics'
+                };
+                if (!self.data.localHost()) {
+                    relay = 'relay/';
+                    remoteInfo.ip = self.data.host();
+                    remoteInfo.port = self.data.port();
+                    remoteInfo.client_id = self.data.accesskey();
+                    remoteInfo.client_secret = self.data.secretkey();
+                }
+                $.extend(getData, remoteInfo);
+                self.albaBackendLoading(true);
+                self.invalidAlbaInfo(false);
+                self.fetchAlbaVPoolHandle = api.get(relay + 'backends', { queryparams: getData })
+                    .done(function(data) {
+                        var available_backends = [], calls = [];
+                        $.each(data.data, function (index, item) {
+                            if (item.available === true) {
+                                calls.push(
+                                    api.get(relay + 'alba/backends/' + item.linked_guid + '/', { queryparams: getData })
+                                        .then(function(data) {
+                                            data.presetNames = ko.observableArray(data.presets.filter(function(preset) {
+                                                return preset.is_available === true;
+                                            }));
+                                            if (data.available === true && data.presetNames().length > 0) {
+                                                available_backends.push(data);
+                                            }
+                                        })
+                                );
+                            }
+                        });
+                        $.when.apply($, calls)
+                            .then(function() {
+                                if (available_backends.length > 0) {
+                                    self.data.albaBackends(available_backends);
+                                    self.data.albaBackend(available_backends[0]);
+                                    self.data.albaPreset(available_backends[0].presetNames()[0]);
+                                } else {
+                                    self.data.albaBackends(undefined);
+                                    self.data.albaBackend(undefined);
+                                    self.data.albaPreset(undefined);
+                                }
+                                self.albaBackendLoading(false);
+                            })
+                            .done(albaDeferred.resolve)
+                            .fail(function() {
+                                self.data.albaBackends(undefined);
+                                self.data.albaBackend(undefined);
+                                self.data.albaPreset(undefined);
+                                self.albaBackendLoading(false);
+                                self.invalidAlbaInfo(true);
+                                albaDeferred.reject();
+                            });
+                    })
+                    .fail(function() {
+                        self.data.albaBackends(undefined);
+                        self.data.albaBackend(undefined);
+                        self.albaBackendLoading(false);
+                        self.invalidAlbaInfo(true);
+                        albaDeferred.reject();
+                    });
+            }).promise();
+        };
 
         // Durandal
         self.activate = function() {
             generic.xhrAbort(self.loadStorageRoutersHandle);
             self.loadStorageRoutersHandle = api.get('storagerouters', {
-                queryparams: {
+                    queryparams: {
                     contents: 'storagedrivers',
                     sort: 'name'
                 }
@@ -191,6 +287,31 @@ define([
                         self.data.target(self.data.storageRouters()[0]);
                     }
                 });
+
+            if (generic.xhrCompleted(self.loadVPoolsHandle)) {
+                var options = {
+                    contents: ''
+                };
+                self.loadVPoolsHandle = api.get('vpools', { queryparams: options })
+                    .done(function (data) {
+                        var guids = [], vpData = {};
+                        $.each(data.data, function (index, item) {
+                            guids.push(item.guid);
+                            vpData[item.guid] = item;
+                        });
+                        generic.crossFiller(
+                            guids, self.data.vPools,
+                            function (guid) {
+                                return new VPool(guid);
+                            }, 'guid'
+                        );
+                        $.each(self.data.vPools(), function (index, vpool) {
+                            if (guids.contains(vpool.guid())) {
+                                vpool.fillData(vpData[vpool.guid()]);
+                            }
+                        });
+                    });
+            }
         };
     };
 });

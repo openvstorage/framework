@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# Copyright 2014 CloudFounders NV
+#!/usr/bin/env python2
+# Copyright 2014 Open vStorage NV
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,27 +13,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ConfigParser
 import os
 import random
 import re
 import string
 import sys
+import json
 from subprocess import check_output, CalledProcessError
 
+dist_info = check_output('cat /etc/os-release', shell=True)
+if 'CentOS Linux' in dist_info:
+    openstack_webservice_name = 'httpd'
+else:  # Default fallback to Ubuntu in this case
+    openstack_webservice_name = 'apache2'
+
+# Cleanup *.pyc files
+# TODO: set owner:group only where it is really needed
+check_output('chown -R ovs:ovs /opt/OpenvStorage', shell=True)
+check_output('find /opt/OpenvStorage -name *.pyc -exec rm -rf {} \;', shell=True)
+
 SECRET_KEY_LENGTH = 50
-SECRET_SELECTION = "{}{}{}".format(string.ascii_letters, string.digits, string.punctuation)
+SECRET_SELECTION = "{0}{1}{2}".format(string.ascii_letters, string.digits, string.punctuation)
 secret_key = ''.join([random.SystemRandom().choice(SECRET_SELECTION) for i in range(SECRET_KEY_LENGTH)])
 
-config_filename = '/opt/OpenvStorage/config/ovs.cfg'
-config = ConfigParser.ConfigParser()
-config.read(config_filename)
-config.set('webapps', 'main.secret', secret_key)
-with open(config_filename, 'wb') as config_file:
-    config.write(config_file)
+config_filename = '/opt/OpenvStorage/config/ovs.json'
+with open(config_filename, 'r') as config_file:
+    contents = json.loads(config_file.read())
+contents['webapps']['main']['secret'] = secret_key
+with open(config_filename, 'w') as config_file:
+    config_file.write(json.dumps(contents, indent=4))
 
 os.chdir('/opt/OpenvStorage/webapps/api')
-check_output('export PYTHONPATH=/opt/OpenvStorage; python manage.py syncdb --noinput', shell=True)
+check_output('export PYTHONPATH=/opt/OpenvStorage:$PYTHONPATH; python manage.py syncdb --noinput', shell=True)
+
+run_level_regex = '^[KS][0-9]{2}(.*)'
 
 # Create web certificates
 if not os.path.exists('/opt/OpenvStorage/config/ssl/server.crt'):
@@ -58,11 +71,26 @@ for filename in filenames:
         with open(filename, 'w') as changed:
             changed.write(contents)
 
+# Disable default nginx site if it's configured
+if os.path.exists('/etc/nginx/sites-enabled/default'):
+    os.remove('/etc/nginx/sites-enabled/default')
+
+# Setup nginx site
+if not os.path.exists("/etc/nginx/sites-enabled/openvstorage.conf") and os.path.exists('/etc/nginx/sites-available/openvstorage.conf'):
+    check_output("ln -s /etc/nginx/sites-available/openvstorage.conf /etc/nginx/sites-enabled/openvstorage.conf", shell=True)
+if not os.path.exists("/etc/nginx/sites-enabled/openvstorage_ssl.conf") and os.path.exists('/etc/nginx/sites-available/openvstorage_ssl.conf'):
+    check_output("ln -s /etc/nginx/sites-available/openvstorage_ssl.conf /etc/nginx/sites-enabled/openvstorage_ssl.conf", shell=True)
+
 # Check conflicts with apache2 running on port 80 (most likely devstack/openstack gui)
 try:
-    running = check_output('ps aux | grep apache2 | grep -v grep', shell=True)
+    running = check_output('ps aux | grep {0} | grep -v grep'.format(openstack_webservice_name), shell=True)
 except CalledProcessError:
     running = False
 if running:
     if os.path.exists('/etc/nginx/sites-enabled/openvstorage.conf'):
         os.remove('/etc/nginx/sites-enabled/openvstorage.conf')
+    if os.path.exists('/etc/nginx/conf.d/openvstorage.conf'):
+        os.remove('/etc/nginx/conf.d/openvstorage.conf')
+
+# Restart Nginx
+check_output("service nginx restart", shell=True)
