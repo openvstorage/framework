@@ -45,7 +45,6 @@ define([
         self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
         self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendReads          = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });

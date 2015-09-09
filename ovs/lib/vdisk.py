@@ -463,7 +463,7 @@ class VDiskController(object):
             mutex.release()
 
     @staticmethod
-    @celery.task(name='ovs.disk.set_configparams')
+    @celery.task(name='ovs.vdisk.set_configparams')
     def set_configparams(vdisk_guid, configparams):
         """
         Sets configuration parameters to a given vdisk. Items not passed are (re)set.

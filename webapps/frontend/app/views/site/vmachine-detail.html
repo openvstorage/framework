@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section data-bind="with: vMachine()">
-	<ol class="breadcrumb">
+    <ol class="breadcrumb">
         <li data-bind="lazylist: { items: vPools, loadedObservable: 'loaded' }">
             <a data-part="entry"
                data-bind="text: name,
                           attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: guid }) }"></a>
         </li>
-	    <li class="active" data-bind="lazyloader: { item: name, loadedObservable: 'loaded' }"></li>
-	</ol>
+        <li class="active" data-bind="lazyloader: { item: name, loadedObservable: 'loaded' }"></li>
+    </ol>
     <div>
         <ul class="nav nav-tabs">
             <li class="active">
@@ -38,7 +38,7 @@ limitations under the License.
                         data-bind="click: function() { $root.snapshot(); },
                                    enable: loaded(),
                                    tooltip: 'ovs:vmachines.detail.snapshot',
-                                   enable: $.inArray('write', $root.shared.user.roles()) !== -1">
+                                   enable: $root.shared.user.roles().contains('write')">
                     <span class="fa" data-i18n="[html]ovs:icons.snapshot"></span>
                 </button>
                 <button type="button" class="btn btn-mini btn-default"
@@ -129,7 +129,7 @@ limitations under the License.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                                        green: ['ok_standalone', 'ok_sync'].contains(failoverMode()),
                                                         orange: failoverMode() == 'catch_up',
                                                         red: failoverMode() == 'degraded'
                                                     },
@@ -152,7 +152,7 @@ limitations under the License.
             <li data-bind="tooltip: 'ovs:generic.snapshots'">
                 <a href="#snapshots" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.snapshot"></a>
             </li>
-            <li data-bind="tooltip: 'ovs:generic.management', visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
+            <li data-bind="tooltip: 'ovs:generic.management', visible: $root.shared.user.roles().contains('manage')">
                 <a href="#management" data-toggle="tab" class="fa" data-i18n="[html]ovs:icons.management"></a>
             </li>
         </ul>
@@ -178,7 +178,7 @@ limitations under the License.
                             <td>
                                 <div data-bind="status: {
                                                     colors: {
-                                                        green: $.inArray(failoverMode(), ['ok_standalone', 'ok_sync']) !== -1,
+                                                        green: ['ok_standalone', 'ok_sync'].contains(failoverMode()),
                                                         orange: failoverMode() == 'catch_up',
                                                         red: failoverMode() == 'degraded'
                                                     },
@@ -209,7 +209,7 @@ limitations under the License.
                     <span data-i18n="[html]ovs:icons.inconsistent" class="fa"></span> &nbsp;<span data-i18n="ovs:generic.inconsistentss"></span>
                 </div>
             </div>
-            <div class="tab-pane" id="management" style="padding: 15px;" data-bind="visible: $.inArray('manage', $root.shared.user.roles()) !== -1">
+            <div class="tab-pane" id="management" style="padding: 15px;" data-bind="visible: $root.shared.user.roles().contains('manage')">
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>

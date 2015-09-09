@@ -25,8 +25,8 @@ define(['jquery', 'jqp/pnotify'], function($) {
         return returnvalue;
     }
     function deg2rad(deg) {
-		return deg * Math.PI / 180;
-	}
+        return deg * Math.PI / 180;
+    }
     function setDecimals(value, decimals) {
         decimals = decimals || 2;
         var parts = [];
@@ -484,45 +484,45 @@ define(['jquery', 'jqp/pnotify'], function($) {
         return stringStartsWith(this, searchString);
     };
     return {
-        getTimestamp : getTimestamp,
-        formatBytes : formatBytes,
-        formatSpeed : formatSpeed,
-        formatRatio : formatRatio,
-        formatShort : formatShort,
-        formatNumber : formatNumber,
-        formatPercentage : formatPercentage,
-        padRight : padRight,
-        padLeft : padLeft,
-        tryGet : tryGet,
-        trySet : trySet,
-        lower : lower,
-        alert : alert,
-        alertInfo : alertInfo,
-        alertSuccess : alertSuccess,
-        alertError : alertError,
-        keys : keys,
-        xhrAbort : xhrAbort,
-        xhrCompleted : xhrCompleted,
-        removeElement : removeElement,
-        smooth : smooth,
-        round : round,
-        ceil : ceil,
-        buildString : buildString,
-        setDecimals : setDecimals,
-        crossFiller : crossFiller,
-        syncObservableArray: syncObservableArray,
-        deg2rad : deg2rad,
-        numberSort : numberSort,
-        advancedSort : advancedSort,
-        validate : validate,
-        overlap : overlap,
-        merge : merge,
-        getColor: getColor,
-        getLocalTime: getLocalTime,
+        advancedSort: advancedSort,
+        alert: alert,
+        alertError: alertError,
+        alertInfo: alertInfo,
+        alertSuccess: alertSuccess,
         arrayFilterUnique: arrayFilterUnique,
-        getHash: getHash,
-        setCookie: setCookie,
+        buildString: buildString,
+        ceil: ceil,
+        crossFiller: crossFiller,
+        deg2rad: deg2rad,
+        formatBytes: formatBytes,
+        formatNumber: formatNumber,
+        formatPercentage: formatPercentage,
+        formatRatio: formatRatio,
+        formatShort: formatShort,
+        formatSpeed: formatSpeed,
+        getColor: getColor,
         getCookie: getCookie,
-        removeCookie: removeCookie
+        getHash: getHash,
+        getLocalTime: getLocalTime,
+        getTimestamp: getTimestamp,
+        keys: keys,
+        lower: lower,
+        merge: merge,
+        numberSort: numberSort,
+        overlap: overlap,
+        padLeft: padLeft,
+        padRight: padRight,
+        removeCookie: removeCookie,
+        removeElement: removeElement,
+        round: round,
+        setCookie: setCookie,
+        setDecimals: setDecimals,
+        smooth: smooth,
+        syncObservableArray: syncObservableArray,
+        tryGet: tryGet,
+        trySet: trySet,
+        validate: validate,
+        xhrAbort: xhrAbort,
+        xhrCompleted: xhrCompleted
     };
 });
