@@ -57,8 +57,10 @@ class OpenStackManagement(object):
         try:
             from cinder import version
             version_string = version.version_string()
-            if version_string.startswith('2015.2') or version_string.startswith('2015.1') or version_string.startswith('7.0'):
-                self._stack_version = 'kilo'  # For the moment use K driver
+            if version_string.startswith('2015.2') or version_string.startswith('7.0'):
+                self._stack_version = 'liberty'
+            elif version_string.startswith('2015.1'):
+                self._stack_version = 'kilo'
             elif version_string.startswith('2014.2'):
                 self._stack_version = 'juno'
             else:
@@ -294,10 +296,7 @@ class OpenStackManagement(object):
 
         if remote_version > existing_version:
             logger.debug('Updating existing driver using {0} from version {1} to version {2}'.format(remote_driver, existing_version, remote_version))
-            if self._is_devstack is True:
-                self.client.run('cp -f {0} /opt/stack/cinder/cinder/volume/drivers'.format(remote_driver))
-            else:
-                self.client.run('cp -f {0} {1}'.format(remote_driver, local_driver))
+            self.client.run('cp -f {0} {1}'.format(remote_driver, local_driver))
         else:
             logger.debug('Using driver {0} version {1}'.format(local_driver, existing_version))
 
@@ -309,12 +308,20 @@ class OpenStackManagement(object):
 
         # 3. Apply patches
         logger.info('  Applying patches')
+        if self._stack_version == 'liberty':
+            if self._is_devstack is True:
+                nova_volume_file = '{0}/virt/libvirt/volume/volume.py'.format(nova_base_path)
+            else:
+                nova_volume_file = '{0}/nova/virt/libvirt/volume/volume.py'.format(self._driver_location)
+        else:
+            if self._is_devstack is True:
+                nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
+            else:
+                nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
         if self._is_devstack is True:
-            nova_volume_file = '{0}/virt/libvirt/volume.py'.format(nova_base_path)
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
             cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
-            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
             nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
             cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
@@ -397,7 +404,7 @@ class OpenStackManagement(object):
 
         # 5. Enable events consumer
         logger.info('   - Enabling events consumer service')
-        service_name = 'ovs-openstack-events-consumer'
+        service_name = 'openstack-events-consumer'
         if not ServiceManager.has_service(service_name, self.client):
             ServiceManager.add_service(service_name, self.client)
             ServiceManager.enable_service(service_name, self.client)
