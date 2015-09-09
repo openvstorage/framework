@@ -322,7 +322,6 @@ class OpenStackManagement(object):
             nova_driver_file = '{0}/virt/libvirt/driver.py'.format(nova_base_path)
             cinder_brick_initiator_file = '{0}/brick/initiator/connector.py'.format(cinder_base_path)
         else:
-            nova_volume_file = '{0}/nova/virt/libvirt/volume.py'.format(self._driver_location)
             nova_driver_file = '{0}/nova/virt/libvirt/driver.py'.format(self._driver_location)
             cinder_brick_initiator_file = '{0}/cinder/brick/initiator/connector.py'.format(self._driver_location)
 
