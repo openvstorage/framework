@@ -1219,8 +1219,9 @@ class SetupController(object):
         print '\n+++ Promoting node +++\n'
         logger.info('Promoting node')
 
-        if SetupController._validate_local_memcache_servers(ip_client_map) is False:
-            raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
+        if configure_memcached:
+            if SetupController._validate_local_memcache_servers(ip_client_map) is False:
+                raise RuntimeError('Not all memcache nodes can be reached which is required for promoting a node.')
 
         target_client = ip_client_map[cluster_ip]
         node_name = target_client.run('hostname')
@@ -1360,8 +1361,9 @@ class SetupController(object):
         print '\n+++ Demoting node +++\n'
         logger.info('Demoting node')
 
-        if SetupController._validate_local_memcache_servers(ip_client_map) is False:
-            raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
+        if configure_memcached:
+            if SetupController._validate_local_memcache_servers(ip_client_map) is False:
+                raise RuntimeError('Not all memcache nodes can be reached which is required for demoting a node.')
 
         target_client = ip_client_map[cluster_ip]
         node_name = target_client.run('hostname')
@@ -2453,13 +2455,13 @@ EOF
     @staticmethod
     def _validate_local_memcache_servers(ip_client_map):
         """
-        Reads the rabbitmq client configuration file from one of the given nodes, and validates whether it can reach all
+        Reads the memcache client configuration file from one of the given nodes, and validates whether it can reach all
         nodes to handle a possible future memcache restart
         """
         if len(ip_client_map) <= 1:
             return True
         client = ip_client_map.values()[0]
-        config = client.rawconfig_read('{0}/{1}'.format(client.config_read('ovs.core.cfgdir'), 'rabbitmqclient.cfg'))
+        config = client.rawconfig_read('{0}/{1}'.format(client.config_read('ovs.core.cfgdir'), 'memcacheclient.cfg'))
         nodes = [node.strip() for node in config.get('main', 'nodes').split(',')]
         ips = map(lambda n: config.get(n, 'location').split(':')[0], nodes)
         for ip in ips:
