@@ -27,7 +27,7 @@ from ovs.lib.vmachine import VMachineController
 from ovs.lib.helpers.decorators import log
 from ovs.log.logHandler import LogHandler
 
-logger = LogHandler('lib', name='vpool')
+logger = LogHandler.get('lib', name='vpool')
 
 
 class VPoolController(object):
@@ -77,35 +77,25 @@ class VPoolController(object):
     def can_be_served_on(storagerouter_guid):
         """
         temporary check to avoid creating 2 ganesha nfs exported vpools
-        as this is not yet supported on volumedriverlevel
+        as this is not yet supported on storage driver level
         """
         _ = storagerouter_guid
         return True
 
     @staticmethod
-    @celery.task(name='ovs.vpool.set_configparams')
-    def set_configparams(vpool_guid, configparams):
+    @celery.task(name='ovs.vpool.set_config_params')
+    def set_config_params(vpool_guid, config_params):
         """
-        Sets configuration parameters to a given vpool/vdisk. Items not passed are (re)set.
+        Sets configuration parameters to a given vpool/vdisk.
         """
         vpool = VPool(vpool_guid)
-        resolved_configs = {}
-        for vdisk in vpool.vdisks:
-            resolved_configs[vdisk.guid] = vdisk.resolved_configuration
-        raw_config = vpool.configuration
-        keys = ['iops', 'cache_strategy', 'cache_size', 'foc']
-        for key in keys:
-            if key not in configparams and key in raw_config:
-                del raw_config[key]
-            if key in configparams:
-                raw_config[key] = configparams[key]
-        vpool.configuration = raw_config
+        resolved_configs = dict((vdisk.guid, vdisk.resolved_configuration) for vdisk in vpool.vdisks)
+        vpool.configuration = config_params
         vpool.save()
         for vdisk in vpool.vdisks:
             vdisk.invalidate_dynamics(['resolved_configuration'])
-            resolved_config = resolved_configs[vdisk.guid]
+            old_resolved_config = resolved_configs[vdisk.guid]
             new_resolved_config = vdisk.resolved_configuration
-            for key in keys:
-                if resolved_config.get(key) != new_resolved_config.get(key):
-                    # @TODO: update the 'key' property on the disk.
+            for key, value in config_params.iteritems():
+                if old_resolved_config.get(key) != new_resolved_config.get(key):
                     logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))

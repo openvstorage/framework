@@ -20,6 +20,9 @@ define([
     return function(guid) {
         var self = this;
 
+        // Variables
+        self.configurableStorageDriverAttrs = ['cache_strategy', 'dedupe_mode', 'dtl_mode', 'sco_size', 'write_buffer'];
+
         // Handles
         self.loadHandle = undefined;
 
@@ -29,120 +32,193 @@ define([
         self.vpool         = ko.observable();
 
         // Observables
-        self.loading               = ko.observable(false);
-        self.loaded                = ko.observable(false);
-        self.guid                  = ko.observable(guid);
-        self.name                  = ko.observable();
-        self.order                 = ko.observable(0);
-        self.snapshots             = ko.observableArray([]);
-        self.configuration         = ko.observable();
-        self._configuration        = ko.observable();
-        self.resolvedConfiguration = ko.observable();
-        self.size                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.storedData            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.cacheHits             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.cacheMisses           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.iops                  = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
-        self.readSpeed             = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.writeSpeed            = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
-        self.backendWritten        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.backendRead           = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.bandwidthSaved        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
-        self.namespace             = ko.observable();
-        self.storageRouterGuid     = ko.observable();
-        self.vpoolGuid             = ko.observable();
-        self.vMachineGuid          = ko.observable();
-        self.failoverMode          = ko.observable();
-        self.cacheStrategies       = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
-        self.hasFOC                = ko.observableArray([undefined, { value: true }, { value: false }]);
+        self.loading           = ko.observable(false);
+        self.loaded            = ko.observable(false);
+        self.guid              = ko.observable(guid);
+        self.name              = ko.observable();
+        self.order             = ko.observable(0);
+        self.snapshots         = ko.observableArray([]);
+        self.oldConfiguration  = ko.observable();
+        self.newConfiguration  = ko.observable();
+        self.size              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.storedData        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.cacheHits         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.cacheMisses       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.iops              = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
+        self.readSpeed         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.writeSpeed        = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatSpeed });
+        self.backendWritten    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.backendRead       = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.bandwidthSaved    = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
+        self.namespace         = ko.observable();
+        self.storageRouterGuid = ko.observable();
+        self.vpoolGuid         = ko.observable();
+        self.vMachineGuid      = ko.observable();
+        self.failoverMode      = ko.observable();
+        self.cacheStrategies   = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
+        self.dtlModes          = ko.observableArray([undefined, { name: 'nosync' }, { name: 'async' }, { name: 'sync' }]);
+        self.dedupeModes       = ko.observableArray([undefined, { name: 'dedupe' }, { name: 'nondedupe' }]);
+        self.scoSizes          = ko.observableArray([undefined, 4, 8, 16, 32, 64, 128]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
+            if (self.cacheHits() === undefined || self.cacheMisses() === undefined) {
+                return undefined;
+            }
             var total = (self.cacheHits.raw() || 0) + (self.cacheMisses.raw() || 0);
             if (total === 0) {
                 total = 1;
             }
             return generic.formatRatio((self.cacheHits.raw() || 0) / total * 100);
         });
-        self.configIops = ko.computed({
-            read: function() {
-                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('iops')) {
-                    return self._configuration().iops;
+        self.fallbackConfig = ko.computed(function() {
+            var fallback = {};
+            if (self.vMachine() !== undefined) {
+                if (self.vMachine().configCacheStrategy() !== undefined) {
+                    fallback.cache_strategy = [self.vMachine().configCacheStrategy().name, 'machine'];
                 }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self._configuration();
-                if (value === '') {
-                    delete target.iops;
-                } else {
-                    target.iops = parseInt(value, 10);
-                    if (isNaN(target.iops)) {
-                        delete target.iops;
-                    }
+                if (self.vMachine().dedupeMode() !== undefined) {
+                    fallback.dedupe_mode = [self.vMachine().dedupeMode().name, 'machine'];
                 }
-                self._configuration(target);
+                if (self.vMachine().dtlMode() !== undefined) {
+                    fallback.dtl_mode = [self.vMachine().dtlMode().name, 'machine'];
+                }
+                if (self.vMachine().scoSize() !== undefined) {
+                    fallback.sco_size = [self.vMachine().scoSize(), 'machine'];
+                }
+                if (self.vMachine().writeBuffer() !== undefined) {
+                    fallback.write_buffer = [self.vMachine().writeBuffer(), 'machine'];
+                }
             }
-        }).extend({ notify: 'always' });
+            if (self.vpool() !== undefined) {
+                if (fallback.cache_strategy === undefined && self.vpool().configCacheStrategy() !== undefined) {
+                    fallback.cache_strategy = [self.vpool().configCacheStrategy().name, 'vpool'];
+                }
+                if (fallback.dedupe_mode === undefined && self.vpool().dedupeMode() !== undefined) {
+                    fallback.dedupe_mode = [self.vpool().dedupeMode().name, 'vpool'];
+                }
+                if (fallback.dtl_mode === undefined && self.vpool().dtlMode() !== undefined) {
+                    fallback.dtl_mode = [self.vpool().dtlMode().name, 'vpool'];
+                }
+                if (fallback.sco_size === undefined && self.vpool().scoSize() !== undefined) {
+                    fallback.sco_size = [self.vpool().scoSize(), 'vpool'];
+                }
+                if (fallback.write_buffer === undefined && self.vpool().writeBuffer() !== undefined) {
+                    fallback.write_buffer = [self.vpool().writeBuffer(), 'vpool'];
+                }
+            }
+            return fallback;
+        });
         self.configCacheStrategy = ko.computed({
             read: function() {
-                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('cache_strategy')) {
-                    return { name: self._configuration().cache_strategy };
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('cache_strategy')) {
+                    if (self.newConfiguration().cache_strategy === null) {
+                        return undefined;
+                    }
+                    return { name: self.newConfiguration().cache_strategy };
                 }
                 return undefined;
             },
             write: function(value) {
-                var target = self._configuration();
+                var target = self.newConfiguration();
                 if (value === undefined) {
-                    delete target.cache_strategy;
+                    target.cache_strategy = null;
                 } else {
                     target.cache_strategy = value.name;
                 }
-                self._configuration(target);
+                self.newConfiguration(target);
             }
         });
-        self.configCacheSize = ko.computed({
+        self.dedupeMode = ko.computed({
             read: function() {
-                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('cache_size')) {
-                    return self._configuration().cache_size;
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dedupe_mode')) {
+                    if (self.newConfiguration().dedupe_mode === null) {
+                        return undefined;
+                    }
+                    return { name: self.newConfiguration().dedupe_mode };
                 }
                 return undefined;
             },
             write: function(value) {
-                var target = self._configuration();
-                if (value === '') {
-                    delete target.cache_size;
+                var target = self.newConfiguration();
+                if (value === undefined) {
+                    target.dedupe_mode = null;
                 } else {
-                    target.cache_size = parseInt(value, 10);
-                    if (isNaN(target.cache_size)) {
-                        delete target.cache_size;
+                    target.dedupe_mode = value.name;
+                }
+                self.newConfiguration(target);
+            }
+        });
+        self.dtlMode = ko.computed({
+            read: function() {
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dtl_mode')) {
+                    if (self.newConfiguration().dtl_mode === null) {
+                        return undefined;
+                    }
+                    return { name: self.newConfiguration().dtl_mode };
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self.newConfiguration();
+                if (value === undefined) {
+                    target.dtl_mode = null;
+                } else {
+                    target.dtl_mode = value.name;
+                }
+                self.newConfiguration(target);
+            }
+        });
+        self.scoSize = ko.computed({
+            read: function() {
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('sco_size')) {
+                    if (self.newConfiguration().sco_size === null) {
+                        return undefined;
+                    }
+                    return self.newConfiguration().sco_size;
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self.newConfiguration();
+                if (value === undefined) {
+                    target.sco_size = null;
+                } else {
+                    target.sco_size = value;
+                }
+                self.newConfiguration(target);
+            }
+        });
+        self.writeBuffer = ko.computed({
+            read: function() {
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('write_buffer')) {
+                    if (self.newConfiguration().write_buffer === null) {
+                        return undefined;
+                    }
+                    return self.newConfiguration().write_buffer;
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self.newConfiguration();
+                if (value === '') {
+                    target.write_buffer = null;
+                } else {
+                    target.write_buffer = parseInt(value, 10);
+                    if (isNaN(target.write_buffer)) {
+                        delete target.write_buffer;
+                    } else if (target.write_buffer === 0) {
+                        target.write_buffer = null;
                     }
                 }
-                self._configuration(target);
+                self.newConfiguration(target);
             }
         }).extend({ notify: 'always' });
-        self.configFoc = ko.computed({
-            read: function() {
-                if (self._configuration() !== undefined && self._configuration().hasOwnProperty('foc')) {
-                    return { value: self._configuration().foc };
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self._configuration();
-                if (value === undefined) {
-                    delete target.foc;
-                } else {
-                    target.foc = value.value;
-                }
-                self._configuration(target);
-            }
-        });
         self.configChanged = ko.computed(function() {
             var changed = false;
-            if (self._configuration() !== undefined && self.configuration() !== undefined) {
-                $.each(['iops', 'cache_strategy', 'cache_size', 'foc'], function (i, key) {
-                    if (self._configuration()[key] !== self.configuration()[key]) {
+            if (self.newConfiguration() !== undefined && self.oldConfiguration() !== undefined) {
+                $.each(self.configurableStorageDriverAttrs, function (i, key) {
+                    if (self.newConfiguration()[key] !== self.oldConfiguration()[key]) {
                         changed = true;
                         return false;
                     }
@@ -168,18 +244,17 @@ define([
             generic.trySet(self.vpoolGuid, data, 'vpool_guid');
             generic.trySet(self.vMachineGuid, data, 'vmachine_guid');
             generic.trySet(self.storageRouterGuid, data, 'storagerouter_guid');
-            generic.trySet(self.resolvedConfiguration, data, 'resolved_configuration');
             if (data.hasOwnProperty('configuration')) {
-                if (self._configuration() === undefined) {
-                    self._configuration($.extend({}, data.configuration));
+                if (self.newConfiguration() === undefined) {
+                    self.newConfiguration($.extend({}, data.configuration));
                 }
-                if (self.configuration() === undefined) {
-                    self.configuration($.extend({}, data.configuration));
+                if (self.oldConfiguration() === undefined) {
+                    self.oldConfiguration($.extend({}, data.configuration));
                 }
-                var target = self._configuration();
-                generic.merge(self.configuration(), data.configuration, target, ['iops', 'cache_strategy', 'cache_size', 'foc']);
-                self._configuration(target);
-                self.configuration($.extend({}, data.configuration));
+                var target = self.newConfiguration();
+                generic.merge(self.oldConfiguration(), data.configuration, target, self.configurableStorageDriverAttrs);
+                self.newConfiguration(target);
+                self.oldConfiguration($.extend({}, data.configuration));
             }
             if (data.hasOwnProperty('info')) {
                 self.storedData(data.info.stored);

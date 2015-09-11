@@ -65,6 +65,7 @@ define([
         self.storageRoutersLoaded      = ko.observable(false);
         self.updatingStorageRouters    = ko.observable(false);
         self.vPool                     = ko.observable();
+        self.dtlLocation               = ko.observable();
         self.storageRouters            = ko.observableArray([]);
         self.checkedStorageRouterGuids = ko.observableArray([]);
 
@@ -361,8 +362,8 @@ define([
         self.saveConfiguration = function() {
             if (self.vPool() !== undefined) {
                 var vp = self.vPool();
-                api.post('vpools/' + vp.guid() + '/set_configparams', {
-                    data: { configparams: vp._configuration() }
+                api.post('vpools/' + vp.guid() + '/set_config_params', {
+                    data: { config_params: vp.newConfiguration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
@@ -374,10 +375,9 @@ define([
                     .fail(function (error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile', {
-                                context: 'error',
+                            $.t('ovs:generic.messages.errorwhile_error', {
                                 what: $.t('ovs:vpools.saveconfig.errormsg', { what: vp.name() }),
-                                error: error.responseText
+                                error: error
                             })
                         );
                     });

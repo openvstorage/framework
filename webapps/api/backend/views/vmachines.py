@@ -246,8 +246,8 @@ class VMachineViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VMachine)
-    def set_configparams(self, vmachine, configparams):
+    def set_config_params(self, vmachine, config_params):
         """
-        Sets configuration parameters to a given vmachine/vdisk. Items not passed are (re)set.
+        Sets configuration parameters to a given vmachine/vdisk.
         """
-        return VMachineController.set_configparams.delay(vmachine_guid=vmachine.guid, configparams=configparams)
+        return VMachineController.set_config_params.delay(vmachine_guid=vmachine.guid, config_params=config_params)

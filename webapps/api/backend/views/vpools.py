@@ -133,8 +133,8 @@ class VPoolViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VPool)
-    def set_configparams(self, vpool, configparams):
+    def set_config_params(self, vpool, config_params):
         """
-        Sets configuration parameters to a given vpool/vdisk. Items not passed are (re)set.
+        Sets configuration parameters to a given vpool/vdisk.
         """
-        return VPoolController.set_configparams.delay(vpool_guid=vpool.guid, configparams=configparams)
+        return VPoolController.set_config_params.delay(vpool_guid=vpool.guid, config_params=config_params)

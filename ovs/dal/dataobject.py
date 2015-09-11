@@ -124,7 +124,7 @@ class DataObject(object):
     #######################
 
     # Properties that needs to be overwritten by implementation
-    _properties = []  # Blueprint data of the objec type
+    _properties = []  # Blueprint data of the object type
     _dynamics = []    # Timeout of readonly object properties cache
     _relations = []   # Blueprint for relations
 

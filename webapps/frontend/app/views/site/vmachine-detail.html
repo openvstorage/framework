@@ -222,37 +222,177 @@ limitations under the License.
                                 <h4 data-i18n="ovs:vmachines.detail.configuration"></h4>
                                 <p data-i18n="ovs:vmachines.detail.configurationinfo"></p>
                                 <ul>
-                                    <li>
-                                        <span data-i18n="ovs:generic.limitiops"></span>:
-                                        <input data-bind="value: configIops, valueUpdate: 'afterkeydown'" placeholder=" -" style="margin: 5px;" />
+                                    <li data-bind="visible: false"> <!--Currently disabled because volumedriver does not allow dtl configurations-->
+                                        <span data-i18n="ovs:storagerouters.configuration.general.dtl"></span>
+                                        <a data-bind="popover: {
+                                                          title: 'ovs:storagerouters.configuration.general.dtl_help_title',
+                                                          content: 'ovs:storagerouters.configuration.general.dtl_help_message'
+                                                      }"
+                                           class="hand fa noline"
+                                           data-i18n="[html]ovs:icons.question_circle"
+                                           style="margin-left: 5px; color: blue;"
+                                           role="button"
+                                           tabindex="-1">
+                                        </a>
+                                        <div>
+                                            <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_mode"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <span data-bind="dropdown: {
+                                                                                 items: dtlModes,
+                                                                                 target: dtlMode,
+                                                                                 text: function(item) {
+                                                                                     if (item === undefined) {
+                                                                                         return '-';
+                                                                                     }
+                                                                                     return $.t('ovs:storagerouters.configuration.general.dtl_modes.' + item.name);
+                                                                                 },
+                                                                                 key: 'name',
+                                                                                 keyisfunction: false,
+                                                                                 small: true
+                                                                             }">
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_location"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <!--<span data-bind="dropdown: {-->
+                                                                                 <!--items: $parent.storageRouters, not yet defined-->
+                                                                                 <!--target: $parent.dtlLocation,-->
+                                                                                 <!--text: function(item) {-->
+                                                                                     <!--return item.name;-->
+                                                                                 <!--},-->
+                                                                                 <!--small: true-->
+                                                                             <!--}">-->
+                                                            <!--</span>-->
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </li>
                                     <li>
-                                        <span data-i18n="ovs:generic.cachestrategy"></span>:
-                                        <span data-bind="dropdown: {
-                                                             items: cacheStrategies, target: configCacheStrategy,
-                                                             text: function(item) {
-                                                                 if (item === undefined) {
-                                                                     return '-';
-                                                                 }
-                                                                 return $.t('ovs:generic.cachestrategies.' + item.name);
-                                                             }, key: 'name', keyisfunction: false, small: true
-                                                         }" style="margin-left: 5px;"></span>
+                                        <span data-i18n="ovs:storagerouters.configuration.general.caching"></span>
+                                        <div>
+                                            <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.strategy"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <span data-bind="dropdown: {
+                                                                                 items: cacheStrategies,
+                                                                                 target: configCacheStrategy,
+                                                                                 text: function(item) {
+                                                                                     if (item === undefined) {
+                                                                                         return '-';
+                                                                                     }
+                                                                                     return $.t('ovs:storagerouters.configuration.general.cache_strategies.' + item.name);
+                                                                                 },
+                                                                                 key: 'name',
+                                                                                 keyisfunction: false,
+                                                                                 small: true
+                                                                             }">
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr >
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.dedupe"></span>:
+                                                                <a data-bind="popover: {
+                                                                                  title: 'ovs:storagerouters.configuration.general.dedupe_help_title',
+                                                                                  content: 'ovs:storagerouters.configuration.general.dedupe_help_message'
+                                                                              }"
+                                                                   class="hand fa noline"
+                                                                   data-i18n="[html]ovs:icons.question_circle"
+                                                                   style="margin-left: 5px; color: blue;"
+                                                                   role="button"
+                                                                   tabindex="-1">
+                                                                </a>
+                                                                <span class="help-block"
+                                                                      data-i18n="ovs:storagerouters.configuration.general.dedupe_warning"
+                                                                      style="font-size: smaller; margin-top: -4px">
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <span data-bind="dropdown: {
+                                                                                 items: dedupeModes,
+                                                                                 target: dedupeMode,
+                                                                                 text: function(item) {
+                                                                                     if (item === undefined) {
+                                                                                         return '-';
+                                                                                     }
+                                                                                     return $.t('ovs:storagerouters.configuration.general.dedupe_modes.' + item.name);
+                                                                                 },
+                                                                                 key: 'name',
+                                                                                 keyisfunction: false,
+                                                                                 small: true
+                                                                             }">
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </li>
                                     <li>
-                                        <span data-i18n="ovs:generic.maxnondispcachesize"></span>:
-                                        <input data-bind="value: configCacheSize, valueUpdate: 'afterkeydown'" placeholder=" -" style="margin: 5px;" />
-                                    </li>
-                                    <li>
-                                        <span data-i18n="ovs:generic.hasfailovercache"></span>:
-                                        <span data-bind="dropdown: {
-                                                             items: hasFOC, target: configFoc,
-                                                             text: function(item) {
-                                                                 if (item === undefined) {
-                                                                     return '-';
-                                                                 }
-                                                                 return $.t('ovs:generic.' + (item.value ? 'yes' : 'no'));
-                                                             }, key: 'value', keyisfunction: false, small: true
-                                                         }" style="margin-left: 5px;"></span>
+                                        <span data-i18n="ovs:storagerouters.configuration.general.volume"></span>
+                                        <div>
+                                            <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
+                                                <tbody>
+                                                    <tr>
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.sco_size"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <span data-bind="dropdown: {
+                                                                                 items: scoSizes,
+                                                                                 target: scoSize,
+                                                                                 text: function(item) {
+                                                                                     if (item === undefined || item === null) {
+                                                                                         return '-';
+                                                                                     }
+                                                                                     return item + ' ' + $.t('ovs:generic.m') + $.t('ovs:generic.b');
+                                                                                 },
+                                                                                 small: true
+                                                                             }">
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td style="width: 20%; padding: 0;">
+                                                            <div style="margin-top: 5px;">
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.write_buffer"></span>:
+                                                            </div>
+                                                        </td>
+                                                        <td style="padding: 0;">
+                                                            <input data-bind="value: writeBuffer, valueUpdate: 'afterkeydown'"
+                                                                   size="5"
+                                                                   style="height: 25px; text-align: center;"/>
+                                                            <span data-bind="text: ' GB'"></span>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </li>
                                 </ul>
                                 <button data-bind="click: function() { $root.saveConfiguration() }, enable: configChanged()" class="btn btn-default" data-i18n="ovs:generic.save"></button>

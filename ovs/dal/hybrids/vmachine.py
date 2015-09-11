@@ -37,7 +37,7 @@ class VMachine(DataObject):
                     Property('devicename', str, doc='The name of the container file (e.g. the VMX-file) describing the vMachine.'),
                     Property('is_vtemplate', bool, default=False, doc='Indicates whether this vMachine is a vTemplate.'),
                     Property('status', ['OK', 'NOK', 'CREATED', 'SYNC', 'SYNC_NOK'], default='OK', doc='Internal status of the vMachine'),
-                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specifc fallback configurations')]
+                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specific fallback configurations')]
     __relations = [Relation('pmachine', PMachine, 'vmachines'),
                    Relation('vpool', VPool, 'vmachines', mandatory=False)]
     __dynamics = [Dynamic('snapshots', list, 60),
@@ -137,7 +137,7 @@ class VMachine(DataObject):
         storagedrivers = DataList({'object': StorageDriver,
                                    'data': DataList.select.GUIDS,
                                    'query': {'type': DataList.where_operator.AND,
-                                             'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data  # noqa
+                                             'items': [('storagedriver_id', DataList.operator.IN, storagedriver_ids)]}}).data
         for storagedriver in DataObjectList(storagedrivers, StorageDriver):
             storagerouter_guids.add(storagedriver.storagerouter_guid)
         return list(storagerouter_guids)

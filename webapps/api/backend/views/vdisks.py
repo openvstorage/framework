@@ -77,8 +77,8 @@ class VDiskViewSet(viewsets.ViewSet):
     @required_roles(['read', 'write', 'manage'])
     @return_task()
     @load(VDisk)
-    def set_configparams(self, vdisk, configparams):
+    def set_config_params(self, vdisk, config_params):
         """
-        Sets configuration parameters to a given vdisk. Items not passed are (re)set.
+        Sets configuration parameters to a given vdisk.
         """
-        return VDiskController.set_configparams.delay(vdisk_guid=vdisk.guid, configparams=configparams)
+        return VDiskController.set_config_params.delay(vdisk_guid=vdisk.guid, config_params=config_params)

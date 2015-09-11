@@ -75,11 +75,6 @@
             "PASSWORD": "Password Credentials",
             "CLIENT_CREDENTIALS": "Client Credentials"
         },
-        "cachestrategies": {
-            "onread": "On read",
-            "onwrite": "On write",
-            "none": "No cache"
-        },
         "caches": {
             "read": "Read cache",
             "write": "Write cache",
@@ -202,12 +197,8 @@
         "backendtype": "Type",
         "storageip": "Storage IP",
         "namespace": "Backend location",
-        "limitiops": "Limit IOPS",
-        "cachestrategy": "Cache strategy",
-        "maxnondispcachesize": "Max non-disposable cache size",
-        "hasfailovercache": "Has FOC",
         "save": "Save",
-        "fallbackvalue": "Fallback value",
+        "fallbackvalue": "Fallback",
         "usage": "Usage",
         "custompath": "Custom path",
         "reload": "Reload",
@@ -225,7 +216,9 @@
         "partitionusage": "Detailed partition usage:",
         "sizeunspecified": "Size up to __amount__",
         "tempspace": "Temporary files",
-        "accept": "Accept"
+        "accept": "Accept",
+        "warning": "Warning",
+        "inheritedfrom": "Inherited from"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -252,6 +245,43 @@
             "disks": {
                 "title": "Physical disks"
             }
+        },
+        "configuration": {
+            "general": {
+                "cache_strategies": {
+                    "none": "No Cache",
+                    "null": "-",
+                    "onread": "On Read",
+                    "onwrite": "On Write"
+                },
+                "caching": "Caching",
+                "dedupe": "Deduplication",
+                "dedupe_help_message": "Deduplication will calculate MD5 sum for each write resulting in performance loss, but better cache performance",
+                "dedupe_help_title": "Help - Deduplication",
+                "dedupe_modes": {
+                    "dedupe": "Deduped",
+                    "nondedupe": "Non-Deduped",
+                    "null": "-"
+                },
+                "dedupe_warning": "Non-deduplication cannot be changed again!",
+                "dtl": "Distributed Transaction Log",
+                "dtl_help_message": "The Distributed Transaction Log does a bunch of stuff",
+                "dtl_help_title": "Help - Distributed Transaction Log",
+                "dtl_location": "Location",
+                "dtl_mode": "Mode",
+                "dtl_modes": {
+                    "async": "Async",
+                    "nosync": "No Sync",
+                    "sync": "Sync"
+                },
+                "sco_size": "SCO size",
+                "strategy": "Strategy",
+                "volume": "Volumes",
+                "write_buffer": "Maximum write buffer"
+            },
+            "vdisk": {
+                "volume": "Volume"
+            }
         }
     },
     "vpools" : {
@@ -273,8 +303,8 @@
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
             "logginginfo3": "to view this vPool's logs.",
-            "configuration": "vDisk configuration defaults",
-            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+            "configuration": "vPool configuration defaults",
+            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine, from its vPool."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -290,7 +320,7 @@
         "saveconfig": {
             "done": "Save complete",
             "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "while saving __what__"
+            "errormsg": "saving __what__"
         },
         "add": "Add new vPool"
     },
@@ -351,7 +381,7 @@
         "saveconfig": {
             "done": "Save complete",
             "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "while saving __what__"
+            "errormsg": "saving __what__"
         }
     },
     "vdisks": {
@@ -368,7 +398,7 @@
         "saveconfig": {
             "done": "Save complete",
             "donemsg": "The configuration details for __what__ are saved.",
-            "errormsg": "while saving __what__"
+            "errormsg": "saving __what__"
         }
     },
     "vtemplates": {
@@ -908,7 +938,6 @@
         "expand": "&#xf196;",
         "externallink": "&#xf08e;",
         "fromtemplate": "&#xf045;",
-        "help": "&#xf059;",
         "inconsistent": "&#xf097;",
         "information": "&#xf05a;",
         "licensing": "&#xf132;",
@@ -920,6 +949,7 @@
         "moveaway": "&#xf074;",
         "notchecked": "&#xf096;",
         "password": "&#xf084;",
+        "question_circle": "&#xf059;",
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
         "separator": "&#xf101;",

@@ -55,6 +55,7 @@ define([
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
         self.vMachine             = ko.observable();
+        self.dtlLocation          = ko.observable();
 
         // Functions
         self.load = function() {
@@ -190,8 +191,8 @@ define([
         self.saveConfiguration = function() {
             if (self.vMachine() !== undefined) {
                 var vm = self.vMachine();
-                api.post('vmachines/' + vm.guid() + '/set_configparams', {
-                    data: { configparams: vm._configuration() }
+                api.post('vmachines/' + vm.guid() + '/set_config_params', {
+                    data: { config_params: vm.newConfiguration() }
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
@@ -203,10 +204,9 @@ define([
                     .fail(function (error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile', {
-                                context: 'error',
+                            $.t('ovs:generic.messages.errorwhile_error', {
                                 what: $.t('ovs:vmachines.saveconfig.errormsg', { what: vm.name() }),
-                                error: error.responseText
+                                error: error
                             })
                         );
                     });
