@@ -49,17 +49,17 @@ class DebianPackage(object):
     def install(package_name, client, force=False):
         force_text = '--force-yes' if force is True else ''
         counter = 0
-        max_counter = 3
+        max_counter = 5
         while True and counter < max_counter:
             counter += 1
             try:
                 client.run('apt-get install -y {0} {1}'.format(force_text, package_name))
                 break
             except CalledProcessError as cpe:
-                logger.warning('Install failed, trying again. Error: {0}'.format(cpe.output))
-                if cpe.output and 'You may want to run apt-get update' in cpe.output[0]:
+                if cpe.output and 'You may want to run apt-get update' in cpe.output[0] and counter != max_counter:
                     DebianPackage.update(client)
-                if counter == max_counter:
+                if counter == max_counter:    # Install can sometimes fail because apt lock cannot be retrieved
+                    logger.error('Install failed. Error: {0}'.format(cpe.output))
                     raise cpe
             except Exception as ex:
                 raise ex
@@ -68,15 +68,17 @@ class DebianPackage(object):
     @staticmethod
     def update(client):
         counter = 0
-        max_counter = 3
+        max_counter = 5
         while True and counter < max_counter:
             counter += 1
             try:
                 client.run('apt-get update {0}'.format(DebianPackage.APT_CONFIG_STRING))
                 break
             except CalledProcessError as cpe:
-                logger.warning('Update failed, trying again. Error: {0}'.format(cpe.output))
-                if counter == max_counter:
+                if cpe.output and 'Could not get lock' in cpe.output[0] and counter != max_counter:
+                    logger.info('Attempt {0} to get lock failed, trying again'.format(counter))
+                if counter == max_counter:  # Update can sometimes fail because apt lock cannot be retrieved
+                    logger.error('Update failed. Error: {0}'.format(cpe.output))
                     raise cpe
             time.sleep(1)
 
