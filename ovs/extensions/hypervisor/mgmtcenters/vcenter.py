@@ -113,7 +113,7 @@ class VCenter(object):
         """
         This method does not make sense for vCenter as you cannot retrieve a Virtual Disk by uuid
         """
-        raise NotImplementedError('Method <get_vdisk_device_info> not implemented for vCenter ManagementCenter')
+        raise NotImplementedError('Method <get_vdisk_device_info> not implemented for vCenter Management Center')
 
     def get_vmachine_device_info(self, instanceid):
         """
@@ -139,7 +139,15 @@ class VCenter(object):
         'id': '4a607820-202c-496b-b942-591a9a67fe0f',
         'name': 'instance1'}
         """
-        return self.sdk.make_agnostic_config(self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename)[0])
+        vm_object = None
+        for host_id in self.sdk.get_hosts():
+            try:
+                vm_object, _ = self.sdk.get_nfs_datastore_object(ip, mountpoint, devicename, host=host_id)
+            except RuntimeError:
+                pass
+        if vm_object is not None:
+            return self.sdk.make_agnostic_config(vm_object)
+        return None
 
     def is_host_configured_for_vpool(self, vpool_guid, ip):
         _ = self
