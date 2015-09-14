@@ -131,7 +131,9 @@ class Sdk(object):
             ).obj_identifier
             # pylint: enable=line-too-long
         else:
-            self._esxHost = self._get_vcenter_hosts()[0].obj_identifier  # TODO?
+            # @TODO: We need to extend all calls to specify the ESXi host where the action needs to be executed.
+            # We cannot just assume an ESXi host here, as this is important for certain calls like creating a VM.
+            self._esxHost = None
 
     @authenticated(force=True)
     def _get_vcenter_hosts(self):
