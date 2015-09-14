@@ -112,7 +112,7 @@ class OVSSNMPServer():
                 return True
         return False
 
-    def _register_dal_model(self, class_id, model_object, attribute, attrb_oid, key=None, func=None, atype=str):
+    def _register_dal_model(self, class_id, model_object, attribute, attrb_oid, key=None, func=None, atype=str, index=None):
         """
         Register a DAL model as OID
         class_id is the unique id of the type
@@ -138,7 +138,18 @@ class OVSSNMPServer():
             try:
                 value = getattr(model_object, attribute)
                 if key and isinstance(value, dict):
-                    value = value[key]
+                    if '.' in key:
+                        key1, key2 = key.split('.')
+                        value = value[key1][key2]
+                    else:
+                        value = value[key]
+                elif key and index and isinstance(value, list):
+                    value = value[index]
+                    if '.' in key:
+                        key1, key2 = key.split('.')
+                        value = value[key1][key2]
+                    else:
+                        value = value[key]
                 elif key:
                     value = getattr(value, key)
                 elif not key and (isinstance(value, list) or isinstance(value, DataObjectList)):
@@ -146,7 +157,7 @@ class OVSSNMPServer():
             except Exception as ex:
                 print('[EXCEPTION] %s' % (str(ex)))
                 if atype == int:
-                    value = -1
+                    value = 0
                 elif atype == str:
                     value = 'N/A'
             try:
@@ -384,6 +395,26 @@ class OVSSNMPServer():
                     self._register_dal_model(4, storagedriver, 'stored_data', "2", atype = int)
                     self.instance_oid += 1
 
+            try:
+                # try to load OVS Backends
+                from ovs.dal.lists.albabackendlist import AlbaBackendList
+                for backend in AlbaBackendList.get_albabackends():
+                    _guids.add(backend.guid)
+                    if not self._check_added(backend):
+                        self._register_dal_model(5, backend, 'guid', 0)
+                        self._register_dal_model(5, backend, 'name', 1)
+                        for disk_id in range(len((backend.all_disks))):
+                            self._register_dal_model(5, backend, 'all_disks', '2.{0}.0'.format(disk_id), key = "name", index=disk_id)
+                            self._register_dal_model(5, backend, 'all_disks', '2.{0}.1'.format(disk_id), key = "usage.size", atype = long, index=disk_id)
+                            self._register_dal_model(5, backend, 'all_disks', '2.{0}.2'.format(disk_id), key = "usage.used", atype = long, index=disk_id)
+                            self._register_dal_model(5, backend, 'all_disks', '2.{0}.3'.format(disk_id), key = "usage.available", atype = long, index=disk_id)
+                            self._register_dal_model(5, backend, 'all_disks', '2.{0}.4'.format(disk_id), key = "state.state", index=disk_id)
+                            self._register_dal_model(5, backend, 'all_disks', '2.{0}.5'.format(disk_id), key = "node_id", index=disk_id)
+
+                        self.instance_oid += 1
+            except ImportError:
+                print('OVS Backend not present')
+                pass
             reload = False
             for object_guid in list(self.model_oids):
                 if not object_guid in _guids:
