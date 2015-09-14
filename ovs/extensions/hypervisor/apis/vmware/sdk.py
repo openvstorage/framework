@@ -97,10 +97,10 @@ class Sdk(object):
         self._cache = ObjectCache()
         self._cache.setduration(weeks=1)
 
-        self._client = Client('https://%s/sdk/vimService?wsdl' % host,
+        self._client = Client('https://{0}/sdk/vimService?wsdl'.format(host),
                               cache=self._cache,
                               cachingpolicy=1)
-        self._client.set_options(location='https://%s/sdk' % host,
+        self._client.set_options(location='https://{0}/sdk'.format(host),
                                  plugins=[ValueExtender()])
 
         service_reference = self._build_property('ServiceInstance')
@@ -251,8 +251,8 @@ class Sdk(object):
                 return True
             elif result.info.state == 'error':
                 error = result.info.error.localizedMessage
-                raise Exception(('%s: %s' % (message, error)) if message else error)
-        raise Exception(('%s: %s' % (message, 'Unexpected result'))
+                raise Exception(('{0}: {1}'.format(message, error)) if message else error)
+        raise Exception(('{0}: {1}'.format(message, 'Unexpected result'))
                         if message else 'Unexpected result')
 
     @authenticated()
@@ -470,10 +470,10 @@ class Sdk(object):
         """
         device_info = factory.create('ns0:Description')
         device_info.label = disk['name']
-        device_info.summary = 'Disk %s' % disk['name']
+        device_info.summary = 'Disk {0}'.format(disk['name'])
         backing = factory.create('ns0:VirtualDiskFlatVer2BackingInfo')
         backing.diskMode = 'persistent'
-        backing.fileName = '[%s] %s' % (datastore.name, disk['backingdevice'])
+        backing.fileName = '[{0}] {1}'.format(datastore.name, disk['backingdevice'])
         backing.thinProvisioned = True
         device = factory.create('ns0:VirtualDisk')
         device.controllerKey = key
@@ -493,7 +493,7 @@ class Sdk(object):
         Creates a file info object
         """
         file_info = factory.create('ns0:VirtualMachineFileInfo')
-        file_info.vmPathName = '[%s]' % datastore
+        file_info.vmPathName = '[{0}]'.format(datastore)
         return file_info
 
     @staticmethod
@@ -506,7 +506,7 @@ class Sdk(object):
         device_info.summary = device_summary
         backing = factory.create('ns0:VirtualEthernetCardNetworkBackingInfo')
         backing.deviceName = network
-        device = factory.create('ns0:%s' % device_type)
+        device = factory.create('ns0:{0}'.format(device_type))
         device.addressType = 'Generated'
         device.wakeOnLanEnabled = True
         device.controllerKey = 100  # PCI Controller
@@ -641,7 +641,7 @@ class Sdk(object):
 
         source_vm_object = self.exists(key=vmid)
         if not source_vm_object:
-            raise Exception('VM with key reference %s not found' % vmid)
+            raise Exception('VM with key reference {0} not found'.format(vmid))
         source_vm = self._get_object(source_vm_object)
         datastore = self._get_object(source_vm.datastore[0][0])
 
@@ -666,7 +666,7 @@ class Sdk(object):
                 Sdk._create_disk(self._client.factory, disk_controller_key,
                                  disk, disks.index(disk), datastore))
             self.copy_file(
-                '[{0}] {1}'.format(datastore.name, '%s.vmdk' % disk['name'].split('_')[-1].replace('-clone', '')),
+                '[{0}] {1}.vmdk'.format(datastore.name, disk['name'].split('_')[-1].replace('-clone', '')),
                 '[{0}] {1}'.format(datastore.name, disk['backingdevice'])
             )
 
