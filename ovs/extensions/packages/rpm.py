@@ -38,3 +38,15 @@ class RpmPackage(object):
             if version_info:
                 versions[package_name] = version_info
         return versions
+
+    @staticmethod
+    def install(package_name, client, force=False):
+        raise NotImplementedError("Installing RPM packages not yet implemented")
+
+    @staticmethod
+    def update(client):
+        raise NotImplementedError("Updating RPM packages not yet implemented")
+
+    @staticmethod
+    def verify_update_required(packages, services, client):
+        raise NotImplementedError("Verifying RPM packages not yet implemented")
