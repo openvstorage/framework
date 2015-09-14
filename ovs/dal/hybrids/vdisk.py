@@ -158,7 +158,7 @@ class VDisk(DataObject):
         Returns resolved configuration for this vDisk, falling back to the vMachine and vPool
         """
         configuration = {}
-        keys = ['cache_strategy', 'dedupe_mode', 'dtl_mode', 'sco_size', 'write_buffer']
+        keys = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer']
         self.invalidate_cached_objects()
         for key in keys:
             if key in self.configuration:

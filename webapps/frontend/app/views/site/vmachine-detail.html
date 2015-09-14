@@ -222,7 +222,7 @@ limitations under the License.
                                 <h4 data-i18n="ovs:vmachines.detail.configuration"></h4>
                                 <p data-i18n="ovs:vmachines.detail.configurationinfo"></p>
                                 <ul>
-                                    <li data-bind="visible: false"> <!--Currently disabled because volumedriver does not allow dtl configurations-->
+                                    <li>
                                         <span data-i18n="ovs:storagerouters.configuration.general.dtl"></span>
                                         <a data-bind="popover: {
                                                           title: 'ovs:storagerouters.configuration.general.dtl_help_title',
@@ -240,33 +240,54 @@ limitations under the License.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_mode"></span>:
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_enable"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
                                                             <span data-bind="dropdown: {
-                                                                                 items: dtlModes,
-                                                                                 target: dtlMode,
+                                                                                 items: dtlOptions,
+                                                                                 target: dtlEnable,
                                                                                  text: function(item) {
                                                                                      if (item === undefined) {
                                                                                          return '-';
                                                                                      }
-                                                                                     return $.t('ovs:storagerouters.configuration.general.dtl_modes.' + item.name);
+                                                                                     return $.t('ovs:storagerouters.configuration.general.dtl_options.' + item.value);
                                                                                  },
-                                                                                 key: 'name',
+                                                                                 key: 'value',
                                                                                  keyisfunction: false,
                                                                                  small: true
                                                                              }">
                                                             </span>
                                                         </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td style="width: 20%; padding: 0;">
-                                                            <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_location"></span>:
-                                                            </div>
-                                                        </td>
-                                                        <td style="padding: 0;">
+                                                        <!--<td style="width: 20%; padding: 0;">-->
+                                                            <!--<div style="margin-top: 5px;">-->
+                                                                <!--<span data-i18n="ovs:storagerouters.configuration.general.dtl_mode"></span>:-->
+                                                            <!--</div>-->
+                                                        <!--</td>-->
+                                                        <!--<td style="padding: 0;">-->
+                                                            <!--<span data-bind="dropdown: {-->
+                                                                                 <!--items: dtlModes,-->
+                                                                                 <!--target: dtlMode,-->
+                                                                                 <!--text: function(item) {-->
+                                                                                     <!--if (item === undefined) {-->
+                                                                                         <!--return '-';-->
+                                                                                     <!--}-->
+                                                                                     <!--return $.t('ovs:storagerouters.configuration.general.dtl_modes.' + item.name);-->
+                                                                                 <!--},-->
+                                                                                 <!--key: 'name',-->
+                                                                                 <!--keyisfunction: false,-->
+                                                                                 <!--small: true-->
+                                                                             <!--}">-->
+                                                            <!--</span>-->
+                                                        <!--</td>-->
+                                                    <!--</tr>-->
+                                                    <!--<tr>-->
+                                                        <!--<td style="width: 20%; padding: 0;">-->
+                                                            <!--<div style="margin-top: 5px;">-->
+                                                                <!--<span data-i18n="ovs:storagerouters.configuration.general.dtl_location"></span>:-->
+                                                            <!--</div>-->
+                                                        <!--</td>-->
+                                                        <!--<td style="padding: 0;">-->
                                                             <!--<span data-bind="dropdown: {-->
                                                                                  <!--items: $parent.storageRouters, not yet defined-->
                                                                                  <!--target: $parent.dtlLocation,-->
@@ -276,7 +297,7 @@ limitations under the License.
                                                                                  <!--small: true-->
                                                                              <!--}">-->
                                                             <!--</span>-->
-                                                        </td>
+                                                        <!--</td>-->
                                                     </tr>
                                                 </tbody>
                                             </table>

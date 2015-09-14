@@ -21,7 +21,7 @@ define([
         var self = this;
 
         // Variables
-        self.configurableStorageDriverAttrs = ['cache_strategy', 'dedupe_mode', 'dtl_mode', 'sco_size', 'write_buffer'];
+        self.configurableStorageDriverAttrs = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer'];
 
         // Handles
         self.loadHandle = undefined;
@@ -58,6 +58,7 @@ define([
         self.cacheStrategies   = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
         self.dtlModes          = ko.observableArray([undefined, { name: 'nosync' }, { name: 'async' }, { name: 'sync' }]);
         self.dedupeModes       = ko.observableArray([undefined, { name: 'dedupe' }, { name: 'nondedupe' }]);
+        self.dtlOptions        = ko.observableArray([undefined, { value: true }, { value: false }]);
         self.scoSizes          = ko.observableArray([undefined, 4, 8, 16, 32, 64, 128]);
 
         // Computed
@@ -80,6 +81,9 @@ define([
                 if (self.vMachine().dedupeMode() !== undefined) {
                     fallback.dedupe_mode = [self.vMachine().dedupeMode().name, 'machine'];
                 }
+                if (self.vMachine().dtlEnable() !== undefined) {
+                    fallback.dtl_enabled = [self.vMachine().dtlEnable().value, 'machine'];
+                }
                 if (self.vMachine().dtlMode() !== undefined) {
                     fallback.dtl_mode = [self.vMachine().dtlMode().name, 'machine'];
                 }
@@ -96,6 +100,9 @@ define([
                 }
                 if (fallback.dedupe_mode === undefined && self.vpool().dedupeMode() !== undefined) {
                     fallback.dedupe_mode = [self.vpool().dedupeMode().name, 'vpool'];
+                }
+                if (fallback.dtl_enabled === undefined && self.vpool().dtlEnable() !== undefined) {
+                    fallback.dtl_enabled = [self.vpool().dtlEnable().value, 'vpool'];
                 }
                 if (fallback.dtl_mode === undefined && self.vpool().dtlMode() !== undefined) {
                     fallback.dtl_mode = [self.vpool().dtlMode().name, 'vpool'];
@@ -145,6 +152,26 @@ define([
                     target.dedupe_mode = null;
                 } else {
                     target.dedupe_mode = value.name;
+                }
+                self.newConfiguration(target);
+            }
+        });
+        self.dtlEnable = ko.computed({
+            read: function() {
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dtl_enabled')) {
+                    if (self.newConfiguration().dtl_enabled === null) {
+                        return undefined;
+                    }
+                    return self.newConfiguration().dtl_enabled;
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self.newConfiguration();
+                if (value === undefined) {
+                    target.dtl_enabled = null;
+                } else {
+                    target.dtl_enabled = value;
                 }
                 self.newConfiguration(target);
             }

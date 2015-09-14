@@ -25,7 +25,7 @@ define([
         self.shared                         = shared;
         self.vPoolGuids                     = [];
         self.vMachineGuids                  = [];
-        self.configurableStorageDriverAttrs = ['cache_strategy', 'dedupe_mode', 'dtl_mode', 'sco_size', 'write_buffer'];
+        self.configurableStorageDriverAttrs = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer'];
 
         // Handles
         self.loadVDisksHandle      = undefined;
@@ -69,6 +69,7 @@ define([
         self.cacheStrategies       = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
         self.dtlModes              = ko.observableArray([undefined, { name: 'nosync' }, { name: 'async' }, { name: 'sync' }]);
         self.dedupeModes           = ko.observableArray([undefined, { name: 'dedupe' }, { name: 'nondedupe' }]);
+        self.dtlOptions            = ko.observableArray([undefined, { value: true }, { value: false }]);
         self.scoSizes              = ko.observableArray([undefined, 4, 8, 16, 32, 64, 128]);
 
         // Computed
@@ -128,6 +129,26 @@ define([
                     target.dedupe_mode = null;
                 } else {
                     target.dedupe_mode = value.name;
+                }
+                self.newConfiguration(target);
+            }
+        });
+        self.dtlEnable = ko.computed({
+            read: function() {
+                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dtl_enabled')) {
+                    if (self.newConfiguration().dtl_enabled === null) {
+                        return undefined;
+                    }
+                    return self.newConfiguration().dtl_enabled;
+                }
+                return undefined;
+            },
+            write: function(value) {
+                var target = self.newConfiguration();
+                if (value === undefined) {
+                    target.dtl_enabled = null;
+                } else {
+                    target.dtl_enabled = value;
                 }
                 self.newConfiguration(target);
             }

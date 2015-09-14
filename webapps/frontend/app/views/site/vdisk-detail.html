@@ -173,7 +173,7 @@ limitations under the License.
                                 <h4 data-i18n="ovs:vdisks.detail.configuration"></h4>
                                 <p data-i18n="ovs:vdisks.detail.configurationinfo"></p>
                                 <ul>
-                                    <li data-bind="visible: false"> <!--Currently disabled because volumedriver does not allow dtl configurations-->
+                                    <li>
                                         <span data-i18n="ovs:storagerouters.configuration.general.dtl"></span>
                                         <a data-bind="popover: {
                                                           title: 'ovs:storagerouters.configuration.general.dtl_help_title',
@@ -191,47 +191,84 @@ limitations under the License.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_mode"></span>:
+                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_enable"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="width: 15%; padding: 0;">
                                                             <span data-bind="dropdown: {
-                                                                                 items: dtlModes,
-                                                                                 target: dtlMode,
+                                                                                 items: dtlOptions,
+                                                                                 target: dtlEnable,
                                                                                  text: function(item) {
                                                                                      if (item === undefined) {
                                                                                          return '-';
                                                                                      }
-                                                                                     return $.t('ovs:storagerouters.configuration.general.dtl_modes.' + item.name);
+                                                                                     return $.t('ovs:storagerouters.configuration.general.dtl_options.' + item.value);
                                                                                  },
-                                                                                 key: 'name',
+                                                                                 key: 'value',
                                                                                  keyisfunction: false,
                                                                                  small: true
                                                                              }">
                                                             </span>
                                                         </td>
                                                         <td style="padding: 0;">
-                                                            <!-- ko if: dtlMode() === undefined && fallbackConfig().dtl_mode !== undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="translate: 'ovs:storagerouters.configuration.general.dtl_modes.' + fallbackConfig().dtl_mode[0]"></span>
+                                                            <!-- ko if: dtlEnable() === undefined && fallbackConfig().dtl_enabled !== undefined -->
+                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="translate: 'ovs:storagerouters.configuration.general.dtl_options.' + fallbackConfig().dtl_enabled[0]"></span>
                                                                 (<span data-i18n="ovs:generic.inheritedfrom"></span>
                                                                 <span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_mode[1] === 'machine',
+                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_enabled[1] === 'machine',
                                                                                   attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>
                                                                 </span>
                                                                 <span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">
-                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_mode[1] === 'vpool',
+                                                                    <a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_enabled[1] === 'vpool',
                                                                                   attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>
                                                                 </span>)
                                                             <!-- /ko -->
                                                         </td>
                                                     </tr>
-                                                    <tr>
-                                                        <td style="width: 20%; padding: 0;">
-                                                            <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_location"></span>:
-                                                            </div>
-                                                        </td>
-                                                        <td style="width: 15%; padding: 0;">
+                                                    <!--<tr>-->
+                                                        <!--<td style="width: 20%; padding: 0;">-->
+                                                            <!--<div style="margin-top: 5px;">-->
+                                                                <!--<span data-i18n="ovs:storagerouters.configuration.general.dtl_mode"></span>:-->
+                                                            <!--</div>-->
+                                                        <!--</td>-->
+                                                        <!--<td style="width: 15%; padding: 0;">-->
+                                                            <!--<span data-bind="dropdown: {-->
+                                                                                 <!--items: dtlModes,-->
+                                                                                 <!--target: dtlMode,-->
+                                                                                 <!--text: function(item) {-->
+                                                                                     <!--if (item === undefined) {-->
+                                                                                         <!--return '-';-->
+                                                                                     <!--}-->
+                                                                                     <!--return $.t('ovs:storagerouters.configuration.general.dtl_modes.' + item.name);-->
+                                                                                 <!--},-->
+                                                                                 <!--key: 'name',-->
+                                                                                 <!--keyisfunction: false,-->
+                                                                                 <!--small: true-->
+                                                                             <!--}">-->
+                                                            <!--</span>-->
+                                                        <!--</td>-->
+                                                        <!--<td style="padding: 0;">-->
+                                                            <!--&lt;!&ndash; ko if: dtlMode() === undefined && fallbackConfig().dtl_mode !== undefined &ndash;&gt;-->
+                                                                <!--<span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="translate: 'ovs:storagerouters.configuration.general.dtl_modes.' + fallbackConfig().dtl_mode[0]"></span>-->
+                                                                <!--(<span data-i18n="ovs:generic.inheritedfrom"></span>-->
+                                                                <!--<span data-bind="lazyloader: { item: vMachine, loadedObservable: 'loaded', undefinedLoading: false }">-->
+                                                                    <!--<a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_mode[1] === 'machine',-->
+                                                                                  <!--attr: { href: $root.shared.routing.loadHash('vmachine-detail', { guid: item().guid }) }"></a>-->
+                                                                <!--</span>-->
+                                                                <!--<span data-bind="lazyloader: { item: vpool, loadedObservable: 'loaded', undefinedLoading: false }">-->
+                                                                    <!--<a data-part="lazy-entry" data-bind="text: item().name(), visible: $parent.fallbackConfig().dtl_mode[1] === 'vpool',-->
+                                                                                  <!--attr: { href: $root.shared.routing.loadHash('vpool-detail', { guid: item().guid }) }"></a>-->
+                                                                <!--</span>)-->
+                                                            <!--&lt;!&ndash; /ko &ndash;&gt;-->
+                                                        <!--</td>-->
+                                                    <!--</tr>-->
+                                                    <!--<tr>-->
+                                                        <!--<td style="width: 20%; padding: 0;">-->
+                                                            <!--<div style="margin-top: 5px;">-->
+                                                                <!--<span data-i18n="ovs:storagerouters.configuration.general.dtl_location"></span>:-->
+                                                            <!--</div>-->
+                                                        <!--</td>-->
+                                                        <!--<td style="width: 15%; padding: 0;">-->
                                                             <!--<span data-bind="dropdown: {-->
                                                                                  <!--items: $parent.storageRouters,   not yet defined-->
                                                                                  <!--target: $parent.dtlLocation,-->
@@ -241,13 +278,13 @@ limitations under the License.
                                                                                  <!--small: true-->
                                                                              <!--}">-->
                                                             <!--</span>-->
-                                                        </td>
-                                                        <td style="padding: 0;">
-                                                            <!-- ko if: $parent.dtlLocation() === undefined -->
-                                                                <span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="text: ''"></span>
-                                                            <!-- /ko -->
-                                                        </td>
-                                                    </tr>
+                                                        <!--</td>-->
+                                                        <!--<td style="padding: 0;">-->
+                                                            <!--&lt;!&ndash; ko if: $parent.dtlLocation() === undefined &ndash;&gt;-->
+                                                                <!--<span data-i18n="ovs:generic.fallbackvalue"></span>: <span data-bind="text: ''"></span>-->
+                                                            <!--&lt;!&ndash; /ko &ndash;&gt;-->
+                                                        <!--</td>-->
+                                                    <!--</tr>-->
                                                 </tbody>
                                             </table>
                                         </div>

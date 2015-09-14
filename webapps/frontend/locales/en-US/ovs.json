@@ -265,6 +265,7 @@
                 },
                 "dedupe_warning": "Non-deduplication cannot be changed again!",
                 "dtl": "Distributed Transaction Log",
+                "dtl_enable": "Enable",
                 "dtl_help_message": "The Distributed Transaction Log does a bunch of stuff",
                 "dtl_help_title": "Help - Distributed Transaction Log",
                 "dtl_location": "Location",
@@ -273,6 +274,11 @@
                     "async": "Async",
                     "nosync": "No Sync",
                     "sync": "Sync"
+                },
+                "dtl_options": {
+                    "false": "No",
+                    "none": "-",
+                    "true": "Yes"
                 },
                 "sco_size": "SCO size",
                 "strategy": "Strategy",
