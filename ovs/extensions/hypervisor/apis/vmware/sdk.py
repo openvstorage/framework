@@ -701,7 +701,7 @@ class Sdk(object):
         return task
 
     @authenticated()
-    def get_datastore(self, ip, mountpoint):
+    def get_datastore(self, ip, mountpoint, host=None):
         """
         @param ip : hypervisor ip to query for datastore presence
         @param mountpoint: nfs mountpoint on hypervisor
@@ -710,7 +710,9 @@ class Sdk(object):
         """
 
         datastore = None
-        esxhost = self._validate_host(self._esxHost)
+        if host is None:
+            host = self._esxHost
+        esxhost = self._validate_host(host)
         host_system = self._get_object(esxhost, properties=['datastore'])
         for store in host_system.datastore[0]:
             store = self._get_object(store)
@@ -736,10 +738,12 @@ class Sdk(object):
         else:
             return False
 
-    def make_agnostic_config(self, vm_object):
+    def make_agnostic_config(self, vm_object, host=None):
         regex = '\[([^\]]+)\]\s(.+)'
         match = re.search(regex, vm_object.config.files.vmPathName)
-        esxhost = self._validate_host(self._esxHost)
+        if host is None:
+            host = self._esxHost
+        esxhost = self._validate_host(host)
 
         config = {'name': vm_object.config.name,
                   'id': vm_object.obj_identifier.value,
@@ -879,7 +883,7 @@ class Sdk(object):
             host = self._esxHost
         esxhost = self._validate_host(host)
 
-        datastore = self.get_datastore(ip, mountpoint)
+        datastore = self.get_datastore(ip, mountpoint, host=esxhost)
         if not datastore:
             raise RuntimeError('Could not find datastore')
 
