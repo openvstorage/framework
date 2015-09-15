@@ -38,8 +38,8 @@ class OAuth2TokenView(View):
     """
 
     @log()
-    @limit(amount=5, per=60, timeout=60)
     @auto_response()
+    @limit(amount=5, per=60, timeout=60)
     def post(self, request, *args, **kwargs):
         """
         Handles token post

@@ -100,6 +100,7 @@ def limit(amount, per, timeout):
                 active_timeout = rate_info['timeout']
                 if active_timeout is not None:
                     if active_timeout > now:
+                        logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, active_timeout - now))
                         return HttpResponse, {'error_code': 'rate_limit_timeout',
                                               'error': 'Rate limit timeout ({0}s remaining)'.format(round(active_timeout - now, 2))}, 429
                     else:
@@ -109,6 +110,7 @@ def limit(amount, per, timeout):
                 if calls > amount:
                     rate_info['timeout'] = now + timeout
                     client.set(key, rate_info)
+                    logger.warning('Call {0} is being throttled with a wait of {1}'.format(key, timeout))
                     return HttpResponse, {'error_code': 'rate_limit_reached',
                                           'error': 'Rate limit reached ({0} in last {1}s)'.format(calls, per)}, 429
                 client.set(key, rate_info)
