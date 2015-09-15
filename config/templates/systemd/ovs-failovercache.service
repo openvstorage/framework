@@ -1,7 +1,7 @@
 [Unit]
 Description=ovs failovercache
-Wants=ovs-volumedriver_<VPOOL_NAME>.service
-Before=ovs-volumedriver_<VPOOL_NAME>.service
+Wants=ovs-watcher-volumedriver.service
+Before=ovs-watcher-volumedriver.service
 
 [Service]
 Type=simple
