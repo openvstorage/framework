@@ -1,6 +1,6 @@
 [Unit]
 Description=ovs volumedriver
-Requires=ovs-watcher-volumedriver.service ovs-failovercache_<VPOOL_NAME>.service <ADDITIONAL_DEPENDENCIES>
+Requires=ovs-watcher-volumedriver.service <ADDITIONAL_DEPENDENCIES>
 After=ovs-watcher-volumedriver.service
 
 [Service]
