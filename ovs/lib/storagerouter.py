@@ -769,6 +769,9 @@ class StorageRouterController(object):
         if ServiceManager.has_service(voldrv_service, client=client):
             ServiceManager.disable_service(voldrv_service, client=client)
             ServiceManager.stop_service(voldrv_service, client=client)
+        if ServiceManager.has_service(foc_service, client=client):
+            ServiceManager.disable_service(foc_service, client=client)
+            ServiceManager.stop_service(foc_service, client=client)
 
         if not storagedrivers_left:
             try:

@@ -95,7 +95,7 @@ limitations under the License.
                                               $root.reconfigureHost(guid(), true);
                                           }
                                       },
-                                      tooltip: 'ovs:wizards.linkhosts.gather.configure',
+                                      tooltip: isConfigured() === true ? '' : 'ovs:wizards.linkhosts.gather.configure',
                                       style: { color: $root.shared.user.roles().contains('manage') ? 'black' : 'lightgrey' },
                                       visible: (missingMgmtCenter() === false && isConfigured() === false && $root.mgmtCenters().length > 0) || isConfigured() === true"
                            class="hand fa fa-fw fa-stack-1x" data-i18n="[html]ovs:icons.cog">
