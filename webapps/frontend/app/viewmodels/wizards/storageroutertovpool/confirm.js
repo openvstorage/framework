@@ -266,7 +266,7 @@ define([
                         return true;
                     });
                 });
-                if (!self._removeValidations.hasOwnProperty(storageRouter.guid())) {
+                if (foundStorageDriverGuid !== undefined && !self._removeValidations.hasOwnProperty(storageRouter.guid())) {
                     self._removeValidations[storageRouter.guid()] = new self.RemoveValidation(foundStorageDriverGuid);
                     self._removeValidations[storageRouter.guid()].validate();
                 }
@@ -371,7 +371,9 @@ define([
                     self.addValidations()[storageRouter.guid()].validate();
                 });
                 $.each(self.data.removingStorageRouters(), function(index, storageRouter) {
-                    self.removeValidations()[storageRouter.guid()].validate();
+                    if (self.removeValidations().hasOwnProperty(storageRouter.guid())) {
+                        self.removeValidations()[storageRouter.guid()].validate();
+                    }
                 });
             }, 5000);
             self.refresher.run();
