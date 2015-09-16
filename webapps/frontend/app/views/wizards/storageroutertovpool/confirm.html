@@ -36,6 +36,12 @@ limitations under the License.
                         <span data-i18n="ovs:wizards.storageroutertovpool.confirm.validating"></span>
                     </div>
                 <!-- /ko -->
+                <!-- ko if: !$root.addValidations().hasOwnProperty(guid()) -->
+                    <div class="alert alert-info" style="margin-top: 5px;">
+                        <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+                        <span data-i18n="ovs:wizards.storageroutertovpool.confirm.validating"></span>
+                    </div>
+                <!-- /ko -->
             </li>
         </ul>
         <ul data-bind="foreach: data.removingStorageRouters()" style="list-style-type: none;">
@@ -54,6 +60,12 @@ limitations under the License.
                         <span data-i18n="ovs:wizards.storageroutertovpool.confirm.removevalid"></span>
                     </div>
                     <div data-bind="visible: validationState().valid === undefined" class="alert alert-info" style="margin-top: 5px;">
+                        <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
+                        <span data-i18n="ovs:wizards.storageroutertovpool.confirm.validating"></span>
+                    </div>
+                <!-- /ko -->
+                <!-- ko if: !$root.removeValidations().hasOwnProperty(guid()) -->
+                    <div class="alert alert-info" style="margin-top: 5px;">
                         <span class="fa fa-spin" style="margin-right: 10px;" data-i18n="[html]ovs:icons.loading"></span>
                         <span data-i18n="ovs:wizards.storageroutertovpool.confirm.validating"></span>
                     </div>
