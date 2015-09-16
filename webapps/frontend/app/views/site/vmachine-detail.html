@@ -223,13 +223,13 @@ limitations under the License.
                                 <p data-i18n="ovs:vmachines.detail.configurationinfo"></p>
                                 <ul>
                                     <li>
-                                        <span data-i18n="ovs:storagerouters.configuration.general.dtl"></span>
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.dtl"></span>
                                         <a data-bind="popover: {
-                                                          title: 'ovs:storagerouters.configuration.general.dtl_help_title',
-                                                          content: 'ovs:storagerouters.configuration.general.dtl_help_message'
+                                                          title: 'ovs:storagedrivers.configuration.general.dtl_help_title',
+                                                          content: 'ovs:storagedrivers.configuration.general.dtl_help_message'
                                                       }"
                                            class="hand fa noline"
-                                           data-i18n="[html]ovs:icons.question_circle"
+                                           data-i18n="[html]ovs:icons.help"
                                            style="margin-left: 5px; color: blue;"
                                            role="button"
                                            tabindex="-1">
@@ -240,7 +240,7 @@ limitations under the License.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.dtl_enable"></span>:
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.dtl_enable"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
@@ -251,7 +251,7 @@ limitations under the License.
                                                                                      if (item === undefined) {
                                                                                          return '-';
                                                                                      }
-                                                                                     return $.t('ovs:storagerouters.configuration.general.dtl_options.' + item.value);
+                                                                                     return $.t('ovs:storagedrivers.configuration.general.dtl_options.' + item.value);
                                                                                  },
                                                                                  key: 'value',
                                                                                  keyisfunction: false,
@@ -261,7 +261,7 @@ limitations under the License.
                                                         </td>
                                                         <!--<td style="width: 20%; padding: 0;">-->
                                                             <!--<div style="margin-top: 5px;">-->
-                                                                <!--<span data-i18n="ovs:storagerouters.configuration.general.dtl_mode"></span>:-->
+                                                                <!--<span data-i18n="ovs:storagedrivers.configuration.general.dtl_mode"></span>:-->
                                                             <!--</div>-->
                                                         <!--</td>-->
                                                         <!--<td style="padding: 0;">-->
@@ -272,7 +272,7 @@ limitations under the License.
                                                                                      <!--if (item === undefined) {-->
                                                                                          <!--return '-';-->
                                                                                      <!--}-->
-                                                                                     <!--return $.t('ovs:storagerouters.configuration.general.dtl_modes.' + item.name);-->
+                                                                                     <!--return $.t('ovs:storagedrivers.configuration.general.dtl_modes.' + item.name);-->
                                                                                  <!--},-->
                                                                                  <!--key: 'name',-->
                                                                                  <!--keyisfunction: false,-->
@@ -284,7 +284,7 @@ limitations under the License.
                                                     <!--<tr>-->
                                                         <!--<td style="width: 20%; padding: 0;">-->
                                                             <!--<div style="margin-top: 5px;">-->
-                                                                <!--<span data-i18n="ovs:storagerouters.configuration.general.dtl_location"></span>:-->
+                                                                <!--<span data-i18n="ovs:storagedrivers.configuration.general.dtl_location"></span>:-->
                                                             <!--</div>-->
                                                         <!--</td>-->
                                                         <!--<td style="padding: 0;">-->
@@ -304,14 +304,14 @@ limitations under the License.
                                         </div>
                                     </li>
                                     <li>
-                                        <span data-i18n="ovs:storagerouters.configuration.general.caching"></span>
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.caching"></span>
                                         <div>
                                             <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
                                                 <tbody>
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.strategy"></span>:
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.strategy"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
@@ -322,7 +322,7 @@ limitations under the License.
                                                                                      if (item === undefined) {
                                                                                          return '-';
                                                                                      }
-                                                                                     return $.t('ovs:storagerouters.configuration.general.cache_strategies.' + item.name);
+                                                                                     return $.t('ovs:storagedrivers.configuration.general.cache_strategies.' + item.name);
                                                                                  },
                                                                                  key: 'name',
                                                                                  keyisfunction: false,
@@ -334,19 +334,19 @@ limitations under the License.
                                                     <tr >
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.dedupe"></span>:
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.dedupe"></span>:
                                                                 <a data-bind="popover: {
-                                                                                  title: 'ovs:storagerouters.configuration.general.dedupe_help_title',
-                                                                                  content: 'ovs:storagerouters.configuration.general.dedupe_help_message'
+                                                                                  title: 'ovs:storagedrivers.configuration.general.dedupe_help_title',
+                                                                                  content: 'ovs:storagedrivers.configuration.general.dedupe_help_message'
                                                                               }"
                                                                    class="hand fa noline"
-                                                                   data-i18n="[html]ovs:icons.question_circle"
+                                                                   data-i18n="[html]ovs:icons.help"
                                                                    style="margin-left: 5px; color: blue;"
                                                                    role="button"
                                                                    tabindex="-1">
                                                                 </a>
                                                                 <span class="help-block"
-                                                                      data-i18n="ovs:storagerouters.configuration.general.dedupe_warning"
+                                                                      data-i18n="ovs:storagedrivers.configuration.general.dedupe_warning"
                                                                       style="font-size: smaller; margin-top: -4px">
                                                                 </span>
                                                             </div>
@@ -359,7 +359,7 @@ limitations under the License.
                                                                                      if (item === undefined) {
                                                                                          return '-';
                                                                                      }
-                                                                                     return $.t('ovs:storagerouters.configuration.general.dedupe_modes.' + item.name);
+                                                                                     return $.t('ovs:storagedrivers.configuration.general.dedupe_modes.' + item.name);
                                                                                  },
                                                                                  key: 'name',
                                                                                  keyisfunction: false,
@@ -373,14 +373,14 @@ limitations under the License.
                                         </div>
                                     </li>
                                     <li>
-                                        <span data-i18n="ovs:storagerouters.configuration.general.volume"></span>
+                                        <span data-i18n="ovs:storagedrivers.configuration.general.volume"></span>
                                         <div>
                                             <table class="table table-condensed" style="margin-left: 20px; margin-bottom: 0; width: 100%;">
                                                 <tbody>
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.sco_size"></span>:
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.sco_size"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">
@@ -401,7 +401,7 @@ limitations under the License.
                                                     <tr>
                                                         <td style="width: 20%; padding: 0;">
                                                             <div style="margin-top: 5px;">
-                                                                <span data-i18n="ovs:storagerouters.configuration.general.write_buffer"></span>:
+                                                                <span data-i18n="ovs:storagedrivers.configuration.general.write_buffer"></span>:
                                                             </div>
                                                         </td>
                                                         <td style="padding: 0;">

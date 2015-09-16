@@ -117,6 +117,18 @@ class StorageRouterController(object):
         """
         Add a vPool to the machine this task is running on
         """
+        onread = 'CacheOnRead'
+        onwrite = 'CacheOnWrite'
+        deduped = 'ContentBased'
+        non_deduped = 'LocationBased'
+        cache_mapping = {'none': None,
+                         'onread': onread,
+                         'onwrite': onwrite}
+        dedupe_mapping = {'dedupe': deduped,
+                          'nondedupe': non_deduped}
+        dtl_mode_mapping = {'sync': '',
+                            'async': '',
+                            'nosync': ''}
         required_params = {'vpool_name': (str, Toolbox.regex_vpool),
                            'storage_ip': (str, Toolbox.regex_ip),
                            'storagerouter_ip': (str, Toolbox.regex_ip),
@@ -127,13 +139,20 @@ class StorageRouterController(object):
                            'mountpoint_temp': (str, Toolbox.regex_mountpoint),
                            'mountpoint_readcaches': (list, Toolbox.regex_mountpoint),
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
-        required_params_without_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
+        required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
+                                         'config_params': (dict, {'dtl_mode': (str, dtl_mode_mapping.keys()),
+                                                                  'sco_size': (int, None),
+                                                                  'dedupe_mode': (str, dedupe_mapping.keys()),
+                                                                  'dtl_enabled': (bool, None),
+                                                                  'dtl_location': (str, None),
+                                                                  'write_buffer': (int, None),
+                                                                  'cache_strategy': (str, cache_mapping.keys())}),
                                          'connection_host': (str, Toolbox.regex_ip, False),
                                          'connection_port': (int, None),
                                          'connection_backend': (dict, None),
                                          'connection_username': (str, None),
                                          'connection_password': (str, None)}
-        required_params_local = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
+        required_params_for_new_local_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3'])}
 
         if not isinstance(parameters, dict):
             raise ValueError('Parameters should be of type "dict"')
@@ -189,9 +208,9 @@ class StorageRouterController(object):
         # Keep in mind that if the Storage Driver exists, the vPool does as well
         if vpool is None:
             if parameters['type'] == 'local':
-                Toolbox.verify_required_params(required_params_local, parameters)
+                Toolbox.verify_required_params(required_params_for_new_local_vpool, parameters)
             else:
-                Toolbox.verify_required_params(required_params_without_vpool, parameters)
+                Toolbox.verify_required_params(required_params_for_new_vpool, parameters)
             vpool = VPool()
             backend_type = BackendTypeList.get_backend_type_by_code(parameters['type'])
             vpool.backend_type = backend_type
@@ -395,18 +414,6 @@ class StorageRouterController(object):
         else:
             volumedriver_storageip = storage_ip
         vrouter_id = '{0}{1}'.format(vpool_name, unique_id)
-
-        vrouter_config = {'vrouter_id': vrouter_id,
-                          'vrouter_redirect_timeout_ms': '5000',
-                          'vrouter_routing_retries': 10,
-                          'vrouter_volume_read_threshold': 1024,
-                          'vrouter_volume_write_threshold': 1024,
-                          'vrouter_file_read_threshold': 1024,
-                          'vrouter_file_write_threshold': 1024,
-                          'vrouter_min_workers': 4,
-                          'vrouter_max_workers': 16,
-                          'vrouter_backend_sync_timeout_ms': 5000,
-                          'vrouter_migrate_timeout_ms': 5000}
         voldrv_arakoon_cluster_id = 'voldrv'
         voldrv_arakoon_cluster = ArakoonManagementEx().getCluster(voldrv_arakoon_cluster_id)
         voldrv_arakoon_client_config = voldrv_arakoon_cluster.getClientConfig()
@@ -534,6 +541,19 @@ class StorageRouterController(object):
                                                                       backend_type='ALBA')
         else:
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
+
+        if 'config_params' in parameters:
+            # sco_factor = write buffer (in GiB) / tlog multiplier (default 20) / sco size (in MiB)
+            sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / 20 / parameters['config_params']['sco_size']
+            dedupe_mode = parameters['config_params']['dedupe_mode']
+            cache_strategy = parameters['config_params']['cache_strategy']
+            sco_multiplier = parameters['config_params']['sco_size'] / 4 * 1024  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB)
+        else:
+            sco_factor = 12
+            dedupe_mode = deduped
+            cache_strategy = onwrite
+            sco_multiplier = 1024
+
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=rsppath)
         storagedriver_config.configure_scocache(scocache_mount_points=writecaches,
@@ -545,9 +565,21 @@ class StorageRouterController(object):
                                                       metadata_path=metadatapath,
                                                       tlog_path=tlogpath,
                                                       foc_throttle_usecs=4000,
-                                                      read_cache_default_behaviour='CacheOnWrite',
-                                                      non_disposable_scos_factor=12)
-        storagedriver_config.configure_volume_router(**vrouter_config)
+                                                      read_cache_default_mode=dedupe_mapping[dedupe_mode],
+                                                      read_cache_default_behaviour=cache_mapping[cache_strategy],
+                                                      non_disposable_scos_factor=sco_factor)
+        storagedriver_config.configure_volume_router(vrouter_id=vrouter_id,
+                                                     vrouter_redirect_timeout_ms='5000',
+                                                     vrouter_routing_retries=10,
+                                                     vrouter_volume_read_threshold=1024,
+                                                     vrouter_volume_write_threshold=1024,
+                                                     vrouter_file_read_threshold=1024,
+                                                     vrouter_file_write_threshold=1024,
+                                                     vrouter_min_workers=4,
+                                                     vrouter_max_workers=16,
+                                                     vrouter_sco_multiplier=sco_multiplier,
+                                                     vrouter_backend_sync_timeout_ms=5000,
+                                                     vrouter_migrate_timeout_ms=5000)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
         storagedriver_config.configure_volume_registry(vregistry_arakoon_cluster_id=voldrv_arakoon_cluster_id,
                                                        vregistry_arakoon_cluster_nodes=arakoon_nodes)

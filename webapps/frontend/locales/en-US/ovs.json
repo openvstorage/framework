@@ -63,7 +63,6 @@
             "ceph_s3": "Ceph S3",
             "swift_s3": "Swift S3",
             "local": "Local FS",
-            "rest": "REST backend",
             "distributed": "Distributed FS",
             "alba": "Open vStorage Backend"
         },
@@ -245,7 +244,9 @@
             "disks": {
                 "title": "Physical disks"
             }
-        },
+        }
+    },
+    "storagedrivers": {
         "configuration": {
             "general": {
                 "cache_strategies": {
@@ -277,7 +278,6 @@
                 },
                 "dtl_options": {
                     "false": "No",
-                    "none": "-",
                     "true": "Yes"
                 },
                 "sco_size": "SCO size",
@@ -672,6 +672,10 @@
         },
         "addvpool": {
             "title": "Add new vPool",
+            "gatherconfig": {
+                "basicinfo": "Specify the configurations for the vPool",
+                "incorrect_write_buffer": "Write buffer must be a positive number or empty"
+            },
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
@@ -679,7 +683,6 @@
                 "backendtype": "BackendType:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
-                "timeout": "Timeout:",
                 "accesskey": "Access key:",
                 "secretkey": "Secret key:",
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
@@ -944,6 +947,7 @@
         "expand": "&#xf196;",
         "externallink": "&#xf08e;",
         "fromtemplate": "&#xf045;",
+        "help": "&#xf059;",
         "inconsistent": "&#xf097;",
         "information": "&#xf05a;",
         "licensing": "&#xf132;",
@@ -955,7 +959,6 @@
         "moveaway": "&#xf074;",
         "notchecked": "&#xf096;",
         "password": "&#xf084;",
-        "question_circle": "&#xf059;",
         "rollback": "&#xf01e;",
         "save": "&#xf0c7;",
         "separator": "&#xf101;",

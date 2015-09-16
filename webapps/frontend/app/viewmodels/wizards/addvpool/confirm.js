@@ -38,7 +38,6 @@ define([
                         type: self.data.backend(),
                         connection_host: self.data.host(),
                         connection_port: self.data.port(),
-                        connection_timeout: self.data.timeout(),
                         connection_username: self.data.accesskey(),
                         connection_password: self.data.secretkey(),
                         connection_backend: {'backend': (self.data.backend() === 'alba' ? self.data.albaBackend().guid : undefined),
@@ -50,7 +49,16 @@ define([
                         mountpoint_writecaches: self.data.mtptWriteCaches(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        integratemgmt: self.data.integratemgmt()
+                        integratemgmt: self.data.integratemgmt(),
+                        config_params: {
+                            'dtl_mode': self.data.dtlMode(),
+                            'sco_size': self.data.scoSize(),
+                            'dedupe_mode': self.data.dedupeMode(),
+                            'dtl_enabled': self.data.dtlEnabled(),
+                            'dtl_location': self.data.dtlLocation(),
+                            'write_buffer': self.data.writeBuffer(),
+                            'cache_strategy': self.data.cacheStrategy(),
+                        }
                     }
                 };
                 var target_guid;

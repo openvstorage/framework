@@ -14,8 +14,8 @@
 /*global define */
 define([
     'jquery', 'ovs/generic',
-    '../build', './data', './gather_vpool', './gather_mountpoints', './gather_mgmtcenter', './confirm'
-], function($, generic, build, data, GatherVPool, GatherMountPoints, IntegrateMgmt, Confirm) {
+    '../build', './data', './gather_config', './gather_vpool', './gather_mountpoints', './gather_mgmtcenter', './confirm'
+], function($, generic, build, data, GatherConfig, GatherVPool, GatherMountPoints, IntegrateMgmt, Confirm) {
     "use strict";
     return function(options) {
         var self = this;
@@ -33,7 +33,7 @@ define([
             data.target(options.pendingStorageRouters()[0]);
         } else {
             self.title(generic.tryGet(options, 'title', $.t('ovs:wizards.addvpool.title')));
-            self.steps([new GatherVPool(), new GatherMountPoints(), new IntegrateMgmt(), new Confirm()]);
+            self.steps([new GatherVPool(), new GatherMountPoints(), new GatherConfig(), new IntegrateMgmt(), new Confirm()]);
             data.storageRouter([]);
             data.target(undefined);
         }
@@ -56,7 +56,6 @@ define([
         data.host('');
         data.localHost(true);
         data.port(80);
-        data.timeout(600);
         data.backends(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']);
         data.storageRouters([]);
         data.storageDrivers([]);
@@ -73,5 +72,12 @@ define([
         data.mgmtcenterType(undefined);
         data.mgmtcenterName(undefined);
         data.mgmtcenterLoaded(undefined);
+        data.cacheStrategy('onwrite');
+        data.dedupeMode('dedupe');
+        data.dtlEnabled(true);
+        data.dtlLocation('');
+        data.dtlMode('nosync');
+        data.scoSize(4);
+        data.writeBuffer(undefined);
     };
 });
