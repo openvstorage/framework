@@ -25,6 +25,7 @@ import pwd
 import glob
 import json
 import time
+import types
 import logging
 import tempfile
 import paramiko
@@ -48,10 +49,12 @@ def connected():
             Wrapped function
             """
             try:
+                if not self.client.is_connected():
+                    self._connect()
                 return f(self, *args, **kwargs)
             except AttributeError as ex:
                 if "'NoneType' object has no attribute 'open_session'" in str(ex):
-                    self._connect()
+                    self._connect()  # Reconnect
                     return f(self, *args, **kwargs)
                 raise
 
@@ -60,6 +63,13 @@ def connected():
         return new_function
 
     return wrap
+
+
+def is_connected(self):
+    """
+    Monkey-patch method to check whether the Paramiko client is connected
+    """
+    return self._transport is not None
 
 
 class UnableToConnectException(Exception):
@@ -118,10 +128,14 @@ class SSHClient(object):
             if key not in SSHClient.client_cache:
                 client = paramiko.SSHClient()
                 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.is_connected = types.MethodType(is_connected, client)
                 SSHClient.client_cache[key] = client
             self.client = SSHClient.client_cache[key]
 
     def __del__(self):
+        """
+        Class destructor
+        """
         try:
             if not self.is_local:
                 self._disconnect()
