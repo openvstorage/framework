@@ -25,12 +25,51 @@ import pwd
 import glob
 import json
 import time
+import types
 import logging
 import tempfile
 import paramiko
 import socket
 
 logger = LogHandler.get('extensions', name='sshclient')
+
+
+def connected():
+    """
+    Makes sure a call is executed against a connected client if required
+    """
+
+    def wrap(f):
+        """
+        Wrapper function
+        """
+
+        def new_function(self, *args, **kwargs):
+            """
+            Wrapped function
+            """
+            try:
+                if not self.client.is_connected():
+                    self._connect()
+                return f(self, *args, **kwargs)
+            except AttributeError as ex:
+                if "'NoneType' object has no attribute 'open_session'" in str(ex):
+                    self._connect()  # Reconnect
+                    return f(self, *args, **kwargs)
+                raise
+
+        new_function.__name__ = f.__name__
+        new_function.__module__ = f.__module__
+        return new_function
+
+    return wrap
+
+
+def is_connected(self):
+    """
+    Monkey-patch method to check whether the Paramiko client is connected
+    """
+    return self._transport is not None
 
 
 class UnableToConnectException(Exception):
@@ -42,37 +81,37 @@ class SSHClient(object):
     Remote/local client
     """
 
+    client_cache = {}
     IP_REGEX = re.compile('^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$')
 
     def __init__(self, endpoint, username='ovs', password=None):
         """
         Initializes an SSHClient
         """
+        storagerouter = None
         if isinstance(endpoint, basestring):
             ip = endpoint
             if not re.findall(SSHClient.IP_REGEX, ip):
                 raise ValueError('Incorrect IP {0} specified'.format(ip))
         elif Descriptor.isinstance(endpoint, StorageRouter):
             # Refresh the object before checking its attributes
-            endpoint = StorageRouter(endpoint.guid)
-            process_heartbeat = endpoint.heartbeats.get('process')
-            ip = endpoint.ip
-            if process_heartbeat is not None:
-                if time.time() - process_heartbeat > 300:
-                    message = 'StorageRouter {0} process heartbeat > 300s'.format(ip)
-                    logger.error(message)
-                    raise UnableToConnectException(message)
+            storagerouter = StorageRouter(endpoint.guid)
+            ip = storagerouter.ip
         else:
             raise ValueError('The endpoint parameter should be either an ip address or a StorageRouter')
-
-        logging.getLogger('paramiko').setLevel(logging.WARNING)
-        self.client = paramiko.SSHClient()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         self.ip = ip
         local_ips = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
         self.local_ips = [ip.strip() for ip in local_ips]
         self.is_local = self.ip in self.local_ips
+
+        if self.is_local is False and storagerouter is not None:
+            process_heartbeat = storagerouter.heartbeats.get('process')
+            if process_heartbeat is not None:
+                if time.time() - process_heartbeat > 300:
+                    message = 'StorageRouter {0} process heartbeat > 300s'.format(ip)
+                    logger.error(message)
+                    raise UnableToConnectException(message)
 
         current_user = check_output('whoami', shell=True).strip()
         if username is None:
@@ -84,16 +123,19 @@ class SSHClient(object):
         self.password = password
 
         if not self.is_local:
-            try:
-                self._connect()
-            except socket.error, ex:
-                if 'No route to host' in str(ex):
-                    message = 'SocketException: No route to host {0}'.format(ip)
-                    logger.error(message)
-                    raise UnableToConnectException(message)
-                raise
+            logging.getLogger('paramiko').setLevel(logging.WARNING)
+            key = '{0}@{1}'.format(self.ip, self.username)
+            if key not in SSHClient.client_cache:
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.is_connected = types.MethodType(is_connected, client)
+                SSHClient.client_cache[key] = client
+            self.client = SSHClient.client_cache[key]
 
     def __del__(self):
+        """
+        Class destructor
+        """
         try:
             if not self.is_local:
                 self._disconnect()
@@ -107,7 +149,14 @@ class SSHClient(object):
         if self.is_local is True:
             return
 
-        self.client.connect(self.ip, username=self.username, password=self.password)
+        try:
+            self.client.connect(self.ip, username=self.username, password=self.password)
+        except socket.error as ex:
+            if 'No route to host' in str(ex):
+                message = 'SocketException: No route to host {0}'.format(ip)
+                logger.error(message)
+                raise UnableToConnectException(message)
+            raise
 
     def _disconnect(self):
         """
@@ -123,6 +172,7 @@ class SSHClient(object):
         """Makes sure that the given path/string is escaped and safe for shell"""
         return "".join([("\\" + _) if _ in " '\";`|" else _ for _ in path_to_check])
 
+    @connected()
     def run(self, command, debug=False):
         """
         Executes a shell command
@@ -301,6 +351,7 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
         else:
             return self.run('cat "{0}"'.format(filename))
 
+    @connected()
     def file_write(self, filename, contents, mode='w'):
         """
         Writes into a file to the remote end
@@ -316,9 +367,11 @@ print json.dumps(glob.glob('{0}'))""".format(filename)
             try:
                 sftp = self.client.open_sftp()
                 sftp.put(temp_filename, filename)
+                sftp.close()
             finally:
                 os.remove(temp_filename)
 
+    @connected()
     def file_upload(self, remote_filename, local_filename):
         """
         Uploads a file to a remote end
@@ -350,6 +403,7 @@ print json.dumps(os.path.isfile('{0}'))""".format(self._shell_safe(filename))
         else:
             self.run(command)
 
+    @connected()
     def config_read(self, key):
         if self.is_local is True:
             from ovs.extensions.generic.configuration import Configuration
@@ -363,6 +417,7 @@ print json.dumps(Configuration.get('{0}'))
 """.format(key)
             return json.loads(self.run('python -c """{0}"""'.format(read)))
 
+    @connected()
     def config_set(self, key, value):
         if self.is_local is True:
             from ovs.extensions.generic.configuration import Configuration
