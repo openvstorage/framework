@@ -57,6 +57,7 @@ class ArakoonStore(object):
         self._cluster = ArakoonManagementEx().getCluster(cluster)
         self._client = self._cluster.getClient()
         self._lock = Lock()
+        self._batch_size = 100
 
     @locked()
     def get(self, key):
@@ -78,11 +79,21 @@ class ArakoonStore(object):
         return ArakoonStore._try(self._client.set, key, json.dumps(value))
 
     @locked()
-    def prefix(self, prefix, max_elements=10000):
+    def prefix(self, prefix):
         """
         Lists all keys starting with the given prefix
         """
-        return ArakoonStore._try(self._client.prefix, prefix, maxElements=max_elements)
+        next_prefix = ArakoonStore._next_key(prefix)
+        batch = None
+        while batch is None or len(batch) > 0:
+            batch = ArakoonStore._try(self._client.range,
+                                      beginKey=prefix if batch is None else batch[-1],
+                                      beginKeyIncluded=batch is None,
+                                      endKey=next_prefix,
+                                      endKeyIncluded=False,
+                                      maxElements=self._batch_size)
+            for item in batch:
+                yield item
 
     @locked()
     def delete(self, key):
@@ -123,3 +134,19 @@ class ArakoonStore(object):
                 tries -= 1
                 time.sleep(1)
         raise last_exception
+
+    @staticmethod
+    def _next_key(key):
+        """
+        Calculates the next key (to be used in range queries)
+        """
+        encoding = 'ascii'  # For future python 3 compatibility
+        array = bytearray(str(key), encoding)
+        for index in range(len(array) - 1, -1, -1):
+            array[index] += 1
+            if array[index] < 128:
+                while array[-1] == 0:
+                    array = array[:-1]
+                return str(array.decode(encoding))
+            array[index] = 0
+        return '\xff'

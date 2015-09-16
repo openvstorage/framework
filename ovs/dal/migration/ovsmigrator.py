@@ -173,7 +173,7 @@ class OVSMigrator(object):
             from ovs.extensions.storage.persistentfactory import PersistentFactory
 
             client = PersistentFactory.get_client()
-            keys = client.prefix('ovs_data', max_elements=-1)
+            keys = client.prefix('ovs_data')
             for key in keys:
                 data = client.get(key)
                 modified = False
@@ -204,7 +204,7 @@ class OVSMigrator(object):
             from ovs.extensions.storage.persistentfactory import PersistentFactory
 
             client = PersistentFactory.get_client()
-            keys = client.prefix('ovs_data', max_elements=-1)
+            keys = client.prefix('ovs_data')
             for key in keys:
                 data = client.get(key)
                 modified = False
