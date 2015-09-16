@@ -435,4 +435,5 @@ class DataList(object):
         """
         persistent = PersistentFactory.get_client()
         prefix = '{0}_{1}_'.format(namespace, name)
-        return set([key.replace(prefix, '') for key in persistent.prefix(prefix, max_elements=-1)])
+        for key in persistent.prefix(prefix):
+            yield key.replace(prefix, '')
