@@ -52,7 +52,6 @@ class RPMPackager(object):
         # Prepare
         #@TODO
         #To create both binary and source packages, change directory to ~/redhat/SPECS and run:
-
         #$ rpmbuild -ba NAME.spec
 
     @staticmethod
