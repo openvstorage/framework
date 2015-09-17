@@ -49,7 +49,7 @@ def connected():
             Wrapped function
             """
             try:
-                if not self.client.is_connected():
+                if self.client is not None and not self.client.is_connected():
                     self._connect()
                 return f(self, *args, **kwargs)
             except AttributeError as ex:
@@ -122,6 +122,7 @@ class SSHClient(object):
                 self.is_local = False  # If specified user differs from current executing user, we always use the paramiko SSHClient
         self.password = password
 
+        self.client = None
         if not self.is_local:
             logging.getLogger('paramiko').setLevel(logging.WARNING)
             key = '{0}@{1}'.format(self.ip, self.username)
