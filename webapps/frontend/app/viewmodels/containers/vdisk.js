@@ -94,26 +94,6 @@ define([
                     fallback.write_buffer = [self.vMachine().writeBuffer(), 'machine'];
                 }
             }
-            if (self.vpool() !== undefined) {
-                if (fallback.cache_strategy === undefined && self.vpool().configCacheStrategy() !== undefined) {
-                    fallback.cache_strategy = [self.vpool().configCacheStrategy().name, 'vpool'];
-                }
-                if (fallback.dedupe_mode === undefined && self.vpool().dedupeMode() !== undefined) {
-                    fallback.dedupe_mode = [self.vpool().dedupeMode().name, 'vpool'];
-                }
-                if (fallback.dtl_enabled === undefined && self.vpool().dtlEnable() !== undefined) {
-                    fallback.dtl_enabled = [self.vpool().dtlEnable().value, 'vpool'];
-                }
-                if (fallback.dtl_mode === undefined && self.vpool().dtlMode() !== undefined) {
-                    fallback.dtl_mode = [self.vpool().dtlMode().name, 'vpool'];
-                }
-                if (fallback.sco_size === undefined && self.vpool().scoSize() !== undefined) {
-                    fallback.sco_size = [self.vpool().scoSize(), 'vpool'];
-                }
-                if (fallback.write_buffer === undefined && self.vpool().writeBuffer() !== undefined) {
-                    fallback.write_buffer = [self.vpool().writeBuffer(), 'vpool'];
-                }
-            }
             return fallback;
         });
         self.configCacheStrategy = ko.computed({

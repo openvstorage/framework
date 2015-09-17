@@ -262,7 +262,6 @@ define([
                     });
             }
         };
-
         self.reconfigurePmachine = function(sr_guid, configure) {
             self.updatingStorageRouters(true);
             var pmachine_guid;
@@ -308,7 +307,6 @@ define([
             }
             self.updatingStorageRouters(false);
         };
-
         self.addStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
 
@@ -334,7 +332,6 @@ define([
                 self.updatingStorageRouters(false);
             });
         };
-
         self.removeStorageRouter = function(sr) {
             self.updatingStorageRouters(true);
             var deferred = $.Deferred(), wizard, removingStorageRouter = ko.observableArray();

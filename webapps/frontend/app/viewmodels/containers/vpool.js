@@ -187,6 +187,9 @@ define([
                 self.loadConfig = api.get('vpools/' + self.guid() + '/get_configuration')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
+                        if (data.write_buffer !== undefined) {
+                            data.write_buffer = Math.round(data.write_buffer);
+                        }
                         self.configuration(data);
                         deferred.resolve();
                     })

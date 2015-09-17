@@ -16,7 +16,6 @@
 VPool module
 """
 
-import math
 from ovs.celery_run import celery
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vmachinelist import VMachineList
@@ -121,12 +120,12 @@ class VPoolController(object):
         sco_size = sco_multiplier * 4 / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
         dtl_enabled = storagedriver_config.configuration.get('', {}).get('', None)
         dtl_location = storagedriver_config.configuration.get('', {}).get('', None)
-        write_buffer = int(math.ceil(tlog_multiplier * sco_size * non_disposable_sco_factor / 1024.0))  # SCO size is in MiB, but write buffer must be GiB
+        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor / 1024.0  # SCO size is in MiB, but write buffer must be GiB
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
                 'dtl_enabled': dtl_enabled,  # @TODO: Must be boolean value once implemented correctly
                 'dedupe_mode': dedupe_mapping[dedupe_mode],
-                'write_buffer': int(write_buffer),
+                'write_buffer': write_buffer,
                 'dtl_location': dtl_location,
                 'cache_strategy': cache_mapping[cache_strategy]}

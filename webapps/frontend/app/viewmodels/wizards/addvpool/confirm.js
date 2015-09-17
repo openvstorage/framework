@@ -49,18 +49,22 @@ define([
                         mountpoint_writecaches: self.data.mtptWriteCaches(),
                         mountpoint_foc: self.data.mtptFOC(),
                         storage_ip: self.data.storageIP(),
-                        integratemgmt: self.data.integratemgmt(),
-                        config_params: {
-                            'dtl_mode': self.data.dtlMode(),
-                            'sco_size': self.data.scoSize(),
-                            'dedupe_mode': self.data.dedupeMode(),
-                            'dtl_enabled': self.data.dtlEnabled(),
-                            'dtl_location': self.data.dtlLocation(),
-                            'write_buffer': self.data.writeBuffer(),
-                            'cache_strategy': self.data.cacheStrategy(),
-                        }
+                        integratemgmt: self.data.integratemgmt()
                     }
                 };
+                var configParams = undefined;
+                if (self.data.extendVpool() === false) {
+                    configParams = {
+                        'dtl_mode': self.data.dtlMode(),
+                        'sco_size': self.data.scoSize(),
+                        'dedupe_mode': self.data.dedupeMode(),
+                        'dtl_enabled': self.data.dtlEnabled(),
+                        'dtl_location': self.data.dtlLocation(),
+                        'write_buffer': self.data.writeBuffer(),
+                        'cache_strategy': self.data.cacheStrategy()
+                    }
+                }
+                post_data.call_parameters.config_params = configParams;
                 var target_guid;
                 if (self.data.extendVpool() === true) {
                     target_guid = self.data.storageRouter().guid()

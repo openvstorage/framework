@@ -165,8 +165,6 @@ class VDisk(DataObject):
                 configuration[key] = self.configuration[key]
             elif self.vmachine is not None and key in self.vmachine.configuration:
                 configuration[key] = self.vmachine.configuration[key]
-            elif self.vpool is not None and key in self.vpool.configuration:
-                configuration[key] = self.vpool.configuration[key]
         return configuration
 
     def reload_client(self):

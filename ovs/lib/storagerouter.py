@@ -51,6 +51,7 @@ from ovs.lib.disk import DiskController
 from ovs.lib.helpers.decorators import add_hooks
 from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
+from ovs.lib.vpool import VPoolController
 from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
 from volumedriver.storagerouter.storagerouterclient import ClusterRegistry, ArakoonNodeConfig, ClusterNodeConfig, LocalStorageRouterClient
@@ -182,7 +183,9 @@ class StorageRouterController(object):
 
         vpool = VPoolList.get_vpool_by_name(vpool_name)
         storagedriver = None
+        current_storage_driver_config = {}
         if vpool is not None:
+            current_storage_driver_config = VPoolController.get_configuration(vpool.guid)
             if vpool.backend_type.code == 'local':
                 # Might be an issue, investigating whether it's on the same Storage Router or not
                 if len(vpool.storagedrivers) == 1 and vpool.storagedrivers[0].storagerouter.machine_id != unique_id:
@@ -558,12 +561,11 @@ class StorageRouterController(object):
 
             dedupe_mode = parameters['config_params']['dedupe_mode']
             cache_strategy = parameters['config_params']['cache_strategy']
-            sco_multiplier = sco_size / 4 * 1024  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB)
         else:
-            sco_factor = 12
-            dedupe_mode = deduped
-            cache_strategy = onwrite
-            sco_multiplier = 1024
+            sco_size = current_storage_driver_config['sco_size']
+            sco_factor = current_storage_driver_config['write_buffer'] * 1024.0 / 20 / sco_size
+            dedupe_mode = current_storage_driver_config['dedupe_mode']
+            cache_strategy = current_storage_driver_config['cache_strategy']
 
         storagedriver_config.configure_content_addressed_cache(clustercache_mount_points=readcaches,
                                                                read_cache_serialization_path=rsppath)
@@ -588,7 +590,7 @@ class StorageRouterController(object):
                                                      vrouter_file_write_threshold=1024,
                                                      vrouter_min_workers=4,
                                                      vrouter_max_workers=16,
-                                                     vrouter_sco_multiplier=sco_multiplier,
+                                                     vrouter_sco_multiplier=sco_size / 4 * 1024,  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB),
                                                      vrouter_backend_sync_timeout_ms=5000,
                                                      vrouter_migrate_timeout_ms=5000)
         storagedriver_config.configure_volume_router_cluster(vrouter_cluster_id=vpool.guid)
