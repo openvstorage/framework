@@ -231,7 +231,9 @@ class DataList(object):
             else:
                 self.data = []
 
+            elements = 0
             for guid in guids:
+                elements += 1
                 try:
                     instance = query_object(guid)
                     if query_type == DataList.where_operator.AND:
@@ -253,7 +255,7 @@ class DataList(object):
             if 'post_query' in DataList.test_hooks:
                 DataList.test_hooks['post_query'](self)
 
-            if self._key is not None and len(guids) > 0 and self._can_cache:
+            if self._key is not None and elements > 0 and self._can_cache:
                 invalidated = False
                 for class_name in invalidations:
                     key = '{0}_{1}'.format(DataList.cachelink, class_name)
