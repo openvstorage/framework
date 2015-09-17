@@ -315,10 +315,6 @@ class StorageDriverConfiguration(object):
         # Fix some manual "I know what I'm doing" overrides
         backend_connection_manager = 'backend_connection_manager'
         backend_type = 'backend_type'
-        if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'REST':
-            if 'rest_connection_policy_id' in self.params[self.config_type][backend_connection_manager]['mandatory']:
-                self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
-                self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
         if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'LOCAL':
             if 'local_connection_path' in self.params[self.config_type][backend_connection_manager]['mandatory']:
                 self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
