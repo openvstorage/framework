@@ -38,7 +38,6 @@ define([
                         type: self.data.backend(),
                         connection_host: self.data.host(),
                         connection_port: self.data.port(),
-                        connection_timeout: self.data.timeout(),
                         connection_username: self.data.accesskey(),
                         connection_password: self.data.secretkey(),
                         connection_backend: {'backend': (self.data.backend() === 'alba' ? self.data.albaBackend().guid : undefined),
@@ -53,6 +52,19 @@ define([
                         integratemgmt: self.data.integratemgmt()
                     }
                 };
+                var configParams = undefined;
+                if (self.data.extendVpool() === false) {
+                    configParams = {
+                        'dtl_mode': self.data.dtlMode(),
+                        'sco_size': self.data.scoSize(),
+                        'dedupe_mode': self.data.dedupeMode(),
+                        'dtl_enabled': self.data.dtlEnabled(),
+                        'dtl_location': self.data.dtlLocation(),
+                        'write_buffer': self.data.writeBuffer(),
+                        'cache_strategy': self.data.cacheStrategy()
+                    }
+                }
+                post_data.call_parameters.config_params = configParams;
                 var target_guid;
                 if (self.data.extendVpool() === true) {
                     target_guid = self.data.storageRouter().guid()

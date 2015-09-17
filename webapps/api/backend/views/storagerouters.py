@@ -209,24 +209,8 @@ class StorageRouterViewSet(viewsets.ViewSet):
         """
         Adds a vPool to a given Storage Router
         """
-        fields = ['vpool_name', 'type', 'connection_host', 'connection_port', 'connection_timeout', 'connection_backend',
-                  'connection_username', 'connection_password', 'mountpoint_temp', 'mountpoint_bfs', 'mountpoint_md',
-                  'mountpoint_readcaches', 'mountpoint_writecaches', 'mountpoint_foc',
-                  'storage_ip', 'integratemgmt']
-
-        parameters = {'storagerouter_ip': storagerouter.ip}
-        for field in fields:
-            if field not in call_parameters:
-                if field in ['connection_backend']:
-                    parameters[field] = ''
-                    continue
-                else:
-                    raise NotAcceptable('Invalid data passed: {0} is missing'.format(field))
-            parameters[field] = call_parameters[field]
-            if isinstance(parameters[field], basestring):
-                parameters[field] = str(parameters[field])
-
-        return StorageRouterController.add_vpool.s(parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
+        call_parameters['storagerouter_ip'] = storagerouter.ip
+        return StorageRouterController.add_vpool.s(call_parameters).apply_async(routing_key='sr.{0}'.format(storagerouter.machine_id))
 
     @link()
     @log()

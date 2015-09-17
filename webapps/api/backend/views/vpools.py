@@ -111,7 +111,6 @@ class VPoolViewSet(viewsets.ViewSet):
         storagedriver = StorageDriver(storagedriver_guid)
         parameters = {'connection_host': None if vpool.connection is None else vpool.connection.split(':')[0],
                       'connection_port': None if vpool.connection is None else int(vpool.connection.split(':')[1]),
-                      'connection_timeout': 0,  # Not in use anyway
                       'connection_username': vpool.login,
                       'connection_password': vpool.password,
                       'mountpoint_bfs': storagedriver.mountpoint_bfs,
@@ -128,3 +127,21 @@ class VPoolViewSet(viewsets.ViewSet):
                 parameters[field] = str(parameters[field])
 
         return StorageRouterController.update_storagedrivers.delay(valid_storagedriver_guids, storagerouters, parameters)
+
+    @link()
+    @required_roles(['read'])
+    @return_task()
+    @load(VPool)
+    def get_configuration(self, vpool):
+        """
+        Retrieve the configuration settings for this vPool
+        Currently we are able to configure the following settings (via GUI)
+          - DTL enabled
+          - DTL mode  (no sync, async, sync)
+          - DTL location  (where DTL is configured to)
+          - SCO size  (4MB - 128 MB)
+          - Dedupe mode  (deduped aka ContentBased, non-deduped aka LocationBased)
+          - Write buffer  (Amount of data allowed not immediately being put on backend)
+          - Cache strategy  (no cache, cache on read, cache on write)
+        """
+        return VPoolController.get_configuration.delay(vpool_guid=vpool.guid)

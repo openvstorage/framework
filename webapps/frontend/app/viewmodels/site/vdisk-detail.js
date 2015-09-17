@@ -14,10 +14,10 @@
 /*global define */
 define([
     'jquery', 'plugins/dialog', 'knockout',
-    'ovs/shared', 'ovs/generic', 'ovs/refresher',
+    'ovs/shared', 'ovs/generic', 'ovs/refresher', 'ovs/api',
     '../containers/vdisk', '../containers/vmachine', '../containers/vpool', '../containers/storagerouter',
     '../wizards/rollback/index', '../wizards/snapshot/index'
-], function($, dialog, ko, shared, generic, Refresher, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
+], function($, dialog, ko, shared, generic, Refresher, api, VDisk, VMachine, VPool, StorageRouter, RollbackWizard) {
     "use strict";
     return function() {
         var self = this;
@@ -38,6 +38,7 @@ define([
         // Observables
         self.snapshotsInitialLoad = ko.observable(true);
         self.vDisk                = ko.observable();
+        self.dtlLocation          = ko.observable();
 
         // Functions
         self.load = function() {
@@ -85,6 +86,30 @@ define([
                         guid: vdisk.guid()
                     }));
                 }
+            }
+        };
+        self.saveConfiguration = function() {
+            if (self.vDisk() !== undefined) {
+                var vd = self.vDisk();
+                api.post('vdisks/' + vd.guid() + '/set_config_params', {
+                    data: { config_params: vd.newConfiguration() }
+                })
+                    .then(self.shared.tasks.wait)
+                    .done(function () {
+                        generic.alertSuccess(
+                            $.t('ovs:vdisks.saveconfig.done'),
+                            $.t('ovs:vdisks.saveconfig.donemsg', { what: vd.name() })
+                        );
+                    })
+                    .fail(function (error) {
+                        generic.alertError(
+                            $.t('ovs:generic.error'),
+                            $.t('ovs:generic.messages.errorwhile_error', {
+                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() }),
+                                error: error
+                            })
+                        );
+                    });
             }
         };
 

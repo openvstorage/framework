@@ -16,14 +16,14 @@ limitations under the License.
 <div>
     <form id="form.gather.vpool" role="form form-horizontal" class="form-horizontal">
         <p data-i18n="ovs:wizards.addvpool.gathervpool.basicinfo"></p>
-        <div class="form-group" data-bind="css: { 'has-error': $.inArray('name', canContinue().fields) !== -1 }">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.name"></label>
+        <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('name') }">
+            <label class="col-lg-3 control-label" for="inputVpoolName" data-i18n="ovs:wizards.addvpool.gathervpool.name"></label>
             <div class="col-lg-7">
                 <input type="text" id="inputVpoolName" class="autofocus form-control" data-bind="value: data.name, valueUpdate: 'input'" />
             </div>
         </div>
         <div class="form-group">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.backendtype"></label>
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathervpool.backendtype"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
                          items: data.backends, target: data.backend,
@@ -35,7 +35,7 @@ limitations under the License.
             </div>
         </div>
         <div data-bind="visible: data.backend() === 'alba'">
-            <div class="form-group" data-bind="css: { 'has-error': $.inArray('clientid', canContinue().fields) !== -1 }">
+            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
                 <div class="col-lg-3"></div>
                 <div class="col-lg-7">
                     <input type="checkbox" id="inputVpoolLocalHost" class="autofocus" data-bind="checked: data.localHost" />
@@ -44,7 +44,7 @@ limitations under the License.
             </div>
         </div>
         <div data-bind="visible: data.backend() !== 'local' && data.backend() !== 'distributed' && (data.backend() !== 'alba' || !data.localHost())">
-            <div class="form-group" data-bind="css: { 'has-error': $.inArray('host', canContinue().fields) !== -1 }">
+            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('host') }">
                 <label class="col-lg-3 control-label" for="inputVpoolHost" data-i18n="ovs:wizards.addvpool.gathervpool.host"></label>
                 <div class="col-lg-4">
                     <input type="text" id="inputVpoolHost" class="autofocus form-control" data-bind="value: data.host, valueUpdate: 'input'" />
@@ -55,20 +55,14 @@ limitations under the License.
                 </div>
             </div>
         </div>
-        <div class="form-group" data-bind="visible: data.backend() === 'rest'">
-            <label class="col-lg-3 control-label" for="inputVpoolTimeout" data-i18n="ovs:wizards.addvpool.gathervpool.timeout"></label>
-            <div class="col-lg-7">
-                <input type="text" id="inputVpoolTimeout" class="autofocus form-control" data-bind="value: data.timeout" />
-            </div>
-        </div>
         <div data-bind="visible: data.backend().match(/^.+_s3$/) !== null">
-            <div class="form-group" data-bind="css: { 'has-error': $.inArray('accesskey', canContinue().fields) !== -1 }">
+            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('accesskey') }">
                 <label class="col-lg-3 control-label" for="inputVpoolAccessKey" data-i18n="ovs:wizards.addvpool.gathervpool.accesskey"></label>
                 <div class="col-lg-7">
                     <input type="text" id="inputVpoolAccessKey" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
                 </div>
             </div>
-            <div class="form-group" data-bind="css: { 'has-error': $.inArray('secretkey', canContinue().fields) !== -1 }">
+            <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('secretkey') }">
                 <label class="col-lg-3 control-label" for="inputVpoolSecretKey" data-i18n="ovs:wizards.addvpool.gathervpool.secretkey"></label>
                 <div class="col-lg-7">
                     <input type="password" id="inputVpoolSecretKey" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'" />
@@ -77,13 +71,13 @@ limitations under the License.
         </div>
         <div data-bind="visible: data.backend() === 'alba'">
             <div data-bind="visible: !data.localHost()">
-                <div class="form-group" data-bind="css: { 'has-error': $.inArray('clientid', canContinue().fields) !== -1 }">
+                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientid') }">
                     <label class="col-lg-3 control-label" for="inputVpoolClientId" data-i18n="ovs:wizards.addvpool.gathervpool.clientid"></label>
                     <div class="col-lg-7">
                         <input type="text" id="inputVpoolClientId" class="autofocus form-control" data-bind="value: data.accesskey, valueUpdate: 'input'" />
                     </div>
                 </div>
-                <div class="form-group" data-bind="css: { 'has-error': $.inArray('clientsecret', canContinue().fields) !== -1 }">
+                <div class="form-group" data-bind="css: { 'has-error': canContinue().fields.contains('clientsecret') }">
                     <label class="col-lg-3 control-label" for="inputVpoolClientSecret" data-i18n="ovs:wizards.addvpool.gathervpool.clientsecret"></label>
                     <div class="col-lg-7">
                         <input type="password" id="inputVpoolClientSecret" class="autofocus form-control" data-bind="value: data.secretkey, valueUpdate: 'input'">
@@ -91,7 +85,7 @@ limitations under the License.
                 </div>
             </div>
             <div class="form-group">
-                <label class="col-lg-3 control-label" for="" data-i18n="ovs:wizards.addvpool.gathervpool.albabackend"></label>
+                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathervpool.albabackend"></label>
                 <div class="col-lg-7">
                     <!-- ko if: data.albaBackends() === undefined || data.albaBackends().length === 0 -->
                         <i data-i18n="[html]ovs:wizards.addvpool.gathervpool.nobackends"
@@ -119,7 +113,7 @@ limitations under the License.
                 </div>
             </div>
             <div class="form-group" data-bind="if: data.albaBackend() !== undefined">
-                <label class="col-lg-3 control-label" for="" data-i18n="ovs:wizards.addvpool.gathervpool.albapreset"></label>
+                <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathervpool.albapreset"></label>
                 <div class="col-lg-7">
                     <span data-bind="dropdown: {
                                          key: 'name', keyisfunction: false,
@@ -134,17 +128,19 @@ limitations under the License.
         </div>
         <p data-i18n="ovs:wizards.addvpool.gathervpool.extendedinfo"></p>
         <div class="form-group">
-            <label class="col-lg-3 control-label" for="name" data-i18n="ovs:wizards.addvpool.gathervpool.initialstoragerouter"></label>
+            <label class="col-lg-3 control-label" data-i18n="ovs:wizards.addvpool.gathervpool.initialstoragerouter"></label>
             <div class="col-lg-7">
                 <span data-bind="dropdown: {
-                         key: 'guid', keyisfunction: true,
-                         items: data.storageRouters, target: data.target,
-                         text: function(item) {
-                             if (item !== undefined) {
-                                 return item.name()
-                             }
-                         }
-                     }">
+                                     key: 'guid',
+                                     keyisfunction: true,
+                                     items: data.storageRouters,
+                                     target: data.target,
+                                     text: function(item) {
+                                         if (item !== undefined) {
+                                             return item.name()
+                                         }
+                                     }
+                                 }">
                 </span>
             </div>
         </div>

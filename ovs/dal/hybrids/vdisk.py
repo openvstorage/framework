@@ -38,8 +38,9 @@ class VDisk(DataObject):
                     Property('devicename', str, doc='The name of the container file (e.g. the VMDK-file) describing the vDisk.'),
                     Property('order', int, mandatory=False, doc='Order with which vDisk is attached to a vMachine. None if not attached to a vMachine.'),
                     Property('volume_id', str, mandatory=False, doc='ID of the vDisk in the Open vStorage Volume Driver.'),
-                    Property('parentsnapshot', str, mandatory=False, doc='Points to a parent voldrvsnapshotid. None if there is no parent Snapshot'),
-                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder')]
+                    Property('parentsnapshot', str, mandatory=False, doc='Points to a parent storage driver parent ID. None if there is no parent Snapshot'),
+                    Property('cinder_id', str, mandatory=False, doc='Cinder Volume ID, for volumes managed through Cinder'),
+                    Property('configuration', dict, default=dict(), doc='Hypervisor/volumedriver specific configurations')]
     __relations = [Relation('vmachine', VMachine, 'vdisks', mandatory=False),
                    Relation('vpool', VPool, 'vdisks'),
                    Relation('parent_vdisk', None, 'child_vdisks', mandatory=False)]
@@ -47,7 +48,8 @@ class VDisk(DataObject):
                   Dynamic('info', dict, 60),
                   Dynamic('statistics', dict, 4, locked=True),
                   Dynamic('storagedriver_id', str, 60),
-                  Dynamic('storagerouter_guid', str, 15)]
+                  Dynamic('storagerouter_guid', str, 15),
+                  Dynamic('resolved_configuration', dict, 300, locked=True)]
 
     def __init__(self, *args, **kwargs):
         """
@@ -72,7 +74,7 @@ class VDisk(DataObject):
                 voldrv_snapshots = []
             for guid in voldrv_snapshots:
                 snapshot = self.storagedriver_client.info_snapshot(volume_id, guid)
-                # @todo: to be investigated howto handle during set as template
+                # @todo: to be investigated how to handle during set as template
                 if snapshot.metadata:
                     metadata = pickle.loads(snapshot.metadata)
                     snapshots.append({'guid': guid,
@@ -151,6 +153,20 @@ class VDisk(DataObject):
             return storagedrivers[0].storagerouter_guid
         return None
 
+    def _resolved_configuration(self):
+        """
+        Returns resolved configuration for this vDisk, falling back to the vMachine and vPool
+        """
+        configuration = {}
+        keys = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer']
+        self.invalidate_cached_objects()
+        for key in keys:
+            if key in self.configuration:
+                configuration[key] = self.configuration[key]
+            elif self.vmachine is not None and key in self.vmachine.configuration:
+                configuration[key] = self.vmachine.configuration[key]
+        return configuration
+
     def reload_client(self):
         """
         Reloads the StorageDriver Client
@@ -196,7 +212,7 @@ class VDisk(DataObject):
                 block_size = 4096
             vdiskstatsdict['4k_read_operations'] = vdiskstatsdict['data_read'] / block_size
             vdiskstatsdict['4k_write_operations'] = vdiskstatsdict['data_written'] / block_size
-            # Precalculate sums
+            # Pre-calculate sums
             for key, items in StorageDriverClient.stat_sums.iteritems():
                 vdiskstatsdict[key] = 0
                 for item in items:

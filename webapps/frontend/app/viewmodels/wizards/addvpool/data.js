@@ -31,6 +31,12 @@ define([
             allowVPool:       ko.observable(true),
             localHost:        ko.observable(true),
             backend:          ko.observable('local'),
+            cacheStrategy:    ko.observable(''),
+            dedupeMode:       ko.observable(''),
+            dtlEnabled:       ko.observable(true),
+            dtlLocation:      ko.observable(''),
+            dtlMode:          ko.observable(''),
+            scoSize:          ko.observable(4),
             mtptTemp:         ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-temp' }),
             mtptBFS:          ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-bfs' }),
             mtptMD:           ko.observable().extend({ regex: mountpointRegex, identifier: 'mtpt-md' }),
@@ -45,7 +51,6 @@ define([
             name:             ko.observable('').extend({ regex: nameRegex }),
             host:             ko.observable('').extend({ regex: hostRegex }),
             port:             ko.observable(80).extend({ numeric: { min: 1, max: 65536 } }),
-            timeout:          ko.observable(600).extend({ numeric: {}}),
             albaBackend:      ko.observable(),
             albaPreset:       ko.observable(),
             backends:         ko.observableArray(['local', 'ceph_s3', 'amazon_s3', 'swift_s3', 'distributed', 'alba']),
@@ -68,7 +73,12 @@ define([
             mgmtcenterType:   ko.observable(),
             mgmtcenterName:   ko.observable(),
             mgmtcenterLoaded: ko.observable(false),
-            mountpointRegex:  mountpointRegex
+            mountpointRegex:  mountpointRegex,
+            dtlModes:         ko.observableArray(['nosync', 'async', 'sync']),
+            cacheStrategies:  ko.observableArray(['onread', 'onwrite', 'none']),
+            dedupeModes:      ko.observableArray(['dedupe', 'nondedupe']),
+            scoSizes:         ko.observableArray([4, 8, 16, 32, 64, 128]),
+            writeBuffer:      ko.observable().extend({ numeric: { min: 0, max: 1024, allowUndefined: true } }),
         }, resetAlbaBackends = function() {
             wizardData.albaBackends(undefined);
             wizardData.albaBackend(undefined);

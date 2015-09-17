@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <section data-bind="with: vPool()">
-	<ol class="breadcrumb">
-	    <li class="active" data-bind="text: name"></li>
-	</ol>
+    <ol class="breadcrumb">
+        <li class="active" data-bind="text: name"></li>
+    </ol>
     <div>
         <ul class="nav nav-tabs">
             <li class="active">
@@ -44,16 +44,23 @@ limitations under the License.
                         <tr>
                             <th data-i18n="ovs:vpools.statistics" colspan="2"></th>
                             <th data-i18n="ovs:vpools.backend" colspan="2"></th>
+                            <th data-i18n="ovs:vpools.configuration" colspan="2"></th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="width: 15%;" data-i18n="ovs:generic.storeddata"></td>
-                            <td style="width: 35%;"><span data-bind="text: storedData"></span></td>
-                            <td style="width: 15%;" data-i18n="ovs:vpools.backendtype"></td>
-                            <td style="width: 35%;">
+                            <td style="width: 12%;" data-i18n="ovs:generic.storeddata"></td>
+                            <td style="width: 20%;"><span data-bind="text: storedData"></span></td>
+                            <td style="width: 12%;" data-i18n="ovs:vpools.backendtype"></td>
+                            <td style="width: 29%;">
                                 <span data-bind="lazyloader: { item: backendType, loadedObservable: 'loaded', undefinedLoading: false }">
                                     <span data-part="lazy-entry" data-bind="translate: 'ovs:generic.backendtypes.' + item().code()"></span>
+                                </span>
+                            </td>
+                            <td style="width: 12%;" data-i18n="ovs:vpools.cache_strategy"></td>
+                            <td style="width: 15%;">
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.cache_strategies.' + item().cache_strategy"></span>
                                 </span>
                             </td>
                         </tr>
@@ -62,34 +69,86 @@ limitations under the License.
                             <td><span data-bind="text: cacheRatio"></span></td>
                             <td data-i18n="ovs:vpools.backendconnection"></td>
                             <td><span data-bind="text: backendConnection() ? backendConnection() : '-'"></span></td>
+                            <td data-i18n="ovs:vpools.dedupe_mode"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="translate: 'ovs:storagedrivers.configuration.general.dedupe_modes.' + item().dedupe_mode"></span>
+                                </span>
+                            </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.iops"></td>
                             <td><span data-bind="text: iops"></span></td>
                             <td data-i18n="ovs:vpools.backendlogin"></td>
                             <td><span data-bind="text: backendLogin() ? backendLogin() : '-'"></span></td>
+                            <td data-i18n="ovs:vpools.sco_size"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry">
+                                        <span data-bind="text: item().sco_size"></span>
+                                        <span data-i18n="ovs:generic.mib"></span>
+                                    </span>
+                                </span>
+                            </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: readSpeed"></span></td>
                             <td data-i18n="ovs:generic.readspeed"></td>
                             <td><span data-bind="text: backendReadSpeed"></span></td>
+                            <td data-i18n="ovs:vpools.write_buffer"></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry">
+                                        <span data-bind="text: item().write_buffer"></span>
+                                        <span data-i18n="ovs:generic.gib"></span>
+                                    </span>
+                                </span>
+                            </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: writeSpeed"></span></td>
                             <td data-i18n="ovs:generic.writespeed"></td>
                             <td><span data-bind="text: backendWriteSpeed"></span></td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry">
+                                        <span data-bind="translate: 'ovs:vpools.' + (item().dtl_enabled === true ? 'dtl_mode' : 'dtl')"></span>
+                                        <a data-bind="tooltip: 'ovs:storagedrivers.configuration.general.dtl_help_title',
+                                                      visible: item().dtl_enabled !== true"
+                                           class="hand fa noline"
+                                           data-i18n="[html]ovs:icons.help"
+                                           style="margin-left: 5px; color: blue;">
+                                        </a>
+                                    </span>
+                                </span>
+                            </td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="text: (item().dtl_enabled === true ? item().dtl_mode : $.t('ovs:vpools.dtl_disabled'))"></span>
+                                </span>
+                            </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvmachines"></td>
                             <td><span data-bind="text: vMachines().length"></span></td>
                             <td colspan="2">&nbsp;</td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-i18n="ovs:vpools.dtl_location" data-bind="visible: item().dtl_enabled === true"></span>
+                                </span>
+                            </td>
+                            <td>
+                                <span data-bind="lazyloader: { item: configuration, loadedObservable: 'loaded', undefinedLoading: false }">
+                                    <span data-part="lazy-entry" data-bind="text: item().dtl_location, visible: item().dtl_enabled === true"></span>
+                                </span>
+                            </td>
                         </tr>
                         <tr>
                             <td data-i18n="ovs:generic.nrofvdisks"></td>
                             <td><span data-bind="text: vDisks().length"></span></td>
-                            <td colspan="2">&nbsp;</td>
+                            <td colspan="4">&nbsp;</td>
                         </tr>
                     </tbody>
                 </table>
@@ -191,7 +250,7 @@ limitations under the License.
                 <table class="table table-noborder" style="width: 100%;">
                     <tbody>
                         <tr>
-                            <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
+                             <td style="width: 90px; vertical-align: middle; padding: 0 0 20px 0;">
                                 <button id="btn.vpool.management" type="button" class="btn btn-lg" data-bind="enable: false">
                                     <span class="fa fa-1p5x" data-i18n="[html]ovs:icons.storageroutervpoollink"></span>
                                 </button>

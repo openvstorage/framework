@@ -32,7 +32,7 @@ class VPool(DataObject):
                     Property('size', int, mandatory=False, doc='Size of the vPool expressed in Bytes. Set to zero if not applicable.'),
                     Property('login', str, mandatory=False, doc='Login/Username for the Storage BackendType.'),
                     Property('password', str, mandatory=False, doc='Password for the Storage BackendType.'),
-                    Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domainname, Zone, ...) for the Storage BackendType.'),
+                    Property('connection', str, mandatory=False, doc='Connection (IP, URL, Domain name, Zone, ...) for the Storage BackendType.'),
                     Property('metadata', dict, mandatory=False, doc='Metadata for the backend, as used by the Storage Drivers.')]
     __relations = [Relation('backend_type', BackendType, 'vpools', doc='Type of storage backend.')]
     __dynamics = [Dynamic('status', str, 10),

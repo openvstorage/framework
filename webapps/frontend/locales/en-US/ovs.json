@@ -63,7 +63,6 @@
             "ceph_s3": "Ceph S3",
             "swift_s3": "Swift S3",
             "local": "Local FS",
-            "rest": "REST backend",
             "distributed": "Distributed FS",
             "alba": "Open vStorage Backend"
         },
@@ -197,6 +196,8 @@
         "backendtype": "Type",
         "storageip": "Storage IP",
         "namespace": "Backend location",
+        "save": "Save",
+        "fallbackvalue": "Fallback",
         "usage": "Usage",
         "custompath": "Custom path",
         "reload": "Reload",
@@ -214,7 +215,9 @@
         "partitionusage": "Detailed partition usage:",
         "sizeunspecified": "Size up to __amount__",
         "tempspace": "Temporary files",
-        "accept": "Accept"
+        "accept": "Accept",
+        "warning": "Warning",
+        "inheritedfrom": "Inherited from"
     },
     "storagerouters": {
         "title": "Storage Routers",
@@ -243,14 +246,68 @@
             }
         }
     },
+    "storagedrivers": {
+        "configuration": {
+            "general": {
+                "cache_strategies": {
+                    "none": "No Cache",
+                    "null": "-",
+                    "onread": "Cache On Read",
+                    "onwrite": "Cache On Write"
+                },
+                "caching": "Caching",
+                "dedupe": "Deduplication",
+                "dedupe_help_message": "Deduplication will calculate MD5 sum for each write resulting in performance loss, but better cache performance",
+                "dedupe_help_title": "Help - Deduplication",
+                "dedupe_modes": {
+                    "dedupe": "Deduped",
+                    "nondedupe": "Non-Deduped",
+                    "null": "-"
+                },
+                "dedupe_warning": "Non-deduplication cannot be changed again!",
+                "dtl": "Distributed Transaction Log",
+                "dtl_enable": "Enable",
+                "dtl_help_message": "The Distributed Transaction Log does a bunch of stuff",
+                "dtl_help_title": "Distributed Transaction Log",
+                "dtl_location": "Location",
+                "dtl_mode": "Mode",
+                "dtl_modes": {
+                    "async": "Async",
+                    "nosync": "No Sync",
+                    "sync": "Sync"
+                },
+                "dtl_options": {
+                    "false": "No",
+                    "true": "Yes"
+                },
+                "sco_size": "SCO size",
+                "strategy": "Strategy",
+                "volume": "Volumes",
+                "write_buffer": "Maximum write buffer"
+            },
+            "vdisk": {
+                "volume": "Volume"
+            }
+        }
+    },
     "vpools" : {
-        "title": "vPools",
-        "backendtype": "Type",
+        "add": "Add new vPool",
+        "backend": "Backend",
         "backendconnection": "Connection",
         "backendlogin": "Login",
-        "statistics": "Statistics",
-        "backend": "Backend",
+        "backendtype": "Type",
+        "cache_strategy": "Cache Strategy",
+        "configuration": "Configurations",
+        "dedupe_mode": "Dedupe Mode",
+        "dtl": "DTL",
+        "dtl_disabled": "Disabled",
+        "dtl_location": "DTL Location",
+        "dtl_mode": "DTL Mode",
         "freespace": "Free space",
+        "title": "vPools",
+        "sco_size": "SCO Size",
+        "statistics": "Statistics",
+        "write_buffer": "Write Buffer",
         "detail": {
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
@@ -261,7 +318,9 @@
             "logging": "vPool logs",
             "logginginfo1": "Open vStorage uses Logstash/Kibana for logging.",
             "logginginfo2": "Open Kibana",
-            "logginginfo3": "to view this vPool's logs."
+            "logginginfo3": "to view this vPool's logs.",
+            "configuration": "vPool configuration defaults",
+            "configurationinfo": "Below are the default/fallback values for this vPool's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine, from its vPool."
         },
         "sync": {
             "title": "Sync all vMachines using __what__",
@@ -274,7 +333,11 @@
             "donemsg": "All vMachines using vPool __what__ synced",
             "errormsg": "syncing all vMachines using __what__"
         },
-        "add": "Add new vPool"
+        "saveconfig": {
+            "done": "Save complete",
+            "donemsg": "The configuration details for __what__ are saved.",
+            "errormsg": "saving __what__"
+        }
     },
     "statistics": {
         "title": "Statistics",
@@ -326,7 +389,14 @@
             "snapshots": "Snapshots",
             "rollback": "Rollback",
             "setastemplate": "Set as vTemplate",
-            "snapshot": "Take snapshot"
+            "snapshot": "Take snapshot",
+            "configuration": "vDisk configuration defaults",
+            "configurationinfo": "Below are the default/fallback values for this vMachine's vDisks. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+        },
+        "saveconfig": {
+            "done": "Save complete",
+            "donemsg": "The configuration details for __what__ are saved.",
+            "errormsg": "saving __what__"
         }
     },
     "vdisks": {
@@ -336,7 +406,14 @@
         "detail": {
             "title": "vDisk",
             "snapshots": "Snapshots",
-            "rollback": "Rollback"
+            "rollback": "Rollback",
+            "configuration": "vDisk configuration",
+            "configurationinfo": "Below are specific configuration settings. If a vDisk has no specific settings, settings will be inherited from its vMachine, and if not set on the vMachine from its vPool."
+        },
+        "saveconfig": {
+            "done": "Save complete",
+            "donemsg": "The configuration details for __what__ are saved.",
+            "errormsg": "saving __what__"
         }
     },
     "vtemplates": {
@@ -604,6 +681,10 @@
         },
         "addvpool": {
             "title": "Add new vPool",
+            "gatherconfig": {
+                "basicinfo": "Specify the configurations for the vPool",
+                "incorrect_write_buffer": "Write buffer must be a positive number or empty"
+            },
             "gathervpool": {
                 "basicinfo": "Add basic vPool information",
                 "name": "Name:",
@@ -611,7 +692,6 @@
                 "backendtype": "BackendType:",
                 "host": "Host (FQDN/IP):",
                 "port": "Port:",
-                "timeout": "Timeout:",
                 "accesskey": "Access key:",
                 "secretkey": "Secret key:",
                 "invalidhost": "Invalid host (should be a FQDN or IP address)",
@@ -867,6 +947,7 @@
         "checked": "&#xf046;",
         "cog": "&#xf013;",
         "collapse": "&#xf147;",
+        "configuration": "&#xf013;",
         "consistent": "&#xf02e;",
         "delete": "&#xf014;",
         "disks": "&#xf0a0;",

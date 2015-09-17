@@ -81,7 +81,7 @@ class VMachineController(object):
         if len(storagerouters) == 1:
             target_storagerouter = storagerouters[0]
         else:
-            raise ValueError('Pmachine {} has no StorageRouter assigned to it'.format(pmachineguid))
+            raise ValueError('Pmachine {0} has no StorageRouter assigned to it'.format(pmachineguid))
         routing_key = "sr.{0}".format(target_storagerouter.machine_id)
 
         vpool = None
@@ -148,8 +148,8 @@ class VMachineController(object):
 
         disks = []
         disks_by_order = sorted(template_vm.vdisks, key=lambda x: x.order)
-        try:
-            for disk in disks_by_order:
+        for disk in disks_by_order:
+            try:
                 prefix = '{0}-clone'.format(disk.name)
                 result = VDiskController.create_from_template(
                     diskguid=disk.guid,
@@ -161,10 +161,10 @@ class VMachineController(object):
                 )
                 disks.append(result)
                 logger.debug('Disk appended: {0}'.format(result))
-        except Exception as exception:
-            logger.error('Creation of disk {0} failed: {1}'.format(disk.name, str(exception)), print_msg=True)
-            VMachineController.delete.s(machineguid=new_vm.guid).apply_async(routing_key = routing_key)
-            raise
+            except Exception as exception:
+                logger.error('Creation of disk {0} failed: {1}'.format(disk.name, str(exception)), print_msg=True)
+                VMachineController.delete.s(machineguid=new_vm.guid).apply_async(routing_key = routing_key)
+                raise
 
         try:
             result = target_hv.create_vm_from_template(
@@ -321,7 +321,7 @@ class VMachineController(object):
         new_name = hypervisor.clean_vmachine_filename(new_name)
         scenario = hypervisor.get_rename_scenario(old_name, new_name)
         if scenario == 'RENAME':
-            # Most likely a change from path. Updaing path
+            # Most likely a change from path. Updating path
             vm = VMachineList.get_by_devicename_and_vpool(old_name, vpool)
             if vm is not None:
                 vm.devicename = new_name
@@ -384,7 +384,7 @@ class VMachineController(object):
 
         snapshots = [snap for snap in vmachine.snapshots if snap['timestamp'] == timestamp]
         if not snapshots:
-            raise ValueError('No vmachine snapshots found for timestamp {}'.format(timestamp))
+            raise ValueError('No vmachine snapshots found for timestamp {0}'.format(timestamp))
 
         for disk in vmachine.vdisks:
             VDiskController.rollback(diskguid=disk.guid,
@@ -416,7 +416,7 @@ class VMachineController(object):
 
         # @todo: we now skip creating a snapshot when a vmachine's disks
         #        is missing a mandatory property: volume_id
-        #        subtask will now raise an exception earlier in the workflow
+        #        sub-task will now raise an exception earlier in the workflow
         for disk in machine.vdisks:
             if not disk.volume_id:
                 message = 'Missing volume_id on disk {0} - unable to create snapshot for vm {1}'.format(
@@ -427,16 +427,16 @@ class VMachineController(object):
 
         snapshots = {}
         success = True
-        try:
-            for disk in machine.vdisks:
+        for disk in machine.vdisks:
+            try:
                 snapshots[disk.guid] = VDiskController.create_snapshot(diskguid=disk.guid,
                                                                        metadata=metadata)
-        except Exception as ex:
-            logger.info('Error snapshotting disk {0}: {1}'.format(disk.name, str(ex)))
-            success = False
-            for diskguid, snapshotid in snapshots.iteritems():
-                VDiskController.delete_snapshot(diskguid=diskguid,
-                                                snapshotid=snapshotid)
+            except Exception as ex:
+                logger.info('Error taking snapshot of disk {0}: {1}'.format(disk.name, str(ex)))
+                success = False
+                for diskguid, snapshotid in snapshots.iteritems():
+                    VDiskController.delete_snapshot(diskguid=diskguid,
+                                                    snapshotid=snapshotid)
         logger.info('Create snapshot for vMachine {0}: {1}'.format(
             machine.name, 'Success' if success else 'Failure'
         ))
@@ -462,7 +462,7 @@ class VMachineController(object):
             try:
                 mgmt_center = Factory.get_mgmtcenter(vmachine.pmachine)
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
-                logger.info('Syncing vMachine (name {}) with Management center {}'.format(vmachine.name, vmachine.pmachine.mgmtcenter.name))
+                logger.info('Syncing vMachine (name {0}) with Management center {1}'.format(vmachine.name, vmachine.pmachine.mgmtcenter.name))
                 vm_object = mgmt_center.get_vm_agnostic_object(devicename=vmachine.devicename,
                                                                ip=storagedriver.storage_ip,
                                                                mountpoint=storagedriver.mountpoint)
@@ -471,16 +471,16 @@ class VMachineController(object):
 
         if vm_object is None and storagedriver_id is None and vmachine.hypervisor_id is not None and vmachine.pmachine is not None:
             try:
-                # Only the vmachine was received, so base the sync on hypervisorid and pmachine
+                # Only the vmachine was received, so base the sync on hypervisor id and pmachine
                 hypervisor = Factory.get(vmachine.pmachine)
-                logger.info('Syncing vMachine (name {})'.format(vmachine.name))
+                logger.info('Syncing vMachine (name {0})'.format(vmachine.name))
                 vm_object = hypervisor.get_vm_agnostic_object(vmid=vmachine.hypervisor_id)
             except Exception as ex:
                 logger.info('Error while fetching vMachine info from hypervisor: {0}'.format(str(ex)))
 
         if vm_object is None and storagedriver_id is not None and vmachine.devicename is not None:
             try:
-                # Storage Driver id was given, using the devicename instead (to allow hypervisorid updates
+                # Storage Driver id was given, using the devicename instead (to allow hypervisor id updates
                 # which can be caused by re-adding a vm to the inventory)
                 pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
                 storagedriver = StorageDriverList.get_by_storagedriver_id(storagedriver_id)
@@ -490,9 +490,9 @@ class VMachineController(object):
                 vmachine.pmachine = pmachine
                 vmachine.save()
 
-                logger.info('Syncing vMachine (device {}, ip {}, mtpt {})'.format(vmachine.devicename,
-                                                                                  storagedriver.storage_ip,
-                                                                                  storagedriver.mountpoint))
+                logger.info('Syncing vMachine (device {0}, ip {1}, mountpoint {2})'.format(vmachine.devicename,
+                                                                                           storagedriver.storage_ip,
+                                                                                           storagedriver.mountpoint))
                 vm_object = hypervisor.get_vm_object_by_devicename(devicename=vmachine.devicename,
                                                                    ip=storagedriver.storage_ip,
                                                                    mountpoint=storagedriver.mountpoint)
@@ -531,7 +531,7 @@ class VMachineController(object):
             else:
                 vpool = None
             pmachine = PMachineList.get_by_storagedriver_id(storagedriver_id)
-            mutex = VolatileMutex('{}_{}'.format(name, vpool.guid if vpool is not None else 'none'))
+            mutex = VolatileMutex('{0}_{1}'.format(name, vpool.guid if vpool is not None else 'none'))
             try:
                 mutex.acquire(wait=120)
                 limit = 5
@@ -596,7 +596,7 @@ class VMachineController(object):
             vmachine.save()
             # Updating and linking disks
             storagedrivers = StorageDriverList.get_storagedrivers()
-            datastores = dict([('{}:{}'.format(storagedriver.storage_ip, storagedriver.mountpoint), storagedriver) for storagedriver in storagedrivers])
+            datastores = dict([('{0}:{1}'.format(storagedriver.storage_ip, storagedriver.mountpoint), storagedriver) for storagedriver in storagedrivers])
             vdisk_guids = []
             for disk in vm_object['disks']:
                 if disk['datastore'] in vm_object['datastores']:
@@ -634,12 +634,30 @@ class VMachineController(object):
                     vdisk.vmachine = None
                     vdisk.save()
 
-            logger.info('Updating vMachine finished (name {}, {} vdisks (re)linked)'.format(
+            logger.info('Updating vMachine finished (name {0}, {1} vdisks (re)linked)'.format(
                 vmachine.name, vdisks_synced
             ))
         except Exception as ex:
             logger.info('Error during vMachine update: {0}'.format(str(ex)))
             raise
+
+    @staticmethod
+    @celery.task(name='ovs.machine.set_config_params')
+    def set_config_params(vmachine_guid, config_params):
+        """
+        Sets configuration parameters to a given vmachine/vdisk.
+        """
+        vmachine = VMachine(vmachine_guid)
+        resolved_configs = dict((vdisk.guid, vdisk.resolved_configuration) for vdisk in vmachine.vdisks)
+        vmachine.configuration = config_params
+        vmachine.save()
+        for vdisk in vmachine.vdisks:
+            vdisk.invalidate_dynamics(['resolved_configuration'])
+            old_resolved_config = resolved_configs[vdisk.guid]
+            new_resolved_config = vdisk.resolved_configuration
+            for key, value in config_params.iteritems():
+                if old_resolved_config.get(key) != new_resolved_config.get(key):
+                    logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))
 
     @staticmethod
     @celery.task(name='ovs.machine.update_vmachine_name')
@@ -672,7 +690,7 @@ class VMachineController(object):
             return
 
         vpool = vmachine.vpool
-        mutex = VolatileMutex('{}_{}'.format(old_name, vpool.guid if vpool is not None else 'none'))
+        mutex = VolatileMutex('{0}_{1}'.format(old_name, vpool.guid if vpool is not None else 'none'))
         try:
             mutex.acquire(wait=5)
             vmachine.name = new_name

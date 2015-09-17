@@ -1289,6 +1289,31 @@ class Basic(TestCase):
         machine.save()
         disk1.save()
 
+    def test_invalidate_dynamics(self):
+        """
+        Validates whether the invalidate_dynamics call actually works.
+        """
+        disk = TestDisk()
+        disk.__dict__['dynamic_value'] = 0
+        disk.dynamic_value = 0
+        disk.name = 'test'
+        disk.save()
+        value = disk.updatable
+        self.assertEqual(value, 0, 'Dynamic should be 0')
+        disk.dynamic_value = 5
+        value = disk.updatable
+        self.assertEqual(value, 0, 'Dynamic should still be 0 ({0})'.format(value))
+        time.sleep(5)
+        value = disk.updatable
+        self.assertEqual(value, 5, 'Dynamic should be 5 now ({0})'.format(value))
+        disk.dynamic_value = 10
+        value = disk.updatable
+        self.assertEqual(value, 5, 'Dynamic should still be 5 ({0})'.format(value))
+        disk.invalidate_dynamics(['updatable'])
+        value = disk.updatable
+        self.assertEqual(value, 10, 'Dynamic should be 10 now ({0})'.format(value))
+
+
 if __name__ == '__main__':
     import unittest
     suite = unittest.TestLoader().loadTestsFromTestCase(Basic)

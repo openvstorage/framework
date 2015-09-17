@@ -122,13 +122,13 @@ class StorageDriverConfiguration(object):
     # DO NOT MAKE MANUAL CHANGES HERE
 
     parameters = {
-        # hg branch: 3.6
-        # hg revision: 4d71655c8b41
-        # buildTime: Tue Aug  4 07:18:42 UTC 2015
+        # hg branch: 3.6-dev
+        # hg revision: 388879da12d6
+        # buildTime: Thu Sep 17 10:25:33 UTC 2015
         'metadataserver': {
             'backend_connection_manager': {
-                'optional': ['backend_connection_pool_capacity', 'backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
-                'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
+                'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
+                'mandatory': ['local_connection_path', ]
             },
             'metadata_server': {
                 'optional': ['mds_db_type', 'mds_cached_pages', 'mds_poll_secs', 'mds_timeout_secs', 'mds_threads', 'mds_nodes', ],
@@ -137,8 +137,8 @@ class StorageDriverConfiguration(object):
         },
         'storagedriver': {
             'backend_connection_manager': {
-                'optional': ['backend_connection_pool_capacity', 'backend_type', 'rest_connection_host', 'rest_connection_port', 'rest_connection_timeout_secs', 'rest_connection_metadata_format', 'rest_connection_entries_per_chunk', 'rest_connection_verbose_logging', 'rest_connection_user', 'rest_connection_password', 'rest_connection_encryption_policy', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
-                'mandatory': ['rest_connection_policy_id', 'local_connection_path', ]
+                'optional': ['backend_connection_pool_capacity', 'backend_type', 's3_connection_host', 's3_connection_port', 's3_connection_username', 's3_connection_password', 's3_connection_verbose_logging', 's3_connection_use_ssl', 's3_connection_ssl_verify_host', 's3_connection_ssl_cert_file', 's3_connection_flavour', 'alba_connection_host', 'alba_connection_port', 'alba_connection_timeout', 'alba_connection_preset', ],
+                'mandatory': ['local_connection_path', ]
             },
             'content_addressed_cache': {
                 'optional': ['serialize_read_cache', 'clustercache_mount_points', ],
@@ -157,7 +157,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': ['fd_cache_path', 'fd_namespace', ]
             },
             'filesystem': {
-                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_cache_dentries', ],
+                'optional': ['fs_ignore_sync', 'fs_raw_disk_suffix', 'fs_max_open_files', 'fs_file_event_rules', 'fs_metadata_backend_type', 'fs_metadata_backend_arakoon_cluster_id', 'fs_metadata_backend_arakoon_cluster_nodes', 'fs_metadata_backend_mds_nodes', 'fs_metadata_backend_mds_apply_relocations_to_slaves', 'fs_cache_dentries', ],
                 'mandatory': ['fs_virtual_disk_format', ]
             },
             'metadata_server': {
@@ -173,7 +173,7 @@ class StorageDriverConfiguration(object):
                 'mandatory': []
             },
             'volume_manager': {
-                'optional': ['open_scos_per_volume', 'foc_throttle_usecs', 'foc_queue_depth', 'foc_write_trigger', 'sap_persist_interval', 'failovercache_check_interval_in_seconds', 'read_cache_default_behaviour', 'required_tlog_freespace', 'required_meta_freespace', 'freespace_check_interval', 'number_of_scos_in_tlog', 'non_disposable_scos_factor', 'debug_metadata_path', 'arakoon_metadata_sequence_size', ],
+                'optional': ['open_scos_per_volume', 'foc_throttle_usecs', 'foc_queue_depth', 'foc_write_trigger', 'sap_persist_interval', 'failovercache_check_interval_in_seconds', 'read_cache_default_behaviour', 'read_cache_default_mode', 'required_tlog_freespace', 'required_meta_freespace', 'freespace_check_interval', 'number_of_scos_in_tlog', 'non_disposable_scos_factor', 'debug_metadata_path', 'arakoon_metadata_sequence_size', ],
                 'mandatory': ['metadata_path', 'tlog_path', 'clean_interval', ]
             },
             'volume_registry': {
@@ -310,15 +310,11 @@ class StorageDriverConfiguration(object):
 
     def _validate(self):
         """
-        Validates the loaded configuration agains the mandatory and optional parameters
+        Validates the loaded configuration against the mandatory and optional parameters
         """
         # Fix some manual "I know what I'm doing" overrides
         backend_connection_manager = 'backend_connection_manager'
         backend_type = 'backend_type'
-        if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'REST':
-            if 'rest_connection_policy_id' in self.params[self.config_type][backend_connection_manager]['mandatory']:
-                self.params[self.config_type][backend_connection_manager]['mandatory'].remove('rest_connection_policy_id')
-                self.params[self.config_type][backend_connection_manager]['optional'].append('rest_connection_policy_id')
         if self.configuration.get(backend_connection_manager, {}).get(backend_type, '') != 'LOCAL':
             if 'local_connection_path' in self.params[self.config_type][backend_connection_manager]['mandatory']:
                 self.params[self.config_type][backend_connection_manager]['mandatory'].remove('local_connection_path')
