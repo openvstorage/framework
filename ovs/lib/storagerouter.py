@@ -145,7 +145,7 @@ class StorageRouterController(object):
                                                                   'dedupe_mode': (str, dedupe_mapping.keys()),
                                                                   'dtl_enabled': (bool, None),
                                                                   'dtl_location': (str, None),
-                                                                  'write_buffer': (int, None),
+                                                                  'write_buffer': (int, None, False),
                                                                   'cache_strategy': (str, cache_mapping.keys())}),
                                          'connection_host': (str, Toolbox.regex_ip, False),
                                          'connection_port': (int, None),
@@ -543,11 +543,22 @@ class StorageRouterController(object):
             storagedriver_config.configure_backend_connection_manager(**vpool.metadata)
 
         if 'config_params' in parameters:
-            # sco_factor = write buffer (in GiB) / tlog multiplier (default 20) / sco size (in MiB)
-            sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / 20 / parameters['config_params']['sco_size']
+            sco_size = parameters['config_params']['sco_size']
+            if 'write_buffer' in parameters['config_params']:
+                # sco_factor = write buffer (in GiB) / tlog multiplier (default 20) / sco size (in MiB)
+                sco_factor = parameters['config_params']['write_buffer'] * 1024.0 / 20 / sco_size
+            else:
+                # Below table makes sure the write buffer is always between 1 and 5 GiG
+                sco_factor = {4: 12,
+                              8: 12,
+                              16: 12,
+                              32: 6,
+                              64: 3,
+                              128: 2}[sco_size]
+
             dedupe_mode = parameters['config_params']['dedupe_mode']
             cache_strategy = parameters['config_params']['cache_strategy']
-            sco_multiplier = parameters['config_params']['sco_size'] / 4 * 1024  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB)
+            sco_multiplier = sco_size / 4 * 1024  # sco multiplier = SCO size (in MiB) / cluster size (currently 4KiB)
         else:
             sco_factor = 12
             dedupe_mode = deduped

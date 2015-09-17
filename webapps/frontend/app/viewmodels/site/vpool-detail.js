@@ -65,7 +65,6 @@ define([
         self.storageRoutersLoaded      = ko.observable(false);
         self.updatingStorageRouters    = ko.observable(false);
         self.vPool                     = ko.observable();
-        self.dtlLocation               = ko.observable();
         self.storageRouters            = ko.observableArray([]);
         self.checkedStorageRouterGuids = ko.observableArray([]);
 
@@ -97,6 +96,7 @@ define([
                 var vpool = self.vPool();
                 $.when.apply($, [
                     vpool.load('storagedrivers,vdisks,_dynamics,backend_type'),
+                    vpool.loadConfiguration(),
                     vpool.loadStorageRouters()
                         .then(function() {
                             if (self.checksInit === false) {
@@ -358,30 +358,6 @@ define([
             deferred.always(function() {
                 self.updatingStorageRouters(false);
             });
-        };
-        self.saveConfiguration = function() {
-            if (self.vPool() !== undefined) {
-                var vp = self.vPool();
-                api.post('vpools/' + vp.guid() + '/set_config_params', {
-                    data: { config_params: vp.newConfiguration() }
-                })
-                    .then(self.shared.tasks.wait)
-                    .done(function () {
-                        generic.alertSuccess(
-                            $.t('ovs:vpools.saveconfig.done'),
-                            $.t('ovs:vpools.saveconfig.donemsg', { what: vp.name() })
-                        );
-                    })
-                    .fail(function (error) {
-                        generic.alertError(
-                            $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile_error', {
-                                what: $.t('ovs:vpools.saveconfig.errormsg', { what: vp.name() }),
-                                error: error
-                            })
-                        );
-                    });
-            }
         };
 
         // Durandal

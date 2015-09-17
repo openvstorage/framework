@@ -252,8 +252,8 @@
                 "cache_strategies": {
                     "none": "No Cache",
                     "null": "-",
-                    "onread": "On Read",
-                    "onwrite": "On Write"
+                    "onread": "Cache On Read",
+                    "onwrite": "Cache On Write"
                 },
                 "caching": "Caching",
                 "dedupe": "Deduplication",
@@ -268,7 +268,7 @@
                 "dtl": "Distributed Transaction Log",
                 "dtl_enable": "Enable",
                 "dtl_help_message": "The Distributed Transaction Log does a bunch of stuff",
-                "dtl_help_title": "Help - Distributed Transaction Log",
+                "dtl_help_title": "Distributed Transaction Log",
                 "dtl_location": "Location",
                 "dtl_mode": "Mode",
                 "dtl_modes": {
@@ -291,13 +291,23 @@
         }
     },
     "vpools" : {
-        "title": "vPools",
-        "backendtype": "Type",
+        "add": "Add new vPool",
+        "backend": "Backend",
         "backendconnection": "Connection",
         "backendlogin": "Login",
-        "statistics": "Statistics",
-        "backend": "Backend",
+        "backendtype": "Type",
+        "cache_strategy": "Cache Strategy",
+        "configuration": "Configurations",
+        "dedupe_mode": "Dedupe Mode",
+        "dtl": "DTL",
+        "dtl_disabled": "Disabled",
+        "dtl_location": "DTL Location",
+        "dtl_mode": "DTL Mode",
         "freespace": "Free space",
+        "title": "vPools",
+        "sco_size": "SCO Size",
+        "statistics": "Statistics",
+        "write_buffer": "Write Buffer",
         "detail": {
             "title": "vPool",
             "introduction": "Below an overview of the vPool properties.",
@@ -327,8 +337,7 @@
             "done": "Save complete",
             "donemsg": "The configuration details for __what__ are saved.",
             "errormsg": "saving __what__"
-        },
-        "add": "Add new vPool"
+        }
     },
     "statistics": {
         "title": "Statistics",

@@ -72,7 +72,7 @@ define([
         data.mgmtcenterType(undefined);
         data.mgmtcenterName(undefined);
         data.mgmtcenterLoaded(undefined);
-        data.cacheStrategy('onwrite');
+        data.cacheStrategy('onread');
         data.dedupeMode('dedupe');
         data.dtlEnabled(true);
         data.dtlLocation('');

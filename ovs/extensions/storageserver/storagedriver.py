@@ -324,7 +324,7 @@ class StorageDriverConfiguration(object):
 
     def _validate(self):
         """
-        Validates the loaded configuration agains the mandatory and optional parameters
+        Validates the loaded configuration against the mandatory and optional parameters
         """
         # Fix some manual "I know what I'm doing" overrides
         backend_connection_manager = 'backend_connection_manager'

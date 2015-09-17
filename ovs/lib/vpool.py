@@ -16,16 +16,18 @@
 VPool module
 """
 
+import math
 from ovs.celery_run import celery
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.extensions.fs.exportfs import Nfsexports
-from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.hypervisor.factory import Factory
 from ovs.lib.vmachine import VMachineController
 from ovs.lib.helpers.decorators import log
 from ovs.log.logHandler import LogHandler
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
 
 logger = LogHandler.get('lib', name='vpool')
 
@@ -83,19 +85,48 @@ class VPoolController(object):
         return True
 
     @staticmethod
-    @celery.task(name='ovs.vpool.set_config_params')
-    def set_config_params(vpool_guid, config_params):
-        """
-        Sets configuration parameters to a given vpool/vdisk.
-        """
+    @celery.task(name='ovs.vpool.get_configuration')
+    def get_configuration(vpool_guid):
         vpool = VPool(vpool_guid)
-        resolved_configs = dict((vdisk.guid, vdisk.resolved_configuration) for vdisk in vpool.vdisks)
-        vpool.configuration = config_params
-        vpool.save()
-        for vdisk in vpool.vdisks:
-            vdisk.invalidate_dynamics(['resolved_configuration'])
-            old_resolved_config = resolved_configs[vdisk.guid]
-            new_resolved_config = vdisk.resolved_configuration
-            for key, value in config_params.iteritems():
-                if old_resolved_config.get(key) != new_resolved_config.get(key):
-                    logger.info('Updating property {0} on vDisk {1} to {2}'.format(key, vdisk.guid, new_resolved_config.get(key)))
+        if not vpool.storagedrivers or not vpool.storagedrivers[0].storagerouter:
+            return {}
+
+        onread = 'CacheOnRead'
+        onwrite = 'CacheOnWrite'
+        deduped = 'ContentBased'
+        non_deduped = 'LocationBased'
+        cache_mapping = {None: 'none',
+                         onread: 'onread',
+                         onwrite: 'onwrite'}
+        dedupe_mapping = {deduped: 'dedupe',
+                          non_deduped: 'nondedupe'}
+        dtl_mode_mapping = {'': 'sync',
+                            '': 'async',
+                            '': 'nosync'}
+
+        client = SSHClient(vpool.storagedrivers[0].storagerouter)
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+        storagedriver_config.load(client)
+
+        volume_router = storagedriver_config.configuration.get('volume_router', {})
+        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+
+        dedupe_mode = volume_manager.get('read_cache_default_mode', 'ContentBased')
+        cache_strategy = volume_manager.get('read_cache_default_behaviour', 'CacheOnRead')
+        sco_multiplier = volume_router.get('vrouter_sco_multiplier', 1024)
+        tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
+        non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
+
+        dtl_mode = storagedriver_config.configuration.get('', {}).get('', None)
+        sco_size = sco_multiplier * 4 / 1024  # SCO size is in MiB ==> SCO multiplier * cluster size (4 KiB by default)
+        dtl_enabled = storagedriver_config.configuration.get('', {}).get('', None)
+        dtl_location = storagedriver_config.configuration.get('', {}).get('', None)
+        write_buffer = int(math.ceil(tlog_multiplier * sco_size * non_disposable_sco_factor / 1024.0))  # SCO size is in MiB, but write buffer must be GiB
+
+        return {'sco_size': sco_size,
+                'dtl_mode': dtl_mode,
+                'dtl_enabled': dtl_enabled,  # @TODO: Must be boolean value once implemented correctly
+                'dedupe_mode': dedupe_mapping[dedupe_mode],
+                'write_buffer': int(write_buffer),
+                'dtl_location': dtl_location,
+                'cache_strategy': cache_mapping[cache_strategy]}

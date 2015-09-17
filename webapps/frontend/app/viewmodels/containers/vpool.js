@@ -13,20 +13,21 @@
 // limitations under the License.
 /*global define */
 define([
-    'jquery', 'knockout',
+    'jquery', 'knockout', 'ovs/shared',
     'ovs/generic', 'ovs/api',
     'viewmodels/containers/backendtype', 'viewmodels/containers/vdisk', 'viewmodels/containers/vmachine'
-], function($, ko, generic, api, BackendType, VDisk, VMachine) {
+], function($, ko, shared, generic, api, BackendType, VDisk, VMachine) {
     "use strict";
     return function(guid) {
         var self = this;
 
         // Variables
-        self.configurableStorageDriverAttrs = ['cache_strategy', 'dedupe_mode', 'dtl_enabled', 'dtl_mode', 'sco_size', 'write_buffer'];
+        self.shared = shared;
 
         // Handles
         self.loadHandle          = undefined;
         self.diskHandle          = undefined;
+        self.loadConfig          = undefined;
         self.machineHandle       = undefined;
         self.storageRouterHandle = undefined;
 
@@ -35,8 +36,7 @@ define([
         self.loaded             = ko.observable(false);
         self.guid               = ko.observable(guid);
         self.name               = ko.observable();
-        self.oldConfiguration   = ko.observable();
-        self.newConfiguration   = ko.observable();
+        self.configuration      = ko.observable();
         self.size               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
         self.iops               = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatNumber });
         self.storedData         = ko.observable().extend({ smooth: {} }).extend({ format: generic.formatBytes });
@@ -57,11 +57,6 @@ define([
         self.vMachines          = ko.observableArray([]);
         self.storageRouterGuids = ko.observableArray([]);
         self.storageDriverGuids = ko.observableArray([]);
-        self.cacheStrategies    = ko.observableArray([undefined, { name: 'onread' }, { name: 'onwrite' }, { name: 'none' }]);
-        self.dtlModes           = ko.observableArray([undefined, { name: 'nosync' }, { name: 'async' }, { name: 'sync' }]);
-        self.dedupeModes        = ko.observableArray([undefined, { name: 'dedupe' }, { name: 'nondedupe' }]);
-        self.dtlOptions         = ko.observableArray([undefined, { value: true }, { value: false }]);
-        self.scoSizes           = ko.observableArray([undefined, 4, 8, 16, 32, 64, 128]);
 
         // Computed
         self.cacheRatio = ko.computed(function() {
@@ -81,143 +76,6 @@ define([
             var total = (self.readSpeed.raw() || 0) + (self.writeSpeed.raw() || 0);
             return generic.formatSpeed(total);
         });
-        self.configCacheStrategy = ko.computed({
-            read: function() {
-                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('cache_strategy')) {
-                    if (self.newConfiguration().cache_strategy === null) {
-                        return undefined;
-                    }
-                    return { name: self.newConfiguration().cache_strategy };
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.newConfiguration();
-                if (value === undefined) {
-                    target.cache_strategy = null;
-                } else {
-                    target.cache_strategy = value.name;
-                }
-                self.newConfiguration(target);
-            }
-        });
-        self.dedupeMode = ko.computed({
-            read: function() {
-                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dedupe_mode')) {
-                    if (self.newConfiguration().dedupe_mode === null) {
-                        return undefined;
-                    }
-                    return { name: self.newConfiguration().dedupe_mode };
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.newConfiguration();
-                if (value === undefined) {
-                    target.dedupe_mode = null;
-                } else {
-                    target.dedupe_mode = value.name;
-                }
-                self.newConfiguration(target);
-            }
-        });
-        self.dtlEnable = ko.computed({
-            read: function() {
-                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dtl_enabled')) {
-                    if (self.newConfiguration().dtl_enabled === null) {
-                        return undefined;
-                    }
-                    return self.newConfiguration().dtl_enabled;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.newConfiguration();
-                if (value === undefined) {
-                    target.dtl_enabled = null;
-                } else {
-                    target.dtl_enabled = value;
-                }
-                self.newConfiguration(target);
-            }
-        });
-        self.dtlMode = ko.computed({
-            read: function() {
-                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('dtl_mode')) {
-                    if (self.newConfiguration().dtl_mode === null) {
-                        return undefined;
-                    }
-                    return { name: self.newConfiguration().dtl_mode };
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.newConfiguration();
-                if (value === undefined) {
-                    target.dtl_mode = null;
-                } else {
-                    target.dtl_mode = value.name;
-                }
-                self.newConfiguration(target);
-            }
-        });
-        self.scoSize = ko.computed({
-            read: function() {
-                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('sco_size')) {
-                    if (self.newConfiguration().sco_size === null) {
-                        return undefined;
-                    }
-                    return self.newConfiguration().sco_size;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.newConfiguration();
-                if (value === undefined) {
-                    target.sco_size = null;
-                } else {
-                    target.sco_size = value;
-                }
-                self.newConfiguration(target);
-            }
-        });
-        self.writeBuffer = ko.computed({
-            read: function() {
-                if (self.newConfiguration() !== undefined && self.newConfiguration().hasOwnProperty('write_buffer')) {
-                    if (self.newConfiguration().write_buffer === null) {
-                        return undefined;
-                    }
-                    return self.newConfiguration().write_buffer;
-                }
-                return undefined;
-            },
-            write: function(value) {
-                var target = self.newConfiguration();
-                if (value === '') {
-                    target.write_buffer = null;
-                } else {
-                    target.write_buffer = parseInt(value, 10);
-                    if (isNaN(target.write_buffer)) {
-                        delete target.write_buffer;
-                    } else if (target.write_buffer === 0) {
-                        target.write_buffer = null;
-                    }
-                }
-                self.newConfiguration(target);
-            }
-        }).extend({ notify: 'always' });
-        self.configChanged = ko.computed(function() {
-            var changed = false;
-            if (self.newConfiguration() !== undefined && self.oldConfiguration() !== undefined) {
-                $.each(self.configurableStorageDriverAttrs, function (i, key) {
-                    if (self.newConfiguration()[key] !== self.oldConfiguration()[key]) {
-                        changed = true;
-                        return false;
-                    }
-                });
-            }
-            return changed;
-        });
 
         // Functions
         self.fillData = function(data, options) {
@@ -227,18 +85,6 @@ define([
             generic.trySet(self.size, data, 'size');
             generic.trySet(self.backendConnection, data, 'connection');
             generic.trySet(self.backendLogin, data, 'login');
-            if (data.hasOwnProperty('configuration')) {
-                if (self.newConfiguration() === undefined) {
-                    self.newConfiguration($.extend({}, data.configuration));
-                }
-                if (self.oldConfiguration() === undefined) {
-                    self.oldConfiguration($.extend({}, data.configuration));
-                }
-                var target = self.newConfiguration();
-                generic.merge(self.oldConfiguration(), data.configuration, target, self.configurableStorageDriverAttrs);
-                self.newConfiguration(target);
-                self.oldConfiguration($.extend({}, data.configuration));
-            }
             if (data.hasOwnProperty('backend_type_guid')) {
                 self.backendTypeGuid(data.backend_type_guid);
             } else {
@@ -334,6 +180,17 @@ define([
                     .always(function() {
                         self.loading(false);
                     });
+            }).promise();
+        };
+        self.loadConfiguration = function() {
+            return $.Deferred(function(deferred) {
+                self.loadConfig = api.get('vpools/' + self.guid() + '/get_configuration')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        self.configuration(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
             }).promise();
         };
         self.loadStorageRouters = function() {
