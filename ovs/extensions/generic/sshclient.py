@@ -151,15 +151,19 @@ class SSHClient(object):
             return
 
         try:
-            self.client.connect(self.ip, username=self.username, password=self.password)
+            try:
+                self.client.connect(self.ip, username=self.username, password=self.password)
+            except:
+                try:
+                    self.client.close()
+                except:
+                    pass
+                raise
         except socket.error as ex:
             if 'No route to host' in str(ex):
                 message = 'SocketException: No route to host {0}'.format(self.ip)
                 logger.error(message)
                 raise UnableToConnectException(message)
-            raise
-        except paramiko.AuthenticationException:
-            self.client.close()
             raise
 
     def _disconnect(self):
