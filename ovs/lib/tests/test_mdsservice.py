@@ -145,17 +145,27 @@ class MDSServices(TestCase):
         service_type = ServiceType()
         service_type.name = 'MetadataServer'
         service_type.save()
+        backend_type = BackendType()
+        backend_type.name = 'BackendType'
+        backend_type.code = 'BT'
+        backend_type.save()
+        pmachine = PMachine()
+        pmachine.name = 'PMachine'
+        pmachine.username = 'root'
+        pmachine.ip = '127.0.0.1'
+        pmachine.hvtype = 'VMWARE'
+        pmachine.save()
         for vpool_id in structure['vpools']:
             vpool = VPool()
             vpool.name = str(vpool_id)
-            vpool.backend_type = BackendType()
+            vpool.backend_type = backend_type
             vpool.save()
             vpools[vpool_id] = vpool
         for sr_id in structure['storagerouters']:
             storagerouter = StorageRouter()
             storagerouter.name = str(sr_id)
             storagerouter.ip = '10.0.0.{0}'.format(sr_id)
-            storagerouter.pmachine = PMachine()
+            storagerouter.pmachine = pmachine
             storagerouter.save()
             storagerouters[sr_id] = storagerouter
         for sd_info in structure['storagedrivers']:
