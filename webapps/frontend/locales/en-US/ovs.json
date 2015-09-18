@@ -745,12 +745,14 @@
             },
             "confirm": {
                 "basicinfo": "Validate the basic vPool information.",
-                "storagerouterinfo": "Validate whether the correct Storage Router was selected.",
-                "mountpoints": "Validate whether mountpoints and connection information are correct.",
-                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
-                "started": "Creation started",
-                "inprogress": "Creation of vPool __what__ is started.",
+                "configuration": "Validate the configuration settings.",
                 "creating": "creating the vPool",
+                "dtl_location": "DTL Location:",
+                "extra": "If the above information is correct, press &quot;Finish&quot; to start the provisioning. This can take a minute or two. Do not forget to mount the vPool on the host after completion.",
+                "inprogress": "Creation of vPool __what__ is started.",
+                "mountpoints": "Validate whether mountpoints and connection information are correct.",
+                "started": "Creation started",
+                "storagerouterinfo": "Validate whether the correct Storage Router was selected.",
                 "success": "Creation of vPool __what__ finished."
             }
         },

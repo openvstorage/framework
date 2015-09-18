@@ -74,7 +74,7 @@ define([
         data.mgmtcenterLoaded(undefined);
         data.cacheStrategy('onread');
         data.dedupeMode('dedupe');
-        data.dtlEnabled(true);
+        data.dtlEnabled(false);
         data.dtlLocation('');
         data.dtlMode('nosync');
         data.scoSize(4);
