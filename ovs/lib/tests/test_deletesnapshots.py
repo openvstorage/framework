@@ -183,7 +183,7 @@ class DeleteSnapshots(TestCase):
 
             # Validate snapshots
             print '- Validating snapshots'
-            for vdisk in [vdisk_3]:  # [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
+            for vdisk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
                 self._validate(vdisk, d, now, amount_of_days, debug)
 
             # During the day, snapshots are taken
@@ -194,28 +194,33 @@ class DeleteSnapshots(TestCase):
                 timestamp = base_timestamp + (hour * h)
                 for vm in [vmachine_1, vmachine_2]:
                     VMachineController.snapshot(machineguid=vm.guid,
-                                                label='ss_i_{}:00'.format(str(h)),
+                                                label='ss_i_{0}:00'.format(str(h)),
                                                 is_consistent=False,
                                                 timestamp=timestamp)
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
                         VMachineController.snapshot(machineguid=vm.guid,
-                                                    label='ss_c_{}:30'.format(str(h)),
+                                                    label='ss_c_{0}:30'.format(str(h)),
                                                     is_consistent=True,
                                                     timestamp=ts)
 
                 VDiskController.create_snapshot(diskguid=vdisk_3.guid,
-                                                metadata={'label': 'ss_i_{}:00'.format(str(h)),
+                                                metadata={'label': 'ss_i_{0}:00'.format(str(h)),
                                                           'is_consistent': False,
-                                                          'timestamp': timestamp,
+                                                          'timestamp': str(timestamp),
                                                           'machineguid': None})
                 if h in [6, 12, 18]:
                     ts = (timestamp + (minute * 30))
                     VDiskController.create_snapshot(diskguid=vdisk_3.guid,
-                                                    metadata={'label': 'ss_c_{}:30'.format(str(h)),
+                                                    metadata={'label': 'ss_c_{0}:30'.format(str(h)),
                                                               'is_consistent': True,
-                                                              'timestamp': ts,
+                                                              'timestamp': str(ts),
                                                               'machineguid': None})
+
+            for vdisk in [vdisk_1_1, vdisk_1_2, vdisk_2_1, vdisk_3]:
+                consistent = [s['timestamp'] for s in vdisk.snapshots if s['is_consistent'] is True]
+                inconsistent = [s['timestamp'] for s in vdisk.snapshots if s['is_consistent'] is False]
+                print '  - {0}: {1} consistent, {2} inconsistent'.format(vdisk.name, len(consistent), len(inconsistent))
 
     def _validate(self, vdisk, current_day, initial_timestamp, amount_of_days, debug):
         """
@@ -234,14 +239,16 @@ class DeleteSnapshots(TestCase):
         hour = minute * 60
         day = hour * 24
 
+        print '  - {0}'.format(vdisk.name)
+
         # Visualisation
         if debug:
             snapshots = {}
             for snapshot in vdisk.snapshots:
-                snapshots[snapshot['timestamp']] = snapshot
+                snapshots[int(snapshot['timestamp'])] = snapshot
             for d in xrange(0, amount_of_days):
                 timestamp = initial_timestamp + (d * day)
-                visual = '  - {} '.format(datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'))
+                visual = '    - {0} {1} '.format(datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d'), timestamp)
                 for t in xrange(timestamp, timestamp + day, minute * 30):
                     if t in snapshots:
                         visual += 'C' if snapshots[t]['is_consistent'] else 'R'
@@ -249,9 +256,9 @@ class DeleteSnapshots(TestCase):
                         visual += '-'
                 print visual
 
-        consistent = [s['timestamp'] for s in vdisk.snapshots if s['is_consistent'] is True]
-        inconsistent = [s['timestamp'] for s in vdisk.snapshots if s['is_consistent'] is False]
-        print '  - {} consistent, {} inconsistent'.format(len(consistent), len(inconsistent))
+        consistent = [int(s['timestamp']) for s in vdisk.snapshots if s['is_consistent'] is True]
+        inconsistent = [int(s['timestamp']) for s in vdisk.snapshots if s['is_consistent'] is False]
+        print '    - {0} consistent, {1} inconsistent'.format(len(consistent), len(inconsistent))
 
         # Check for correct amount of snapshots
         amount_consistent = 0
@@ -269,13 +276,13 @@ class DeleteSnapshots(TestCase):
             pointer += 7
         self.assertEqual(
             len(consistent), amount_consistent,
-            'Wrong amount of consistent snapshots: {} vs expected {}'.format(len(consistent),
-                                                                             amount_consistent)
+            'Wrong amount of consistent snapshots: {0} vs expected {1}'.format(len(consistent),
+                                                                               amount_consistent)
         )
         self.assertEqual(
             len(inconsistent), amount_inconsistent,
-            'Wrong amount of inconsistent snapshots: {} vs expected {}'.format(len(inconsistent),
-                                                                               amount_inconsistent)
+            'Wrong amount of inconsistent snapshots: {0} vs expected {1}'.format(len(inconsistent),
+                                                                                 amount_inconsistent)
         )
 
         # Check of the correctness of the snapshot timestamp
@@ -285,32 +292,32 @@ class DeleteSnapshots(TestCase):
                     timestamp = initial_timestamp + (d * day) + (hour * h)
                     self.assertIn(
                         timestamp, inconsistent,
-                        'Expected hourly inconsistent snapshot at {}'.format(
-                            datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+                        'Expected hourly inconsistent snapshot for {0} at {1}'.format(
+                            vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
                         )
                     )
                     if h in [6, 12, 18]:
                         ts = (timestamp + (minute * 30))
                         self.assertIn(
                             ts, consistent,
-                            'Expected random consistent snapshot at {}'.format(
-                                datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
+                            'Expected random consistent snapshot for {0} at {1}'.format(
+                                vdisk.name, datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
                             )
                         )
             elif d > (current_day - 7):
                 timestamp = initial_timestamp + (day * d) + (hour * 18) + (minute * 30)
                 self.assertIn(
                     timestamp, consistent,
-                    'Expected daily consistent snapshot at {}'.format(
-                        datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+                    'Expected daily consistent snapshot for {0} at {1}'.format(
+                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
                     )
                 )
             elif d % 7 == 0 and d > 28:
                 timestamp = initial_timestamp + (day * d) + (hour * 18) + (minute * 30)
                 self.assertIn(
                     timestamp, consistent,
-                    'Expected weekly consistent snapshot at {}'.format(
-                        datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
+                    'Expected weekly consistent snapshot for {0} at {1}'.format(
+                        vdisk.name, datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M')
                     )
                 )
 
