@@ -1497,7 +1497,8 @@ class SetupController(object):
 [
    {{rabbit, [{{tcp_listeners, [{0}]}},
               {{default_user, <<"{1}">>}},
-              {{default_pass, <<"{2}">>}}]}}
+              {{default_pass, <<"{2}">>}},
+              {{vm_memory_high_watermark, 0.2}}]}}
 ].
 EOF
 """.format(rabbitmq_port, rabbitmq_login, rabbitmq_password))
