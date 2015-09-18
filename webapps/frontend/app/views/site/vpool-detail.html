@@ -290,7 +290,7 @@ limitations under the License.
                                                     </button>
                                                     <span class="fa-stack">
                                                         <i data-bind="click: function() { $root.reconfigurePmachine(guid(), true); },
-                                                                      tooltip: pMachine().isVPoolConfigured()[$root.vPool().guid()] ? '' : 'ovs:wizards.linkhosts.gather.configure',
+                                                                      tooltip: (pMachine() !== undefined && pMachine().isVPoolConfigured()[$root.vPool().guid()]) ? '' : 'ovs:wizards.linkhosts.gather.configure',
                                                                       visible: $root.updatingStorageRouters() === false &&
                                                                                pMachine() !== undefined &&
                                                                                !(pMachine().mgmtCenterGuid() === undefined || pMachine().mgmtCenterGuid() === null)"
