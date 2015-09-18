@@ -99,14 +99,24 @@ class DeleteSnapshots(TestCase):
         """
         # Setup
         # There are 2 machines; one with two disks, one with one disk and an additional disk
+        backend_type = BackendType()
+        backend_type.name = 'BackendType'
+        backend_type.code = 'BT'
+        backend_type.save()
         vpool = VPool()
         vpool.name = 'vpool'
-        vpool.backend_type = BackendType()
+        vpool.backend_type = backend_type
         vpool.save()
+        pmachine = PMachine()
+        pmachine.name = 'PMachine'
+        pmachine.username = 'root'
+        pmachine.ip = '127.0.0.1'
+        pmachine.hvtype = 'VMWARE'
+        pmachine.save()
         vmachine_1 = VMachine()
         vmachine_1.name = 'vmachine_1'
         vmachine_1.devicename = 'dummy'
-        vmachine_1.pmachine = PMachine()
+        vmachine_1.pmachine = pmachine
         vmachine_1.save()
         vdisk_1_1 = VDisk()
         vdisk_1_1.name = 'vdisk_1_1'
@@ -129,7 +139,7 @@ class DeleteSnapshots(TestCase):
         vmachine_2 = VMachine()
         vmachine_2.name = 'vmachine_2'
         vmachine_2.devicename = 'dummy'
-        vmachine_2.pmachine = PMachine()
+        vmachine_2.pmachine = pmachine
         vmachine_2.save()
         vdisk_2_1 = VDisk()
         vdisk_2_1.name = 'vdisk_2_1'
