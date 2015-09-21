@@ -22,7 +22,7 @@ import time
 import os
 import traceback
 from time import mktime
-from datetime import datetime
+from datetime import datetime, timedelta
 from ovs.extensions.generic.configuration import Configuration
 from ovs.celery_run import celery
 from ovs.lib.vmachine import VMachineController
@@ -89,27 +89,30 @@ class ScheduledTaskController(object):
 
         logger.info('Delete snapshots started')
 
-        day = 60 * 60 * 24
+        day = timedelta(1)
         week = day * 7
+
+        def make_timestamp(offset):
+            return int(mktime((base - offset).timetuple()))
 
         # Calculate bucket structure
         if timestamp is None:
             timestamp = time.time()
-        offset = int(mktime(datetime.fromtimestamp(timestamp).date().timetuple())) - day
+        base = datetime.fromtimestamp(timestamp).date() - day
         buckets = []
         # Buckets first 7 days: [0-1[, [1-2[, [2-3[, [3-4[, [4-5[, [5-6[, [6-7[
         for i in xrange(0, 7):
-            buckets.append({'start': offset - (day * i),
-                            'end': offset - (day * (i + 1)),
+            buckets.append({'start': make_timestamp(day * i),
+                            'end': make_timestamp(day * (i + 1)),
                             'type': '1d',
                             'snapshots': []})
         # Week buckets next 3 weeks: [7-14[, [14-21[, [21-28[
         for i in xrange(1, 4):
-            buckets.append({'start': offset - (week * i),
-                            'end': offset - (week * (i + 1)),
+            buckets.append({'start': make_timestamp(week * i),
+                            'end': make_timestamp(week * (i + 1)),
                             'type': '1w',
                             'snapshots': []})
-        buckets.append({'start': offset - (week * 4),
+        buckets.append({'start': make_timestamp(week * 4),
                         'end': 0,
                         'type': 'rest',
                         'snapshots': []})
