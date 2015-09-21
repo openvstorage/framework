@@ -229,7 +229,7 @@ class ScheduledTaskController(object):
                         continue
                 work_units = vdisk.storagedriver_client.get_scrubbing_workunits(str(vdisk.volume_id))
                 for work_unit in work_units:
-                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedriver.mountpoint_temp))
+                    scrubbing_result = _storagedriver_scrubber.scrub(work_unit, str(storagedriver.mountpoints['scrub']))
                     vdisk.storagedriver_client.apply_scrubbing_result(scrubbing_result)
             except Exception, ex:
                 failed += 1

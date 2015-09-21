@@ -96,10 +96,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['md'],
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['tmp'],
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 
@@ -137,10 +137,10 @@ class MDSServiceController(object):
                 if mds_service.vpool_guid == vpool.guid:
                     mds_nodes.append({'host': service.storagerouter.ip,
                                       'port': service.ports[0],
-                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
+                                      'db_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['md'],
                                                                                vpool.name,
                                                                                mds_service.number),
-                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
+                                      'scratch_directory': '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['temp'],
                                                                                     vpool.name,
                                                                                     mds_service.number)})
 
@@ -155,10 +155,10 @@ class MDSServiceController(object):
         cleaned = False
         while tries > 0 and cleaned is False:
             try:
-                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_md,
+                client.dir_delete(['{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['md'],
                                                             vpool.name,
                                                             this_service_number),
-                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoint_temp,
+                                   '{0}/mds_{1}_{2}'.format(storagedriver.mountpoints['tmp'],
                                                             vpool.name,
                                                             this_service_number)])
                 logger.debug('MDS files cleaned up')

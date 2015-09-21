@@ -20,6 +20,7 @@ from ovs.dal.structures import Property, Relation, Dynamic
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
+
 import time
 
 
@@ -35,19 +36,14 @@ class StorageDriver(DataObject):
                     Property('storage_ip', str, doc='IP address on which the vpool is shared to hypervisor'),
                     Property('storagedriver_id', str, doc='ID of the Storage Driver as known by the Storage Drivers.'),
                     Property('mountpoint', str, doc='Mountpoint from which the Storage Driver serves data'),
-                    Property('mountpoint_temp', str, doc='Mountpoint for temporary workload (scrubbing etc)'),
-                    Property('mountpoint_bfs', str, mandatory=False, doc='Mountpoint for backend filesystem (local or distributed fs)'),
-                    Property('mountpoint_md', str, doc='Mountpoint for metadata'),
-                    Property('mountpoint_fragmentcache', str, doc='Mountpoint for fragment cache'),
-                    Property('mountpoint_readcaches', list, doc='Read cache mountpoints'),
-                    Property('mountpoint_writecaches', list, doc='Write cache mountpoints'),
-                    Property('mountpoint_foc', str, doc='Mountpoint for failover cache'),
                     Property('startup_counter', int, default=0, doc='StorageDriver startup counter')]
     __relations = [Relation('vpool', VPool, 'storagedrivers'),
                    Relation('storagerouter', StorageRouter, 'storagedrivers')]
     __dynamics = [Dynamic('status', str, 30),
                   Dynamic('statistics', dict, 0),
-                  Dynamic('stored_data', int, 60)]
+                  Dynamic('stored_data', int, 60),
+                  Dynamic('mountpoints', dict, 3600),
+                  Dynamic('paths', dict, 3600)]
 
     def _status(self):
         """
@@ -81,3 +77,29 @@ class StorageDriver(DataObject):
         if self.vpool is not None:
             return sum([disk.info['stored'] for disk in self.vpool.vdisks])
         return 0
+
+    def _mountpoints(self):
+        """
+        Returns all mountpoint used by this storagedriver
+        """
+        result = dict()
+        for sd_partition in self.partitions:
+            if sd_partition:
+                if sd_partition.usage not in result:
+                    result[sd_partition.usage] = list()
+                else:
+                    result[sd_partition.usage].append(sd_partition.mountpoint)
+        return result
+
+    def _paths(self):
+        """
+        Returns all actual paths used by this storagedriver
+        """
+        result = dict()
+        for sd_partition in self.partitions:
+            if sd_partition:
+                if sd_partition.usage not in result:
+                    result[sd_partition.usage] = list()
+                else:
+                    result[sd_partition.usage].append(sd_partition.path)
+        return result

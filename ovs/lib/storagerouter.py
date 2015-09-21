@@ -28,6 +28,7 @@ from ovs.dal.hybrids.storagedriver import StorageDriver
 from ovs.dal.hybrids.storagerouter import StorageRouter
 from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.hybrids.j_albaproxy import AlbaProxy
+from ovs.dal.hybrids.j_storagedriverpartition import StorageDriverPartition
 from ovs.dal.hybrids.service import Service as DalService
 from ovs.dal.lists.clientlist import ClientList
 from ovs.dal.lists.vpoollist import VPoolList
@@ -36,6 +37,8 @@ from ovs.dal.lists.storagerouterlist import StorageRouterList
 from ovs.dal.lists.backendtypelist import BackendTypeList
 from ovs.dal.lists.vmachinelist import VMachineList
 from ovs.dal.lists.servicetypelist import ServiceTypeList
+from ovs.dal.lists.diskpartitionlist import DiskPartitionList
+from ovs.dal.lists.storagedriverpartitionlist import StorageDriverPartitionList
 from ovs.extensions.api.client import OVSClient
 from ovs.extensions.generic.configuration import Configuration
 from ovs.extensions.generic.system import System
@@ -93,7 +96,8 @@ class StorageRouterController(object):
         if storagerouter.pmachine.hvtype == 'KVM':
             ipaddresses = ['127.0.0.1']
         else:
-            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1", shell=True).strip().splitlines()
+            ipaddresses = check_output("ip a | grep 'inet ' | sed 's/\s\s*/ /g' | cut -d ' ' -f 3 | cut -d '/' -f 1",
+                                       shell=True).strip().splitlines()
             ipaddresses = [ip.strip() for ip in ipaddresses]
             ipaddresses.remove('127.0.0.1')
         allow_vpool = VPoolController.can_be_served_on(storagerouter_guid)
@@ -162,12 +166,17 @@ class StorageRouterController(object):
         ip = parameters['storagerouter_ip']
         vpool_name = parameters['vpool_name']
         storage_ip = parameters['storage_ip']
-        mountpoint_md = parameters['mountpoint_md']
-        mountpoint_bfs = parameters['mountpoint_bfs']
-        mountpoint_foc = parameters['mountpoint_foc']
-        mountpoint_temp = parameters['mountpoint_temp']
-        mountpoint_readcaches = parameters['mountpoint_readcaches']
-        mountpoint_writecaches = parameters['mountpoint_writecaches']
+
+        md_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_md'])
+        bfs_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_bfs'])
+        dtl_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_foc'])
+        tmp_partition = DiskPartitionList.get_partition_for(parameters['mountpoint_temp'])
+        read_partitions = list()
+        for readcache in parameters['mountpoint_readcaches']:
+            read_partitions.append(DiskPartitionList.get_partition_for(readcache))
+        write_partitions = list()
+        for writecache in parameters['mountpoint_writecaches']:
+            write_partitions.append(DiskPartitionList.get_partition_for(writecache))
 
         client = SSHClient(ip)
         root_client = SSHClient(ip, username='root')
@@ -223,7 +232,7 @@ class StorageRouterController(object):
             connection_password = parameters.get('connection_password', '')
             if vpool.backend_type.code in ['local', 'distributed']:
                 vpool.metadata = {'backend_type': 'LOCAL',
-                                  'local_connection_path': mountpoint_bfs}
+                                  'local_connection_path': bfs_partition.mountpoint}
             elif vpool.backend_type.code == 'alba':
                 if connection_host == '':
                     connection_host = StorageRouterList.get_masters()[0].ip
@@ -280,24 +289,31 @@ class StorageRouterController(object):
             vpool.description = '{0} {1}'.format(vpool.backend_type.code, vpool_name)
             vpool.save()
 
-        if len(mountpoint_readcaches) == 0:
+        if len(read_partitions) == 0:
             raise RuntimeError('No read cache mountpoints specified')
-        if len(mountpoint_writecaches) == 0:
+        if len(write_partitions) == 0:
             raise RuntimeError('No write cache mountpoints specified')
 
-        mountpoint_fcache = mountpoint_writecaches[0]
-        mountpoint_fragmentcache = mountpoint_readcaches[0] if vpool.backend_type.code == 'alba' else ''
+        mountpoint_fcache = write_partitions[0].mountpoint
+        mountpoint_fragmentcache = read_partitions[0].mountpoint if vpool.backend_type.code == 'alba' else ''
 
         # Check inodes and count the usages (to divide available space later on)
-        all_locations = set()
-        all_mountpoints = [mountpoint_bfs, mountpoint_temp, mountpoint_md, mountpoint_foc, mountpoint_fragmentcache, mountpoint_fcache] + mountpoint_readcaches + mountpoint_writecaches
+        all_mountpoints = list()
+        for disk_partition in [bfs_partition, tmp_partition, md_partition, dtl_partition]:
+            if disk_partition:
+                all_mountpoints.append(disk_partition.mountpoint)
+        all_mountpoints.append(mountpoint_fragmentcache)
+        all_mountpoints.append(mountpoint_fcache)
+
+        for read_partition in read_partitions:
+            all_mountpoints.append(read_partition.mountpoint)
+        for write_partition in write_partitions:
+            all_mountpoints.append(write_partition.mountpoint)
         for mountpoint in all_mountpoints[:]:
             if not mountpoint:  # Eg: when bfs mountpoint is not used, the value is ''
                 all_mountpoints.remove(mountpoint)
                 continue
-            all_locations.add(mountpoint)
-
-        root_client.dir_create(all_locations)
+        root_client.dir_create(set(all_mountpoints))
 
         directory_usage = {}
 
@@ -314,10 +330,10 @@ class StorageRouterController(object):
         if vpool.backend_type.code in ['local', 'distributed']:
             root_client.dir_chmod(parameters['mountpoint_bfs'], 0777)
 
-        fdcache = '{0}/fd_{1}'.format(mountpoint_foc, vpool_name)
-        failovercache = '{0}/foc_{1}'.format(mountpoint_foc, vpool_name)
-        metadatapath = '{0}/metadata_{1}'.format(mountpoint_md, vpool_name)
-        tlogpath = '{0}/tlogs_{1}'.format(mountpoint_md, vpool_name)
+        fdcache = '{0}/fd_{1}'.format(dtl_partition.mountpoint, vpool_name)
+        failovercache = '{0}/foc_{1}'.format(dtl_partition.mountpoint, vpool_name)
+        metadatapath = '{0}/metadata_{1}'.format(md_partition.mountpoint, vpool_name)
+        tlogpath = '{0}/tlogs_{1}'.format(md_partition.mountpoint, vpool_name)
         rsppath = '{0}/{1}'.format(client.config_read('ovs.storagedriver.rsp'), vpool_name)
 
         dirs2create = [failovercache, metadatapath, tlogpath, rsppath]
@@ -341,7 +357,7 @@ class StorageRouterController(object):
             else:
                 available_size = os.statvfs(mountpoint).f_bavail * os.statvfs(mountpoint).f_bsize / count
 
-            if mountpoint in mountpoint_readcaches:
+            if mountpoint in parameters['mountpoint_readcaches']:
                 if mountpoint == mountpoint_fragmentcache and vpool.backend_type.code == 'alba':
                     # Multiply by 2 again because we don't want to divide available space evenly between
                     # fragment cache and readcache
@@ -359,7 +375,7 @@ class StorageRouterController(object):
                 directory_usage[inode].append({'type': 'cache',
                                                'metadata': {'type': 'read'},
                                                'size': r_size * 1024})
-            elif mountpoint in mountpoint_writecaches:
+            elif mountpoint in parameters['mountpoint_writecaches']:
                 w_size = int(available_size * .98 / 1024 / 4096) * 4096
                 dir2create = '{0}/sco_{1}'.format(mountpoint, vpool_name)
                 writecaches.append({'path': dir2create,
@@ -375,15 +391,6 @@ class StorageRouterController(object):
         if vpool.backend_type.code == 'alba' and frag_size is None:
             raise ValueError('Something went wrong trying to calculate the fragment cache size')
 
-        logger.info('readcaches: {0}'.format(readcaches))
-        logger.info('writecaches: {0}'.format(writecaches))
-        logger.info('mountpoint_temp: {0}'.format(mountpoint_temp))
-        logger.info('mountpoint_md: {0}'.format(mountpoint_md))
-        logger.info('mountpoint_foc: {0}'.format(mountpoint_foc))
-        logger.info('mountpoint_fragmentcache: {0}'.format(mountpoint_fragmentcache))
-        logger.info('mountpoint_fcache: {0}'.format(mountpoint_fcache))
-        logger.info('mountpoint_readcaches: {0}'.format(mountpoint_readcaches))
-        logger.info('mountpoint_writecaches: {0}'.format(mountpoint_writecaches))
         logger.info('all_locations: {0}'.format(mountpoint_count_mapping.keys()))
 
         model_ports_in_use = []
@@ -472,13 +479,18 @@ class StorageRouterController(object):
         storagedriver.description = storagedriver.name
         storagedriver.storagerouter = storagerouter
         storagedriver.storagedriver_id = vrouter_id
-        storagedriver.mountpoint_md = mountpoint_md
-        storagedriver.mountpoint_foc = mountpoint_foc
-        storagedriver.mountpoint_bfs = mountpoint_bfs
-        storagedriver.mountpoint_temp = mountpoint_temp
-        storagedriver.mountpoint_readcaches = mountpoint_readcaches
-        storagedriver.mountpoint_writecaches = mountpoint_writecaches
-        storagedriver.mountpoint_fragmentcache = mountpoint_fragmentcache
+        storagedriver.save()
+        md_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, md_partition, 'md')
+        dtl_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'dtl')
+        bfs_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'bfs')
+        tmp_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'tmp')
+        readcaches_sdps = list()
+        for read_partition in read_partitions:
+            readcaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, read_partition, 'read'))
+        writecaches_sdps = list()
+        for write_partition in write_partitions:
+            writecaches_sdps.append(StorageRouterController._get_storagedriverpartition(storagedriver, write_partition, 'write'))
+        fragment_sdp = StorageRouterController._get_storagedriverpartition(storagedriver, dtl_partition, 'fragment')
         storagedriver.save()
 
         config_dir = '{0}/storagedriver/storagedriver'.format(client.config_read('ovs.core.cfgdir'))
@@ -605,29 +617,40 @@ class StorageRouterController(object):
         storagedriver_config.save(client, reload_config=False)
 
         DiskController.sync_with_reality(storagerouter.guid)
-        for mountpoint, usage in {mountpoint_md: {'type': 'metadata',
-                                                  'metadata': {}},
-                                  mountpoint_foc: {'type': 'cache',
-                                                   'metadata': {'type': 'foc'}},
-                                  mountpoint_bfs: {'type': 'backend',
-                                                   'metadata': {'type': 'local'}},
-                                  mountpoint_temp: {'type': 'temp',
-                                                    'metadata': {}}}.iteritems():
-            if not mountpoint:
-                continue
-            inode = os.stat(mountpoint).st_dev
-            if inode not in directory_usage:
-                directory_usage[inode] = []
-            usage['size'] = None
-            directory_usage[inode].append(usage)
-        for inode in directory_usage:
-            for usage in directory_usage[inode]:
-                usage['relation'] = ('storagedriver', storagedriver.guid)
-        for disk in storagerouter.disks:
-            for partition in disk.partitions:
-                if partition.inode is not None and partition.inode in directory_usage:
-                    partition.usage += directory_usage[partition.inode]
-                    partition.save()
+
+        # mountpoint_usage = dict()
+        # for disk_partition in StorageDriverPartitionList.get_partitions_by_storagedriver(storagedriver):
+        #     if disk_partition:
+        #         if disk_partition.usage == 'dtl':
+        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'cache',
+        #                                                            'metadata': {'type': 'foc'}}
+        #         elif disk_partition.usage == 'local':
+        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'backend',
+        #                                                            'metadata': {'type': 'local'}},
+        #         elif disk_partition.usage == 'md':
+        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'metadata',
+        #                                                            'metadata': {}},
+        #         elif disk_partition.usage == 'temp':
+        #             mountpoint_usage[disk_partition.mountpoint] = {'type': 'temp',
+        #                                                            'metadata': {}},
+
+        # for mountpoint, usage in mountpoint_usage.iteritems():
+        #     if not mountpoint:
+        #         continue
+        #     inode = os.stat(mountpoint).st_dev
+        #     if inode not in directory_usage:
+        #         directory_usage[inode] = []
+        #     usage['size'] = None
+        #     directory_usage[inode].append(usage)
+        # for inode in directory_usage:
+        #     for usage in directory_usage[inode]:
+        #         usage['relation'] = ('storagedriver', storagedriver.guid)
+        # for disk_partition in StorageDriverPartitionList.get_partitions_by_storagedriver(storagedriver):
+        # # for disk in storagerouter.disks:
+        # #     for partition in disk.partitions:
+        #     if disk_partition.partition.inode is not None and disk_partition.partition.inode in directory_usage:
+        #         partition.usage += directory_usage[partition.inode]
+        #         partition.save()
 
         MDSServiceController.prepare_mds_service(client, storagerouter, vpool, reload_config=False)
 
@@ -1354,3 +1377,22 @@ class StorageRouterController(object):
         ports = System.get_free_ports(port_range, ports_in_use, number, client)
 
         return ports if number != 1 else ports[0]
+
+    @staticmethod
+    def _get_storagedriverpartition(storagedriver, partition, usage):
+        """
+        Returns new storagedriver partition object with correct number
+        """
+        highest_number = 0
+        for existing_sdp in StorageDriverPartitionList.get_partitions_by_storagedriver(storagedriver):
+            if existing_sdp.storagedriver.mountpoint == storagedriver.mountpoint and existing_sdp.usage == usage:
+                    highest_number = max(existing_sdp.number, highest_number)
+        sdp = StorageDriverPartition()
+        sdp.number = highest_number + 1
+        sdp.storagedriver = storagedriver
+        sdp.partition = partition
+        sdp.usage = usage
+        sdp.save()
+
+        return sdp
+
