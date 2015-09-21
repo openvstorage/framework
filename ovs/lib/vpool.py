@@ -124,7 +124,7 @@ class VPoolController(object):
 
         return {'sco_size': sco_size,
                 'dtl_mode': dtl_mode,
-                'dtl_enabled': dtl_enabled,  # @TODO: Must be boolean value once implemented correctly
+                'dtl_enabled': dtl_enabled,
                 'dedupe_mode': dedupe_mapping[dedupe_mode],
                 'write_buffer': write_buffer,
                 'dtl_location': dtl_location,

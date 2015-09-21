@@ -96,6 +96,7 @@ define([
                 })
                     .then(self.shared.tasks.wait)
                     .done(function () {
+                        vd.updateConfiguration();
                         generic.alertSuccess(
                             $.t('ovs:vdisks.saveconfig.done'),
                             $.t('ovs:vdisks.saveconfig.donemsg', { what: vd.name() })
@@ -104,9 +105,8 @@ define([
                     .fail(function (error) {
                         generic.alertError(
                             $.t('ovs:generic.error'),
-                            $.t('ovs:generic.messages.errorwhile_error', {
-                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() }),
-                                error: error
+                            $.t('ovs:generic.messages.errorwhile', {
+                                what: $.t('ovs:vdisks.saveconfig.errormsg', { what: vd.name() })
                             })
                         );
                     });

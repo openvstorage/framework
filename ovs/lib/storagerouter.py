@@ -142,7 +142,7 @@ class StorageRouterController(object):
                            'mountpoint_writecaches': (list, Toolbox.regex_mountpoint)}
         required_params_for_new_vpool = {'type': (str, ['local', 'distributed', 'alba', 'ceph_s3', 'amazon_s3', 'swift_s3']),
                                          'config_params': (dict, {'dtl_mode': (str, dtl_mode_mapping.keys()),
-                                                                  'sco_size': (int, None),
+                                                                  'sco_size': (int, [4, 8, 16, 32, 64, 128]),
                                                                   'dedupe_mode': (str, dedupe_mapping.keys()),
                                                                   'dtl_enabled': (bool, None),
                                                                   'dtl_location': (str, None),

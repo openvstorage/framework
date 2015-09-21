@@ -25,6 +25,7 @@ define([
 
         // Handles
         self.loadHandle       = undefined;
+        self.loadConfig       = undefined;
         self.loadParentConfig = undefined;
 
         // External dependencies
@@ -255,7 +256,7 @@ define([
         };
         self.loadConfiguration = function() {
             return $.Deferred(function(deferred) {
-                self.loadParentConfig = api.get('vpools/' + self.vpoolGuid() + '/get_configuration')
+                self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
                     .then(self.shared.tasks.wait)
                     .done(function(data) {
                         if (data.write_buffer !== undefined) {
@@ -273,6 +274,20 @@ define([
         self.loadAllConfigurations = function() {
             self.loadConfiguration();
             self.loadParentConfiguration();
+        };
+        self.updateConfiguration = function() {
+            return $.Deferred(function(deferred) {
+                self.loadConfig = api.get('vdisks/' + self.guid() + '/get_config_params')
+                    .then(self.shared.tasks.wait)
+                    .done(function(data) {
+                        if (data.write_buffer !== undefined) {
+                            data.write_buffer = Math.round(data.write_buffer);
+                        }
+                        self.oldConfiguration(data);
+                        deferred.resolve();
+                    })
+                    .fail(deferred.reject);
+            }).promise();
         };
     };
 });

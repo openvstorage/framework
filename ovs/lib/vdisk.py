@@ -21,25 +21,33 @@ import os
 import time
 from subprocess import check_output
 
-from ovs.lib.helpers.decorators import log
 from ovs.celery_run import celery
 from ovs.dal.hybrids.vdisk import VDisk
 from ovs.dal.hybrids.vmachine import VMachine
 from ovs.dal.hybrids.pmachine import PMachine
 from ovs.dal.hybrids.storagedriver import StorageDriver
+from ovs.dal.hybrids.vpool import VPool
 from ovs.dal.lists.vdisklist import VDiskList
 from ovs.dal.lists.storagedriverlist import StorageDriverList
 from ovs.dal.lists.vpoollist import VPoolList
 from ovs.dal.lists.pmachinelist import PMachineList
 from ovs.dal.lists.mgmtcenterlist import MgmtCenterList
-from ovs.dal.hybrids.vpool import VPool
+from ovs.extensions.generic.sshclient import SSHClient
+from ovs.extensions.generic.volatilemutex import VolatileMutex
 from ovs.extensions.hypervisor.factory import Factory
 from ovs.extensions.storageserver.storagedriver import StorageDriverClient
-from ovs.log.logHandler import LogHandler
+from ovs.extensions.storageserver.storagedriver import StorageDriverConfiguration
+from ovs.lib.helpers.decorators import log
+from ovs.lib.helpers.toolbox import Toolbox
 from ovs.lib.mdsservice import MDSServiceController
-from ovs.extensions.generic.volatilemutex import VolatileMutex
+from ovs.log.logHandler import LogHandler
 from volumedriver.storagerouter import storagerouterclient
-from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig, MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import ClusterContact
+from volumedriver.storagerouter.storagerouterclient import MDSMetaDataBackendConfig
+from volumedriver.storagerouter.storagerouterclient import MDSNodeConfig
+from volumedriver.storagerouter.storagerouterclient import ReadCacheBehaviour
+from volumedriver.storagerouter.storagerouterclient import ReadCacheMode
+from volumedriver.storagerouter.storagerouterclient import StorageRouterClient
 
 logger = LogHandler.get('lib', name='vdisk')
 storagerouterclient.Logger.setupLogging(LogHandler.load_path('storagerouterclient'))
@@ -463,15 +471,118 @@ class VDiskController(object):
             mutex.release()
 
     @staticmethod
+    @celery.task(name='ovs.vdisk.get_config_params')
+    def get_config_params(vdisk_guid):
+        """
+        Retrieve the configuration parameters for the given disk from the storagedriver.
+        """
+        cache_mapping = {ReadCacheBehaviour.NO_CACHE: 'none',
+                         ReadCacheBehaviour.CACHE_ON_READ: 'onread',
+                         ReadCacheBehaviour.CACHE_ON_WRITE: 'onwrite'}
+        dedupe_mapping = {ReadCacheMode.CONTENT_BASED: 'dedupe',
+                          ReadCacheMode.LOCATION_BASED: 'nondedupe'}
+        dtl_mode_mapping = {'': 'sync',
+                            '': 'async',
+                            '': 'nosync'}
+
+        vdisk = VDisk(vdisk_guid)
+        vpool = VPool(vdisk.vpool_guid)
+        cluster_contacts = []
+        for storagedriver in vpool.storagedrivers[:3]:
+            cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports[1]))
+
+        vdisk_client = StorageRouterClient(vpool.guid, cluster_contacts)
+        vpool_client = SSHClient(vpool.storagedrivers[0].storagerouter)
+
+        storagedriver_config = StorageDriverConfiguration('storagedriver', vpool.name)
+        storagedriver_config.load(vpool_client)
+
+        volume_id = str(vdisk.volume_id)
+        volume_manager = storagedriver_config.configuration.get('volume_manager', {})
+        sco_size = vdisk_client.get_sco_multiplier(volume_id) / 1024 * 4
+        dedupe_mode = dedupe_mapping[vdisk_client.get_readcache_mode(volume_id)]
+        cache_strategy = cache_mapping[vdisk_client.get_readcache_behaviour(volume_id)]
+        tlog_multiplier = vdisk_client.get_tlog_multiplier(volume_id)
+        non_disposable_sco_factor = vdisk_client.get_sco_cache_max_non_disposable_factor(volume_id)
+
+        if dedupe_mode is None:
+            dedupe_mode = volume_manager.get('read_cache_default_mode', 'ContentBased')
+            dedupe_mode = {'ContentBased': 'dedupe',
+                           'LocationBased': 'nondedupe'}[dedupe_mode]
+        if cache_strategy is None:
+            cache_strategy = volume_manager.get('read_cache_default_behaviour', 'CacheOnRead')
+            cache_strategy = {'None': 'none',
+                              'CacheOnRead': 'onread',
+                              'CacheOnWrite': 'onwrite'}[cache_strategy]
+        if tlog_multiplier is None:
+            tlog_multiplier = volume_manager.get('number_of_scos_in_tlog', 20)
+        if non_disposable_sco_factor is None:
+            non_disposable_sco_factor = volume_manager.get('non_disposable_scos_factor', 12)
+
+        write_buffer = tlog_multiplier * sco_size * non_disposable_sco_factor / 1024.0  # SCO size is in MiB, but write buffer must be GiB
+
+        return {'sco_size': sco_size,
+                'dtl_mode': None,
+                'dtl_enabled': False,
+                'dedupe_mode': dedupe_mode,
+                'write_buffer': write_buffer,
+                'dtl_location': None,
+                'cache_strategy': cache_strategy}
+
+    @staticmethod
     @celery.task(name='ovs.vdisk.set_config_params')
     def set_config_params(vdisk_guid, new_config_params, old_config_params):
         """
         Sets configuration parameters for a given vdisk.
         """
+        cache_mapping = {'none': ReadCacheBehaviour.NO_CACHE,
+                         'onread': ReadCacheBehaviour.CACHE_ON_READ,
+                         'onwrite': ReadCacheBehaviour.CACHE_ON_WRITE}
+        dedupe_mapping = {'dedupe': ReadCacheMode.CONTENT_BASED,
+                          'nondedupe': ReadCacheMode.LOCATION_BASED}
+        dtl_mode_mapping = {'sync': '',
+                            'async': '',
+                            'nosync': ''}
+        required_params = {
+                           # 'dtl_mode': (str, dtl_mode_mapping.keys()),
+                           'sco_size': (int, [4, 8, 16, 32, 64, 128]),
+                           'dedupe_mode': (str, dedupe_mapping.keys()),
+                           'dtl_enabled': (bool, None),
+                           # 'dtl_location': (str, None),
+                           'write_buffer': (int, None, False),
+                           'cache_strategy': (str, cache_mapping.keys())}
+
+        Toolbox.verify_required_params(required_params, new_config_params)
+        Toolbox.verify_required_params(required_params, old_config_params)
+
+        vdisk = VDisk(vdisk_guid)
+        vpool = VPool(vdisk.vpool_guid)
+        cluster_contacts = []
+        for storagedriver in vpool.storagedrivers[:3]:
+            cluster_contacts.append(ClusterContact(str(storagedriver.cluster_ip), storagedriver.ports[1]))
+        client = StorageRouterClient(vpool.guid, cluster_contacts)
+
+        volume_id = str(vdisk.volume_id)
         for key, old_value in old_config_params.iteritems():
-            new_value = new_config_params.get(key)
+            new_value = new_config_params[key]
             if new_value != old_value:
-                logger.info('Updating property {0} on vDisk {1} from {2} to {3}'.format(key, vdisk_guid, old_value, new_value))
+                try:
+                    logger.info('Updating property {0} on vDisk {1} from {2} to {3}'.format(key, vdisk_guid, old_value, new_value))
+                    if key == 'cache_strategy':
+                        client.set_readcache_behaviour(volume_id, cache_mapping[new_value])
+                    elif key == 'dedupe_mode':
+                        client.set_readcache_mode(volume_id, dedupe_mapping[new_value])
+                    elif key == 'sco_size':
+                        client.set_sco_multiplier(volume_id, new_value / 4 * 1024)
+                    elif key == 'write_buffer':
+                        tlog_multiplier = client.get_tlog_multiplier(volume_id) or 20
+                        client.set_sco_cache_max_non_disposable_factor(volume_id, new_value * 1024 / tlog_multiplier / new_config_params['sco_size'])
+                    else:
+                        raise KeyError('Unsupported property provided: "{0}"'.format(key))
+                    logger.info('Updated property {0}'.format(key))
+                except Exception as ex:
+                    logger.error('Error updating "{0}": {1}'.format(key, ex))
+                    raise ex
 
     @staticmethod
     def sync_with_mgmtcenter(disk, pmachine, storagedriver):
